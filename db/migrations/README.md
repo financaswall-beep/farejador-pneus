@@ -138,6 +138,30 @@ caixa ou conta a receber. `À vista` passa a significar pagamento no acerto da c
 recebimento já acertado pela Matriz, sem abrir permissão para alterar quantidade,
 valor, venda ou pagamento.
 
+`0189_checkout_price_negotiation.sql` separa preço tabelado de preço negociado no
+Caixa, congela o valor efetivamente vendido e preserva permissão do dono sobre a tabela.
+
+`0190_finance_audit_consistency.sql` fecha as invariantes causais e matemáticas do
+Financeiro e amplia a reconciliação entre fatos operacionais, contas e ledger.
+
+`0191_logistics_audit_corrections.sql` protege entrega, reentrega, comprovantes,
+reservas e competência financeira da Logística.
+
+`0192_team_employment_and_payroll_integrity.sql` e
+`0193_partner_staff_employment_rollovers.sql` preservam períodos de emprego,
+permissões e cálculos de folha/comissão na Matriz e no parceiro.
+
+`0194_network_audit_corrections.sql` fecha candidatura, aprovação, cobertura e
+roteamento da Rede; `0195_network_municipality_catalog.sql` substitui cidade livre
+por catálogo oficial e protege a cobertura no banco.
+
+`0196_customer_lead_board.sql` torna o funil de Clientes versionado, auditável e
+recuperável, sem confundir movimentação manual com venda realizada.
+
+`0197_catalog_integrity.sql` alinha Catálogo, Caixa e estoque: exige preço positivo
+em todas as fontes, impede variantes e janelas duplicadas e preserva o histórico de
+preço publicado em produção.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

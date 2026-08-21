@@ -105,6 +105,28 @@ export async function getCatalogOverview(
     const purchase = tireSizeKey(product.tire_size) ? lastPurchase.get(key) : undefined;
     const cost = state.unit_cost;
     const price = product.price_amount === null ? null : Number(product.price_amount);
+    const usablePrice = price !== null && Number.isFinite(price) && price > 0;
+    if (product.product_type === 'service') {
+      return {
+        ...product,
+        compatibility_count: 0,
+        row_key: `product:${product.product_id}`,
+        catalogued: true,
+        price_amount: price,
+        official_quantity_on_hand: null,
+        official_quantity_reserved: null,
+        total_stock_available: null,
+        official_unit_cost: null,
+        stock_source: null,
+        stock_updated_at: null,
+        last_purchase_cost: null,
+        last_purchase_at: null,
+        gross_profit: null,
+        margin_percent: null,
+        sellable: usablePrice,
+        block_reason: usablePrice ? null : 'catalog_price_missing',
+      };
+    }
     return {
       ...product,
       compatibility_count: Number(product.compatibility_count ?? 0),
@@ -119,10 +141,12 @@ export async function getCatalogOverview(
       stock_updated_at: officialStock?.updated_at ?? null,
       last_purchase_cost: purchase ? Number(purchase.unit_cost) : null,
       last_purchase_at: purchase?.purchased_at ?? null,
-      gross_profit: price !== null && cost !== null ? (moneyCents(price) - moneyCents(cost)) / 100 : null,
-      margin_percent: price && cost !== null ? ((price - cost) / price) * 100 : null,
-      sellable: state.sellable && price !== null,
-      block_reason: price === null ? 'catalog_price_missing' : state.block_reason,
+      gross_profit: usablePrice && cost !== null
+        ? (moneyCents(price) - moneyCents(cost)) / 100 : null,
+      margin_percent: usablePrice && cost !== null
+        ? ((moneyCents(price) - moneyCents(cost)) / moneyCents(price)) * 100 : null,
+      sellable: state.sellable && usablePrice,
+      block_reason: usablePrice ? state.block_reason : 'catalog_price_missing',
     };
   });
   const stockOnlyRows = stock.rows
@@ -171,8 +195,9 @@ export async function getCatalogOverview(
       products: catalogRows.length,
       stock_only: stockOnlyRows.length,
       brands: brands.length,
-      without_price: rows.filter((row) => row.price_amount === null).length,
-      with_stock: rows.filter((row) => row.total_stock_available > 0).length,
+      without_price: rows.filter((row) => row.price_amount === null
+        || !Number.isFinite(Number(row.price_amount)) || Number(row.price_amount) <= 0).length,
+      with_stock: rows.filter((row) => Number(row.total_stock_available ?? 0) > 0).length,
     },
     brands,
     rows,
@@ -209,7 +234,11 @@ export async function setCatalogPrice(
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
   if (!Number.isFinite(input.priceAmount) || input.priceAmount <= 0) throw new Error('catalog_price_invalid');
+  if (Math.abs(input.priceAmount * 100 - moneyCents(input.priceAmount)) >= 1e-7) {
+    throw new Error('catalog_price_cent_precision');
+  }
   if (reason.length < 2) throw new Error('catalog_price_reason_required');
+  const normalizedPrice = moneyCents(input.priceAmount) / 100;
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -222,7 +251,7 @@ export async function setCatalogPrice(
       [environment, input.productId],
     );
     const official = current.rows[0] ? Number(current.rows[0].price_amount) : null;
-    if (official !== null && Math.round(official * 100) === Math.round(input.priceAmount * 100)) {
+    if (official !== null && moneyCents(official) === moneyCents(normalizedPrice)) {
       await client.query('COMMIT');
       return { changed: false, price_id: current.rows[0]!.id, price_amount: official };
     }
@@ -236,7 +265,7 @@ export async function setCatalogPrice(
       `INSERT INTO commerce.matriz_product_prices
          (environment,product_id,price_amount,currency,valid_from)
        VALUES ($1,$2,$3,'BRL',now()) RETURNING id`,
-      [environment, input.productId, input.priceAmount],
+      [environment, input.productId, normalizedPrice],
     );
     const priceId = inserted.rows[0]!.id;
     await client.query(
@@ -244,10 +273,10 @@ export async function setCatalogPrice(
          (environment,domain,entity_table,entity_id,event_type,actor_label,payload_before,payload_after)
        VALUES ($1,'catalog','commerce.matriz_product_prices',$2,'catalog_price_changed',$3,$4::jsonb,$5::jsonb)`,
       [environment, priceId, input.actorLabel, JSON.stringify({ active_prices: current.rows }),
-       JSON.stringify({ product_id: input.productId, price_amount: input.priceAmount, reason })],
+       JSON.stringify({ product_id: input.productId, price_amount: normalizedPrice, reason })],
     );
     await client.query('COMMIT');
-    return { changed: true, price_id: priceId, price_amount: input.priceAmount };
+    return { changed: true, price_id: priceId, price_amount: normalizedPrice };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

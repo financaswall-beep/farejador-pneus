@@ -3,6 +3,7 @@ const CATALOGO_KNOWN_BRANDS = Object.freeze([
   'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
   'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
 ]);
+const catalogoMoneyValue = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 window.PAINEL_MODULES.catalogo = function () {
   return {
     async loadCatalogo() {
@@ -32,7 +33,7 @@ window.PAINEL_MODULES.catalogo = function () {
       return this.catalogoRows.filter((row) => {
         if (this.catalogoMarca !== 'todas' && row.brand !== this.catalogoMarca) return false;
         if (this.catalogoFiltro === 'estoque' && Number(row.total_stock_available ?? row.official_quantity_on_hand ?? 0) <= 0) return false;
-        if (this.catalogoFiltro === 'sem_preco' && row.price_amount != null) return false;
+        if (this.catalogoFiltro === 'sem_preco' && Number(row.price_amount) > 0) return false;
         if (!search) return true;
         return [row.product_code, row.product_name, row.brand, row.tire_size,
           this.catalogoConditionLabel(row.tire_condition)]
@@ -94,7 +95,8 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoOpen(row) {
-      if (this.catalogoIsUnknownBrand(row?.brand)) {
+      if (this.adminUser?.role !== 'owner') return;
+      if (row?.product_type === 'tire' && this.catalogoIsUnknownBrand(row?.brand)) {
         this.catalogoBrandCorrectionOpen(row);
         return;
       }
@@ -115,7 +117,7 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     catalogoCreateOpen(row) {
-      if (!row || row.catalogued !== false) return;
+      if (this.adminUser?.role !== 'owner' || !row || row.catalogued !== false) return;
       const brandCode = String(row.brand || '').normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '')
         .slice(0, 3).toUpperCase() || 'PNE';
@@ -146,7 +148,7 @@ window.PAINEL_MODULES.catalogo = function () {
 
     catalogoCreateCanSave() {
       const form = this.catalogoCadastro.form;
-      return !this.catalogoCadastro.saving
+      return this.adminUser?.role === 'owner' && !this.catalogoCadastro.saving
         && /^[A-Z0-9][A-Z0-9._/-]{1,79}$/.test(String(form.product_code || '').trim().toUpperCase())
         && String(form.product_name || '').trim().length >= 2;
     },
@@ -160,7 +162,8 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoCreateSave() {
-      if (!this.catalogoCreateCanSave() || !this.catalogoCadastro.row) return;
+      if (this.adminUser?.role !== 'owner'
+        || !this.catalogoCreateCanSave() || !this.catalogoCadastro.row) return;
       const row = this.catalogoCadastro.row;
       const form = this.catalogoCadastro.form;
       this.catalogoCadastro.saving = true;
@@ -222,42 +225,39 @@ window.PAINEL_MODULES.catalogo = function () {
     catalogoNovoPreco() {
       return Number(this.catalogoPriceForm.price || 0);
     },
-
     catalogoLucro() {
       if (this.catalogoSelecionado?.official_unit_cost == null) return null;
-      const cost = Number(this.catalogoSelecionado?.official_unit_cost);
-      const price = this.catalogoNovoPreco();
+      const cost = catalogoMoneyValue(this.catalogoSelecionado?.official_unit_cost);
+      const price = catalogoMoneyValue(this.catalogoNovoPreco());
       return Number.isFinite(cost) && price > 0 ? price - cost : null;
     },
-
     catalogoMargem() {
       const profit = this.catalogoLucro();
-      const price = this.catalogoNovoPreco();
+      const price = catalogoMoneyValue(this.catalogoNovoPreco());
       return profit == null || price <= 0 ? null : (profit / price) * 100;
     },
-
     catalogoPrecoMinimo() {
       if (this.catalogoSelecionado?.official_unit_cost == null) return null;
-      const cost = Number(this.catalogoSelecionado?.official_unit_cost);
+      const cost = catalogoMoneyValue(this.catalogoSelecionado?.official_unit_cost);
       return Number.isFinite(cost) && cost > 0 ? cost / 0.65 : null;
     },
-
     catalogoApplyMargin(percent) {
       if (this.catalogoSelecionado?.official_unit_cost == null) return;
-      const cost = Number(this.catalogoSelecionado?.official_unit_cost);
+      const cost = catalogoMoneyValue(this.catalogoSelecionado?.official_unit_cost);
       if (!Number.isFinite(cost) || cost <= 0 || percent >= 100) return;
       this.catalogoPriceForm.price = (cost / (1 - percent / 100)).toFixed(2);
       this.catalogoPriceForm.marginPreset = percent;
     },
-
     catalogoPodeSalvar() {
-      return !this.catalogoSaving
-        && this.catalogoNovoPreco() > 0
+      const price = this.catalogoNovoPreco();
+      return this.adminUser?.role === 'owner' && !this.catalogoSaving
+        && price > 0 && Math.abs(price * 100 - Math.round(price * 100)) < 1e-7
         && String(this.catalogoPriceForm.reason || '').trim().length >= 2;
     },
 
     async catalogoSavePrice() {
-      if (!this.catalogoSelecionado || !this.catalogoPodeSalvar()) return;
+      if (this.adminUser?.role !== 'owner'
+        || !this.catalogoSelecionado || !this.catalogoPodeSalvar()) return;
       this.catalogoSaving = true;
       this.catalogoMessage = null;
       const productId = this.catalogoSelecionado.product_id;

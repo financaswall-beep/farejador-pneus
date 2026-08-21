@@ -9,7 +9,9 @@ import { operatorLabel } from './route-helpers.js';
 
 const productParams = z.object({ product_id: z.string().uuid() });
 const priceBody = z.object({
-  price_amount: z.number().positive().max(9_999_999.99),
+  price_amount: z.number().positive().max(9_999_999.99)
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+      'catalog_price_cent_precision'),
   reason: z.string().trim().min(2).max(500),
 });
 const createProductBody = z.object({

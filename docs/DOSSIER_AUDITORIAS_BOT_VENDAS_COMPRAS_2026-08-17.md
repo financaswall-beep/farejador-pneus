@@ -1,10 +1,16 @@
-# Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística e Equipe
+# Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística, Equipe, Rede, Clientes e Catálogo
 
 **Data da revisão:** 21/08/2026
 **Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro e Equipe.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
 **Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. As migrations de Equipe `0192` e `0193` foram aplicadas e reconciliadas em 21/08/2026, antes do deploy do runtime correspondente. A release de código de Equipe é rastreada pela PR `#66`.
+
+**Auditoria atual do Catálogo:** concluída em código e banco descartável em 21/08/2026.
+A migration aditiva `0197` foi aplicada no banco-alvo depois de backup validado, dry-run e
+reconciliação 8/8 zerada. O código ainda depende de publicação e deploy manual. A auditoria
+somente leitura encontrou apenas um produto de teste sem preço, corretamente impedido de vender.
+Relatório: `docs/AUDITORIA_CATALOGO_PONTA_A_PONTA_2026-08-21.md`.
 
 **Atualização de continuidade em 20/08/2026:** o repositório está em `main` no SHA
 `2064f1a`. A migration `0189_checkout_price_negotiation.sql` foi confirmada
@@ -815,3 +821,35 @@ coordenada, sem registrar seus valores neste documento.
 **Veredito:** Clientes aprovada em código, banco e deploy técnico. Restam reautorizar a Meta,
 rotacionar os segredos, validar um contato novo e concluir o smoke visual autenticado. Relatório:
 `docs/AUDITORIA_CLIENTES_PONTA_A_PONTA_2026-08-21.md`.
+
+## 17. Auditoria concluída em código — Catálogo da Matriz e preços do parceiro
+
+Catálogo foi cruzado com Caixa, Bot, Vendas, Compras, Estoque, Financeiro, Logística, Rede
+e PDV do parceiro. A auditoria confirmou a separação correta entre preço oficial da Matriz,
+preço comercial da Rede, preço local do parceiro e preço negociado/congelado em cada venda.
+
+Foram corrigidos: mutações visíveis a funcionário, fração silenciosa de centavo, preço zero,
+serviço tratado como pneu físico, divergência entre custo fracionário e margem em moeda,
+duplicidade de variante, sobreposição concorrente de preço, mutabilidade do histórico e um
+caminho da compra do parceiro que ainda aceitava preço de revenda zero.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos | **1.267/1.267**, 255 arquivos |
+| Integração completa | **267/267**, 51 arquivos |
+| PostgreSQL específico da `0197` | **3/3** |
+| TypeScript, build e migrations | aprovados; **198 migrations**, última `0197` |
+| Painéis | parceiro 597 propriedades; Matriz 1.100; 93 contratos; 240 rotas |
+| Segurança de dependências | zero vulnerabilidades altas ou superiores |
+| Banco-alvo somente leitura | zero duplicidade, sobreposição, preço inválido, órfão de estoque ou cruzamento de ambiente |
+
+**Pendência comercial segura:** `TEC-909018-MV` não tem preço vigente e permanece bloqueado
+para venda. Não impede a migration nem os outros produtos.
+
+**Veredito:** Catálogo aprovado em código, matemática, integração, segurança, banco-alvo e
+auditoria somente leitura. A `0197` foi aplicada depois do backup restaurável de 5.018.607
+bytes, 2.658 entradas e SHA-256 validado; o dry-run, o commit e a reconciliação passaram.
+Ainda não está implantado: faltam publicação, deploy manual e smoke autenticado. Depois do Catálogo, a auditoria setorial
+profunda ainda pendente é **Marketing**; em seguida vêm os gates finais de produção,
+incluindo smoke autenticado geral, rotação dos segredos expostos, reautorização da Meta e
+decisão formal de go-live.

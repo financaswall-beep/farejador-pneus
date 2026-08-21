@@ -59,7 +59,8 @@ export const partnerPurchaseSchema = z.object({
     tire_condition: z.enum(['meia_vida', 'novo', 'remold']),
     quantity: z.number().int().positive().max(999_999),
     unit_cost: centMoneySchema,
-    sale_price: centMoneySchema.nullable().optional(),
+    sale_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive')
+      .nullable().optional(),
   })).min(1),
 }).superRefine((data, ctx) => {
   if (data.payment_status === 'payable' && !data.payable_due_date?.trim()) {

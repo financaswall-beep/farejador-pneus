@@ -207,7 +207,8 @@ const stockSchema = z.object({
   quantity_on_hand: z.number().int().nonnegative().nullable().optional(),
   minimum_quantity: z.number().int().nonnegative().nullable().optional(),
   average_cost: sixDecimalCostSchema.nullable().optional(),
-  sale_price: centMoneySchema.nullable().optional(),
+  sale_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive')
+    .nullable().optional(),
   // Campos do refit da tela de estoque (migration 0073).
   tire_condition: z.enum(['meia_vida', 'novo', 'remold']).nullable().optional(),
   shelf_location: z.string().max(60).nullable().optional(),

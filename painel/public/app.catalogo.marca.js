@@ -11,7 +11,7 @@ window.PAINEL_MODULES.catalogoMarca = function () {
       return !key || key === 'semmarca';
     },
     catalogoBrandCorrectionOpen(row) {
-      if (!row) return;
+      if (this.adminUser?.role !== 'owner' || !row || row.product_type === 'service') return;
       this.catalogoSelecionado = null;
       this.catalogoCadastro.open = false;
       this.catalogoCompatibilidade.open = false;
@@ -57,12 +57,13 @@ window.PAINEL_MODULES.catalogoMarca = function () {
     catalogoBrandCorrectionCanSave() {
       const form = this.catalogoMarcaCorrecao;
       const target = brandKey(form.to_brand);
-      return !form.saving && !form.result && form.confirmed && target && target !== 'semmarca'
+      return this.adminUser?.role === 'owner'
+        && !form.saving && !form.result && form.confirmed && target && target !== 'semmarca'
         && target !== brandKey(form.from_brand)
         && String(form.reason || '').trim().length >= 2;
     },
     async catalogoBrandCorrectionSave() {
-      if (!this.catalogoBrandCorrectionCanSave()) return;
+      if (this.adminUser?.role !== 'owner' || !this.catalogoBrandCorrectionCanSave()) return;
       const form = this.catalogoMarcaCorrecao;
       const row = form.row;
       const measure = row?.tire_size || row?.measure;

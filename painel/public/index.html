@@ -79,9 +79,9 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260807-reserva-matriz1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260807-reserva-matriz1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260731-compat1"></script>
-<script src="/admin/painel/app.catalogo.marca.js?v=20260807-reserva-matriz1"></script>
+<script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260810-chaverede1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260817-sales-integrity1"></script>
@@ -8636,6 +8636,9 @@
 
     <!-- ═══ TELA: CATÁLOGO CENTRAL ═══ -->
     <div x-show="currentPage === 'catalogo'" class="space-y-5">
+      <div x-show="adminUser?.role !== 'owner'" x-cloak class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        Catálogo em modo de consulta. Somente o proprietário pode cadastrar produtos, corrigir marcas ou alterar o preço oficial.
+      </div>
       <section class="relative overflow-hidden rounded-2xl min-h-[190px] border border-emerald-900 shadow-sm text-white"
                style="background-image:linear-gradient(90deg,rgba(2,44,34,.98) 0%,rgba(2,78,58,.91) 55%,rgba(2,44,34,.70) 100%),url('/admin/painel/assets/estoque-hero.webp?preview=tire');background-size:cover;background-position:center;">
         <div class="relative z-10 flex min-h-[190px] items-center justify-between gap-8 px-8 py-7">
@@ -8728,9 +8731,10 @@
                   <td class="px-5 py-3.5">
                     <div class="flex items-center gap-3">
                       <span class="flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                        <img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1"
+                        <img x-show="row.product_type !== 'service'" src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1"
                              alt="" aria-hidden="true"
                              class="h-full w-full object-contain mix-blend-multiply">
+                        <i x-show="row.product_type === 'service'" data-lucide="wrench" class="h-6 w-6 text-emerald-700" aria-hidden="true"></i>
                       </span>
                       <div class="min-w-0">
                         <template x-if="catalogoBrandLogo(row.brand)">
@@ -8739,34 +8743,34 @@
                         </template>
                         <template x-if="!catalogoBrandLogo(row.brand)">
                           <span class="inline-flex rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600"
-                                x-text="String(row.brand || 'SEM MARCA').toUpperCase()"></span>
+                                x-text="row.product_type === 'service' ? 'SERVIÇO' : String(row.brand || 'SEM MARCA').toUpperCase()"></span>
                         </template>
                         <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="[row.product_name,row.tire_size].filter(Boolean).join(' · ')"></p>
-                        <p class="text-[10px] font-semibold text-emerald-700" x-text="catalogoConditionLabel(row.tire_condition)"></p>
+                        <p class="text-[10px] font-semibold text-emerald-700" x-text="row.product_type === 'service' ? 'Serviço' : catalogoConditionLabel(row.tire_condition)"></p>
                         <p class="text-[11px] text-gray-400" x-text="row.product_code || 'Ainda não cadastrado como produto'"></p>
                       </div>
                     </div>
                   </td>
-                  <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="Number(row.official_quantity_on_hand || 0) + ' un.'"></p><p class="text-[10px] text-gray-400">Galpão central</p></td>
-                  <td class="px-4 py-3.5"><p class="text-sm font-medium" x-text="row.official_unit_cost == null ? '—' : formatCurrency(Number(row.official_unit_cost))"></p><p class="flex items-center gap-1 text-[10px] text-gray-400"><i data-lucide="lock" class="h-2.5 w-2.5"></i>Somente leitura</p></td>
-                  <td class="px-4 py-3.5"><p class="text-base font-bold text-gray-950" x-text="row.price_amount == null ? '—' : formatCurrency(Number(row.price_amount))"></p><p class="text-[10px] text-gray-400" x-text="row.price_amount == null ? 'sem preço' : 'oficial da Matriz'"></p></td>
-                  <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400">por pneu</p></td>
+                  <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="row.product_type === 'service' ? 'Não se aplica' : Number(row.official_quantity_on_hand || 0) + ' un.'"></p><p class="text-[10px] text-gray-400" x-text="row.product_type === 'service' ? 'Serviço' : 'Galpão central'"></p></td>
+                  <td class="px-4 py-3.5"><p class="text-sm font-medium" x-text="row.product_type === 'service' ? 'Não se aplica' : (row.official_unit_cost == null ? '—' : formatCurrency(Number(row.official_unit_cost)))"></p><p class="flex items-center gap-1 text-[10px] text-gray-400"><i data-lucide="lock" class="h-2.5 w-2.5"></i>Somente leitura</p></td>
+                  <td class="px-4 py-3.5"><p class="text-base font-bold text-gray-950" x-text="Number(row.price_amount) > 0 ? formatCurrency(Number(row.price_amount)) : '—'"></p><p class="text-[10px] text-gray-400" x-text="Number(row.price_amount) > 0 ? 'oficial da Matriz' : 'sem preço'"></p></td>
+                  <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400" x-text="row.product_type === 'service' ? 'Custo não configurado' : 'por pneu'"></p></td>
                   <td class="px-4 py-3.5 text-sm font-medium" x-text="catalogoPercent(row.margin_percent)"></td>
                   <td class="px-4 py-3.5">
                     <span x-show="row.catalogued === false" class="rounded-full border border-dashed border-emerald-700 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-800">Não catalogado</span>
                     <span x-show="row.catalogued !== false && row.sellable" class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Ativo</span>
-                    <span x-show="row.catalogued !== false && row.price_amount == null" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
-                    <span x-show="row.catalogued !== false && row.price_amount != null && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
+                    <span x-show="row.catalogued !== false && !(Number(row.price_amount) > 0)" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
+                    <span x-show="row.catalogued !== false && Number(row.price_amount) > 0 && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
                   </td>
                   <td class="px-4 py-3.5">
                     <button type="button" @click="catalogoCompatibilityOpen(row)"
-                            :disabled="row.catalogued === false || !row.product_id"
+                            :disabled="row.product_type !== 'tire' || row.catalogued === false || !row.product_id"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-gray-50 disabled:text-gray-400">
                       <i data-lucide="bike" class="h-3.5 w-3.5"></i>
-                      <span x-text="row.catalogued === false ? 'Após cadastrar' : (Number(row.compatibility_count || 0) > 0 ? Number(row.compatibility_count) + ' moto(s)' : 'Ver motos')"></span>
+                      <span x-text="row.product_type !== 'tire' ? 'Não se aplica' : (row.catalogued === false ? 'Após cadastrar' : (Number(row.compatibility_count || 0) > 0 ? Number(row.compatibility_count) + ' moto(s)' : 'Ver motos'))"></span>
                     </button>
                   </td>
-                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" :class="catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.price_amount == null ? 'Definir preço' : 'Editar preço'))"></button></td>
+                  <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (Number(row.price_amount) > 0 ? 'Editar preço' : 'Definir preço'))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
                 </tr>
               </template>
               <tr x-show="catalogoPaginaRows().length === 0"><td colspan="9" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
