@@ -647,9 +647,12 @@ novo comprovante.
 | Backup pré-`0191` | **4.960.069 bytes**, legível pelo `pg_restore`; SHA-256 `ec08c387b4b9eb600003bb637e9bc1632f13ba83c561d0da932e38b3a6de0f15` |
 | Migration `0191` no banco-alvo | **Aplicada com COMMIT** após dry-run com rollback; funções, trigger e permissões confirmados materialmente |
 | Reconciliação pós-migration | `prod`: **21/21 contadores zerados**; `test`: nove ajustes históricos sem ledger, isolados e preservados |
-| Publicação do código | PR `#63` incorporada à `main`; SHA funcional `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; deploy manual pendente |
+| Publicação do código | PR funcional `#63` e PR documental `#64` incorporadas; SHA funcional `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; `main` consolidada em `a758bb6e17f66d0335ba434799f4917c3f6f9633` antes deste adendo |
+| CI da `main` | **PASS** no run `32449374390`: tamanho, migrations, TypeScript, unitários, integrações e build aprovados |
+| Estado operacional | Deploy manual ainda não iniciado; usar o `HEAD` atual da `main` e executar smoke autenticado depois |
 
 **Novo veredito:** Logística aprovada no código e no banco para deploy. A migration `0191`
 já foi aplicada materialmente após backup validado e o código foi incorporado à `main` pela
-PR `#63`. O deploy manual e o smoke autenticado pós-deploy continuam obrigatórios; este
-adendo não declara o runtime novo já implantado.
+PR `#63`; a documentação foi consolidada pela PR `#64` e o CI final da `main` passou. O
+deploy manual e o smoke autenticado pós-deploy continuam obrigatórios; este adendo não
+declara o runtime novo já implantado.
