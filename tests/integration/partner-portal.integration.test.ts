@@ -235,6 +235,93 @@ describe('Portal Parceiro — realização financeira de entrega e retirada rese
     );
     expect(receivables.rows[0]).toMatchObject({ count: 2, total: '200.00' });
   });
+
+  it('replay de entregue preserva data, pagamento, entregador e auditoria originais', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 5 });
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Cliente Replay', customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 90 }],
+      payment_method: 'A receber', payment_status: 'receivable',
+      fulfillment_mode: 'delivery', delivery_address: 'Rua Replay, 10',
+      source_tag: '2w', idempotency_key: `delivery-replay-${randomUUID()}`,
+    });
+    await q.updatePartnerDeliveryStatus(f.ctx, sale.order_id, {
+      delivery_status: 'delivered', payment_method: 'Pix', delivery_courier: 'Ana',
+    });
+    const first = await db.pool.query(
+      `SELECT o.delivery_courier,r.received_at,r.payment_method,
+        (SELECT count(*)::int FROM audit.events a
+          WHERE a.entity_id=o.id AND a.event_type='partner_delivery_status_changed') audits
+       FROM commerce.partner_orders o
+       JOIN finance.partner_receivables r ON r.source_order_id=o.id
+      WHERE o.id=$1`, [sale.order_id],
+    );
+
+    await q.updatePartnerDeliveryStatus(f.ctx, sale.order_id, {
+      delivery_status: 'delivered', payment_method: 'Dinheiro', delivery_courier: 'Bruno',
+    });
+    const replay = await db.pool.query(
+      `SELECT o.delivery_courier,r.received_at,r.payment_method,
+        (SELECT count(*)::int FROM audit.events a
+          WHERE a.entity_id=o.id AND a.event_type='partner_delivery_status_changed') audits
+       FROM commerce.partner_orders o
+       JOIN finance.partner_receivables r ON r.source_order_id=o.id
+      WHERE o.id=$1`, [sale.order_id],
+    );
+    expect(replay.rows[0]).toEqual(first.rows[0]);
+    expect(replay.rows[0]).toMatchObject({
+      delivery_courier: 'Ana', payment_method: 'Pix', audits: 1,
+    });
+  });
+
+  it('falha preserva a reserva e só o retorno físico libera o estoque', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 5 });
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Cliente Retorno', customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 2, unit_price: 75 }],
+      payment_method: 'A receber', payment_status: 'receivable',
+      fulfillment_mode: 'delivery', delivery_address: 'Rua Retorno, 20',
+      source_tag: '2w', idempotency_key: `delivery-return-${randomUUID()}`,
+    });
+    await q.updatePartnerDeliveryStatus(f.ctx, sale.order_id, {
+      delivery_status: 'dispatched', delivery_courier: 'Carla',
+    });
+    await q.updatePartnerDeliveryStatus(f.ctx, sale.order_id, {
+      delivery_status: 'failed', delivery_courier: 'Carla', reason: 'Cliente recusou',
+    });
+    const reported = await db.pool.query(
+      `SELECT o.status,o.delivery_status,s.quantity_on_hand,s.quantity_reserved,r.status receivable_status
+         FROM commerce.partner_orders o
+         JOIN commerce.partner_stock_levels s ON s.id=$2
+         LEFT JOIN finance.partner_receivables r ON r.source_order_id=o.id AND r.deleted_at IS NULL
+        WHERE o.id=$1`, [sale.order_id, f.stockId],
+    );
+    expect(reported.rows[0]).toMatchObject({
+      status: 'confirmed', delivery_status: 'failed', quantity_on_hand: 5,
+      quantity_reserved: 2, receivable_status: null,
+    });
+    await expect(q.updatePartnerDeliveryStatus(f.ctx, sale.order_id, {
+      delivery_status: 'pending',
+    })).rejects.toThrow('delivery_already_finalized');
+
+    await q.confirmPartnerDeliveryReturn(f.ctx, sale.order_id, 'Pneus conferidos na loja');
+    await expect(q.confirmPartnerDeliveryReturn(f.ctx, sale.order_id, 'replay'))
+      .resolves.toEqual({ order_id: sale.order_id, return_confirmed: true });
+    const returned = await db.pool.query(
+      `SELECT o.status,o.delivery_status,s.quantity_on_hand,s.quantity_reserved,
+        (SELECT count(*)::int FROM audit.events a WHERE a.entity_id=o.id
+          AND a.event_type='partner_delivery_return_confirmed') return_audits
+       FROM commerce.partner_orders o
+       JOIN commerce.partner_stock_levels s ON s.id=$2
+      WHERE o.id=$1`, [sale.order_id, f.stockId],
+    );
+    expect(returned.rows[0]).toMatchObject({
+      status: 'cancelled', delivery_status: 'failed', quantity_on_hand: 5,
+      quantity_reserved: 0, return_audits: 1,
+    });
+  });
 });
 
 describe('Portal Parceiro — invariantes monetárias e concorrência financeira', () => {

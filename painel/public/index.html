@@ -51,10 +51,10 @@
 <script src="/admin/painel/app.compras.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260817-arrival-adjustment1"></script>
-<script src="/admin/painel/app.logistica.js?v=20260817-sales-integrity1"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260813-logistica-cards1"></script>
-<script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
-<script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
+<script src="/admin/painel/app.logistica.js?v=20260821-auditfix1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20260821-auditfix1"></script>
+<script src="/admin/painel/app.logistica.comprovantes.js?v=20260821-auditfix1"></script>
+<script src="/admin/painel/app.logistica.acoes.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260816-paineis-alinhados1"></script>
 <script src="/admin/painel/app.colaboradores.gestao.js?v=20260816-paineis-alinhados1"></script>
 <script src="/admin/painel/app.sino.js?v=20260731-condicao2"></script>
@@ -4422,7 +4422,7 @@
         <!-- Cada aba tem uma responsabilidade visual própria. -->
         <div x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div><h2 class="text-xl font-semibold text-gray-950">Rotas da Matriz</h2><p class="mt-1 text-sm text-gray-500">Acompanhe a rota aberta e consulte o resultado das últimas saídas.</p></div>
-          <button x-show="!logisticaRotaAtual()" @click="$nextTick(() => $refs.novaRotaCard?.scrollIntoView({ behavior: 'smooth', block: 'center' }))" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"><i data-lucide="plus" class="h-4 w-4"></i>Nova rota</button>
+          <button x-show="logisticaCouriersDisponiveis().length && entregasSemRota().length" @click="$nextTick(() => $refs.novaRotaCard?.scrollIntoView({ behavior: 'smooth', block: 'center' }))" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"><i data-lucide="plus" class="h-4 w-4"></i>Nova rota</button>
         </div>
 
         <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas'" class="order-2 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -4434,10 +4434,13 @@
                   <h2 class="text-lg font-semibold text-gray-950">Fila de entregas</h2>
                   <p class="text-sm text-gray-500 mt-1" x-text="logisticaEntregasView().length + ' pedido(s) no filtro de ' + logisticaPeriodoLabel().toLowerCase()"></p>
                 </div>
-                <button x-show="!logisticaRotaAtual() && entregasSemRota().length" @click="setLogisticaTab('rotas')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
-                  <i data-lucide="route" class="h-4 w-4"></i>Montar rota
-                </button>
+                <div class="flex flex-wrap items-center gap-2">
+                  <select x-show="(logistica?.rotas_abertas || []).length > 1" x-model="logisticaRotaAbertaId" @change="selecionarLogisticaRotaAberta($event.target.value)" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs text-gray-700"><template x-for="t in (logistica?.rotas_abertas || [])" :key="'delivery-route-' + t.id"><option :value="t.id" x-text="'Pôr em ' + t.trip_number + ' · ' + (t.courier_name || 'Entregador')"></option></template></select>
+                  <button x-show="entregasSemRota().length && logisticaCouriersDisponiveis().length" @click="setLogisticaTab('rotas')"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+                    <i data-lucide="route" class="h-4 w-4"></i>Montar rota
+                  </button>
+                </div>
               </div>
               <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
                 <label class="relative block flex-1">
@@ -4565,9 +4568,10 @@
                   <p class="text-xs text-gray-500 mt-1" x-text="'Fechada em ' + rotaDataFechamento(logisticaRotaSelecionada()) + ' · ' + logisticaRotaSelecionada().courier_name"></p>
                 </div>
               </div>
-              <button @click="$refs.logisticaDespesas.scrollIntoView({ behavior: 'smooth', block: 'start' })" class="inline-flex self-start items-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
-                <i data-lucide="receipt-text" class="w-4 h-4"></i>Ver comprovantes
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <label x-show="!rotaResultado(logisticaRotaSelecionada()).completo" class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-amber-500 bg-white px-4 py-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"><i data-lucide="paperclip" class="h-4 w-4"></i><span x-text="uploadingReceipt ? 'Enviando...' : 'Anexar comprovante correto'"></span><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="enviarComprovante(logisticaRotaSelecionada(), $event)" :disabled="uploadingReceipt"></label>
+                <button @click="$refs.logisticaDespesas.scrollIntoView({ behavior: 'smooth', block: 'start' })" class="inline-flex self-start items-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"><i data-lucide="receipt-text" class="w-4 h-4"></i>Ver comprovantes</button>
+              </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -4676,6 +4680,11 @@
 
         <!-- Rotas recentes em cards: cada card abre o resultado completo já existente. -->
         <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-2 space-y-4">
+          <label x-show="(logistica?.rotas_abertas || []).length > 1" class="block max-w-sm text-xs font-semibold text-gray-700">Rota em andamento
+            <select x-model="logisticaRotaAbertaId" @change="selecionarLogisticaRotaAberta($event.target.value)" class="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-normal text-gray-800">
+              <template x-for="t in (logistica?.rotas_abertas || [])" :key="'open-select-' + t.id"><option :value="t.id" x-text="t.trip_number + ' · ' + (t.courier_name || 'Entregador')"></option></template>
+            </select>
+          </label>
           <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <template x-if="logisticaRotaAtual()">
               <article class="flex flex-col rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
@@ -4705,8 +4714,8 @@
             </template>
             <article x-ref="novaRotaCard" class="flex min-h-[260px] flex-col rounded-xl border border-dashed border-emerald-300 bg-emerald-50/30 p-5">
               <div class="flex items-start justify-between gap-3"><div><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="route" class="h-5 w-5"></i></div><h3 class="mt-3 text-base font-semibold text-gray-900">Planejar próxima saída</h3><p class="mt-1 text-sm text-gray-500" x-text="entregasSemRota().length + ' pedido(s) aguardando rota'"></p></div></div>
-              <template x-if="!logisticaRotaAtual()"><div class="mt-4"><div class="grid grid-cols-2 gap-2"><input x-ref="logisticaCourierName" x-model="rotaForm.courier_name" type="text" placeholder="Nome do entregador" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"><input x-model="rotaForm.km_start" type="number" min="0" placeholder="KM inicial" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"></div><div class="mt-3 max-h-48 space-y-1.5 overflow-y-auto"><template x-for="d in entregasSemRota()" :key="'nova-' + d.order_id"><label class="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5"><input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="mt-0.5 rounded border-gray-300 text-emerald-700"><span class="min-w-0"><span class="block text-xs font-semibold text-gray-800" x-text="logisticaOrderLabel(d) + ' · ' + (d.customer_name || 'Cliente')"></span><span class="mt-0.5 block truncate text-[11px] text-gray-400" x-text="d.delivery_address || 'Sem endereço'"></span></span></label></template></div><button @click="abrirRota()" :disabled="logisticaSaving || !Object.values(rotaForm.selecionadas).some(Boolean)" class="mt-3 w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Abrir nova rota</button></div></template>
-              <div x-show="logisticaRotaAtual()" class="mt-auto rounded-lg bg-white p-4 text-center text-sm text-gray-500">Feche a rota em andamento antes de abrir a próxima.</div>
+              <template x-if="logisticaCouriersDisponiveis().length && entregasSemRota().length"><div class="mt-4"><div class="grid grid-cols-2 gap-2"><select x-model="rotaForm.courier_collaborator_id" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"><option value="">Escolha o entregador</option><template x-for="courier in logisticaCouriersDisponiveis()" :key="courier.id"><option :value="courier.id" x-text="courier.display_name"></option></template></select><input x-model="rotaForm.km_start" type="number" min="0" placeholder="KM inicial" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"></div><div class="mt-3 max-h-48 space-y-1.5 overflow-y-auto"><template x-for="d in entregasSemRota()" :key="'nova-' + d.order_id"><label class="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5"><input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="mt-0.5 rounded border-gray-300 text-emerald-700"><span class="min-w-0"><span class="block text-xs font-semibold text-gray-800" x-text="logisticaOrderLabel(d) + ' · ' + (d.customer_name || 'Cliente')"></span><span class="mt-0.5 block truncate text-[11px] text-gray-400" x-text="d.delivery_address || 'Sem endereço'"></span></span></label></template></div><button @click="abrirRota()" :disabled="logisticaSaving || !rotaForm.courier_collaborator_id || !Object.values(rotaForm.selecionadas).some(Boolean)" class="mt-3 w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Abrir nova rota</button></div></template>
+              <div x-show="!logisticaCouriersDisponiveis().length || !entregasSemRota().length" class="mt-auto rounded-lg bg-white p-4 text-center text-sm text-gray-500" x-text="!entregasSemRota().length ? 'Nenhum pedido está aguardando rota.' : 'Todos os entregadores ativos já possuem uma rota aberta.'"></div>
             </article>
           </div>
         </section>

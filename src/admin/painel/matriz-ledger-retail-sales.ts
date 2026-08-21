@@ -15,6 +15,7 @@ interface RetailSaleLedgerState {
   paymentMethod: string | null;
   dueDate: string | null;
   fulfillmentMode: string;
+  deliveryStatus: string;
   cashRealized: boolean;
   stockDecremented: boolean;
   createdBy: string | null;
@@ -30,15 +31,17 @@ async function getRetailSaleState(
     customer_id: string | null; total_amount: string; cogs_amount: string;
     occurred_at: string; cash_at: string; payment_method: string | null;
     payment_due_on: string | null;
-    fulfillment_mode: string; cash_realized: boolean; status: string;
+    fulfillment_mode: string; delivery_status: string; cash_realized: boolean; status: string;
     stock_decremented: boolean; created_by: string | null;
   }>(
     `SELECT COALESCE(o.customer_id,o.contact_id) customer_id,o.total_amount,
             COALESCE(sum(i.quantity*i.matriz_unit_cost)
               FILTER (WHERE i.matriz_unit_cost IS NOT NULL),0)::numeric(14,2)::text cogs_amount,
-            o.created_at occurred_at,
+            CASE WHEN o.fulfillment_mode='delivery'
+              THEN o.delivered_at ELSE o.created_at END occurred_at,
             COALESCE(o.delivered_at,o.closed_at,o.created_at) cash_at,
-            o.payment_method,o.payment_due_on,o.fulfillment_mode,o.closed_by created_by,o.status,
+            o.payment_method,o.payment_due_on,o.fulfillment_mode,o.delivery_status,
+            o.closed_by created_by,o.status,
             (o.payment_method IS NOT NULL
               AND lower(btrim(o.payment_method))<>'a receber'
               AND (
@@ -71,6 +74,7 @@ async function getRetailSaleState(
     occurredAt: row.occurred_at, cashAt: row.cash_at,
     paymentMethod: row.payment_method, dueDate: row.payment_due_on,
     fulfillmentMode: row.fulfillment_mode,
+    deliveryStatus: row.delivery_status,
     cashRealized: row.cash_realized, stockDecremented: row.stock_decremented,
     createdBy: row.created_by, status: row.status,
   } : null;
@@ -152,6 +156,8 @@ export async function postMatrizRetailSaleFacts(
   // Pedido ainda aberto/pendente não é faturamento confirmado. O fato nasce
   // quando a retirada/entrega realmente muda o pedido para um estado realizado.
   if (!sale || !['confirmed', 'paid', 'delivered'].includes(sale.status)) return;
+  if (sale.fulfillmentMode === 'delivery' && sale.deliveryStatus !== 'delivered') return;
+  if (!sale.occurredAt) throw new Error('retail_delivery_fact_date_missing');
   await ensureRetailRevenue(client, sale);
   await ensureRetailCogs(client, sale);
 }
@@ -165,6 +171,7 @@ export async function postMatrizRetailPaymentIfRealized(
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   const sale = await getRetailSaleState(client, environment, orderId);
   if (!sale || !sale.cashRealized) return null;
+  if (!sale.occurredAt) throw new Error('retail_delivery_fact_date_missing');
   const amount = matrizLedgerAmount(sale.totalAmount, 'retail_ledger_amount_invalid');
   if (amount === 0) return null;
   const revenueId = await ensureRetailRevenue(client, { ...sale, cashRealized: false });

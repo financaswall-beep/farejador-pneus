@@ -26,7 +26,7 @@ export const logisticaRecolocarSchema = z.object({
   order_id: z.string().uuid(),
 });
 export const abrirRotaSchema = z.object({
-  courier_name: z.string().min(1, 'courier_required').max(120),
+  courier_collaborator_id: z.string().uuid('courier_required'),
   km_start: z.coerce.number().min(0).max(9999999).optional().nullable(),
   order_ids: z.array(z.string().uuid()).max(100).optional(),
 });

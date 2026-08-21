@@ -566,3 +566,89 @@ migration, reconciliação pós-migration, CI e incorporação à `main` foram c
 responsável fazer o deploy, executar smoke autenticado e repetir a reconciliação pós-deploy.
 
 Relatório reproduzível: `docs/AUDITORIA_FINANCEIRO_PONTA_A_PONTA_2026-08-20.md`.
+
+## 13. Auditoria concluída — Logística da Matriz, entregador e parceiro
+
+A auditoria percorreu pedido, reserva e baixa de estoque, montagem e fechamento de rota,
+app do entregador, entrega local do parceiro, recusas, reentrega, comprovantes, despesa de
+combustível, ledger, CMV, comissão, permissões e isolamento entre Matriz e parceiros. O
+código auditado foi o SHA `abbcab556cf2a6b32b9a4875fc0d94e9e2479d52`.
+
+### Evidência consolidada
+
+| Bateria | Resultado |
+|---|---|
+| Unitários direcionados | **50/50**, 13 arquivos |
+| Integração logística da Matriz | **32/32**, 4 arquivos |
+| Integração parceiro e folha | **40/40**, 2 arquivos |
+| Provas descartáveis de matemática, estados e concorrência | **3/3** |
+| TypeScript | aprovado |
+| Migrations | 191 verificadas; última `0190`; gap histórico `0071` documentado |
+| Regressão completa no mesmo SHA | referência anterior de **1.227 unitários + 243 integrações**, aprovada na auditoria financeira |
+| Produção somente leitura | nenhuma divergência causal atual em entrega, estoque ou fatos financeiros |
+
+Os cálculos explícitos fecharam em centavos: em uma rota de **R$ 280,02**, os itens
+representaram **R$ 240,02**, o frete **R$ 40,00**, o CMV **R$ 150,00**, o lucro dos pneus
+**R$ 90,02** e a margem antes das despesas da rota **R$ 130,02**.
+
+### Bloqueadores confirmados
+
+1. repetir uma entrega já recebida pelo parceiro consegue alterar data, pagamento e
+   entregador de um recebível histórico;
+2. uma venda criada no fim de um mês e entregue no mês seguinte entra na competência
+   financeira do mês do pedido, não no mês da entrega;
+3. uma rota aberta pela Matriz apenas com o nome livre do entregador não fica vinculada ao
+   cadastro dele e pode desaparecer do app e da apuração de desempenho;
+4. no parceiro, reportar falha cancela a venda e libera o estoque antes de o pneu voltar
+   fisicamente à loja.
+
+Também foram registrados oito problemas relevantes de interface, concorrência, histórico e
+recuperação operacional, além de endurecimentos e propostas de funcionalidades. Entre as
+melhorias de maior valor estão painel multirrota, retorno físico em duas etapas, aceitação
+parcial por pneu, acerto de dinheiro por entregador, prova de entrega, comunicação de
+previsão ao cliente, cadastro de veículos e roteirização.
+
+A leitura atual de produção encontrou duas rotas de teste que precisam de decisão humana:
+`ROTA-0074`, fechada com comprovante rejeitado e sem despesa aprovada, e `ROTA-0076`, com
+R$ 52,00 declarados e R$ 50,00 aprovados. Não houve alteração automática desses dados.
+
+### Veredito desta seção
+
+**AUDITORIA CONCLUÍDA, MAS LOGÍSTICA AINDA NÃO APROVADA COMO SEÇÃO ENCERRADA PARA
+PRODUÇÃO.** O fluxo principal está consistente e os dados atuais estão limpos, porém os
+quatro bloqueadores acima precisam ser corrigidos e retestados antes da autorização final.
+Nenhuma migration, correção de produto, publicação ou deploy foi executado nesta etapa.
+
+Relatório reproduzível:
+`docs/AUDITORIA_LOGISTICA_PONTA_A_PONTA_2026-08-21.md`. Auditoria remota somente leitura:
+`scripts/auditar-logistica-prod-readonly.cjs`.
+
+### Adendo — correções da Logística concluídas em código
+
+Os quatro bloqueadores e os oito problemas relevantes foram corrigidos. O escopo foi
+deliberadamente estrito: **nenhuma sugestão de funcionalidade ou endurecimento opcional da
+auditoria foi implementada**.
+
+Principais mudanças: replay terminal do parceiro não reescreve o passado; falha de entrega
+preserva a reserva até a confirmação do retorno físico; competência da entrega usa
+`delivered_at`; rota administrativa exige colaborador ativo; tela opera múltiplas rotas;
+identidade de cliente de balcão e reentrega foram corrigidas; upload possui erros controlados;
+o teto concorrente de 50 comprovantes é protegido pelo banco; Histórico usa os sete dias
+passados; agregações dos últimos 30 dias não são truncadas; e rota fechada pendente permite
+novo comprovante.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos | **1.232/1.232**, 244 arquivos |
+| Integração completa | **249/249**, 46 arquivos |
+| Direcionados da Logística | **19/19 unitários + 62/62 integrações** |
+| TypeScript e build | aprovados |
+| Migrations | **192 verificadas**; última `0191` |
+| Backup pré-`0191` | **4.960.069 bytes**, legível pelo `pg_restore`; SHA-256 `ec08c387b4b9eb600003bb637e9bc1632f13ba83c561d0da932e38b3a6de0f15` |
+| Migration `0191` no banco-alvo | **Aplicada com COMMIT** após dry-run com rollback; funções, trigger e permissões confirmados materialmente |
+| Reconciliação pós-migration | `prod`: **21/21 contadores zerados**; `test`: nove ajustes históricos sem ledger, isolados e preservados |
+
+**Novo veredito:** Logística aprovada no código e no banco para publicação. A migration
+`0191` já foi aplicada materialmente após backup validado. O código ainda precisa ser
+publicado/deployado e o smoke autenticado pós-deploy continua obrigatório; este adendo não
+declara o runtime novo já implantado.

@@ -34,6 +34,9 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
       if (err instanceof Error && err.message === 'trip_needs_delivery') {
         return reply.status(400).send({ error: 'trip_needs_delivery' });
       }
+      if (err instanceof Error && err.message === 'courier_not_found') {
+        return reply.status(400).send({ error: 'courier_not_found' });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel logistica abrir rota failed');
       return reply.status(mapped.status).send({ error: mapped.error });

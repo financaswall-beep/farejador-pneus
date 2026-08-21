@@ -326,6 +326,35 @@ describe('Etapa 7 — schema descartavel de comprovantes com aprovacao humana', 
     });
   });
 
+  it('serializa o limite e nunca aceita o 51o comprovante', async () => {
+    const q = await import('../../src/admin/painel/queries.js');
+    const trip = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_delivery_trips(environment,courier_name)
+       VALUES ('test','Limite concorrente') RETURNING id`,
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.matriz_trip_receipts
+         (environment,trip_id,mime,size_bytes,ai_status,workflow_status)
+       SELECT 'test',$1,'image/jpeg',n,'skipped','review_required'
+         FROM generate_series(1,49) n`, [trip.rows[0]!.id],
+    );
+    const attempts = await Promise.allSettled([
+      q.addMatrizTripReceipt({ trip_id: trip.rows[0]!.id,
+        bytes: Buffer.from('limit-race-a'), mime: 'image/jpeg', environment: 'test' }, db.pool),
+      q.addMatrizTripReceipt({ trip_id: trip.rows[0]!.id,
+        bytes: Buffer.from('limit-race-b'), mime: 'image/jpeg', environment: 'test' }, db.pool),
+    ]);
+    expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(attempts.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect((attempts.find((result) => result.status === 'rejected') as PromiseRejectedResult)
+      .reason).toMatchObject({ message: 'receipt_limit' });
+    const count = await db.pool.query<{ n: number }>(
+      `SELECT count(*)::int n FROM commerce.matriz_trip_receipts
+        WHERE environment='test' AND trip_id=$1`, [trip.rows[0]!.id],
+    );
+    expect(count.rows[0]!.n).toBe(50);
+  });
+
   it('serializa duas aprovacoes diferentes em uma decisao e uma despesa', async () => {
     const q = await import('../../src/admin/painel/queries.js');
     const receipt = await db.pool.query<{ id: string }>(`

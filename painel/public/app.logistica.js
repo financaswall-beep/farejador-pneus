@@ -12,6 +12,10 @@ window.PAINEL_MODULES.logistica = function () {
         if (this.logisticaRotaSelecionadaId && !this.logisticaRotaSelecionada()) {
           this.logisticaRotaSelecionadaId = null;
         }
+        const openTrips = this.logistica?.rotas_abertas || [];
+        if (!openTrips.some((trip) => trip.id === this.logisticaRotaAbertaId)) {
+          this.logisticaRotaAbertaId = openTrips[0]?.id || null;
+        }
         void this.loadReceiptThumbs();
       } catch (err) {
         // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).
@@ -103,6 +107,11 @@ window.PAINEL_MODULES.logistica = function () {
       d.setUTCDate(d.getUTCDate() + 6);
       return this.logisticaDateISO(d);
     },
+    logisticaPeriodoInicioISO(days) {
+      const d = new Date(this.hojeISO() + 'T12:00:00-03:00');
+      d.setUTCDate(d.getUTCDate() - Math.max(Number(days || 1) - 1, 0));
+      return this.logisticaDateISO(d);
+    },
     logisticaDataOperacional(d) {
       if (d?.delivery_status === 'delivered' && d.delivered_at) return this.logisticaDateISO(d.delivered_at);
       return this.logisticaDateISO(d?.scheduled_date || d?.created_at);
@@ -168,7 +177,17 @@ window.PAINEL_MODULES.logistica = function () {
       return 'bg-amber-50 text-amber-700 border-amber-100';
     },
     logisticaRotaAtual() {
-      return (this.logistica?.rotas_abertas || [])[0] || null;
+      const trips = this.logistica?.rotas_abertas || [];
+      return trips.find((trip) => trip.id === this.logisticaRotaAbertaId) || trips[0] || null;
+    },
+    selecionarLogisticaRotaAberta(tripId) {
+      this.logisticaRotaAbertaId = tripId || null;
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    logisticaCouriersDisponiveis() {
+      const occupied = new Set((this.logistica?.rotas_abertas || [])
+        .map((trip) => trip.courier_collaborator_id).filter(Boolean));
+      return (this.logistica?.couriers || []).filter((courier) => !occupied.has(courier.id));
     },
     logisticaEntregasDaRota(t) {
       if (!t?.id) return [];
@@ -242,9 +261,9 @@ window.PAINEL_MODULES.logistica = function () {
       if (!this.logistica) return [];
       return (this.logistica.abertas || []).filter((d) => !d.trip_id);
     },
-    // Rota aberta pra "pendurar" (a UI só deixa 1 aberta por vez).
+    // Rota selecionada para receber uma entrega quando há várias em andamento.
     rotaAberta() {
-      return (this.logistica?.rotas_abertas || [])[0] || null;
+      return this.logisticaRotaAtual();
     },
     // ── Agendamento (07-03e): toda entrega nasce pra D+1; o dono remarca se precisar ──
     hojeISO() {

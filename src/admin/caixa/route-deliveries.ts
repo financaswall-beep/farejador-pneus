@@ -134,9 +134,6 @@ export function registerCaixaDeliveryRoutes(
       if (error instanceof Error && error.message === 'trip_not_found') {
         return reply.status(404).send({ error: error.message });
       }
-      if (error instanceof ReceiptExactDuplicateError) {
-        return reply.status(409).send({ error: 'receipt_exact_duplicate' });
-      }
       if (error instanceof TripHasUnresolvedDeliveriesError) {
         return reply.status(409).send({
           error: 'trip_has_unresolved_deliveries', deliveries: error.deliveries,
@@ -170,6 +167,13 @@ export function registerCaixaDeliveryRoutes(
     } catch (error) {
       if (error instanceof Error && error.message === 'trip_not_found') {
         return reply.status(404).send({ error: error.message });
+      }
+      if (error instanceof Error && error.message === 'receipt_limit') {
+        return reply.status(400).send({ error: 'receipt_limit' });
+      }
+      if (error instanceof ReceiptExactDuplicateError) {
+        return reply.status(409).send({ error: 'receipt_exact_duplicate',
+          duplicate_trip_number: error.duplicateTripNumber });
       }
       throw error;
     }

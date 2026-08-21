@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-16T18:23:00.000Z",
-  "commitBase": "auditoria-encerramento",
-  "total": 92,
+  "geradoEm": "2026-08-21T04:41:07.883Z",
+  "commitBase": "correcoes-logistica-2026-08-21",
+  "total": 93,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -61,6 +61,7 @@
     "call:this.api(`contas-a-receber/${receivableId}`, { method: 'DELETE' })",
     "call:this.api(`contas-a-receber/${this.editingReceivableId}`, { method: 'PATCH', body: JSON.stringify(payload), })",
     "call:this.api(`despesas/${expenseId}`, { method: 'DELETE' })",
+    "call:this.api(`entregas/${sale.order_id}/confirmar-retorno`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() || null }), })",
     "call:this.api(`entregas/${sale.order_id}`, { method: 'POST', body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null, payment_method, reason: reason ?? null }), })",
     "call:this.api(`equipe/${f.id}/comissao`)",
     "call:this.api(`equipe/${f.id}/comissao`, { method: 'PUT', body: JSON.stringify({ kind: this.funcCommForm.kind === 'fixed' ? 'fixed' : 'percent', basis: this.funcCommForm.kind === 'fixed' ? 'sale' : 'revenue', value: this.funcCommForm.active ? Number(this.funcCommForm.value) : 0, active: !!this.funcCommForm.active, starts_on: this.funcCommForm.starts_on || this.funcRemForm.starts_on, settlement_frequency: this.funcCommForm.settlement_frequency, itemized: !!this.funcCommForm.itemized, item_rules: this.funcCommForm.item_rules, }), })",
