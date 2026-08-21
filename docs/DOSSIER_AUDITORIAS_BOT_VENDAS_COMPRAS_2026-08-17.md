@@ -772,3 +772,7 @@ responsável; depois dele, o smoke deve conferir cadastro, aprovação e ediçã
 Matriz, candidatura pública e edição pelo dono do parceiro. O escopo atual é deliberadamente
 o Estado do Rio de Janeiro; expansão para outro estado exige ampliar o catálogo em mudança
 auditada, não reabrir texto livre.
+
+Publicação rastreável: commit funcional `05c76ea`, PR `#68` contra `main`. Na data desta
+atualização, a PR aguardava o GitHub Actions e a incorporação; usar no Coolify somente o SHA
+final da `main` informado depois do merge.
