@@ -773,6 +773,8 @@ Matriz, candidatura pública e edição pelo dono do parceiro. O escopo atual é
 o Estado do Rio de Janeiro; expansão para outro estado exige ampliar o catálogo em mudança
 auditada, não reabrir texto livre.
 
-Publicação rastreável: commit funcional `05c76ea`, PR `#68` contra `main`. Na data desta
-atualização, a PR aguardava o GitHub Actions e a incorporação; usar no Coolify somente o SHA
-final da `main` informado depois do merge.
+Publicação rastreável: commit funcional `05c76ea`; PR `#68` aprovada pelo GitHub Actions
+no run `32489173112` e incorporada à `main` no SHA funcional
+`007f224c10b4923223990b55ed1e8dfcc15bb46b`. A PR documental `#69` pode avançar o HEAD
+sem mudar o runtime; o Coolify deve importar o HEAD atual da `main`, que precisa conter esse
+SHA funcional. O deploy ainda não foi iniciado.
