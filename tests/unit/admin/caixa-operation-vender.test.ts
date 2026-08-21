@@ -49,7 +49,8 @@ describe('Etapa 2 - Vender na Operação da Loja', () => {
   });
 
   it('permite ao vendedor negociar cada item sem mudar o preço oficial', () => {
-    expect(pricing).toContain("label.textContent = 'Preço negociado'");
+    expect(pricing).toContain("label.textContent = 'Preço nesta venda'");
+    expect(pricing).toContain('input.maxLength = 12');
     expect(pricing).toContain('line.negotiatedPrice = price');
     expect(pricing).toContain('price <= 0');
     expect(catalog).toContain('unit_price: Number(line.negotiatedPrice)');

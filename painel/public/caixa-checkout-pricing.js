@@ -45,11 +45,12 @@
       official.textContent = 'Preço oficial: ' + Caixa.currency.format(Number(line.referencePrice));
       copy.append(name, description, official);
       const editor = document.createElement('label'); editor.className = 'checkout-negotiated-price';
-      const label = document.createElement('span'); label.textContent = 'Preço negociado';
-      const field = document.createElement('span');
+      const label = document.createElement('span'); label.className = 'checkout-negotiated-label'; label.textContent = 'Preço nesta venda';
+      const field = document.createElement('span'); field.className = 'checkout-negotiated-field';
       const currency = document.createElement('b'); currency.textContent = 'R$';
       const input = document.createElement('input');
       input.type = 'text'; input.inputMode = 'decimal'; input.autocomplete = 'off';
+      input.maxLength = 12; input.size = 8;
       input.value = Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
       input.setAttribute('aria-label', 'Preço negociado de ' + productTitle(line.product));
       field.append(currency, input); editor.append(label, field);

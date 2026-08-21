@@ -491,18 +491,20 @@ form { display: grid; gap: 16px; }
 .checkout-review-content { padding: 18px 20px 0; }
 .checkout-review-items { display: grid; gap: 10px; padding-bottom: 15px; border-bottom: 1px dashed #d9dedb; }
 .checkout-review-items > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.checkout-review-items > .checkout-review-line { display: grid; grid-template-columns: minmax(0,1fr) 132px auto; align-items: end; padding: 9px 0; }
+.checkout-review-items > .checkout-review-line { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "item subtotal" "price price"; align-items: start; gap: 8px 12px; padding: 11px 0; }
+.checkout-review-line > span:first-child { grid-area: item; }
 .checkout-review-items span { display: grid; min-width: 0; gap: 3px; }
 .checkout-review-items strong { overflow: hidden; color: #25342d; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .checkout-review-items small { overflow: hidden; color: #7b837f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .checkout-review-items b { flex: 0 0 auto; color: #174d38; font-size: 12px; }
 .checkout-review-items .checkout-reference-price { color: #087246; font-weight: 650; }
-.checkout-negotiated-price { display: grid; gap: 4px; color: #526159; font-size: 9px; font-weight: 650; }
-.checkout-negotiated-price > span { display: flex; overflow: hidden; gap: 0; border: 1px solid #9eb8aa; border-radius: 9px; background: #fff; }
+.checkout-negotiated-price { display: flex; min-width: 0; grid-area: price; align-items: center; justify-content: flex-end; gap: 8px; padding: 7px 9px; border-radius: 10px; color: #526159; background: #f3f7f5; font-size: 9px; font-weight: 650; }
+.checkout-negotiated-label { white-space: nowrap; }
+.checkout-negotiated-price > .checkout-negotiated-field { display: flex; width: 112px; overflow: hidden; gap: 0; border: 1px solid #9eb8aa; border-radius: 9px; background: #fff; }
 .checkout-negotiated-price b { display: flex; align-items: center; padding: 0 7px; border-right: 1px solid #dce4df; color: #637169; }
-.checkout-negotiated-price input { width: 82px; min-width: 0; padding: 8px; border: 0; outline: 0; color: #153c2c; background: transparent; font-size: 12px; font-weight: 750; }
+.checkout-negotiated-price input { width: 69px; min-width: 0; padding: 8px 6px; border: 0; outline: 0; color: #153c2c; background: transparent; font-size: 12px; font-weight: 750; text-align: right; }
 .checkout-negotiated-price input.invalid { color: #b4233d; background: #fff1f3; }
-.checkout-negotiated-total { min-width: 82px; padding-bottom: 9px; color: #174d38; font-size: 12px; text-align: right; }
+.checkout-negotiated-total { min-width: 82px; grid-area: subtotal; color: #174d38; font-size: 12px; text-align: right; }
 .checkout-review-meta { display: grid; gap: 8px; margin: 14px 0; }
 .checkout-review-meta > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .checkout-review-meta dt { color: #7b837f; font-size: 10px; }
@@ -516,8 +518,9 @@ form { display: grid; gap: 16px; }
 .checkout-review-actions button:last-child { border-color: #087246; color: #fff; background: #087246; }
 .checkout-review-actions button:disabled { opacity: .6; cursor: wait; }
 @media (max-width: 560px) {
-  .checkout-review-items > .checkout-review-line { grid-template-columns: minmax(0,1fr) 126px; }
-  .checkout-negotiated-total { grid-column: 1 / -1; min-width: 0; padding: 0; text-align: right; }
+  .checkout-review-content { padding-inline: 15px; }
+  .checkout-negotiated-price { justify-content: space-between; }
+  .checkout-negotiated-total { min-width: 76px; }
 }
 
 .sales-loading { display: grid; min-height: 255px; place-content: center; justify-items: center; color: #6a746e; }
