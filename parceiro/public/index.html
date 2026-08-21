@@ -1103,13 +1103,13 @@
                     <small x-text="'Cadastro em ' + formatDate(customer.created_at)"></small>
                   </span>
                   <span>
-                    <span class="pos-vip-mini" :class="customerIsVip(customer) && 'active'" :title="customerIsVip(customer) ? ('Cliente VIP - ' + customerSales(customer).length + ' compras') : (customerSales(customer).length + ' de ' + vipMinPurchases + ' compras para VIP')">
+                    <span class="pos-vip-mini" :class="customerIsVip(customer) && 'active'" :title="customerIsVip(customer) ? ('Cliente VIP - ' + customerPurchaseCount(customer) + ' compras') : (customerPurchaseCount(customer) + ' de ' + vipMinPurchases + ' compras para VIP')">
                       <i data-lucide="star"></i>
                     </span>
                   </span>
                   <span x-text="formatPhoneDisplay(customer.phone) || '-'"></span>
                   <span x-text="customerAddressLine(customer)"></span>
-                  <span class="pos-green-text" x-text="customerSales(customer).length"></span>
+                  <span class="pos-green-text" x-text="customerPurchaseCount(customer)"></span>
                   <span x-text="money(customerTotalSpent(customer))"></span>
                   <span x-text="customerLastSaleLabel(customer)"></span>
                 </div>

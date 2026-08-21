@@ -17,6 +17,7 @@ import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { loadLastAcceptedAgentText } from './turn-guards.js';
+import { isPlaceholderCustomerName } from '../shared/customer-name.js';
 
 const MAX_TOOL_ROUNDS = 5;
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -33,16 +34,7 @@ const OPENAI_RETRY_ON_TIMEOUT = 1;
  * strings vazias) pra evitar bot chamar cliente de "+5521..." ou "Cliente".
  */
 function isValidChatwootName(name: string | null): boolean {
-  if (!name) return false;
-  const trimmed = name.trim();
-  if (trimmed.length < 2) return false;
-  // Rejeita strings que parecem numero de telefone
-  if (/^\+?\d[\d\s\-()]*$/.test(trimmed)) return false;
-  // Rejeita placeholders comuns
-  const lower = trimmed.toLowerCase();
-  const placeholders = ['cliente', 'lead', 'unknown', 'desconhecido', 'visitante', 'no name', 'sem nome', 'whatsapp', 'user'];
-  if (placeholders.some((p) => lower === p || lower.startsWith(p + ' '))) return false;
-  return true;
+  return !isPlaceholderCustomerName(name);
 }
 
 async function loadCustomerContext(

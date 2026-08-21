@@ -128,6 +128,7 @@
     "customerLastSaleLabel": "function",
     "customerListSearch": "value:string",
     "customerPayloadFromForm": "function",
+    "customerPurchaseCount": "function",
     "customerSales": "function",
     "customerTotalSpent": "function",
     "customersWithAddressCount": "getter",

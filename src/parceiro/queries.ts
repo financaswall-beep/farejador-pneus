@@ -57,6 +57,7 @@ export { DeliveryAlreadyFinalizedError, DeliveryReturnNotAwaitingError, confirmP
 export { PartnerUsernameConflictError } from './partner-staff-account.js';
 export type { CreatedFuncionario, PartnerTokenRow } from './partner-staff-account.js';
 export type { PartnerCommissionConfig } from './commission.js';
+export { getPartnerCustomers, searchPartnerCustomers } from './customer-queries.js';
 export {
   getPartnerCommissionTeam,
   getPartnerMyPerformance,
@@ -697,54 +698,6 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
          item_name ASC
        LIMIT 300`,
       [ctx.environment, ctx.unitId],
-    );
-    return result.rows;
-  });
-}
-
-export async function getPartnerCustomers(ctx: PartnerContext): Promise<unknown[]> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query(
-      `SELECT id, name, phone, cpf, address,
-              address_street, address_number, address_neighborhood, address_city,
-              is_vip, created_at, updated_at
-       FROM commerce.partner_customers
-       WHERE environment = $1
-         AND unit_id = $2
-         AND deleted_at IS NULL
-       ORDER BY updated_at DESC
-       LIMIT 300`,
-      [ctx.environment, ctx.unitId],
-    );
-    return result.rows;
-  });
-}
-
-export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Promise<unknown[]> {
-  const search = q.trim();
-  if (!search) return [];
-  const digits = search.replace(/\D/g, '');
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query(
-      `SELECT id, name, phone, cpf, address,
-              address_street, address_number, address_neighborhood, address_city,
-              is_vip, created_at, updated_at
-       FROM commerce.partner_customers
-       WHERE environment = $1
-         AND unit_id = $2
-         AND deleted_at IS NULL
-         AND (
-           lower(name) LIKE lower($3)
-           OR ($4 <> '' AND phone LIKE $5)
-           OR ($4 <> '' AND cpf LIKE $5)
-           OR lower(COALESCE(address, '')) LIKE lower($3)
-           OR lower(COALESCE(address_street, '')) LIKE lower($3)
-           OR lower(COALESCE(address_neighborhood, '')) LIKE lower($3)
-           OR lower(COALESCE(address_city, '')) LIKE lower($3)
-         )
-       ORDER BY updated_at DESC
-       LIMIT 30`,
-      [ctx.environment, ctx.unitId, `%${search}%`, digits, `%${digits}%`],
     );
     return result.rows;
   });

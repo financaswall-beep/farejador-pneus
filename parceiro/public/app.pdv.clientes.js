@@ -218,7 +218,12 @@ window.PARCEIRO_MODULES.pdvClientes = () => ({
 
     // VIP automático: cliente é VIP quando atinge vipMinPurchases compras.
     customerIsVip(customer) {
-      return this.customerSales(customer).length >= this.vipMinPurchases;
+      return this.customerPurchaseCount(customer) >= this.vipMinPurchases;
+    },
+
+    customerPurchaseCount(customer) {
+      if (customer?.purchases != null) return this.num(customer.purchases);
+      return this.customerSales(customer).length;
     },
 
     customerSales(customer) {
@@ -236,6 +241,7 @@ window.PARCEIRO_MODULES.pdvClientes = () => ({
     },
 
     customerTotalSpent(customer) {
+      if (customer?.total_spent != null) return this.num(customer.total_spent);
       return this.customerSales(customer).reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
     },
 
@@ -251,6 +257,7 @@ window.PARCEIRO_MODULES.pdvClientes = () => ({
     },
 
     customerLastSaleLabel(customer) {
+      if (customer?.last_purchase_at) return this.formatDate(customer.last_purchase_at);
       const sales = this.customerSales(customer);
       if (!sales.length) return 'sem venda vinculada';
       const latest = sales

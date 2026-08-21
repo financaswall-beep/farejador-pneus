@@ -8,7 +8,7 @@ const RECONNECT_DELAY_MS = 3000;
 export interface ClientesKanbanEvent {
   environment: 'prod' | 'test';
   conversation_id: string;
-  reason: 'message' | 'conversation' | 'order' | 'agent_turn';
+  reason: 'message' | 'conversation' | 'order' | 'agent_turn' | 'crm';
 }
 
 type Subscriber = (event: ClientesKanbanEvent) => void;
