@@ -110,14 +110,15 @@ export async function getCaixaCatalog(
 
   const products = catalog.rows.map<CaixaCatalogProduct>((row) => {
     const price = row.price_amount === null ? null : Number(row.price_amount);
+    const usablePrice = price !== null && Number.isFinite(price) && price > 0;
     if (row.product_type === 'service') {
       return {
         ...row,
         price_amount: price,
         currency: row.currency ?? 'BRL',
         stock_quantity: null,
-        sellable: price !== null,
-        block_reason: price === null ? 'catalog_price_missing' : null,
+        sellable: usablePrice,
+        block_reason: usablePrice ? null : 'catalog_price_missing',
       };
     }
     const official = matrizStockForMeasure(
@@ -131,8 +132,8 @@ export async function getCaixaCatalog(
       price_amount: price,
       currency: row.currency ?? 'BRL',
       stock_quantity: official.quantity_available,
-      sellable: official.sellable && price !== null,
-      block_reason: price === null ? 'catalog_price_missing' : official.block_reason,
+      sellable: official.sellable && usablePrice,
+      block_reason: usablePrice ? official.block_reason : 'catalog_price_missing',
     };
   }).sort((a, b) => {
     if (a.sellable !== b.sellable) return a.sellable ? -1 : 1;

@@ -234,4 +234,42 @@ describe('catalogo conciliado com estoque e precos', () => {
     }, { connect } as unknown as Pool)).rejects.toThrow('catalog_price_reason_required');
     expect(connect).not.toHaveBeenCalled();
   });
+
+  it('recusa preço com fração de centavo antes de abrir transação', async () => {
+    const connect = vi.fn();
+    await expect(setCatalogPrice({
+      productId: 'produto-1',
+      priceAmount: 139.999,
+      reason: 'Nova tabela',
+      actorLabel: 'Admin',
+      environment: 'test',
+    }, { connect } as unknown as Pool)).rejects.toThrow('catalog_price_cent_precision');
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('trata serviço com preço como vendável sem exigir estoque físico', async () => {
+    let priceAmount = '25.00';
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM commerce.products')) return { rows: [{
+        product_id: 'servico-1', product_code: 'SERV-1', product_name: 'Montagem',
+        product_type: 'service', tire_condition: null, brand: null, tire_size: null,
+        tire_position: null, price_amount: priceAmount, currency: 'BRL', price_type: 'matriz',
+        compatibility_count: 0,
+      }] };
+      if (sql.includes('FROM commerce.wholesale_stock')) return { rows: [] };
+      if (sql.includes('FROM commerce.wholesale_purchase_items')) return { rows: [] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const result = await getCatalogOverview('test', { query } as unknown as Pool);
+    expect(result.rows[0]).toMatchObject({
+      product_type: 'service', sellable: true, block_reason: null,
+      total_stock_available: null, official_unit_cost: null,
+    });
+    priceAmount = '0.00';
+    const invalid = await getCatalogOverview('test', { query } as unknown as Pool);
+    expect(invalid.rows[0]).toMatchObject({
+      sellable: false, block_reason: 'catalog_price_missing',
+    });
+    expect(invalid.summary.without_price).toBe(1);
+  });
 });

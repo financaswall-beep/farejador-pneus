@@ -24,6 +24,9 @@ describe('contrato monetário da compra do parceiro', () => {
     expect(partnerPurchaseSchema.safeParse({
       ...purchase, items: [{ ...purchase.items[0], sale_price: 149.999 }],
     }).success).toBe(false);
+    expect(partnerPurchaseSchema.safeParse({
+      ...purchase, items: [{ ...purchase.items[0], sale_price: 0 }],
+    }).success).toBe(false);
   });
 
   it('exige chave idempotente e vencimento em compra a prazo', () => {

@@ -47,6 +47,7 @@ describe('catalogo no painel', () => {
   it('nao inventa lucro sem custo e exige motivo para salvar', () => {
     const module = loadCatalogModule();
     const context = {
+      adminUser: { role: 'owner' },
       catalogoSelecionado: { official_unit_cost: null },
       catalogoPriceForm: { price: '139.90', reason: '' },
       catalogoSaving: false,
@@ -58,13 +59,27 @@ describe('catalogo no painel', () => {
     expect(module.catalogoPodeSalvar.call(context)).toBe(false);
     context.catalogoPriceForm.reason = 'Nova tabela';
     expect(module.catalogoPodeSalvar.call(context)).toBe(true);
+    context.catalogoPriceForm.price = '139.999';
+    expect(module.catalogoPodeSalvar.call(context)).toBe(false);
+  });
+
+  it('arredonda custo fracionário ao centavo antes de calcular lucro e margem', () => {
+    const module = loadCatalogModule();
+    const context = {
+      catalogoSelecionado: { official_unit_cost: 82.125 },
+      catalogoPriceForm: { price: '139.90', reason: '' },
+      catalogoNovoPreco: module.catalogoNovoPreco,
+      catalogoLucro: module.catalogoLucro,
+    };
+    expect(module.catalogoLucro.call(context)).toBeCloseTo(57.77);
+    expect(module.catalogoMargem.call(context)).toBeCloseTo((57.77 / 139.9) * 100);
   });
 
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260813-logistica-redesign2');
-    expect(html).toContain('app.catalogo.js?v=20260807-reserva-matriz1');
+    expect(html).toContain('app.catalogo.js?v=20260821-catalogo-auditoria1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -113,6 +128,7 @@ describe('catalogo no painel', () => {
     const module = loadCatalogModule();
     const context = {
       ...module,
+      adminUser: { role: 'owner' },
       catalogoCadastro: {
         open: false, row: null, form: { product_code: '', product_name: '' },
         saving: false, message: null,
@@ -184,6 +200,7 @@ describe('catalogo no painel', () => {
     const sourceRow = {
       row_key: 'stock:1008018::meia_vida',
       product_id: null,
+      product_type: 'tire',
       catalogued: false,
       brand: 'Sem marca',
       tire_size: '100/80-18',
@@ -198,6 +215,7 @@ describe('catalogo no painel', () => {
     };
     const context = {
       ...module,
+      adminUser: { role: 'owner' },
       catalogoSelecionado: null,
       catalogoCadastro: { open: false },
       catalogoCompatibilidade: { open: false },
@@ -291,7 +309,46 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain('<th class="px-4 py-3">Compatibilidade</th>');
     expect(html).toContain('data-testid="catalog-compatibility-drawer"');
-    expect(html).toContain(':disabled="row.catalogued === false || !row.product_id"');
+    expect(html).toContain(":disabled=\"row.product_type !== 'tire' || row.catalogued === false || !row.product_id\"");
     expect(html).toContain('Nenhuma moto associada');
+  });
+
+  it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {
+    const module = loadCatalogModule();
+    const employee = {
+      ...module,
+      adminUser: { role: 'employee' },
+      catalogoSelecionado: null,
+      catalogoCadastro: { open: false },
+      catalogoMarcaCorrecao: { open: false },
+      catalogoPriceForm: { price: '100.00', reason: 'Mudança' },
+      catalogoSaving: false,
+    };
+    await module.catalogoOpen.call(employee, {
+      product_id: 'servico-1', product_type: 'service', brand: null,
+      catalogued: true, price_amount: 100,
+    });
+    expect(employee.catalogoSelecionado).toBeNull();
+    expect(module.catalogoPodeSalvar.call(employee)).toBe(false);
+
+    const owner = {
+      ...employee,
+      adminUser: { role: 'owner' },
+      catalogoHistory: [],
+      catalogoMessage: null,
+      catalogoLoadHistory: vi.fn(),
+      $nextTick: vi.fn(),
+    };
+    await module.catalogoOpen.call(owner, {
+      product_id: 'servico-1', product_type: 'service', brand: null,
+      catalogued: true, price_amount: 100,
+    });
+    expect(owner.catalogoSelecionado).toMatchObject({ product_id: 'servico-1' });
+    expect(owner.catalogoMarcaCorrecao.open).toBe(false);
+
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('Catálogo em modo de consulta');
+    expect(html).toContain('x-show="adminUser?.role === \'owner\'" type="button" @click="catalogoOpen(row)"');
+    expect(html).toContain("row.product_type === 'service' ? 'Não se aplica'");
   });
 });
