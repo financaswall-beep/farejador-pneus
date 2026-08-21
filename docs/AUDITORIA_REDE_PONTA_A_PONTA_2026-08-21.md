@@ -150,5 +150,6 @@ dois painéis, 93 contratos, 238 rotas e `npm audit` sem vulnerabilidade. Backup
 **Veredito:** cobertura por cidade aprovada para deploy; banco de produção já preparado.
 O deploy e o smoke autenticado continuam sob responsabilidade do dono.
 
-Publicação: commit funcional `05c76ea`, PR `#68` contra `main`; aguardar CI e merge antes de
-acionar o Coolify e conferir o SHA final importado.
+Publicação: commit funcional `05c76ea`; PR `#68` aprovada pelo GitHub Actions no run
+`32489173112` e incorporada à `main`. SHA final de deploy:
+`007f224c10b4923223990b55ed1e8dfcc15bb46b`. O Coolify ainda não foi acionado.
