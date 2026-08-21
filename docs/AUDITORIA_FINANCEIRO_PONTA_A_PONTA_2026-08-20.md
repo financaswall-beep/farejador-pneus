@@ -204,12 +204,14 @@ Os dados de produção satisfizeram todas as novas proteções sem limpeza ou re
 2. [x] Aplicar `0190_finance_audit_consistency.sql` e confirmar materialmente o schema.
 3. [x] Repetir reconciliação somente leitura: `PASS`, com todos os contadores financeiros e
    da Etapa 3 em zero.
-4. [ ] Publicar e implantar o mesmo SHA aprovado. O deploy é feito pelo responsável do sistema.
-5. [ ] Executar smoke autenticado em desktop e celular:
+4. [x] Publicar e incorporar o código pela PR `#61`; `main` no SHA
+   `92ae93d73a33780adf801b0e2a33fb16a7f78906`.
+5. [ ] O responsável implantar esse mesmo SHA no Coolify.
+6. [ ] Executar smoke autenticado em desktop e celular:
    - Matriz: Caixa, Contas, Despesas, Vendas, Atacado, Compras e Colaboradores;
    - parceiro: venda à vista, fiado, entrega, retirada, conta a pagar/receber e relatório;
    - carga: saída, recusa parcial, acerto, recebimento e quitação.
-6. [ ] Repetir a reconciliação somente leitura depois do deploy e exigir todos os contadores
+7. [ ] Repetir a reconciliação somente leitura depois do deploy e exigir todos os contadores
    em zero.
 
 O smoke público atual abriu o painel e a tela de login em desktop e celular sem erro de
@@ -220,6 +222,6 @@ console. O smoke autenticado da versão corrigida só pode existir depois do dep
 **Financeiro da Matriz e dos parceiros: APROVADO EM CÓDIGO, INTEGRAÇÃO, MATEMÁTICA,
 SEGURANÇA E CONCORRÊNCIA.**
 
-**Banco de produção com a `0190`: APROVADO. Produção com o pacote completo: AINDA NÃO
-HOMOLOGADA**, exclusivamente porque o código ainda precisa ser implantado e o smoke
-pós-deploy ainda não aconteceu.
+**Banco de produção com a `0190` e código na `main`: APROVADOS. Produção com o pacote
+completo: AINDA NÃO HOMOLOGADA**, exclusivamente porque o responsável ainda precisa
+implantar o SHA aprovado e executar o smoke pós-deploy.

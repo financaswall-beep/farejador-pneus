@@ -17,8 +17,9 @@ continuam dependendo de evidência própria e não são presumidos por essa veri
 
 **Auditoria atual do Financeiro:** concluída em código em 20/08/2026. O relatório completo
 está em `docs/AUDITORIA_FINANCEIRO_PONTA_A_PONTA_2026-08-20.md`. A migration `0190` foi
-aplicada com backup e reconciliação `PASS`; o novo código ainda não foi implantado. A
-aprovação atual cobre código e banco, mas ainda não substitui o smoke pós-deploy.
+aplicada com backup e reconciliação `PASS`; o código foi incorporado pela PR `#61` à `main`
+no SHA `92ae93d73a33780adf801b0e2a33fb16a7f78906`. A aprovação atual cobre código e banco,
+mas ainda não substitui o deploy e o smoke pós-deploy.
 
 ## Como ler o veredito
 
@@ -544,6 +545,7 @@ Catálogo, CRM, Resumo e app.
 | Backup pré-0190 | 4.953.210 bytes; 2.580 entradas restauráveis; SHA-256 validado |
 | Migration `0190` em produção | **COMMIT aprovado** em 20/08/2026 às 23:51; schema material confirmado |
 | Reconciliação pós-migration | **PASS**; todos os 21 contadores da Etapa 3 em zero |
+| Publicação do código | PR `#61` aprovada pelo CI e incorporada à `main`; SHA `92ae93d73a33780adf801b0e2a33fb16a7f78906` |
 
 ### Correções centrais
 
@@ -560,7 +562,7 @@ Catálogo, CRM, Resumo e app.
 ### Veredito e continuidade
 
 **APROVADO EM CÓDIGO, BANCO, INTEGRAÇÃO, MATEMÁTICA, SEGURANÇA E CONCORRÊNCIA.** Backup,
-migration e reconciliação pós-migration foram concluídos. Restam publicar/incorporar o código,
-o responsável fazer o deploy, executar smoke autenticado e repetir a reconciliação pós-deploy.
+migration, reconciliação pós-migration, CI e incorporação à `main` foram concluídos. Restam o
+responsável fazer o deploy, executar smoke autenticado e repetir a reconciliação pós-deploy.
 
 Relatório reproduzível: `docs/AUDITORIA_FINANCEIRO_PONTA_A_PONTA_2026-08-20.md`.
