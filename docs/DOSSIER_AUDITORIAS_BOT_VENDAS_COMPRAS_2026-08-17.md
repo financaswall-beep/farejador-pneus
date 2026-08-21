@@ -8,7 +8,8 @@
 
 **Auditoria atual do Catálogo:** concluída em código e banco descartável em 21/08/2026.
 A migration aditiva `0197` foi aplicada no banco-alvo depois de backup validado, dry-run e
-reconciliação 8/8 zerada. O código ainda depende de publicação e deploy manual. A auditoria
+reconciliação 8/8 zerada. O código foi incorporado à `main` pela PR `#72`, no SHA
+`ab853b3aa8a99030c3d71e0150cfbd77a3d7042b`, com CI aprovado. Falta o deploy manual. A auditoria
 somente leitura encontrou apenas um produto de teste sem preço, corretamente impedido de vender.
 Relatório: `docs/AUDITORIA_CATALOGO_PONTA_A_PONTA_2026-08-21.md`.
 
@@ -822,7 +823,7 @@ coordenada, sem registrar seus valores neste documento.
 rotacionar os segredos, validar um contato novo e concluir o smoke visual autenticado. Relatório:
 `docs/AUDITORIA_CLIENTES_PONTA_A_PONTA_2026-08-21.md`.
 
-## 17. Auditoria concluída em código — Catálogo da Matriz e preços do parceiro
+## 17. Auditoria concluída — Catálogo da Matriz e preços do parceiro
 
 Catálogo foi cruzado com Caixa, Bot, Vendas, Compras, Estoque, Financeiro, Logística, Rede
 e PDV do parceiro. A auditoria confirmou a separação correta entre preço oficial da Matriz,
@@ -849,7 +850,9 @@ para venda. Não impede a migration nem os outros produtos.
 **Veredito:** Catálogo aprovado em código, matemática, integração, segurança, banco-alvo e
 auditoria somente leitura. A `0197` foi aplicada depois do backup restaurável de 5.018.607
 bytes, 2.658 entradas e SHA-256 validado; o dry-run, o commit e a reconciliação passaram.
-Ainda não está implantado: faltam publicação, deploy manual e smoke autenticado. Depois do Catálogo, a auditoria setorial
+A PR `#72` foi incorporada à `main` no SHA `ab853b3aa8a99030c3d71e0150cfbd77a3d7042b`,
+com o GitHub Actions aprovado. Ainda não está implantado: faltam deploy manual e smoke
+autenticado. Depois do Catálogo, a auditoria setorial
 profunda ainda pendente é **Marketing**; em seguida vêm os gates finais de produção,
 incluindo smoke autenticado geral, rotação dos segredos expostos, reautorização da Meta e
 decisão formal de go-live.
