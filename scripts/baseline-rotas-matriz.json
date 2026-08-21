@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-18T01:36:03.074Z",
-  "total": 236,
+  "geradoEm": "2026-08-21T13:22:13.814Z",
+  "total": 238,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -109,6 +109,7 @@
     "GET /admin/painel/app.marketing.journeys.js PUBLICA",
     "GET /admin/painel/app.marketing.js PUBLICA",
     "GET /admin/painel/app.montagem.js PUBLICA",
+    "GET /admin/painel/app.municipios.js PUBLICA",
     "GET /admin/painel/app.nav.js PUBLICA",
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",
     "GET /admin/painel/app.rede.apply.js PUBLICA",
@@ -236,6 +237,7 @@
     "POST /api/seja-parceiro PUBLICA",
     "PUT /admin/api/colaboradores/:collaboratorId/permissoes-operacao AUTH(1)",
     "PUT /admin/api/marketing/ad-accounts/:adAccountId/campaigns/:campaignId/scope AUTH(1)",
+    "PUT /admin/api/partners/:partnerUnitId/coverage AUTH(1)",
     "PUT /admin/api/partners/:partnerUnitId/delivery-radius AUTH(1)",
     "PUT /admin/api/partners/:partnerUnitId/network-orders AUTH(1)"
   ]

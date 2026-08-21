@@ -6,11 +6,16 @@ import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { createPartnerUnit, setPartnerUnitDeliveryRadius, setPartnerUnitNetworkOrders } from './queries.js';
+import {
+  createPartnerUnit,
+  setPartnerUnitCoverage,
+  setPartnerUnitDeliveryRadius,
+  setPartnerUnitNetworkOrders,
+} from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import {
   createPartnerSchema, setDeliveryRadiusBodySchema, setDeliveryRadiusParamsSchema,
-  setNetworkOrdersBodySchema,
+  setNetworkOrdersBodySchema, setPartnerCoverageBodySchema,
 } from './route-schemas.js';
 
 export async function registerPainelParceiros(fastify: FastifyInstance): Promise<void> {
@@ -89,6 +94,29 @@ export async function registerPainelParceiros(fastify: FastifyInstance): Promise
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel set network orders failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.put('/admin/api/partners/:partnerUnitId/coverage', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = setDeliveryRadiusParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_partner_unit_id' });
+    const body = setPartnerCoverageBodySchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await setPartnerUnitCoverage(
+        env.FAREJADOR_ENV,
+        params.data.partnerUnitId,
+        body.data.municipios,
+        operatorLabel(request),
+      );
+      if (!result.updated) return reply.status(404).send({ error: 'partner_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel set partner coverage failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

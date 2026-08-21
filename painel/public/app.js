@@ -31,14 +31,14 @@ function painelApp() {
     partnerResult: null,
     partnerForm: {
       trade_name: '', responsible_name: '', whatsapp_phone: '', email: '',
-      address: '', commission_percent: '', municipios: '', slug: '',
+      address: '', commission_percent: '', municipios: [], slug: '',
     },
     // Etapa 3: fila de candidaturas
     applicationsModalOpen: false,
     applications: [],
     applicationsLoading: false, applicationsError: null,
     approvingApp: null,
-    approveForm: { municipios: '', commission_percent: '', slug: '' },
+    approveForm: { municipios: [], commission_percent: '', slug: '' },
     approveSubmitting: false,
     approveError: null,
     approveResult: null,

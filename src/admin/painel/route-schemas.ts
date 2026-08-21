@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { assertWholesaleSaleMoney } from './sales-money.js';
 import { assertPartnerCommercialTerms } from './partner-commercial-terms.js';
+import { networkMunicipalitiesSchema, networkMunicipalitiesTextSchema } from '../../network/municipality-schema.js';
 
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
@@ -68,7 +69,7 @@ export const createPartnerSchema = z.object({
   commercial_model: z.enum(['commission', 'monthly', 'hybrid']).default('commission'),
   commission_percent: z.number().min(0).max(100).nullable().optional(),
   monthly_fee: z.number().min(0).nullable().optional(),
-  municipios: z.array(z.string().min(1)).default([]),
+  municipios: networkMunicipalitiesSchema,
   slug: z.string().min(1).nullable().optional(),
 }).superRefine((body, ctx) => {
   try {
@@ -97,6 +98,10 @@ export const setDeliveryRadiusBodySchema = z.object({
 // contrato comercial não se escolhe ambiente pelo navegador).
 export const setNetworkOrdersBodySchema = z.object({
   accepts_network_orders: z.boolean(),
+});
+
+export const setPartnerCoverageBodySchema = z.object({
+  municipios: networkMunicipalitiesSchema,
 });
 
 // ATACADO (Fase 1): venda de atacado da Matriz. Comprador = ficha existente
@@ -260,7 +265,7 @@ export const partnerApplicationSchema = z.object({
     z.string().max(160).nullable().optional(),
   ),
   address: z.string().trim().min(1).max(500).nullable().optional(),
-  municipios: z.string().trim().min(1).max(500).nullable().optional(),
+  municipios: networkMunicipalitiesTextSchema,
   message: z.string().max(1000).nullable().optional(),
   website: z.string().max(500).optional(),
 });
@@ -272,7 +277,7 @@ export const applicationsQuerySchema = z.object({
 // Aprovação: termos comerciais e cobertura REAL são definidos pelo dono aqui.
 export const approveApplicationSchema = z.object({
   idempotency_key: idempotencyKeySchema,
-  municipios: z.array(z.string().min(1)).min(1),
+  municipios: networkMunicipalitiesSchema,
   commission_percent: z.number().min(0).max(100).nullable().optional(),
   monthly_fee: z.number().min(0).nullable().optional(),
   commercial_model: z.enum(['commission', 'monthly', 'hybrid']).default('commission'),

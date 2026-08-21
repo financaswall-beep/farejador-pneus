@@ -82,6 +82,7 @@ window.PAINEL_MODULES.core = function () {
 
     async init() {
       if (!(await this.ensureCredentials())) return;
+      await this.loadNetworkMunicipalities();
       void this.loadRealData();
       // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
       // (flag off = resposta enabled:false, barata; a consulta é somente leitura).

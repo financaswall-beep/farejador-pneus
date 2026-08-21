@@ -63,6 +63,7 @@ export async function getPainelRede(
        pu.service_mode,
        COALESCE(pu.accepts_network_orders, true) AS accepts_network_orders, -- 0165: null (join vazio) = ligada
        pu.delivery_radius_km,
+       COALESCE(coverage.municipalities,'[]'::jsonb) AS coverage_municipalities,
        p.commercial_model,
        p.commission_percent,
        p.monthly_fee,
@@ -86,6 +87,14 @@ export async function getPainelRede(
        ON p.id = s.partner_id AND p.environment = s.environment
      LEFT JOIN network.partner_units pu
        ON pu.id = s.partner_unit_id AND pu.environment = s.environment
+     LEFT JOIN LATERAL (
+       SELECT jsonb_agg(city.municipio ORDER BY city.municipio) AS municipalities
+         FROM (
+           SELECT DISTINCT uc.municipio
+             FROM network.unit_coverage uc
+            WHERE uc.environment=s.environment AND uc.unit_id=s.unit_id
+         ) city
+     ) coverage ON true
      ${buildRedeAccountingJoins(period, periodStartSql)}
      LEFT JOIN LATERAL (
        SELECT COALESCE(sum(total_amount), 0) AS sales_total,

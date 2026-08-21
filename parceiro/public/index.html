@@ -3055,7 +3055,12 @@
               </div>
               <div class="cx-pick-row" style="grid-template-columns:1fr 1fr">
                 <label>Bairro <input x-model="lojaForm.address_neighborhood" placeholder="Centro" maxlength="160" /></label>
-                <label>Município <input x-model="lojaForm.address_city" placeholder="Ex: Niterói" maxlength="160" /></label>
+                <label>Município
+                  <select x-model="lojaForm.address_city" :disabled="!networkMunicipalities.length">
+                    <option value="">Selecione…</option>
+                    <template x-for="municipio in networkMunicipalities" :key="'loja-city-'+municipio"><option :value="municipio" x-text="municipio"></option></template>
+                  </select>
+                </label>
               </div>
               <div class="cx-pick-row" style="grid-template-columns:1fr 1fr">
                 <label>Complemento <input x-model="lojaForm.address_complement" placeholder="Loja 2, ponto de referência" maxlength="240" /></label>
@@ -3141,9 +3146,24 @@
               <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
                 <i data-lucide="info" style="width:13px;height:13px;"></i> O plano B de quando o cliente não manda a localização. Quem decide a entrega é o <b>raio em km</b> acima.
               </p>
-              <label>Cidade base da loja
-                <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
-              </label>
+              <label>Cidades atendidas</label>
+              <div style="border:1px solid var(--pos-border,#334155);border-radius:10px;padding:10px;background:var(--pos-card,#111827);">
+                <div x-show="areaMunicipalities.length" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px;">
+                  <template x-for="municipio in areaMunicipalities" :key="'area-'+municipio">
+                    <span style="display:inline-flex;align-items:center;gap:6px;border-radius:7px;background:rgba(16,185,129,.13);color:#6ee7b7;padding:6px 9px;font-size:12px;font-weight:700;">
+                      <span x-text="municipio"></span>
+                      <button type="button" @click="removeAreaMunicipality(municipio)" :aria-label="'Remover '+municipio"
+                              style="border:0;background:transparent;color:#34d399;padding:0;cursor:pointer;font-size:17px;line-height:1;">×</button>
+                    </span>
+                  </template>
+                </div>
+                <select x-model="areaMunicipalityChoice" @change="addAreaMunicipality()" :disabled="!networkMunicipalities.length"
+                        style="width:100%;border:1px solid var(--pos-border,#334155);border-radius:8px;padding:10px;background:var(--pos-input,#0f172a);color:inherit;">
+                  <option value="">Adicionar cidade…</option>
+                  <template x-for="municipio in availableNetworkMunicipalities(areaMunicipalities)" :key="'area-option-'+municipio"><option :value="municipio" x-text="municipio"></option></template>
+                </select>
+              </div>
+              <p x-show="networkMunicipalitiesError" style="color:#fb7185;font-size:12px;margin:6px 0 0;" x-text="networkMunicipalitiesError"></p>
 
               <button @click="saveAtendimento()" :disabled="saving || (!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada)" class="pos-form-submit success">
                 <i data-lucide="save"></i>
@@ -3426,6 +3446,7 @@
 <script src="./app.chat.js?v=20260611-onda-c"></script>
 <script src="./app.chat.cliente.js?v=20260731-condicao2"></script>
 <script src="./app.config.js?v=20260812-equipe-ativos1"></script>
+<script src="./app.config.municipios.js?v=20260821-cidades1"></script>
 <script src="./app.config.equipe.js?v=20260816-paineis-alinhados1"></script>
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>

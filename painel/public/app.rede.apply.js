@@ -187,6 +187,8 @@ window.PAINEL_MODULES.redeApply = function () {
           fazEntrega: (row.service_mode || 'both') === 'delivery' || (row.service_mode || 'both') === 'both',
           deliveryRadiusKm: (row.delivery_radius_km === null || row.delivery_radius_km === undefined)
             ? null : Number(row.delivery_radius_km),
+          municipios: (Array.isArray(row.coverage_municipalities) ? row.coverage_municipalities : [])
+            .map((name) => this.municipalityDisplayName(name)),
           comissaoPercent,
           mensalidadeValor,
           comissaoDevida,

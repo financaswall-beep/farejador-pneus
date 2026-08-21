@@ -150,6 +150,7 @@ window.PARCEIRO_MODULES.config = () => ({
     // permissões + funcionários). Só o dono chega aqui (backend é requireOwner cru).
     async loadConfiguracoes() {
       if (!this.isOwner) return;
+      await this.loadPartnerMunicipalities();
       await this.loadFuncionarios();
       try {
         const cfg = await this.api('configuracoes');
@@ -159,7 +160,7 @@ window.PARCEIRO_MODULES.config = () => ({
           address_street: loja.address_street || '',
           address_number: loja.address_number || '',
           address_neighborhood: loja.address_neighborhood || '',
-          address_city: loja.address_city || '',
+          address_city: this.municipalityDisplayName(loja.address_city || ''),
           address_complement: loja.address_complement || '',
           cep: loja.cep || '',
           opening_hours_text: loja.opening_hours_text || '',
@@ -172,10 +173,13 @@ window.PARCEIRO_MODULES.config = () => ({
             ? Number(loja.delivery_radius_km) : null,
         };
         this.coverageList = Array.isArray(cfg.coverage) ? cfg.coverage : [];
-        // Área: edita o município da loja (ou o 1º coberto). Só o município — a
-        // entrega é decidida pelo raio (aba Atendimento), não por bairros.
-        const baseMunicipio = (loja.address_city || (this.coverageList[0] && this.coverageList[0].municipio) || '').toString();
-        this.areaForm = { municipio: baseMunicipio };
+        this.areaMunicipalities = this.coverageList
+          .map((coverage) => this.municipalityDisplayName(coverage.municipio))
+          .filter((municipio) => this.networkMunicipalities.includes(municipio));
+        const addressMunicipality = this.municipalityDisplayName(loja.address_city || '');
+        if (!this.areaMunicipalities.length && this.networkMunicipalities.includes(addressMunicipality)) {
+          this.areaMunicipalities = [addressMunicipality];
+        }
         // Permissões: preenche os toggles com o efetivo do servidor.
         if (cfg.permissions && typeof cfg.permissions === 'object') {
           this.permForm = { ...this.permForm, ...cfg.permissions };
@@ -205,6 +209,9 @@ window.PARCEIRO_MODULES.config = () => ({
       if (!this.atendimentoForm.faz_entrega && !this.atendimentoForm.tem_retirada) {
         this.flash('Marque pelo menos uma opção: entrega ou retirada.'); return;
       }
+      if (!this.areaMunicipalities.length) {
+        this.flash('Escolha ao menos uma cidade atendida.'); return;
+      }
       // Raio só vale quando faz entrega. Vazio = null (não preenchido → fora da
       // entrega quando a Rede ligar o roteamento por proximidade). > 0 e ≤ 9999,99.
       let radius = null;
@@ -230,15 +237,10 @@ window.PARCEIRO_MODULES.config = () => ({
         });
         // Reflete o que o backend gravou (zera o raio quando não faz entrega).
         this.atendimentoForm.delivery_radius_km = radius;
-        // Bloco 1: a cidade base (era a aba "Área de entrega") salva junto. Só manda se
-        // preenchida — município vazio não bloqueia salvar o atendimento.
-        const municipio = (this.areaForm.municipio || '').trim();
-        if (municipio) {
-          await this.api('configuracoes/area', {
-            method: 'PUT',
-            body: JSON.stringify({ municipio, city_wide: true, neighborhoods: [] }),
-          });
-        }
+        await this.api('configuracoes/cobertura', {
+          method: 'PUT',
+          body: JSON.stringify({ municipios: this.areaMunicipalities }),
+        });
         this.flash('Atendimento salvo.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));

@@ -41,6 +41,7 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260810-chaverede1"></script>
+<script src="/admin/painel/app.municipios.js?v=20260821-cidades1"></script>
 <script src="/admin/painel/app.format.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260817-sales-integrity1"></script>
@@ -1763,6 +1764,37 @@
           <span x-show="chaveRedeMsg" class="text-xs text-emerald-600" x-text="chaveRedeMsg"></span>
         </div>
         <p class="mt-2 text-[11px] text-gray-400">Pedidos que já existem não são afetados, e você continua podendo mandar pedido manual pra esta loja.</p>
+      </div>
+
+      <!-- Cobertura por cidade: catálogo oficial, sem texto livre. -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5" x-effect="selectedParceiroIndex; syncCoverageForm()">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <div class="text-sm font-semibold text-gray-700">Cidades atendidas</div>
+          <span class="text-[11px] rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700" x-text="coverageMunicipios.length + (coverageMunicipios.length === 1 ? ' cidade' : ' cidades')"></span>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Plano B usado pela Rede quando o cliente informa a cidade, mas não manda a localização.</p>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <template x-for="municipio in coverageMunicipios" :key="'coverage-'+municipio">
+            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+              <span x-text="municipio"></span>
+              <button x-show="adminUser?.role === 'owner'" type="button" @click="removeMunicipality('coverageMunicipios', municipio)"
+                      class="ml-0.5 text-sm leading-none text-emerald-600 hover:text-rose-600" :aria-label="'Remover '+municipio">×</button>
+            </span>
+          </template>
+          <span x-show="!coverageMunicipios.length" class="text-xs font-medium text-amber-700">Nenhuma cidade definida.</span>
+        </div>
+        <div x-show="adminUser?.role === 'owner'" class="mt-3 flex flex-col gap-2 sm:flex-row">
+          <select x-model="coverageMunicipalityChoice" @change="addMunicipality('coverageMunicipios','coverageMunicipalityChoice')"
+                  class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm" :disabled="!networkMunicipalities.length">
+            <option value="">Adicionar cidade…</option>
+            <template x-for="municipio in availableNetworkMunicipalities(coverageMunicipios)" :key="'coverage-option-'+municipio"><option :value="municipio" x-text="municipio"></option></template>
+          </select>
+          <button @click="saveSelectedPartnerCoverage()" :disabled="coverageSaving || !coverageMunicipios.length"
+                  class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            <span x-text="coverageSaving ? 'Salvando...' : 'Salvar cidades'"></span>
+          </button>
+        </div>
+        <p x-show="coverageMsg" class="mt-2 text-xs" :class="coverageMsg.startsWith('Erro:') ? 'text-rose-600' : 'text-emerald-600'" x-text="coverageMsg"></p>
       </div>
 
       <!-- Entrega na Rede: raio de entrega (proximidade-primeiro Fase 2) -->
@@ -9088,8 +9120,22 @@
               <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div class="md:col-span-2">
                   <label class="text-xs font-medium text-gray-700 block mb-1">Cidades que ele vai atender (cobertura) *</label>
-                  <input x-model="approveForm.municipios" type="text" placeholder="Niterói, São Gonçalo"
-                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
+                  <div class="min-h-11 rounded-lg border border-gray-200 bg-white p-2">
+                    <div class="mb-2 flex flex-wrap gap-1.5" x-show="approveForm.municipios.length">
+                      <template x-for="municipio in approveForm.municipios" :key="'approve-'+municipio">
+                        <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                          <span x-text="municipio"></span>
+                          <button type="button" @click="removeMunicipality('approveForm.municipios', municipio)" class="ml-0.5 text-sm leading-none text-emerald-600 hover:text-rose-600" :aria-label="'Remover '+municipio">×</button>
+                        </span>
+                      </template>
+                    </div>
+                    <select x-model="approveMunicipalityChoice" @change="addMunicipality('approveForm.municipios','approveMunicipalityChoice')"
+                            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm" :disabled="!networkMunicipalities.length">
+                      <option value="">Escolha uma cidade…</option>
+                      <template x-for="municipio in availableNetworkMunicipalities(approveForm.municipios)" :key="'approve-option-'+municipio"><option :value="municipio" x-text="municipio"></option></template>
+                    </select>
+                  </div>
+                  <p x-show="networkMunicipalitiesError" class="mt-1 text-xs text-rose-600" x-text="networkMunicipalitiesError"></p>
                 </div>
                 <div>
                   <label class="text-xs font-medium text-gray-700 block mb-1">Comissão (%) *</label>
@@ -9228,8 +9274,23 @@
           <input x-model="partnerForm.address" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
         </div>
         <div>
-          <label class="text-xs font-medium text-gray-700 mb-1 block">Cidades que atende * <span class="text-gray-400">(separadas por vírgula)</span></label>
-          <input x-model="partnerForm.municipios" type="text" placeholder="Niterói, São Gonçalo" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          <label class="text-xs font-medium text-gray-700 mb-1 block">Cidades que atende *</label>
+          <div class="min-h-11 rounded-lg border border-gray-200 bg-white p-2">
+            <div class="mb-2 flex flex-wrap gap-1.5" x-show="partnerForm.municipios.length">
+              <template x-for="municipio in partnerForm.municipios" :key="'partner-'+municipio">
+                <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                  <span x-text="municipio"></span>
+                  <button type="button" @click="removeMunicipality('partnerForm.municipios', municipio)" class="ml-0.5 text-sm leading-none text-emerald-600 hover:text-rose-600" :aria-label="'Remover '+municipio">×</button>
+                </span>
+              </template>
+            </div>
+            <select x-model="partnerMunicipalityChoice" @change="addMunicipality('partnerForm.municipios','partnerMunicipalityChoice')"
+                    class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm" :disabled="!networkMunicipalities.length">
+              <option value="">Escolha uma cidade…</option>
+              <template x-for="municipio in availableNetworkMunicipalities(partnerForm.municipios)" :key="'partner-option-'+municipio"><option :value="municipio" x-text="municipio"></option></template>
+            </select>
+          </div>
+          <p x-show="networkMunicipalitiesError" class="mt-1 text-xs text-rose-600" x-text="networkMunicipalitiesError"></p>
         </div>
         <div>
           <label class="text-xs font-medium text-gray-700 mb-1 block">Endereço de acesso (slug) <span class="text-gray-400">(opcional — gerado do nome)</span></label>

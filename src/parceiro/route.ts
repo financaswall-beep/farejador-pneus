@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { networkMunicipalityNameSchema } from '../network/municipality-schema.js';
 import { requirePartnerAuth, requireOwner, requireScreen, requireAnyScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
 import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
@@ -17,6 +18,7 @@ import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
 // as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
 import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
+import { registerPartnerCoverageRoute } from './route-coverage.js';
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -295,12 +297,16 @@ async function requireDismissibleScreen(request: PartnerAuthedRequest, reply: Fa
 
 // ─── Configurações da Loja (Fase 1) ───
 // Dados da loja: nome de exibição obrigatório; endereço estruturado + horário (texto livre).
+const optionalNetworkMunicipalitySchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
+  networkMunicipalityNameSchema.nullable().optional(),
+);
 const configLojaSchema = z.object({
   display_name: z.string().trim().min(1).max(200),
   address_street: z.string().trim().max(240).nullable().optional(),
   address_number: z.string().trim().max(40).nullable().optional(),
   address_neighborhood: z.string().trim().max(160).nullable().optional(),
-  address_city: z.string().trim().max(160).nullable().optional(),
+  address_city: optionalNetworkMunicipalitySchema,
   address_complement: z.string().trim().max(240).nullable().optional(),
   cep: z.string().trim().max(20).nullable().optional(),
   opening_hours_text: z.string().trim().max(500).nullable().optional(),
@@ -322,7 +328,7 @@ const configAtendimentoSchema = z.object({
 
 // Área de entrega: cidade inteira vs bairros específicos (Fase 1 = declarativo).
 const configAreaSchema = z.object({
-  municipio: z.string().trim().min(1).max(160),
+  municipio: networkMunicipalityNameSchema,
   city_wide: z.boolean(),
   neighborhoods: z.array(z.string().trim().min(1).max(160)).max(200).optional(),
 }).refine((d) => d.city_wide || (Array.isArray(d.neighborhoods) && d.neighborhoods.length > 0), {
@@ -463,6 +469,7 @@ function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boole
 }
 
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
+  registerPartnerCoverageRoute(fastify);
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
     if (retireLegacyMobile(request, reply)) return;

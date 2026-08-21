@@ -274,6 +274,7 @@ function parceiroApp() {
     window.PARCEIRO_MODULES.chat, // passo 5: nucleo do Bate-papo (SSE/poll, conversas, enviar)
     window.PARCEIRO_MODULES.chatCliente, // passo 5: cliente vinculado + carrinho do chat
     window.PARCEIRO_MODULES.config, // passo 6: isOwner/canSee + funcionarios + configuracoes da loja
+    window.PARCEIRO_MODULES.configMunicipios, // catálogo oficial + chips das cidades atendidas
     window.PARCEIRO_MODULES.configEquipe, // passo 6: Bloco 2 — acesso + comissão POR PESSOA (drawer Equipe)
     window.PARCEIRO_MODULES.comissao, // passo 6: Bloco 2 telas #2/#3 — Comissão da equipe (dono) + Meu desempenho (chip)
     window.PARCEIRO_MODULES.estoqueKpis, // passo 7: KPIs/filtros/series de estoque + stockAvailable 0076
