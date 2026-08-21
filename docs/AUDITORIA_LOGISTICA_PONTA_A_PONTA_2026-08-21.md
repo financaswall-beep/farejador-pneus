@@ -5,7 +5,9 @@
 **Banco:** produção auditada, migration aplicada e PostgreSQL 17 descartável
 **Situação:** auditoria concluída; 12 correções implementadas e aprovadas; migration `0191`
 aplicada materialmente após backup validado; código incorporado à `main` pela PR `#63` no
-SHA `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; deploy ainda pendente
+SHA funcional `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; handoff consolidado pela
+PR `#64`; `main` confirmada no SHA `a758bb6e17f66d0335ba434799f4917c3f6f9633`
+com CI de `push` aprovado; deploy ainda pendente
 
 ## 1. Veredito executivo
 
@@ -354,6 +356,9 @@ nenhuma funcionalidade sugerida nas seções 6 e 9 foi implementada.
 - A reconciliação de `prod` retornou zero nos 21 contadores. O ambiente isolado `test`
   manteve nove ajustes de inventário históricos sem ledger, anteriores a esta entrega;
   nenhuma linha foi apagada ou misturada com `prod`.
+- A PR funcional `#63` e a PR documental `#64` foram incorporadas à `main`. O CI de `push`
+  da `main` concluiu com sucesso no run `32449374390`, incluindo fiscal de tamanho,
+  checksums, TypeScript, unitários, integrações e build.
 
 Os logs `terminating connection due to administrator command` continuam sendo apenas o
 encerramento intencional dos PostgreSQL descartáveis depois de cada grupo aprovado.
@@ -362,6 +367,8 @@ encerramento intencional dos PostgreSQL descartáveis depois de cada grupo aprov
 
 **LOGÍSTICA APROVADA EM CÓDIGO, BANCO, INTEGRAÇÃO, MATEMÁTICA, SEGURANÇA E CONCORRÊNCIA
 PARA DEPLOY.** A migration `0191` já está aplicada e confirmada materialmente, e o código foi
-incorporado à `main` pela PR `#63`. Ainda não é uma aprovação do runtime novo em execução: o
-responsável precisa fazer o deploy do SHA publicado e o smoke autenticado pós-deploy precisa
-confirmar Matriz, entregador e parceiro.
+incorporado à `main` pela PR `#63`; o handoff foi consolidado pela PR `#64` e o CI final da
+`main` passou. Ainda não é uma aprovação do runtime novo em execução: o responsável precisa
+fazer o deploy do `HEAD` publicado da `main` e o smoke autenticado pós-deploy precisa confirmar
+Matriz, entregador e parceiro. Atualizações documentais posteriores não mudam o runtime
+funcional aprovado.
