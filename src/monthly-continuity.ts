@@ -4,6 +4,7 @@ import { env } from './shared/config/env.js';
 import { logger } from './shared/logger.js';
 import { closeMatrizWeeklyCommissions } from './admin/caixa/operation-commissions.js';
 import { closeMatrizWeeklySalaries } from './admin/caixa/operation-salary-rollover.js';
+import { sweepCommissionEntries } from './admin/painel/queries-comissoes.js';
 
 const MONTHLY_CONTINUITY_INTERVAL_MS = 60 * 60_000;
 
@@ -71,8 +72,11 @@ export function startMonthlyContinuityScheduler(): () => void {
   const loop = async (): Promise<void> => {
     if (stopped) return;
     try {
+      const commissionSweep = env.NETWORK_COMMISSION_LEDGER
+        ? await sweepCommissionEntries(env.FAREJADOR_ENV)
+        : null;
       const result = await runMonthlyContinuityCycle();
-      logger.info(result, 'monthly continuity cycle completed');
+      logger.info({ ...result, commission_sweep: commissionSweep }, 'monthly continuity cycle completed');
     } catch (error) {
       // Deploy sem a migration ainda aplicada nao derruba o sistema. O proximo
       // ciclo recupera automaticamente todas as competencias que ficaram para tras.

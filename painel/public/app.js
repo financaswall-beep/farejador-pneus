@@ -36,7 +36,7 @@ function painelApp() {
     // Etapa 3: fila de candidaturas
     applicationsModalOpen: false,
     applications: [],
-    applicationsLoading: false,
+    applicationsLoading: false, applicationsError: null,
     approvingApp: null,
     approveForm: { municipios: '', commission_percent: '', slug: '' },
     approveSubmitting: false,
@@ -112,7 +112,7 @@ function painelApp() {
     varejoResumo: null, // null = ainda não carregou (cards caem no cálculo da lista)
     varejoPeriodo: 'tudo',
     // ── REDE — comissões como lançamento (0118, flag NETWORK_COMMISSION_LEDGER) ──
-    comissoes: null, // null ou enabled:false = flag desligada (o bloco some sozinho)
+    comissoes: null, comissoesUnavailable: false, // null/enabled:false = flag desligada; unavailable = falha
     comissaoSettling: null, // partner_id em quitação (trava o botão Recebi)
     comissaoRefunding: null, // reversal_id em devolução (0146)
     termsForm: { model: 'commission', percent: '', fee: '' }, // editor do modelo comercial
@@ -197,7 +197,7 @@ function painelApp() {
       receipt_status: 'received', idempotency_key: '',
       items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }],
     },
-    redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
+    redePeriod: localStorage.getItem('farejador_rede_period') || 'month', redeFunnelUnassigned: 0,
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [{ id: 'today', label: 'Hoje' }, { id: '7d', label: '7 dias' },
       { id: '30d', label: '30 dias' }, { id: 'month', label: 'Mês atual' }],

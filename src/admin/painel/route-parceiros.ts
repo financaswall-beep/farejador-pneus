@@ -14,17 +14,21 @@ import {
 } from './route-schemas.js';
 
 export async function registerPainelParceiros(fastify: FastifyInstance): Promise<void> {
-  fastify.post('/admin/api/partners', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/partners', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = createPartnerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await createPartnerUnit({ ...parsed.data, actor_label: operatorLabel(request) });
+      const result = await createPartnerUnit({
+        ...parsed.data,
+        environment: env.FAREJADOR_ENV,
+        actor_label: operatorLabel(request),
+      });
       if (result.already_exists) {
         return reply.status(409).send({ error: 'slug_already_exists', slug: result.slug });
       }
-      return reply.status(201).send(result);
+      return reply.status(result.replayed ? 200 : 201).send(result);
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel create partner failed');
@@ -41,9 +45,10 @@ export async function registerPainelParceiros(fastify: FastifyInstance): Promise
     if (!body.success) {
       return reply.status(400).send({ error: body.error.issues[0]?.message ?? 'invalid_body' });
     }
-    const environment = body.data.environment ?? env.FAREJADOR_ENV;
     try {
-      const result = await setPartnerUnitDeliveryRadius(environment, params.data.partnerUnitId, body.data.delivery_radius_km);
+      const result = await setPartnerUnitDeliveryRadius(
+        env.FAREJADOR_ENV, params.data.partnerUnitId, body.data.delivery_radius_km,
+      );
       if (!result.updated) {
         if (result.reason === 'not_found') return reply.status(404).send({ error: 'partner_not_found' });
         if (result.reason === 'pickup_only') return reply.status(409).send({ error: 'partner_pickup_only' });

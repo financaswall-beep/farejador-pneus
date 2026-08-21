@@ -40,6 +40,14 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (err.message === 'idempotency_key_required') {
     return { status: 400, error: err.message };
   }
+  if (['invalid_percent','invalid_fee','commission_percent_required',
+       'commission_percent_not_applicable','monthly_fee_required',
+       'monthly_fee_not_applicable'].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
+  if (err.message === 'slug_already_exists') {
+    return { status: 409, error: err.message };
+  }
   if (['receipt_not_reviewable', 'receipt_processing', 'receipt_suggestion_stale',
        'receipt_possible_duplicate_confirmation_required',
        'receipt_legacy_expense_confirmation_required',

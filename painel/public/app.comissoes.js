@@ -9,8 +9,10 @@ window.PAINEL_MODULES.comissoes = function () {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.comissoes = (await this.apiGet('/admin/api/rede/comissoes')) || null;
+        this.comissoesUnavailable = false;
       } catch (err) {
-        this.comissoes = null; // sem resposta = bloco some (não inventa número)
+        this.comissoes = null;
+        this.comissoesUnavailable = true;
       }
     },
     async settleComissao(p) {
@@ -82,14 +84,27 @@ window.PAINEL_MODULES.comissoes = function () {
     async salvarTerms() {
       const p = this.selectedParceiro();
       if (!p || !p.partnerId) return;
+      const model = this.termsForm.model;
+      const percent = model === 'monthly' ? null
+        : (this.termsForm.percent === '' ? null : Number(this.termsForm.percent));
+      const fee = model === 'commission' ? null
+        : (this.termsForm.fee === '' ? null : Number(this.termsForm.fee));
+      if ((model === 'commission' || model === 'hybrid') && percent === null) {
+        this.termsMsg = 'Informe a comissão, mesmo quando for 0%.';
+        return;
+      }
+      if ((model === 'monthly' || model === 'hybrid') && fee === null) {
+        this.termsMsg = 'Informe a mensalidade, mesmo quando for R$ 0,00.';
+        return;
+      }
       this.termsSaving = true;
       this.termsMsg = null;
       try {
         await this.apiPost(`/admin/api/partners/${p.partnerId}/terms`, {
           idempotency_key: this.termsForm.idempotency_key,
-          commercial_model: this.termsForm.model,
-          commission_percent: this.termsForm.percent === '' ? null : Number(this.termsForm.percent),
-          monthly_fee: this.termsForm.fee === '' ? null : Number(this.termsForm.fee),
+          commercial_model: model,
+          commission_percent: percent,
+          monthly_fee: fee,
         });
         this.termsMsg = 'Salvo ✓';
         this.termsForm.idempotency_key = `partner-terms-${p.partnerId}-${crypto.randomUUID()}`;

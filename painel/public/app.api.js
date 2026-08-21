@@ -42,6 +42,8 @@ function recoverPendingIntegrityOperations(state) {
         label: 'a entrada de estoque anterior', message: 'stockMsg' },
       { scope: 'stock-manual-decrement', domain: 'stock.manual_decrement',
         label: 'a baixa de estoque anterior', message: 'stockMsg' },
+      { scope: 'partner-create', domain: 'partner.create',
+        label: 'o cadastro de parceiro anterior', message: 'partnerError', plainMessage: true },
     ];
     const recovered = [];
     const unresolved = [];
@@ -54,8 +56,17 @@ function recoverPendingIntegrityOperations(state) {
         });
         if (resolution.status === 'completed') {
           window.PAINEL_INTEGRITY.complete(form.scope, 'form');
-          state[form.message] = { ok: true,
-            text: `O servidor confirmou ${form.label} após a recarga. Nenhum lançamento foi repetido.` };
+          if (form.scope === 'partner-create') {
+            state.partnerResult = {
+              ...(resolution.result || {}),
+              credential_reissue_required: true,
+            };
+            state.partnerModalOpen = true;
+          }
+          state[form.message] = form.plainMessage
+            ? `O servidor confirmou ${form.label} após a recarga. Nenhum cadastro foi repetido.`
+            : { ok: true,
+              text: `O servidor confirmou ${form.label} após a recarga. Nenhum lançamento foi repetido.` };
           recovered.push(form.label);
         } else if (resolution.status === 'incomplete') {
           unresolved.push(form.label);

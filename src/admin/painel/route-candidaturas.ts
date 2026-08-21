@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { approvePartnerApplication, createPartnerApplication, listPartnerApplications, reissuePartnerCredential, rejectPartnerApplication } from './queries.js';
@@ -47,14 +47,14 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
     sendStatic(reply, 'seja-parceiro.html', 'text/html; charset=utf-8'));
 
   // ADMIN: fila de candidaturas.
-  fastify.get('/admin/api/partner-applications', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.get('/admin/api/partner-applications', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = applicationsQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send(dashboardPayload(await listPartnerApplications(parsed.data.status)));
   });
 
   // ADMIN: aprovar candidatura → cria o parceiro (login + cobertura) e marca approved.
-  fastify.post('/admin/api/partner-applications/:id/approve', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/partner-applications/:id/approve', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = approveApplicationSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     const { id } = request.params as { id: string };
@@ -80,7 +80,7 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
   });
 
   // ADMIN: recusar candidatura.
-  fastify.post('/admin/api/partner-applications/:id/reject', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/partner-applications/:id/reject', { preHandler: requireAdminOwner }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = (request.body ?? {}) as { notes?: string };
     try {
@@ -93,7 +93,7 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
     }
   });
 
-  fastify.post('/admin/api/partner-units/:id/reissue-token', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/partner-units/:id/reissue-token', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = reissueCredentialSchema.safeParse(request.body);
     const { id } = request.params as { id: string };
     if (!parsed.success || !z.string().uuid().safeParse(id).success) {

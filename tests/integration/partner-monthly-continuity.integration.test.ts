@@ -288,7 +288,7 @@ describe('continuidade mensal do parceiro', () => {
     const fixture = await createPartnerFixture(db.pool);
     await db.pool.query(
       `UPDATE network.partners
-          SET commercial_model='monthly',monthly_fee=150,status='active'
+          SET commercial_model='monthly',commission_percent=NULL,monthly_fee=150,status='active'
         WHERE environment='test' AND id=$1`,
       [fixture.partnerId],
     );

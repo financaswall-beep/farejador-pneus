@@ -175,7 +175,7 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
     const fixture = await createPartnerFixture(db.pool);
     await db.pool.query(
       `UPDATE network.partners
-          SET commercial_model='monthly',monthly_fee=150 WHERE id=$1`,
+          SET commercial_model='monthly',commission_percent=NULL,monthly_fee=150 WHERE id=$1`,
       [fixture.partnerId],
     );
     const currentCompetence = await db.pool.query<{ competence: string }>(

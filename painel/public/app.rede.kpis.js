@@ -118,7 +118,12 @@ window.PAINEL_MODULES.redeKpis = function () {
     },
 
     redeTotalMensalidade() {
-      return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.mensalidadeDevida || 0), 0);
+      const byPartner = new Map();
+      for (const parceiro of this.parceirosRede) {
+        if (!parceiro.partnerId || byPartner.has(parceiro.partnerId)) continue;
+        byPartner.set(parceiro.partnerId, Number(parceiro.mensalidadeDevida || 0));
+      }
+      return [...byPartner.values()].reduce((sum, amount) => sum + amount, 0);
     },
 
     redeTotalDevido() {
@@ -133,19 +138,24 @@ window.PAINEL_MODULES.redeKpis = function () {
       return !!(this.comissoes && this.comissoes.enabled);
     },
     redeComissaoAReceber() {
+      if (this.comissoesUnavailable) return null;
       return this.livroComissaoOn() ? Number(this.comissoes.total_aberto || 0) : this.redeTotalComissao();
     },
     redeAReceberTotal() {
-      return this.redeTotalMensalidade() + this.redeComissaoAReceber();
+      const commission = this.redeComissaoAReceber();
+      return commission === null ? null : this.redeTotalMensalidade() + commission;
     },
     parceiroComissaoAReceber(p) {
       if (!p) return 0;
+      if (this.comissoesUnavailable) return null;
       if (!this.livroComissaoOn()) return Number(p.comissaoDevida || 0);
       const hit = (this.comissoes.partners || []).find((x) => x.partner_id === p.partnerId);
       return hit ? Number(hit.open_total || 0) : 0;
     },
     parceiroAReceberTotal(p) {
-      return p ? Number(p.mensalidadeDevida || 0) + this.parceiroComissaoAReceber(p) : 0;
+      if (!p) return 0;
+      const commission = this.parceiroComissaoAReceber(p);
+      return commission === null ? null : Number(p.mensalidadeDevida || 0) + commission;
     },
 
     redeConversao2w() {

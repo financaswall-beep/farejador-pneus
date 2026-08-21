@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth, requireAdminOwner } from '../auth.js';
+import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
@@ -151,6 +151,9 @@ export async function registerPainelIntegrity(fastify: FastifyInstance): Promise
     const parsed = resolveIntegrityOperationSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    if (parsed.data.domain === 'partner.create' && getAdminContext(request).role !== 'owner') {
+      return reply.status(403).send({ error: 'admin_owner_required' });
     }
     const client = await pool.connect();
     try {

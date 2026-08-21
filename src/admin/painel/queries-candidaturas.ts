@@ -7,6 +7,7 @@ import {
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
 import { createPartnerUnitWithClient, type CreatePartnerResult } from './queries-parceiros.js';
+import type { PartnerCommercialModel } from './partner-commercial-terms.js';
 
 export interface PartnerApplicationInput {
   environment?: 'prod' | 'test';
@@ -58,7 +59,7 @@ export interface ApproveApplicationInput {
   municipios: string[];
   commission_percent?: number | null;
   monthly_fee?: number | null;
-  commercial_model?: string | null;
+  commercial_model?: PartnerCommercialModel | null;
   slug?: string | null;
 }
 
@@ -231,23 +232,36 @@ export async function reissuePartnerCredential(
         WHERE environment=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE`,
       [environment,input.partner_unit_id]);
     if (!unit.rows[0]) throw new Error('partner_unit_not_found');
-    const revoked = await client.query(
-      `UPDATE network.partner_access_tokens SET revoked_at=now()
-        WHERE environment=$1 AND partner_unit_id=$2 AND revoked_at IS NULL
-          AND last_used_at IS NULL`, [environment,input.partner_unit_id]);
+    const account = await client.query<{ id: string }>(
+      `SELECT id FROM network.partner_access_tokens
+        WHERE environment=$1 AND partner_unit_id=$2 AND role='owner'
+          AND revoked_at IS NULL
+        ORDER BY (person_id IS NOT NULL) DESC,(login_password_hash IS NOT NULL) DESC,
+                 created_at,id
+        LIMIT 1 FOR UPDATE`,
+      [environment,input.partner_unit_id]);
+    if (!account.rows[0]) throw new Error('partner_owner_account_not_found');
+    const consumed = await client.query(
+      `UPDATE network.partner_access_tokens SET raw_access_consumed_at=now()
+        WHERE environment=$1 AND partner_unit_id=$2 AND role='owner'
+          AND revoked_at IS NULL AND raw_access_consumed_at IS NULL`,
+      [environment,input.partner_unit_id]);
     const token = randomBytes(32).toString('hex');
-    const inserted = await client.query<{ id: string }>(
-      `INSERT INTO network.partner_access_tokens
-        (environment,partner_unit_id,token_hash,label,created_by,role)
-       VALUES ($1,$2,network.hash_partner_token($3),$4,$5,'owner') RETURNING id`,
-      [environment,input.partner_unit_id,token,
-       `reissue_${new Date().toISOString().slice(0,10)}`,input.actor_label]);
+    const rotated = await client.query<{ id: string }>(
+      `UPDATE network.partner_access_tokens
+          SET recovery_token_hash=network.hash_partner_token($3),
+              recovery_token_consumed_at=NULL
+        WHERE environment=$1 AND id=$2 AND revoked_at IS NULL
+        RETURNING id`,
+      [environment,account.rows[0].id,token]);
+    if (!rotated.rows[0]) throw new Error('partner_owner_account_not_found');
     const result = integrityResult({ partner_unit_id: input.partner_unit_id,
-      token_id: inserted.rows[0]!.id,slug: unit.rows[0].slug });
+      token_id: rotated.rows[0].id,slug: unit.rows[0].slug });
     await recordIntegrityEvent(client,{ environment,domain: 'network',
       entityTable: 'network.partner_units',entityId: input.partner_unit_id,
       eventType: 'partner_credential_reissued',actorLabel: input.actor_label,
-      idempotencyKey: input.idempotency_key,before: { unused_tokens_revoked: revoked.rowCount ?? 0 },
+      idempotencyKey: input.idempotency_key,
+      before: { raw_owner_tokens_consumed: consumed.rowCount ?? 0 },
       after: { ...result,reason: input.reason } });
     await completeIntegrityOperation(client,operation,'network.partner_units',
       input.partner_unit_id,result);

@@ -20,6 +20,7 @@ async function main(): Promise<void> {
   try {
     created = await createPartnerUnit({
       environment: ENV,
+      idempotency_key: `test-create-partner-${Date.now()}`,
       trade_name: 'Teste Onboarding Niteroi',
       responsible_name: 'Fulano Teste',
       whatsapp_phone: '+5521999990000',

@@ -117,7 +117,8 @@ window.PAINEL_MODULES.redeApply = function () {
 
         // ─── Cobrança matriz↔parceiro ──────────────────────────────
         // Base da comissão = vendas de origem 2W (o que a matriz trouxe).
-        // Mensalidade é valor fixo do mês. O modelo comercial decide o que incide.
+        // Mensalidade em aberto vem do livro financeiro real; o valor do contrato
+        // continua separado para edicao e nunca vira cobranca por estimativa.
         const modeloComercialRaw = row.commercial_model || 'commission';
         const comissaoPercent = row.commission_percent === null || row.commission_percent === undefined
           ? null
@@ -126,9 +127,9 @@ window.PAINEL_MODULES.redeApply = function () {
           ? null
           : Number(row.monthly_fee);
         const cobraComissao = modeloComercialRaw === 'commission' || modeloComercialRaw === 'hybrid';
-        const cobraMensalidade = modeloComercialRaw === 'monthly' || modeloComercialRaw === 'hybrid';
         const comissaoDevida = cobraComissao && comissaoPercent ? vendas2w * (comissaoPercent / 100) : 0;
-        const mensalidadeDevida = cobraMensalidade && mensalidadeValor ? mensalidadeValor : 0;
+        // Dívida já lançada sobrevive à troca futura de modelo comercial.
+        const mensalidadeDevida = Number(row.monthly_fee_open_total || 0);
         const devidoMatriz = comissaoDevida + mensalidadeDevida;
 
         return {

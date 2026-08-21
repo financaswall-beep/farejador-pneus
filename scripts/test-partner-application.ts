@@ -33,6 +33,7 @@ async function main(): Promise<void> {
     created = await approvePartnerApplication({
       application_id: appId, actor_label: 'test:etapa3',
       municipios: ['São Gonçalo'], commission_percent: 12,
+      idempotency_key: `approve-test-${appId}`,
     });
     check('3. aprovou e criou o parceiro', created.already_exists === false && !!created.partner_id);
     check('4. parceiro nasce com login (token)', typeof created.token === 'string' && created.token!.length === 64);

@@ -5,9 +5,17 @@ import type { Pool, PoolClient } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import {
+  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  operationFingerprint, recordIntegrityEvent,
+} from './stage5-integrity.js';
+import {
+  assertPartnerCommercialTerms, type PartnerCommercialModel,
+} from './partner-commercial-terms.js';
 
 export interface CreatePartnerInput {
   environment?: 'prod' | 'test';
+  idempotency_key?: string;
   trade_name: string;                 // nome fantasia (obrigatório)
   legal_name?: string | null;
   document_number?: string | null;
@@ -15,7 +23,7 @@ export interface CreatePartnerInput {
   whatsapp_phone?: string | null;
   email?: string | null;
   address?: string | null;
-  commercial_model?: string | null;   // termos comerciais: definidos pela matriz na criação/aprovação
+  commercial_model?: PartnerCommercialModel | null; // termos definidos pela matriz
   commission_percent?: number | null;
   monthly_fee?: number | null;
   municipios: string[];               // cobertura — cidades que o parceiro atende
@@ -30,6 +38,8 @@ export interface CreatePartnerResult {
   partner_unit_id?: string;
   slug?: string;
   token?: string;                     // texto puro, UMA vez (só quando criado de fato)
+  replayed?: boolean;
+  credential_reissue_required?: boolean;
 }
 
 interface CreatePartnerUnitOptions { sourceApplicationId?: string | null }
@@ -62,6 +72,14 @@ export async function createPartnerUnitWithClient(
   options: CreatePartnerUnitOptions = {},
 ): Promise<CreatePartnerResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  const commercialModel = input.commercial_model ?? 'commission';
+  const commissionPercent = input.commission_percent ?? null;
+  const monthlyFee = input.monthly_fee ?? null;
+  assertPartnerCommercialTerms({
+    commercial_model: commercialModel,
+    commission_percent: commissionPercent,
+    monthly_fee: monthlyFee,
+  });
   const baseSlug = slugify(input.slug || input.trade_name);
   if (!baseSlug) throw new Error('trade_name_or_slug_required');
   const explicitSlug = !!input.slug;
@@ -98,7 +116,7 @@ export async function createPartnerUnitWithClient(
         environment, input.legal_name ?? input.trade_name, input.trade_name,
         input.document_number ?? null, input.responsible_name ?? null,
         input.whatsapp_phone ?? null, input.email ?? null, input.address ?? null,
-        input.commercial_model ?? 'commission', input.commission_percent ?? null, input.monthly_fee ?? null,
+        commercialModel, commissionPercent, monthlyFee,
       ],
     );
   const partnerId = partnerRes.rows[0]!.id;
@@ -143,12 +161,61 @@ export async function createPartnerUnit(
   input: CreatePartnerInput,
   dbPool: Pool = defaultPool,
 ): Promise<CreatePartnerResult> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const operation = {
+    environment,
+    domain: 'partner.create',
+    idempotencyKey: input.idempotency_key ?? '',
+    fingerprint: operationFingerprint({
+      trade_name: input.trade_name,
+      legal_name: input.legal_name ?? null,
+      document_number: input.document_number ?? null,
+      responsible_name: input.responsible_name ?? null,
+      whatsapp_phone: input.whatsapp_phone ?? null,
+      email: input.email ?? null,
+      address: input.address ?? null,
+      commercial_model: input.commercial_model ?? 'commission',
+      commission_percent: input.commission_percent ?? null,
+      monthly_fee: input.monthly_fee ?? null,
+      municipios: input.municipios,
+      slug: input.slug ?? null,
+    }),
+  };
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const result = await createPartnerUnitWithClient(input, client);
+    const replay = await beginIntegrityOperation<CreatePartnerResult>(client, operation);
+    if (replay.replayed) {
+      await client.query('COMMIT');
+      return {
+        ...replay.result,
+        replayed: true,
+        credential_reissue_required: true,
+      };
+    }
+    const created = await createPartnerUnitWithClient({ ...input, environment }, client);
+    if (created.already_exists || !created.partner_unit_id
+      || !created.partner_id || !created.unit_id) {
+      throw new Error('slug_already_exists');
+    }
+    const stable = integrityResult({
+      already_exists: false,
+      partner_id: created.partner_id,
+      unit_id: created.unit_id,
+      partner_unit_id: created.partner_unit_id,
+      slug: created.slug,
+    });
+    await recordIntegrityEvent(client, {
+      environment, domain: 'network', entityTable: 'network.partner_units',
+      entityId: created.partner_unit_id, eventType: 'partner_created',
+      actorLabel: input.actor_label, idempotencyKey: operation.idempotencyKey,
+      after: stable,
+    });
+    await completeIntegrityOperation(
+      client, operation, 'network.partner_units', created.partner_unit_id, stable,
+    );
     await client.query('COMMIT');
-    return result;
+    return { ...stable, token: created.token };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

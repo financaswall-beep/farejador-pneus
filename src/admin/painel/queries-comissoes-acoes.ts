@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { assertPartnerCommercialTerms } from './partner-commercial-terms.js';
 import {
   beginIntegrityOperation,completeIntegrityOperation,integrityResult,
   operationFingerprint,recordIntegrityEvent,
@@ -107,9 +108,7 @@ export async function updatePartnerCommercialTerms(
   dbPool: Pool = defaultPool,
 ): Promise<{ updated: true; replayed?: boolean }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  if (input.commission_percent !== null
-    && (input.commission_percent<0 || input.commission_percent>100)) throw new Error('invalid_percent');
-  if (input.monthly_fee !== null && input.monthly_fee<0) throw new Error('invalid_fee');
+  assertPartnerCommercialTerms(input);
   const operation = { environment,domain: 'partner.terms.update',
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({ partner_id: input.partner_id,

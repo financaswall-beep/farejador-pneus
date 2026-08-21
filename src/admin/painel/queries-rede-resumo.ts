@@ -10,7 +10,7 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
-import type { PainelRedePeriod } from './queries-pedidos.js';
+import { resolveRedePeriodStartSql, type PainelRedePeriod } from './queries-pedidos.js';
 
 export interface RedeFunnelRow {
   municipio: string;
@@ -29,32 +29,59 @@ export interface RedeFunnelRow {
  * `unit_id` = unidade parceira que atende o município (v1: 1 parceiro/município, derivado
  * dos pedidos existentes; vira `network.unit_coverage` quando houver vários). Só leitura.
  */
-export async function getRedeFunnel(dbPool: Pool = defaultPool): Promise<RedeFunnelRow[]> {
+export interface RedeFunnelResult {
+  rows: RedeFunnelRow[];
+  unassigned: number;
+}
+
+export async function getRedeFunnel(
+  period: PainelRedePeriod = 'month',
+  dbPool: Pool = defaultPool,
+): Promise<RedeFunnelResult> {
+  const periodStartSql = resolveRedePeriodStartSql(period);
   const result = await dbPool.query(
-    `WITH conv AS (
-       SELECT cf.conversation_id,
-              replace(max(cf.fact_value::text) FILTER (WHERE cf.fact_key = 'municipio_entrega'), '"', '') AS municipio
-       FROM analytics.conversation_facts cf
-       WHERE cf.environment = $1
-       GROUP BY cf.conversation_id
+    `WITH decisions AS (
+       SELECT d.conversation_id,d.unit_id,d.municipio
+         FROM ops.partner_routing_decisions d
+        WHERE d.environment=$1 AND d.decided_at>=${periodStartSql}::timestamptz
+     ), attempts AS (
+       SELECT d.unit_id,max(d.municipio) AS municipio,
+              count(DISTINCT d.conversation_id)::int AS tentou
+         FROM decisions d WHERE d.unit_id IS NOT NULL GROUP BY d.unit_id
+     ), orders AS (
+       SELECT po.unit_id,max(d.municipio) AS municipio,
+              count(DISTINCT o.source_conversation_id)::int AS pediu,
+              count(DISTINCT o.source_conversation_id)
+                FILTER (WHERE po.delivery_status='delivered')::int AS efetivou
+         FROM commerce.orders o
+         JOIN commerce.partner_orders po
+           ON po.id=o.partner_order_id AND po.environment=o.environment
+         LEFT JOIN decisions d ON d.conversation_id=o.source_conversation_id
+        WHERE o.environment=$1 AND o.source_conversation_id IS NOT NULL
+          AND po.created_at>=${periodStartSql}::timestamptz
+          AND po.deleted_at IS NULL AND po.status<>'cancelled'
+        GROUP BY po.unit_id
      )
-     SELECT c.municipio,
-            max(po.unit_id::text) AS unit_id,
-            count(DISTINCT c.conversation_id)::int AS tentou,
-            count(DISTINCT c.conversation_id) FILTER (WHERE o.partner_order_id IS NOT NULL)::int AS pediu,
-            count(DISTINCT c.conversation_id) FILTER (WHERE po.delivery_status = 'delivered')::int AS efetivou
-     FROM conv c
-     LEFT JOIN commerce.orders o
-       ON o.source_conversation_id = c.conversation_id
-      AND o.environment = $1
-      AND o.partner_order_id IS NOT NULL
-     LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
-     WHERE c.municipio IS NOT NULL
-     GROUP BY c.municipio
-     ORDER BY tentou DESC`,
+     SELECT COALESCE(a.municipio,o.municipio,'Sem municipio') AS municipio,
+            COALESCE(a.unit_id,o.unit_id)::text AS unit_id,
+            GREATEST(COALESCE(a.tentou,0),COALESCE(o.pediu,0))::int AS tentou,
+            COALESCE(o.pediu,0)::int AS pediu,
+            COALESCE(o.efetivou,0)::int AS efetivou
+       FROM attempts a FULL JOIN orders o ON o.unit_id=a.unit_id
+      ORDER BY tentou DESC`,
     [env.FAREJADOR_ENV],
   );
-  return result.rows as RedeFunnelRow[];
+  const unassigned = await dbPool.query<{ total: number }>(
+    `SELECT count(DISTINCT conversation_id)::int AS total
+       FROM ops.partner_routing_decisions
+      WHERE environment=$1 AND decision_kind='unresolved'
+        AND decided_at>=${periodStartSql}::timestamptz`,
+    [env.FAREJADOR_ENV],
+  );
+  return {
+    rows: result.rows as RedeFunnelRow[],
+    unassigned: Number(unassigned.rows[0]?.total ?? 0),
+  };
 }
 
 export interface MatrizResumo {
