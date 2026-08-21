@@ -148,11 +148,70 @@ com rollback. Nenhum nome, telefone ou conteúdo de conversa foi copiado para o 
    de nomes no Chatwoot. O Farejador deve receber a correção por evento; não se deve reescrever
    `raw_events`.
 
-## Pendências para autorização
-
-1. publicar o código, executar o deploy manual e fazer smoke autenticado em Clientes da
-   Matriz, Bot/Facebook e Clientes/PDV do parceiro.
-
 Backup pré-migration: `farejador-prod-pre-0196-20260821203005.dump`, 4.481.418 bytes,
 2.648 entradas legíveis pelo `pg_restore`, SHA-256
 `59d3199e5116d6f844d463797e068eb3e8211132ab0089468b34d2be24a575b2`.
+
+## Adendo — deploy e investigação do Chatwoot
+
+### Deploy de Clientes
+
+- PR `#70` incorporada à `main` no SHA
+  `22ea499c7a3bd98d81a3daf0733042f39ed87dd1`;
+- GitHub Actions da PR e do merge: aprovados;
+- Coolify importou o SHA esperado, construiu uma imagem nova e concluiu o rolling update em
+  21/08/2026, 20:52–20:53 (America/Sao_Paulo);
+- `/livez`, `/readyz` e `/healthz`: HTTP 200 com o SHA implantado;
+- banco principal, schema e banco restrito do parceiro: `ok`;
+- páginas da Matriz e da unidade Rio do Ouro: HTTP 200;
+- módulos implantados do Kanban e do VIP do parceiro: HTTP 200, com os marcadores da versão
+  nova presentes;
+- API de Clientes sem sessão: HTTP 401, como exigido.
+
+O aviso do Coolify sobre `NODE_ENV=production` não bloqueou a entrega: a construção e o
+container terminaram com sucesso. O smoke visual autenticado continua pendente porque o
+navegador de auditoria não possuía sessão normal da Matriz; nenhum token emergencial foi
+usado para contornar o login.
+
+### Diagnóstico direto da inbox Facebook
+
+A API do Chatwoot da conta operacional foi consultada somente para leitura. Nenhuma
+credencial é reproduzida neste documento. Foram confirmadas as inboxes WhatsApp `30`,
+Instagram `32` e Facebook `34`; a origem dos nomes genéricos é a inbox Facebook `34`.
+
+Na própria API do Chatwoot:
+
+- a busca retornou 15 contatos `John Doe`, todos ligados à inbox `34`;
+- as 15 conversas existentes dessa inbox também apresentaram `John Doe` como remetente;
+- os 15 vínculos possuem `source_id` do Facebook, mas nenhum dos contatos possui e-mail,
+  identificador canônico, avatar, atributo adicional ou atributo personalizado;
+- os cadastros afetados vão de 18/06/2026 a 19/08/2026, logo não é um evento isolado;
+- a inbox possui IDs da página/Instagram e informa `reauthorization_required=false`.
+
+`reauthorization_required=false` prova apenas que o Chatwoot não marcou a conexão como
+expirada; não prova que a Meta liberou leitura do perfil. A evidência mostra que o Facebook
+entrega o identificador, mas o Chatwoot não obtém os dados do perfil e grava o fallback
+`John Doe`. O Farejador não criou o nome. A defesa implantada impede o Bot de chamar o
+cliente de John e mostra `Cliente sem nome` até chegar um nome confiável.
+
+### Pendências operacionais
+
+1. Reautorizar a inbox `Facebook - 2W Pneus` no Chatwoot usando uma conta administradora da
+   página e conceder todas as permissões solicitadas pela Meta.
+2. Como token de API e segredo HMAC foram expostos no canal de trabalho, rotacioná-los. A
+   troca do HMAC deve ser simultânea no webhook do Chatwoot e no Coolify para não interromper
+   a ingestão; o token usado pelo runtime também deve ser atualizado onde estiver configurado.
+3. Depois da reautorização, criar ou aguardar um contato novo e confirmar que nome e avatar
+   chegam ao Chatwoot e ao Farejador. Os 15 contatos antigos devem ser reconciliados de forma
+   controlada; `raw_events` nunca deve ser reescrito.
+4. Executar o smoke visual com sessão normal: abrir Clientes → Leads, mover um card de teste,
+   arquivar, restaurar e conferir `★ VIP` na Matriz e no parceiro.
+
+O `.env` local desta estação ainda referencia uma configuração legada por HTTP/conta `1`;
+ele não foi alterado e não deve ser confundido com a configuração operacional da conta `2`
+nem usado como prova da configuração atual do Coolify.
+
+**Veredito atualizado:** Clientes está aprovada em código, banco, integração e deploy
+técnico. O nome real do Facebook permanece uma pendência externa de autorização
+Chatwoot/Meta, protegida no runtime pelo tratamento de placeholder. A homologação visual
+autenticada e a rotação dos segredos continuam obrigatórias.
