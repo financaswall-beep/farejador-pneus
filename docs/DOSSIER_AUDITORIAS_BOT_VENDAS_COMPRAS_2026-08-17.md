@@ -647,8 +647,9 @@ novo comprovante.
 | Backup pré-`0191` | **4.960.069 bytes**, legível pelo `pg_restore`; SHA-256 `ec08c387b4b9eb600003bb637e9bc1632f13ba83c561d0da932e38b3a6de0f15` |
 | Migration `0191` no banco-alvo | **Aplicada com COMMIT** após dry-run com rollback; funções, trigger e permissões confirmados materialmente |
 | Reconciliação pós-migration | `prod`: **21/21 contadores zerados**; `test`: nove ajustes históricos sem ledger, isolados e preservados |
+| Publicação do código | PR `#63` incorporada à `main`; SHA funcional `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; deploy manual pendente |
 
-**Novo veredito:** Logística aprovada no código e no banco para publicação. A migration
-`0191` já foi aplicada materialmente após backup validado. O código ainda precisa ser
-publicado/deployado e o smoke autenticado pós-deploy continua obrigatório; este adendo não
-declara o runtime novo já implantado.
+**Novo veredito:** Logística aprovada no código e no banco para deploy. A migration `0191`
+já foi aplicada materialmente após backup validado e o código foi incorporado à `main` pela
+PR `#63`. O deploy manual e o smoke autenticado pós-deploy continuam obrigatórios; este
+adendo não declara o runtime novo já implantado.
