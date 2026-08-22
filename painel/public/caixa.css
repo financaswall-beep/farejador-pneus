@@ -454,7 +454,10 @@ form { display: grid; gap: 16px; }
 .catalog-product-visual--other { width: 76px; height: 76px; margin: auto; border-radius: 22px; color: #087246; background: linear-gradient(145deg,#f1f8ed,#e0f0d9); }
 .catalog-product-visual--service svg,.catalog-product-visual--other svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
 .catalog-product-content { display: flex; min-width: 0; flex-direction: column; justify-content: center; }
-.catalog-product-content > strong { overflow: hidden; color: #151b18; font-size: 16px; font-weight: 680; line-height: 1.2; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-product-heading { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 5px; }
+.catalog-product-heading > strong { max-width: 100%; overflow: hidden; color: #151b18; font-size: 16px; font-weight: 680; line-height: 1.2; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-brand-logo { display: block; width: 86px; height: 21px; object-fit: contain; object-position: left center; }
+.catalog-brand-fallback { display: inline-flex; min-height: 20px; align-items: center; padding: 2px 7px; border-radius: 6px; color: #4b5851; background: #eef2ef; font-size: 9px; font-weight: 750; letter-spacing: .035em; }
 .catalog-product-content > small { margin-top: 4px; overflow: hidden; color: #69716d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-stock { display: inline-flex; width: fit-content; max-width: 100%; min-height: 28px; align-items: center; gap: 6px; margin-top: 9px; padding: 0 9px; overflow: hidden; border: 1px solid #cfe5ca; border-radius: 9px; color: #175a3d; background: #edf8e9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-stock--blocked { border-color: #e6d9c8; color: #805f31; background: #fff7e8; }

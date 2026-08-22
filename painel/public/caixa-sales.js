@@ -133,7 +133,7 @@
           : stock ? 'Estoque' : deliveries ? 'Entregas'
             : (team || teamRemuneration || teamCommission || teamPermissions) ? 'Equipe'
               : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro'
-                : notifications ? 'Notificações' : cash ? 'Vender' : 'Minhas vendas';
+                : notifications ? 'Notificações' : cash ? 'Caixa' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);

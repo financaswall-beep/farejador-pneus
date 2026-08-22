@@ -86,6 +86,17 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
     'image/webp',
     'public, max-age=31536000, immutable',
   );
+  for (const asset of [
+    'pirelli', 'metzeler', 'michelin', 'bridgestone', 'dunlop', 'levorin',
+    'rinaldi', 'maggion', 'technic', 'vipal', 'mitas', 'kenda',
+  ]) {
+    text(
+      `/operacao/catalog-brands/${asset}.webp`,
+      `assets/catalog-brands/${asset}.webp`,
+      'image/webp',
+      'public, max-age=31536000, immutable',
+    );
+  }
   text(
     '/operacao/vendas-hero.webp',
     'assets/vendas-hero.webp',

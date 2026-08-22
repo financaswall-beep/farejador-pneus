@@ -1,12 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 function source(file: string): string {
   return readFileSync(resolve(file), 'utf8');
 }
 
-describe('Etapa 2 - Vender na Operação da Loja', () => {
+describe('Etapa 2 - Caixa na Operação da Loja', () => {
   const html = source('painel/public/caixa.html');
   const core = source('painel/public/caixa-core.js');
   const login = source('painel/public/caixa.js');
@@ -20,13 +21,32 @@ describe('Etapa 2 - Vender na Operação da Loja', () => {
   const operationLogin = source('src/admin/caixa/route-operation-login.ts');
 
   it('mantém Matriz e parceiro na mesma tela e identifica operador e unidade', () => {
-    expect(html).toContain('id="app-heading-title">Vender</h2>');
+    expect(html).toContain('id="app-heading-title">Caixa</h2>');
     expect(html).toContain('id="operation-unit-label"');
     expect(core).toContain("scope: '2w_caixa_escopo'");
     expect(core).toContain("elements.operationUnitLabel.textContent = unitName");
     expect(login).toContain("Caixa.showSession(payload)");
     expect(operationLogin).toContain('display_name: workplace.displayName');
     expect(operationLogin).toContain('modules: workplace.modules');
+  });
+
+  it('reaproveita os logos homologados do Catálogo da Matriz e mantém fallback textual', () => {
+    const sandbox = { window: { Caixa: {} as Record<string, unknown> } };
+    runInNewContext(catalog, sandbox);
+    const brandLogo = sandbox.window.Caixa.catalogBrandLogo as (brand: string) => string | null;
+    for (const brand of [
+      'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
+      'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+    ]) {
+      const url = brandLogo(brand);
+      expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260822-caixa-brand1$/);
+      const asset = url?.match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
+      if (!asset) throw new Error(`Logo não mapeado: ${brand}`);
+      expect(statSync(resolve('painel/public/assets/catalog-brands', asset)).size).toBeGreaterThan(500);
+    }
+    expect(brandLogo('Magion')).toBe(brandLogo('Maggion'));
+    expect(brandLogo('Marca futura')).toBeNull();
+    expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });
 
   it('normaliza somente o catálogo e o estoque da unidade autenticada', () => {

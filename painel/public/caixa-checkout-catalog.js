@@ -2,6 +2,31 @@
   'use strict';
 
   const Caixa = window.Caixa;
+  const CATALOG_BRAND_ASSETS = Object.freeze({
+    pirelli: 'pirelli',
+    metzeler: 'metzeler',
+    michelin: 'michelin',
+    bridgestone: 'bridgestone',
+    dunlop: 'dunlop',
+    levorin: 'levorin',
+    rinaldi: 'rinaldi',
+    maggion: 'maggion',
+    magion: 'maggion',
+    technic: 'technic',
+    vipal: 'vipal',
+    mitas: 'mitas',
+    kenda: 'kenda',
+  });
+
+  Caixa.catalogBrandLogo = function (brand) {
+    const key = String(brand || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    const asset = CATALOG_BRAND_ASSETS[key];
+    return asset ? '/operacao/catalog-brands/' + asset + '.webp?v=20260822-caixa-brand1' : null;
+  };
 
   Caixa.createCheckoutCatalogView = function (checkout, ui, onQuantityChange) {
     function icon(paths) {
@@ -55,6 +80,34 @@
       return visual;
     }
 
+    function productHeading(product) {
+      const heading = document.createElement('div');
+      heading.className = 'catalog-product-heading';
+      if (product.product_type === 'tire') {
+        const logoUrl = Caixa.catalogBrandLogo(product.brand);
+        if (logoUrl) {
+          const logo = document.createElement('img');
+          logo.className = 'catalog-brand-logo';
+          logo.src = logoUrl;
+          logo.alt = 'Logo ' + product.brand;
+          logo.loading = 'lazy';
+          logo.decoding = 'async';
+          heading.appendChild(logo);
+        } else {
+          const fallback = document.createElement('span');
+          fallback.className = 'catalog-brand-fallback';
+          fallback.textContent = String(product.brand || 'Sem marca').toUpperCase();
+          heading.appendChild(fallback);
+        }
+      }
+      const title = document.createElement('strong');
+      title.textContent = product.product_type === 'tire'
+        ? product.tire_size || product.product_name
+        : product.product_name;
+      heading.appendChild(title);
+      return heading;
+    }
+
     function quantityControl(product) {
       const current = checkout.cart.get(product.product_id)?.quantity || 0;
       if (!product.sellable) {
@@ -95,8 +148,6 @@
       article.className = 'catalog-product' + (product.sellable ? '' : ' catalog-product--blocked');
       const content = document.createElement('div');
       content.className = 'catalog-product-content';
-      const title = document.createElement('strong');
-      title.textContent = productTitle(product);
       const name = document.createElement('small');
       name.textContent = product.product_type === 'tire'
         ? product.product_name
@@ -115,7 +166,7 @@
       const price = document.createElement('b');
       price.textContent = product.price_amount === null ? '—' : Caixa.currency.format(product.price_amount);
       footer.append(price, quantityControl(product));
-      content.append(title, name, badge, footer);
+      content.append(productHeading(product), name, badge, footer);
       article.append(productImage(product), content);
       return article;
     }
