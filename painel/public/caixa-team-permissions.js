@@ -6,7 +6,7 @@
   let payload = null;
 
   const definitions = {
-    vendas: ['Vender', 'Frente de caixa, catálogo e as próprias vendas', 'V'],
+    vendas: ['Caixa', 'Frente de caixa, catálogo e as próprias vendas', 'C'],
     estoque: ['Estoque', 'Consultar produtos, fazer contagem e recebimento', 'E'],
     entregas: ['Entregas', 'Ver pedidos, rotas e registrar a entrega', 'R'],
     pedidos: ['Pedidos', 'Consultar e acompanhar pedidos da unidade', 'P'],

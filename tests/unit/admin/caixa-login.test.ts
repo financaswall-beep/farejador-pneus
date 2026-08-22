@@ -189,7 +189,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('data-payment="pix"');
     expect(html).toContain('data-catalog-type="other"');
     expect(html).toContain('id="operation-unit-label"');
-    expect(html).toContain('<span>Vender</span>');
+    expect(html).toContain('<span>Caixa</span>');
     expect(html).toContain('id="nav-stock"');
     expect(html).toContain('id="nav-deliveries"');
     expect(script).toContain("Caixa.operationPath('produtos')");

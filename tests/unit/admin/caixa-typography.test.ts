@@ -7,7 +7,7 @@ const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
 
 describe('legibilidade da Operação da Loja', () => {
   it('publica a folha com uma versão própria para invalidar o cache', () => {
-    expect(html).toContain('/operacao/caixa.css?v=20260820-negociacao2');
+    expect(html).toContain('/operacao/caixa.css?v=20260822-caixa-brand1');
   });
 
   it('define uma escala mínima compartilhada para textos operacionais', () => {
