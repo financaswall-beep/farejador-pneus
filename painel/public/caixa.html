@@ -9,7 +9,8 @@
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260816-paineis-alinhados1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260816-permissions-header1"></script>
-  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand2"></script>
+  <script defer src="/operacao/caixa-brand-catalog.js?v=20260822-caixa-brand-select1"></script>
+  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260820-negociacao1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260820-negociacao1"></script>
@@ -18,8 +19,8 @@
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260820-preco-oficial1"></script>
-  <script defer src="/operacao/caixa-stock-edit.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-stock.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-stock-edit.js?v=20260822-brand-select1"></script>
+  <script defer src="/operacao/caixa-stock.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-receipts.js?v=20260817-arrival-adjustment1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20260822-caixa-brand1"></script>
@@ -1027,7 +1028,9 @@
                 </select>
               </label>
             </div>
-            <label data-product-fields>Marca<input id="stock-item-brand" maxlength="120" placeholder="Ex.: Maggion" /></label>
+            <label data-product-fields>Marca
+              <select id="stock-item-brand"><option value="">Selecione a marca</option></select>
+            </label>
             <div class="stock-form-grid" data-stock-fields>
               <label>Estoque mínimo<input id="stock-item-minimum" type="number" min="0" max="999999" inputmode="numeric" placeholder="Opcional" /></label>
               <label>Localização<input id="stock-item-shelf" maxlength="60" placeholder="Ex.: A-01" /></label>
@@ -1061,7 +1064,9 @@
               <label>Condição<select id="stock-edit-condition"><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></label>
               <label>Posição<select id="stock-edit-position"><option value="">Não informar</option><option value="Dianteiro">Dianteiro</option><option value="Traseiro">Traseiro</option><option value="Ambos">Ambos</option></select></label>
             </div>
-            <label data-stock-edit-product>Marca<input id="stock-edit-brand" maxlength="120" /></label>
+            <label data-stock-edit-product>Marca
+              <select id="stock-edit-brand"><option value="">Selecione a marca</option></select>
+            </label>
             <div class="stock-form-grid" data-stock-edit-stock>
               <label>Estoque mínimo<input id="stock-edit-minimum" type="number" min="0" max="999999" inputmode="numeric" /></label>
               <label>Localização<input id="stock-edit-shelf" maxlength="60" placeholder="Ex.: A-01" /></label>

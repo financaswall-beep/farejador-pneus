@@ -8,6 +8,7 @@
   };
   const registerModal = byId('stock-register-modal');
   const registerForm = byId('stock-register-form');
+  Caixa.populateCatalogBrandSelect(byId('stock-item-brand'));
 
   function idempotencyKey(prefix) {
     const random = window.crypto && typeof window.crypto.randomUUID === 'function'
@@ -80,6 +81,7 @@
       byId(id).required = type === 'pneu';
     });
     byId('stock-tire-condition').required = type === 'pneu';
+    byId('stock-item-brand').required = type === 'pneu';
     byId('stock-register-kicker').textContent = isService ? 'Catálogo de serviços' : 'Estoque protegido';
     byId('stock-register-title').textContent = isService ? 'Cadastrar serviço' : 'Cadastrar produto';
     byId('stock-register-notice-title').textContent = isService ? 'Preço protegido' : 'Sem valores financeiros';
