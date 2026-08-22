@@ -34,7 +34,7 @@ describe('Bot — acessos por horário', () => {
   it('mantém a definição e os elementos acessíveis do novo gráfico no HTML', () => {
     const html = readFileSync(path.join(process.cwd(), 'painel', 'public', 'index.html'), 'utf8');
 
-    expect(html).toContain('Resumo da operação');
+    expect(html).toContain('Movimento do Bot');
     expect(html).toContain('botMovementSubtitle');
     expect(html).toContain('Dias da semana');
     expect(html).toContain('app.bot.js?v=20260822-continuity1');
