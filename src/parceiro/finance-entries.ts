@@ -51,29 +51,36 @@ export async function getPartnerFinanceEntries(
              FROM commerce.partner_order_items
             WHERE environment=po.environment AND order_id=po.id
          ) items ON true
-         WHERE po.environment=$1 AND po.unit_id=$2 AND po.status<>'cancelled'
+         WHERE po.environment=$1 AND po.unit_id=$2
+           AND (po.status<>'cancelled' OR EXISTS (SELECT 1
+             FROM finance.partner_order_refunds refund
+             WHERE refund.environment=po.environment AND refund.order_id=po.id))
            AND po.deleted_at IS NULL
            AND NOT (po.fulfillment_mode='delivery'
              AND po.delivery_status<>'delivered')
            AND NOT po.awaiting_pickup
            AND realized.realized_at>=b.start_at AND realized.realized_at<b.end_at
-           AND (po.payment_method IS NULL OR po.payment_method<>'A receber')
+           AND NOT EXISTS (SELECT 1 FROM finance.partner_receivables linked
+             WHERE linked.environment=po.environment
+               AND linked.source_order_id=po.id AND linked.deleted_at IS NULL)
        UNION ALL
-       SELECT COALESCE(pre.installment_id,pre.receivable_id)::text,'receivable'::text,
+       SELECT event.id::text,'receivable'::text,
               COALESCE(NULLIF(btrim(pr.customer_name),''),'Conta recebida'),
-              COALESCE(NULLIF(btrim(pr.description),''),'Recebimento confirmado'),
-              'Conta recebida'::text,
-              COALESCE(pri.payment_method,pr.payment_method),pre.amount,
-              to_char(pre.received_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD'),
-              pre.received_at
-         FROM finance.partner_receivables_effective pre
+              CASE WHEN event.event_kind='recovery'
+                THEN 'Recuperação de valor dado como perda'
+                ELSE COALESCE(NULLIF(btrim(pr.description),''),'Recebimento confirmado') END,
+              CASE WHEN event.event_kind='recovery' THEN 'Recuperação de crédito'
+                ELSE 'Conta recebida' END,
+              event.payment_method,event.amount,
+              to_char(event.occurred_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD'),
+              event.occurred_at
+         FROM finance.partner_receivable_events event
          JOIN finance.partner_receivables pr
-           ON pr.environment=pre.environment AND pr.id=pre.receivable_id
-         LEFT JOIN finance.partner_receivable_installments pri
-           ON pri.environment=pre.environment AND pri.id=pre.installment_id
+           ON pr.environment=event.environment AND pr.id=event.receivable_id
          CROSS JOIN bounds b
-        WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.status='received'
-          AND pre.received_at>=b.start_at AND pre.received_at<b.end_at
+        WHERE event.environment=$1 AND event.unit_id=$2
+          AND event.event_kind IN ('receipt','recovery')
+          AND event.occurred_at>=b.start_at AND event.occurred_at<b.end_at
      ), counted AS (
        SELECT *,sum(amount) OVER()::text total_amount,count(*) OVER()::int total_count
          FROM entries

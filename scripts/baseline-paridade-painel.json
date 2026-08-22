@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-21T13:21:14.080Z",
+  "geradoEm": "2026-08-22T17:50:35.787Z",
   "commitBase": "c0d7913",
-  "total": 596,
+  "total": 599,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -441,6 +441,7 @@
     "renderFinanceCostsPosChart": "function",
     "renderFinanceRevenuePosChart": "function",
     "renderPosSparkline": "function",
+    "renegotiateReceivable": "function",
     "resetOrderForm": "function",
     "resetPayableForm": "function",
     "resetReceivableForm": "function",
@@ -599,6 +600,7 @@
     "vendas": "value:array",
     "vipMinPurchases": "value:number",
     "waLink": "function",
-    "wazeNavUrl": "function"
+    "wazeNavUrl": "function",
+    "writeOffReceivable": "function"
   }
 }

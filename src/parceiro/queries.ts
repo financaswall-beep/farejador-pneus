@@ -67,6 +67,24 @@ export type {
   PartnerMyPerformance,
   PartnerMyPerformanceSale,
 } from './commission-ledger.js';
+export {
+  settlePartnerReceivable,
+  settlePartnerReceivableInstallment,
+} from './partner-receivable-events.js';
+export type {
+  SettlePartnerReceivableInput,
+  SettlePartnerReceivableInstallmentInput,
+} from './partner-receivable-events.js';
+export {
+  recoverPartnerReceivable,
+  renegotiatePartnerReceivable,
+  writeOffPartnerReceivable,
+} from './partner-receivable-losses.js';
+export type {
+  RecoverPartnerReceivableInput,
+  RenegotiatePartnerReceivableInput,
+  WriteOffPartnerReceivableInput,
+} from './partner-receivable-losses.js';
 
 export interface PartnerOrderItemInput {
   partner_stock_id: string;
@@ -107,11 +125,6 @@ export interface PartnerCustomerInput {
   address_city?: string | null;
   is_vip?: boolean | null;
   idempotency_key?: string | null;
-}
-
-export interface SettlePartnerReceivableInstallmentInput {
-  received_at?: string | null;
-  payment_method?: string | null;
 }
 
 export interface UpsertPartnerStockInput {
@@ -209,7 +222,9 @@ export type UpdatePartnerReceivableInput = Pick<
 export interface SettlePartnerPayableInput {
   paid_at?: string | null;
   payment_method?: string | null;
+  amount?: number | null;
   force_duplicate?: boolean;
+  idempotency_key?: string | null;
 }
 
 export class DuplicateExpenseError extends Error {
@@ -290,11 +305,6 @@ export class StockPositiveCannotDeleteError extends Error {
     this.stock_id = stockId;
     this.quantity_on_hand = quantityOnHand;
   }
-}
-
-export interface SettlePartnerReceivableInput {
-  received_at?: string | null;
-  payment_method?: string | null;
 }
 
 // ----------------------------------------------------------------------------
@@ -532,71 +542,96 @@ export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: Relato
   });
 }
 
-/**
- * Relatório CAIXA DO PERÍODO (0108, só dono) — lente "Vendi × gastei" (movimento,
- * NÃO lucro nem caixa-real). Espelha o CONTRATO de dinheiro do painel:
- *   ENTROU = vendas REALIZADAS no período (isPhysicalExitSale: retirada/balcão
- *            conta na hora; delivery só 'delivered'), datadas por saleRealizedAt
- *            (delivery→delivered_at; senão created_at). Soma total_amount.
- *   SAIU   = despesas (por expense_date) + compras (por purchased_at).
- * 🔒 Anti-duplo-cômputo: NÃO soma partner_payables (a compra a prazo já gera um
- *    payable; somar os dois contaria a compra 2×). Contas avulsas = v2.
- * Datas-tipo-DATE (expense_date/purchased_at) comparadas no fuso de São Paulo pra
- * casar com o dia local; vendas (timestamptz) comparam direto. Tudo escopado por
- * unidade (RLS + WHERE).
- */
+/** Caixa realizado: só dinheiro efetivamente recebido ou pago. Venda fiada e
+ * compra a prazo ficam fora até o respectivo evento financeiro acontecer. */
 export interface RelatorioCaixa {
   entrou: number; saiu: number; saldo: number;
   vendas_total: number; vendas_count: number; despesas_total: number; compras_total: number;
+  estornos_total: number;
 }
 export async function getPartnerRelatorioCaixa(ctx: PartnerContext, opts: RelatorioPeriodoOpts = {}): Promise<RelatorioCaixa> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const res = await client.query<{
-      vendas_total: string; vendas_count: string; despesas_total: string; compras_total: string;
+      cash_sales: string; cash_events: string; cash_count: string;
+      direct_expenses: string; cash_purchases: string; payable_events: string;
+      refund_events: string; order_refunds: string;
     }>(
-      `WITH vendas AS (
-         SELECT pof.total_amount,
+      `WITH vendas_caixa AS (
+         SELECT pof.order_id,pof.total_amount,
                 CASE WHEN pof.fulfillment_mode = 'delivery'
                      THEN COALESCE(pof.delivered_at, pof.created_at)
                      ELSE COALESCE(pof.retrieved_at, pof.created_at) END AS realized_at
            FROM commerce.partner_orders_full pof
           WHERE pof.environment = $1 AND pof.unit_id = $2
-            AND pof.status <> 'cancelled'
+            AND (pof.status <> 'cancelled' OR EXISTS (SELECT 1
+              FROM finance.partner_order_refunds refund
+              WHERE refund.environment=pof.environment AND refund.order_id=pof.order_id))
             AND (pof.fulfillment_mode <> 'delivery' OR pof.delivery_status = 'delivered')
             AND NOT pof.awaiting_pickup
-       ),
-       vendas_periodo AS (
-         SELECT * FROM vendas
-          WHERE ($3::timestamptz IS NULL OR realized_at >= $3::timestamptz)
-            AND ($4::timestamptz IS NULL OR realized_at <  $4::timestamptz)
+            AND NOT EXISTS (SELECT 1 FROM finance.partner_receivables linked
+              WHERE linked.environment=pof.environment
+                AND linked.source_order_id=pof.order_id AND linked.deleted_at IS NULL)
+            AND ($3::timestamptz IS NULL OR (CASE WHEN pof.fulfillment_mode='delivery'
+              THEN COALESCE(pof.delivered_at,pof.created_at)
+              ELSE COALESCE(pof.retrieved_at,pof.created_at) END)>=$3::timestamptz)
+            AND ($4::timestamptz IS NULL OR (CASE WHEN pof.fulfillment_mode='delivery'
+              THEN COALESCE(pof.delivered_at,pof.created_at)
+              ELSE COALESCE(pof.retrieved_at,pof.created_at) END)<$4::timestamptz)
        )
        SELECT
-         (SELECT COALESCE(SUM(total_amount), 0) FROM vendas_periodo)        AS vendas_total,
-         (SELECT COUNT(*)                       FROM vendas_periodo)        AS vendas_count,
+         (SELECT COALESCE(sum(total_amount),0) FROM vendas_caixa) AS cash_sales,
+         (SELECT COALESCE(sum(e.amount),0) FROM finance.partner_receivable_events e
+           WHERE e.environment=$1 AND e.unit_id=$2
+             AND e.event_kind IN ('receipt','recovery')
+             AND ($3::timestamptz IS NULL OR e.occurred_at>=$3::timestamptz)
+             AND ($4::timestamptz IS NULL OR e.occurred_at<$4::timestamptz)) AS cash_events,
+         ((SELECT count(*) FROM vendas_caixa)
+           +(SELECT count(*) FROM finance.partner_receivable_events e
+             WHERE e.environment=$1 AND e.unit_id=$2
+               AND e.event_kind IN ('receipt','recovery')
+               AND ($3::timestamptz IS NULL OR e.occurred_at>=$3::timestamptz)
+               AND ($4::timestamptz IS NULL OR e.occurred_at<$4::timestamptz))) AS cash_count,
          (SELECT COALESCE(SUM(e.amount), 0)
             FROM finance.partner_expenses e
            WHERE e.environment = $1 AND e.unit_id = $2 AND e.deleted_at IS NULL
              AND ($3::timestamptz IS NULL OR e.expense_date >= ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
              AND ($4::timestamptz IS NULL OR e.expense_date <  ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
-         )                                                                   AS despesas_total,
+         ) AS direct_expenses,
          (SELECT COALESCE(SUM(p.total_amount), 0)
             FROM commerce.partner_purchases p
            WHERE p.environment = $1 AND p.unit_id = $2 AND p.deleted_at IS NULL
+             AND p.payment_status='paid_now'
+             AND NOT EXISTS (SELECT 1 FROM finance.partner_payables linked
+               WHERE linked.environment=p.environment
+                 AND linked.source_purchase_id=p.id AND linked.deleted_at IS NULL)
              AND ($3::timestamptz IS NULL OR p.purchased_at >= ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
              AND ($4::timestamptz IS NULL OR p.purchased_at <  ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
-         )                                                                   AS compras_total`,
+         ) AS cash_purchases,
+         (SELECT COALESCE(sum(e.amount),0) FROM finance.partner_payable_events e
+           WHERE e.environment=$1 AND e.unit_id=$2
+             AND ($3::timestamptz IS NULL OR e.paid_at>=$3::timestamptz)
+             AND ($4::timestamptz IS NULL OR e.paid_at<$4::timestamptz)) AS payable_events,
+         (SELECT COALESCE(sum(e.amount),0) FROM finance.partner_receivable_events e
+           WHERE e.environment=$1 AND e.unit_id=$2 AND e.event_kind='refund'
+             AND ($3::timestamptz IS NULL OR e.occurred_at>=$3::timestamptz)
+             AND ($4::timestamptz IS NULL OR e.occurred_at<$4::timestamptz)) AS refund_events,
+         (SELECT COALESCE(sum(r.amount),0) FROM finance.partner_order_refunds r
+           WHERE r.environment=$1 AND r.unit_id=$2
+             AND ($3::timestamptz IS NULL OR r.refunded_at>=$3::timestamptz)
+             AND ($4::timestamptz IS NULL OR r.refunded_at<$4::timestamptz)) AS order_refunds`,
       [ctx.environment, ctx.unitId, opts.from ?? null, opts.to ?? null],
     );
     const r = res.rows[0];
-    const vendas = Number(r?.vendas_total ?? 0);
-    const despesas = Number(r?.despesas_total ?? 0);
-    const compras = Number(r?.compras_total ?? 0);
+    const vendas = Number(r?.cash_sales ?? 0) + Number(r?.cash_events ?? 0);
+    const despesas = Number(r?.direct_expenses ?? 0) + Number(r?.payable_events ?? 0);
+    const compras = Number(r?.cash_purchases ?? 0);
+    const estornos = Number(r?.refund_events ?? 0) + Number(r?.order_refunds ?? 0);
     const entrou = vendas;
-    const saiu = despesas + compras;
+    const saiu = despesas + compras + estornos;
     return {
       entrou, saiu, saldo: entrou - saiu,
-      vendas_total: vendas, vendas_count: Number(r?.vendas_count ?? 0),
-      despesas_total: despesas, compras_total: compras,
+      vendas_total: vendas, vendas_count: Number(r?.cash_count ?? 0),
+      despesas_total: despesas, compras_total: compras, estornos_total: estornos,
     };
   });
 }
@@ -767,14 +802,15 @@ export async function getPartnerPayables(ctx: PartnerContext, opts: PartnerListO
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT payable.id,payable.counterparty_name,payable.description,payable.category,
-              payable.amount,payable.due_date,payable.status,payable.paid_at,
+              payable.amount,payable.paid_amount,payable.open_amount,
+              payable.due_date,payable.status,payable.paid_at,
               payable.payment_method,payable.notes,payable.created_at,payable.source_purchase_id,
               EXISTS (SELECT 1 FROM commerce.partner_purchases purchase
                 WHERE purchase.environment=payable.environment
                   AND purchase.id=payable.source_purchase_id
                   AND purchase.source_wholesale_order_id IS NOT NULL) AS managed_by_matrix
-       FROM finance.partner_payables payable
-       WHERE payable.environment = $1 AND payable.unit_id = $2 AND payable.deleted_at IS NULL
+       FROM finance.partner_payables_effective payable
+       WHERE payable.environment = $1 AND payable.unit_id = $2
          AND NOT EXISTS (
            SELECT 1 FROM commerce.partner_purchases matrix_purchase
             WHERE matrix_purchase.environment=payable.environment
@@ -807,10 +843,17 @@ export async function getPartnerReceivables(ctx: PartnerContext, opts: PartnerLi
     const result = await client.query(
       `SELECT pr.id, pr.customer_id, pr.customer_name, pr.description, pr.source_tag, pr.amount, pr.due_date,
               pr.status, pr.received_at, pr.payment_method, pr.notes, pr.created_at,
+              pr.source_order_id,pr.source_order_id IS NOT NULL AS managed_by_sale,
+              COALESCE(totals.received_amount,0)::numeric(12,2) AS received_amount,
+              COALESCE(totals.written_off_amount,0)::numeric(12,2) AS written_off_amount,
+              COALESCE(totals.open_amount,0)::numeric(12,2) AS open_amount,
               COALESCE(jsonb_agg(jsonb_build_object(
                 'id', pri.id,
                 'sequence', pri.sequence,
                 'amount', pri.amount,
+                'received_amount', COALESCE(prei.received_amount,0),
+                'written_off_amount', COALESCE(prei.written_off_amount,0),
+                'open_amount', COALESCE(prei.open_amount,pri.amount),
                 'due_date', pri.due_date,
                 'status', pri.status,
                 'received_at', pri.received_at,
@@ -819,12 +862,21 @@ export async function getPartnerReceivables(ctx: PartnerContext, opts: PartnerLi
        FROM finance.partner_receivables pr
        LEFT JOIN finance.partner_receivable_installments pri
          ON pri.receivable_id = pr.id AND pri.deleted_at IS NULL
+       LEFT JOIN finance.partner_receivables_effective prei
+         ON prei.environment=pri.environment AND prei.installment_id=pri.id
+       LEFT JOIN LATERAL (
+         SELECT sum(pre.received_amount) received_amount,
+                sum(pre.written_off_amount) written_off_amount,
+                sum(pre.open_amount) open_amount
+           FROM finance.partner_receivables_effective pre
+          WHERE pre.environment=pr.environment AND pre.receivable_id=pr.id
+       ) totals ON true
        WHERE pr.environment = $1 AND pr.unit_id = $2 AND pr.deleted_at IS NULL
          AND ($3 OR NOT EXISTS (
            SELECT 1 FROM commerce.partner_dismissed_items d
             WHERE d.environment = $1 AND d.unit_id = $2
               AND d.item_type = 'receivable' AND d.item_id = pr.id::text))
-       GROUP BY pr.id
+       GROUP BY pr.id,totals.received_amount,totals.written_off_amount,totals.open_amount
        ORDER BY
          CASE pr.status WHEN 'open' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
          pr.due_date ASC NULLS LAST,
@@ -833,49 +885,6 @@ export async function getPartnerReceivables(ctx: PartnerContext, opts: PartnerLi
       [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
     return result.rows;
-  });
-}
-
-export async function settlePartnerReceivableInstallment(
-  ctx: PartnerContext,
-  receivableId: string,
-  installmentId: string,
-  input: SettlePartnerReceivableInstallmentInput,
-): Promise<{ installment_id: string; received: boolean }> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const receivedAt = normalizeBusinessFactInstant(
-      input.received_at, new Date(), 'received_at_future',
-    ) ?? new Date().toISOString();
-    const result = await client.query<{ id: string }>(
-      `UPDATE finance.partner_receivable_installments
-       SET status = 'received',
-           received_at = $4::timestamptz,
-           payment_method = COALESCE($5, payment_method)
-       WHERE id = $1
-         AND receivable_id = $2
-         AND environment = $3
-         AND status = 'open'
-         AND deleted_at IS NULL
-       RETURNING id`,
-      [installmentId, receivableId, ctx.environment, receivedAt, input.payment_method ?? null],
-    );
-
-    if (result.rowCount !== 1) return { installment_id: installmentId, received: false };
-
-    await client.query(
-      `INSERT INTO audit.events (
-         environment, domain, entity_table, entity_id, event_type,
-         actor_label, payload_after
-       ) VALUES ($1, 'partner_finance', 'finance.partner_receivable_installments', $2,
-                 'partner_receivable_installment_received', $3, $4::jsonb)`,
-      [
-        ctx.environment,
-        installmentId,
-        `partner:${ctx.slug}`,
-        JSON.stringify({ unit_id: ctx.unitId, receivable_id: receivableId, received_at: receivedAt }),
-      ],
-    );
-    return { installment_id: installmentId, received: true };
   });
 }
 
@@ -2391,8 +2400,36 @@ async function _settlePartnerPayableWithClient(
   ctx: PartnerContext,
   payableId: string,
   input: SettlePartnerPayableInput,
-): Promise<{ payable_id: string; paid: boolean }> {
+): Promise<{ payable_id: string; paid: boolean; closed: boolean; amount: string; remaining_balance: string }> {
     await assertPayableNotManagedByMatrix(client, ctx, payableId);
+    const requestKey = input.idempotency_key?.trim() || null;
+    if (requestKey) {
+      const replay = await client.query<{
+        payable_id: string; amount: string; status: string; open_amount: string;
+      }>(
+        `SELECT event.payable_id,event.amount::text,payable.status,
+                effective.open_amount::text
+           FROM finance.partner_payable_events event
+           JOIN finance.partner_payables payable
+             ON payable.environment=event.environment AND payable.id=event.payable_id
+           JOIN finance.partner_payables_effective effective
+             ON effective.environment=payable.environment AND effective.id=payable.id
+          WHERE event.environment=$1 AND event.unit_id=$2
+            AND event.idempotency_key=$3`,
+        [ctx.environment, ctx.unitId, requestKey],
+      );
+      const found = replay.rows[0];
+      if (found) {
+        const sameAmount = input.amount == null
+          || moneyCents(Number(found.amount)) === moneyCents(input.amount);
+        if (found.payable_id !== payableId || !sameAmount) {
+          throw new Error('partner_finance_idempotency_conflict');
+        }
+        return { payable_id: payableId, paid: true, closed: found.status === 'paid',
+          amount: (moneyCents(Number(found.amount)) / 100).toFixed(2),
+          remaining_balance: (moneyCents(Number(found.open_amount)) / 100).toFixed(2) };
+      }
+    }
     const paidAt = normalizeBusinessFactInstant(
       input.paid_at, new Date(), 'paid_at_future',
     ) ?? new Date().toISOString();
@@ -2400,28 +2437,50 @@ async function _settlePartnerPayableWithClient(
       id: string;
       description: string;
       category: RegisterPartnerPayableInput['category'];
-      amount: string;
+      original_amount: string;
+      open_amount: string;
       payment_method: string | null;
       source_purchase_id: string | null;
       competence_month: string;
     }>(
-      `UPDATE finance.partner_payables
-       SET status = 'paid',
-           paid_at = $4::timestamptz,
-           payment_method = COALESCE($5, payment_method)
-       WHERE id = $1
-         AND environment = $2
-         AND unit_id = $3
-         AND status = 'open'
-         AND deleted_at IS NULL
-       RETURNING id, description, category, amount, payment_method,
-                 source_purchase_id, competence_month::text`,
-      [payableId, ctx.environment, ctx.unitId, paidAt, input.payment_method ?? null],
+      `SELECT p.id,p.description,p.category,p.amount::text original_amount,
+              GREATEST(p.amount-COALESCE((SELECT sum(e.amount)
+                FROM finance.partner_payable_events e
+               WHERE e.environment=p.environment AND e.payable_id=p.id),0),0)::text open_amount,
+              COALESCE($4,p.payment_method,'Pix') payment_method,
+              p.source_purchase_id,p.competence_month::text
+         FROM finance.partner_payables p
+        WHERE p.id=$1 AND p.environment=$2 AND p.unit_id=$3
+          AND p.status='open' AND p.deleted_at IS NULL
+        FOR UPDATE OF p`,
+      [payableId, ctx.environment, ctx.unitId, input.payment_method?.trim() || null],
     );
 
-    if (result.rowCount !== 1) return { payable_id: payableId, paid: false };
+    if (result.rowCount !== 1 || Number(result.rows[0]?.open_amount ?? 0) <= 0) {
+      return { payable_id: payableId, paid: false, closed: false,
+        amount: '0.00', remaining_balance: '0.00' };
+    }
 
     const row = result.rows[0]!;
+    const openAmount = Number(row.open_amount);
+    const paidAmount = input.amount == null ? openAmount : assertPositiveCentMoney(input.amount);
+    if (moneyCents(paidAmount) > moneyCents(openAmount)) {
+      throw new Error('payable_payment_exceeds_balance');
+    }
+    const remainingCents = moneyCents(openAmount) - moneyCents(paidAmount);
+    const closed = remainingCents === 0;
+    await client.query(
+      `INSERT INTO finance.partner_payable_events (
+         environment,unit_id,payable_id,amount,paid_at,payment_method,
+         idempotency_key,created_by
+       ) VALUES ($1,$2,$3,$4,$5::timestamptz,$6,$7,$8)
+       ON CONFLICT (environment,idempotency_key) DO UPDATE
+         SET idempotency_key=EXCLUDED.idempotency_key`,
+      [ctx.environment, ctx.unitId, payableId, paidAmount, paidAt,
+       row.payment_method ?? 'Pix',
+       requestKey || `payable:${payableId}:payment:${randomBytes(8).toString('hex')}`,
+       `partner:${ctx.slug}`],
+    );
     const idempotencyKey = `payable:${payableId}:expense`;
 
     // Etapa 3: se o payable veio de uma compra (source_purchase_id preenchido),
@@ -2434,7 +2493,7 @@ async function _settlePartnerPayableWithClient(
            environment, domain, entity_table, entity_id, event_type,
            actor_label, payload_after
          ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
-                   'partner_payable_paid', $3, $4::jsonb)`,
+                   $5, $3, $4::jsonb)`,
         [
           ctx.environment,
           payableId,
@@ -2442,20 +2501,24 @@ async function _settlePartnerPayableWithClient(
           JSON.stringify({
             unit_id: ctx.unitId,
             paid_at: paidAt,
-            amount: row.amount,
+            amount: paidAmount,
+            remaining_balance: (remainingCents / 100).toFixed(2),
             source_purchase_id: row.source_purchase_id,
             expense_skipped: 'origin_is_purchase',
           }),
+          closed ? 'partner_payable_paid' : 'partner_payable_partially_paid',
         ],
       );
-      return { payable_id: payableId, paid: true };
+      return { payable_id: payableId, paid: true, closed,
+        amount: (moneyCents(paidAmount) / 100).toFixed(2),
+        remaining_balance: (remainingCents / 100).toFixed(2) };
     }
 
     // Trava de duplicidade (BUG #3): se ja existe despesa com mesma descricao
     // e mesmo valor nos ultimos 7 dias E ela nao foi gerada por este mesmo payable
     // (via FK source_payable_id, introduzida na Etapa 2), bloqueia e pede
     // confirmacao do usuario (force_duplicate=true).
-    if (!input.force_duplicate) {
+    if (closed && !input.force_duplicate) {
       const dup = await client.query<{
         id: string;
         expense_date: string;
@@ -2474,14 +2537,14 @@ async function _settlePartnerPayableWithClient(
            AND (source_payable_id IS NULL OR source_payable_id <> $6::uuid)
          ORDER BY expense_date DESC, created_at DESC
          LIMIT 5`,
-        [ctx.environment, ctx.unitId, row.description, row.amount, paidAt, payableId],
+        [ctx.environment, ctx.unitId, row.description, row.original_amount, paidAt, payableId],
       );
       if (dup.rowCount && dup.rowCount > 0) {
         throw new DuplicateExpenseError(dup.rows);
       }
     }
 
-    await client.query(
+    if (closed) await client.query(
       `INSERT INTO finance.partner_expenses (
          environment, unit_id, expense_date, category, description, amount,
          payment_method, created_by, idempotency_key, source_payable_id,
@@ -2498,7 +2561,7 @@ async function _settlePartnerPayableWithClient(
         paidAt,
         payableCategoryToExpenseCategory(row.category),
         row.description,
-        row.amount,
+        row.original_amount,
         row.payment_method,
         `partner:${ctx.slug}`,
         idempotencyKey,
@@ -2512,23 +2575,27 @@ async function _settlePartnerPayableWithClient(
          environment, domain, entity_table, entity_id, event_type,
          actor_label, payload_after
        ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
-                 'partner_payable_paid', $3, $4::jsonb)`,
+                 $5, $3, $4::jsonb)`,
       [
         ctx.environment,
         payableId,
         `partner:${ctx.slug}`,
-        JSON.stringify({ unit_id: ctx.unitId, paid_at: paidAt, amount: row.amount }),
+        JSON.stringify({ unit_id: ctx.unitId, paid_at: paidAt, amount: paidAmount,
+          remaining_balance: (remainingCents / 100).toFixed(2) }),
+        closed ? 'partner_payable_paid' : 'partner_payable_partially_paid',
       ],
     );
 
-    return { payable_id: payableId, paid: true };
+    return { payable_id: payableId, paid: true, closed,
+      amount: (moneyCents(paidAmount) / 100).toFixed(2),
+      remaining_balance: (remainingCents / 100).toFixed(2) };
 }
 
 export async function settlePartnerPayable(
   ctx: PartnerContext,
   payableId: string,
   input: SettlePartnerPayableInput,
-): Promise<{ payable_id: string; paid: boolean }> {
+): Promise<{ payable_id: string; paid: boolean; closed: boolean; amount: string; remaining_balance: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     return _settlePartnerPayableWithClient(client, ctx, payableId, input);
   });
@@ -2735,53 +2802,6 @@ export async function registerPartnerReceivable(
   });
 }
 
-export async function settlePartnerReceivable(
-  ctx: PartnerContext,
-  receivableId: string,
-  input: SettlePartnerReceivableInput,
-): Promise<{ receivable_id: string; received: boolean }> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const receivedAt = normalizeBusinessFactInstant(
-      input.received_at, new Date(), 'received_at_future',
-    ) ?? new Date().toISOString();
-    const result = await client.query<{ id: string; description: string; amount: string }>(
-      `UPDATE finance.partner_receivables
-       SET status = 'received',
-           received_at = $4::timestamptz,
-           payment_method = COALESCE($5, payment_method)
-       WHERE id = $1
-         AND environment = $2
-         AND unit_id = $3
-         AND status = 'open'
-         AND deleted_at IS NULL
-       RETURNING id, description, amount`,
-      [receivableId, ctx.environment, ctx.unitId, receivedAt, input.payment_method ?? null],
-    );
-
-    if (result.rowCount !== 1) return { receivable_id: receivableId, received: false };
-
-    await client.query(
-      `INSERT INTO audit.events (
-         environment, domain, entity_table, entity_id, event_type,
-         actor_label, payload_after
-       ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
-                 'partner_receivable_received', $3, $4::jsonb)`,
-      [
-        ctx.environment,
-        receivableId,
-        `partner:${ctx.slug}`,
-        JSON.stringify({
-          unit_id: ctx.unitId,
-          received_at: receivedAt,
-          amount: result.rows[0]!.amount,
-        }),
-      ],
-    );
-
-    return { receivable_id: receivableId, received: true };
-  });
-}
-
 export async function updatePartnerReceivable(
   ctx: PartnerContext,
   receivableId: string,
@@ -2804,6 +2824,10 @@ export async function updatePartnerReceivable(
          AND unit_id = $3
          AND status = 'open'
          AND deleted_at IS NULL
+         AND source_order_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM finance.partner_receivable_events event
+           WHERE event.environment=finance.partner_receivables.environment
+             AND event.receivable_id=finance.partner_receivables.id)
        RETURNING id`,
       [
         receivableId,
@@ -2861,6 +2885,10 @@ export async function cancelPartnerReceivable(
          AND unit_id = $3
          AND status = 'open'
          AND deleted_at IS NULL
+         AND source_order_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM finance.partner_receivable_events event
+           WHERE event.environment=finance.partner_receivables.environment
+             AND event.receivable_id=finance.partner_receivables.id)
        RETURNING id, description, amount`,
       [receivableId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
     );

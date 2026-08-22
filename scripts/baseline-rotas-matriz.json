@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-22T01:51:23.539Z",
-  "total": 242,
+  "geradoEm": "2026-08-22T17:51:03.323Z",
+  "total": 243,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -123,7 +123,6 @@
     "GET /admin/painel/app.venda.modal.js PUBLICA",
     "GET /admin/painel/app.vendas.historico.js PUBLICA",
     "GET /admin/painel/app.vendas.marcas.js PUBLICA",
-    "GET /admin/painel/business-time.js PUBLICA",
     "GET /admin/painel/assets/bot-hero.webp PUBLICA",
     "GET /admin/painel/assets/catalog-brands/:asset PUBLICA",
     "GET /admin/painel/assets/catalog-tire.webp PUBLICA",
@@ -139,6 +138,7 @@
     "GET /admin/painel/assets/rede-hero-v2.webp PUBLICA",
     "GET /admin/painel/assets/rede-hero-visao-v3.webp PUBLICA",
     "GET /admin/painel/assets/vendas-hero.webp PUBLICA",
+    "GET /admin/painel/business-time.js PUBLICA",
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",
     "GET /admin/painel/style.css PUBLICA",
@@ -202,6 +202,7 @@
     "POST /admin/api/matriz/despesas/remove AUTH(1)",
     "POST /admin/api/matriz/despesas/settle AUTH(1)",
     "POST /admin/api/matriz/financeiro/ledger/settle AUTH(1)",
+    "POST /admin/api/matriz/financeiro/ledger/write-off AUTH(1)",
     "POST /admin/api/matriz/financeiro/settle AUTH(1)",
     "POST /admin/api/orders/:order_id/cancel AUTH(1)",
     "POST /admin/api/orders/:order_id/retrieve AUTH(1)",

@@ -58,7 +58,10 @@ export async function getPartnerSimpleFinance(
            COALESCE((SELECT sum(po.total_amount)
              FROM commerce.partner_orders po,bounds b
             WHERE po.environment=$1 AND po.unit_id=$2
-              AND po.status<>'cancelled' AND po.deleted_at IS NULL
+              AND (po.status<>'cancelled' OR EXISTS (SELECT 1
+                FROM finance.partner_order_refunds refund
+                WHERE refund.environment=po.environment AND refund.order_id=po.id))
+              AND po.deleted_at IS NULL
               AND NOT (po.fulfillment_mode='delivery'
                 AND po.delivery_status<>'delivered')
               AND NOT po.awaiting_pickup
@@ -68,11 +71,15 @@ export async function getPartnerSimpleFinance(
               AND (CASE WHEN po.fulfillment_mode='delivery' THEN po.delivered_at
                         ELSE COALESCE(po.retrieved_at,po.created_at) END)
                     <b.range_end_at
-              AND (po.payment_method IS NULL OR po.payment_method<>'A receber')),0)
-           + COALESCE((SELECT sum(pre.amount)
-             FROM finance.partner_receivables_effective pre,bounds b
-            WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.status='received'
-              AND pre.received_at>=b.range_start_at AND pre.received_at<b.range_end_at),0)
+              AND NOT EXISTS (SELECT 1 FROM finance.partner_receivables linked
+                WHERE linked.environment=po.environment
+                  AND linked.source_order_id=po.id AND linked.deleted_at IS NULL)),0)
+           + COALESCE((SELECT sum(event.amount)
+             FROM finance.partner_receivable_events event,bounds b
+            WHERE event.environment=$1 AND event.unit_id=$2
+              AND event.event_kind IN ('receipt','recovery')
+              AND event.occurred_at>=b.range_start_at
+              AND event.occurred_at<b.range_end_at),0)
            AS total
        ), cash_out AS (
          SELECT
@@ -80,6 +87,9 @@ export async function getPartnerSimpleFinance(
              FROM commerce.partner_purchases pp,bounds b
             WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.deleted_at IS NULL
               AND pp.payment_status='paid_now'
+              AND NOT EXISTS (SELECT 1 FROM finance.partner_payables linked
+                WHERE linked.environment=pp.environment
+                  AND linked.source_purchase_id=pp.id AND linked.deleted_at IS NULL)
               AND pp.purchased_at>=b.range_start_at AND pp.purchased_at<b.range_end_at),0)
            + COALESCE((SELECT sum(pe.amount)
              FROM finance.partner_expenses pe,bounds b
@@ -87,11 +97,22 @@ export async function getPartnerSimpleFinance(
               AND pe.source_payable_id IS NULL
               AND pe.expense_date>=b.range_start_date
               AND pe.expense_date<b.range_end_date),0)
-           + COALESCE((SELECT sum(pp2.amount)
-             FROM finance.partner_payables pp2,bounds b
-            WHERE pp2.environment=$1 AND pp2.unit_id=$2 AND pp2.deleted_at IS NULL
-              AND pp2.status='paid' AND pp2.paid_at>=b.range_start_at
-              AND pp2.paid_at<b.range_end_at),0) AS total
+           + COALESCE((SELECT sum(event.amount)
+             FROM finance.partner_payable_events event,bounds b
+            WHERE event.environment=$1 AND event.unit_id=$2
+              AND event.paid_at>=b.range_start_at
+              AND event.paid_at<b.range_end_at),0)
+           + COALESCE((SELECT sum(event.amount)
+             FROM finance.partner_receivable_events event,bounds b
+            WHERE event.environment=$1 AND event.unit_id=$2
+              AND event.event_kind='refund'
+              AND event.occurred_at>=b.range_start_at
+              AND event.occurred_at<b.range_end_at),0)
+           + COALESCE((SELECT sum(refund.amount)
+             FROM finance.partner_order_refunds refund,bounds b
+            WHERE refund.environment=$1 AND refund.unit_id=$2
+              AND refund.refunded_at>=b.range_start_at
+              AND refund.refunded_at<b.range_end_at),0) AS total
        ), commissions AS (
          SELECT
            COALESCE((SELECT sum(ce.commission_amount)
@@ -105,21 +126,19 @@ export async function getPartnerSimpleFinance(
        )
        SELECT cash_in.total::text AS cash_in,
               cash_out.total::text AS cash_out,
-              COALESCE((SELECT sum(pre.amount)
+              COALESCE((SELECT sum(pre.open_amount)
                 FROM finance.partner_receivables_effective pre
-               WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.status='open'),0)::text
+               WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.open_amount>0),0)::text
                 AS receivable_total,
               (SELECT count(*)::int FROM finance.partner_receivables_effective pre
-                WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.status='open')
+                WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.open_amount>0)
                 AS receivable_count,
-              COALESCE((SELECT sum(pp.amount) FROM finance.partner_payables pp
-                WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.deleted_at IS NULL
-                  AND pp.status='open'
+              COALESCE((SELECT sum(pp.open_amount) FROM finance.partner_payables_effective pp
+                WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.open_amount>0
                   AND pp.due_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date),0)::text
                 AS due_today_total,
-              (SELECT count(*)::int FROM finance.partner_payables pp
-                WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.deleted_at IS NULL
-                  AND pp.status='open'
+              (SELECT count(*)::int FROM finance.partner_payables_effective pp
+                WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.open_amount>0
                   AND pp.due_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date)
                 AS due_today_count,
               commissions.total::text AS commission_total

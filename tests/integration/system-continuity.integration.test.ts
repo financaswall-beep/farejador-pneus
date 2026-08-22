@@ -3,7 +3,7 @@ import {
   startPostgres, stopPostgres, type IntegrationDb,
 } from './helpers/postgres.js';
 
-describe('migration 0199 em PostgreSQL limpo', () => {
+describe('continuidade do schema em PostgreSQL limpo', () => {
   let db: IntegrationDb;
 
   beforeAll(async () => { db = await startPostgres(); }, 120_000);
@@ -14,8 +14,8 @@ describe('migration 0199 em PostgreSQL limpo', () => {
       'SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true',
     );
     expect(state.rows[0]).toEqual({
-      version: 199,
-      migration_name: '0199_system_continuity.sql',
+      version: 200,
+      migration_name: '0200_finance_credit_lifecycle.sql',
     });
 
     const constraints = await db.pool.query<{ conname: string; convalidated: boolean }>(`

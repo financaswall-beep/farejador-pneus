@@ -41,13 +41,18 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='partner_order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='reference_unit_price'`);
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.application_schema_state')");
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=199');
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivable_events')");
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payable_events')");
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_order_refunds')");
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivables_effective')");
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payables_effective')");
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=200');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0199', async () => {
+  it('recusa iniciar antes da migration 0200', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0199_system_continuity');
+      .rejects.toThrow('required_schema_missing:0200_finance_credit_lifecycle');
   });
 });

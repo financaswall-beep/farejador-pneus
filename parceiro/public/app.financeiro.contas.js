@@ -92,13 +92,26 @@ window.PARCEIRO_MODULES.financeiroContas = () => ({
     },
 
     async settlePayable(payableId) {
-      if (!confirm('Marcar esta conta como paga agora?')) return;
+      const payable = this.payables.find((item) => item.id === payableId);
+      const balance = this.num(payable?.open_amount ?? payable?.amount);
+      const rawAmount = prompt(
+        `Quanto foi pago? Saldo atual: ${this.money(balance)}`,
+        balance.toFixed(2).replace('.', ','),
+      );
+      if (rawAmount === null) return;
+      const amount = Number(String(rawAmount).trim().replace(/\./g, '').replace(',', '.'));
+      if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) {
+        this.flash('Informe um valor válido, sem ultrapassar o saldo.');
+        return;
+      }
       this.saving = true;
       this.savingAction = `payable-pay-${payableId}`;
       const paidAt = new Date().toISOString();
+      const idempotencyKey = this.uuid();
       const attempt = async (force) => this.api(`contas-a-pagar/${payableId}/pagar`, {
         method: 'POST',
-        body: JSON.stringify({ paid_at: paidAt, payment_method: 'Pix', force_duplicate: force }),
+        body: JSON.stringify({ paid_at: paidAt, payment_method: 'Pix', amount,
+          idempotency_key: idempotencyKey, force_duplicate: force }),
       });
       try {
         try {
@@ -121,7 +134,9 @@ window.PARCEIRO_MODULES.financeiroContas = () => ({
           }
         }
         await this.loadData();
-        this.flash('Conta marcada como paga.');
+        this.flash(amount + 0.001 < balance
+          ? 'Pagamento parcial registrado. O restante continua em aberto.'
+          : 'Conta marcada como paga.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {

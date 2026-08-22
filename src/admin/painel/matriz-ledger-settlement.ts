@@ -2,12 +2,15 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
-import {
-  matrizLedgerActor, postMatrizLedgerTransaction,
-  type MatrizLedgerAccountClass,
-} from './matriz-ledger-posting.js';
+import { matrizLedgerActor } from './matriz-ledger-posting.js';
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   moneyCents, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
+import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
+import {
+  lockSettlementObligation as lockObligation,
+  recordSettlementPayment as recordPayment,
+  type SettlementObligationRow as ObligationRow,
+} from './matriz-ledger-settlement-payment.js';
 type Environment = 'prod' | 'test';
 type Target = { obligation_id: string; account_code?: never } |
   { obligation_id?: never; account_code: 'marketing_payable' };
@@ -29,18 +32,6 @@ export interface MatrizLedgerSettlementResult {
   payment_ids: string[];
   settled_at: string;
 }
-interface ObligationRow {
-  id: string;
-  source_type: string;
-  source_id: string;
-  account_code: string;
-  account_class: MatrizLedgerAccountClass;
-  open_amount: string;
-}
-const CENTRAL_ACCOUNTS = new Set([
-  'supplier_refund_receivable', 'expense_refund_receivable',
-  'customer_refund_payable',
-]);
 function requestedAmount(value: number | undefined, balance: number): number {
   if (value !== undefined && Math.abs(value * 100 - Math.round(value * 100)) >= 1e-7) throw new Error('settlement_amount_cent_precision');
   const amount = value === undefined ? balance : moneyCents(value) / 100;
@@ -52,71 +43,6 @@ function requestedAmount(value: number | undefined, balance: number): number {
 }
 function paymentSourceId(key: string, fingerprint: string, index = 0): string {
   return `${key.trim().slice(0, 120)}:${fingerprint.slice(0, 40)}:${index}`;
-}
-async function recordPayment(
-  client: PoolClient,
-  environment: Environment,
-  obligation: ObligationRow,
-  amount: number,
-  paidAt: string,
-  actor: string,
-  sourceType: string,
-  sourceId: string,
-  metadata: Record<string, unknown>,
-): Promise<string> {
-  const receivable = obligation.account_class === 'asset';
-  const paymentId = await postMatrizLedgerTransaction(client, {
-    environment, sourceType, sourceId, kind: 'payment', amount,
-    occurredAt: paidAt, cashAt: paidAt,
-    description: receivable ? 'Recebimento no Financeiro central' : 'Pagamento no Financeiro central',
-    createdBy: actor,
-    lines: receivable ? [
-      { account_code: 'cash', account_class: 'asset', side: 'debit', amount },
-      { account_code: obligation.account_code, account_class: 'asset', side: 'credit', amount },
-    ] : [
-      { account_code: obligation.account_code, account_class: 'liability', side: 'debit', amount },
-      { account_code: 'cash', account_class: 'asset', side: 'credit', amount },
-    ],
-    metadata,
-  });
-  await client.query(
-    `SELECT finance.record_matriz_ledger_payment(
-       $1::env_t,$2,$3,$4::timestamptz,$5,NULL
-     )`,
-    [environment, obligation.id, paymentId, paidAt, actor],
-  );
-  return paymentId;
-}
-async function lockObligation(
-  client: PoolClient,
-  environment: Environment,
-  obligationId: string,
-): Promise<ObligationRow> {
-  const result = await client.query<ObligationRow>(
-    `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
-            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind='settlement'
-              THEN p.amount ELSE -p.amount END)
-              FROM finance.matriz_ledger_payments p
-             WHERE p.environment=t.environment
-               AND p.obligation_transaction_id=t.id),0))::numeric(14,2)::text open_amount
-       FROM finance.matriz_ledger_transactions t
-       JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
-      WHERE t.environment=$1 AND t.id=$2
-        AND ((e.account_class='asset' AND e.side='debit')
-          OR (e.account_class='liability' AND e.side='credit'))
-        AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
-          WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
-      FOR UPDATE OF t`,
-    [environment, obligationId],
-  );
-  const row = result.rows[0];
-  const retail = row?.account_code === 'accounts_receivable'
-    && row.source_type === 'commerce.order.revenue';
-  if (!row || (!CENTRAL_ACCOUNTS.has(row.account_code) && !retail)) {
-    throw new Error('central_obligation_not_actionable');
-  }
-  if (Number(row.open_amount) <= 0) throw new Error('central_obligation_not_open');
-  return row;
 }
 async function settleObligation(
   client: PoolClient,
@@ -135,16 +61,26 @@ async function settleObligation(
   const remainingCents = balanceCents - amountCents;
   const remaining = (remainingCents / 100).toFixed(2);
   const retail = obligation.source_type === 'commerce.order.revenue';
+  const wholesaleSale = ['commerce.wholesale_order.revenue',
+    'commerce.wholesale_order.arrival_revenue'].includes(obligation.source_type);
+  const wholesalePurchase = obligation.source_type === 'commerce.wholesale_purchase.accrual';
   const full = remainingCents === 0;
   const method = input.payment_method?.trim();
-  if (retail && full && (!method || method.toLowerCase() === 'a receber')) {
+  if ((retail || wholesaleSale) && full
+    && (!method || method.toLowerCase() === 'a receber')) {
     throw new Error('retail_payment_method_required');
   }
-  const sourceType = retail && full
-    ? 'commerce.order.payment' : retail
-      ? 'commerce.order.partial_payment'
-      : 'finance.matriz_ledger_obligation.settlement';
-  const sourceId = retail && full ? obligation.source_id
+  const sourceType = retail
+    ? (full ? 'commerce.order.payment' : 'commerce.order.partial_payment')
+    : wholesaleSale
+      ? (full ? 'commerce.wholesale_order.payment'
+        : 'commerce.wholesale_order.partial_payment')
+      : wholesalePurchase
+        ? (full ? 'commerce.wholesale_purchase.payment'
+          : 'commerce.wholesale_purchase.partial_payment')
+        : 'finance.matriz_ledger_obligation.settlement';
+  const sourceId = (retail || wholesaleSale || wholesalePurchase) && full
+    ? obligation.source_id
     : paymentSourceId(operation.idempotencyKey, operation.fingerprint);
   const paymentId = await recordPayment(
     client, operation.environment, obligation, amount, paidAt, actor,
@@ -164,6 +100,33 @@ async function settleObligation(
       [operation.environment, obligation.source_id, method],
     );
     if (!updated.rows[0]) throw new Error('retail_receivable_not_open');
+  }
+  if (wholesaleSale && full) {
+    const updated = await client.query(
+      `UPDATE commerce.wholesale_orders
+          SET payment_status='paid',paid_at=$3::timestamptz,
+              payment_method=COALESCE($4,payment_method)
+        WHERE environment=$1 AND id=$2 AND status='confirmed'
+          AND payment_status='pending' RETURNING id`,
+      [operation.environment, obligation.source_id, paidAt, method ?? null],
+    );
+    if (!updated.rows[0]) throw new Error('receivable_not_found');
+  }
+  if (wholesaleSale) {
+    await settleLinkedPartnerPayable(
+      client, operation.environment, obligation.source_id, paidAt, actor,
+      method ?? null, amount, operation.idempotencyKey,
+    );
+  }
+  if (wholesalePurchase && full) {
+    const updated = await client.query(
+      `UPDATE commerce.wholesale_purchases
+          SET payment_status='paid',paid_at=$3::timestamptz
+        WHERE environment=$1 AND id=$2 AND status<>'cancelled'
+          AND payment_status='pending' RETURNING id`,
+      [operation.environment, obligation.source_id, paidAt],
+    );
+    if (!updated.rows[0]) throw new Error('payable_not_found');
   }
   return integrityResult({
     target_id: obligation.id,
@@ -199,7 +162,7 @@ async function settleMarketing(
   let pendingCents = moneyCents(requestedAmount(input.amount, balance));
   const obligations = await client.query<ObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
-            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind='settlement'
+            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff')
               THEN p.amount ELSE -p.amount END) FROM finance.matriz_ledger_payments p
              WHERE p.environment=t.environment
                AND p.obligation_transaction_id=t.id),0))::numeric(14,2)::text open_amount

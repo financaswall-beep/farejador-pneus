@@ -1,12 +1,16 @@
 # Handoff - Farejador
 
-> **Atualização mais recente — 22/08/2026:** auditoria sistêmica de continuidade concluída.
-> Calendário unificado em São Paulo, migration canônica `0199`, partições e retenção
-> automáticas, recuperação de lacunas do Marketing e health operacional implementados.
-> A `0199` foi aplicada no banco-alvo depois de backup, dry-run e reconciliação. O código
-> está aprovado; ainda faltam deploy e smoke. Ver
-> [`AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md`](AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md)
-> e a seção 19 do dossiê consolidado.
+> **Atualização mais recente — 22/08/2026:** ciclo contábil de crédito corrigido na
+> Matriz e no parceiro. Venda fiada permanece em resultado por competência e fora
+> do caixa; pagamentos parciais, saldo aberto, inadimplência, recuperação, COD sem
+> dupla contagem, caixa realizado e datas de entrega passaram a ter eventos e
+> proteções próprias. TypeScript, build, 1.291 unitários, 276 integrações e todas as
+> provas dos painéis passaram. A migration `0200_finance_credit_lifecycle.sql` foi
+> aplicada no banco-alvo depois de backup validado, dry-run e reconciliação; o
+> marcador material está na versão 200. Código, commit, push e deploy continuam
+> pendentes. Ver
+> [`AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md`](AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md)
+> e a seção 20 do dossiê consolidado.
 
 **Atualizado: 2026-05-23 (sessão Claude Sonnet 4.5).**
 

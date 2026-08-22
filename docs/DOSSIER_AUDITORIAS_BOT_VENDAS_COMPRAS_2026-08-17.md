@@ -1,6 +1,6 @@
 # Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística, Equipe, Rede, Clientes, Catálogo e Marketing
 
-**Data da revisão:** 21/08/2026
+**Data da revisão:** 22/08/2026
 **Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro, Equipe e Marketing.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
@@ -924,3 +924,36 @@ já expostos e reautorização da Meta. O sistema não possui
 prazo de validade interno e renova suas estruturas automaticamente, mas continua dependente
 de infraestrutura, espaço, certificados, credenciais, provedores e monitoramento humano.
 Relatório completo: `docs/AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md`.
+
+## 20. Correção contábil de prosseguimento — crédito, caixa e inadimplência
+
+A leitura das vendas fiadas confirmou que o painel estava correto ao manter o caixa
+inalterado e reconhecer receita, custo e resultado por competência. A fragilidade estava no
+prosseguimento do crédito: faltavam recebimento parcial, baixa por calote, recuperação,
+renegociação auditada e uma origem única de caixa no parceiro.
+
+A migration aditiva `0200_finance_credit_lifecycle.sql` introduz eventos imutáveis de
+recebimento, pagamento, perda, recuperação e estorno, com RLS, proteção de data, saldo,
+idempotência e travas contra excesso. Recebíveis gerados por venda não podem mais ser
+editados ou apagados isoladamente. Matriz e parceiro aceitam baixas parciais; a perda reduz
+resultado sem movimentar caixa; a recuperação posterior movimenta caixa sem recriar venda
+ou estoque. O caixa do parceiro agora usa dinheiro realizado e deduplica COD de recebimento
+vinculado. O reconhecimento de venda entregue foi alinhado a `delivered_at`, e rótulos e
+score foram corrigidos para não confundir competência com dinheiro disponível.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos | **1.291/1.291**, 260 arquivos |
+| Integração completa PostgreSQL | **276/276**, 55 arquivos |
+| TypeScript e build | aprovados |
+| Migrations | **201 verificadas**, última `0200` |
+| Painéis e contratos | parceiro 599; Matriz 1.105; 95 APIs; 243 rotas |
+| Fiscal de tamanho e diff | aprovados |
+
+**Veredito:** correções contábeis aprovadas em código e banco. A `0200` foi aplicada no
+banco-alvo depois de backup validado (3.540.280 bytes, 2.741 entradas), dry-run com rollback
+e reconciliação pós-commit. O marcador está na versão 200, com zero saldo negativo, zero
+título fechado com saldo e ledger balanceado. O runtime ainda não foi commitado, publicado
+ou implantado. Faltam commit/push, deploy manual pelo responsável e smoke autenticado em
+Matriz e parceiro. Até o deploy, a interface continua no comportamento anterior. Relatório completo:
+`docs/AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md`.

@@ -211,6 +211,8 @@ export async function settleLinkedPartnerPayable(
   paidAt: string,
   actorLabel: string,
   paymentMethod?: string | null,
+  amount?: number | null,
+  idempotencyKey?: string | null,
 ): Promise<string | null> {
   const purchase = await client.query<{ purchase_id: string; unit_id: string }>(
     `SELECT p.id AS purchase_id,p.unit_id
@@ -222,30 +224,47 @@ export async function settleLinkedPartnerPayable(
   );
   const row = purchase.rows[0];
   if (!row) return null;
-  const payable = await client.query<{ payable_id: string }>(
-    `SELECT id AS payable_id FROM finance.partner_payables
+  const payable = await client.query<{ payable_id: string; open_amount: string }>(
+    `SELECT p.id AS payable_id,
+            GREATEST(p.amount-COALESCE((SELECT sum(e.amount)
+              FROM finance.partner_payable_events e
+             WHERE e.environment=p.environment AND e.payable_id=p.id),0),0)::text open_amount
+       FROM finance.partner_payables p
       WHERE environment=$1 AND source_purchase_id=$2 AND deleted_at IS NULL
-        AND status='open' FOR UPDATE`,
+        AND status='open' FOR UPDATE OF p`,
     [environment, row.purchase_id],
   );
   if (!payable.rows[0]) throw new Error('matrix_partner_payable_not_open');
+  const openAmount = Number(payable.rows[0].open_amount);
+  const paidAmount = amount == null ? openAmount : Math.round(amount * 100) / 100;
+  if (!(paidAmount > 0) || paidAmount > openAmount + 0.001) {
+    throw new Error('matrix_partner_payable_payment_invalid');
+  }
   await client.query(`SELECT set_config('app.matrix_partner_bridge','on',true)`);
   const paid = await client.query<{ id: string }>(
-    `UPDATE finance.partner_payables
-        SET status='paid',paid_at=$3::timestamptz,
-            payment_method=COALESCE($4,payment_method)
-      WHERE environment=$1 AND id=$2 AND status='open'
-      RETURNING id`,
-    [environment, payable.rows[0].payable_id, paidAt, paymentMethod?.trim() || null],
+    `INSERT INTO finance.partner_payable_events (
+       environment,unit_id,payable_id,amount,paid_at,payment_method,
+       idempotency_key,created_by
+     ) VALUES ($1,$2,$3,$4,$5::timestamptz,$6,$7,$8)
+     ON CONFLICT (environment,idempotency_key) DO UPDATE
+       SET idempotency_key=EXCLUDED.idempotency_key
+     RETURNING id`,
+    [environment, row.unit_id, payable.rows[0].payable_id, paidAmount, paidAt,
+     paymentMethod?.trim() || 'Nao informado',
+     idempotencyKey?.trim() || `matrix-wholesale:${orderId}:payment`,
+     `matrix:${actorLabel}`],
   );
   if (!paid.rows[0]) throw new Error('matrix_partner_payable_not_open');
-  await client.query(
-    `UPDATE commerce.partner_purchases
-        SET payment_status='paid_now',payable_due_date=NULL,
-            payment_method=COALESCE($3,payment_method)
-      WHERE environment=$1 AND id=$2 AND payment_status='payable'`,
-    [environment, row.purchase_id, paymentMethod?.trim() || null],
-  );
+  const full = Math.round((openAmount-paidAmount)*100) === 0;
+  if (full) {
+    await client.query(
+      `UPDATE commerce.partner_purchases
+          SET payment_status='paid_now',payable_due_date=NULL,
+              payment_method=COALESCE($3,payment_method)
+        WHERE environment=$1 AND id=$2 AND payment_status='payable'`,
+      [environment, row.purchase_id, paymentMethod?.trim() || null],
+    );
+  }
   await client.query(
     `INSERT INTO audit.events (
        environment,domain,entity_table,entity_id,event_type,actor_label,payload_after
@@ -253,7 +272,8 @@ export async function settleLinkedPartnerPayable(
                'matrix_linked_partner_payable_paid',$3,$4::jsonb)`,
     [environment, payable.rows[0].payable_id, `matrix:${actorLabel}`, JSON.stringify({
       wholesale_order_id: orderId, source_purchase_id: row.purchase_id,
-      unit_id: row.unit_id, paid_at: paidAt,
+      unit_id: row.unit_id, paid_at: paidAt, amount: paidAmount,
+      remaining_balance: Math.max(0, openAmount-paidAmount), full,
     })],
   );
   return payable.rows[0].payable_id;

@@ -151,7 +151,18 @@ window.PARCEIRO_MODULES.financeiroReceber = () => ({
     },
 
     async settleReceivable(receivableId) {
-      if (!confirm('Marcar esta conta como recebida agora?')) return;
+      const receivable = this.receivables.find((item) => item.id === receivableId);
+      const balance = this.num(receivable?.open_amount ?? receivable?.amount);
+      const rawAmount = prompt(
+        `Quanto foi recebido? Saldo atual: ${this.money(balance)}`,
+        balance.toFixed(2).replace('.', ','),
+      );
+      if (rawAmount === null) return;
+      const amount = Number(String(rawAmount).trim().replace(/\./g, '').replace(',', '.'));
+      if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) {
+        this.flash('Informe um valor válido, sem ultrapassar o saldo.');
+        return;
+      }
       this.saving = true;
       this.savingAction = `receivable-receive-${receivableId}`;
       try {
@@ -160,16 +171,65 @@ window.PARCEIRO_MODULES.financeiroReceber = () => ({
           body: JSON.stringify({
             received_at: new Date().toISOString(),
             payment_method: 'Pix',
+            amount,
+            idempotency_key: this.uuid(),
           }),
         });
         await this.loadData();
-        this.flash('Conta marcada como recebida.');
+        this.flash(amount + 0.001 < balance
+          ? 'Recebimento parcial registrado. O restante continua em aberto.'
+          : 'Conta recebida e caixa atualizado.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
         this.saving = false;
         this.savingAction = '';
       }
+    },
+
+    async renegotiateReceivable(receivableId) {
+      const dueDate = prompt('Novo vencimento (AAAA-MM-DD):', window.FarejadorTime.businessDate());
+      if (!dueDate) return;
+      const reason = prompt('Motivo da renegociação:');
+      if (!reason || reason.trim().length < 3) return;
+      this.saving = true;
+      this.savingAction = `receivable-renegotiate-${receivableId}`;
+      try {
+        await this.api(`contas-a-receber/${receivableId}/renegociar`, {
+          method: 'PATCH', body: JSON.stringify({ due_date: dueDate, reason: reason.trim() }),
+        });
+        await this.loadData();
+        this.flash('Novo vencimento registrado no histórico.');
+      } catch (err) { this.flash(this.errMessage(err)); }
+      finally { this.saving = false; this.savingAction = ''; }
+    },
+
+    async writeOffReceivable(receivableId) {
+      const receivable = this.receivables.find((item) => item.id === receivableId);
+      const balance = this.num(receivable?.open_amount ?? receivable?.amount);
+      const rawAmount = prompt(
+        `Valor que não será recebido (saldo: ${this.money(balance)}):`,
+        balance.toFixed(2).replace('.', ','),
+      );
+      if (rawAmount === null) return;
+      const amount = Number(String(rawAmount).trim().replace(/\./g, '').replace(',', '.'));
+      if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) {
+        this.flash('Informe um valor válido, sem ultrapassar o saldo.'); return;
+      }
+      const reason = prompt('Motivo da perda (ex.: cliente inadimplente):');
+      if (!reason || reason.trim().length < 3) return;
+      if (!confirm('Confirmar perda? Isso reduz o resultado por competência, sem mexer no caixa.')) return;
+      this.saving = true;
+      this.savingAction = `receivable-writeoff-${receivableId}`;
+      try {
+        await this.api(`contas-a-receber/${receivableId}/perda`, {
+          method: 'POST', body: JSON.stringify({ amount, reason: reason.trim(),
+            occurred_at: new Date().toISOString(), idempotency_key: this.uuid() }),
+        });
+        await this.loadData();
+        this.flash('Perda registrada. A venda foi preservada para auditoria.');
+      } catch (err) { this.flash(this.errMessage(err)); }
+      finally { this.saving = false; this.savingAction = ''; }
     },
 
     async cancelReceivable(receivableId) {

@@ -118,7 +118,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
           title: payable.counterparty_name || payable.description,
           subtitle: this.payableCategoryLabel(payable.category),
           date: payable.due_date,
-          amount: this.num(payable.amount),
+          amount: this.num(payable.open_amount ?? payable.amount),
         }))
         .filter((item) => item.amount > 0)
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -135,7 +135,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
           title: receivable.customer_name || receivable.description,
           subtitle: receivable.description,
           date: receivable.due_date,
-          amount: this.num(receivable.amount),
+          amount: this.num(receivable.open_amount ?? receivable.amount),
         }))
         .filter((item) => item.amount > 0)
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -144,7 +144,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
     get payablesOpenTotal() {
       return this.payables
         .filter((payable) => payable.status === 'open')
-        .reduce((sum, payable) => sum + this.num(payable.amount), 0);
+        .reduce((sum, payable) => sum + this.num(payable.open_amount ?? payable.amount), 0);
     },
 
     // Despesas + contas do mes (regime de competencia).
@@ -158,7 +158,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
     get receivablesOpenTotal() {
       return this.receivables
         .filter((receivable) => receivable.status === 'open')
-        .reduce((sum, receivable) => sum + this.num(receivable.amount), 0);
+        .reduce((sum, receivable) => sum + this.num(receivable.open_amount ?? receivable.amount), 0);
     },
 
     get payablesPaidMonthTotal() {

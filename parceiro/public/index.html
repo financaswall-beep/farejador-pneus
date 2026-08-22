@@ -502,7 +502,7 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="percent"></i></div>
-          <div><small x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Resultado pendente' : 'Lucro do mês'"></small><strong x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Custo pendente' : money(resumo?.estimated_result_month)"></strong><span x-text="num(resumo?.pending_cost_items_month) > 0 ? num(resumo?.pending_cost_items_month) + ' item(ns) sem custo confirmado' : 'margem ' + estimatedMargin.toFixed(1).replace('.', ',') + '%'"></span></div>
+          <div><small x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Resultado pendente' : 'Resultado por competência'"></small><strong x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Custo pendente' : money(resumo?.estimated_result_month)"></strong><span x-text="num(resumo?.pending_cost_items_month) > 0 ? num(resumo?.pending_cost_items_month) + ' item(ns) sem custo confirmado' : 'inclui vendas fiadas · margem ' + estimatedMargin.toFixed(1).replace('.', ',') + '%'"></span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="wallet"></i></div>
@@ -2298,10 +2298,13 @@
                     <div class="pos-money-side">
                       <strong x-text="money(item.amount)"></strong>
                       <div class="pos-money-actions">
-                        <button @click="editReceivable(item.raw)">Editar</button>
+                        <button x-show="!item.raw?.managed_by_sale" @click="editReceivable(item.raw)">Editar</button>
                         <button class="success" @click="settleReceivable(item.source_id)" :disabled="isSaving('receivable-receive-' + item.source_id)">Receber</button>
-                        <button class="danger" @click="cancelReceivable(item.source_id)" :disabled="isSaving('receivable-cancel-' + item.source_id)">Excluir</button>
+                        <button x-show="isOwner" @click="renegotiateReceivable(item.source_id)" :disabled="isSaving('receivable-renegotiate-' + item.source_id)">Vencimento</button>
+                        <button x-show="isOwner" class="danger" @click="writeOffReceivable(item.source_id)" :disabled="isSaving('receivable-writeoff-' + item.source_id)">Dar como perda</button>
+                        <button x-show="!item.raw?.managed_by_sale" class="danger" @click="cancelReceivable(item.source_id)" :disabled="isSaving('receivable-cancel-' + item.source_id)">Excluir</button>
                       </div>
+                      <small x-show="item.raw?.managed_by_sale">Gerada por uma venda; valor e origem protegidos.</small>
                     </div>
                   </div>
                 </template>
@@ -2878,7 +2881,7 @@
             <span class="rel-head-ic"><i data-lucide="bar-chart-3"></i></span>
             <div>
               <h2 x-text="relView === 'pneus' ? 'Pneu mais vendido' : (relView === 'caixa' ? 'Caixa do período' : 'Relatório de vendas')"></h2>
-              <p x-text="relView === 'pneus' ? 'O que mais saiu no período — pra saber o que recomprar e estocar.' : (relView === 'caixa' ? 'Quanto entrou (vendi) × quanto saiu (gastei) no período. É movimento, não lucro.' : 'Tudo o que passou — inclusive o que você tirou da tela. Filtra por período e traz de volta se precisar.')"></p>
+              <p x-text="relView === 'pneus' ? 'O que mais saiu no período — pra saber o que recomprar e estocar.' : (relView === 'caixa' ? 'Dinheiro realmente recebido menos dinheiro realmente pago no período. Fiado só entra quando receber.' : 'Tudo o que passou — inclusive o que você tirou da tela. Filtra por período e traz de volta se precisar.')"></p>
             </div>
           </header>
 
@@ -2979,19 +2982,19 @@
             </div>
           </template>
 
-          <!-- ───────── CAIXA DO PERÍODO (Vendi × gastei) ───────── -->
+          <!-- ───────── CAIXA REALIZADO DO PERÍODO ───────── -->
           <template x-if="relView === 'caixa'">
             <div>
               <div class="rel-cash">
                 <div class="rel-cash-card in">
-                  <small>Entrou (vendi)</small>
+                  <small>Dinheiro que entrou</small>
                   <strong x-text="money(relCaixa ? relCaixa.entrou : 0)"></strong>
-                  <span x-text="(relCaixa ? relCaixa.vendas_count : 0) + ' venda(s) no período'"></span>
+                  <span x-text="(relCaixa ? relCaixa.vendas_count : 0) + ' recebimento(s) no período'"></span>
                 </div>
                 <div class="rel-cash-card out">
-                  <small>Saiu (gastei)</small>
+                  <small>Dinheiro que saiu</small>
                   <strong x-text="money(relCaixa ? relCaixa.saiu : 0)"></strong>
-                  <span>despesas + compras</span>
+                  <span>pagamentos realizados</span>
                 </div>
                 <div class="rel-cash-card" :class="(relCaixa && relCaixa.saldo < 0) ? 'neg' : 'pos'">
                   <small>Saldo</small>
@@ -3000,11 +3003,12 @@
                 </div>
               </div>
               <div class="rel-cash-detail">
-                <div><span>Vendas</span><b x-text="money(relCaixa ? relCaixa.vendas_total : 0)"></b></div>
-                <div><span>Despesas</span><b x-text="money(relCaixa ? relCaixa.despesas_total : 0)"></b></div>
-                <div><span>Compras</span><b x-text="money(relCaixa ? relCaixa.compras_total : 0)"></b></div>
+                <div><span>Recebimentos</span><b x-text="money(relCaixa ? relCaixa.vendas_total : 0)"></b></div>
+                <div><span>Contas e despesas pagas</span><b x-text="money(relCaixa ? relCaixa.despesas_total : 0)"></b></div>
+                <div><span>Compras pagas na hora</span><b x-text="money(relCaixa ? relCaixa.compras_total : 0)"></b></div>
+                <div x-show="num(relCaixa?.estornos_total) > 0"><span>Estornos devolvidos</span><b x-text="money(relCaixa ? relCaixa.estornos_total : 0)"></b></div>
               </div>
-              <p class="rel-cash-note">É o <b>movimento</b> do período (o que você vendeu × o que gastou), <b>não o lucro</b> — não desconta o custo do pneu.</p>
+              <p class="rel-cash-note">Este é o <b>caixa realizado</b>: só conta dinheiro recebido ou pago. Venda fiada fica fora até a baixa. O resultado por competência aparece no Financeiro.</p>
             </div>
           </template>
         </div>

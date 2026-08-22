@@ -19,6 +19,7 @@ import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
 import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
 import { registerPartnerCoverageRoute } from './route-coverage.js';
+import { registerPartnerCreditRoutes } from './route-finance-credit.js';
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -86,8 +87,6 @@ import {
   registerPartnerReceivable,
   registerPartnerSale,
   settlePartnerPayable,
-  settlePartnerReceivable,
-  settlePartnerReceivableInstallment,
   updatePartnerCustomer,
   deletePartnerCustomer,
   updatePartnerPayable,
@@ -182,11 +181,6 @@ const payableParamsSchema = paramsSchema.extend({
 
 const receivableParamsSchema = paramsSchema.extend({
   receivableId: z.string().uuid(),
-});
-
-const receivableInstallmentParamsSchema = paramsSchema.extend({
-  receivableId: z.string().uuid(),
-  installmentId: z.string().uuid(),
 });
 
 const stockSchema = z.object({
@@ -435,12 +429,9 @@ const receivableUpdateSchema = receivableSchema
 const settlePayableSchema = z.object({
   paid_at: partnerFactDatetime('paid_at_future').nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
+  amount: centMoneySchema.refine((value) => value > 0, 'amount_must_be_positive').nullable().optional(),
   force_duplicate: z.boolean().optional(),
-});
-
-const settleReceivableSchema = z.object({
-  received_at: partnerFactDatetime('received_at_future').nullable().optional(),
-  payment_method: z.string().max(80).nullable().optional(),
+  idempotency_key: z.string().min(8).max(200).nullable().optional(),
 });
 
 async function sendStatic(reply: FastifyReply, file: string, type: string) {
@@ -471,6 +462,7 @@ function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boole
 
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
   registerPartnerCoverageRoute(fastify);
+  registerPartnerCreditRoutes(fastify);
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
     if (retireLegacyMobile(request, reply)) return;
@@ -1560,6 +1552,12 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       if (err instanceof Error && err.message === 'matrix_linked_payable_managed_by_matrix') {
         return reply.status(409).send({ error: err.message });
       }
+      if (err instanceof Error && err.message === 'payable_payment_exceeds_balance') {
+        return reply.status(409).send({ error: err.message });
+      }
+      if (err instanceof Error && err.message === 'partner_finance_idempotency_conflict') {
+        return reply.status(409).send({ error: err.message });
+      }
       throw err;
     }
   });
@@ -1620,22 +1618,6 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    const params = receivableParamsSchema.safeParse(request.params);
-    if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
-
-    const parsed = settleReceivableSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const path = issue?.path?.join('.') || 'body';
-      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
-    }
-
-    const result = await settlePartnerReceivable(getPartnerContext(request), params.data.receivableId, parsed.data);
-    if (!result.received) return reply.status(404).send({ error: 'receivable_not_found' });
-    return reply.status(200).send(result);
-  });
-
   fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'receivable_not_found' });
@@ -1645,24 +1627,4 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    const params = receivableInstallmentParamsSchema.safeParse(request.params);
-    if (!params.success) return reply.status(404).send({ error: 'installment_not_found' });
-
-    const parsed = settleReceivableSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const path = issue?.path?.join('.') || 'body';
-      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
-    }
-
-    const result = await settlePartnerReceivableInstallment(
-      getPartnerContext(request),
-      params.data.receivableId,
-      params.data.installmentId,
-      parsed.data,
-    );
-    if (!result.received) return reply.status(404).send({ error: 'installment_not_found' });
-    return reply.status(200).send(result);
-  });
 }
