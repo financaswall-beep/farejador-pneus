@@ -44,6 +44,10 @@ export function buildCapiPayload(row: CapiSourceRow, options: {
   testEventCode?: string;
   extendedMatching?: boolean;
 }): Record<string, unknown> {
+  const realizedAt = new Date(row.realized_at);
+  if (Number.isNaN(realizedAt.getTime())) throw new Error('marketing_capi_realized_at_invalid');
+  const totalAmount = Number(row.total_amount);
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) throw new Error('marketing_capi_total_amount_invalid');
   const phone = row.phone_e164?.replace(/\D/g, '') ?? '';
   const channel = row.channel ?? 'whatsapp';
   const userData: Record<string, unknown> = {};
@@ -81,13 +85,13 @@ export function buildCapiPayload(row: CapiSourceRow, options: {
   const payload: Record<string, unknown> = {
     data: [{
       event_name: 'Purchase',
-      event_time: Math.floor(new Date(row.realized_at).getTime() / 1000),
+      event_time: Math.floor(realizedAt.getTime() / 1000),
       event_id: row.order_number,
       action_source: 'business_messaging',
       messaging_channel: channel,
       user_data: userData,
       custom_data: {
-        value: Math.round(Number(row.total_amount) * 100) / 100,
+        value: Math.round(totalAmount * 100) / 100,
         currency: 'BRL',
         order_id: row.order_number,
       },

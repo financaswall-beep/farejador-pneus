@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-21T13:22:13.814Z",
-  "total": 238,
+  "geradoEm": "2026-08-22T01:51:23.539Z",
+  "total": 241,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -79,9 +79,9 @@
     "GET /admin/painel/app.charts.rede.js PUBLICA",
     "GET /admin/painel/app.charts.saude.js PUBLICA",
     "GET /admin/painel/app.charts.unidade.js PUBLICA",
-    "GET /admin/painel/app.clientes.kanban.js PUBLICA",
     "GET /admin/painel/app.clientes.identity.js PUBLICA",
     "GET /admin/painel/app.clientes.js PUBLICA",
+    "GET /admin/painel/app.clientes.kanban.js PUBLICA",
     "GET /admin/painel/app.colaboradores.gestao.js PUBLICA",
     "GET /admin/painel/app.colaboradores.js PUBLICA",
     "GET /admin/painel/app.comissoes.js PUBLICA",
@@ -106,6 +106,7 @@
     "GET /admin/painel/app.logistica.resultado.js PUBLICA",
     "GET /admin/painel/app.marketing.campaign-detail.js PUBLICA",
     "GET /admin/painel/app.marketing.campaigns.js PUBLICA",
+    "GET /admin/painel/app.marketing.chart.js PUBLICA",
     "GET /admin/painel/app.marketing.integrations.js PUBLICA",
     "GET /admin/painel/app.marketing.journeys.js PUBLICA",
     "GET /admin/painel/app.marketing.js PUBLICA",

@@ -72,18 +72,23 @@ window.PAINEL_MODULES.marketingCampaigns = function () {
 
     async loadMarketingCampaigns() {
       const requestedChannel = this.marketingCampaignChannel;
+      const requestedPeriod = this.marketingPeriod;
       const requestSeq = ++this.marketingCampaignRequestSeq;
       this.marketingCampaignsLoading = true;
       this.marketingCampaignsError = null;
       try {
         const payload = this.marketingIsMock()
-          ? marketingCampaignMockPayload(requestedChannel, this.marketingPeriod)
-          : await this.apiGet(`/admin/api/marketing/campaigns?period=${encodeURIComponent(this.marketingPeriod)}&channel=${encodeURIComponent(requestedChannel)}`);
-        if (requestSeq === this.marketingCampaignRequestSeq && this.marketingCampaignChannel === requestedChannel) {
+          ? marketingCampaignMockPayload(requestedChannel, requestedPeriod)
+          : await this.apiGet(`/admin/api/marketing/campaigns?period=${encodeURIComponent(requestedPeriod)}&channel=${encodeURIComponent(requestedChannel)}`);
+        if (requestSeq === this.marketingCampaignRequestSeq
+            && this.marketingCampaignChannel === requestedChannel
+            && this.marketingPeriod === requestedPeriod) {
           this.marketingCampaigns = payload;
         }
       } catch {
-        if (requestSeq === this.marketingCampaignRequestSeq && this.marketingCampaignChannel === requestedChannel) {
+        if (requestSeq === this.marketingCampaignRequestSeq
+            && this.marketingCampaignChannel === requestedChannel
+            && this.marketingPeriod === requestedPeriod) {
           this.marketingCampaignsError = 'Não foi possível carregar as campanhas agora.';
         }
       } finally {

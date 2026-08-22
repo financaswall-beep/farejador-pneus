@@ -24,6 +24,19 @@ function includedInSummary(value: unknown): boolean {
   return value !== false && value !== 'false' && value !== 0 && value !== '0';
 }
 
+function calendarDates(since: string, until: string): string[] {
+  const dates: string[] = [];
+  const [sinceYear, sinceMonth, sinceDay] = since.split('-').map(Number);
+  const [untilYear, untilMonth, untilDay] = until.split('-').map(Number);
+  let cursor = Date.UTC(sinceYear ?? 1970, (sinceMonth ?? 1) - 1, sinceDay ?? 1);
+  const end = Date.UTC(untilYear ?? 1970, (untilMonth ?? 1) - 1, untilDay ?? 1);
+  while (cursor <= end) {
+    dates.push(new Date(cursor).toISOString().slice(0, 10));
+    cursor += 86_400_000;
+  }
+  return dates;
+}
+
 export function canonicalConversationAction(actions: unknown): {
   value: number;
   actionType: string | null;
@@ -134,8 +147,14 @@ export function summarizeMetaRows(
     cost_per_conversation: conversations > 0
       ? Math.round((roundedSpend / conversations) * 100) / 100
       : null,
-    daily: [...byDate.values()]
-      .sort((a, b) => a.date.localeCompare(b.date))
+    daily: calendarDates(since, until)
+      .map((date) => byDate.get(date) ?? {
+        date,
+        spend: 0,
+        conversations: 0,
+        impressions: 0,
+        clicks: 0,
+      })
       .map((row) => ({
         ...row,
         spend: Math.round(row.spend * 100) / 100,

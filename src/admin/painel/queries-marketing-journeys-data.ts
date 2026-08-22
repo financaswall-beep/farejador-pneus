@@ -43,16 +43,16 @@ export async function loadOperationalJourney(
                 bool_or(channel='instagram') AS has_instagram
          FROM marketing.ad_referrals
          WHERE environment = $1
-           AND captured_at >= $2::date
-           AND captured_at < ($3::date + 1)
+           AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+           AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
          GROUP BY conversation_id
        ),
        referrals AS (
          SELECT DISTINCT conversation_id
          FROM marketing.ad_referrals
          WHERE environment = $1
-           AND captured_at >= $2::date
-           AND captured_at < ($3::date + 1)
+           AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+           AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
        )
        SELECT
          (SELECT count(*) FROM referrals)::int AS referrals,

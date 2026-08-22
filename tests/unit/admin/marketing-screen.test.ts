@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 describe('Marketing — primeira tela da matriz', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const front = readFileSync(resolve('painel/public/app.marketing.js'), 'utf8');
+  const chartFront = readFileSync(resolve('painel/public/app.marketing.chart.js'), 'utf8');
   const campaignsFront = readFileSync(resolve('painel/public/app.marketing.campaigns.js'), 'utf8');
   const campaignDetailFront = readFileSync(resolve('painel/public/app.marketing.campaign-detail.js'), 'utf8');
   const journeysFront = readFileSync(resolve('painel/public/app.marketing.journeys.js'), 'utf8');
@@ -38,11 +39,15 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-detail1');
-    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260731-marketing-scope1');
-    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2');
-    expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2');
-    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260731-marketing-scope1');
+    expect(staticRoute).toContain("'app.marketing.chart.js'");
+    expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
+      .toContain('window.PAINEL_MODULES.marketingChart');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/tailwind.css?v=20260813-logistica-redesign2');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
@@ -65,8 +70,13 @@ describe('Marketing — primeira tela da matriz', () => {
     const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
     const marketingHtml = html.slice(marketingStart, marketingEnd);
 
-    expect(front).toContain('marketingSeriesPoints(field, area = false)');
-    expect(front).toContain('const controlX = (current.x + next.x) / 2');
+    expect(marketingHtml).toContain('id="chartMarketingRhythm"');
+    expect(chartFront).toContain("label: 'Investimento (R$)'");
+    expect(chartFront).toContain("label: 'Conversas'");
+    expect(chartFront).toContain("yAxisID: 'investment'");
+    expect(chartFront).toContain("yAxisID: 'conversations'");
+    expect(chartFront).toContain('borderDash: [6, 5]');
+    expect(front).not.toContain('marketingSeriesPoints');
     expect(marketingHtml).toContain('marketingJourneyLine');
     expect(marketingHtml).toContain('Uma trilha contínua; nenhuma etapa avança sem evidência');
     expect(marketingHtml).toContain('/assets/brands/facebook.svg');
@@ -103,7 +113,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain("marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes'");
   });
 
-  it('implementa Jornadas com ledger CTWA e denominador comercial explícito', () => {
+  it('implementa Jornadas com ledger multicanal e denominador comercial explícito', () => {
     const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
     const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
     const marketingHtml = html.slice(marketingStart, marketingEnd);

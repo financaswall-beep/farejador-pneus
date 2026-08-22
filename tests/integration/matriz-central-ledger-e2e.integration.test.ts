@@ -170,8 +170,8 @@ describe('Etapa 8 — fluxo financeiro central ponta a ponta', () => {
       await metaClient.query('BEGIN');
       const run = await metaClient.query<{ id: string }>(
         `INSERT INTO marketing.meta_sync_runs
-           (environment,trigger_type,window_since,window_until,status)
-         VALUES ('test','manual','2026-07-15','2026-07-15','succeeded')
+           (environment,trigger_type,window_since,window_until,status,finished_at)
+         VALUES ('test','manual','2026-07-15','2026-07-15','succeeded',now())
          RETURNING id`,
       );
       const insight = await metaClient.query<{ id: string }>(

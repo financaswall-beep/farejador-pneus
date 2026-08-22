@@ -58,6 +58,13 @@ describe('Marketing — integrações read-only', () => {
       dbPool: {} as Pool,
       overviewProvider,
       auditProvider,
+      healthProvider: vi.fn().mockResolvedValue({
+        available: true,
+        last_sync_at: '2026-07-26T11:35:00.000Z',
+        last_sync_status: 'succeeded',
+        rows_upserted: 12,
+        capi: { pending: 0, sent: 0, failed: 0, dead_letter: 0, suppressed: 0 },
+      }),
       config: { adAccountId: 'act_123456789' },
     });
 
@@ -92,5 +99,29 @@ describe('Marketing — integrações read-only', () => {
     expect(payload.platforms[0]?.account_masked).toBeNull();
     expect(payload.platforms[0]?.imported).toEqual([]);
     expect(payload.audit_events).toEqual([]);
+  });
+
+  it('não pinta atribuição, lucro ou coleta de verde só porque há referral', async () => {
+    const withReferral = overview('connected', 2);
+    withReferral.connection.attribution = 'enabled';
+    const payload = await getMarketingIntegrations('30d', {
+      dbPool: {} as Pool,
+      overviewProvider: vi.fn().mockResolvedValue(withReferral),
+      auditProvider: vi.fn().mockResolvedValue([]),
+      healthProvider: vi.fn().mockResolvedValue({
+        available: true,
+        last_sync_at: '2026-07-26T11:35:00.000Z',
+        last_sync_status: 'failed',
+        rows_upserted: 0,
+        capi: { pending: 0, sent: 0, failed: 0, dead_letter: 0, suppressed: 0 },
+      }),
+      config: { adAccountId: 'act_1' },
+    });
+
+    expect(payload.pipeline.find((row) => row.id === 'collection')?.status).toBe('pending');
+    expect(payload.pipeline.find((row) => row.id === 'attribution')?.status).toBe('pending');
+    expect(payload.pipeline.find((row) => row.id === 'profit')?.status).toBe('blocked');
+    expect(payload.quality.find((row) => row.id === 'sync')?.status).toBe('error');
+    expect(payload.summary.critical_pending).toBeGreaterThan(0);
   });
 });

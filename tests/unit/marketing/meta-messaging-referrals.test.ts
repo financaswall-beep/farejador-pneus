@@ -81,6 +81,9 @@ describe('referrals diretos da Meta', () => {
           rowCount: 1,
         };
       }
+      if (sql.includes('INSERT INTO marketing.ad_referrals')) {
+        return { rows: [{ id: 'ref-1' }], rowCount: 1 };
+      }
       return { rows: [], rowCount: 1 };
     });
     const matched = await reconcilePendingMetaReferrals(
@@ -98,7 +101,34 @@ describe('referrals diretos da Meta', () => {
     const pendingSql = String(query.mock.calls.find(([sql]) =>
       String(sql).includes('FROM marketing.meta_messaging_referrals'))?.[0]);
     expect(pendingSql).toContain('provider_message_id IS NOT NULL');
+    expect(pendingSql).toContain('ORDER BY occurred_at,id');
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("status='unmatched'")))
+      .toBe(true);
     expect(query.mock.calls.some(([sql]) => String(sql).includes("status='matched'")))
       .toBe(true);
+  });
+
+  it('não marca staging como casado quando o referral conflita com outra cadeia', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM marketing.meta_messaging_referrals')) {
+        return { rows: [{
+          id: 'pending-2', provider_event_key: 'event-2', channel: 'messenger',
+          provider_message_id: 'mid.conflict', user_scoped_id: 'psid-2',
+          business_account_id: 'page-2', ad_id: 'ad-2', referral_ref: null,
+          source_type: 'ADS', headline: null, occurred_at: new Date('2026-08-21T12:00:00Z'),
+        }], rowCount: 1 };
+      }
+      if (sql.includes('FROM core.messages')) {
+        return { rows: [{ id: 'msg-2', conversation_id: 'conv-2', channel_type: 'facebook' }] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    await expect(reconcilePendingMetaReferrals(
+      { query } as unknown as PoolClient,
+      'test',
+    )).resolves.toBe(0);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("status='matched'")))
+      .toBe(false);
   });
 });

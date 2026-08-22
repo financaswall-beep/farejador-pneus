@@ -126,8 +126,8 @@ describe('Portao final — conciliacao central em duas competencias', () => {
       });
       const run = await client.query<{ id: string }>(
         `INSERT INTO marketing.meta_sync_runs
-           (environment,trigger_type,window_since,window_until,status)
-         VALUES ('test','manual',$1,$1,'succeeded') RETURNING id`,
+           (environment,trigger_type,window_since,window_until,status,finished_at)
+         VALUES ('test','manual',$1,$1,'succeeded',now()) RETURNING id`,
         [`${month}-15`],
       );
       const insight = await client.query<{ id: string }>(

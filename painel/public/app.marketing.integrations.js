@@ -54,18 +54,26 @@ function marketingIntegrationMockPayload() {
 window.PAINEL_MODULES.marketingIntegrations = function () {
   return {
     async loadMarketingIntegrations() {
-      if (this.marketingIntegrationsLoading) return;
+      const requestedPeriod = this.marketingPeriod;
+      const requestSeq = ++this.marketingIntegrationsRequestSeq;
       this.marketingIntegrationsLoading = true;
       this.marketingIntegrationsError = null;
       try {
-        this.marketingIntegrations = this.marketingIsMock()
+        const payload = this.marketingIsMock()
           ? marketingIntegrationMockPayload()
-          : await this.apiGet(`/admin/api/marketing/integrations?period=${encodeURIComponent(this.marketingPeriod)}`);
+          : await this.apiGet(`/admin/api/marketing/integrations?period=${encodeURIComponent(requestedPeriod)}`);
+        if (requestSeq === this.marketingIntegrationsRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingIntegrations = payload;
+        }
       } catch {
-        this.marketingIntegrationsError = 'Não foi possível carregar as integrações agora.';
+        if (requestSeq === this.marketingIntegrationsRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingIntegrationsError = 'Não foi possível carregar as integrações agora.';
+        }
       } finally {
-        this.marketingIntegrationsLoading = false;
-        this.$nextTick(() => lucide.createIcons());
+        if (requestSeq === this.marketingIntegrationsRequestSeq) {
+          this.marketingIntegrationsLoading = false;
+          this.$nextTick(() => lucide.createIcons());
+        }
       }
     },
 

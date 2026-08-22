@@ -3,31 +3,41 @@
 // Módulo-fábrica sem estado próprio; montagem via getOwnPropertyDescriptors.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 
-function marketingMockPayload() {
+function marketingMockPayload(period = '30d') {
+  const allSeries = [
+    { date: '2026-06-24', spend: 18, conversations: 7 },
+    { date: '2026-06-27', spend: 22, conversations: 8 },
+    { date: '2026-06-30', spend: 20, conversations: 6 },
+    { date: '2026-07-03', spend: 24, conversations: 10 },
+    { date: '2026-07-06', spend: 26, conversations: 9 },
+    { date: '2026-07-09', spend: 23, conversations: 8 },
+    { date: '2026-07-12', spend: 25, conversations: 11 },
+    { date: '2026-07-15', spend: 21, conversations: 7 },
+    { date: '2026-07-18', spend: 29, conversations: 12 },
+    { date: '2026-07-22', spend: 24.99, conversations: 8 },
+  ];
+  const series = period === '7d' ? allSeries.slice(-3) : allSeries;
+  const investment = Math.round(series.reduce((sum, row) => sum + row.spend, 0) * 100) / 100;
+  const conversations = series.reduce((sum, row) => sum + row.conversations, 0);
   return {
     environment: 'test',
     generated_at: '2026-07-22T12:00:00.000Z',
-    period: { id: '30d', days: 30, since: '2026-06-24', until: '2026-07-22' },
+    period: {
+      id: period,
+      days: period === '7d' ? 7 : 30,
+      since: period === '7d' ? '2026-07-16' : '2026-06-24',
+      until: '2026-07-22',
+    },
     connection: { meta: 'connected', attribution: 'enabled', capi: 'disabled' },
     metrics: {
-      investment: 232.99, campaigns: 4, conversations: 86,
+      investment, campaigns: 4, conversations,
       impressions: 18420, clicks: 612, ctr: 3.32,
-      cost_per_conversation: 2.71, attributed_sales: 7, attributed_revenue: 5840,
+      cost_per_conversation: conversations ? Math.round((investment / conversations) * 100) / 100 : null,
+      attributed_sales: 7, attributed_revenue: 5840,
       gross_margin: 1420, net_after_media: 1187.01, profit: 1187.01,
       pending_margin_orders: 1,
     },
-    series: [
-      { date: '2026-06-24', spend: 18, conversations: 7 },
-      { date: '2026-06-27', spend: 22, conversations: 8 },
-      { date: '2026-06-30', spend: 20, conversations: 6 },
-      { date: '2026-07-03', spend: 24, conversations: 10 },
-      { date: '2026-07-06', spend: 26, conversations: 9 },
-      { date: '2026-07-09', spend: 23, conversations: 8 },
-      { date: '2026-07-12', spend: 25, conversations: 11 },
-      { date: '2026-07-15', spend: 21, conversations: 7 },
-      { date: '2026-07-18', spend: 29, conversations: 12 },
-      { date: '2026-07-22', spend: 24.99, conversations: 8 },
-    ],
+    series,
     comparison: {
       available: false, previous: null, spend_delta_percent: null,
       conversations_delta_percent: null, reason: 'historico_anterior_insuficiente',
@@ -65,18 +75,29 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     async loadMarketing() {
-      if (this.marketingLoading) return;
+      const requestedPeriod = this.marketingPeriod;
+      const requestSeq = ++this.marketingRequestSeq;
       this.marketingLoading = true;
       this.marketingError = null;
       try {
-        this.marketingVisao = this.marketingIsMock()
-          ? marketingMockPayload()
-          : await this.apiGet(`/admin/api/marketing/overview?period=${encodeURIComponent(this.marketingPeriod)}`);
-      } catch (error) {
-        this.marketingError = 'Não foi possível carregar o Marketing agora.';
+        const payload = this.marketingIsMock()
+          ? marketingMockPayload(requestedPeriod)
+          : await this.apiGet(`/admin/api/marketing/overview?period=${encodeURIComponent(requestedPeriod)}`);
+        if (requestSeq === this.marketingRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingVisao = payload;
+        }
+      } catch {
+        if (requestSeq === this.marketingRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingError = 'Não foi possível carregar o Marketing agora.';
+        }
       } finally {
-        this.marketingLoading = false;
-        this.$nextTick(() => lucide.createIcons());
+        if (requestSeq === this.marketingRequestSeq) {
+          this.marketingLoading = false;
+          this.$nextTick(() => {
+            lucide.createIcons();
+            this.renderMarketingChart();
+          });
+        }
       }
     },
 
@@ -99,7 +120,10 @@ window.PAINEL_MODULES.marketing = function () {
       if (tab === 'campanhas') void this.loadMarketingCampaigns();
       if (tab === 'jornadas') void this.loadMarketingJourneys();
       if (tab === 'integracoes') void this.loadMarketingIntegrations();
-      this.$nextTick(() => lucide.createIcons());
+      this.$nextTick(() => {
+        lucide.createIcons();
+        if (tab === 'visao') this.renderMarketingChart();
+      });
     },
 
     marketingPeriodChanged() {
@@ -154,31 +178,6 @@ window.PAINEL_MODULES.marketing = function () {
         { id: 'profit', label: 'Margem após mídia', value: metrics.net_after_media == null ? 'Não calculada' : money(metrics.net_after_media),
           detail: metrics.pending_margin_orders ? `${metrics.pending_margin_orders} pedido(s) sem custo` : 'margem bruta − mídia', icon: 'trending-up' },
       ];
-    },
-
-    marketingSeriesPoints(field, area = false) {
-      const rows = this.marketingVisao?.series || [];
-      if (!rows.length) return '';
-      const max = Math.max(1, ...rows.map((row) => Number(row[field]) || 0));
-      const points = rows.map((row, index) => {
-        const x = rows.length === 1 ? 350 : 20 + (660 * index / (rows.length - 1));
-        const y = 180 - ((Number(row[field]) || 0) / max * 145);
-        return { x, y };
-      });
-      if (points.length === 1) {
-        const point = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-        return area ? `${point} L ${points[0].x.toFixed(1)} 180 Z` : point;
-      }
-      let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-      for (let index = 0; index < points.length - 1; index += 1) {
-        const current = points[index];
-        const next = points[index + 1];
-        const controlX = (current.x + next.x) / 2;
-        path += ` C ${controlX.toFixed(1)} ${current.y.toFixed(1)}, ${controlX.toFixed(1)} ${next.y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
-      }
-      return area
-        ? `${path} L ${points[points.length - 1].x.toFixed(1)} 180 L ${points[0].x.toFixed(1)} 180 Z`
-        : path;
     },
 
     marketingDateLabel(date) {

@@ -109,8 +109,8 @@ async function attributionHealth(
          count(DISTINCT conversation_id) FILTER (WHERE channel='instagram')::int AS instagram
        FROM marketing.ad_referrals
        WHERE environment = $1
-         AND captured_at >= $2::date
-         AND captured_at < ($3::date + 1)`,
+         AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+         AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`,
       [environment, since, until],
     );
     return {

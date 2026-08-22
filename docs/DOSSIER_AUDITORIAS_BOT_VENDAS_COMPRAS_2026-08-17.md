@@ -1,7 +1,7 @@
-# Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística, Equipe, Rede, Clientes e Catálogo
+# Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística, Equipe, Rede, Clientes, Catálogo e Marketing
 
 **Data da revisão:** 21/08/2026
-**Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro e Equipe.
+**Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro, Equipe e Marketing.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
 **Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. As migrations de Equipe `0192` e `0193` foram aplicadas e reconciliadas em 21/08/2026, antes do deploy do runtime correspondente. A release de código de Equipe é rastreada pela PR `#66`.
@@ -12,6 +12,13 @@ reconciliação 8/8 zerada. O código foi incorporado à `main` pela PR `#72`, n
 `ab853b3aa8a99030c3d71e0150cfbd77a3d7042b`, com CI aprovado. Falta o deploy manual. A auditoria
 somente leitura encontrou apenas um produto de teste sem preço, corretamente impedido de vender.
 Relatório: `docs/AUDITORIA_CATALOGO_PONTA_A_PONTA_2026-08-21.md`.
+
+**Auditoria atual do Marketing:** concluída em código e PostgreSQL descartável em 21/08/2026.
+O escopo implementado foi aprovado em matemática, integrações, permissões, regressão e
+navegador responsivo. A migration aditiva `0198` foi criada, mas ainda não foi aplicada no
+banco-alvo; também não houve commit, push ou deploy nesta etapa. Há uma campanha aguardando
+classificação humana, e Criativos/Geografia continuam como estruturas ainda não implementadas.
+Relatório: `docs/AUDITORIA_MARKETING_PONTA_A_PONTA_2026-08-21.md`.
 
 **Atualização de continuidade em 20/08/2026:** o repositório está em `main` no SHA
 `2064f1a`. A migration `0189_checkout_price_negotiation.sql` foi confirmada
@@ -852,7 +859,36 @@ auditoria somente leitura. A `0197` foi aplicada depois do backup restaurável d
 bytes, 2.658 entradas e SHA-256 validado; o dry-run, o commit e a reconciliação passaram.
 A PR `#72` foi incorporada à `main` no SHA `ab853b3aa8a99030c3d71e0150cfbd77a3d7042b`,
 com o GitHub Actions aprovado. Ainda não está implantado: faltam deploy manual e smoke
-autenticado. Depois do Catálogo, a auditoria setorial
-profunda ainda pendente é **Marketing**; em seguida vêm os gates finais de produção,
+autenticado. Depois do Catálogo, a auditoria setorial profunda de **Marketing foi concluída
+no escopo implementado**; em seguida vêm a aplicação da `0198` e os gates finais de produção,
 incluindo smoke autenticado geral, rotação dos segredos expostos, reautorização da Meta e
 decisão formal de go-live.
+
+## 18. Auditoria concluída — Marketing da Matriz
+
+Marketing foi cruzado com Meta Insights, Chatwoot/core, Analytics, Vendas, Estoque,
+Financeiro e CAPI. A auditoria corrigiu corte diário em UTC, dias ausentes no gráfico,
+respostas antigas após troca de filtro, saúde de integração otimista, filas Meta que podiam
+ficar presas, sync abandonado, taxa de resposta acima de 100% e relações causais aceitas
+apenas por ambiente, mas não pela mesma conversa.
+
+O gráfico **Ritmo de investimento e conversas** agora segue o padrão visual consolidado da
+Rede, preservando as unidades próprias: investimento em reais e conversas em quantidade,
+com eixos separados e tooltip conjunto. Desktop e celular passaram sem overflow.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos | **1.273/1.273**, 256 arquivos |
+| Integração completa PostgreSQL 17 | **269/269**, 52 arquivos |
+| Marketing direcionado | **58/58 unitários** e integrações específicas aprovadas |
+| TypeScript, build e migrations | aprovados; **199 migrations**, última `0198` |
+| Navegador | desktop, celular, 7/30 dias e tooltip aprovados |
+| Produção somente leitura | ledger de Marketing **R$ 181,04 = R$ 181,04**, divergência zero |
+
+**Veredito:** escopo implementado do Marketing aprovado para deploy. A `0198` foi aplicada
+depois de backup restaurável de 5.030.829 bytes e 2.658 entradas, dry-run com rollback e
+reconciliação pós-commit; quatro gatilhos, quatro funções, três constraints e o índice exclusivo
+estão presentes, sem execução pública ou do parceiro. Ainda faltam deploy e smoke autenticado.
+Uma campanha continua pendente de decisão humana. Criativos, Geografia e demanda,
+Google Ads e TikTok não são declarados prontos porque ainda não possuem implementação real.
+Relatório completo: `docs/AUDITORIA_MARKETING_PONTA_A_PONTA_2026-08-21.md`.
