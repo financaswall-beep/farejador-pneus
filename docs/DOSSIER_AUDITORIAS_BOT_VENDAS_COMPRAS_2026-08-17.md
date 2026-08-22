@@ -957,3 +957,36 @@ título fechado com saldo e ledger balanceado. O runtime ainda não foi commitad
 ou implantado. Faltam commit/push, deploy manual pelo responsável e smoke autenticado em
 Matriz e parceiro. Até o deploy, a interface continua no comportamento anterior. Relatório completo:
 `docs/AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md`.
+
+## 21. Adendo — movimentos diário e semanal do Bot
+
+A Visão geral do Bot passou a usar um recorte único para os quatro indicadores e o gráfico
+horário. O dia comercial é sempre `America/Sao_Paulo`. No modo diário, clicar no cartão de
+um dia — por exemplo, 21 — consulta somente aquele dia; no modo semanal, o intervalo começa
+no domingo e termina no sábado, limitado ao dia atual quando a semana ainda não acabou.
+
+As datas respeitam o fato de negócio: Conversas e barras horárias usam
+`core.conversations.started_at`; Pedidos fechados, Faturamento e Ticket médio usam
+`commerce.orders.created_at`. Só contam pedidos não cancelados, ligados a conversa e com
+origem `bot_promoted` ou `chatwoot_com_bot`. Assim, uma conversa iniciada no dia 20 e fechada
+no dia 21 aparece como conversa no dia 20 e como pedido/faturamento no dia 21. Não há soma
+paralela no frontend nem tabela duplicada.
+
+### Proteções e relações preservadas
+
+- rota somente leitura e protegida por autenticação administrativa;
+- isolamento obrigatório por `environment`, sem mistura `prod`/`test`;
+- datas inválidas e futuras recusadas pela API;
+- comparação diária usa o dia anterior; semanal usa os mesmos dias da semana anterior;
+- Ticket médio é `faturamento / pedidos fechados`, em centavos, e fica vazio sem pedido;
+- pedido cancelado e venda Chatwoot manual sem Bot ficam fora dos números do Bot;
+- menu lateral da Matriz, campainha ao vivo e abas Conversas, Vendas e Demanda/Estoque não
+  foram substituídos nem tiveram seus contratos alterados;
+- nenhuma migration é necessária: as consultas usam tabelas e índices canônicos existentes.
+
+**Veredito do adendo:** aprovado em 1.299 testes unitários, 276 cenários de integração
+PostgreSQL, tipagem, matemática, segurança da rota, build, paridade dos painéis, contratos,
+rotas e fiscal de tamanho. O teste visual automatizado no navegador
+local ficou indisponível por falha da conexão de controle nesta estação; portanto, o smoke
+visual autenticado continua obrigatório depois do deploy manual. Código, commit e push ainda
+estão pendentes neste ponto do documento.
