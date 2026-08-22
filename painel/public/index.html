@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260813-logistica-redesign2" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260822-bot-layout1" />
 <style>
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -6288,34 +6288,14 @@
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="bot-heading"
-               class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
-        <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
-          <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
-          <p class="mt-3 max-w-md text-sm text-slate-500">Atenda clientes no WhatsApp, acompanhe conversas e descubra onde o Bot ajuda a vender mais</p>
-        </div>
-        <div class="relative min-h-[148px] overflow-hidden rounded-xl border border-emerald-950/20 bg-white shadow-sm">
-          <img
-            src="/admin/painel/assets/bot-hero.webp?v=20260723-bot-rede2"
-            alt="Assistente automatizado conduzindo conversas para pedidos de pneus"
-            class="absolute inset-0 h-full w-full object-cover object-center">
-          <div class="absolute inset-0 bg-gradient-to-r from-white/5 via-transparent to-emerald-950/5"></div>
-          <div class="absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
-              <i data-lucide="activity" class="h-3.5 w-3.5 text-emerald-200"></i>
-              dados reais
-            </span>
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
-              <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
-              <span x-text="botTab === 'visao' ? botMovementScopeLabel : (botPeriodo === 'today' ? 'Hoje' : (botPeriodo === '7d' ? '7 dias' : (botPeriodo === '30d' ? '30 dias' : 'Mês atual')))"></span>
-            </span>
-          </div>
-        </div>
+      <section aria-labelledby="bot-heading" class="px-1 pt-1">
+        <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
+        <p class="mt-1 text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
       </section>
 
       <!-- NAVEGAÇÃO INTERNA: separa operação, vendas e demanda sem perder nenhum dado atual -->
-      <div class="mb-7 rounded-b-xl border border-gray-200 border-t-0 bg-white">
-        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
+      <div class="mb-5 mt-4 border-b border-gray-200 bg-transparent">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções do Bot" class="flex items-center gap-1 overflow-x-auto">
             <button @click="botTab = 'visao'"
                     :class="botTab === 'visao' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
@@ -6330,7 +6310,7 @@
                     :class="botTab === 'demanda' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1">Demanda e estoque</button>
           </nav>
-          <div x-show="botTab !== 'visao'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 xl:mb-0 xl:self-auto">
+          <div x-show="botTab !== 'visao'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -6347,7 +6327,7 @@
           <div class="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-3">
               <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="trending-up" class="h-6 w-6"></i></div>
-              <div><h2 id="bot-movement-heading" class="text-xl font-semibold text-gray-900">Resumo da operação</h2><p class="text-sm text-gray-500">Visão geral do desempenho do Bot</p></div>
+              <div><h2 id="bot-movement-heading" class="text-xl font-semibold text-gray-900">Movimento do Bot</h2><p class="text-sm text-gray-500">Desempenho das conversas automáticas</p></div>
             </div>
             <div class="grid w-full grid-cols-2 overflow-hidden rounded-xl border border-gray-200 p-1 sm:w-80" aria-label="Modo do movimento">
               <button type="button" @click="setBotMovementMode('daily')" :aria-pressed="botMovementMode === 'daily'" :class="botMovementMode === 'daily' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-5 py-2 text-sm font-semibold transition-colors">Diário</button>
@@ -6356,8 +6336,8 @@
           </div>
 
           <div class="border-b border-gray-100 px-5 py-4">
-            <div class="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center">
-              <div class="flex shrink-0 items-center justify-between gap-3 xl:w-80">
+            <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center">
+              <div class="flex shrink-0 items-center justify-between gap-3 lg:w-80">
                 <button type="button" @click="moveBotMovementWeek(-1)" aria-label="Semana anterior" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>
                 <div class="flex items-center gap-2 text-sm font-semibold text-gray-800"><i data-lucide="calendar-days" class="h-5 w-5 text-gray-500"></i><span x-text="botMovementWeekLabel"></span></div>
                 <button type="button" @click="moveBotMovementWeek(1)" :disabled="!botMovementCanNextWeek" aria-label="Próxima semana" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-30"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>
@@ -6376,11 +6356,11 @@
 
           <p x-show="botMovementError" class="mx-5 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700" x-text="botMovementError"></p>
           <div :class="botMovementLoading ? 'opacity-60' : ''" class="transition-opacity">
-            <div class="grid grid-cols-1 gap-3 border-b border-gray-100 px-5 py-5 sm:grid-cols-2 xl:grid-cols-4">
-              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="message-circle" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Conversas</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.conversas : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.conversas_pct)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.conversas_pct) + ' ' + botMovementComparisonLabel"></span></div>
-              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="shopping-cart" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Pedidos fechados</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.fecharam : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.fecharam_delta)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.fecharam_delta, '') + ' ' + botMovementComparisonLabel"></span></div>
-              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="circle-dollar-sign" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Faturamento do Bot</p><p class="text-2xl font-semibold" x-text="botMovementCards ? formatCurrency(Number(botMovementCards.faturamento || 0)) : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.faturamento_pct)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.faturamento_pct) + ' ' + botMovementComparisonLabel"></span></div>
-              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="tag" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Ticket médio</p><p class="text-2xl font-semibold" x-text="botMovementCards?.ticket_medio != null ? formatCurrency(Number(botMovementCards.ticket_medio)) : '—'"></p></div></div><p class="mt-3 text-[11px] font-medium text-emerald-700">Média por pedido fechado</p></div>
+            <div class="grid grid-cols-1 gap-3 border-b border-gray-100 px-5 py-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="message-circle" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Conversas</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.conversas : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.conversas_pct)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.conversas_pct)"></span></div>
+              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="shopping-cart" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Pedidos fechados</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.fecharam : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.fecharam_delta)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.fecharam_delta, '')"></span></div>
+              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="circle-dollar-sign" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Faturamento do Bot</p><p class="whitespace-nowrap text-2xl font-semibold" x-text="botMovementCards ? formatCurrency(Number(botMovementCards.faturamento || 0)) : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.faturamento_pct)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.faturamento_pct)"></span></div>
+              <div class="flex min-h-[104px] items-center gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="tag" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Ticket médio</p><p class="whitespace-nowrap text-2xl font-semibold" x-text="botMovementCards?.ticket_medio != null ? formatCurrency(Number(botMovementCards.ticket_medio)) : '—'"></p></div></div>
             </div>
 
             <div class="px-5 py-5">
