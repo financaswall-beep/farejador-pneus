@@ -60,7 +60,7 @@ window.PARCEIRO_MODULES.financeiroScore = () => ({
         else if (sales > 0) score -= 80;
       }
 
-      if (cashNet >= 0) score += 90;
+      if (cashNet > 0) score += 90;
       else score -= 120;
 
       if (futureNet >= 0) score += 80;

@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-22T01:51:10.373Z",
+  "geradoEm": "2026-08-22T17:50:40.552Z",
   "commitBase": "dd64a35",
-  "total": 1103,
+  "total": 1105,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -483,6 +483,7 @@
     "finBarWidth": "function",
     "finCobrancasAbertas": "function",
     "finConfirmarBaixa": "function",
+    "finConfirmarPerda": "function",
     "finExtrato": "value:null",
     "finExtratoFiltro": "value:object",
     "finExtratoLoading": "value:boolean",
@@ -502,6 +503,7 @@
     "finParseValor": "function",
     "finPctLucro": "function",
     "finPermiteParcial": "function",
+    "finPodeDarPerda": "function",
     "finQuitando": "value:boolean",
     "finReceber": "function",
     "finResPct": "function",

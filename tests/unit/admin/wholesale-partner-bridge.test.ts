@@ -108,10 +108,10 @@ describe('ponte de estoque Matriz → parceiro', () => {
       if (sql.includes('SELECT p.id AS purchase_id')) {
         return { rows: [{ purchase_id: 'purchase-1', unit_id: 'unit-1' }] };
       }
-      if (sql.includes('SELECT id AS payable_id')) {
-        return { rows: [{ payable_id: 'payable-1' }] };
+      if (sql.includes('SELECT p.id AS payable_id')) {
+        return { rows: [{ payable_id: 'payable-1', open_amount: '45.00' }] };
       }
-      if (sql.includes('UPDATE finance.partner_payables')) {
+      if (sql.includes('INSERT INTO finance.partner_payable_events')) {
         return { rows: [{ id: 'payable-1' }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
@@ -126,5 +126,11 @@ describe('ponte de estoque Matriz → parceiro', () => {
       .includes('UPDATE commerce.partner_purchases'))!;
     expect(String(purchaseUpdate[0])).toContain("payment_status='paid_now'");
     expect(purchaseUpdate[1]).toEqual(['test', 'purchase-1', 'pix']);
+    const paymentEvent = query.mock.calls.find(([sql]) => String(sql)
+      .includes('INSERT INTO finance.partner_payable_events'))!;
+    expect(paymentEvent[1]).toEqual([
+      'test', 'unit-1', 'payable-1', 45, '2026-08-18T15:00:00.000Z',
+      'pix', 'matrix-wholesale:order-1:payment', 'matrix:Wallace',
+    ]);
   });
 });

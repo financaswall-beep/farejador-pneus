@@ -7,7 +7,7 @@ beforeAll(async () => { db = await startPostgres(); });
 afterAll(async () => { if (db) await stopPostgres(db); });
 
 describe('datas factuais do sistema inteiro', () => {
-  it('instala as 11 barreiras da migration 0186', async () => {
+  it('instala as 14 barreiras de datas, incluindo eventos financeiros da 0200', async () => {
     const result = await db.pool.query<{ count: string }>(`
       SELECT count(*)::text
         FROM pg_trigger
@@ -15,7 +15,7 @@ describe('datas factuais do sistema inteiro', () => {
           OR tgname LIKE '%business_dates_guard'
           OR tgname LIKE '%business_timestamps_guard'
     `);
-    expect(Number(result.rows[0].count)).toBe(11);
+    expect(Number(result.rows[0].count)).toBe(14);
   });
 
   it('permite vencimento futuro e bloqueia ocorrência futura', async () => {

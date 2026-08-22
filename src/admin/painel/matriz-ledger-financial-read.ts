@@ -7,15 +7,13 @@ interface LedgerTruthRow {
   cash_out: string; cash_retail: string; cash_wholesale: string; cash_network: string; cash_monthly: string;
   cash_purchases: string; cash_expenses: string; cash_commission_refund: string;
   pending_revenue: string; pending_items: number; pending_orders: number; receivables: string; payables: string; retail_receivable: string;
-  cancelled_retail: number; cancelled_wholesale: number; cancelled_purchases: number;
-  reversed_commissions: number; deleted_expenses: number;
+  cancelled_retail: number; cancelled_wholesale: number; cancelled_purchases: number; reversed_commissions: number; deleted_expenses: number;
   reversed_after_settlement: number; suspected_test_rows: number;
   source_wholesale: string; ledger_wholesale: string; source_retail: string;
   ledger_retail: string; source_freight: string; source_commission: string;
   ledger_commission: string; source_monthly: string; ledger_monthly: string;
   source_expenses: string; ledger_expenses: string;
-  source_marketing: string; ledger_marketing: string;
-  source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
+  source_marketing: string; ledger_marketing: string; source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
 }
 const cents = (value: string | number): number => Math.round(Number(value || 0) * 100); const money = (value: number): string => (value / 100).toFixed(2);
 export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' | 'test' = env.FAREJADOR_ENV,
@@ -44,6 +42,8 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
      ), retail AS (
        SELECT o.id,o.total_amount,o.created_at,o.updated_at,o.status,
               o.fulfillment_mode,o.closed_by,
+              CASE WHEN o.fulfillment_mode='delivery' THEN o.delivered_at
+                ELSE o.created_at END recognized_at,
               COALESCE(sum(i.quantity*i.unit_price-i.discount_amount),0) item_total,
               COALESCE(sum(i.quantity*i.unit_price-i.discount_amount)
                 FILTER (WHERE i.matriz_unit_cost IS NULL),0) pending_revenue,
@@ -149,7 +149,7 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
            AND source_type LIKE 'commerce.wholesale_order.%'),0) ledger_wholesale,
        COALESCE((SELECT sum(total_amount) FROM retail,bounds b
          WHERE status IN ('confirmed','paid','delivered','cancelled')
-           AND created_at>=b.month_ts AND created_at<b.month_end_ts),0)
+           AND recognized_at>=b.month_ts AND recognized_at<b.month_end_ts),0)
        -COALESCE((SELECT sum(total_amount) FROM retail,bounds b
          WHERE status='cancelled' AND updated_at>=b.month_ts
            AND updated_at<b.month_end_ts),0) source_retail,
@@ -158,8 +158,8 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
            AND source_type LIKE 'commerce.order.%'),0) ledger_retail,
        COALESCE((SELECT sum(GREATEST(total_amount-item_total,0))
          FROM retail,bounds b WHERE fulfillment_mode='delivery'
-           AND status IN ('confirmed','paid','delivered') AND created_at>=b.month_ts
-           AND created_at<b.month_end_ts),0) source_freight,
+           AND status IN ('confirmed','paid','delivered') AND recognized_at>=b.month_ts
+           AND recognized_at<b.month_end_ts),0) source_freight,
        COALESCE((SELECT sum(commission_amount) FROM network.commission_entries,bounds b
          WHERE environment=$1 AND realized_at>=b.month_ts
            AND realized_at<b.month_end_ts),0)

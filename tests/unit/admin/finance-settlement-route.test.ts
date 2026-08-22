@@ -36,6 +36,9 @@ async function buildRoute() {
   vi.doMock('../../../src/admin/painel/matriz-ledger-statement.js', () => ({
     getMatrizLedgerStatement: vi.fn(),
   }));
+  vi.doMock('../../../src/admin/painel/matriz-ledger-writeoff.js', () => ({
+    writeOffMatrizCredit: vi.fn(),
+  }));
   vi.doMock('../../../src/admin/painel/queries-financeiro-integridade.js', () => ({
     settleMatrizExpense: vi.fn(),
     settleWholesaleOrderPayment: vi.fn(),
@@ -66,6 +69,8 @@ async function buildRoute() {
 describe('contrato da porta unica de baixa financeira', () => {
   it.each([
     ['retail_sale', 'accounts_receivable'],
+    ['wholesale_sale', 'accounts_receivable'],
+    ['wholesale_purchase', 'accounts_payable'],
     ['central_obligation', 'accounts_payable'],
   ])(
     'aceita %s enviado por um painel antigo e liquida pela obrigacao',

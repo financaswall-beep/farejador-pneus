@@ -23,7 +23,8 @@ describe('verdade financeira na interface da Matriz', () => {
     expect(indicadores).toContain('v.verdade.caixa.movimento_liquido');
     expect(indicadores).not.toContain('const resultado = Number(v.mes.lucro || 0)');
     expect(html).toContain('Caixa no período');
-    expect(html).toContain('Lucro líquido confirmado');
+    expect(html).toContain('Resultado por competência');
+    expect(html).toContain('Inclui vendas fiadas; não representa dinheiro no caixa.');
     expect(html).toContain('receita_custo_pendente');
     const extrato = html.indexOf("x-show=\"finTab === 'extrato'\"");
     const indicadorHtml = html.indexOf("x-show=\"finTab === 'indicadores'\"");

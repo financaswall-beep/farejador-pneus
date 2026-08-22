@@ -36,8 +36,14 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       return modes[item.tipo] || 'central_obligation';
     },
     finPermiteParcial(item) {
-      return ['retail_sale', 'central_obligation', 'central_account']
+      return ['retail_sale', 'wholesale_sale', 'wholesale_purchase',
+        'central_obligation', 'central_account']
         .includes(this.finSettlementMode(item));
+    },
+    finPodeDarPerda(item, direction) {
+      return direction === 'receivable' && item?.obligation_id
+        && item?.account_code === 'accounts_receivable'
+        && this.adminUser?.role === 'owner';
     },
     finAbrirBaixa(item, direction) {
       if (this.finQuitando || this.adminUser?.role !== 'owner') return;
@@ -80,7 +86,8 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       );
       const target = mode === 'central_account'
         ? { account_code: item.account_code || undefined }
-        : ['retail_sale', 'central_obligation'].includes(mode)
+        : ['retail_sale', 'wholesale_sale', 'wholesale_purchase',
+          'central_obligation'].includes(mode)
           ? { obligation_id: item.obligation_id || undefined }
           : {};
       this.finQuitando = true;
@@ -104,6 +111,45 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
         ]);
       } catch (err) {
         modal.error = `Não consegui concluir a baixa (${err.message}).`;
+      } finally {
+        this.finQuitando = false;
+      }
+    },
+    async finConfirmarPerda() {
+      const modal = this.finBaixaModal;
+      const item = modal.item;
+      if (!this.finPodeDarPerda(item, modal.direction) || this.finQuitando) return;
+      const amount = this.finParseValor(modal.amount);
+      const balance = Number(item.valor || 0);
+      const reason = String(modal.note || '').trim();
+      if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) {
+        modal.error = 'O valor da perda precisa ser maior que zero e não pode ultrapassar o saldo.';
+        return;
+      }
+      if (reason.length < 3) {
+        modal.error = 'Explique o motivo da perda na observação.';
+        return;
+      }
+      if (!confirm('Confirmar perda de crédito? Isso reduz o resultado e não cria entrada no caixa.')) return;
+      const targetKey = `writeoff:${item.obligation_id}:${amount}:${modal.payment_date}:${reason}`;
+      const operation = window.PAINEL_INTEGRITY.operation('finance-credit-writeoff', targetKey);
+      this.finQuitando = true;
+      modal.error = null;
+      try {
+        await this.apiPost('/admin/api/matriz/financeiro/ledger/write-off', {
+          obligation_id: item.obligation_id,
+          amount,
+          occurred_at: this.businessFactInstant(modal.payment_date),
+          reason,
+          idempotency_key: operation.key,
+        });
+        window.PAINEL_INTEGRITY.complete('finance-credit-writeoff', targetKey);
+        this.finFecharBaixa(true);
+        await Promise.allSettled([
+          this.loadFinanceiro(), this.loadSino(), this.loadFinExtrato(),
+        ]);
+      } catch (err) {
+        modal.error = `Não consegui registrar a perda (${err.message}).`;
       } finally {
         this.finQuitando = false;
       }

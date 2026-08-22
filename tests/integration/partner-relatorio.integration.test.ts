@@ -10,7 +10,8 @@
  *   2. SAIU = despesas + compras do período.
  *   3. 🔒 anti-duplo-cômputo: compra a prazo gera um payable, mas o SAIU NÃO o
  *      soma de novo (senão a compra entraria 2×).
- *   4. Período corta certo (fora da janela não entra) e cancelado nunca entra.
+ *   4. Período corta certo; uma venda recebida e cancelada preserva a entrada
+ *      histórica e registra o estorno na data em que o dinheiro foi devolvido.
  *   5. Pneus: agrupa por medida/marca/condição, soma unidades por created_at (não pelo
  *      realizado — é "o que está saindo"), ordena por quantidade, exclui cancelado.
  *
@@ -82,10 +83,12 @@ async function setOrderDates(orderId: string, fields: { created_at?: string; del
  *   C deliv.  M×1 @999 = 999  pending, created 03-10 → caixa NÃO (pending) ; pneus M+1 (created na janela, não-cancelado)
  *   D pickup  P×1 @250 = 250  created 03-18        → caixa +250 ; pneus P+1
  *   E pickup  M×1 @500        created 04-05 (fora)  → exclui dos dois
- *   F pickup  M×1 @300        created 03-12, CANCELADA → exclui dos dois
- * Despesas: 50 (03-05, dentro) + 70 (04-02, fora)        → despesas 50
- * Compras:  80 (03-08, A PRAZO→gera payable) + 90 (04-10, fora) → compras 80
- * Esperado caixa: entrou 750, vendas_count 3, despesas 50, compras 80, saiu 130, saldo 620.
+ *   F pickup  M×1 @300        created 03-12, CANCELADA depois → entrada histórica +300;
+ *                                                   o estorno fica na data da devolução
+ * Despesas: 50 (03-05, dentro) + 70 (04-02, fora)        → despesas pagas 50
+ * Compras:  80 (03-08, a prazo, quitada 03-09) + 90 (04-10, fora) → contas pagas 80
+ * Esperado caixa de março: entrou 1.050, vendas_count 4, contas/despesas 130, compras imediatas 0,
+ * estorno 0 (foi devolvido em outro período), saiu 130, saldo 920.
  * Esperado pneus: Michelin 3, Pirelli 1 (Michelin primeiro).
  */
 async function seedScenario(q: Q, f: PartnerFixture): Promise<string> {
@@ -113,7 +116,15 @@ async function seedScenario(q: Q, f: PartnerFixture): Promise<string> {
   await q.registerPartnerExpense(f.ctx, { expense_date: '2026-03-05', category: 'other', description: 'dentro', amount: 50, payment_method: 'pix', idempotency_key: `e1-${randomUUID()}` });
   await q.registerPartnerExpense(f.ctx, { expense_date: '2026-04-02', category: 'other', description: 'fora', amount: 70, payment_method: 'pix', idempotency_key: `e2-${randomUUID()}` });
 
-  await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-03-08', items: [{ item_name: 'Pneu X', tire_condition: 'meia_vida', quantity: 2, unit_cost: 40 }], payment_method: 'pix', payment_status: 'payable', payable_due_date: '2026-04-08', idempotency_key: `p1-${randomUUID()}` });
+  const paidLaterPurchase = await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-03-08', items: [{ item_name: 'Pneu X', tire_condition: 'meia_vida', quantity: 2, unit_cost: 40 }], payment_method: 'pix', payment_status: 'payable', payable_due_date: '2026-04-08', idempotency_key: `p1-${randomUUID()}` });
+  const payable = await db.pool.query<{ id: string }>(
+    `SELECT id FROM finance.partner_payables
+      WHERE environment='test' AND source_purchase_id=$1`, [paidLaterPurchase.purchase_id],
+  );
+  await q.settlePartnerPayable(f.ctx, payable.rows[0]!.id, {
+    paid_at: '2026-03-09T12:00:00Z', payment_method: 'pix',
+    idempotency_key: `pay-${randomUUID()}`,
+  });
   await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-04-10', items: [{ item_name: 'Pneu Y', tire_condition: 'meia_vida', quantity: 1, unit_cost: 90 }], payment_method: 'pix', payment_status: 'paid_now', idempotency_key: `p2-${randomUUID()}` });
 
   return P;
@@ -127,12 +138,13 @@ describe('Relatório Caixa — "Vendi × gastei" (contrato de dinheiro)', () => 
 
     const caixa = await q.getPartnerRelatorioCaixa(f.ctx, { from: FROM, to: TO });
 
-    expect(caixa.entrou).toBe(750);          // A(300) + B(200, pelo delivered_at) + D(250); C pending e E fora não entram
-    expect(caixa.vendas_count).toBe(3);
-    expect(caixa.despesas_total).toBe(50);   // só a de 03-05
-    expect(caixa.compras_total).toBe(80);    // só a de 03-08
-    expect(caixa.saiu).toBe(130);            // 50 + 80 — NÃO 210 (o payable de 80 não é somado de novo)
-    expect(caixa.saldo).toBe(620);           // 750 - 130
+    expect(caixa.entrou).toBe(1050);         // A(300) + B(COD 200) + D(250) + F(recebida antes do cancelamento 300)
+    expect(caixa.vendas_count).toBe(4);
+    expect(caixa.despesas_total).toBe(130);  // despesa 50 + pagamento posterior da compra 80
+    expect(caixa.compras_total).toBe(0);     // a compra não foi paga na hora
+    expect(caixa.estornos_total).toBe(0);    // a devolução aconteceu fora de março
+    expect(caixa.saiu).toBe(130);            // 50 + 80; payable não duplica a compra
+    expect(caixa.saldo).toBe(920);           // 1.050 - 130; estorno aparece no período da devolução
 
     // O payable da compra a prazo EXISTE (prova de que o anti-duplo-cômputo é real, não ausência de dado).
     const pay = await db.pool.query<{ c: string }>(
@@ -146,7 +158,8 @@ describe('Relatório Caixa — "Vendi × gastei" (contrato de dinheiro)', () => 
     const q = await importQueries();
     const f = await createPartnerFixture(db.pool, { initialStockQty: 20, role: 'owner', slugSuffix: 'cx0' + randomUUID().slice(0, 6) });
     const caixa = await q.getPartnerRelatorioCaixa(f.ctx, { from: FROM, to: TO });
-    expect(caixa).toEqual({ entrou: 0, saiu: 0, saldo: 0, vendas_total: 0, vendas_count: 0, despesas_total: 0, compras_total: 0 });
+    expect(caixa).toEqual({ entrou: 0, saiu: 0, saldo: 0, vendas_total: 0,
+      vendas_count: 0, despesas_total: 0, compras_total: 0, estornos_total: 0 });
   });
 });
 

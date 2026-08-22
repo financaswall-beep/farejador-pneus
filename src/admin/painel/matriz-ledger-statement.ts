@@ -129,7 +129,7 @@ export async function getMatrizLedgerStatement(
                 EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
                   WHERE r.environment=t.environment
                     AND r.reversal_of_transaction_id=t.id) reversed,
-                COALESCE((SELECT sum(CASE WHEN p.payment_kind='settlement'
+                COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff')
                   THEN p.amount ELSE -p.amount END)
                   FROM finance.matriz_ledger_payments p
                  WHERE p.environment=t.environment

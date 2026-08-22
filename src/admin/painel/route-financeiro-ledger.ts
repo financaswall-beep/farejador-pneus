@@ -5,9 +5,8 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { settleMatrizLedgerOpenItem } from './matriz-ledger-settlement.js';
 import { getMatrizLedgerStatement } from './matriz-ledger-statement.js';
-import {
-  settleMatrizExpense, settleWholesaleOrderPayment, settleWholesalePurchasePayment,
-} from './queries-financeiro-integridade.js';
+import { writeOffMatrizCredit } from './matriz-ledger-writeoff.js';
+import { settleMatrizExpense } from './queries-financeiro-integridade.js';
 import { settleCommissionEntries } from './queries-comissoes-acoes.js';
 import { settleCommissionRefund } from './queries-comissoes-estornos.js';
 import { settleMatrizPartnerMonthlyFee } from './queries-mensalidades.js';
@@ -47,6 +46,14 @@ const settleLedgerItemSchema = z.object({
   message: 'settlement_target_invalid',
 });
 
+const writeOffCreditSchema = z.object({
+  obligation_id: z.string().uuid(),
+  amount: settlementAmountSchema.optional(),
+  occurred_at: paidAtSchema.optional(),
+  reason: z.string().trim().min(3).max(500),
+  idempotency_key: z.string().trim().min(8).max(200),
+});
+
 const settlementModeSchema = z.enum([
   'wholesale_sale', 'retail_sale', 'commission', 'monthly_fee',
   'wholesale_purchase', 'expense', 'commission_refund',
@@ -64,7 +71,8 @@ const settleFinanceItemSchema = z.object({
   amount: settlementAmountSchema.optional(),
   idempotency_key: z.string().trim().min(8).max(200),
 }).merge(requiredPaymentDetailsSchema).superRefine((body, ctx) => {
-  const centralObligation = ['retail_sale', 'central_obligation']
+  const centralObligation = ['retail_sale', 'wholesale_sale',
+    'wholesale_purchase', 'central_obligation']
     .includes(body.settlement_mode);
   if (centralObligation && !body.obligation_id) {
     ctx.addIssue({
@@ -79,7 +87,8 @@ const settleFinanceItemSchema = z.object({
       message: 'settlement_target_invalid',
     });
   }
-  const acceptsPartial = ['retail_sale', 'central_obligation', 'central_account']
+  const acceptsPartial = ['retail_sale', 'wholesale_sale', 'wholesale_purchase',
+    'central_obligation', 'central_account']
     .includes(body.settlement_mode);
   if (!acceptsPartial && body.amount !== undefined) {
     ctx.addIssue({
@@ -167,6 +176,30 @@ export async function registerPainelFinanceiroLedger(
     }
   });
 
+  fastify.post('/admin/api/matriz/financeiro/ledger/write-off', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = writeOffCreditSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({
+      error: parsed.error.issues[0]?.message ?? 'invalid_body',
+    });
+    try {
+      const result = await writeOffMatrizCredit({
+        ...parsed.data, actor_label: operatorLabel(request),
+      });
+      return reply.status(200).send({ written_off: true, ...result });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'internal_server_error';
+      if (['credit_writeoff_amount_invalid', 'credit_writeoff_not_actionable']
+        .includes(code)) return reply.status(400).send({ error: code });
+      if (['credit_writeoff_not_open', 'credit_writeoff_exceeds_balance']
+        .includes(code)) return reply.status(409).send({ error: code });
+      const mapped = mapWriteError(error);
+      logger.error({ error, status: mapped.status }, 'credit write-off failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
   // Porta única da tela Financeiro. As tabelas operacionais continuam sendo
   // atualizadas por seus serviços de domínio, mas a UI não precisa conhecer
   // endpoints de Compras, Rede ou Colaboradores para registrar uma baixa.
@@ -184,7 +217,8 @@ export async function registerPainelFinanceiroLedger(
     const details = commonDetails(data);
     try {
       let result: unknown;
-      if (['retail_sale', 'central_obligation', 'central_account']
+      if (['retail_sale', 'wholesale_sale', 'wholesale_purchase',
+        'central_obligation', 'central_account']
         .includes(data.settlement_mode)) {
         if (!env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) {
           return reply.status(409).send({ error: 'central_ledger_read_disabled' });
@@ -196,16 +230,6 @@ export async function registerPainelFinanceiroLedger(
           ...target, amount: data.amount, ...details,
           idempotency_key: data.idempotency_key, actor_label: actor,
         });
-      } else if (data.settlement_mode === 'wholesale_sale') {
-        result = await settleWholesaleOrderPayment(
-          data.target_id, env.FAREJADOR_ENV, undefined,
-          { ...details, idempotency_key: data.idempotency_key, actor_label: actor },
-        );
-      } else if (data.settlement_mode === 'wholesale_purchase') {
-        result = await settleWholesalePurchasePayment(
-          data.target_id, env.FAREJADOR_ENV, undefined,
-          { ...details, idempotency_key: data.idempotency_key, actor_label: actor },
-        );
       } else if (data.settlement_mode === 'expense') {
         result = await settleMatrizExpense(
           data.target_id, env.FAREJADOR_ENV, undefined,

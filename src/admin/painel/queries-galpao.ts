@@ -11,7 +11,6 @@ import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailC
 import { hashPassword } from '../../parceiro/password.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { requireTireCondition, type TireCondition } from '../../shared/tire-condition.js';
-
 export interface WholesaleStockRow {
   measure: string;
   brand: string;
@@ -28,7 +27,6 @@ export interface WholesaleStockRow {
   tire_aspect_ratio: number | null;
   tire_rim_diameter: number | null;
 }
-
 /** Lista o estoque do galpão (uma linha por medida, marca e condição). */
 export async function listWholesaleStock(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
@@ -262,7 +260,9 @@ export async function getVarejoResumo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<VarejoResumoRow> {
-  const periodWhere = salesPeriodWhere(period);
+  const recognizedAt = `(CASE WHEN o.fulfillment_mode='delivery'
+    THEN o.delivered_at ELSE o.created_at END)`;
+  const periodWhere = salesPeriodWhere(period, recognizedAt);
   const r = await dbPool.query<VarejoResumoRow>(
     `SELECT
        COALESCE(SUM(x.item_total) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS faturamento,
