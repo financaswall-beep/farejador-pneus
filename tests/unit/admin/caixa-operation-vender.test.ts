@@ -11,6 +11,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
   const html = source('painel/public/caixa.html');
   const core = source('painel/public/caixa-core.js');
   const login = source('painel/public/caixa.js');
+  const brandCatalog = source('painel/public/caixa-brand-catalog.js');
   const catalog = source('painel/public/caixa-checkout-catalog.js');
   const checkout = source('painel/public/caixa-checkout.js');
   const pricing = source('painel/public/caixa-checkout-pricing.js');
@@ -32,6 +33,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
 
   it('reaproveita os logos homologados do Catálogo da Matriz e mantém fallback textual', () => {
     const sandbox = { window: { Caixa: {} as Record<string, unknown> } };
+    runInNewContext(brandCatalog, sandbox);
     runInNewContext(catalog, sandbox);
     const brandLogo = sandbox.window.Caixa.catalogBrandLogo as (brand: string) => string | null;
     for (const brand of [
@@ -48,6 +50,13 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(brandLogo('Levorim')).toBe(brandLogo('Levorin'));
     expect(brandLogo('Michellin')).toBe(brandLogo('Michelin'));
     expect(brandLogo('Ira')).toBeNull();
+    const canonical = sandbox.window.Caixa.canonicalCatalogBrand as (brand: string) => string;
+    const options = sandbox.window.Caixa.catalogBrandOptions as string[];
+    expect(canonical('Levorim')).toBe('Levorin');
+    expect(canonical('Michellin')).toBe('Michelin');
+    expect(canonical('ira')).toBe('IRA');
+    expect(options).toContain('IRA');
+    expect(new Set(options).size).toBe(13);
     expect(brandLogo('Marca futura')).toBeNull();
     expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });

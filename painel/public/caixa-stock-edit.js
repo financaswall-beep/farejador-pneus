@@ -6,6 +6,7 @@
   const modal = byId('stock-edit-modal');
   const form = byId('stock-edit-form');
   const state = { row: null, idempotencyKey: '' };
+  Caixa.populateCatalogBrandSelect(byId('stock-edit-brand'));
 
   function nullable(value) {
     const normalized = String(value || '').trim();
@@ -47,6 +48,7 @@
       byId(id).required = tire;
     });
     byId('stock-edit-condition').required = tire;
+    byId('stock-edit-brand').required = tire;
   }
 
   function open(row) {
@@ -57,7 +59,7 @@
     byId('stock-edit-unit').textContent = Caixa.stored(Caixa.keys.store) || 'Unidade parceira';
     byId('stock-edit-type').textContent = typeLabel(row.item_type);
     setValue('stock-edit-name', row.item_name);
-    setValue('stock-edit-brand', row.brand);
+    setValue('stock-edit-brand', Caixa.canonicalCatalogBrand(row.brand));
     setValue('stock-edit-width', row.tire_width_mm);
     setValue('stock-edit-aspect', row.tire_aspect_ratio);
     setValue('stock-edit-rim', row.tire_rim_diameter);

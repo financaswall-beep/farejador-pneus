@@ -65,6 +65,11 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(html).toContain('Cadastrar serviço');
     expect(html).toContain('Fazer contagem');
     expect(html).toContain('id="stock-count-list"');
+    expect(html).toContain('id="stock-item-brand"><option value="">Selecione a marca</option>');
+    expect(html).toContain('id="stock-edit-brand"><option value="">Selecione a marca</option>');
+    expect(html).not.toContain('id="stock-item-brand" maxlength');
+    expect(stock).toContain("populateCatalogBrandSelect(byId('stock-item-brand'))");
+    expect(stock).toContain("byId('stock-item-brand').required = type === 'pneu'");
     expect(html).toContain('Enviar contagem para aprovação');
     expect(html).toContain('O saldo não será alterado sem aprovação do dono');
     expect(html).toContain('Sem valores financeiros');
@@ -128,6 +133,8 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(stockEdit).not.toContain('average_cost');
     expect(stockEdit).not.toContain('sale_price');
     expect(stockEdit).not.toContain('quantity_on_hand');
+    expect(stockEdit).toContain('Caixa.canonicalCatalogBrand(row.brand)');
+    expect(stockEdit).toContain("byId('stock-edit-brand').required = tire");
     expect(updateRoute).toContain("requireScreen('estoque')");
     expect(updateRoute).toContain('requireOwner');
     expect(updateBackend).toContain("'partner_stock_update_approved'");
