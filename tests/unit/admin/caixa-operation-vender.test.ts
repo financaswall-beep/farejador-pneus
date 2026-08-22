@@ -39,12 +39,15 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
       'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
     ]) {
       const url = brandLogo(brand);
-      expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260822-caixa-brand1$/);
+      expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260822-caixa-brand2$/);
       const asset = url?.match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
       if (!asset) throw new Error(`Logo não mapeado: ${brand}`);
       expect(statSync(resolve('painel/public/assets/catalog-brands', asset)).size).toBeGreaterThan(500);
     }
     expect(brandLogo('Magion')).toBe(brandLogo('Maggion'));
+    expect(brandLogo('Levorim')).toBe(brandLogo('Levorin'));
+    expect(brandLogo('Michellin')).toBe(brandLogo('Michelin'));
+    expect(brandLogo('Ira')).toBeNull();
     expect(brandLogo('Marca futura')).toBeNull();
     expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });

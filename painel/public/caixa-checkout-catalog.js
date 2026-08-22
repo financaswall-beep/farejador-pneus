@@ -6,9 +6,11 @@
     pirelli: 'pirelli',
     metzeler: 'metzeler',
     michelin: 'michelin',
+    michellin: 'michelin',
     bridgestone: 'bridgestone',
     dunlop: 'dunlop',
     levorin: 'levorin',
+    levorim: 'levorin',
     rinaldi: 'rinaldi',
     maggion: 'maggion',
     magion: 'maggion',
@@ -25,7 +27,7 @@
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '');
     const asset = CATALOG_BRAND_ASSETS[key];
-    return asset ? '/operacao/catalog-brands/' + asset + '.webp?v=20260822-caixa-brand1' : null;
+    return asset ? '/operacao/catalog-brands/' + asset + '.webp?v=20260822-caixa-brand2' : null;
   };
 
   Caixa.createCheckoutCatalogView = function (checkout, ui, onQuantityChange) {
