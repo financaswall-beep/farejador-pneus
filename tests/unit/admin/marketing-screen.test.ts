@@ -48,7 +48,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260822-bot-layout1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260822-bot-compact2');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
     expect(staticRoute).toContain("'app.marketing.campaign-detail.js'");

@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260822-bot-layout1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260822-bot-compact2" />
 <style>
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -6288,9 +6288,22 @@
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="bot-heading" class="px-1 pt-1">
-        <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
-        <p class="mt-1 text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
+      <section aria-labelledby="bot-heading" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
+        <div class="flex min-h-[132px] flex-col justify-center px-1">
+          <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
+          <p class="mt-2 max-w-sm text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
+        </div>
+        <div class="relative min-h-[132px] overflow-hidden rounded-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+          <img src="/admin/painel/assets/bot-hero.webp?v=20260723-bot-rede2"
+               alt="Assistente automatizado conduzindo conversas para pedidos de pneus"
+               class="absolute inset-0 h-full w-full object-cover object-center">
+          <div class="absolute inset-0 bg-gradient-to-r from-emerald-950/10 via-transparent to-emerald-950/20"></div>
+          <div class="absolute right-3 top-3 z-10 flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="activity" class="h-3.5 w-3.5 text-emerald-200"></i>dados reais
+            </span>
+          </div>
+        </div>
       </section>
 
       <!-- NAVEGAÇÃO INTERNA: separa operação, vendas e demanda sem perder nenhum dado atual -->
@@ -6322,31 +6335,31 @@
       </div>
 
       <!-- VISÃO GERAL: cockpit leve do Bot -->
-      <div x-show="botTab === 'visao'" class="space-y-4">
-        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-labelledby="bot-movement-heading">
-          <div class="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+      <div x-show="botTab === 'visao'" class="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm xl:col-span-8" aria-labelledby="bot-movement-heading">
+          <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-3">
               <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="trending-up" class="h-6 w-6"></i></div>
               <div><h2 id="bot-movement-heading" class="text-xl font-semibold text-gray-900">Movimento do Bot</h2><p class="text-sm text-gray-500">Desempenho das conversas automáticas</p></div>
             </div>
-            <div class="grid w-full grid-cols-2 overflow-hidden rounded-xl border border-gray-200 p-1 sm:w-80" aria-label="Modo do movimento">
-              <button type="button" @click="setBotMovementMode('daily')" :aria-pressed="botMovementMode === 'daily'" :class="botMovementMode === 'daily' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-5 py-2 text-sm font-semibold transition-colors">Diário</button>
-              <button type="button" @click="setBotMovementMode('weekly')" :aria-pressed="botMovementMode === 'weekly'" :class="botMovementMode === 'weekly' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-5 py-2 text-sm font-semibold transition-colors">Semanal</button>
+            <div class="grid w-full grid-cols-2 overflow-hidden rounded-xl border border-gray-200 p-1 sm:w-56" aria-label="Modo do movimento">
+              <button type="button" @click="setBotMovementMode('daily')" :aria-pressed="botMovementMode === 'daily'" :class="botMovementMode === 'daily' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-4 py-2 text-xs font-semibold transition-colors">Diário</button>
+              <button type="button" @click="setBotMovementMode('weekly')" :aria-pressed="botMovementMode === 'weekly'" :class="botMovementMode === 'weekly' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-4 py-2 text-xs font-semibold transition-colors">Semanal</button>
             </div>
           </div>
 
-          <div class="border-b border-gray-100 px-5 py-4">
-            <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center">
-              <div class="flex shrink-0 items-center justify-between gap-3 lg:w-80">
+          <div class="border-b border-gray-100 px-4 py-4">
+            <div class="space-y-3">
+              <div class="mx-auto flex max-w-sm items-center justify-between gap-3">
                 <button type="button" @click="moveBotMovementWeek(-1)" aria-label="Semana anterior" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>
                 <div class="flex items-center gap-2 text-sm font-semibold text-gray-800"><i data-lucide="calendar-days" class="h-5 w-5 text-gray-500"></i><span x-text="botMovementWeekLabel"></span></div>
                 <button type="button" @click="moveBotMovementWeek(1)" :disabled="!botMovementCanNextWeek" aria-label="Próxima semana" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-30"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>
               </div>
-              <div class="min-w-0 flex-1 overflow-x-auto pb-1">
-                <div class="grid min-w-[650px] grid-cols-7 gap-2" role="list" aria-label="Dias da semana">
+              <div class="min-w-0 overflow-x-auto pb-1">
+                <div class="grid min-w-[560px] grid-cols-7 gap-2" role="list" aria-label="Dias da semana">
                   <template x-for="day in botMovementWeekDays" :key="day.date">
-                    <button type="button" @click="selectBotMovementDay(day.date)" :disabled="day.future" :aria-label="'Mostrar estatísticas de ' + window.FarejadorTime.formatDate(day.date)" :aria-pressed="botMovementMode === 'daily' && day.selected" :class="botMovementMode === 'daily' && day.selected ? 'border-emerald-700 bg-emerald-700 text-white shadow-md' : (day.today ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-white text-gray-800 hover:border-emerald-300 hover:bg-emerald-50')" class="rounded-xl border px-2 py-2.5 text-center transition-colors disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300">
-                      <span class="block text-xs font-medium" x-text="day.label"></span><span class="mt-0.5 block text-xl font-semibold" x-text="day.day"></span><span class="block h-4 text-[10px]" x-text="day.today ? 'Hoje' : ''"></span>
+                    <button type="button" @click="selectBotMovementDay(day.date)" :disabled="day.future" :aria-label="'Mostrar estatísticas de ' + window.FarejadorTime.formatDate(day.date)" :aria-pressed="botMovementMode === 'daily' && day.selected" :class="botMovementMode === 'daily' && day.selected ? 'border-emerald-700 bg-emerald-700 text-white shadow-md' : (day.today ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-white text-gray-800 hover:border-emerald-300 hover:bg-emerald-50')" class="rounded-xl border px-2 py-2 text-center transition-colors disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300">
+                      <span class="block text-[11px] font-medium" x-text="day.label"></span><span class="block text-lg font-semibold" x-text="day.day"></span><span class="block h-3 text-[9px]" x-text="day.today ? 'Hoje' : ''"></span>
                     </button>
                   </template>
                 </div>
@@ -6356,16 +6369,16 @@
 
           <p x-show="botMovementError" class="mx-5 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700" x-text="botMovementError"></p>
           <div :class="botMovementLoading ? 'opacity-60' : ''" class="transition-opacity">
-            <div class="grid grid-cols-1 gap-3 border-b border-gray-100 px-5 py-5 sm:grid-cols-2 lg:grid-cols-4">
-              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="message-circle" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Conversas</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.conversas : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.conversas_pct)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.conversas_pct)"></span></div>
-              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="shopping-cart" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Pedidos fechados</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.fecharam : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.fecharam_delta)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.fecharam_delta, '')"></span></div>
-              <div class="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex min-w-0 items-center gap-3"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="circle-dollar-sign" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Faturamento do Bot</p><p class="whitespace-nowrap text-2xl font-semibold" x-text="botMovementCards ? formatCurrency(Number(botMovementCards.faturamento || 0)) : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.faturamento_pct)" class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.faturamento_pct)"></span></div>
-              <div class="flex min-h-[104px] items-center gap-3 rounded-xl border border-emerald-100 p-4"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="tag" class="h-5 w-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-sm text-gray-500">Ticket médio</p><p class="whitespace-nowrap text-2xl font-semibold" x-text="botMovementCards?.ticket_medio != null ? formatCurrency(Number(botMovementCards.ticket_medio)) : '—'"></p></div></div>
+            <div class="grid grid-cols-1 gap-2 border-b border-gray-100 px-4 py-4 sm:grid-cols-2 min-[1500px]:grid-cols-4">
+              <div class="flex min-h-[80px] items-center gap-2 rounded-xl border border-emerald-100 p-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="message-circle" class="h-4 w-4 text-emerald-700"></i></div><div class="min-w-0 flex-1"><p class="truncate text-[10px] text-gray-500">Conversas</p><div class="flex items-baseline justify-between gap-1"><p class="text-lg font-semibold" x-text="botMovementCards ? botMovementCards.conversas : '—'"></p><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.conversas_pct)" class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.conversas_pct)"></span></div></div></div>
+              <div class="flex min-h-[80px] items-center gap-2 rounded-xl border border-emerald-100 p-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="shopping-cart" class="h-4 w-4 text-emerald-700"></i></div><div class="min-w-0 flex-1"><p class="truncate text-[10px] text-gray-500">Pedidos fechados</p><div class="flex items-baseline justify-between gap-1"><p class="text-lg font-semibold" x-text="botMovementCards ? botMovementCards.fecharam : '—'"></p><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.fecharam_delta)" class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.fecharam_delta, '')"></span></div></div></div>
+              <div class="flex min-h-[80px] items-center gap-2 rounded-xl border border-emerald-100 p-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="circle-dollar-sign" class="h-4 w-4 text-emerald-700"></i></div><div class="min-w-0 flex-1"><p class="truncate text-[10px] text-gray-500">Faturamento do Bot</p><div class="flex items-baseline justify-between gap-1"><p class="whitespace-nowrap text-base font-semibold" x-text="botMovementCards ? formatCurrency(Number(botMovementCards.faturamento || 0)) : '—'"></p><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.faturamento_pct)" class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium" :title="botMovementComparisonLabel" x-text="botMovementDeltaText(botMovementComparison.faturamento_pct)"></span></div></div></div>
+              <div class="flex min-h-[80px] items-center gap-2 rounded-xl border border-emerald-100 p-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="tag" class="h-4 w-4 text-emerald-700"></i></div><div class="min-w-0"><p class="truncate text-[10px] text-gray-500">Ticket médio</p><p class="whitespace-nowrap text-base font-semibold" x-text="botMovementCards?.ticket_medio != null ? formatCurrency(Number(botMovementCards.ticket_medio)) : '—'"></p></div></div>
             </div>
 
-            <div class="px-5 py-5">
+            <div class="px-4 py-4">
               <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h3 class="text-lg font-semibold text-gray-900" x-text="botMovementTitle"></h3><p class="text-sm text-gray-500" x-text="botMovementSubtitle"></p></div><span x-show="botMovementHourlyMax > 0" class="inline-flex items-center gap-1.5 self-start rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"><i data-lucide="trending-up" class="h-4 w-4"></i><span x-text="'Pico: ' + botMovementPeak"></span></span></div>
-              <div class="relative mt-5 h-56 pl-9" role="img" :aria-label="botMovementSubtitle">
+              <div class="relative mt-4 h-48 pl-9" role="img" :aria-label="botMovementSubtitle">
                 <div aria-hidden="true" class="absolute left-9 right-0 top-0 border-t border-dashed border-gray-200"></div><div aria-hidden="true" class="absolute left-9 right-0 top-1/2 border-t border-dashed border-gray-200"></div><div aria-hidden="true" class="absolute bottom-6 left-9 right-0 border-t border-gray-200"></div>
                 <span aria-hidden="true" class="absolute -top-1.5 left-0 w-7 text-right text-[10px] text-gray-400" x-text="botMovementHourlyMax"></span><span aria-hidden="true" class="absolute left-0 top-1/2 w-7 -translate-y-1/2 text-right text-[10px] text-gray-400" x-text="Math.round(botMovementHourlyMax / 2)"></span><span aria-hidden="true" class="absolute bottom-4 left-0 w-7 text-right text-[10px] text-gray-400">0</span>
                 <div class="absolute bottom-6 left-9 right-0 top-0 flex items-end gap-[2px] sm:gap-1.5">
@@ -6377,24 +6390,39 @@
           </div>
         </section>
 
-        <div class="bg-white border border-gray-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div class="flex items-center gap-5 min-w-0"><div class="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0" :class="(botMudas.length + botEscalados.length) > 0 ? 'bg-amber-50' : 'bg-emerald-50'"><i x-show="(botMudas.length + botEscalados.length) === 0" data-lucide="circle-check" class="w-10 h-10 text-emerald-700"></i><i x-show="(botMudas.length + botEscalados.length) > 0" data-lucide="bell-ring" class="w-10 h-10 text-amber-600"></i></div><div class="min-w-0"><h2 class="text-xl font-semibold text-emerald-800" x-text="!botCampainha ? 'Atualizando operação…' : ((botMudas.length + botEscalados.length) ? ((botMudas.length + botEscalados.length) + ' conversa(s) precisam de atenção') : 'Tudo sob controle')"></h2><p class="text-sm text-gray-700 mt-1" x-text="!botCampainha ? 'Buscando a situação mais recente do atendimento' : (botMudas.length ? (botMudas.length + ' cliente(s) esperando resposta') : 'Nenhum cliente esperando resposta')"></p><p class="text-xs text-gray-400 mt-2">Fila ao vivo · atualização automática</p></div></div>
-          <button @click="botTab = 'conversas'" class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"><i data-lucide="message-circle" class="w-4 h-4"></i>Ver conversas</button>
-        </div>
+        <aside class="space-y-4 xl:col-span-4" aria-label="Situação operacional do Bot">
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-start gap-4">
+              <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" :class="(botMudas.length + botEscalados.length) > 0 ? 'bg-amber-50' : 'bg-emerald-50'">
+                <i x-show="(botMudas.length + botEscalados.length) === 0" data-lucide="shield-check" class="h-7 w-7 text-emerald-700"></i>
+                <i x-show="(botMudas.length + botEscalados.length) > 0" data-lucide="bell-ring" class="h-7 w-7 text-amber-600"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-semibold text-gray-900" x-text="!botCampainha ? 'Atualizando operação…' : ((botMudas.length + botEscalados.length) ? ((botMudas.length + botEscalados.length) + ' conversa(s) precisam de atenção') : 'Tudo sob controle')"></h2>
+                <p class="mt-1 text-sm text-gray-500" x-text="!botCampainha ? 'Buscando a situação mais recente do atendimento' : (botMudas.length ? (botMudas.length + ' cliente(s) esperando resposta') : 'Indicadores do atendimento automático em dia')"></p>
+                <p class="mt-2 text-xs text-gray-400">Fila ao vivo · atualização automática</p>
+              </div>
+            </div>
+            <button @click="botTab = 'conversas'" class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-900">Ver todos <i data-lucide="chevron-right" class="h-4 w-4"></i></button>
+          </section>
 
-        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-          <div class="flex items-center justify-between mb-4"><h3 class="text-base font-semibold">Atenção rápida</h3><button @click="botTab = 'conversas'" class="text-sm text-emerald-700 hover:text-emerald-900 font-medium">Ver todas →</button></div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="flex items-center justify-between gap-4 border border-gray-100 rounded-xl p-4">
-              <div class="flex items-center gap-3 min-w-0"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botMudas.length ? ((botMudas[0].contact_name || 'Cliente') + ' está esperando') : 'Nenhum cliente esperando'"></p><p class="text-xs text-gray-500 truncate" x-text="botMudas.length ? botMudas[0].preview : 'O bot está em dia'"></p></div></div>
-              <button x-show="botMudas.length" @click="abrirNoChatwoot(botMudas[0].chatwoot_conversation_id)" class="text-xs border border-emerald-700 text-emerald-800 rounded-lg px-3 py-2 whitespace-nowrap">Abrir no Chatwoot</button>
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <header class="mb-4 flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-3"><div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="bell" class="h-6 w-6 text-emerald-700"></i></div><div><h3 class="text-base font-semibold text-gray-900">Atenção rápida</h3><p class="text-xs text-gray-500">Conversas que precisam de ação</p></div></div>
+              <button @click="botTab = 'conversas'" class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900">Ver todas →</button>
+            </header>
+            <div class="space-y-3">
+              <article class="rounded-xl border border-gray-100 p-4">
+                <div class="flex items-start gap-3"><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50"><i data-lucide="clock" class="h-5 w-5 text-amber-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botMudas.length ? ((botMudas[0].contact_name || 'Cliente') + ' está esperando') : 'Nenhum cliente esperando'"></p><p class="mt-0.5 truncate text-xs text-gray-500" x-text="botMudas.length ? botMudas[0].preview : 'O bot está em dia'"></p></div></div>
+                <button x-show="botMudas.length" @click="abrirNoChatwoot(botMudas[0].chatwoot_conversation_id)" class="mt-3 rounded-lg border border-emerald-700 px-3 py-2 text-xs font-medium text-emerald-800">Abrir no Chatwoot</button>
+              </article>
+              <article class="rounded-xl border border-gray-100 p-4">
+                <div class="flex items-start gap-3"><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-50"><i data-lucide="user-round-plus" class="h-5 w-5 text-orange-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botEscalados.length ? ((botEscalados[0].contact_name || 'Cliente') + ' pediu uma pessoa') : 'Nenhum pedido de atendimento humano'"></p><p class="mt-0.5 truncate text-xs text-gray-500" x-text="botEscalados.length ? (botEscalados[0].motivo || 'Sem motivo registrado') : 'Últimas 48h sem escaladas'"></p></div></div>
+                <button x-show="botEscalados.length" @click="abrirNoChatwoot(botEscalados[0].chatwoot_conversation_id)" class="mt-3 rounded-lg border border-emerald-700 px-3 py-2 text-xs font-medium text-emerald-800">Abrir no Chatwoot</button>
+              </article>
             </div>
-            <div class="flex items-center justify-between gap-4 border border-gray-100 rounded-xl p-4">
-              <div class="flex items-center gap-3 min-w-0"><div class="w-11 h-11 rounded-full bg-orange-50 flex items-center justify-center"><i data-lucide="user-round-plus" class="w-5 h-5 text-orange-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botEscalados.length ? ((botEscalados[0].contact_name || 'Cliente') + ' pediu uma pessoa') : 'Nenhum pedido de atendimento humano'"></p><p class="text-xs text-gray-500 truncate" x-text="botEscalados.length ? (botEscalados[0].motivo || 'Sem motivo registrado') : 'Últimas 48h sem escaladas'"></p></div></div>
-              <button x-show="botEscalados.length" @click="abrirNoChatwoot(botEscalados[0].chatwoot_conversation_id)" class="text-xs border border-emerald-700 text-emerald-800 rounded-lg px-3 py-2 whitespace-nowrap">Abrir no Chatwoot</button>
-            </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
 
       <!-- CONVERSAS: fila operacional do Bot -->
