@@ -33,6 +33,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.colaboradoresGestao, // 0133: remuneração, comissão, folha e desempenho
     window.PAINEL_MODULES.sino, // app.sino.js (2026-07-06): sino vivo — getter notificacoes derivado + lidas em localStorage
     window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
+    window.PAINEL_MODULES.botMovimento, // recorte diário/semanal único dos movimentos do Bot
     window.PAINEL_MODULES.botMapa, // app.bot.mapa.js (2026-07-06): desenho do mapa IBGE pintado por camada
     window.PAINEL_MODULES.clientes, // CRM da matriz: clientes/leads/compradores/recompra/parceiros
     window.PAINEL_MODULES.clientesKanban, // movimento, arquivamento recuperavel e paginacao por coluna

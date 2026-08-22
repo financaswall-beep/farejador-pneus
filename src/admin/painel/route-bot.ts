@@ -5,12 +5,21 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
-import { getBotCampainha, getBotResilience, getBotVisao,
+import { businessDateSaoPaulo } from '../../shared/business-time.js';
+import { getBotCampainha, getBotMovement, getBotResilience, getBotVisao,
   reprocessBotDeadLetter, resolveBotDeadLetter } from './queries.js';
 import { operatorLabel } from './route-helpers.js';
 import type { PainelRedePeriod } from './queries-pedidos.js';
 
 const PERIODOS: PainelRedePeriod[] = ['today', '7d', '30d', 'month'];
+const botMovementQuerySchema = z.object({
+  mode: z.enum(['daily', 'weekly']).default('daily'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+    const [year = 0, month = 0, day = 0] = value.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }),
+}).strict();
 const deadLetterActionSchema = z.object({ id: z.string().uuid(), reason: z.string().trim().min(5).max(500),
   risk_confirmed: z.boolean().optional() }).strict();
 
@@ -35,6 +44,25 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
       return reply.status(200).send(await getBotVisao(period));
     } catch (err) {
       logger.error({ err }, 'painel bot visao failed');
+      return reply.status(500).send({ error: 'internal_error' });
+    }
+  });
+
+  // Movimento: um único recorte alimenta cards e gráfico; dias futuros são
+  // recusados na API pela mesma data comercial de São Paulo usada no banco.
+  fastify.get('/admin/api/bot/movimento', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = botMovementQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    const today = businessDateSaoPaulo(new Date());
+    if (parsed.data.date > today) return reply.status(400).send({ error: 'future_date_not_allowed' });
+    try {
+      return reply.status(200).send(await getBotMovement({
+        mode: parsed.data.mode,
+        selectedDate: parsed.data.date,
+        today,
+      }));
+    } catch (err) {
+      logger.error({ err }, 'painel bot movimento failed');
       return reply.status(500).send({ error: 'internal_error' });
     }
   });

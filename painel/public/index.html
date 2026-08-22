@@ -62,6 +62,7 @@
 <script src="/admin/painel/app.sino.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260822-continuity1"></script>
+<script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.clientes.kanban.js?v=20260821-clientes-auditoria1"></script>
@@ -6306,7 +6307,7 @@
             </span>
             <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
               <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
-              <span x-text="botPeriodo === 'today' ? 'Hoje' : (botPeriodo === '7d' ? '7 dias' : (botPeriodo === '30d' ? '30 dias' : 'Mês atual'))"></span>
+              <span x-text="botTab === 'visao' ? botMovementScopeLabel : (botPeriodo === 'today' ? 'Hoje' : (botPeriodo === '7d' ? '7 dias' : (botPeriodo === '30d' ? '30 dias' : 'Mês atual')))"></span>
             </span>
           </div>
         </div>
@@ -6329,7 +6330,7 @@
                     :class="botTab === 'demanda' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1">Demanda e estoque</button>
           </nav>
-          <div aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 xl:mb-0 xl:self-auto">
+          <div x-show="botTab !== 'visao'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 xl:mb-0 xl:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -6342,98 +6343,63 @@
 
       <!-- VISÃO GERAL: cockpit leve do Bot -->
       <div x-show="botTab === 'visao'" class="space-y-4">
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" aria-labelledby="bot-movement-heading">
+          <div class="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-3">
+              <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="trending-up" class="h-6 w-6"></i></div>
+              <div><h2 id="bot-movement-heading" class="text-xl font-semibold text-gray-900">Resumo da operação</h2><p class="text-sm text-gray-500">Visão geral do desempenho do Bot</p></div>
+            </div>
+            <div class="grid w-full grid-cols-2 overflow-hidden rounded-xl border border-gray-200 p-1 sm:w-80" aria-label="Modo do movimento">
+              <button type="button" @click="setBotMovementMode('daily')" :aria-pressed="botMovementMode === 'daily'" :class="botMovementMode === 'daily' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-5 py-2 text-sm font-semibold transition-colors">Diário</button>
+              <button type="button" @click="setBotMovementMode('weekly')" :aria-pressed="botMovementMode === 'weekly'" :class="botMovementMode === 'weekly' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="rounded-lg px-5 py-2 text-sm font-semibold transition-colors">Semanal</button>
+            </div>
+          </div>
+
+          <div class="border-b border-gray-100 px-5 py-4">
+            <div class="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center">
+              <div class="flex shrink-0 items-center justify-between gap-3 xl:w-80">
+                <button type="button" @click="moveBotMovementWeek(-1)" aria-label="Semana anterior" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>
+                <div class="flex items-center gap-2 text-sm font-semibold text-gray-800"><i data-lucide="calendar-days" class="h-5 w-5 text-gray-500"></i><span x-text="botMovementWeekLabel"></span></div>
+                <button type="button" @click="moveBotMovementWeek(1)" :disabled="!botMovementCanNextWeek" aria-label="Próxima semana" class="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-30"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>
+              </div>
+              <div class="min-w-0 flex-1 overflow-x-auto pb-1">
+                <div class="grid min-w-[650px] grid-cols-7 gap-2" role="list" aria-label="Dias da semana">
+                  <template x-for="day in botMovementWeekDays" :key="day.date">
+                    <button type="button" @click="selectBotMovementDay(day.date)" :disabled="day.future" :aria-label="'Mostrar estatísticas de ' + window.FarejadorTime.formatDate(day.date)" :aria-pressed="botMovementMode === 'daily' && day.selected" :class="botMovementMode === 'daily' && day.selected ? 'border-emerald-700 bg-emerald-700 text-white shadow-md' : (day.today ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-white text-gray-800 hover:border-emerald-300 hover:bg-emerald-50')" class="rounded-xl border px-2 py-2.5 text-center transition-colors disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300">
+                      <span class="block text-xs font-medium" x-text="day.label"></span><span class="mt-0.5 block text-xl font-semibold" x-text="day.day"></span><span class="block h-4 text-[10px]" x-text="day.today ? 'Hoje' : ''"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p x-show="botMovementError" class="mx-5 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700" x-text="botMovementError"></p>
+          <div :class="botMovementLoading ? 'opacity-60' : ''" class="transition-opacity">
+            <div class="grid grid-cols-1 gap-3 border-b border-gray-100 px-5 py-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="message-circle" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Conversas</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.conversas : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.conversas_pct)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.conversas_pct) + ' ' + botMovementComparisonLabel"></span></div>
+              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="shopping-cart" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Pedidos fechados</p><p class="text-2xl font-semibold" x-text="botMovementCards ? botMovementCards.fecharam : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.fecharam_delta)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.fecharam_delta, '') + ' ' + botMovementComparisonLabel"></span></div>
+              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="circle-dollar-sign" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Faturamento do Bot</p><p class="text-2xl font-semibold" x-text="botMovementCards ? formatCurrency(Number(botMovementCards.faturamento || 0)) : '—'"></p></div></div><span x-show="botMovementCards" :class="botMovementDeltaClass(botMovementComparison.faturamento_pct)" class="mt-3 inline-flex rounded-md px-2 py-1 text-[11px] font-medium" x-text="botMovementDeltaText(botMovementComparison.faturamento_pct) + ' ' + botMovementComparisonLabel"></span></div>
+              <div class="rounded-xl border border-emerald-100 p-4"><div class="flex items-center gap-3"><div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="tag" class="h-5 w-5 text-emerald-700"></i></div><div><p class="text-sm text-gray-500">Ticket médio</p><p class="text-2xl font-semibold" x-text="botMovementCards?.ticket_medio != null ? formatCurrency(Number(botMovementCards.ticket_medio)) : '—'"></p></div></div><p class="mt-3 text-[11px] font-medium text-emerald-700">Média por pedido fechado</p></div>
+            </div>
+
+            <div class="px-5 py-5">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h3 class="text-lg font-semibold text-gray-900" x-text="botMovementTitle"></h3><p class="text-sm text-gray-500" x-text="botMovementSubtitle"></p></div><span x-show="botMovementHourlyMax > 0" class="inline-flex items-center gap-1.5 self-start rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800"><i data-lucide="trending-up" class="h-4 w-4"></i><span x-text="'Pico: ' + botMovementPeak"></span></span></div>
+              <div class="relative mt-5 h-56 pl-9" role="img" :aria-label="botMovementSubtitle">
+                <div aria-hidden="true" class="absolute left-9 right-0 top-0 border-t border-dashed border-gray-200"></div><div aria-hidden="true" class="absolute left-9 right-0 top-1/2 border-t border-dashed border-gray-200"></div><div aria-hidden="true" class="absolute bottom-6 left-9 right-0 border-t border-gray-200"></div>
+                <span aria-hidden="true" class="absolute -top-1.5 left-0 w-7 text-right text-[10px] text-gray-400" x-text="botMovementHourlyMax"></span><span aria-hidden="true" class="absolute left-0 top-1/2 w-7 -translate-y-1/2 text-right text-[10px] text-gray-400" x-text="Math.round(botMovementHourlyMax / 2)"></span><span aria-hidden="true" class="absolute bottom-4 left-0 w-7 text-right text-[10px] text-gray-400">0</span>
+                <div class="absolute bottom-6 left-9 right-0 top-0 flex items-end gap-[2px] sm:gap-1.5">
+                  <template x-for="hour in botMovementHorarios" :key="'movement-' + hour.hora"><div class="group relative flex h-full min-w-0 flex-1 items-end justify-center" :title="hour.label + ': ' + hour.n + (hour.n === 1 ? ' conversa' : ' conversas')"><span class="block w-full rounded-t-md bg-emerald-300 transition-colors group-hover:bg-emerald-500" :class="hour.peak ? 'bg-emerald-700 group-hover:bg-emerald-800' : ''" :style="'height:' + (hour.n > 0 ? Math.max(5, hour.pct) : 0) + '%' "></span><span x-show="hour.showLabel" class="absolute top-full mt-1.5 text-[9px] text-gray-400" x-text="hour.label"></span></div></template>
+                </div>
+              </div>
+              <div class="mt-2 flex items-center justify-end gap-2 text-xs text-gray-400"><span class="h-2 w-2 rounded-full bg-emerald-500"></span><span>Dados reais · fuso de São Paulo</span></div>
+            </div>
+          </div>
+        </section>
+
         <div class="bg-white border border-gray-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div class="flex items-center gap-5 min-w-0">
-            <div class="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0"
-                 :class="(botMudas.length + botEscalados.length) > 0 ? 'bg-amber-50' : 'bg-emerald-50'">
-              <i x-show="(botMudas.length + botEscalados.length) === 0" data-lucide="circle-check" class="w-12 h-12 text-emerald-700"></i>
-              <i x-show="(botMudas.length + botEscalados.length) > 0" data-lucide="bell-ring" class="w-12 h-12 text-amber-600"></i>
-            </div>
-            <div class="min-w-0">
-              <h2 class="text-xl font-semibold text-emerald-800"
-                  x-text="!botCampainha ? 'Atualizando operação…' : ((botMudas.length + botEscalados.length) ? ((botMudas.length + botEscalados.length) + ' conversa(s) precisam de atenção') : 'Tudo sob controle')"></h2>
-              <p class="text-sm text-gray-700 mt-1"
-                 x-text="!botCampainha ? 'Buscando a situação mais recente do atendimento' : (botMudas.length ? (botMudas.length + ' cliente(s) esperando resposta') : 'Nenhum cliente esperando resposta')"></p>
-              <p class="text-xs text-gray-400 mt-2">Última atualização <span class="text-emerald-700 font-medium">agora</span></p>
-            </div>
-          </div>
-          <button @click="botTab = 'conversas'"
-                  class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-            <i data-lucide="message-circle" class="w-4 h-4"></i>Ver conversas
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="message-circle" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Conversas</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? botCards.conversas : '—'"></p></div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="shopping-bag" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Fecharam pedido</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? botCards.fecharam : '—'"></p><p class="text-[11px] text-emerald-700" x-text="botCards ? (botCards.taxa_conversao + '% de conversão') : ''"></p></div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Custo do bot</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? formatCurrency(Number(botCards.custo_bot || 0)) : '—'"></p></div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="chart-no-axes-combined" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Faturamento (bot)</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? formatCurrency(Number(botCards.faturamento || 0)) : '—'"></p></div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-5">Resultado do período</h3>
-            <template x-for="r in [
-              { label: 'Fecharam pedido', n: Number(botCards?.fecharam || 0), color: 'bg-emerald-600' },
-              { label: 'Escalaram', n: Number(botCards?.escalaram || 0), color: 'bg-amber-400' },
-              { label: 'Abandonaram', n: Number(botCards?.abandonaram || 0), color: 'bg-rose-500' }
-            ]" :key="'res-' + r.label">
-              <div class="grid grid-cols-[130px,1fr,55px,48px] items-center gap-3 mb-5 text-sm">
-                <span class="flex items-center gap-2 text-gray-700"><span class="w-2.5 h-2.5 rounded-full" :class="r.color"></span><span x-text="r.label"></span></span>
-                <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full" :class="r.color" :style="'width:' + (botCards?.conversas ? Math.min(100, Math.round((r.n / Number(botCards.conversas)) * 100)) : 0) + '%' "></div></div>
-                <span class="font-medium text-right" x-text="r.n"></span>
-                <span class="text-xs text-gray-400 text-right" x-text="botCards?.conversas ? Math.round((r.n / Number(botCards.conversas)) * 100) + '%' : '—'"></span>
-              </div>
-            </template>
-            <div class="pt-3 border-t border-gray-100 flex justify-between text-sm"><span class="text-gray-400">Total de conversas</span><span class="font-medium" x-text="botCards ? botCards.conversas : '—'"></span></div>
-          </div>
-
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-5">Operação</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="tag" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Ticket médio</p><p class="text-lg font-semibold" x-text="botCards?.ticket_medio != null ? formatCurrency(Number(botCards.ticket_medio)) : '—'"></p></div></div>
-              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Resposta média</p><p class="text-lg font-semibold" x-text="botCards?.resposta_seg != null ? botCards.resposta_seg + 's' : '—'"></p></div></div>
-              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Horário de pico</p><p class="text-sm font-semibold" x-text="botHorarioPico"></p></div></div>
-            </div>
-            <div class="flex items-start justify-between gap-3">
-              <div><p class="text-xs font-medium text-gray-700">Acessos por horário</p><p class="text-[10px] text-gray-400 mt-0.5">Conversas iniciadas em cada hora</p></div>
-              <span x-show="botHorarioMax > 0" class="shrink-0 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800" x-text="'Pico: ' + botHorarioPico"></span>
-            </div>
-            <div x-show="botHorarios.length" class="relative h-32 mt-3 pl-8" role="img" aria-label="Gráfico de conversas iniciadas por hora">
-              <div aria-hidden="true" class="absolute left-8 right-0 top-0 border-t border-dashed border-gray-200"></div>
-              <div aria-hidden="true" class="absolute left-8 right-0 top-1/2 border-t border-dashed border-gray-200"></div>
-              <div aria-hidden="true" class="absolute left-8 right-0 bottom-5 border-t border-gray-200"></div>
-              <span aria-hidden="true" class="absolute left-0 -top-1.5 w-6 text-right text-[9px] text-gray-400" x-text="botHorarioMax"></span>
-              <span aria-hidden="true" class="absolute left-0 top-1/2 w-6 -translate-y-1/2 text-right text-[9px] text-gray-400" x-text="Math.round(botHorarioMax / 2)"></span>
-              <span aria-hidden="true" class="absolute left-0 bottom-3.5 w-6 text-right text-[9px] text-gray-400">0</span>
-              <div class="absolute left-8 right-0 top-0 bottom-5 flex items-end gap-[2px] sm:gap-1">
-                <template x-for="h in botHorarios" :key="'overview-' + h.hora">
-                  <button type="button"
-                          class="group relative flex h-full min-w-0 flex-1 items-end justify-center rounded-t-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
-                          :aria-label="h.label + ': ' + h.n + (h.n === 1 ? ' conversa iniciada' : ' conversas iniciadas')"
-                          :title="h.label + ': ' + h.n + (h.n === 1 ? ' conversa' : ' conversas')">
-                    <span class="block w-full rounded-t-sm bg-emerald-300 transition-colors group-hover:bg-emerald-500"
-                          :class="h.pico ? 'bg-emerald-700 group-hover:bg-emerald-800' : ''"
-                          :style="'height:' + (h.n > 0 ? Math.max(8, h.pct) : 0) + '%' "></span>
-                    <span x-show="h.mostraLabel" class="absolute top-full mt-1 text-[9px] text-gray-400" x-text="h.label"></span>
-                  </button>
-                </template>
-              </div>
-            </div>
-            <p x-show="botVisao && !botHorarios.length" class="py-8 text-center text-xs text-gray-400">A série horária não está disponível neste período.</p>
-          </div>
+          <div class="flex items-center gap-5 min-w-0"><div class="w-20 h-20 rounded-full flex items-center justify-center flex-shrink-0" :class="(botMudas.length + botEscalados.length) > 0 ? 'bg-amber-50' : 'bg-emerald-50'"><i x-show="(botMudas.length + botEscalados.length) === 0" data-lucide="circle-check" class="w-10 h-10 text-emerald-700"></i><i x-show="(botMudas.length + botEscalados.length) > 0" data-lucide="bell-ring" class="w-10 h-10 text-amber-600"></i></div><div class="min-w-0"><h2 class="text-xl font-semibold text-emerald-800" x-text="!botCampainha ? 'Atualizando operação…' : ((botMudas.length + botEscalados.length) ? ((botMudas.length + botEscalados.length) + ' conversa(s) precisam de atenção') : 'Tudo sob controle')"></h2><p class="text-sm text-gray-700 mt-1" x-text="!botCampainha ? 'Buscando a situação mais recente do atendimento' : (botMudas.length ? (botMudas.length + ' cliente(s) esperando resposta') : 'Nenhum cliente esperando resposta')"></p><p class="text-xs text-gray-400 mt-2">Fila ao vivo · atualização automática</p></div></div>
+          <button @click="botTab = 'conversas'" class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"><i data-lucide="message-circle" class="w-4 h-4"></i>Ver conversas</button>
         </div>
 
         <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">

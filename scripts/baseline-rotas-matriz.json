@@ -1,8 +1,9 @@
 {
-  "geradoEm": "2026-08-22T17:51:03.323Z",
-  "total": 243,
+  "geradoEm": "2026-08-22T22:19:02.176Z",
+  "total": 245,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
+    "GET /admin/api/bot/movimento AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
     "GET /admin/api/catalog AUTH(1)",
@@ -73,6 +74,7 @@
     "GET /admin/painel/app.atacado.transfer.js PUBLICA",
     "GET /admin/painel/app.bot.js PUBLICA",
     "GET /admin/painel/app.bot.mapa.js PUBLICA",
+    "GET /admin/painel/app.bot.movimento.js PUBLICA",
     "GET /admin/painel/app.catalogo.compatibilidade.js PUBLICA",
     "GET /admin/painel/app.catalogo.js PUBLICA",
     "GET /admin/painel/app.catalogo.marca.js PUBLICA",

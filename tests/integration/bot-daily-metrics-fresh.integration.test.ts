@@ -7,6 +7,7 @@ import {
 } from './helpers/postgres.js';
 
 let getBotVisao: typeof import('../../src/admin/painel/queries-bot-visao').getBotVisao;
+let getBotMovement: typeof import('../../src/admin/painel/queries-bot-movimento').getBotMovement;
 
 describe('0177 - metricas diarias do Bot no schema greenfield', () => {
   let db: IntegrationDb;
@@ -20,6 +21,7 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
       ADMIN_AUTH_TOKEN: 'integration-admin-token',
     });
     ({ getBotVisao } = await import('../../src/admin/painel/queries-bot-visao'));
+    ({ getBotMovement } = await import('../../src/admin/painel/queries-bot-movimento'));
     db = await startPostgres({ throughMigration: '0176_matriz_operation_stock_permission.sql' });
     await applyMigrationFile(db.pool, '0177_bot_daily_metrics_fresh_schema.sql');
   }, 120_000);
@@ -61,6 +63,8 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
           (date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')+interval '30 minutes', now()),
          ('test', 977004, 977, $1, 'resolved',
           (date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')+interval '40 minutes', now()),
+         ('test', 977006, 977, $1, 'resolved',
+          (date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')-interval '1 day'+interval '50 minutes', now()),
          ('prod', 977005, 977, $2, 'resolved',
           (date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')+interval '50 minutes', now())
        RETURNING id, chatwoot_conversation_id::text`,
@@ -71,6 +75,7 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
     const escalatedId = byChatwoot.get('977002')!;
     const abandonedId = byChatwoot.get('977003')!;
     const cancelledId = byChatwoot.get('977004')!;
+    const previousDayId = byChatwoot.get('977006')!;
 
     const messages = await db.pool.query<{ id: string; chatwoot_conversation_id: string }>(
       `INSERT INTO core.messages
@@ -106,12 +111,13 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
       [escalatedId],
     );
     await db.pool.query(
-      `INSERT INTO commerce.orders
+       `INSERT INTO commerce.orders
          (environment, contact_id, source_conversation_id, total_amount, status,
           fulfillment_mode, source)
        VALUES ('test', $1, $2, 350, 'delivered', 'pickup', 'bot_promoted'),
-              ('test', $1, $3, 999, 'cancelled', 'pickup', 'bot_promoted')`,
-      [testContactId, saleId, cancelledId],
+              ('test', $1, $3, 999, 'cancelled', 'pickup', 'bot_promoted'),
+              ('test', $1, $4, 75, 'delivered', 'pickup', 'bot_promoted')`,
+      [testContactId, saleId, cancelledId, previousDayId],
     );
 
     const view = await db.pool.query<{
@@ -157,6 +163,19 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
       resposta_seg: 60,
       respondidas_bot_48h: 1,
     });
+
+    const today = await db.pool.query<{ today: string }>(
+      `SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date::text AS today`,
+    );
+    const movement = await getBotMovement({
+      mode: 'daily', selectedDate: today.rows[0]!.today, today: today.rows[0]!.today,
+    }, 'test', db.pool);
+    expect(movement.cards).toEqual({
+      conversas: 4, fecharam: 2, faturamento: 425,
+      ticket_medio: 212.5,
+    });
+    expect(movement.horarios).toHaveLength(24);
+    expect(movement.horarios.reduce((sum, item) => sum + item.conversas, 0)).toBe(4);
 
     const prod = await db.pool.query<{ conversas_total: string }>(
       `SELECT conversas_total FROM analytics.v_daily_metrics

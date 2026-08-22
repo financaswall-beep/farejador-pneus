@@ -63,3 +63,4 @@ export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando a
 export * from './queries-bot-resilience.js'; // Etapa 8: outbox/DLQ sem payload sensivel
 export * from './queries-clientes.js'; // CRM da matriz: clientes/leads/compradores/recompra/parceiros
 export * from './queries-bot-visao.js'; // tela do Bot fatia 2: visão (cards/funil/mapa/boca/radar)
+export * from './queries-bot-movimento.js'; // visão diária/semanal do movimento do Bot

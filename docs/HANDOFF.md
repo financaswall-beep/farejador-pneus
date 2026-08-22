@@ -1,16 +1,21 @@
 # Handoff - Farejador
 
-> **Atualização mais recente — 22/08/2026:** ciclo contábil de crédito corrigido na
-> Matriz e no parceiro. Venda fiada permanece em resultado por competência e fora
-> do caixa; pagamentos parciais, saldo aberto, inadimplência, recuperação, COD sem
-> dupla contagem, caixa realizado e datas de entrega passaram a ter eventos e
-> proteções próprias. TypeScript, build, 1.291 unitários, 276 integrações e todas as
-> provas dos painéis passaram. A migration `0200_finance_credit_lifecycle.sql` foi
-> aplicada no banco-alvo depois de backup validado, dry-run e reconciliação; o
-> marcador material está na versão 200. Código, commit, push e deploy continuam
-> pendentes. Ver
+> **Atualização mais recente — 22/08/2026:** a Visão geral do Bot recebeu o painel
+> de movimentos diário/semanal. Clicar em qualquer dia troca, em conjunto, Conversas,
+> Pedidos fechados, Faturamento, Ticket médio e as 24 barras horárias; Semanal agrega
+> domingo a sábado e compara os mesmos dias da semana anterior. Conversa usa o instante
+> em que começou; pedido e faturamento usam o instante canônico em que o pedido do Bot
+> nasceu. Pedido cancelado, venda manual sem Bot, ambiente diferente e dia futuro não
+> entram. O menu lateral existente e as abas Conversas/Vendas/Demanda foram preservados.
+> A mudança é somente de código e leitura: **não exige migration**. Código, commit,
+> push e deploy continuam pendentes. Passaram 1.299 testes unitários, 276 cenários
+> de integração PostgreSQL, TypeScript, build, contratos, rotas e fiscal de tamanho.
+> Ver seção 21 do dossiê consolidado.
+>
+> A correção imediatamente anterior foi o ciclo contábil de crédito da Matriz e do
+> parceiro, documentado em
 > [`AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md`](AUDITORIA_CONTABIL_FINANCEIRO_MATRIZ_PARCEIRO_2026-08-22.md)
-> e a seção 20 do dossiê consolidado.
+> e na seção 20 do dossiê consolidado.
 
 **Atualizado: 2026-05-23 (sessão Claude Sonnet 4.5).**
 
