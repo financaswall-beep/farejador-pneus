@@ -37,6 +37,6 @@ describe('Bot — acessos por horário', () => {
     expect(html).toContain('Acessos por horário');
     expect(html).toContain('Conversas iniciadas em cada hora');
     expect(html).toContain('aria-label="Gráfico de conversas iniciadas por hora"');
-    expect(html).toContain('app.bot.js?v=20260802-horarios1');
+    expect(html).toContain('app.bot.js?v=20260822-continuity1');
   });
 });

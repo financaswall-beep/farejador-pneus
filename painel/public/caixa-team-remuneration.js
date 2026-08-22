@@ -32,10 +32,7 @@
   }
 
   function boundary(frequency) {
-    const date = new Date(); date.setHours(12, 0, 0, 0);
-    if (frequency === 'weekly') date.setDate(date.getDate() + ((7 - date.getDay()) % 7));
-    else { date.setMonth(date.getMonth() + 1, 1); }
-    return date.toISOString().slice(0, 10);
+    return window.FarejadorTime.nextBoundary(frequency);
   }
 
   function applySalaryFrequency(changed) {

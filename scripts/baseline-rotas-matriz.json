@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-08-22T01:51:23.539Z",
-  "total": 241,
+  "total": 242,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -123,6 +123,7 @@
     "GET /admin/painel/app.venda.modal.js PUBLICA",
     "GET /admin/painel/app.vendas.historico.js PUBLICA",
     "GET /admin/painel/app.vendas.marcas.js PUBLICA",
+    "GET /admin/painel/business-time.js PUBLICA",
     "GET /admin/painel/assets/bot-hero.webp PUBLICA",
     "GET /admin/painel/assets/catalog-brands/:asset PUBLICA",
     "GET /admin/painel/assets/catalog-tire.webp PUBLICA",

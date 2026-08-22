@@ -13,6 +13,10 @@ function loadModule() {
     URLSearchParams,
   };
   vm.runInNewContext(
+    readFileSync('painel/public/business-time.js', 'utf8'),
+    sandbox,
+  );
+  vm.runInNewContext(
     readFileSync('painel/public/app.format.js', 'utf8'),
     sandbox,
   );

@@ -892,3 +892,35 @@ estão presentes, sem execução pública ou do parceiro. Ainda faltam deploy e 
 Uma campanha continua pendente de decisão humana. Criativos, Geografia e demanda,
 Google Ads e TikTok não são declarados prontos porque ainda não possuem implementação real.
 Relatório completo: `docs/AUDITORIA_MARKETING_PONTA_A_PONTA_2026-08-21.md`.
+
+## 19. Auditoria sistêmica concluída — continuidade no tempo
+
+Foi executada uma auditoria transversal de passagem de dias, semanas, meses e anos, cobrindo
+Matriz, parceiro, Caixa, servidor, PostgreSQL, migrations, partições, retenção, filas,
+Chatwoot e Marketing. Os dados atuais foram classificados como massa de teste; por decisão
+do proprietário, não houve conciliação comercial nem exclusão destrutiva nesta etapa.
+
+As correções unificam todo o calendário em `America/Sao_Paulo`, inclusive no navegador,
+protegem as faixas de comissão do parceiro contra a virada antecipada do UTC, criam o
+marcador canônico de schema `ops.application_schema_state`, validam as constraints históricas
+pendentes e acrescentam renovação automática de partições, retenção diária de resíduos
+operacionais, recuperação de lacunas do Marketing e diagnóstico operacional em health/readiness.
+Dados brutos, vendas, estoque, financeiro e trilhas comerciais não entram na retenção.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos em UTC | **1.289/1.289**, 260 arquivos |
+| Unitários completos simulando Los Angeles | **1.289/1.289**, 260 arquivos |
+| Integração completa PostgreSQL | **272/272**, 53 arquivos |
+| TypeScript, build e migrations | aprovados; **200 migrations**, última `0199` |
+| Painéis e contratos | parceiro 597; Matriz 1.103; 93 APIs; 242 rotas |
+| Dependências | zero vulnerabilidades conhecidas |
+
+**Veredito:** aprovado tecnicamente para rollout controlado. A migration `0199` foi aplicada
+no banco-alvo depois de backup validado, dry-run com rollback e reconciliação pós-commit; o
+código ainda precisa de deploy, seguido de smoke autenticado e canário. Antes do go-live
+também são obrigatórios limpeza controlada da massa de teste, rotação dos segredos Chatwoot
+já expostos e reautorização da Meta. O sistema não possui
+prazo de validade interno e renova suas estruturas automaticamente, mas continua dependente
+de infraestrutura, espaço, certificados, credenciais, provedores e monitoramento humano.
+Relatório completo: `docs/AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md`.

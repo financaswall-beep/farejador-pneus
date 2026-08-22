@@ -85,13 +85,12 @@
   function occurredAt(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    const now = new Date();
-    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    const same = function (left, right) { return left.toDateString() === right.toDateString(); };
-    const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    if (same(date, now)) return `Hoje, ${time}`;
-    if (same(date, yesterday)) return `Ontem, ${time}`;
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + `, ${time}`;
+    const today = window.FarejadorTime.businessDate();
+    const key = window.FarejadorTime.dateKey(date);
+    const time = window.FarejadorTime.formatTime(date);
+    if (key === today) return `Hoje, ${time}`;
+    if (key === window.FarejadorTime.addDays(today, -1)) return `Ontem, ${time}`;
+    return window.FarejadorTime.formatDate(date).slice(0, 5) + `, ${time}`;
   }
 
   function movementQuantity(row) {

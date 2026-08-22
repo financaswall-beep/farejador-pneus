@@ -194,8 +194,7 @@ window.PAINEL_MODULES.atacado = function () { return {
     },
     atacadoLastPurchase(b) {
       if (!b?.last_purchase_at) return '—';
-      const d = new Date(b.last_purchase_at);
-      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+      return window.FarejadorTime.formatDate(b.last_purchase_at);
     },
     atacadoStatus(b) {
       if (!Number(b?.orders_count)) return { label: 'nunca comprou', cls: 'bg-amber-50 text-amber-700', dot: 'bg-amber-400' };
@@ -216,7 +215,7 @@ window.PAINEL_MODULES.atacado = function () { return {
         ? 'Pago ✓'
         : 'Fiado' + (v.due_date ? ` — vence ${this.atacadoDateOnly(v.due_date)}` : '');
       const msg = [
-        `🧾 Recibo — 2W Pneus (${isNaN(data.getTime()) ? '' : data.toLocaleDateString('pt-BR')})`,
+        `🧾 Recibo — 2W Pneus (${isNaN(data.getTime()) ? '' : window.FarejadorTime.formatDate(data)})`,
         `Cliente: ${v.buyer_name}`,
         '',
         ...linhas,

@@ -21,16 +21,10 @@ window.PAINEL_MODULES.chartsRede = function () {
     redeExecutiveSeriesLabels() {
       const len = Math.max(this.redeExecutiveSalesSeries().length, 1);
       if (len === 1) return ['Hoje'];
-      const formatter = new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit',
-        month: 'short',
-        timeZone: 'America/Sao_Paulo',
-      });
-      const today = new Date();
+      const today = window.FarejadorTime.businessDate();
       return Array.from({ length: len }, (_, index) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() - (len - index - 1));
-        return formatter.format(date).replace('.', '');
+        const date = window.FarejadorTime.addDays(today, -(len - index - 1));
+        return window.FarejadorTime.formatDate(date).slice(0, 5);
       });
     },
 

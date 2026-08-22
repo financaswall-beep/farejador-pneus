@@ -292,7 +292,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         { type: 'text/csv;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `compras-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `compras-${window.FarejadorTime.businessDate()}.csv`;
       link.click();
       URL.revokeObjectURL(link.href);
     },

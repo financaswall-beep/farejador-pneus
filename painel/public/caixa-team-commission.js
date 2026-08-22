@@ -183,7 +183,7 @@
       radio.checked = radio.value === (data.settlement_frequency || 'monthly');
     });
     const start = document.getElementById('team-commission-start'); start.value = String(data.starts_on).slice(0, 10);
-    if (Caixa.isPartner()) start.max = new Date().toISOString().slice(0, 10); else start.removeAttribute('max');
+    if (Caixa.isPartner()) start.max = window.FarejadorTime.businessDate(); else start.removeAttribute('max');
     renderBases(data.kind, data.basis); refreshFields();
     if (itemized) renderItemRules(data);
     renderHistory(data.history || []);

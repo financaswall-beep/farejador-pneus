@@ -5,18 +5,16 @@ window.PAINEL_MODULES.comprasAcoes = function () {
   return {
     compraData(c) {
       if (!c?.purchased_at) return '—';
-      const date = new Date(c.purchased_at);
-      return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
+      return window.FarejadorTime.formatDate(c.purchased_at);
     },
     vendaData(v) {
       if (!v?.sold_at) return '—';
-      const date = new Date(v.sold_at);
-      return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
+      return window.FarejadorTime.formatDate(v.sold_at);
     },
     financeDate(value) {
       if (!value) return 'sem data';
-      const date = new Date(value + (String(value).length === 10 ? 'T12:00:00' : ''));
-      return isNaN(date.getTime()) ? 'sem data' : date.toLocaleDateString('pt-BR');
+      const formatted = window.FarejadorTime.formatDate(value);
+      return formatted === '-' ? 'sem data' : formatted;
     },
     compraOpenDetails(purchase) {
       this.compraDetalhe = purchase;

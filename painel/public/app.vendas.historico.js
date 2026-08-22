@@ -25,21 +25,17 @@ window.PAINEL_MODULES.vendasHistorico = function () {
     },
 
     vendasHistoricoPeriodoDatas() {
-      const fim = new Date();
-      fim.setHours(0, 0, 0, 0);
-      const inicio = new Date(fim);
-      if (this.vendasPeriodo === '7d') inicio.setDate(inicio.getDate() - 6);
-      if (this.vendasPeriodo === '30d') inicio.setDate(inicio.getDate() - 29);
+      const fim = window.FarejadorTime.businessDate();
+      let inicio = fim;
+      if (this.vendasPeriodo === '7d') inicio = window.FarejadorTime.addDays(fim, -6);
+      if (this.vendasPeriodo === '30d') inicio = window.FarejadorTime.addDays(fim, -29);
       return { inicio, fim };
     },
 
     vendasHistoricoPeriodoLabel() {
       const { inicio, fim } = this.vendasHistoricoPeriodoDatas();
       const curto = (data) => {
-        const partes = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).formatToParts(data);
-        const dia = partes.find((parte) => parte.type === 'day')?.value || '';
-        const mes = partes.find((parte) => parte.type === 'month')?.value.replace('.', '') || '';
-        return `${dia} ${mes}`.trim();
+        return window.FarejadorTime.formatDate(data).slice(0, 5);
       };
       if (this.vendasPeriodo === 'today') return `Hoje, ${curto(fim)}`;
       return `${curto(inicio)} — ${curto(fim)}`;
@@ -187,7 +183,7 @@ window.PAINEL_MODULES.vendasHistorico = function () {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `historico-vendas-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `historico-vendas-${window.FarejadorTime.businessDate()}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();

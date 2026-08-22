@@ -75,26 +75,13 @@ window.PARCEIRO_MODULES.estoqueKpis = () => ({
     },
 
     get stockMovementSeries() {
-      const weeks = [];
-      const now = new Date();
-      for (let i = 3; i >= 0; i -= 1) {
-        const end = new Date(now);
-        end.setDate(now.getDate() - (i * 7));
-        const start = new Date(end);
-        start.setDate(end.getDate() - 6);
-        weeks.push({
-          start,
-          end,
-          label: `${start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`,
-          entradas: 0,
-          saidas: 0,
-        });
-      }
+      const weeks = window.FarejadorTime.weekBuckets(new Date(), 4)
+        .map((week) => ({ ...week, entradas: 0, saidas: 0 }));
       const addToWeek = (dateValue, key, amount) => {
         if (!dateValue) return;
-        const date = new Date(dateValue);
-        if (Number.isNaN(date.getTime())) return;
-        const week = weeks.find((item) => date >= item.start && date <= item.end);
+        const date = window.FarejadorTime.dateKey(dateValue);
+        if (!date) return;
+        const week = weeks.find((item) => date >= item.startKey && date <= item.endKey);
         if (week) week[key] += amount;
       };
       for (const purchase of this.compras) {

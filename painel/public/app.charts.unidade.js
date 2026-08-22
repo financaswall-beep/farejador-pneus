@@ -104,8 +104,8 @@ window.PAINEL_MODULES.chartsUnidade = function () {
       if (window._perfChart) window._perfChart.destroy();
 
       const fmtDia = (d) => {
-        const dt = new Date(d);
-        return Number.isFinite(dt.getTime()) ? dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : String(d);
+        const formatted = window.FarejadorTime.formatDate(d);
+        return formatted === '-' ? String(d) : formatted.slice(0, 5);
       };
       window._perfChart = new Chart(ctx, {
         type: 'line',

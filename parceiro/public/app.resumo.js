@@ -177,13 +177,12 @@ window.PARCEIRO_MODULES.resumo = () => ({
 
     get salesSeries7d() {
       const days = [];
-      const now = new Date();
+      const today = window.FarejadorTime.businessDate();
       for (let i = 6; i >= 0; i -= 1) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
+        const key = window.FarejadorTime.addDays(today, -i);
         days.push({
-          key: this.dateKeySaoPaulo(d),
-          label: d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }),
+          key,
+          label: window.FarejadorTime.formatDate(key).slice(0, 5),
           value: 0,
         });
       }
@@ -203,6 +202,6 @@ window.PARCEIRO_MODULES.resumo = () => ({
 
     get lastUpdatedLabel() {
       if (!this.lastUpdatedAt) return 'Aguardando atualização';
-      return `Atualizado ${this.lastUpdatedAt.toLocaleString('pt-BR')}`;
+      return `Atualizado ${window.FarejadorTime.formatDateTime(this.lastUpdatedAt)}`;
     },
 });

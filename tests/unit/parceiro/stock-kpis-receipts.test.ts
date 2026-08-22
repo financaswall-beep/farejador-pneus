@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 function kpis(): any {
   const sandbox: any = { window: { PARCEIRO_MODULES: {} }, console, Date, Intl };
   vm.runInNewContext(
+    readFileSync('parceiro/public/app.business-time.js', 'utf8'),
+    sandbox,
+  );
+  vm.runInNewContext(
     readFileSync('parceiro/public/app.estoque.kpis.js', 'utf8'),
     sandbox,
   );

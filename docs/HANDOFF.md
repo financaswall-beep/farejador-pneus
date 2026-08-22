@@ -1,5 +1,13 @@
 # Handoff - Farejador
 
+> **Atualização mais recente — 22/08/2026:** auditoria sistêmica de continuidade concluída.
+> Calendário unificado em São Paulo, migration canônica `0199`, partições e retenção
+> automáticas, recuperação de lacunas do Marketing e health operacional implementados.
+> A `0199` foi aplicada no banco-alvo depois de backup, dry-run e reconciliação. O código
+> está aprovado; ainda faltam deploy e smoke. Ver
+> [`AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md`](AUDITORIA_CONTINUIDADE_SISTEMA_2026-08-22.md)
+> e a seção 19 do dossiê consolidado.
+
 **Atualizado: 2026-05-23 (sessão Claude Sonnet 4.5).**
 
 > Para o estado MAIS RECENTE (sessão 2026-05-23), ver:

@@ -285,8 +285,7 @@ window.PAINEL_MODULES.galpao = function () {
       return t;
     },
     movQuando(m) {
-      const d = new Date(m.created_at);
-      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      return window.FarejadorTime.formatDateTime(m.created_at);
     },
     // Custo médio só aparece no filme quando MUDOU (entrada/compra recalculam; baixa não).
     movCustoTexto(m) {

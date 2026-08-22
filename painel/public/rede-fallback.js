@@ -18,7 +18,10 @@
 
   function formatDate(value) {
     if (!value) return '-';
-    return new Date(value).toLocaleString('pt-BR');
+    if (window.FarejadorTime) return window.FarejadorTime.formatDateTime(value);
+    const instant = new Date(value);
+    return Number.isFinite(instant.getTime())
+      ? instant.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-';
   }
 
   function renderFallback(rows) {

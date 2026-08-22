@@ -294,7 +294,7 @@ window.PAINEL_MODULES.catalogo = function () {
 
     catalogoDate(value) {
       if (!value) return 'Sem registro';
-      return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      return window.FarejadorTime.formatDateTime(value);
     },
   };
 };

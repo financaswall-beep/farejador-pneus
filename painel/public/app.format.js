@@ -9,19 +9,11 @@ window.PAINEL_MODULES.format = function () {
     },
 
     formatDateTime(value) {
-      if (!value) return '-';
-      return new Date(value).toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      return window.FarejadorTime.formatDateTime(value);
     },
 
     businessTodaySaoPaulo(now = new Date()) {
-      return new Intl.DateTimeFormat('sv-SE', {
-        timeZone: 'America/Sao_Paulo',
-      }).format(now);
+      return window.FarejadorTime.businessDate(now);
     },
 
     businessFactInstant(date, today = this.businessTodaySaoPaulo(), nowIso = new Date().toISOString()) {

@@ -91,8 +91,11 @@ describe('Financeiro simples do proprietario parceiro', () => {
       context, '30d', { query } as never,
     );
     const bounds = operationCommissionBounds('30d');
+    const commissionSql = query.mock.calls.map(([sql]) => sql).join('\n');
 
     expect(bounds.start).toBe(bounds.competence);
+    expect(commissionSql).toContain("($4::date::timestamp AT TIME ZONE 'America/Sao_Paulo')");
+    expect(commissionSql).toContain("($5::date::timestamp AT TIME ZONE 'America/Sao_Paulo')");
     expect(payload.collaborators[0]).toMatchObject({
       name: 'Wallace', commission_amount: 19.99, status: 'payable',
       payment_target_id: 'payable-old', payment_total: 19.99,

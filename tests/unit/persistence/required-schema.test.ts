@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
 import {
-  assertRequiredSchema, REQUIRED_SCHEMA_SQL,
+  assertRequiredSchema, REQUIRED_SCHEMA_SQL, REQUIRED_SCHEMA_STATE_SQL,
 } from '../../../src/persistence/required-schema.js';
 
 describe('schema mínimo exigido no boot', () => {
   it('aceita a estrutura multimarcas completa', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: true }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool)).resolves.toBeUndefined();
-    expect(query).toHaveBeenCalledWith(REQUIRED_SCHEMA_SQL);
+    expect(query).toHaveBeenNthCalledWith(1, REQUIRED_SCHEMA_SQL);
+    expect(query).toHaveBeenNthCalledWith(2, REQUIRED_SCHEMA_STATE_SQL);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='wholesale_order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='wholesale_purchase_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain('wholesale_stock_movements_variant_idx');
@@ -39,11 +40,14 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='partner_order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='reference_unit_price'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.application_schema_state')");
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=199');
+    expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0189', async () => {
+  it('recusa iniciar antes da migration 0199', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0189_checkout_price_negotiation');
+      .rejects.toThrow('required_schema_missing:0199_system_continuity');
   });
 });

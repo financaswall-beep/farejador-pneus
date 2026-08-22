@@ -3,6 +3,9 @@ import { logger } from '../shared/logger.js';
 import { reconcileMarketingAttributions } from './attribution.js';
 import { enqueueCapiPurchases } from './capi.js';
 import { syncMetaInsights } from './meta-sync.js';
+import { pool } from '../persistence/db.js';
+import { businessDateSaoPaulo } from '../shared/business-time.js';
+import { resolveMetaCatchupLookback } from './catchup.js';
 
 const ATTRIBUTION_INTERVAL_MS = 5 * 60_000;
 
@@ -35,7 +38,16 @@ export function startMarketingScheduler(): () => void {
 
   const syncLoop = async (startup: boolean): Promise<void> => {
     if (stopped) return;
-    await runSync(startup ? 'startup' : 'scheduled', startup ? 60 : 7);
+    let lookbackDays = 7;
+    if (startup) {
+      lookbackDays = await resolveMetaCatchupLookback(
+        pool, env.FAREJADOR_ENV, businessDateSaoPaulo(new Date()),
+      ).catch((error) => {
+        logger.warn({ err: error }, 'marketing catch-up window fallback');
+        return 60;
+      });
+    }
+    await runSync(startup ? 'startup' : 'scheduled', lookbackDays);
     if (!stopped) {
       syncTimer = setTimeout(() => void syncLoop(false), env.MARKETING_SYNC_INTERVAL_MS);
     }

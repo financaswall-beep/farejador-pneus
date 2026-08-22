@@ -131,13 +131,7 @@ window.PARCEIRO_MODULES.format = () => ({
     },
 
     dateKeySaoPaulo(value) {
-      if (!value) return '';
-      return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Sao_Paulo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(value));
+      return value ? window.FarejadorTime.dateKey(value) : '';
     },
 
     businessTodaySaoPaulo(now = new Date()) {
@@ -167,12 +161,10 @@ window.PARCEIRO_MODULES.format = () => ({
     },
 
     formatDate(value) {
-      if (!value) return '-';
-      return new Date(value).toLocaleDateString('pt-BR');
+      return window.FarejadorTime.formatDate(value);
     },
 
     formatDateTime(value) {
-      if (!value) return '-';
-      return new Date(value).toLocaleString('pt-BR');
+      return window.FarejadorTime.formatDateTime(value);
     },
 });

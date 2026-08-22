@@ -32,6 +32,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
       reply.header('Cache-Control', 'no-store').redirect('/operacao#entregas'));
   }
   text('/operacao/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
+  text('/operacao/business-time.js', 'business-time.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-checkout-catalog.js', 'caixa-checkout-catalog.js', 'text/javascript; charset=utf-8');

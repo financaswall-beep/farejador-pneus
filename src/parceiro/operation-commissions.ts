@@ -43,13 +43,15 @@ async function teamRows(
                 ce.commission_amount,(ce.settlement_period_id IS NULL)::int unsettled_count
            FROM finance.partner_staff_commission_entries ce
           WHERE ce.environment=$1 AND ce.unit_id=$2 AND ce.status='earned'
-            AND ce.realized_at >= $4::date AND ce.realized_at < $5::date
+            AND ce.realized_at >= ($4::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND ce.realized_at < ($5::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
          UNION ALL
          SELECT ca.token_id,0::int,0::numeric,ca.amount,
                 (ca.settlement_period_id IS NULL)::int unsettled_count
            FROM finance.partner_staff_commission_adjustments ca
           WHERE ca.environment=$1 AND ca.unit_id=$2
-            AND ca.occurred_at >= $4::date AND ca.occurred_at < $5::date
+            AND ca.occurred_at >= ($4::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND ca.occurred_at < ($5::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
        ), totals AS (
          SELECT token_id,sum(sales_count)::int sales_count,
                 COALESCE(sum(gross_amount),0)::numeric gross_sales,
@@ -188,7 +190,8 @@ export async function getPartnerOperationCommissionDetail(
                 WHERE p.environment=$1 AND p.unit_id=$2 AND p.token_id=$3
                   AND p.payable_id=$6 LIMIT 1))
           OR ($6::uuid IS NULL AND ce.status='earned'
-            AND ce.realized_at >= $4::date AND ce.realized_at < $5::date))
+            AND ce.realized_at >= ($4::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND ce.realized_at < ($5::date::timestamp AT TIME ZONE 'America/Sao_Paulo')))
       UNION ALL
       SELECT 'adjustment',ca.id::text,
              COALESCE(NULLIF(btrim(ca.reason),''),'Ajuste de comissão'),ca.occurred_at,
@@ -200,7 +203,8 @@ export async function getPartnerOperationCommissionDetail(
                  WHERE p.environment=$1 AND p.unit_id=$2 AND p.token_id=$3
                    AND p.payable_id=$6 LIMIT 1))
            OR ($6::uuid IS NULL
-             AND ca.occurred_at >= $4::date AND ca.occurred_at < $5::date))
+             AND ca.occurred_at >= ($4::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+             AND ca.occurred_at < ($5::date::timestamp AT TIME ZONE 'America/Sao_Paulo')))
       ORDER BY occurred_at DESC LIMIT 200`,
     [ctx.environment, ctx.unitId, collaboratorId, detailStart, detailEnd,
      collaborator.payment_target_id],

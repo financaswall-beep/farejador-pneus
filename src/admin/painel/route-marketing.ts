@@ -48,7 +48,7 @@ const campaignScopeBodySchema = z.object({
 }).strict();
 
 const syncBodySchema = z.object({
-  lookback_days: z.union([z.literal(7), z.literal(60)]).default(60),
+  lookback_days: z.number().int().min(1).max(365).default(60),
 }).strict();
 
 function capiFailureReason(error: unknown): string {

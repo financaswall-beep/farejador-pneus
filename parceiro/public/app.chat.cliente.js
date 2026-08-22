@@ -38,8 +38,8 @@ window.PARCEIRO_MODULES.chatCliente = () => ({
     },
     chatDateLabel(iso) {
       if (!iso) return '';
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR');
+      const formatted = window.FarejadorTime.formatDate(iso);
+      return formatted === '-' ? '' : formatted;
     },
     chatLastItemLabel(order) {
       const it = (order && Array.isArray(order.items) && order.items[0]) || null;

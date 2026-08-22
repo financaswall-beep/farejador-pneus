@@ -158,12 +158,24 @@ export const REQUIRED_SCHEMA_SQL = `
        WHERE table_schema='commerce' AND table_name='partner_order_items'
          AND column_name='reference_unit_price' AND is_nullable='NO'
     )
+    AND to_regclass('ops.application_schema_state') IS NOT NULL
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0189. */
+export const REQUIRED_SCHEMA_STATE_SQL = `
+  SELECT EXISTS (
+    SELECT 1 FROM ops.application_schema_state
+     WHERE singleton=true
+       AND version>=199
+  ) AS ready`;
+
+/** Impede o processo novo de operar sobre um banco anterior à migration 0199. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0189_checkout_price_negotiation');
+    throw new Error('required_schema_missing:0199_system_continuity');
+  }
+  const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
+  if (state.rows[0]?.ready !== true) {
+    throw new Error('required_schema_missing:0199_system_continuity');
   }
 }

@@ -10,6 +10,19 @@ const baseEnv = {
   ADMIN_AUTH_TOKEN: 'test-admin-token',
 };
 
+const healthyOperational = {
+  critical: [],
+  warnings: [],
+  details: {
+    schema_version: 199,
+    missing_partitions: 0,
+    latest_raw_event: '2026-08-22T00:00:00.000Z',
+    latest_meta_success: '2026-08-22T00:00:00.000Z',
+    open_dead_letters: 0,
+    cron_history_bytes: 0,
+  },
+};
+
 interface MockPool {
   query: ReturnType<typeof vi.fn>;
 }
@@ -43,6 +56,9 @@ async function loadHealthRoute(
   }));
 
   vi.doMock('../../../src/parceiro/db.js', () => ({ partnerPool: partnerPoolMock }));
+  vi.doMock('../../../src/admin/operational-health.js', () => ({
+    inspectOperationalContinuity: vi.fn().mockResolvedValue(healthyOperational),
+  }));
 
   const module = await import('../../../src/admin/health.route.js');
   return module.registerHealthRoute;
@@ -85,6 +101,7 @@ describe('registerHealthRoute', () => {
     vi.doUnmock('pg');
     vi.doUnmock('pino');
     vi.doUnmock('../../../src/parceiro/db.js');
+    vi.doUnmock('../../../src/admin/operational-health.js');
     vi.resetModules();
     vi.useRealTimers();
   });
@@ -118,7 +135,12 @@ describe('registerHealthRoute', () => {
     expect(reply.statusCode).toBe(200);
     expect(reply.payload).toEqual({
       status: 'ok',
-      checks: { database: 'ok', database_schema: 'ok', partner_database: 'ok' },
+      checks: {
+        database: 'ok', database_schema: 'ok', partner_database: 'ok',
+        operational_continuity: 'ok',
+      },
+      warnings: [],
+      operational: healthyOperational.details,
       commit: 'a'.repeat(40),
     });
     expect(poolMock.query).toHaveBeenCalledWith('SELECT 1');
@@ -139,7 +161,12 @@ describe('registerHealthRoute', () => {
     expect(reply.payload).toEqual({
       status: 'error',
       reason: 'dependency_unavailable',
-      checks: { database: 'error', database_schema: 'error', partner_database: 'ok' },
+      checks: {
+        database: 'error', database_schema: 'error', partner_database: 'ok',
+        operational_continuity: 'ok',
+      },
+      warnings: [],
+      operational: healthyOperational.details,
       commit: 'a'.repeat(40),
     });
   });
@@ -156,7 +183,10 @@ describe('registerHealthRoute', () => {
     expect(reply.statusCode).toBe(200);
     expect(reply.payload).toMatchObject({
       status: 'ok',
-      checks: { database: 'ok', database_schema: 'ok', partner_database: 'ok' },
+      checks: {
+        database: 'ok', database_schema: 'ok', partner_database: 'ok',
+        operational_continuity: 'ok',
+      },
     });
   });
 
@@ -180,7 +210,12 @@ describe('registerHealthRoute', () => {
     expect(reply.payload).toEqual({
       status: 'error',
       reason: 'dependency_unavailable',
-      checks: { database: 'error', database_schema: 'error', partner_database: 'ok' },
+      checks: {
+        database: 'error', database_schema: 'error', partner_database: 'ok',
+        operational_continuity: 'ok',
+      },
+      warnings: [],
+      operational: healthyOperational.details,
       commit: 'a'.repeat(40),
     });
   });
@@ -201,7 +236,10 @@ describe('registerHealthRoute', () => {
     expect(reply.statusCode).toBe(503);
     expect(reply.payload).toMatchObject({
       status: 'error',
-      checks: { database: 'ok', database_schema: 'error', partner_database: 'ok' },
+      checks: {
+        database: 'ok', database_schema: 'error', partner_database: 'ok',
+        operational_continuity: 'ok',
+      },
     });
   });
 });

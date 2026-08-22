@@ -59,18 +59,14 @@ window.PAINEL_MODULES.varejo = function () {
     },
 
     vendasInicioPeriodo() {
-      // Meia-noite de SÃO PAULO (mesma régua do servidor em salesPeriodWhere) — não a do
-      // navegador; PC com fuso errado fazia card (servidor) e lista (local) divergirem.
-      // SP não tem horário de verão desde 2019 → offset fixo -03:00.
-      const hojeSP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-      const d = new Date(hojeSP + 'T00:00:00-03:00');
-      if (this.vendasPeriodo === '7d') d.setDate(d.getDate() - 6);
-      if (this.vendasPeriodo === '30d') d.setDate(d.getDate() - 29);
-      return d;
+      const hoje = window.FarejadorTime.businessDate();
+      if (this.vendasPeriodo === '7d') return window.FarejadorTime.addDays(hoje, -6);
+      if (this.vendasPeriodo === '30d') return window.FarejadorTime.addDays(hoje, -29);
+      return hoje;
     },
     vendaNoPeriodo(value) {
-      const d = new Date(value);
-      return !Number.isNaN(d.getTime()) && d >= this.vendasInicioPeriodo();
+      const dia = window.FarejadorTime.dateKey(value);
+      return Boolean(dia) && dia >= this.vendasInicioPeriodo();
     },
 
     // Varejo = pedido da própria Matriz. Pedido roteado ao parceiro permanece na Rede.

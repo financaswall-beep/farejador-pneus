@@ -168,8 +168,7 @@ window.PAINEL_MODULES.clientes = function () {
     },
     clienteData(value) {
       if (!value) return '—';
-      const d = new Date(value);
-      return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+      return window.FarejadorTime.formatDate(value).replace('-', '—');
     },
     clienteDias(value) {
       if (!value) return null;
@@ -263,7 +262,7 @@ window.PAINEL_MODULES.clientes = function () {
       const csv = ['Cliente;Tipo;Telefone;Email;Origem;Classe;Compras;Total comprado;Última compra', ...body].join('\r\n');
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
-      link.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `clientes-${window.FarejadorTime.businessDate()}.csv`;
       link.click(); URL.revokeObjectURL(link.href);
     },
   };

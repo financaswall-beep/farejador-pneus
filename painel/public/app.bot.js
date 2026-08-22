@@ -256,9 +256,8 @@ window.PAINEL_MODULES.bot = function () {
     },
     botQuandoLabel(iso) {
       if (!iso) return '';
-      const d = new Date(iso);
-      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) +
-        ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const formatted = window.FarejadorTime.formatDateTime(iso);
+      return formatted === '-' ? '' : formatted;
     },
   };
 };
