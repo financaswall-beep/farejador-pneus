@@ -108,20 +108,36 @@ export async function getMarketingIntegrations(
   const metaStatus = overview.connection.meta;
   const metaConnected = metaStatus === 'connected';
   const hasReferral = overview.attribution.available && overview.attribution.tracked > 0;
-  const attributionReady = overview.connection.attribution === 'enabled' && hasReferral;
+  const attributionReportAvailable = overview.metrics.attributed_sales != null;
+  const attributionReady = overview.connection.attribution === 'enabled'
+    && hasReferral
+    && attributionReportAvailable;
+  const profitReady = attributionReady
+    && (overview.metrics.pending_margin_orders ?? 0) === 0;
   const syncedAt = health.last_sync_at ?? overview.connection.meta_synced_at;
+  const syncHealthy = metaConnected
+    && health.available
+    && health.last_sync_status === 'succeeded';
   const capiEnabled = overview.connection.capi === 'enabled';
-  const capiHealthy = capiEnabled && health.available && health.capi.dead_letter === 0;
+  const capiHealthy = capiEnabled
+    && health.available
+    && health.capi.failed === 0
+    && health.capi.dead_letter === 0;
 
   const quality = [
     check('credential', 'Credencial protegida', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
     check('account', 'Conta de anúncios', accountId ? 'ok' : 'pending'),
-    check('sync', 'Sincronização', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
+    check('sync', 'Sincronização', syncHealthy
+      ? 'ok'
+      : metaStatus === 'error' || (health.available && health.last_sync_status === 'failed')
+        ? 'error'
+        : 'pending'),
     check('ctwa', 'Atribuição por mensagem', hasReferral ? 'ok' : 'pending'),
     check('capi', 'Retorno CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
   ];
   const ready = quality.filter((row) => row.status === 'ok').length;
   const criticalPending = Number(!metaConnected)
+    + Number(metaConnected && !syncHealthy)
     + Number((overview.metrics.conversations ?? 0) > 0 && !hasReferral);
 
   return {
@@ -162,16 +178,16 @@ export async function getMarketingIntegrations(
     ],
     pipeline: [
       check('platform', 'Plataforma', metaConnected ? 'ok' : 'pending'),
-      check('collection', 'Coleta', metaConnected ? 'ok' : 'pending'),
-      check('normalization', 'Normalização', metaConnected ? 'ok' : 'pending'),
+      check('collection', 'Coleta', syncHealthy ? 'ok' : 'pending'),
+      check('normalization', 'Normalização', syncHealthy ? 'ok' : 'pending'),
       check('attribution', 'Atribuição', attributionReady ? 'ok' : 'pending'),
-      check('profit', 'Vendas e lucro', attributionReady ? 'ok' : 'blocked'),
+      check('profit', 'Vendas e lucro', profitReady ? 'ok' : 'blocked'),
     ],
     collection: [
-      { ...check('campaigns', 'Campanhas e investimento', metaConnected ? 'ok' : 'pending'),
-        detail: metaConnected ? 'recebendo' : 'sem coleta' },
-      { ...check('conversations', 'Conversas por anúncio', metaConnected ? 'ok' : 'pending'),
-        detail: metaConnected ? 'recebendo' : 'sem coleta' },
+      { ...check('campaigns', 'Campanhas e investimento', syncHealthy ? 'ok' : 'pending'),
+        detail: syncHealthy ? 'recebendo' : 'sincronização ainda não confirmada' },
+      { ...check('conversations', 'Conversas por anúncio', syncHealthy ? 'ok' : 'pending'),
+        detail: syncHealthy ? 'recebendo' : 'sincronização ainda não confirmada' },
       { ...check('ctwa', 'Referências de anúncio', hasReferral ? 'ok' : 'pending'),
         detail: hasReferral
           ? `${overview.attribution.tracked} referência(s): ${overview.attribution.ctwa} WhatsApp, ${overview.attribution.messenger} Messenger, ${overview.attribution.instagram} Instagram`
@@ -179,7 +195,7 @@ export async function getMarketingIntegrations(
       {
         ...check('capi', 'CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
         detail: capiEnabled
-          ? `${health.capi.sent} enviado(s), ${health.capi.dead_letter} em dead-letter`
+          ? `${health.capi.sent} enviado(s), ${health.capi.failed} com falha, ${health.capi.dead_letter} em dead-letter`
           : 'implementada e desligada até passar no Test Events',
       },
     ],
@@ -193,7 +209,11 @@ export async function getMarketingIntegrations(
           : !capiEnabled
             ? 'Validar Purchase no Test Events e ativar a CAPI'
             : health.capi.dead_letter > 0
-              ? 'Revisar eventos CAPI em dead-letter'
+            ? 'Revisar eventos CAPI em dead-letter'
+            : health.capi.failed > 0
+              ? 'Revisar eventos CAPI com falha de envio'
+              : !syncHealthy
+                ? 'Concluir uma sincronização Meta com sucesso'
               : 'Pipeline Meta e CAPI operacionais',
     audit_events: auditEvents,
     sync: {

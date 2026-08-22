@@ -1,4 +1,4 @@
-/** Vendas e referências CTWA de uma campanha, sem dados pessoais do cliente. */
+/** Vendas e referências multicanal de uma campanha, sem dados pessoais do cliente. */
 import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
 
@@ -18,12 +18,13 @@ interface AttributedOrderRow {
   gross_margin: unknown;
   cost_complete: boolean;
   time_to_sale_minutes: unknown;
+  channel: 'whatsapp' | 'messenger' | 'instagram';
 }
 
 export interface CampaignAttributedOrder {
   order_number: string;
   realized_at: string;
-  origin: 'CTWA';
+  origin: 'WhatsApp' | 'Messenger' | 'Instagram';
   ad_id: string | null;
   revenue: number;
   product_cost: number | null;
@@ -62,7 +63,8 @@ export async function loadCampaignAttributionDetailData(
         `SELECT count(*)::int AS referrals
            FROM marketing.ad_referrals r
           WHERE r.environment=$1
-            AND r.captured_at>=$3::date AND r.captured_at<($4::date+1)
+            AND r.captured_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND r.captured_at<(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
             AND EXISTS (
               SELECT 1
                 FROM marketing.meta_insights_daily mi
@@ -82,7 +84,7 @@ export async function loadCampaignAttributionDetailData(
             GROUP BY oi.order_id
          ),
          attributed AS (
-           SELECT a.order_id,a.realized_at,r.captured_at,r.source_id,
+           SELECT a.order_id,a.realized_at,r.captured_at,r.source_id,r.channel,
                   map.entity_level,map.entity_id AS mapped_entity_id,
                   COALESCE(o.order_number,'#'||left(o.id::text,8)) AS order_number,
                   o.total_amount,o.partner_order_id,
@@ -111,9 +113,10 @@ export async function loadCampaignAttributionDetailData(
              ) map ON true
             WHERE a.environment=$1 AND a.status='active'
               AND a.superseded_by IS NULL
-              AND a.realized_at>=$3::date AND a.realized_at<($4::date+1)
+              AND a.realized_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+              AND a.realized_at<(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
          )
-         SELECT order_number,realized_at::text,
+         SELECT order_number,realized_at::text,channel,
                 captured_at::text AS referral_captured_at,source_id,
                 CASE WHEN entity_level='ad' THEN mapped_entity_id END AS ad_id,
                 total_amount::float8 AS revenue,
@@ -152,7 +155,11 @@ export async function loadCampaignAttributionDetailData(
       orders: orders.rows.map((row) => ({
         order_number: row.order_number,
         realized_at: row.realized_at,
-        origin: 'CTWA' as const,
+        origin: row.channel === 'instagram'
+          ? 'Instagram' as const
+          : row.channel === 'messenger'
+            ? 'Messenger' as const
+            : 'WhatsApp' as const,
         ad_id: row.ad_id,
         revenue: nullableMoney(row.revenue) ?? 0,
         product_cost: nullableMoney(row.product_cost),

@@ -70,6 +70,13 @@ describe('Marketing Meta read-only', () => {
       campaigns: 2,
       cost_per_conversation: 5,
     });
+    expect(snapshot.current.daily).toHaveLength(7);
+    expect(snapshot.current.daily[0]).toMatchObject({
+      date: '2026-07-19', spend: 10, conversations: 4,
+    });
+    expect(snapshot.current.daily.at(-1)).toMatchObject({
+      date: '2026-07-25', spend: 0, conversations: 0,
+    });
     expect(snapshot.current.campaign_rows).toEqual([
       {
         id: 'camp-2',

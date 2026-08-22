@@ -153,6 +153,24 @@ describe('pipeline determinístico de Marketing', () => {
     });
   });
 
+  it('recusa Purchase com data ou valor inválido antes de chegar à Meta', () => {
+    const base = {
+      attribution_id: 'attr-invalid', order_number: 'PED-INVALID',
+      total_amount: '100', realized_at: '2026-08-21T12:00:00Z',
+      phone_e164: null, channel: 'whatsapp' as const, ctwa_clid: 'clid-invalid',
+      user_scoped_id: null, business_account_id: null,
+      city_name: null, state_code: null, postal_code_prefix: null,
+    };
+    expect(() => buildCapiPayload(
+      { ...base, realized_at: 'data-invalida' },
+      { whatsappBusinessAccountId: 'waba-1' },
+    )).toThrow('marketing_capi_realized_at_invalid');
+    expect(() => buildCapiPayload(
+      { ...base, total_amount: 'NaN' },
+      { whatsappBusinessAccountId: 'waba-1' },
+    )).toThrow('marketing_capi_total_amount_invalid');
+  });
+
   it('enfileira somente compras recentes e nunca leva o código de teste para produção', async () => {
     const source = {
       attribution_id: 'attr-1',

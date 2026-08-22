@@ -1,24 +1,16 @@
-import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { logger } from '../shared/logger.js';
-import type { MarketingMessagingChannel } from './referrals.js';
+import type {
+  DirectMetaChannel,
+  ObservedMetaMessagingReferral,
+} from './meta-messaging-referral-extractor.js';
 
-export type DirectMetaChannel = Exclude<MarketingMessagingChannel, 'whatsapp'>;
-
-export interface ObservedMetaMessagingReferral {
-  providerEventKey: string;
-  channel: DirectMetaChannel;
-  providerMessageId: string | null;
-  userScopedId: string;
-  businessAccountId: string;
-  adId: string;
-  referralRef: string | null;
-  sourceType: string | null;
-  headline: string | null;
-  occurredAt: Date;
-  referralPayload: Record<string, unknown>;
-}
+export { extractMetaMessagingReferrals } from './meta-messaging-referral-extractor.js';
+export type {
+  DirectMetaChannel,
+  ObservedMetaMessagingReferral,
+} from './meta-messaging-referral-extractor.js';
 
 interface PendingReferralRow {
   id: string;
@@ -32,97 +24,6 @@ interface PendingReferralRow {
   source_type: string | null;
   headline: string | null;
   occurred_at: Date;
-}
-
-function object(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-function array(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function text(value: unknown): string | null {
-  if (value == null) return null;
-  const normalized = String(value).trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function eventDate(value: unknown, fallback: Date): Date {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
-  const millis = numeric > 10_000_000_000 ? numeric : numeric * 1000;
-  const parsed = new Date(millis);
-  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
-}
-
-function eventKey(parts: Array<string | null>): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
-}
-
-export function extractMetaMessagingReferrals(
-  payload: unknown,
-  receivedAt = new Date(),
-): ObservedMetaMessagingReferral[] {
-  const root = object(payload);
-  if (!root) return [];
-  const channel: DirectMetaChannel | null = root.object === 'instagram'
-    ? 'instagram'
-    : root.object === 'page'
-      ? 'messenger'
-      : null;
-  if (!channel) return [];
-
-  const referrals: ObservedMetaMessagingReferral[] = [];
-  for (const rawEntry of array(root.entry)) {
-    const entry = object(rawEntry);
-    const businessAccountId = text(entry?.id);
-    if (!entry || !businessAccountId) continue;
-    for (const rawMessaging of array(entry.messaging)) {
-      const messaging = object(rawMessaging);
-      if (!messaging) continue;
-      const message = object(messaging.message);
-      const postback = object(messaging.postback);
-      const referral = object(message?.referral)
-        ?? object(messaging.referral)
-        ?? object(postback?.referral);
-      if (!referral) continue;
-      const adId = text(referral.ad_id ?? referral.adId ?? referral.source_id);
-      const sender = object(messaging.sender);
-      const userScopedId = text(sender?.id);
-      if (!adId || !userScopedId) continue;
-      const providerMessageId = text(message?.mid ?? messaging.message_id);
-      const referralRef = text(referral.ref);
-      const sourceType = text(referral.source ?? referral.source_type);
-      const context = object(referral.ads_context_data);
-      const headline = text(context?.ad_title ?? referral.headline);
-      const occurredAt = eventDate(messaging.timestamp, receivedAt);
-      referrals.push({
-        providerEventKey: eventKey([
-          channel,
-          businessAccountId,
-          userScopedId,
-          providerMessageId,
-          adId,
-          occurredAt.toISOString(),
-          referralRef,
-        ]),
-        channel,
-        providerMessageId,
-        userScopedId,
-        businessAccountId,
-        adId,
-        referralRef,
-        sourceType,
-        headline,
-        occurredAt,
-        referralPayload: referral,
-      });
-    }
-  }
-  return referrals;
 }
 
 export async function persistObservedMetaReferral(
@@ -195,14 +96,15 @@ async function matchPendingReferral(
   }
   if (!channelCompatible(referral.channel, match.channelType)) return false;
 
-  await client.query(
+  const inserted = await client.query<{ id: string }>(
     `INSERT INTO marketing.ad_referrals (
        environment,conversation_id,source_message_id,source_message_sent_at,
        channel,referral_key,ctwa_clid,source_id,source_type,headline,captured_at,
        user_scoped_id,business_account_id,native_message_id,referral_payload
      ) VALUES ($1,$2,$3,$4,$5,$6,NULL,$7,$8,$9,$4,$10,$11,$12,
        jsonb_build_object('provider_event_key',$13::text,'ref',$14::text))
-     ON CONFLICT DO NOTHING`,
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
     [
       environment,
       match.conversationId,
@@ -220,6 +122,23 @@ async function matchPendingReferral(
       referral.referral_ref,
     ],
   );
+  if (inserted.rows.length === 0) {
+    const existing = await client.query<{ id: string }>(
+      `SELECT id
+         FROM marketing.ad_referrals
+        WHERE environment=$1 AND channel=$2 AND referral_key=$3
+          AND source_message_id=$4 AND conversation_id=$5
+        LIMIT 1`,
+      [
+        environment,
+        referral.channel,
+        `${referral.channel}:${referral.provider_event_key}`,
+        match.messageId,
+        match.conversationId,
+      ],
+    );
+    if (existing.rows.length === 0) return false;
+  }
   await client.query(
     `UPDATE marketing.meta_messaging_referrals
         SET status='matched',matched_message_id=$3,matched_conversation_id=$4,
@@ -239,6 +158,13 @@ export async function reconcilePendingMetaReferrals(
     rawEventId?: number;
   } = {},
 ): Promise<number> {
+  await client.query(
+    `UPDATE marketing.meta_messaging_referrals
+        SET status='unmatched',updated_at=now()
+      WHERE environment=$1 AND status='pending'
+        AND created_at < now()-interval '7 days'`,
+    [environment],
+  );
   const result = await client.query<PendingReferralRow>(
     `SELECT id,provider_event_key,channel,provider_message_id,user_scoped_id,
             business_account_id,ad_id,referral_ref,source_type,headline,occurred_at
@@ -247,7 +173,7 @@ export async function reconcilePendingMetaReferrals(
         AND provider_message_id IS NOT NULL
         AND ($2::text IS NULL OR provider_message_id=$2)
         AND ($3::bigint IS NULL OR raw_event_id=$3)
-      ORDER BY occurred_at DESC,id
+      ORDER BY occurred_at,id
       LIMIT 100`,
     [environment, options.providerMessageId ?? null, options.rawEventId ?? null],
   );

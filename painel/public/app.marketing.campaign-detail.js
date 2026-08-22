@@ -48,7 +48,7 @@ function marketingCampaignDetailMock(row, period) {
       roas: investment ? revenue / investment : null,
     }],
     attribution: {
-      status: 'ready', method: 'last_click_ctwa_7d', attributed_sales: sales,
+      status: 'ready', method: 'last_click_messaging_7d', attributed_sales: sales,
       attributed_revenue: revenue, gross_margin: margin, pending_margin_orders: 0,
     },
     financial: {
@@ -69,11 +69,11 @@ function marketingCampaignDetailMock(row, period) {
     },
     orders_total: sales,
     orders: [
-      { order_number: 'PED-10482', realized_at: '2026-07-24T14:32:00.000Z', origin: 'CTWA',
+      { order_number: 'PED-10482', realized_at: '2026-07-24T14:32:00.000Z', origin: 'WhatsApp',
         revenue: 890, gross_margin: 312, time_to_sale_minutes: 138, status: 'confirmed' },
-      { order_number: 'PED-10471', realized_at: '2026-07-23T10:08:00.000Z', origin: 'CTWA',
+      { order_number: 'PED-10471', realized_at: '2026-07-23T10:08:00.000Z', origin: 'WhatsApp',
         revenue: 1240, gross_margin: 405, time_to_sale_minutes: 1122, status: 'confirmed' },
-      { order_number: 'PED-10455', realized_at: '2026-07-21T16:51:00.000Z', origin: 'CTWA',
+      { order_number: 'PED-10455', realized_at: '2026-07-21T16:51:00.000Z', origin: 'WhatsApp',
         revenue: 650, gross_margin: 208, time_to_sale_minutes: 4320, status: 'confirmed' },
     ],
     decision: {

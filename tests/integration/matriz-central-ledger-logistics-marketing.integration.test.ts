@@ -253,8 +253,8 @@ describe('Etapa 4 — logística e marketing no livro central', () => {
     );
     const run = await db.pool.query<{ id: string }>(
       `INSERT INTO marketing.meta_sync_runs
-         (environment,trigger_type,window_since,window_until,status)
-       VALUES ('test','manual','2026-07-24','2026-07-24','succeeded') RETURNING id`,
+         (environment,trigger_type,window_since,window_until,status,finished_at)
+       VALUES ('test','manual','2026-07-24','2026-07-24','succeeded',now()) RETURNING id`,
     );
     await db.pool.query(
       `INSERT INTO marketing.meta_insights_daily

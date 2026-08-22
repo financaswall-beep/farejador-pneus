@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { derivedMetrics } from '../../../src/admin/painel/queries-marketing-campaign-detail-metrics.js';
 
 let getMarketingCampaignDetail:
   typeof import('../../../src/admin/painel/queries-marketing-campaign-detail.js').getMarketingCampaignDetail;
@@ -27,7 +28,20 @@ function action(action_type: string, value: number) {
 }
 
 describe('Marketing — detalhe da campanha', () => {
-  it('carrega somente referências CTWA e pedidos atribuídos da campanha, sem dados do cliente', async () => {
+  it('nunca exibe taxa de resposta acima de 100% quando a Meta duplica ações', () => {
+    expect(derivedMetrics({
+      spend: 100, impressions: 1000, clicks: 20, conversations: 4,
+      firstReplies: 7, linkClicks: 10, videoViews: 0, postEngagements: 0,
+    })).toMatchObject({
+      conversations_started: 4,
+      first_replies: 4,
+      unanswered: 0,
+      response_rate: 100,
+      cost_per_replied: 25,
+    });
+  });
+
+  it('carrega referências multicanal e pedidos atribuídos da campanha, sem dados do cliente', async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => {
       if (sql.includes('count(*)::int AS referrals')) {
         return { rows: [{ referrals: 4 }] };
@@ -62,7 +76,7 @@ describe('Marketing — detalhe da campanha', () => {
       orders: [{
         order_number: 'PED-10482',
         realized_at: '2026-07-25T10:00:00.000Z',
-        origin: 'CTWA',
+        origin: 'WhatsApp',
         ad_id: 'ad-1',
         revenue: 890,
         product_cost: 520,
@@ -133,13 +147,13 @@ describe('Marketing — detalhe da campanha', () => {
       orders: [
         {
           order_number: 'PED-1', realized_at: '2026-07-25T10:00:00.000Z',
-          origin: 'CTWA', ad_id: 'ad-1', revenue: 300, product_cost: 150,
+          origin: 'WhatsApp', ad_id: 'ad-1', revenue: 300, product_cost: 150,
           operation_cost: 30, gross_margin: 120, cost_complete: true,
           time_to_sale_minutes: 120, status: 'confirmed',
         },
         {
           order_number: 'PED-2', realized_at: '2026-07-24T10:00:00.000Z',
-          origin: 'CTWA', ad_id: 'ad-1', revenue: 200, product_cost: 100,
+          origin: 'WhatsApp', ad_id: 'ad-1', revenue: 200, product_cost: 100,
           operation_cost: 20, gross_margin: 80, cost_complete: true,
           time_to_sale_minutes: 60, status: 'confirmed',
         },

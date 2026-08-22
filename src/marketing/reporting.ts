@@ -90,7 +90,8 @@ const REALIZED_CTE = `
     JOIN marketing.ad_referrals r
       ON r.environment=a.environment AND r.id=a.referral_id
     WHERE a.environment=$1 AND a.status='active' AND a.superseded_by IS NULL
-      AND a.realized_at>=$2::date AND a.realized_at<($3::date+1)
+      AND a.realized_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND a.realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
   ),
   attributed_resolved AS (
     SELECT aa.*,o.total_amount,o.partner_order_id,
@@ -136,14 +137,17 @@ export async function getMarketingAttributionReport(
         `${REALIZED_CTE}
          SELECT
            (SELECT count(*) FROM marketing.ad_referrals
-             WHERE environment=$1 AND captured_at>=$2::date
-               AND captured_at<($3::date+1))::int AS referrals,
+             WHERE environment=$1
+               AND captured_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+               AND captured_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo'))::int AS referrals,
            (SELECT count(*) FROM realized
-             WHERE realized_at>=$2::date AND realized_at<($3::date+1))::int
+             WHERE realized_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+               AND realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo'))::int
              AS total_realized_orders,
            (SELECT count(*) FROM realized
              WHERE source_conversation_id IS NOT NULL
-               AND realized_at>=$2::date AND realized_at<($3::date+1))::int
+               AND realized_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+               AND realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo'))::int
              AS orders_with_conversation,
            count(*)::int AS attributed_sales,
            COALESCE(sum(total_amount),0) AS attributed_revenue,

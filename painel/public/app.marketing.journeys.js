@@ -2,11 +2,16 @@
 // Somente leitura. Nenhuma etapa comercial aparece sem vínculo determinístico.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 
-function marketingJourneysMockPayload() {
+function marketingJourneysMockPayload(period = '30d') {
   return {
     environment: 'test',
     generated_at: '2026-07-26T12:00:00.000Z',
-    period: { id: '30d', days: 30, since: '2026-06-27', until: '2026-07-26' },
+    period: {
+      id: period,
+      days: period === '7d' ? 7 : 30,
+      since: period === '7d' ? '2026-07-20' : '2026-06-27',
+      until: '2026-07-26',
+    },
     connection: {
       meta: 'connected',
       meta_synced_at: '2026-07-26T11:55:00.000Z',
@@ -58,18 +63,26 @@ function marketingJourneysMockPayload() {
 window.PAINEL_MODULES.marketingJourneys = function () {
   return {
     async loadMarketingJourneys() {
-      if (this.marketingJourneysLoading) return;
+      const requestedPeriod = this.marketingPeriod;
+      const requestSeq = ++this.marketingJourneysRequestSeq;
       this.marketingJourneysLoading = true;
       this.marketingJourneysError = null;
       try {
-        this.marketingJourneys = this.marketingIsMock()
-          ? marketingJourneysMockPayload()
-          : await this.apiGet(`/admin/api/marketing/journeys?period=${encodeURIComponent(this.marketingPeriod)}`);
+        const payload = this.marketingIsMock()
+          ? marketingJourneysMockPayload(requestedPeriod)
+          : await this.apiGet(`/admin/api/marketing/journeys?period=${encodeURIComponent(requestedPeriod)}`);
+        if (requestSeq === this.marketingJourneysRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingJourneys = payload;
+        }
       } catch {
-        this.marketingJourneysError = 'Não foi possível carregar as Jornadas agora.';
+        if (requestSeq === this.marketingJourneysRequestSeq && this.marketingPeriod === requestedPeriod) {
+          this.marketingJourneysError = 'Não foi possível carregar as Jornadas agora.';
+        }
       } finally {
-        this.marketingJourneysLoading = false;
-        this.$nextTick(() => lucide.createIcons());
+        if (requestSeq === this.marketingJourneysRequestSeq) {
+          this.marketingJourneysLoading = false;
+          this.$nextTick(() => lucide.createIcons());
+        }
       }
     },
 

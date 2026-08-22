@@ -91,7 +91,9 @@ export function aggregate(rows: InsightRow[]): Aggregate {
 }
 
 export function derivedMetrics(values: Aggregate) {
-  const unanswered = Math.max(0, Math.round(values.conversations - values.firstReplies));
+  const conversations = Math.max(0, Math.round(values.conversations));
+  const firstReplies = Math.min(conversations, Math.max(0, Math.round(values.firstReplies)));
+  const unanswered = conversations - firstReplies;
   return {
     investment: round(values.spend),
     impressions: Math.round(values.impressions),
@@ -99,23 +101,23 @@ export function derivedMetrics(values: Aggregate) {
     link_clicks: Math.round(values.linkClicks),
     video_views: Math.round(values.videoViews),
     post_engagements: Math.round(values.postEngagements),
-    conversations_started: Math.round(values.conversations),
-    first_replies: Math.round(values.firstReplies),
+    conversations_started: conversations,
+    first_replies: firstReplies,
     unanswered,
     ctr: values.impressions > 0 ? round((values.clicks / values.impressions) * 100) : null,
     cpc: values.clicks > 0 ? round(values.spend / values.clicks) : null,
     cpm: values.impressions > 0 ? round((values.spend / values.impressions) * 1_000) : null,
-    response_rate: values.conversations > 0
-      ? round((values.firstReplies / values.conversations) * 100, 1)
+    response_rate: conversations > 0
+      ? round((firstReplies / conversations) * 100, 1)
       : null,
-    cost_per_started: values.conversations > 0
-      ? round(values.spend / values.conversations)
+    cost_per_started: conversations > 0
+      ? round(values.spend / conversations)
       : null,
-    cost_per_replied: values.firstReplies > 0
-      ? round(values.spend / values.firstReplies)
+    cost_per_replied: firstReplies > 0
+      ? round(values.spend / firstReplies)
       : null,
-    unanswered_investment: values.conversations > 0
-      ? round(values.spend * (unanswered / values.conversations))
+    unanswered_investment: conversations > 0
+      ? round(values.spend * (unanswered / conversations))
       : null,
   };
 }

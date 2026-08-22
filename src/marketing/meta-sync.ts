@@ -91,6 +91,14 @@ export async function syncMetaInsights(options: {
   const levels: MetaInsightLevel[] = ['campaign', 'ad'];
   const dbPool = options.dbPool ?? defaultPool;
   const config = options.config ?? metaConfig();
+  await dbPool.query(
+    `UPDATE marketing.meta_sync_runs
+        SET status='failed',error_code='meta_sync_stale',
+            error_summary='Sincronização interrompida sem finalização',finished_at=now()
+      WHERE environment=$1 AND source='meta' AND status='running'
+        AND started_at < now()-interval '1 hour'`,
+    [env.FAREJADOR_ENV],
+  );
   const run = await dbPool.query<{ id: string }>(
     `INSERT INTO marketing.meta_sync_runs
        (environment,trigger_type,window_since,window_until,levels)
