@@ -35,6 +35,10 @@ export interface OperationAuthResult {
   workplaces: OperationWorkplace[];
 }
 
+export interface PanelAuthResult extends OperationAuthResult {
+  workplaces: OperationWorkplace[];
+}
+
 type MatrixRow = {
   collaborator_id: string;
   job: 'vendedor' | 'entregador' | 'colaborador';
@@ -179,9 +183,29 @@ export async function authenticateOperation(
   password: string,
   dbPool: Pool = defaultPool,
 ): Promise<OperationAuthResult | null> {
-  const person = await authenticatePersonCredentials(environment, username, password);
+  const person = await authenticatePersonCredentials(environment, username, password, dbPool);
   if (!person) return null;
   const workplaces = await listOperationWorkplaces(environment, person.personId, dbPool);
+  if (workplaces.length === 0) return null;
+  return { personId: person.personId, username: person.username, workplaces };
+}
+
+/**
+ * Porta do painel moderno. A Matriz só aparece para quem realmente possui
+ * panel_role; vendedores e entregadores continuam exclusivamente na Operação.
+ * Parceiros usam os mesmos vínculos já resolvidos para o /operacao.
+ */
+export async function authenticatePanelAccess(
+  environment: string,
+  username: string,
+  password: string,
+  dbPool: Pool = defaultPool,
+): Promise<PanelAuthResult | null> {
+  const person = await authenticatePersonCredentials(environment, username, password, dbPool);
+  if (!person) return null;
+  const workplaces = (await listOperationWorkplaces(environment, person.personId, dbPool))
+    .filter((workplace) => workplace.kind === 'partner'
+      || workplace.role === 'owner' || workplace.role === 'admin');
   if (workplaces.length === 0) return null;
   return { personId: person.personId, username: person.username, workplaces };
 }

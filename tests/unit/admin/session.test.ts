@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 
 let validHash: string;
 let authenticateMatrizAdmin: typeof import('../../../src/admin/session.js').authenticateMatrizAdmin;
+let mintMatrizAdminSessionForPerson: typeof import('../../../src/admin/session.js').mintMatrizAdminSessionForPerson;
 let isMatrizAdminSessionToken: typeof import('../../../src/admin/session.js').isMatrizAdminSessionToken;
 let validateMatrizAdminSession: typeof import('../../../src/admin/session.js').validateMatrizAdminSession;
 
@@ -14,7 +15,8 @@ beforeAll(async () => {
   const password = await import('../../../src/parceiro/password.js');
   const session = await import('../../../src/admin/session.js');
   validHash = await password.hashPassword('uma-senha-forte-123');
-  ({ authenticateMatrizAdmin, isMatrizAdminSessionToken, validateMatrizAdminSession } = session);
+  ({ authenticateMatrizAdmin, mintMatrizAdminSessionForPerson,
+    isMatrizAdminSessionToken, validateMatrizAdminSession } = session);
 });
 
 describe('matriz admin session', () => {
@@ -48,6 +50,15 @@ describe('matriz admin session', () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
+  it('never mints ms_ for a broker workplace without panel_role', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    await expect(mintMatrizAdminSessionForPerson(
+      'prod', 'person-1', 'collab-1', { query } as unknown as Pool,
+    )).resolves.toBeNull();
+    expect(query).toHaveBeenCalledOnce();
+    expect(String(query.mock.calls[0]![0])).toContain('mc.panel_role IS NOT NULL');
+  });
+
   it('validates ms_ sessions and returns the current database role', async () => {
     const token = `ms_${'a'.repeat(64)}`;
     const query = vi.fn().mockResolvedValue({ rows: [{
@@ -60,10 +71,11 @@ describe('matriz admin session', () => {
     expect(query.mock.calls[0]![1]?.[0]).not.toBe(token);
   });
 
-  it('rejects another session prefix without querying the database', async () => {
+  it.each(['ps_', 'cs_', 'es_'])('rejects the %s session prefix without querying the database', async (prefix) => {
     const query = vi.fn();
-    expect(isMatrizAdminSessionToken(`es_${'a'.repeat(64)}`)).toBe(false);
-    await expect(validateMatrizAdminSession('prod', `es_${'a'.repeat(64)}`, { query } as unknown as Pool))
+    const token = `${prefix}${'a'.repeat(64)}`;
+    expect(isMatrizAdminSessionToken(token)).toBe(false);
+    await expect(validateMatrizAdminSession('prod', token, { query } as unknown as Pool))
       .resolves.toBeNull();
     expect(query).not.toHaveBeenCalled();
   });

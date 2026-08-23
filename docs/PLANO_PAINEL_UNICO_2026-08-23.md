@@ -131,6 +131,12 @@ destino, em vez de aceitar silenciosamente o último valor.
   que já junta matriz e parceiro na mesma pessoa e devolve
   `workplaces[] { kind, role, modules{} }`. `publicOperationWorkplace` já omite
   o `tokenId`. **Não criar segunda tabela de permissão.**
+- **PR 6 implementado:** `/admin/api/auth/login` autentica a pessoa uma vez,
+  oferece somente workplaces ativos e usa ticket `pt_` opaco/de uso único na
+  escolha. Matriz só recebe `ms_` após revalidar `panel_role`; parceiro recebe
+  `ps_`; vendedor/entregador sem `panel_role` permanece fora do painel da
+  Matriz. `/admin/api/auth/me` agora devolve `workplace` e módulos calculados
+  no servidor. Nenhum `tokenId` é enviado ao navegador.
 - `unit_id` é **derivado no servidor** e gravado na sessão. Nunca aceito de
   body, query, header ou path. O `:slug` da URL só serve para ser **comparado**
   (401 se divergir). Trocar de loja = **novo login**.

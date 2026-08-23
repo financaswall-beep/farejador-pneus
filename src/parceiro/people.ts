@@ -11,6 +11,7 @@
  * o pool restrito do portal não tem GRANT em partner_people/access_tokens.
  */
 
+import type { Pool } from 'pg';
 import { pool } from '../persistence/db.js';
 import { fakeVerify, verifyPassword } from './password.js';
 
@@ -40,8 +41,9 @@ export async function authenticatePersonCredentials(
   environment: string,
   username: string,
   password: string,
+  dbPool: Pool = pool,
 ): Promise<PersonCredentialsResult | null> {
-  const res = await pool.query<{ id: string; username: string; password_hash: string | null }>(
+  const res = await dbPool.query<{ id: string; username: string; password_hash: string | null }>(
     `SELECT id, username, password_hash
        FROM network.partner_people
       WHERE environment = $1

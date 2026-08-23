@@ -31,9 +31,20 @@ describe('admin login frontend security', () => {
   it('never stores the emergency token during owner bootstrap', async () => {
     const script = await painelFile('login.js');
 
-    expect(script).not.toContain('localStorage');
-    expect(script).not.toContain('sessionStorage');
+    expect(script).not.toContain("setItem('farejador_admin_token'");
+    expect(script).not.toMatch(/(?:local|session)Storage\.setItem\([^\n]*data\.get\('token'\)/);
     expect(script).toContain("Authorization: `Bearer ${data.get('token')}`");
+  });
+
+  it('supports a server-issued workplace choice without exposing internal IDs', async () => {
+    const [html, script] = await Promise.all([
+      painelFile('login.html'), painelFile('login.js'),
+    ]);
+    expect(html).toContain('id="workplace-chooser"');
+    expect(script).toContain("fetch('/admin/api/auth/login/escolher'");
+    expect(script).toContain("payload.scope === 'partner'");
+    expect(script).toContain('farejador_partner_token_');
+    expect(script).not.toContain('tokenId');
   });
 
   it('renders the Matriz visual with a local optimized asset and responsive fallback', async () => {

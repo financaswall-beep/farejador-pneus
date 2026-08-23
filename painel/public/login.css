@@ -270,6 +270,19 @@ small { color: #747e79; font-size: 11px; line-height: 1.45; }
 .bootstrap-form { max-height: min(59vh, 590px); padding-right: 6px; overflow-y: auto; scrollbar-color: #a7bdb3 transparent; scrollbar-width: thin; }
 .bootstrap-form .primary-button { margin-bottom: 2px; }
 
+#workplace-chooser h2 { margin: 0; font-size: 27px; letter-spacing: -.035em; }
+.workplace-list { display: grid; gap: 10px; margin: 22px 0 14px; }
+.workplace-option, .secondary-button {
+  width: 100%; min-height: 54px; border: 1px solid #cfd7d3; border-radius: 11px;
+  color: var(--ink); background: #fff; cursor: pointer;
+}
+.workplace-option { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; text-align: left; }
+.workplace-option:hover, .secondary-button:hover { border-color: var(--green-700); background: #f0faf5; }
+.workplace-option strong, .workplace-option small { display: block; }
+.workplace-option small { margin-top: 3px; text-transform: capitalize; }
+.workplace-option .kind { color: var(--green-700); font-size: 11px; font-weight: 750; text-transform: uppercase; }
+.secondary-button { margin-top: 4px; color: var(--green-800); font-weight: 750; }
+
 .card-footer { margin-top: 29px; }
 .secure-copy { display: grid; grid-template-columns: 1fr auto auto 1fr; align-items: center; gap: 10px; color: #78817d; }
 .secure-copy span { height: 1px; background: #e1e6e3; }
