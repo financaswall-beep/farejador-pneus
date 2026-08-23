@@ -127,7 +127,7 @@ describe('retirada com serviços na mesma verdade comercial', () => {
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
          payment_method,unit_id,source,idempotency_key)
-       VALUES ('test',$1,80,'open','pickup','A receber',$2,'agent_v2',$3) RETURNING id`,
+       VALUES ('test',$1,80,'open','pickup','A receber',$2,'chatwoot_com_bot',$3) RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id, `matrix-pickup-${randomUUID()}`],
     );
     await db.pool.query(

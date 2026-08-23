@@ -98,19 +98,27 @@ Portanto, a etapa restante é: **publicar o código → deploy → smoke**.
 - fiscal de tamanho: aprovado; retirada do parceiro foi extraída para
   `src/parceiro/pickup-queries.ts` e o arquivo herdado encolheu para 4.191 linhas.
 
-## Prova pendente por infraestrutura
+## Prova PostgreSQL
 
 Foi criado `tests/integration/pickup-service-workflow.integration.test.ts`, com
 cenário real para parceiro e Matriz. A execução não chegou aos cenários porque
 o Docker Desktop deixou de responder: `docker version` também ficou pendurado,
 e o hook expirou durante a criação do PostgreSQL 17. Isso é **pendência**, não
-aprovação nem reprovação do fluxo.
+aprovação nem reprovação do fluxo local.
 
-Antes de autorizar produção, reiniciar o Docker Desktop e executar:
+O GitHub CI é o portão PostgreSQL desta publicação. No primeiro ciclo, o cenário
+do parceiro passou integralmente; o cenário da Matriz foi bloqueado antes do
+fluxo porque a fixture usava a origem inexistente `agent_v2`. A restrição
+`orders_source_check` funcionou corretamente, e a fixture foi corrigida para a
+origem real `chatwoot_com_bot`. O PR somente pode ser incorporado depois do novo
+ciclo verde.
+
+Para repetir a mesma prova localmente depois de recuperar o Docker Desktop:
 
 ```text
 npm run test:integration -- tests/integration/pickup-service-workflow.integration.test.ts
 ```
 
-Depois, aplicar a 0204 no banco correto, executar o deploy e fazer smoke real
-com uma retirada de teste na Matriz e uma unidade canário.
+A 0204 já foi aplicada no banco correto. Depois do CI verde, resta executar o
+deploy e fazer smoke real com uma retirada de teste na Matriz e uma unidade
+canário.

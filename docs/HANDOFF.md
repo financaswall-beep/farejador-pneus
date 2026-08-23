@@ -10,8 +10,11 @@
 > (`beisgivepyfhgcujsqan`): 6 colunas de fluxo, 2 colunas de idempotência, 4
 > constraints, 4 índices e 6 produtos internos de serviço. A conexão antiga
 > `.env.pooler` não foi usada. Passaram 1.347 testes, build, 205 migrations e a
-> prova do painel. O Docker Desktop local permaneceu sem responder; a integração
-> PostgreSQL específica está criada, mas continua pendente de execução. Detalhes:
+> prova do painel. O Docker Desktop local permaneceu sem responder; por isso a
+> integração PostgreSQL específica ficou sob responsabilidade do CI do PR #100.
+> No primeiro ciclo, o parceiro passou e a Matriz revelou uma fixture com origem
+> inválida antes de testar o fluxo; a fixture foi corrigida para a origem real do
+> Bot e o merge ficou condicionado ao novo ciclo verde. Detalhes:
 > [`SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md`](SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md).
 
 > **Smoke pós-deploy — 23/08/2026:** login owner e as áreas críticas abriram
