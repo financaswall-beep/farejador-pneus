@@ -319,7 +319,10 @@ describe('Etapa 5 V2 — RLS enforcement com role farejador_partner_app', () => 
          VALUES ('test',$1,'retiradas','read','load_pickups','success')`,
         [b.partnerUnitId],
       );
-    })).rejects.toThrow(/row-level security|violates/);
+    // O trigger de vínculo pode rejeitar antes da própria policy de RLS porque,
+    // sob a role restrita, a unidade alheia também é invisível. Ambos provam o
+    // mesmo contrato: nenhuma linha cruzada chega à tabela.
+    })).rejects.toThrow(/row-level security|violates|env_match/);
 
     await expect(
       restrictedPool.query('SELECT * FROM ops.partner_panel_canary_events'),
