@@ -1,9 +1,10 @@
 /**
  * PROVA DE PARIDADE DE ROTAS — painel da matriz (obra 300, route.ts).
  *
- * O QUE PROVA: a lista completa [método + endereço] que registerPainelRoute
- * registra no Fastify. Se a refatoração derrubar/renomear/duplicar UMA rota
- * que seja, esta prova REPROVA. (Duplicata nem chega aqui: o Fastify estoura
+ * O QUE PROVA: a lista completa [método + endereço + guarda exato] que
+ * registerPainelRoute registra no Fastify. Se uma refatoração derrubar,
+ * renomear, duplicar ou afrouxar UMA rota de owner para admin, esta prova
+ * REPROVA. (Duplicata nem chega aqui: o Fastify estoura
  * FST_ERR_DUPLICATED_ROUTE no registro — a prova captura e reprova também.)
  *
  * USO:
@@ -12,7 +13,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import Fastify from 'fastify';
+import Fastify, { type RouteOptions } from 'fastify';
 
 Object.assign(process.env, {
   NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
@@ -22,20 +23,39 @@ Object.assign(process.env, {
 const BASELINE = path.join(process.cwd(), 'scripts', 'baseline-rotas-matriz.json');
 const gravar = process.argv.includes('--gravar-baseline');
 
+function contratoDeAcesso(route: RouteOptions): string {
+  const handlers = route.preHandler
+    ? (Array.isArray(route.preHandler) ? route.preHandler : [route.preHandler])
+    : [];
+  const guardas = handlers.map((handler) => handler.name || 'ANONIMO');
+
+  if (route.url.startsWith('/admin/api/')) {
+    if (guardas.length !== 1) {
+      throw new Error(`${route.method} ${route.url}: API admin precisa de exatamente um guarda`);
+    }
+    if (guardas[0] === 'requireAdminOwner') {
+      return 'GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)';
+    }
+    if (guardas[0] === 'requireAdminAuth') {
+      return 'GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)';
+    }
+    throw new Error(`${route.method} ${route.url}: guarda admin desconhecido (${guardas[0]})`);
+  }
+
+  if (guardas.length === 0) return 'PUBLICA';
+  return `GUARD(${guardas.join('+')})`;
+}
+
 async function main() {
   const { registerPainelRoute } = await import('../src/admin/painel/route.js');
   const rotas: string[] = [];
   const app = Fastify({ logger: false });
   app.addHook('onRoute', (r) => {
     const metodos = Array.isArray(r.method) ? r.method : [r.method];
-    // Cadeado no manifesto (recomendação da banca de segurança 07-05): rota que
-    // PERDER o preHandler numa refatoração futura reprova aqui sozinha —
-    // método+URL iguais não bastam, o guard faz parte do contrato.
-    const guards = r.preHandler ? (Array.isArray(r.preHandler) ? r.preHandler.length : 1) : 0;
-    const cadeado = guards > 0 ? `AUTH(${guards})` : 'PUBLICA';
+    const acesso = contratoDeAcesso(r);
     for (const m of metodos) {
       if (m === 'HEAD') continue; // Fastify cria HEAD sozinho pra todo GET — ruído, não contrato
-      rotas.push(`${m} ${r.url} ${cadeado}`);
+      rotas.push(`${m} ${r.url} ${acesso}`);
     }
   });
   await registerPainelRoute(app);
