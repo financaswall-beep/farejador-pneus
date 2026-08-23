@@ -1,5 +1,12 @@
 # Handoff - Farejador
 
+> **Smoke pós-deploy — 23/08/2026:** login owner e as áreas críticas abriram
+> no domínio publicado. O drawer `2 moto(s)` do Catálogo funcionou e mostrou as
+> duas compatibilidades cadastradas. Foi encontrado somente um erro de console
+> na avaliação antecipada de campos ocultos; o estado inicial do Catálogo foi
+> completado e o cache de `app.js` versionado. Correção apenas frontend, sem
+> migration e sem alteração de dados. Ver o documento do painel único abaixo.
+
 > **Atualização operacional — 23/08/2026:** os dez PRs do painel único foram
 > incorporados e a migration `0203_partner_modern_panel_canary.sql` foi aplicada
 > e validada no banco novo de São Paulo (`.env.novo`). O banco tinha zero

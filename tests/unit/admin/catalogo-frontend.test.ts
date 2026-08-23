@@ -399,6 +399,16 @@ describe('catalogo no painel', () => {
     expect(html).toContain('@click="catalogoDiscoveryReview(item,\'approve\')"');
   });
 
+  it('inicializa a fila de pesquisa antes de o Alpine avaliar o drawer oculto', () => {
+    const stateSource = readFileSync('painel/public/app.js', 'utf8');
+    expect(stateSource).toContain('discoveries: [], discoveriesLoading: false');
+    expect(stateSource).toContain(
+      "discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 }",
+    );
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('app.js?v=20260823-catalog-state1');
+  });
+
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {
     const module = loadCatalogModule();
     const employee = {
