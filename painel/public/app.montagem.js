@@ -7,6 +7,9 @@
 // Módulo novo? Além daqui: <script> no index.html + lista fixa do route-static.ts
 // (404 no módulo derruba o Alpine INTEIRO — painel branco).
 window.PAINEL_MONTAR = function (estado) {
+  const colisoesPermitidas = new Set([
+    'comprasResumo:compras->comprasRelatorios',
+  ]);
   const fabricas = [
     window.PAINEL_MODULES.nav, // app.nav.js (linhas 208-262 pré-obra): título/menu/badge + seleção de unidade (abrir/voltar)
     window.PAINEL_MODULES.redeKpis, // app.rede.kpis.js (linhas 263-455 pré-obra): derivadas da Rede: metas, séries, totais, rankings, alertas
@@ -65,8 +68,38 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.chartsUnidade, // app.charts.unidade.js (linhas 2852-3000 pré-obra): gráficos da unidade + chartOptions + renderChart genérico
   ];
   const out = estado;
+  const nomePorFabrica = new Map(
+    Object.entries(window.PAINEL_MODULES).map(([nome, fabrica]) => [fabrica, nome]),
+  );
+  const proprietarios = new Map(
+    Reflect.ownKeys(Object.getOwnPropertyDescriptors(out)).map((nome) => [nome, 'estado']),
+  );
+  const colisoesUsadas = new Set();
+  const colisoesNovas = [];
+
   for (const f of fabricas) {
-    Object.defineProperties(out, Object.getOwnPropertyDescriptors(f()));
+    const nomeFabrica = nomePorFabrica.get(f);
+    if (!nomeFabrica) throw new Error('painel_factory_sem_nome');
+    const descritores = Object.getOwnPropertyDescriptors(f());
+    for (const propriedade of Reflect.ownKeys(descritores)) {
+      if (proprietarios.has(propriedade)) {
+        const id = `${String(propriedade)}:${proprietarios.get(propriedade)}->${nomeFabrica}`;
+        if (colisoesPermitidas.has(id)) colisoesUsadas.add(id);
+        else colisoesNovas.push(id);
+      }
+      proprietarios.set(propriedade, nomeFabrica);
+    }
+    Object.defineProperties(out, descritores);
+  }
+
+  const colisoesObsoletas = [...colisoesPermitidas]
+    .filter((id) => !colisoesUsadas.has(id));
+  if (colisoesNovas.length || colisoesObsoletas.length) {
+    const detalhes = [
+      ...colisoesNovas.map((id) => `nova=${id}`),
+      ...colisoesObsoletas.map((id) => `obsoleta=${id}`),
+    ].join('|');
+    throw new Error(`painel_colisao_nao_declarada:${detalhes}`);
   }
   return out;
 };
