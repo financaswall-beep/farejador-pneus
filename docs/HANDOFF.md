@@ -1,5 +1,19 @@
 # Handoff - Farejador
 
+> **Retiradas unificadas — 23/08/2026:** implementado o fluxo único e
+> responsivo de Retiradas para Matriz e parceiro, preservando sessões, pools,
+> RLS, estoques e caixas separados. Chegada e instalação são etapas
+> operacionais; somente a confirmação final materializa serviços, consome a
+> reserva, baixa o pneu e registra pagamento, resultado e comissão na mesma
+> transação. A migration `0204_pickup_service_workflow.sql` foi simulada com
+> rollback, aplicada e verificada no banco novo de São Paulo
+> (`beisgivepyfhgcujsqan`): 6 colunas de fluxo, 2 colunas de idempotência, 4
+> constraints, 4 índices e 6 produtos internos de serviço. A conexão antiga
+> `.env.pooler` não foi usada. Passaram 1.347 testes, build, 205 migrations e a
+> prova do painel. O Docker Desktop local permaneceu sem responder; a integração
+> PostgreSQL específica está criada, mas continua pendente de execução. Detalhes:
+> [`SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md`](SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md).
+
 > **Smoke pós-deploy — 23/08/2026:** login owner e as áreas críticas abriram
 > no domínio publicado. O drawer `2 moto(s)` do Catálogo funcionou e mostrou as
 > duas compatibilidades cadastradas. Foi encontrado somente um erro de console

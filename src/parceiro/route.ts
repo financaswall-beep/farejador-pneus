@@ -13,6 +13,7 @@ import { partnerSaleSchema } from './sale-schema.js';
 export { partnerSaleSchema } from './sale-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
+import { pickupServicesSchema, pickupServicesPublicCatalog } from '../shared/pickup-services.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
@@ -43,6 +44,7 @@ import {
   DeliveryReturnNotAwaitingError,
   PickupAlreadyRetrievedError,
   markPartnerPickupRetrieved,
+  updatePartnerPickupStage,
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
@@ -165,7 +167,13 @@ const deliverySchema = z.object({
 
 // Marcar retirado (retirada reservada do bot): forma de pagamento recebida no balcão.
 const retrieveSchema = z.object({
-  payment_method: z.string().max(80).nullable().optional(),
+  payment_method: z.string().trim().min(1).max(80),
+  services: pickupServicesSchema.optional(),
+});
+
+const pickupStageSchema = z.object({
+  stage: z.enum(['waiting', 'arrived', 'installing']),
+  services: pickupServicesSchema.default([]),
 });
 
 // Cancelar pedido: motivo (free-text) — vira audit + insumo do antifraude da matriz.
@@ -835,7 +843,26 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // requireScreen('retiradas') — o balconista vê só esta fila, sem precisar de
   // 'vendas'. Server-side filtra pra só pickup aguardando (getPartnerRetiradas).
   fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerRetiradas(getPartnerContext(request)) });
+    return reply.status(200).send({
+      rows: await getPartnerRetiradas(getPartnerContext(request)),
+      service_catalog: pickupServicesPublicCatalog(),
+    });
+  });
+
+  fastify.put('/parceiro/:slug/api/retiradas/:orderId/stage', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
+    const params = saleParamsSchema.safeParse(request.params);
+    const body = pickupStageSchema.safeParse(request.body ?? {});
+    if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      return reply.status(200).send(await updatePartnerPickupStage(
+        getPartnerContext(request), params.data.orderId, body.data,
+      ));
+    } catch (err) {
+      if (err instanceof Error && err.message === 'pickup_not_found') {
+        return reply.status(404).send({ error: 'pickup_not_found' });
+      }
+      throw err;
+    }
   });
 
   fastify.get('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {

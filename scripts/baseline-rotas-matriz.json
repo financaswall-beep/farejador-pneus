@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-23T19:03:03.425Z",
-  "total": 258,
+  "geradoEm": "2026-08-23T21:44:20.430Z",
+  "total": 260,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -47,6 +47,7 @@
     "GET /admin/api/rede/comissoes GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/rede/custos-pendentes GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/rede/mensalidades GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/retiradas GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/sales/brands GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/sales/history-data GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/varejo/resumo GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -259,6 +260,7 @@
     "PUT /admin/api/partners/:partnerUnitId/coverage GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/partners/:partnerUnitId/delivery-radius GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/partners/:partnerUnitId/modern-panel GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
-    "PUT /admin/api/partners/:partnerUnitId/network-orders GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)"
+    "PUT /admin/api/partners/:partnerUnitId/network-orders GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "PUT /admin/api/retiradas/:order_id/stage GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)"
   ]
 }

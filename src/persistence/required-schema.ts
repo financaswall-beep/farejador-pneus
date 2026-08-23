@@ -158,6 +158,26 @@ export const REQUIRED_SCHEMA_SQL = `
        WHERE table_schema='commerce' AND table_name='partner_order_items'
          AND column_name='reference_unit_price' AND is_nullable='NO'
     )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='orders'
+         AND column_name='pickup_services' AND is_nullable='NO'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_orders'
+         AND column_name='pickup_services' AND is_nullable='NO'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='order_items'
+         AND column_name='pickup_service_code'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_order_items'
+         AND column_name='pickup_service_code'
+    )
     AND to_regclass('ops.application_schema_state') IS NOT NULL
     AND to_regclass('finance.partner_receivable_events') IS NOT NULL
     AND to_regclass('finance.partner_payable_events') IS NOT NULL
@@ -173,14 +193,14 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
        AND version>=200
   ) AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0200. */
+/** Impede o processo novo de operar sem o contrato mínimo, hoje concluído na 0204. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0200_finance_credit_lifecycle');
+    throw new Error('required_schema_missing:0204_pickup_service_workflow');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0200_finance_credit_lifecycle');
+    throw new Error('required_schema_missing:0204_pickup_service_workflow');
   }
 }

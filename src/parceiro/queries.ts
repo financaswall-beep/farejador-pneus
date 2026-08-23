@@ -54,6 +54,11 @@ import {
   type CreatedFuncionario, type PartnerTokenRow,
 } from './partner-staff-account.js';
 export { DeliveryAlreadyFinalizedError, DeliveryReturnNotAwaitingError, confirmPartnerDeliveryReturn } from './delivery-return.js';
+export {
+  getPartnerRetiradas, markPartnerPickupRetrieved, PickupAlreadyRetrievedError,
+  updatePartnerPickupStage,
+} from './pickup-queries.js';
+export type { MarkPickupRetrievedInput, PartnerPickupStage } from './pickup-queries.js';
 export { PartnerUsernameConflictError } from './partner-staff-account.js';
 export type { CreatedFuncionario, PartnerTokenRow } from './partner-staff-account.js';
 export type { PartnerCommissionConfig } from './commission.js';
@@ -526,6 +531,7 @@ export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: Relato
          JOIN commerce.partner_orders_full pof
            ON pof.order_id = poi.order_id AND pof.environment = poi.environment
         WHERE pof.environment = $1 AND pof.unit_id = $2
+          AND COALESCE(poi.item_type,'pneu')='pneu'
            AND pof.status <> 'cancelled'
           AND NOT (pof.fulfillment_mode='delivery' AND pof.delivery_status<>'delivered')
           AND NOT pof.awaiting_pickup
@@ -633,22 +639,6 @@ export async function getPartnerRelatorioCaixa(ctx: PartnerContext, opts: Relato
       vendas_total: vendas, vendas_count: Number(r?.cash_count ?? 0),
       despesas_total: despesas, compras_total: compras, estornos_total: estornos,
     };
-  });
-}
-
-/**
- * Fila da tela RETIRADAS: só os pedidos de retirada (pickup) RESERVADOS aguardando
- * o cliente vir buscar — a fila de ação do balcão. Deriva de getPartnerVendas e
- * filtra no servidor pra que a tela Retiradas tenha um feed PRÓPRIO (guard
- * requireScreen('retiradas')): o balconista vê só a fila de retirada, sem precisar
- * da permissão 'vendas' (que escancararia o histórico inteiro). Mesma forma de
- * linha das vendas — o front reusa os mesmos campos.
- */
-export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[]> {
-  const all = await getPartnerVendas(ctx);
-  return all.filter((row) => {
-    const o = row as { fulfillment_mode?: string; awaiting_pickup?: boolean; status?: string };
-    return o.fulfillment_mode === 'pickup' && o.awaiting_pickup === true && o.status !== 'cancelled';
   });
 }
 
@@ -1150,103 +1140,6 @@ export interface UpdatePartnerDeliveryInput {
   payment_method?: string | null;
   // Motivo (free-text) do "não entregue" (failed). Vai pro cancel + audit.
   reason?: string | null;
-}
-
-export class PickupAlreadyRetrievedError extends Error {
-  readonly code = 'pickup_already_retrieved';
-  constructor() {
-    super('pickup_already_retrieved');
-  }
-}
-
-export interface MarkPickupRetrievedInput {
-  // Forma de pagamento recebida no balcão na hora da retirada (pix/dinheiro/cartao).
-  payment_method?: string | null;
-}
-
-// Marca uma RETIRADA RESERVADA como retirada (cliente veio e pagou no balcão):
-//  - converte a RESERVA em baixa física (complete_partner_pickup);
-//  - marca o pedido como pago + carimba retrieved_at (vira venda realizada NA RETIRADA);
-//  - lança o caixa: conta a receber já 'received' (espelha o COD entregue), source 2w.
-// Só age em pickup com awaiting_pickup=true e não cancelado. Idempotente (re-clique seguro).
-export async function markPartnerPickupRetrieved(
-  ctx: PartnerContext,
-  orderId: string,
-  input: MarkPickupRetrievedInput,
-): Promise<{ order_id: string; retrieved: boolean }> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const existing = await client.query<{
-      awaiting_pickup: boolean; status: string; total_amount: string;
-      customer_id: string | null; customer_name: string | null;
-    }>(
-      `SELECT awaiting_pickup, status, total_amount, customer_id, customer_name
-       FROM commerce.partner_orders
-       WHERE id = $1 AND environment = $2 AND unit_id = $3
-         AND fulfillment_mode = 'pickup' AND deleted_at IS NULL
-       LIMIT 1
-       FOR UPDATE`,
-      [orderId, ctx.environment, ctx.unitId],
-    );
-    if (existing.rowCount !== 1) throw new Error('pickup_not_found');
-    const row = existing.rows[0]!;
-    if (row.status === 'cancelled') throw new Error('pickup_not_found');
-    if (!row.awaiting_pickup) throw new PickupAlreadyRetrievedError();
-
-    // 1) reserva → baixa física (a função SQL levanta erro se não estiver aguardando).
-    await client.query('SELECT commerce.complete_partner_pickup($1, $2)', [
-      orderId,
-      `partner:${ctx.slug}`,
-    ]);
-
-    // 2) marca retirado: pago + data de realização da venda (retrieved_at) + carimba o
-    //    OPERADOR que finalizou = base da comissão por pessoa (0099). Pedido do bot nasce
-    //    com operator_token_id NULL; quem dá baixa na retirada é "quem finaliza" → leva.
-    //    COALESCE trava o 1º finalizador (não reescreve num eventual reprocesso).
-    await client.query(
-      `UPDATE commerce.partner_orders
-       SET awaiting_pickup = false, retrieved_at = now(), status = 'paid', updated_at = now(),
-           operator_token_id = COALESCE(operator_token_id, $4)
-       WHERE id = $1 AND environment = $2 AND unit_id = $3`,
-      [orderId, ctx.environment, ctx.unitId, ctx.tokenId],
-    );
-
-    // 3) caixa: cliente pagou no balcão → conta a receber já recebida (source 2w).
-    await client.query(
-      `INSERT INTO finance.partner_receivables (
-         environment, unit_id, customer_id, customer_name, description, source_tag, amount,
-         due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
-       ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'received', now(), $7, $8, $9, $10, $11)
-       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
-      [
-        ctx.environment,
-        ctx.unitId,
-        row.customer_id,
-        row.customer_name,
-        `Retirada ${orderId.slice(0, 8)}`,
-        row.total_amount,
-        normalizeText(input.payment_method),
-        `Retirada paga no balcão — pedido ${orderId.slice(0, 8)}`,
-        `partner:${ctx.slug}`,
-        `order:${orderId}:pickup-receivable`,
-        orderId,
-      ],
-    );
-
-    await client.query(
-      `INSERT INTO audit.events (
-         environment, domain, entity_table, entity_id, event_type, actor_label, payload_after
-       ) VALUES ($1, 'partner_orders', 'commerce.partner_orders', $2,
-                 'partner_pickup_retrieved', $3, $4::jsonb)`,
-      [
-        ctx.environment,
-        orderId,
-        `partner:${ctx.slug}`,
-        JSON.stringify({ unit_id: ctx.unitId, payment_method: normalizeText(input.payment_method) }),
-      ],
-    );
-
-    return { order_id: orderId, retrieved: true };
-  });
 }
 
 // Atualiza o estado operacional da entrega de um pedido (fulfillment_mode=delivery).

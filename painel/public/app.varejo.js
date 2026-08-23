@@ -3,6 +3,11 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.varejo = function () {
   return {
+    varejoIsTireItem(item) {
+      if (item?.product_type) return item.product_type === 'tire';
+      if (item?.pickup_service_code) return false;
+      return !String(item?.product_code || '').startsWith('PICKUP-SERVICE-');
+    },
     mapPedidos(rows) {
       const deliveryLabels = { pending: 'Em separação', dispatched: 'Saiu pra entrega', delivered: 'Entregue', failed: 'Entrega falhou' };
       return (rows || []).map((row) => {
@@ -35,6 +40,8 @@ window.PAINEL_MODULES.varejo = function () {
           itens: this.itemSummary(items),
           rawItems: items,
           itensCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+          pneusCount: items.filter((item) => this.varejoIsTireItem(item))
+            .reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           pagto,
           fulfillmentMode: row.fulfillment_mode || null,
           matrizDeliveryStatus: row.matriz_delivery_status || null,
@@ -114,7 +121,7 @@ window.PAINEL_MODULES.varejo = function () {
       const abertas = this.logistica?.abertas || [];
       return {
         clientes: new Set(ativas.map((p) => p.cliente).filter(Boolean)).size,
-        pneus: ativas.reduce((sum, p) => sum + p.itensCount, 0),
+        pneus: ativas.reduce((sum, p) => sum + p.pneusCount, 0),
         pico: Math.max(0, ...Object.values(porHora)),
         aguardando: this.vendasAguardando(),
         separacao: abertas.filter((d) => d.delivery_status === 'pending').length,
@@ -123,7 +130,8 @@ window.PAINEL_MODULES.varejo = function () {
     },
     varejoMedidasMaisVendidas() {
       const totais = new Map();
-      this.vendasVarejoAtivas().forEach((p) => (p.rawItems || []).forEach((item) => {
+      this.vendasVarejoAtivas().forEach((p) => (p.rawItems || [])
+        .filter((item) => this.varejoIsTireItem(item)).forEach((item) => {
         const nome = item.tire_size || item.product_name || item.product_code || 'Produto';
         totais.set(nome, (totais.get(nome) || 0) + Number(item.quantity || 0));
       }));
@@ -273,15 +281,9 @@ window.PAINEL_MODULES.varejo = function () {
     },
     async retirarVarejo(row) {
       if (this.adminUser?.role !== 'owner') return;
-      if (!row?.canCompletePickup || !window.confirm('Confirmar que o cliente retirou e recebeu este pedido?')) return;
-      try {
-        await this.apiPost(`/admin/api/orders/${row.id}/retrieve`, {});
-        await Promise.allSettled([
-          this.loadRealData(), this.loadVendasData(), this.loadFinanceiro(),
-        ]);
-      } catch (err) {
-        window.alert(`Não consegui concluir a retirada: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      if (!row?.canCompletePickup || !this.hasPanelModule('retiradas')) return;
+      this.partnerRetiradasSelectedId = row.id;
+      this.currentPage = 'retiradas';
     },
   };
 };

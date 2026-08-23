@@ -40,6 +40,8 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='partner_order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='reference_unit_price'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='pickup_services'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='pickup_service_code'`);
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.application_schema_state')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivable_events')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payable_events')");
@@ -50,9 +52,9 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0200', async () => {
+  it('recusa iniciar antes da migration 0204', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0200_finance_credit_lifecycle');
+      .rejects.toThrow('required_schema_missing:0204_pickup_service_workflow');
   });
 });
