@@ -1,5 +1,13 @@
 # Handoff - Farejador
 
+> **Atualização operacional — 23/08/2026:** os dez PRs do painel único foram
+> incorporados e a migration `0203_partner_modern_panel_canary.sql` foi aplicada
+> e validada no banco novo de São Paulo (`.env.novo`). O banco tinha zero
+> unidades parceiras; a chave nasceu desligada e nenhuma unidade foi habilitada.
+> A conexão antiga `.env.pooler` não foi usada. O deploy continua pendente.
+> Documento para revisão externa:
+> [`HANDOFF_CLAUDE_PAINEL_UNICO_2026-08-23.md`](HANDOFF_CLAUDE_PAINEL_UNICO_2026-08-23.md).
+
 > **Atualização — 23/08/2026 — Painel único web (PRs 6–10):** o casco único
 > agora abre sessões separadas para Matriz (`ms_`), parceiro (`ps_`) e operação
 > móvel (`cs_`), sem afrouxar `panel_role`. O parceiro moderno recebeu Resumo e
@@ -13,10 +21,9 @@
 > unitários, TypeScript, build, 204 migrations, prova do painel (1.211
 > propriedades), 95 contratos e 258 rotas administrativas aprovados. O Docker
 > local não respondeu; por isso a integração PostgreSQL deve ser confirmada pelo
-> CI antes do merge. A `0203` ainda deve ser aplicada no **banco novo correto**
-> antes do deploy; não usar a conexão `.env.pooler`, já identificada como outro
-> banco. Ordem: CI verde → merge → backup → aplicar `0203` no Supabase novo →
-> deploy → smoke → habilitar uma única unidade canário.
+> CI antes do merge. A `0203` foi posteriormente aplicada e validada no banco
+> novo correto; não usar a conexão `.env.pooler`, já identificada como outro
+> banco. Ordem restante: deploy → smoke → habilitar uma única unidade canário.
 
 > **Atualização mais recente — 23/08/2026:** implementado o cadastro inicial do
 > Catálogo antes da primeira compra e o fluxo auditável de compatibilidade por
