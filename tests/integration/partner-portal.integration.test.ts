@@ -236,6 +236,77 @@ describe('Portal Parceiro — realização financeira de entrega e retirada rese
     expect(receivables.rows[0]).toMatchObject({ count: 2, total: '200.00' });
   });
 
+  it('duplo clique concorrente na retirada baixa estoque e caixa uma única vez', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 6 });
+    const pickup = await db.pool.query<{ order_id: string }>(
+      `SELECT commerce.register_partner_local_order(
+         'test',$1,'Cliente Duplo Clique',NULL,$2::jsonb,'A receber','pickup',NULL,
+         'integration:pickup-race',$3,'2w',0,0,true
+       ) AS order_id`,
+      [f.unitId, JSON.stringify([{
+        partner_stock_id: f.stockId, quantity: 2, unit_price: 40,
+      }]), `pickup-race-${randomUUID()}`],
+    );
+    const pickupId = pickup.rows[0]!.order_id;
+
+    const results = await Promise.allSettled([
+      q.markPartnerPickupRetrieved(f.ctx, pickupId, { payment_method: 'Pix' }),
+      q.markPartnerPickupRetrieved(f.ctx, pickupId, { payment_method: 'Pix' }),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+
+    const state = await db.pool.query(
+      `SELECT o.status,o.awaiting_pickup,s.quantity_on_hand,s.quantity_reserved,
+        (SELECT count(*)::int FROM finance.partner_receivables r
+          WHERE r.source_order_id=o.id AND r.status='received') receipts,
+        (SELECT COALESCE(sum(amount),0)::text FROM finance.partner_receivables r
+          WHERE r.source_order_id=o.id AND r.status='received') received_total,
+        (SELECT count(*)::int FROM audit.events a WHERE a.entity_id=o.id
+          AND a.event_type='partner_pickup_retrieved') audits
+       FROM commerce.partner_orders o
+       JOIN commerce.partner_stock_levels s ON s.id=$2
+       WHERE o.id=$1`,
+      [pickupId, f.stockId],
+    );
+    expect(state.rows[0]).toMatchObject({
+      status: 'paid', awaiting_pickup: false, quantity_on_hand: 4,
+      quantity_reserved: 0, receipts: 1, received_total: '80.00', audits: 1,
+    });
+  });
+
+  it('cancelar retirada libera a reserva sem baixar o físico nem criar caixa', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 5 });
+    const pickup = await db.pool.query<{ order_id: string }>(
+      `SELECT commerce.register_partner_local_order(
+         'test',$1,'Cliente Cancelou',NULL,$2::jsonb,'A receber','pickup',NULL,
+         'integration:pickup-cancel',$3,'2w',0,0,true
+       ) AS order_id`,
+      [f.unitId, JSON.stringify([{
+        partner_stock_id: f.stockId, quantity: 2, unit_price: 70,
+      }]), `pickup-cancel-${randomUUID()}`],
+    );
+    const pickupId = pickup.rows[0]!.order_id;
+
+    await expect(q.cancelPartnerSale(f.ctx, pickupId, 'Cliente não apareceu'))
+      .resolves.toEqual({ order_id: pickupId, cancelled: true });
+
+    const state = await db.pool.query(
+      `SELECT o.status,s.quantity_on_hand,s.quantity_reserved,
+        (SELECT count(*)::int FROM finance.partner_receivables r
+          WHERE r.source_order_id=o.id AND r.status='received') receipts
+       FROM commerce.partner_orders o
+       JOIN commerce.partner_stock_levels s ON s.id=$2
+       WHERE o.id=$1`,
+      [pickupId, f.stockId],
+    );
+    expect(state.rows[0]).toMatchObject({
+      status: 'cancelled', quantity_on_hand: 5, quantity_reserved: 0, receipts: 0,
+    });
+  });
+
   it('replay de entregue preserva data, pagamento, entregador e auditoria originais', async () => {
     const q = await importQueries();
     const f = await createPartnerFixture(db.pool, { initialStockQty: 5 });

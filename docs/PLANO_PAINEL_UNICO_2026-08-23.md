@@ -315,15 +315,25 @@ gate com tela.**
 | **9** | **Retiradas do parceiro** atrás de flag | `painel/public/app.partner-retiradas.js`, rotas existentes | permissão, escrita, idempotência, transação; A6/A8 passam |
 | **10** | canário + telemetria de divergência | flag por unidade | duas telas batendo com o painel antigo |
 
-Andamento: PRs 6 e 7 incorporados. O broker emite `ms_`/`ps_`, `/auth/me`
+Andamento: PRs 6, 7 e 8 incorporados. O broker emite `ms_`/`ps_`, `/auth/me`
 devolve o contexto calculado no servidor, o menu é derivado de `modules`, os
 badges não alteram a definição do menu e o boot administrativo só roda para a
-Matriz. O PR 8 implementa o Resumo moderno do parceiro, somente leitura e
+Matriz. O Resumo moderno do parceiro é somente leitura e permanece
 desligado por padrão: usa exclusivamente `resumo`, `comissao/equipe` e
 `meu-desempenho` sob sessão `ps_`; não refaz contas financeiras no navegador e
 mantém competência, caixa e títulos em aberto visualmente separados. A flag
 por unidade continua reservada ao PR 10, portanto o painel legado permanece o
-único caminho do parceiro até o canário ser habilitado conscientemente.
+único caminho do parceiro até o canário ser habilitado conscientemente. O PR 9
+implementa Retiradas no mesmo casco e preserva a operação auditada: fila
+escopada, pagamento no balcão, reserva→baixa física→caixa apenas na confirmação,
+cancelamento sem caixa e foto aprovada como apoio opcional. O navegador não
+refaz efeitos de estoque ou financeiro.
+
+**Paridade fechada de Retiradas (PR 9):** listar somente pickups aguardando;
+mostrar cliente, telefone, itens, origem 2W, total e foto quando autorizada;
+avisar por telefone/WhatsApp; escolher Pix/Dinheiro/Cartão; confirmar uma única
+vez; cancelar com motivo obrigatório no fluxo 2W; liberar reserva sem entrada
+no caixa; respeitar `requireScreen('retiradas')` sem exigir acesso a Vendas.
 
 **Migrations necessárias:** nenhuma prevista até o PR 10. Se o modelo de
 permissão exigir coluna nova, ela entra em PR próprio, **antes** do PR 6.
