@@ -113,6 +113,12 @@ fluxo porque a fixture usava a origem inexistente `agent_v2`. A restrição
 origem real `chatwoot_com_bot`. O PR somente pode ser incorporado depois do novo
 ciclo verde.
 
+O segundo ciclo avançou até o código de produção e encontrou uma inferência
+ambígua do mesmo parâmetro como `text` e `env_t` na materialização de serviços
+da Matriz. A consulta passou a tipar o ambiente explicitamente como
+`public.env_t`. Essa foi uma correção real do caminho Matriz, e o merge continua
+condicionado a um ciclo integralmente verde.
+
 Para repetir a mesma prova localmente depois de recuperar o Docker Desktop:
 
 ```text

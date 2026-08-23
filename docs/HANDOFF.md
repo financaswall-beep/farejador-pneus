@@ -14,7 +14,9 @@
 > integração PostgreSQL específica ficou sob responsabilidade do CI do PR #100.
 > No primeiro ciclo, o parceiro passou e a Matriz revelou uma fixture com origem
 > inválida antes de testar o fluxo; a fixture foi corrigida para a origem real do
-> Bot e o merge ficou condicionado ao novo ciclo verde. Detalhes:
+> Bot. O segundo ciclo encontrou no código da Matriz uma ambiguidade real entre
+> `text` e `env_t`; a consulta foi tipada explicitamente como `public.env_t`. O
+> merge permanece condicionado ao novo ciclo verde. Detalhes:
 > [`SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md`](SESSAO_2026-08-23_RETIRADAS_UNIFICADAS_HANDOFF.md).
 
 > **Smoke pós-deploy — 23/08/2026:** login owner e as áreas críticas abriram

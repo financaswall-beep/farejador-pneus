@@ -49,9 +49,9 @@ export async function materializeMatrizPickupServices(
          environment,order_id,product_id,quantity,unit_price,discount_amount,
          reference_unit_price,matriz_unit_cost,pickup_service_code
        )
-       SELECT $1,$2,p.id,1,$3,0,$3,0,$4
+       SELECT $1::public.env_t,$2,p.id,1,$3,0,$3,0,$4
          FROM commerce.products p
-        WHERE p.environment=$1 AND p.product_code=$5
+        WHERE p.environment=$1::public.env_t AND p.product_code=$5
           AND p.product_type='service' AND p.deleted_at IS NULL
        ON CONFLICT (environment,order_id,pickup_service_code)
          WHERE pickup_service_code IS NOT NULL DO NOTHING
