@@ -1,5 +1,18 @@
 # Handoff - Farejador
 
+> **Atualização mais recente — 23/08/2026:** implementado o cadastro inicial do
+> Catálogo antes da primeira compra e o fluxo auditável de compatibilidade por
+> medida. Criar produto não inventa estoque nem financeiro; o Bot falha fechado
+> sem fitment aprovado; fontes da internet ficam pendentes até aprovação humana;
+> remoções justificadas preservam o filme histórico da aprovação; o parceiro
+> pesquisa a ficha central pela medida técnica. Migration aditiva
+> `0202` criada e reexecutada do zero com as outras 202. Passaram 1.306 testes
+> unitários, 44 integrações críticas, build, paridade do painel, 252 rotas e fiscal
+> de tamanho. A migration `0202` já foi aplicada e validada no banco novo de São
+> Paulo; **o deploy ainda não foi executado**. A ordem restante é publicar o código
+> → deploy → smoke visual/funcional. Detalhes:
+> [`SESSAO_2026-08-23_CATALOGO_COMPATIBILIDADE_HANDOFF.md`](SESSAO_2026-08-23_CATALOGO_COMPATIBILIDADE_HANDOFF.md).
+
 > **Atualização mais recente — 22/08/2026:** a Visão geral do Bot recebeu o painel
 > de movimentos diário/semanal. Clicar em qualquer dia troca, em conjunto, Conversas,
 > Pedidos fechados, Faturamento, Ticket médio e as 24 barras horárias; Semanal agrega

@@ -44,6 +44,12 @@ interface StockProvenance {
   stock_block_reason: string | null;
 }
 
+export function vehiclesWithApprovedFitments<T extends { produtos: unknown[] }>(
+  vehicles: T[],
+): T[] {
+  return vehicles.filter((vehicle) => vehicle.produtos.length > 0);
+}
+
 export async function buscarProdutoMatriz(
   client: PoolClient,
   input: BuscarProdutoInput,

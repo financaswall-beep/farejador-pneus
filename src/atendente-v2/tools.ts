@@ -32,7 +32,7 @@ import {
 import { env } from '../shared/config/env.js';
 import { getMatrizWholesaleStockQty, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
-import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, verificarEstoqueMatriz } from './matriz-product-search.js';
+import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
@@ -230,7 +230,6 @@ async function quoteFreteFromPin(
 }
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
-
 /**
  * Definições ATIVAS pro LLM: a tool pedir_foto só aparece com PHOTO_REQUESTS on
  * (flag off = o bot nem sabe que foto existe; o prompt também é condicional).
@@ -531,7 +530,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 ];
 
 // ─── Tool executors ────────────────────────────────────────────────────────
-
 export async function executeTool(
   client: PoolClient,
   environment: Environment,
@@ -555,8 +553,11 @@ export async function executeTool(
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        const withApprovedFitments = vehiclesWithApprovedFitments(result);
+        if (withApprovedFitments.length === 0) return JSON.stringify({ encontrado: false,
+          motivo: 'compatibilidade_nao_cadastrada', mensagem: 'A moto foi reconhecida, mas ainda não existe compatibilidade aprovada. Peça ao cliente a medida escrita no pneu; não adivinhe a medida.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) {
-          await applyMatrizPricesToCompatibility(client, environment, result);
+          await applyMatrizPricesToCompatibility(client, environment, withApprovedFitments);
         }
         // Unificação atacado×varejo (flag WHOLESALE_UNIFIED_STOCK): o estoque BASE da matriz
         // vem do GALPÃO (por medida), não da view genérica. Os overrides de loja perto abaixo
@@ -586,7 +587,7 @@ export async function executeTool(
                 })
               : null;
           if (customerLocation && municipio) {
-            const productIds = result.flatMap((v) => v.produtos.map((p) => p.product_id));
+            const productIds = withApprovedFitments.flatMap((v) => v.produtos.map((p) => p.product_id));
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
               municipio,
               customerLocation,
@@ -594,7 +595,7 @@ export async function executeTool(
               productIds,
             });
             estoqueLojaPertoCompat = await applyPartnerPricesToCompatibility(
-              client, environment, result, avail,
+              client, environment, withApprovedFitments, avail,
             );
             lojaResolvidaCompat = true;
           } else if (bairro && municipio) {
@@ -602,14 +603,14 @@ export async function executeTool(
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
             if (partnerStock.size > 0) {
               estoqueLojaPertoCompat = await applyPartnerPricesToCompatibility(
-                client, environment, result, partnerStock,
+                client, environment, withApprovedFitments, partnerStock,
               );
             }
             lojaResolvidaCompat = true;
           }
         }
         if (env.WHOLESALE_UNIFIED_STOCK) {
-          for (const vehicle of result) {
+          for (const vehicle of withApprovedFitments) {
             vehicle.produtos.sort((a, b) => b.total_stock - a.total_stock);
             vehicle.produtos = vehicle.produtos.slice(0, compatInput.limit);
           }
@@ -620,7 +621,7 @@ export async function executeTool(
         // baseado no estoque central). A retirada se resolve depois no localizacao_loja.
         return JSON.stringify({
           encontrado: true,
-          veiculos: result,
+          veiculos: withApprovedFitments,
           ...(lojaResolvidaCompat ? {} : { precisa_localizacao: true }),
           ...(lojaResolvidaCompat && !estoqueLojaPertoCompat ? { sem_estoque_loja_perto: true } : {}),
         });
