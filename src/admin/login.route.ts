@@ -115,6 +115,7 @@ async function issuePanelSession(
     workplace: publicOperationWorkplace(workplace), slug: workplace.slug,
     store_name: workplace.name, session_token: session.session_token,
     expires_at: session.expires_at, modules: workplace.modules,
+    modern_panel_enabled: false,
     user: { display_name: workplace.displayName, username, role: workplace.role },
   };
 }

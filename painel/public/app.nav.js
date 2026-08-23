@@ -21,7 +21,7 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
 // Registro único do ciclo de vida das páginas. As telas do parceiro acrescentam
 // seus handlers nos PRs próprios, sem criar outro watcher ou outro encanamento.
 window.PAINEL_PAGES = {
-  resumo: { scopes: ['matrix'], requires: 'resumo' },
+  resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', partnerLoad: ['loadPartnerResumo'] },
   rede: { scopes: ['matrix'], requires: 'rede', load: ['loadComissoes'], render: [
     'renderRedeChart', 'renderRedeLucroChart', 'renderRedeComprasChart',
     'renderEstoqueParadoChart', 'renderMargemChart', 'renderVendaHojeChart',
@@ -54,6 +54,10 @@ window.PAINEL_MODULES.nav = function () {
 
     isMatrixPanel() {
       return this.panelScope === 'matrix';
+    },
+
+    isPartnerPanel() {
+      return this.panelScope === 'partner';
     },
 
     hasPanelModule(module) {

@@ -51,11 +51,15 @@
         localStorage.setItem(`farejador_partner_token_${payload.slug}`, payload.session_token);
         sessionStorage.setItem('farejador_panel_workplace', JSON.stringify({
           kind: 'partner', slug: payload.slug, id: payload.workplace.id,
+          name: payload.workplace.name,
+          modern_panel_enabled: payload.modern_panel_enabled === true,
         }));
       } catch {
         throw new Error('storage_unavailable');
       }
-      location.replace(`/parceiro/${encodeURIComponent(payload.slug)}/`);
+      location.replace(payload.modern_panel_enabled === true
+        ? '/admin/painel'
+        : `/parceiro/${encodeURIComponent(payload.slug)}/`);
       return;
     }
     sessionStorage.removeItem('farejador_panel_workplace');

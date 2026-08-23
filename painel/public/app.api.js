@@ -89,9 +89,11 @@ window.PAINEL_MODULES.api = function () {
   return {
     async ensureCredentials() {
       if (this.adminAuthenticated) {
-        await recoverPendingIntegrityOperations(this);
+        if (this.isMatrixPanel()) await recoverPendingIntegrityOperations(this);
         return true;
       }
+      const selectedPartner = this.panelSelectedPartner();
+      if (selectedPartner) return this.ensurePartnerPanelCredentials(selectedPartner);
       const response = await fetch('/admin/api/auth/me', { credentials: 'same-origin' });
       if (!response.ok) {
         location.replace('/admin/login');
@@ -184,6 +186,7 @@ window.PAINEL_MODULES.api = function () {
     },
 
     async logoutAdmin() {
+      if (this.isPartnerPanel()) return this.logoutPartnerPanel();
       try {
         await fetch('/admin/api/auth/logout', {
           method: 'POST',

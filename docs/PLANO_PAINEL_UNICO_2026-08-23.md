@@ -315,9 +315,15 @@ gate com tela.**
 | **9** | **Retiradas do parceiro** atrás de flag | `painel/public/app.partner-retiradas.js`, rotas existentes | permissão, escrita, idempotência, transação; A6/A8 passam |
 | **10** | canário + telemetria de divergência | flag por unidade | duas telas batendo com o painel antigo |
 
-Andamento: PR 6 incorporado com o broker `ms_`/`ps_` e `/auth/me` rico. PR 7
-implementa menu imutável derivado de `modules`, badges separados, boot exclusivo
-da Matriz e registro único de carregamento/renderização por página.
+Andamento: PRs 6 e 7 incorporados. O broker emite `ms_`/`ps_`, `/auth/me`
+devolve o contexto calculado no servidor, o menu é derivado de `modules`, os
+badges não alteram a definição do menu e o boot administrativo só roda para a
+Matriz. O PR 8 implementa o Resumo moderno do parceiro, somente leitura e
+desligado por padrão: usa exclusivamente `resumo`, `comissao/equipe` e
+`meu-desempenho` sob sessão `ps_`; não refaz contas financeiras no navegador e
+mantém competência, caixa e títulos em aberto visualmente separados. A flag
+por unidade continua reservada ao PR 10, portanto o painel legado permanece o
+único caminho do parceiro até o canário ser habilitado conscientemente.
 
 **Migrations necessárias:** nenhuma prevista até o PR 10. Se o modelo de
 permissão exigir coluna nova, ela entra em PR próprio, **antes** do PR 6.

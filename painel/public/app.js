@@ -47,6 +47,8 @@ function painelApp() {
     panelScope: 'matrix',
     panelWorkplace: null,
     panelModules: [],
+    panelPartnerSlug: '',
+    panelPartnerToken: '',
     menuBadges: {},
     operatorLabel: 'Operador',
     apiStatus: 'mock',

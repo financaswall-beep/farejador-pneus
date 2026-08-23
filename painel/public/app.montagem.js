@@ -16,6 +16,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.redeOperacao, // app.rede.operacao.js (23/07): apresentação padrão de Operação e saúde + fallback legado explícito
     window.PAINEL_MODULES.unidadeKpis, // app.unidade.kpis.js (linhas 456-549 pré-obra): derivadas da unidade + classes de status + saúde (score)
     window.PAINEL_MODULES.vendaModal, // app.venda.modal.js (linhas 550-604 pré-obra): modal de venda manual/walk-in + período e meta da Rede
+    window.PAINEL_MODULES.partnerApi, // sessão ps_ e cliente HTTP exclusivo de /parceiro/:slug/api
     window.PAINEL_MODULES.api, // app.api.js (linhas 605-704 pré-obra): credenciais + apiGet/Post/Put + salvar raio de entrega
     window.PAINEL_MODULES.municipios, // catálogo oficial + chips de cobertura
     window.PAINEL_MODULES.format, // app.format.js (linhas 705-768 pré-obra): moeda/data/tempo/iniciais + widgets do form de venda
@@ -62,6 +63,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.catalogoMarca,
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)
     window.PAINEL_MODULES.pedidosParceiros, // app.pedidos.parceiros.js (linhas 2098-2248 pré-obra): pedido manual + novo parceiro + candidaturas (Etapa 3)
+    window.PAINEL_MODULES.partnerResumo, // resumo read-only da unidade, sem cálculo financeiro paralelo
     window.PAINEL_MODULES.core, // app.core.js (linhas 2249-2419 pré-obra): encanamento: loadRealData/loadRedeData/init/live refresh
     window.PAINEL_MODULES.chartsRede, // app.charts.rede.js (linhas 2420-2617 pré-obra): gráficos da Rede: vendas, lucro, pneus
     window.PAINEL_MODULES.chartsSaude, // app.charts.saude.js (linhas 2618-2851 pré-obra): gráficos: origem, saúde, compras, estoque parado, margem
