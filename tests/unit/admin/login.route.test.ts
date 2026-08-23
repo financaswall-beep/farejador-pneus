@@ -116,6 +116,7 @@ describe('admin login route', () => {
     expect(response.json()).toMatchObject({
       mode: 'direct', scope: 'partner', slug: 'rio-do-ouro',
       session_token: `ps_${'b'.repeat(64)}`,
+      modern_panel_enabled: false,
     });
     expect(response.headers['set-cookie']).toContain('Max-Age=0');
     expect(mintAdmin).not.toHaveBeenCalled();

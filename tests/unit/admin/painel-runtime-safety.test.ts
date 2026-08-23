@@ -92,7 +92,7 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('app.atacado.transfer.js?v=20260818-business-time1');
     expect(html).toContain('app.compras.relatorios.js?v=20260822-continuity1');
     expect(html).toContain('app.compras.acoes.js?v=20260822-continuity1');
-    expect(html).toContain('app.core.js?v=20260823-shell1');
+    expect(html).toContain('app.core.js?v=20260823-partner-summary1');
     expect(html).toContain('app.clientes.js?v=20260822-continuity1');
     expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });

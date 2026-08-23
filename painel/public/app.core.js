@@ -84,7 +84,11 @@ window.PAINEL_MODULES.core = function () {
 
     async init() {
       if (!(await this.ensureCredentials())) return;
-      if (!this.isMatrixPanel()) return;
+      if (!this.isMatrixPanel()) {
+        this.$watch('currentPage', (page) => { this.activatePanelPage(page); });
+        this.activatePanelPage(this.currentPage);
+        return;
+      }
       if (this.hasPanelModule('rede')) await this.loadNetworkMunicipalities();
       if (['resumo', 'vendas', 'rede'].some((module) => this.hasPanelModule(module))) {
         void this.loadRealData();
@@ -133,7 +137,9 @@ window.PAINEL_MODULES.core = function () {
       }
       if (pageId !== 'clientes') this.stopClientesLive();
       const page = window.PAINEL_PAGES[pageId];
-      for (const method of [...(page.enter || []), ...(page.load || [])]) {
+      const scopedEnter = page[`${this.panelScope}Enter`] || page.enter || [];
+      const scopedLoad = page[`${this.panelScope}Load`] || page.load || [];
+      for (const method of [...scopedEnter, ...scopedLoad]) {
         if (typeof this[method] === 'function') void this[method]();
       }
       this.$nextTick(() => {

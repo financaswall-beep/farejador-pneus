@@ -35,12 +35,14 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260823-shell1"></script>
+<script src="/admin/painel/app.nav.js?v=20260823-partner-summary1"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.api.js?v=20260823-shell1"></script>
+<script src="/admin/painel/app.api.js?v=20260823-partner-summary1"></script>
+<script src="/admin/painel/app.partner-api.js?v=20260823-partner-summary1"></script>
+<script src="/admin/painel/app.partner-resumo.js?v=20260823-partner-summary1"></script>
 <script src="/admin/painel/app.municipios.js?v=20260821-cidades1"></script>
 <script src="/admin/painel/business-time.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.format.js?v=20260822-continuity1"></script>
@@ -88,12 +90,12 @@
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260810-chaverede1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.core.js?v=20260823-shell1"></script>
+<script src="/admin/painel/app.core.js?v=20260823-partner-summary1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260823-collision-gate1"></script>
-<script src="/admin/painel/app.js?v=20260823-shell1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260823-partner-summary1"></script>
+<script src="/admin/painel/app.js?v=20260823-partner-summary1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -139,10 +141,10 @@
         </a>
       </template>
 
-      <div class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
+      <div x-show="isMatrixPanel()" class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
         Fase 2 · próximos
       </div>
-      <div data-future-menu>
+      <div x-show="isMatrixPanel()" data-future-menu>
         <template x-for="item in futureMenu">
           <a href="#"
              @click.prevent="currentPage = item.id"
@@ -159,7 +161,7 @@
     </nav>
 
     <!-- Equipe -->
-    <div class="border-t border-emerald-800/70 px-4 py-4">
+    <div x-show="isMatrixPanel()" class="border-t border-emerald-800/70 px-4 py-4">
       <div class="text-xs font-medium text-emerald-200/65 mb-3">Em operação</div>
 
       <div class="flex items-center gap-2 mb-3">
@@ -182,6 +184,12 @@
       </button>
     </div>
 
+    <div x-show="isPartnerPanel()" class="border-t border-emerald-800/70 px-4 py-4">
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-200/60">Unidade conectada</p>
+      <p class="mt-1 truncate text-sm font-semibold" x-text="panelWorkplace?.name || 'Parceiro'"></p>
+      <p class="mt-1 text-[11px] text-emerald-200/60" x-text="operatorLabel"></p>
+    </div>
+
   </aside>
 
   <!-- ═══════════════════════════════════════════════
@@ -201,7 +209,7 @@
            class="relative flex items-center" id="farejador-topbar-inner">
 
       <!-- Central de comando: padrão da matriz -->
-      <div x-show="mockTopbar" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white" data-mobile-hide data-topbar-command>
+      <div x-show="mockTopbar && isMatrixPanel()" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white" data-mobile-hide data-topbar-command>
         <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-900 text-emerald-300">
           <i data-lucide="network" class="h-5 w-5"></i>
         </span>
@@ -214,7 +222,14 @@
         </div>
       </div>
 
-      <label x-show="mockTopbar"
+      <div x-show="mockTopbar && isPartnerPanel()" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white" data-topbar-command>
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-900 text-emerald-300">
+          <i data-lucide="store" class="h-5 w-5"></i>
+        </span>
+        <div class="min-w-0"><p class="truncate text-[11px] font-bold uppercase tracking-[0.12em]" x-text="panelWorkplace?.name || 'Unidade'"></p><p class="mt-0.5 text-[10px] text-emerald-200/80">Painel da loja</p></div>
+      </div>
+
+      <label x-show="mockTopbar && isMatrixPanel()"
              class="mx-1 flex h-10 min-w-[220px] max-w-md flex-1 items-center gap-2 rounded-xl border border-emerald-700/70 bg-emerald-900/80 px-3 text-emerald-100 shadow-inner" data-mobile-hide>
         <i data-lucide="search" class="h-4 w-4 flex-shrink-0 text-emerald-300"></i>
         <input type="search"
@@ -225,7 +240,7 @@
       </label>
 
       <!-- Nova venda (sem conversa: balcão / telefone / indicação) -->
-      <button x-show="adminUser?.role === 'owner'" @click="openWalkinModal()"
+      <button x-show="isMatrixPanel() && adminUser?.role === 'owner'" @click="openWalkinModal()"
               :class="mockTopbar
                         ? 'ml-auto h-10 px-3.5 text-xs font-semibold bg-emerald-300 hover:bg-emerald-200 text-emerald-950 rounded-xl shadow-[0_0_18px_rgba(110,231,183,0.18)]'
                         : 'px-4 py-2 text-sm font-medium bg-gray-900 hover:bg-gray-800 text-white rounded-lg'"
@@ -235,7 +250,7 @@
       </button>
 
       <!-- Novo parceiro (cadastro na matriz — Etapa 1 onboarding) -->
-      <button x-show="adminUser?.role === 'owner'" @click="openPartnerModal()"
+      <button x-show="isMatrixPanel() && adminUser?.role === 'owner'" @click="openPartnerModal()"
               :class="mockTopbar
                         ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
                         : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
@@ -245,7 +260,7 @@
       </button>
 
       <!-- Candidaturas (Etapa 3) -->
-      <button x-show="adminUser?.role === 'owner'" @click="openApplications()"
+      <button x-show="isMatrixPanel() && adminUser?.role === 'owner'" @click="openApplications()"
               :class="mockTopbar
                         ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
                         : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
@@ -267,7 +282,7 @@
       </button>
 
       <!-- Notificações -->
-      <div class="relative"
+      <div x-show="isMatrixPanel()" class="relative"
            x-data="{ open: false }"
            x-init="$watch('open', v => { if (v) $nextTick(() => lucide.createIcons()) })">
 
@@ -344,7 +359,7 @@
       <div :class="mockTopbar ? 'h-7 bg-emerald-700' : 'h-6 bg-gray-200'" class="w-px mx-1"></div>
 
       <!-- Avatar do operador -->
-      <button @click="logoutAdmin()" title="Sair da Matriz"
+      <button @click="logoutAdmin()" :title="isPartnerPanel() ? 'Sair da unidade' : 'Sair da Matriz'"
               :class="mockTopbar
                         ? 'h-10 p-1 pr-2.5 text-white hover:bg-emerald-900 rounded-xl'
                         : 'p-1 pr-2.5 hover:bg-gray-100 rounded-lg'"
@@ -355,7 +370,7 @@
           <span :class="mockTopbar ? 'max-w-24 text-xs font-semibold' : 'text-sm font-medium'"
                 class="block truncate"
                 x-text="operatorLabel">Operador</span>
-          <span x-show="mockTopbar" class="block text-[9px] font-normal text-emerald-200/70">Administrador</span>
+          <span x-show="mockTopbar" class="block text-[9px] font-normal text-emerald-200/70" x-text="isPartnerPanel() ? 'Unidade parceira' : 'Administrador'"></span>
         </span>
         <i data-lucide="log-out" :class="mockTopbar ? 'text-emerald-300' : 'text-gray-500'" class="w-3.5 h-3.5"></i>
       </button>
@@ -363,7 +378,76 @@
     </div>
 
     <!-- ═══ TELA: RESUMO ═══ -->
-    <div x-show="currentPage === 'resumo'" class="p-8">
+    <section x-show="currentPage === 'resumo' && isPartnerPanel()" x-cloak class="min-h-screen bg-gray-50/70 p-4 lg:p-6" aria-labelledby="partner-summary-title">
+      <header class="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Visão da unidade</p>
+          <h1 id="partner-summary-title" class="mt-1 text-2xl font-semibold tracking-tight" x-text="panelWorkplace?.name || 'Resumo da loja'"></h1>
+          <p class="mt-1 text-sm text-gray-500"><span class="capitalize" x-text="partnerResumoMonthLabel()"></span> · valores calculados no livro da própria unidade</p>
+        </div>
+        <button type="button" @click="loadPartnerResumo()" :disabled="partnerResumoLoading" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm disabled:opacity-50">
+          <i data-lucide="refresh-cw" class="h-4 w-4"></i><span x-text="partnerResumoLoading ? 'Atualizando…' : 'Atualizar'"></span>
+        </button>
+      </header>
+
+      <div x-show="partnerResumoError" role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" x-text="partnerResumoError"></div>
+      <div x-show="partnerResumoLoading && !partnerResumoData" class="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">Carregando o resumo da unidade…</div>
+
+      <div x-show="partnerResumoData" class="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,.8fr)]">
+        <article class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 p-6 text-white shadow-xl shadow-emerald-950/10">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-200">Resultado por competência</p>
+              <p class="mt-1 text-xs text-emerald-100/70">Vendas realizadas menos custo conhecido e despesas</p>
+              <strong x-show="!partnerResumoHasPendingCost" class="mt-3 block text-4xl font-semibold tracking-tight" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.confirmed_result_month))"></strong>
+              <strong x-show="partnerResumoHasPendingCost" class="mt-3 block text-3xl font-semibold text-amber-200">Custo pendente</strong>
+              <p x-show="partnerResumoHasPendingCost" class="mt-2 text-xs text-amber-100" x-text="partnerResumoNumber(partnerResumoData?.pending_cost_items_month) + ' item(ns) sem custo confirmado'"></p>
+            </div>
+            <span class="rounded-full border border-emerald-400/30 bg-emerald-900/70 px-3 py-1 text-xs font-semibold text-emerald-100">Competência</span>
+          </div>
+          <div class="mt-7 grid gap-px overflow-hidden rounded-xl bg-emerald-700/60 sm:grid-cols-3">
+            <div class="bg-emerald-950/35 p-4"><span class="text-xs text-emerald-200">Receita</span><strong class="mt-1 block text-lg" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.sales_month))"></strong></div>
+            <div class="bg-emerald-950/35 p-4"><span class="text-xs text-emerald-200">Custo conhecido</span><strong class="mt-1 block text-lg" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.known_cogs_month))"></strong></div>
+            <div class="bg-emerald-950/35 p-4"><span class="text-xs text-emerald-200">Despesas</span><strong class="mt-1 block text-lg" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.expenses_month))"></strong></div>
+          </div>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl border border-emerald-600/40 bg-emerald-950/25 p-4"><span class="text-xs text-emerald-200">Caixa do mês</span><strong class="mt-1 block text-xl" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.cash_net_month))"></strong><small class="text-emerald-100/60">Entradas recebidas menos saídas pagas</small></div>
+            <div class="rounded-xl border border-emerald-600/40 bg-emerald-950/25 p-4"><span class="text-xs text-emerald-200">Vendas realizadas</span><strong class="mt-1 block text-xl" x-text="partnerResumoNumber(partnerResumoData?.orders_month)"></strong><small class="text-emerald-100/60">Entrega conta somente quando concluída</small></div>
+          </div>
+        </article>
+
+        <aside class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold">Pulso financeiro</h2><p class="text-xs text-gray-500">Posição aberta, sem misturar com caixa</p></div><span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><i data-lucide="activity" class="h-5 w-5"></i></span></div>
+          <dl class="mt-6 divide-y divide-gray-100">
+            <div class="flex items-center justify-between py-4"><dt class="text-sm text-gray-600">A receber</dt><dd class="font-semibold text-emerald-700" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.open_receivables_total))"></dd></div>
+            <div class="flex items-center justify-between py-4"><dt class="text-sm text-gray-600">A pagar</dt><dd class="font-semibold text-amber-600" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.open_payables_total))"></dd></div>
+            <div class="flex items-center justify-between py-4"><dt class="text-sm font-medium text-gray-800">Posição futura</dt><dd class="font-semibold" :class="partnerResumoNumber(partnerResumoData?.net_future_position) < 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.net_future_position))"></dd></div>
+          </dl>
+          <p class="mt-5 rounded-xl bg-gray-50 p-3 text-xs leading-5 text-gray-500">Fiado permanece em “a receber”. Ele só entra no caixa quando o recebimento for baixado.</p>
+        </aside>
+      </div>
+
+      <div x-show="partnerResumoData" class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article class="rounded-2xl border border-gray-200 bg-white p-5"><span class="text-xs text-gray-500">Faturamento do mês</span><strong class="mt-2 block text-2xl" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.sales_month))"></strong><small class="text-gray-400" x-text="partnerResumoNumber(partnerResumoData?.orders_month) + ' venda(s) realizada(s)'"></small></article>
+        <article class="rounded-2xl border border-gray-200 bg-white p-5"><span class="text-xs text-gray-500">Itens em estoque</span><strong class="mt-2 block text-2xl" x-text="partnerResumoNumber(partnerResumoData?.stock_items)"></strong><small class="text-gray-400" x-text="partnerResumoNumber(partnerResumoData?.low_stock_items) + ' com estoque baixo'"></small></article>
+        <article class="rounded-2xl border border-gray-200 bg-white p-5"><span class="text-xs text-gray-500">Compras do mês</span><strong class="mt-2 block text-2xl" x-text="formatCurrency(partnerResumoNumber(partnerResumoData?.purchases_month))"></strong><small class="text-gray-400">Reposição registrada</small></article>
+        <article class="rounded-2xl border border-gray-200 bg-white p-5"><span class="text-xs text-gray-500">Satisfação</span><strong class="mt-2 block text-2xl" x-text="partnerResumoNumber(partnerResumoData?.satisfaction_count) ? partnerResumoData.satisfaction_avg + ' / 5' : '—'"></strong><small class="text-gray-400" x-text="partnerResumoNumber(partnerResumoData?.satisfaction_count) + ' resposta(s)'"></small></article>
+      </div>
+
+      <div x-show="partnerResumoData" class="mt-5 grid gap-5 lg:grid-cols-2">
+        <article class="rounded-2xl border border-gray-200 bg-white p-6">
+          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Equipe no mês</h2><p class="text-xs text-gray-500">Ranking pelo faturamento realizado</p></div><span class="text-sm font-semibold text-emerald-700" x-text="formatCurrency(partnerResumoNumber(partnerResumoTeam?.total_commission)) + ' em comissões'"></span></div>
+          <div class="mt-4 divide-y divide-gray-100"><template x-for="(member, index) in partnerResumoTeamRows" :key="member.token_id"><div class="flex items-center gap-3 py-3"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700" x-text="index + 1"></span><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold" x-text="member.label || member.username || 'Colaborador'"></p><p class="text-xs text-gray-500" x-text="member.finalized_sales + ' venda(s)'"></p></div><strong class="text-sm" x-text="formatCurrency(partnerResumoNumber(member.gross_sales))"></strong></div></template><p x-show="partnerResumoTeamRows.length === 0" class="py-8 text-center text-sm text-gray-400">Nenhuma venda de colaborador no mês.</p></div>
+        </article>
+        <article class="rounded-2xl border border-gray-200 bg-white p-6">
+          <div class="flex items-center justify-between"><div><h2 class="font-semibold">Meu desempenho</h2><p class="text-xs text-gray-500">Somente o login atual</p></div><span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><i data-lucide="user-round-check" class="h-5 w-5"></i></span></div>
+          <div class="mt-5 grid grid-cols-3 gap-3"><div class="rounded-xl bg-gray-50 p-4"><span class="text-xs text-gray-500">Vendas</span><strong class="mt-1 block text-xl" x-text="partnerResumoNumber(partnerResumoSelf?.finalized_sales)"></strong></div><div class="rounded-xl bg-gray-50 p-4"><span class="text-xs text-gray-500">Faturamento</span><strong class="mt-1 block text-base" x-text="formatCurrency(partnerResumoNumber(partnerResumoSelf?.gross_sales))"></strong></div><div class="rounded-xl bg-gray-50 p-4"><span class="text-xs text-gray-500">Comissão</span><strong class="mt-1 block text-base text-emerald-700" x-text="formatCurrency(partnerResumoNumber(partnerResumoSelf?.commission_amount))"></strong></div></div>
+          <p class="mt-4 text-xs text-gray-400">O servidor vincula as vendas ao usuário autenticado; a tela não aceita escolher outra pessoa.</p>
+        </article>
+      </div>
+    </section>
+
+    <div x-show="currentPage === 'resumo' && isMatrixPanel()" class="p-8">
 
       <!-- Saudação + ações -->
       <div class="flex items-start justify-between mb-6 flex-wrap gap-4">

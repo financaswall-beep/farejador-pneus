@@ -50,7 +50,8 @@ describe('casco derivado do painel único', () => {
 
   it('bloqueia o boot administrativo fora do escopo da Matriz', () => {
     const core = readPanel('app.core.js');
-    expect(core).toContain("if (!this.isMatrixPanel()) return;");
+    expect(core).toContain("if (!this.isMatrixPanel()) {");
+    expect(core).toMatch(/if \(!this\.isMatrixPanel\(\)\) \{[\s\S]*activatePanelPage[\s\S]*return;/);
     expect(core).toMatch(/hasPanelModule\('bot'\).*loadBotCampainha/);
     expect(core).toMatch(/hasPanelModule\('rede'\).*loadComissoes/);
   });
