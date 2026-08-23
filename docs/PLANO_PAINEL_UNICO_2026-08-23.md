@@ -37,41 +37,40 @@ painel web moderno (desktop)      /operacao (mobile e frente rápida)
 └── ps_  parceiro escopado
 ```
 
-O servidor é a fonte única das regras. **⚠️ Hoje isso não é verdade — ver §2.**
+O servidor é a fonte única das regras. No parceiro, o desktop legado e o
+`/operacao` já convergem no mesmo endpoint e motor transacional (§2.1).
 
 ---
 
 ## 2. ⚠️ Achados que contradizem o desenho — leia antes de propor
 
-### 2.1 🔴 `/operacao` roda 100% no pool administrativo
+### 2.1 🟢 `/operacao` já separa Matriz e parceiro pelo local autenticado
 
-**Verificado:** `grep -rn "withPartnerContext\|partnerPool" src/admin/caixa/*.ts`
-→ **zero ocorrências em 32 arquivos**.
+O primeiro texto deste plano concluiu, incorretamente, que a ausência de
+`withPartnerContext` em `src/admin/caixa/*.ts` significava que o parceiro móvel
+usava o motor administrativo. O diretório pesquisado contém apenas o caminho da
+**Matriz**. O navegador compartilhado troca rota e sessão conforme o local:
 
-`src/admin/caixa/checkout.ts:2` importa `pool` de `persistence/db.js` (role
-`postgres`, BYPASSRLS) e `:7` usa `registerWalkinOrder` de
-`../painel/walkin-order.js` — o motor de venda **da matriz**.
-`src/admin/caixa/operation-stock.ts:4` só importa um **type** de
-`parceiro/operation-stock.js` (apagado na compilação).
+1. `route-operation-login.ts` emite `cs_` para Matriz e `ps_` por
+   `mintPartnerSession` para parceiro, preservando `scope: 'partner'` e `slug`.
+2. `caixa-core.js:153-156` faz `operationPath`: parceiro vira
+   `/parceiro/:slug/api/:recurso`; Matriz permanece em `/api/caixa/:recurso`.
+3. `caixa-checkout.js:201` envia a venda por `operationPath('vendas',
+   '/api/caixa/vendas')`.
+4. Portanto, parceiro cai em `registerPartnerSale(getPartnerContext(request),
+   parsed.data)`, que usa `withPartnerContext` + role restrita + RLS.
+5. Somente a Matriz entra em `createCaixaSale`/`registerWalkinOrder`; a sessão é
+   `cs_` e `walkin-order.ts` restringe a venda à unidade `main`.
 
-**Consequências:**
-1. A muralha (role restrita + RLS + 70 grants) **não cobre a interface que os
-   parceiros usam hoje no celular**.
-2. O SEC-002 é maior que o documentado: não é "algumas funções do parceiro
-   usam o pool admin" — é **a operação móvel inteira**.
-3. Existem **duas famílias de escrita** para a mesma operação do parceiro:
-   `/parceiro/:slug/api/vendas` (motor do parceiro, pool restrito) e
-   `/api/caixa/vendas` (motor walk-in da matriz, pool admin).
+O desktop parceiro legado também chama `/parceiro/:slug/api/vendas`. Logo,
+**desktop legado e `/operacao` do parceiro já compartilham o mesmo motor**. Não
+existem duas famílias de escrita para a mesma venda do parceiro; existem dois
+motores para dois domínios distintos: venda local do parceiro e varejo da
+Matriz. Uma prova automática (§4) congela essa separação para impedir regressão.
 
-**Risco direto para esta obra:** se o desktop novo chamar as rotas do parceiro
-e o celular continuar nas do caixa, o **mesmo parceiro** vendendo no computador
-e no celular passa por códigos diferentes. Isso não é manutenção — é risco de
-número divergente. Daí o **Portão 0** (§4.0).
-
-**NÃO afirmado (falta provar):** se as duas vendas produzem efeito equivalente
-em estoque e financeiro; se a reserva (0076) vale no caminho do celular.
-`walkin-order.ts:152,177` escreve em `commerce.orders`/`order_items` e não
-menciona reserva — mas há vínculo entre as tabelas desde a 0081.
+As baterias existentes ainda comprovam os efeitos: `partner-portal.integration`
+verifica baixa/reserva, financeiro, auditoria, idempotência e isolamento; e
+`matriz-walkin-atomic.integration` verifica pedido, galpão e ledger da Matriz.
 
 ### 2.2 As 145 rotas da matriz não têm noção de "dono"
 `grep preHandler` em `src/admin/painel/route-*.ts`: **145 handlers**
@@ -163,27 +162,31 @@ nunca o handler.**
 
 ---
 
-## 4. Portões — antes de qualquer tela
+## 4. Portões e regressões — antes de qualquer tela
 
-### Portão 0 — Provar que as duas vendas concordam 🔴 NOVO
-Consequência de §2.1. Antes de escolher qual motor o desktop usa:
+### Regressão obrigatória — roteamento e motor por escopo
+Consequência da correção factual de §2.1. A prova versionada
+`scripts/prova-vendas-roteamento.ts` deve reprovar se qualquer elo mudar:
 
-1. Em laboratório, executar a **mesma venda** por `/parceiro/:slug/api/vendas`
-   e por `/api/caixa/vendas`.
-2. Comparar o efeito em: `commerce.orders`/`order_items`,
-   `commerce.partner_orders`/`partner_order_items`,
-   `commerce.partner_stock_levels` (incl. `quantity_reserved`),
-   `finance.partner_receivables` e trilha de auditoria.
-3. **Se divergirem**, isso é achado financeiro e sobe de prioridade — o desktop
-   novo não pode nascer sobre um motor que discorda do que já roda no celular.
-4. Registrar o resultado como prova versionada (`scripts/prova-vendas-paridade.ts`).
+1. Parceiro autenticado recebe `ps_` e `/operacao` chama
+   `/parceiro/:slug/api/vendas`.
+2. Desktop parceiro legado e `/operacao` convergem no mesmo handler
+   `registerPartnerSale` com `withPartnerContext` + RLS.
+3. O corpo gerado pelo `/operacao` passa em `partnerSaleSchema`.
+4. Matriz autenticada recebe `cs_`, chama `/api/caixa/vendas` e permanece no
+   `registerWalkinOrder` da unidade `main`.
+5. O corpo da Matriz passa em `createCaixaSaleSchema`.
+6. As integrações financeiras existentes dos dois motores continuam verdes.
 
-> Se o dono preferir, este portão roda **em paralelo** ao Portão 1 — mas tem
-> que fechar antes da primeira escrita do parceiro no painel novo.
+Não se compara o conteúdo das tabelas `commerce.orders` e
+`commerce.partner_orders`: elas representam domínios diferentes. A paridade
+exigida é entre as **duas interfaces do parceiro**, que já chegam ao mesmo
+handler transacional.
 
 ### Portão 1 — Gates automáticos
 | gate | o que faz | onde |
 |---|---|---|
+| **Roteamento** | garante `ps_` → rota/RLS do parceiro e `cs_` → walk-in `main` | `prova-vendas-roteamento.ts` |
 | **Arquitetura** | falha o build se arquivo alcançável de `src/parceiro/route*.ts` importar `persistence/db.js`. Exceções **congeladas** (hoje: `auth.ts`, `queries.ts` Config, `people.ts`, `simple-finance.ts`, `my-sales.ts`, `operation-*.ts`), molde de `scripts/teto-herdado.json` | novo |
 | **Rotas** | baseline grava por rota **(guard, pool esperado, escopo)**. Hoje só grava `AUTH(n)` (`scripts/prova-rotas-matriz.ts:29-40`) — trocar `requireAdminOwner` por `requireAdminAuth` passa idêntico | estender |
 | **Compositor** | colisão **não declarada** falha o build; allowlist explícita com justificativa para overrides intencionais | `app.montagem.js:68` |
@@ -267,7 +270,7 @@ gate com tela.**
 
 | PR | Título | Arquivos | Aceite |
 |---|---|---|---|
-| **1** | prova de paridade das duas vendas | `scripts/prova-vendas-paridade.ts` | Portão 0 fechado ou divergência documentada |
+| **1** | corrigir o plano + prova de regressão do roteamento | `scripts/prova-vendas-roteamento.ts`, `package.json`, este plano | parceiro converge no motor com RLS; Matriz permanece no walk-in `main` |
 | **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json` | build falha ao adicionar import novo; exceções atuais congeladas |
 | **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json` | trocar `requireAdminOwner`→`requireAdminAuth` reprova |
 | **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist | redefinição não declarada falha o build |
@@ -311,7 +314,8 @@ com o roteiro do ataque anexado.
 
 ### 7.2 Fiscais em cada PR
 `npm run check:migrations` · `npm run checar-tamanho` · `npx tsc --noEmit` ·
-`npm test` · `npm run prova-painel` · `npm run prova-instalador`
+`npm test` · `npm run prova-vendas-roteamento` · `npm run prova-painel` ·
+`npm run prova-instalador`
 
 ⚠️ **Não rodar `npm test` em paralelo com `prova-painel`** — disputa de CPU
 gera falha falsa em testes sensíveis a tempo (aconteceu em 2026-08-23:
@@ -342,8 +346,8 @@ canário. Sem checklist assinado, a tela não conta como migrada.
 
 ## 9. Critérios de aceite
 
-1. Portão 0 fechado (as duas vendas concordam, ou a divergência está documentada
-   e priorizada).
+1. A regressão de roteamento comprova que `/operacao` e desktop do parceiro
+   convergem na rota com RLS; o Caixa da Matriz continua separado em `main`.
 2. Os 4 gates do Portão 1 rodando em CI e **reprovando de verdade** quando
    provocados.
 3. A1–A13 executados em Docker com resultado registrado.
@@ -359,7 +363,7 @@ canário. Sem checklist assinado, a tela não conta como migrada.
 
 | risco | por quê | mitigação |
 |---|---|---|
-| **Divergência entre as duas vendas** | §2.1 — duas famílias de escrita | Portão 0 |
+| **Roteamento do parceiro regredir para o Caixa da Matriz** | mistura domínio, estoque e financeiro | prova automática de roteamento |
 | **Colisão silenciosa de propriedades** | invisível; paridade não pega | detector + namespace |
 | **Regressão no Financeiro da matriz** | maior superfície; o **sweep de comissão roda no GET** — se o casco mudar quando a página carrega, "quem te deve" congela com a tela viva | teste de carregamento por página |
 | **Regressão na Rede** | 9 charts por id global de `<canvas>` (`app.nav.js:66-81`) — id repetido pinta no lugar errado | namespace de canvas |
@@ -383,9 +387,18 @@ canário. Sem checklist assinado, a tela não conta como migrada.
 
 ## 12. O que NÃO foi verificado
 
-- **Nada rodou ao vivo.** Leitura de código + fiscais estáticos.
-- **Equivalência entre `/api/caixa/vendas` e `/parceiro/:slug/api/vendas`** —
-  é justamente o Portão 0.
+- A prova somente leitura do banco novo confirmou **157 tabelas**, role do
+  parceiro restrita, **70 grants** e zero grant no galpão/comissão. A `0202`
+  cria uma tabela estrutural e declara explicitamente que não semeia negócio.
+- O banco não está mais zerado porque Wallace usou as telas após o deploy:
+  cadastrou 1 produto/medida, 2 compatibilidades, 2 versões de preço e uma
+  compra de 5 pneus. A compra gerou fornecedor, item, estoque, movimento,
+  ledger e auditoria de forma conciliada. São dados de teste, mas só podem ser
+  removidos por uma limpeza transacional completa; apagar cinco linhas avulsas
+  quebraria a trilha financeira. Nenhum dado foi apagado nesta revisão.
+- **Venda real pelo navegador** não foi executada nesta revisão; o roteamento
+  foi provado por código/teste, e os dois motores passaram em Docker (47 testes
+  transacionais nos arquivos `partner-portal` e `matriz-walkin-atomic`).
 - **Paridade funcional real entre `/operacao` e o painel desktop** — não medida.
 - **Front não auditado pela ótica de segurança** — só o servidor.
 - **Custo/latência do pool restrito sob carga unificada**.
