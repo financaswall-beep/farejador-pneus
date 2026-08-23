@@ -26,6 +26,7 @@ export type OperationWorkplace =
       slug: string;
       tokenId: string;
       displayName: string;
+      modernPanelEnabled: boolean;
       modules: OperationModules;
     };
 
@@ -56,6 +57,7 @@ type PartnerRow = {
   store_name: string;
   role: string;
   display_name: string;
+  modern_panel_enabled: boolean;
   allow_vendas: boolean;
   allow_estoque: boolean;
   allow_entregas: boolean;
@@ -101,6 +103,7 @@ export async function listOperationWorkplaces(
               COALESCE(pu.display_name, u.name) AS store_name,
               pat.role,
               COALESCE(NULLIF(btrim(pat.label), ''), pp.username) AS display_name,
+              pu.modern_panel_enabled,
               CASE WHEN pat.role = 'owner' THEN true
                    ELSE COALESCE(ptp.allow_vendas, pup.allow_vendas, true) END AS allow_vendas,
               CASE WHEN pat.role = 'owner' THEN true
@@ -166,6 +169,7 @@ export async function listOperationWorkplaces(
       slug: row.slug,
       tokenId: row.token_id,
       displayName: row.display_name,
+      modernPanelEnabled: row.modern_panel_enabled === true,
       modules: {
         vendas: row.allow_vendas,
         estoque: row.allow_estoque,

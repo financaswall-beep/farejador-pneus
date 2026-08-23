@@ -12,6 +12,10 @@ window.PAINEL_MODULES.partnerResumo = function () {
 
     async loadPartnerResumo() {
       if (!this.isPartnerPanel() || !this.hasPanelModule('resumo')) return;
+      const startedAt = performance.now();
+      void this.partnerPanelTelemetry({
+        page: 'resumo', event_type: 'page_open', outcome: 'success',
+      });
       this.partnerResumoLoading = true;
       this.partnerResumoError = '';
       const [summary, team, self] = await Promise.allSettled([
@@ -29,6 +33,14 @@ window.PAINEL_MODULES.partnerResumo = function () {
       this.partnerResumoTeam = team.status === 'fulfilled'
         ? team.value : { rows: [], total_commission: 0 };
       this.partnerResumoSelf = self.status === 'fulfilled' ? self.value : null;
+      const primaryError = summary.status === 'rejected' ? summary.reason : null;
+      void this.partnerPanelTelemetry({
+        page: 'resumo', event_type: 'read', operation: 'load_summary',
+        outcome: primaryError ? 'error' : 'success',
+        status_code: primaryError?.status || null,
+        duration_ms: Math.round(performance.now() - startedAt),
+        error_code: primaryError ? this.partnerPanelErrorCode(primaryError) : null,
+      });
       this.partnerResumoLoading = false;
       this.$nextTick(() => { lucide.createIcons(); });
     },

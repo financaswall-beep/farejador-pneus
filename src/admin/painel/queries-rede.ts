@@ -62,6 +62,7 @@ export async function getPainelRede(
        p.address,
        pu.service_mode,
        COALESCE(pu.accepts_network_orders, true) AS accepts_network_orders, -- 0165: null (join vazio) = ligada
+       COALESCE(pu.modern_panel_enabled, false) AS modern_panel_enabled,
        pu.delivery_radius_km,
        COALESCE(coverage.municipalities,'[]'::jsonb) AS coverage_municipalities,
        p.commercial_model,

@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 function pickupModule() {
-  const sandbox: Record<string, any> = { window: {}, lucide: { createIcons() {} } };
+  const sandbox: Record<string, any> = {
+    window: {}, lucide: { createIcons() {} }, performance: { now: () => Date.now() },
+  };
   runInNewContext(source('painel/public/app.partner-retiradas.js'), sandbox);
   return sandbox.window.PAINEL_MODULES.partnerRetiradas();
 }
@@ -22,7 +24,7 @@ describe('retiradas do parceiro no painel único', () => {
     expect(nav).toContain("scopes: ['partner'], requires: 'retiradas'");
     expect(nav).toContain("partnerLoad: ['loadPartnerRetiradas']");
     expect(html).toContain("currentPage === 'retiradas' && isPartnerPanel()");
-    expect(html).toContain('app.partner-retiradas.js?v=20260823-partner-pickups1');
+    expect(html).toContain('app.partner-retiradas.js?v=20260823-partner-canary1');
     expect(staticRoute).toContain("'app.partner-retiradas.js'");
     expect(partnerRoute).toContain("fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
     expect(partnerRoute).toContain("fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
@@ -43,6 +45,8 @@ describe('retiradas do parceiro no painel único', () => {
       hasPanelModule: (name: string) => name === 'retiradas',
       partnerApiGet: apiGet,
       partnerApiWrite: apiWrite,
+      partnerPanelTelemetry: vi.fn(),
+      partnerPanelErrorCode: () => 'api_error',
       $nextTick: (callback: () => void) => callback(),
     };
     Object.defineProperties(app, Object.getOwnPropertyDescriptors(pickupModule()));
@@ -71,6 +75,8 @@ describe('retiradas do parceiro no painel único', () => {
       hasPanelModule: () => true,
       partnerApiGet: vi.fn().mockResolvedValue({ rows: [] }),
       partnerApiWrite: apiWrite,
+      partnerPanelTelemetry: vi.fn(),
+      partnerPanelErrorCode: () => 'api_error',
       $nextTick: (callback: () => void) => callback(),
     };
     Object.defineProperties(app, Object.getOwnPropertyDescriptors(pickupModule()));

@@ -14,6 +14,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.nav, // app.nav.js (linhas 208-262 pré-obra): título/menu/badge + seleção de unidade (abrir/voltar)
     window.PAINEL_MODULES.redeKpis, // app.rede.kpis.js (linhas 263-455 pré-obra): derivadas da Rede: metas, séries, totais, rankings, alertas
     window.PAINEL_MODULES.redeOperacao, // app.rede.operacao.js (23/07): apresentação padrão de Operação e saúde + fallback legado explícito
+    window.PAINEL_MODULES.redeCanario, // flag owner-only + saúde técnica do painel moderno por unidade
     window.PAINEL_MODULES.unidadeKpis, // app.unidade.kpis.js (linhas 456-549 pré-obra): derivadas da unidade + classes de status + saúde (score)
     window.PAINEL_MODULES.vendaModal, // app.venda.modal.js (linhas 550-604 pré-obra): modal de venda manual/walk-in + período e meta da Rede
     window.PAINEL_MODULES.partnerApi, // sessão ps_ e cliente HTTP exclusivo de /parceiro/:slug/api

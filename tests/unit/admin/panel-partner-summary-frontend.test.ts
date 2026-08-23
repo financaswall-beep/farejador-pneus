@@ -6,11 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('resumo do parceiro no painel único', () => {
-  it('permanece desligado no broker até a flag por unidade do canário', () => {
+  it('usa a flag por unidade e mantém o legado quando ela está desligada', () => {
     const route = source('src/admin/login.route.ts');
     const login = source('painel/public/login.js');
 
-    expect(route).toContain('modern_panel_enabled: false');
+    expect(route).toContain('modern_panel_enabled: workplace.modernPanelEnabled');
     expect(login).toContain('payload.modern_panel_enabled === true');
     expect(login).toContain("? '/admin/painel'");
     expect(login).toContain('`/parceiro/${encodeURIComponent(payload.slug)}/`');
@@ -39,6 +39,7 @@ describe('resumo do parceiro no painel único', () => {
       ok: true, status: 200,
       json: async () => ({
         slug: 'loja-a', role: 'owner', unit_name: 'Loja A', display_name: 'Ana',
+        modern_panel_enabled: true,
         permissions: { resumo: true, financeiro: false },
       }),
     }));
@@ -70,7 +71,9 @@ describe('resumo do parceiro no painel único', () => {
   });
 
   it('carrega somente as três fontes auditadas e preserva os totais do servidor', async () => {
-    const sandbox: Record<string, any> = { window: {}, lucide: { createIcons() {} } };
+    const sandbox: Record<string, any> = {
+      window: {}, lucide: { createIcons() {} }, performance: { now: () => Date.now() },
+    };
     runInNewContext(source('painel/public/app.partner-resumo.js'), sandbox);
     const apiGet = vi.fn(async (resource: string) => {
       if (resource === 'resumo') return { rows: [{ sales_month: '450.00', confirmed_result_month: '210.00' }] };
@@ -81,6 +84,8 @@ describe('resumo do parceiro no painel único', () => {
       isPartnerPanel: () => true,
       hasPanelModule: () => true,
       partnerApiGet: apiGet,
+      partnerPanelTelemetry: vi.fn(),
+      partnerPanelErrorCode: () => 'api_error',
       $nextTick: (callback: () => void) => callback(),
     };
     Object.defineProperties(

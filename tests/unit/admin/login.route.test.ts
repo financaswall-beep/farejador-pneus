@@ -99,6 +99,7 @@ describe('admin login route', () => {
       personId: 'p2', username: 'parceiro', workplaces: [{
         id: 'partner:rio-do-ouro', kind: 'partner', name: 'Rio do Ouro', role: 'owner',
         slug: 'rio-do-ouro', tokenId: 'token-2', displayName: 'Dono',
+        modernPanelEnabled: true,
         modules: { vendas: true, estoque: true, entregas: true, financeiro: true },
       }],
     });
@@ -116,7 +117,7 @@ describe('admin login route', () => {
     expect(response.json()).toMatchObject({
       mode: 'direct', scope: 'partner', slug: 'rio-do-ouro',
       session_token: `ps_${'b'.repeat(64)}`,
-      modern_panel_enabled: false,
+      modern_panel_enabled: true,
     });
     expect(response.headers['set-cookie']).toContain('Max-Age=0');
     expect(mintAdmin).not.toHaveBeenCalled();

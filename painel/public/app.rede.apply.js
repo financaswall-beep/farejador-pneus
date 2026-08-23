@@ -184,6 +184,7 @@ window.PAINEL_MODULES.redeApply = function () {
           // 0165 "Recebe pedidos da Rede?": ausente/null = LIGADA (fail-open — payload
           // velho ou join vazio nunca some com a loja do roteamento na pintura).
           aceitaRede: row.accepts_network_orders !== false,
+          painelModerno: row.modern_panel_enabled === true,
           fazEntrega: (row.service_mode || 'both') === 'delivery' || (row.service_mode || 'both') === 'both',
           deliveryRadiusKm: (row.delivery_radius_km === null || row.delivery_radius_km === undefined)
             ? null : Number(row.delivery_radius_km),

@@ -2,8 +2,8 @@
   "version": 1,
   "role": "farejador_partner_app",
   "canonicalization": "sort ASC; schema.table:PRIVILEGE:IS_GRANTABLE; join with LF; SHA-256 UTF-8",
-  "expected_count": 70,
-  "expected_sha256": "bcd7da4d107d393b12fcdec35a2f2b15eebb12cb7688e26ba72c48157ab6abae",
+  "expected_count": 71,
+  "expected_sha256": "59ef335494b84faa0b35855c18b14a1a386aa2962e2ddcf39ad93d2eaa8b3ff8",
   "grants": [
     "audit.events:INSERT:NO",
     "commerce.partner_conversations:SELECT:NO",
@@ -74,6 +74,7 @@
     "network.partner_cash_flow_projection:SELECT:NO",
     "network.partner_unit_summary:SELECT:NO",
     "network.partner_units:SELECT:NO",
-    "network.partners:SELECT:NO"
+    "network.partners:SELECT:NO",
+    "ops.partner_panel_canary_events:INSERT:NO"
   ]
 }

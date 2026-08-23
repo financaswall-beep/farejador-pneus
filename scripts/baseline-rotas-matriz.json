@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-23T18:43:27.063Z",
-  "total": 255,
+  "geradoEm": "2026-08-23T19:03:03.425Z",
+  "total": 258,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -42,6 +42,7 @@
     "GET /admin/api/matriz/financeiro/ledger/statement GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/matriz/notificacoes GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/partner-applications GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/partners/:partnerUnitId/modern-panel/telemetry GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/privacy/requests/:id GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/rede/comissoes GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/rede/custos-pendentes GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -124,6 +125,7 @@
     "GET /admin/painel/app.partner-retiradas.js PUBLICA",
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",
     "GET /admin/painel/app.rede.apply.js PUBLICA",
+    "GET /admin/painel/app.rede.canario.js PUBLICA",
     "GET /admin/painel/app.rede.kpis.js PUBLICA",
     "GET /admin/painel/app.rede.operacao.js PUBLICA",
     "GET /admin/painel/app.sino.js PUBLICA",
@@ -256,6 +258,7 @@
     "PUT /admin/api/marketing/ad-accounts/:adAccountId/campaigns/:campaignId/scope GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/partners/:partnerUnitId/coverage GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/partners/:partnerUnitId/delivery-radius GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
+    "PUT /admin/api/partners/:partnerUnitId/modern-panel GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/partners/:partnerUnitId/network-orders GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)"
   ]
 }
