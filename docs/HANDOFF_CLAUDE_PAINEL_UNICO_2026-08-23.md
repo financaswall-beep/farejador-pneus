@@ -126,6 +126,21 @@ bloqueio; nenhuma regra de produção foi relaxada.
 7. Testar Resumo e Retiradas e observar a telemetria por 24 horas.
 8. Se houver problema, desligar a chave; não reverter banco nem deploy.
 
+## 8.1 Smoke real após o primeiro deploy
+
+O smoke autenticado em `farejador.smarttecsolutions.com.br` confirmou login do
+owner e carregamento de Resumo, Bot, Vendas, Compras, Estoque, Financeiro, Rede
+e Catálogo sem alertas visíveis. No Catálogo, clicar em `2 moto(s)` abriu o
+drawer e mostrou corretamente CG 150 Fan e CG 150 Titan, com anos, posição e
+origem.
+
+O console revelou um defeito menor de inicialização: o Alpine avaliava campos
+ocultos de pesquisa antes de `discoveryForm` e `discoveries` existirem no estado
+inicial. O fluxo visível funcionava porque o clique reconstruía o objeto
+completo. A correção inicializa esses campos desde o boot e troca a versão do
+`app.js` para invalidar cache. Não muda API, banco, compatibilidades, Bot,
+estoque ou financeiro e não exige migration.
+
 ## 9. Veredicto para revisão do Claude
 
 O código e o banco estão prontos para o deploy técnico. A liberação ampla para
