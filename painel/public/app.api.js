@@ -146,6 +146,24 @@ window.PAINEL_MODULES.api = function () {
       return response.json();
     },
 
+    async apiDelete(path, body) {
+      if (!this.adminAuthenticated) throw new Error('missing_admin_session');
+      const response = await fetch(path, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: this.apiHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (response.status === 401) this.adminUnauthorized();
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const e = new Error(payload.error || `api_${response.status}`);
+        e.payload = payload; e.status = response.status;
+        throw e;
+      }
+      return response.json();
+    },
+
     async apiPut(path, body) {
       if (!this.adminAuthenticated) throw new Error('missing_admin_session');
       const response = await fetch(path, {

@@ -162,6 +162,17 @@ recuperável, sem confundir movimentação manual com venda realizada.
 em todas as fontes, impede variantes e janelas duplicadas e preserva o histórico de
 preço publicado em produção.
 
+`0198_marketing_integrity.sql` alinha investimento, conversas e vendas atribuídas;
+`0199_system_continuity.sql` protege relógio, filas, reconciliação e passagem do tempo;
+`0200_finance_credit_lifecycle.sql` separa competência, caixa e ciclo do fiado;
+`0201_analytics_greenfield_views.sql` garante que um banco novo reconstrua as peças
+analíticas usadas pelo Bot e pelo painel.
+
+`0202_catalog_bootstrap_fitment_workflow.sql` permite catalogar a medida antes da
+primeira compra, acrescenta a fila auditável de pesquisa/homologação de motos e uma
+visão que denuncia divergência de compatibilidade entre produtos da mesma medida.
+Nenhum produto, estoque, preço ou fitment é criado automaticamente pela migration.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

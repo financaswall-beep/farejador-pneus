@@ -3,10 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buscarCompatibilidadeMatriz,
   buscarProdutoMatriz,
+  vehiclesWithApprovedFitments,
   verificarEstoqueMatriz,
 } from '../../../src/atendente-v2/matriz-product-search.js';
 
 describe('tools do Bot usam a fonte oficial da Matriz', () => {
+  it('não trata moto reconhecida sem fitment aprovado como compatibilidade encontrada', () => {
+    expect(vehiclesWithApprovedFitments([
+      { model: 'CG 160', produtos: [] },
+      { model: 'Factor 150', produtos: [{ product_id: 'p1' }] },
+    ])).toEqual([{ model: 'Factor 150', produtos: [{ product_id: 'p1' }] }]);
+  });
   it('filtra apenas_com_estoque depois de consultar o galpao', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [

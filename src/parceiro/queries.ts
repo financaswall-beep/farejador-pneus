@@ -681,6 +681,7 @@ export interface CatalogSearchRow {
   brand: string | null;
   product_type: string | null;
   tire_condition: TireCondition | null;
+  tire_size: string | null;
 }
 
 /**
@@ -691,21 +692,27 @@ export interface CatalogSearchRow {
  * NÃO reabre o catálogo pra VENDA: a venda do parceiro continua silo (aponta pra
  * `partner_stock_levels.id` — decisão "silo isolado" 2026-05-19). Aqui é só LEITURA, e
  * só pro cadastro de estoque. O role `farejador_partner_app` já tem SELECT em
- * `commerce.products` (sem RLS); a view `product_full` fica fora (sem grant) — por isso
- * a busca é direta na tabela base. A medida costuma vir embutida no `product_name`.
+ * `commerce.products` e `commerce.tire_specs` (sem RLS); a view `product_full` fica fora
+ * (sem grant). A medida é um campo próprio e não depende do nome comercial.
  */
 export async function searchPartnerCatalog(ctx: PartnerContext, termo: string): Promise<CatalogSearchRow[]> {
   const q = termo.trim();
   if (q.length < 2) return [];
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query<CatalogSearchRow>(
-      `SELECT id, product_code, product_name, brand, product_type, tire_condition
-       FROM commerce.products
-       WHERE environment = $1 AND deleted_at IS NULL
-         AND (product_name ILIKE $2 OR product_code ILIKE $2 OR brand ILIKE $2)
-       ORDER BY product_name ASC
+      `SELECT p.id,p.product_code,p.product_name,p.brand,p.product_type,
+              p.tire_condition,ts.tire_size
+       FROM commerce.products p
+       LEFT JOIN commerce.tire_specs ts
+         ON ts.product_id=p.id AND ts.environment=p.environment
+       WHERE p.environment = $1 AND p.deleted_at IS NULL
+         AND (p.product_name ILIKE $2 OR p.product_code ILIKE $2 OR p.brand ILIKE $2
+           OR ts.tire_size ILIKE $2
+           OR ($3 ~ '[0-9]' AND regexp_replace(COALESCE(ts.tire_size,''),'[^0-9]+','','g')
+              =regexp_replace($3,'[^0-9]+','','g')))
+       ORDER BY p.product_name ASC
        LIMIT 20`,
-      [ctx.environment, `%${q}%`],
+      [ctx.environment, `%${q}%`, q],
     );
     return result.rows;
   });

@@ -3,6 +3,8 @@ import type { Pool } from 'pg';
 
 let createCatalogProductFromStock:
   typeof import('../../../src/admin/painel/queries-catalogo-create.js').createCatalogProductFromStock;
+let createCatalogProduct:
+  typeof import('../../../src/admin/painel/queries-catalogo-create.js').createCatalogProduct;
 
 beforeAll(async () => {
   Object.assign(process.env, {
@@ -12,8 +14,58 @@ beforeAll(async () => {
     CHATWOOT_HMAC_SECRET: 'test-secret',
     ADMIN_AUTH_TOKEN: 'emergency-token',
   });
-  ({ createCatalogProductFromStock }
+  ({ createCatalogProductFromStock, createCatalogProduct }
     = await import('../../../src/admin/painel/queries-catalogo-create.js'));
+});
+
+describe('cadastro inicial antes da compra', () => {
+  it('cria produto, ficha e preço sem inventar estoque nem financeiro', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('JOIN commerce.tire_specs')) return { rows: [] };
+      if (sql.includes('SELECT id FROM commerce.products')) return { rows: [] };
+      if (sql.includes('INSERT INTO commerce.products')) return { rows: [{ id: 'produto-novo' }] };
+      if (sql.includes('INSERT INTO commerce.tire_specs')) return { rows: [{ id: 'spec-nova' }] };
+      if (sql.includes('INSERT INTO commerce.vehicle_fitments')) return { rows: [], rowCount: 3 };
+      if (sql.includes('INSERT INTO commerce.matriz_product_prices')) {
+        return { rows: [{ id: 'preco-1' }] };
+      }
+      if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const { pool } = fakePool(query);
+
+    await expect(createCatalogProduct({
+      measure: '90 / 90 R18', brand: 'Levorin', tireCondition: 'meia_vida',
+      productCode: 'lev-909018-mv', productName: 'Pneu Levorin',
+      priceAmount: 45, priceReason: 'Preço inicial', actorLabel: 'Dono',
+      environment: 'test',
+    }, pool)).resolves.toEqual({
+      product_id: 'produto-novo', product_code: 'LEV-909018-MV',
+      product_name: 'Pneu Levorin', brand: 'Levorin',
+      tire_condition: 'meia_vida', tire_size: '90/90-18', price_amount: 45,
+    });
+
+    const sql = query.mock.calls.map(([statement]) => String(statement)).join('\n');
+    expect(sql).not.toContain('commerce.wholesale_stock');
+    expect(sql).not.toContain('finance.');
+    expect(sql).not.toContain('commerce.orders');
+    expect(sql).toContain('commerce.matriz_product_prices');
+    const productAudit = query.mock.calls.find(([statement]) =>
+      String(statement).includes("'catalog_product_created'"));
+    expect(String(productAudit?.[1]?.[3])).toContain('"stock":false');
+  });
+
+  it('recusa preço fracionado além de centavos antes de abrir transação', async () => {
+    const { pool } = fakePool(vi.fn());
+    await expect(createCatalogProduct({
+      measure: '90/90-18', brand: 'Levorin', tireCondition: 'meia_vida',
+      productCode: 'LEV-1', productName: 'Levorin', priceAmount: 45.001,
+      actorLabel: 'Dono', environment: 'test',
+    }, pool)).rejects.toThrow('catalog_price_invalid');
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
 });
 
 function fakePool(query: ReturnType<typeof vi.fn>): {

@@ -40,7 +40,7 @@
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.api.js?v=20260810-chaverede1"></script>
+<script src="/admin/painel/app.api.js?v=20260823-fitment1"></script>
 <script src="/admin/painel/app.municipios.js?v=20260821-cidades1"></script>
 <script src="/admin/painel/business-time.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.format.js?v=20260822-continuity1"></script>
@@ -82,8 +82,9 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260731-compat1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260823-fitment1"></script>
+<script src="/admin/painel/app.catalogo.bootstrap.js?v=20260823-fitment1"></script>
+<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260823-fitment1"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260810-chaverede1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
@@ -8625,9 +8626,14 @@
             <p class="text-sm font-semibold text-gray-950">Filtrar por marca</p>
             <p class="mt-1 text-xs text-gray-500">A marca vem de Compras ou Estoque. Logos esmaecidos ainda não têm produto cadastrado.</p>
           </div>
-          <button type="button" @click="currentPage='estoque'" class="inline-flex items-center gap-2 rounded-lg border border-emerald-700 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
-            <i data-lucide="warehouse" class="h-4 w-4"></i>Abrir Estoque
-          </button>
+          <div class="flex items-center gap-2">
+            <button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoCreateNew()" class="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-900">
+              <i data-lucide="plus" class="h-4 w-4"></i>Novo produto
+            </button>
+            <button type="button" @click="currentPage='estoque'" class="inline-flex items-center gap-2 rounded-lg border border-emerald-700 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
+              <i data-lucide="warehouse" class="h-4 w-4"></i>Abrir Estoque
+            </button>
+          </div>
         </div>
         <div x-show="Number(catalogoSummary.stock_only || 0) > 0" class="mt-4 flex items-start gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
           <i data-lucide="circle-alert" class="mt-0.5 h-4 w-4 flex-shrink-0"></i>
@@ -8750,22 +8756,31 @@
              style="width:min(440px, calc(100vw - 24px));"
              @keydown.escape.window="catalogoCreateClose()">
         <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
-          <div><p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Transformar estoque em produto</p><h2 class="mt-1 text-xl font-bold text-gray-950">Cadastrar no Catálogo</h2><p class="mt-1 text-xs text-gray-500">Cria o produto comercial sem alterar saldo ou custo.</p></div>
+          <div><p class="text-xs font-semibold uppercase tracking-wide text-emerald-700" x-text="catalogoCadastro.mode === 'manual' ? 'Dado mestre do catálogo' : 'Transformar estoque em produto'"></p><h2 class="mt-1 text-xl font-bold text-gray-950">Cadastrar no Catálogo</h2><p class="mt-1 text-xs text-gray-500">Cria o produto comercial sem alterar saldo, custo, caixa ou financeiro.</p></div>
           <button type="button" @click="catalogoCreateClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
         <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div class="grid grid-cols-3 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60">
+          <div x-show="catalogoCadastro.mode !== 'manual'" class="grid grid-cols-3 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60">
             <div class="border-r border-emerald-100 p-4"><p class="text-[10px] text-gray-500">Medida confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.tire_size"></p></div>
             <div class="border-r border-emerald-100 p-4"><p class="text-[10px] text-gray-500">Marca confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.brand"></p></div>
             <div class="p-4"><p class="text-[10px] text-gray-500">Condição</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoConditionLabel(catalogoCadastro.row?.tire_condition)"></p></div>
           </div>
+          <div x-show="catalogoCadastro.mode === 'manual'" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Medida *</span><input id="catalog-product-measure" x-model="catalogoCadastro.form.measure" @blur="catalogoCreateSuggestCode()" type="text" maxlength="60" placeholder="Ex.: 90/90-18" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Aceita 90/90-18 ou 3.00-18.</span></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Marca *</span><input x-model="catalogoCadastro.form.brand" @change="catalogoCreateSuggestCode()" list="catalog-brand-options" type="text" maxlength="60" placeholder="Selecione a marca" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"></label>
+            </div>
+            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Condição *</span><select x-model="catalogoCadastro.form.tire_condition" @change="catalogoCreateSuggestCode()" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
+          </div>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Código do produto *</span><input id="catalog-product-code" x-model="catalogoCadastro.form.product_code" @input="catalogoCadastro.form.product_code = String(catalogoCadastro.form.product_code || '').toUpperCase()" type="text" maxlength="80" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Único no sistema. Aceita letras, números, ponto, barra, hífen e sublinhado.</span></label>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome comercial *</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] leading-4 text-gray-400">Use o modelo ou a linha quando souber, por exemplo: Metzeler ME Street. A medida e a marca já ficam salvas em campos separados.</span></label>
-          <div class="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><i data-lucide="shield-check" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><p>Após cadastrar, o produto continuará bloqueado para venda até você definir o preço oficial na próxima tela.</p></div>
+          <label x-show="catalogoCadastro.mode === 'manual'" class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Preço oficial <span class="font-normal text-gray-400">(opcional)</span></span><div class="flex overflow-hidden rounded-lg border border-gray-200 focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-100"><span class="bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-500">R$</span><input x-model="catalogoCadastro.form.price_amount" inputmode="decimal" placeholder="45,00" class="min-w-0 flex-1 px-3 py-2.5 text-sm outline-none"></div></label>
+          <div class="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><i data-lucide="shield-check" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><p>Após cadastrar, o produto continuará bloqueado para venda enquanto faltar preço oficial ou recebimento físico no estoque.</p></div>
           <div x-show="catalogoCadastro.message" :class="catalogoCadastro.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoCadastro.message?.text"></div>
         </div>
         <div class="grid grid-cols-2 gap-2 border-t border-gray-100 bg-white px-6 py-4">
-          <button type="button" @click="catalogoCreateViewStock()" :disabled="catalogoCadastro.saving" class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Ver no Estoque</button>
+          <button x-show="catalogoCadastro.mode !== 'manual'" type="button" @click="catalogoCreateViewStock()" :disabled="catalogoCadastro.saving" class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Ver no Estoque</button>
+          <button x-show="catalogoCadastro.mode === 'manual'" type="button" @click="catalogoCreateSave(true)" :disabled="!catalogoCreateCanSave()" class="rounded-lg border border-emerald-700 bg-white px-3 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-40">Salvar e ir para Compras</button>
           <button type="button" @click="catalogoCreateSave()" :disabled="!catalogoCreateCanSave()" class="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40" x-text="catalogoCadastro.saving ? 'Cadastrando...' : 'Cadastrar produto'"></button>
         </div>
       </aside>
@@ -8855,6 +8870,37 @@
             <div class="p-4"><p class="text-[10px] text-gray-500">Motos compatíveis</p><p class="mt-1 font-bold text-emerald-900" x-text="Number(catalogoCompatibilidade.summary?.models || 0)"></p></div>
           </section>
 
+          <section x-show="adminUser?.role === 'owner'" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div class="flex items-start gap-2"><i data-lucide="badge-plus" class="mt-0.5 h-4 w-4 text-emerald-700"></i><div><p class="text-sm font-semibold text-gray-950">Associar uma moto à medida</p><p class="mt-0.5 text-[11px] leading-4 text-gray-500">Pesquise na base normalizada. A associação será aplicada a todas as marcas e condições desta mesma medida.</p></div></div>
+            <div class="relative mt-4">
+              <div class="flex gap-2"><input x-model="catalogoCompatibilidade.search" @input.debounce.350ms="catalogoCompatibilitySearch()" type="search" placeholder="Ex.: Honda CG 160 2024" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><span x-show="catalogoCompatibilidade.searching" class="flex items-center px-2 text-gray-400"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i></span></div>
+              <div x-show="catalogoCompatibilidade.searchRows.length > 0" class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
+                <template x-for="vehicle in catalogoCompatibilidade.searchRows" :key="vehicle.vehicle_model_id"><button type="button" @click="catalogoCompatibilitySelectVehicle(vehicle)" class="block w-full rounded-md px-3 py-2 text-left hover:bg-emerald-50"><span class="block text-xs font-semibold text-gray-900" x-text="[vehicle.make,vehicle.model,vehicle.variant].filter(Boolean).join(' ')"></span><span class="text-[10px] text-gray-500" x-text="catalogoCompatibilityYearLabel(vehicle)"></span></button></template>
+              </div>
+            </div>
+            <div x-show="catalogoCompatibilidade.selectedVehicle" class="mt-3 space-y-3">
+              <p class="border-t border-gray-200 pt-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Homologação direta</p>
+              <div class="grid grid-cols-2 gap-2"><label class="text-[11px] font-semibold text-gray-600">Posição<select x-model="catalogoCompatibilidade.form.position" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Dianteiro e traseiro</option></select></label><label class="text-[11px] font-semibold text-gray-600">Fonte<select x-model="catalogoCompatibilidade.form.source" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"><option value="manual">Conferência manual</option><option value="manufacturer">Fabricante</option></select></label></div>
+              <label class="flex items-center gap-2 text-xs text-gray-700"><input x-model="catalogoCompatibilidade.form.is_oem" type="checkbox" class="rounded border-gray-300 text-emerald-700">Medida original de fábrica</label>
+              <textarea x-model="catalogoCompatibilidade.form.reason" maxlength="500" rows="2" placeholder="Fonte ou motivo da associação *" class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-700"></textarea>
+              <button type="button" @click="catalogoCompatibilitySave()" :disabled="!catalogoCompatibilityCanSave()" class="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40" x-text="catalogoCompatibilidade.saving ? 'Salvando...' : 'Salvar compatibilidade'"></button>
+              <div class="mt-4 space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div><p class="text-xs font-semibold text-blue-950">Pesquisa na internet para revisar</p><p class="mt-0.5 text-[10px] leading-4 text-blue-800">Cole a fonte encontrada. Isso cria apenas uma candidata; o Bot não usa antes de você aprovar.</p></div>
+                <input x-model="catalogoCompatibilidade.discoveryForm.source_url" type="url" maxlength="2000" placeholder="https://fonte-oficial..." class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-600">
+                <input x-model="catalogoCompatibilidade.discoveryForm.source_title" type="text" maxlength="300" placeholder="Título da fonte (opcional)" class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-600">
+                <textarea x-model="catalogoCompatibilidade.discoveryForm.evidence_summary" maxlength="2000" rows="2" placeholder="O que essa fonte comprova? *" class="w-full resize-none rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-600"></textarea>
+                <button type="button" @click="catalogoDiscoveryCreate()" :disabled="!catalogoDiscoveryCanCreate()" class="w-full rounded-lg border border-blue-700 bg-white px-3 py-2.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 disabled:opacity-40">Enviar para revisão</button>
+              </div>
+            </div>
+          </section>
+
+          <div x-show="catalogoCompatibilidade.message" :class="catalogoCompatibilidade.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="mt-4 rounded-lg border p-3 text-xs" x-text="catalogoCompatibilidade.message?.text"></div>
+
+          <section x-show="catalogoCompatibilidade.discoveriesLoading || catalogoCompatibilidade.discoveries.length > 0" class="mt-5">
+            <div class="flex items-center justify-between"><div><p class="text-sm font-semibold text-gray-950">Fila de pesquisa</p><p class="text-[10px] text-gray-500">Evidências preservadas, inclusive as rejeitadas.</p></div><i x-show="catalogoCompatibilidade.discoveriesLoading" data-lucide="loader-circle" class="h-4 w-4 animate-spin text-gray-400"></i></div>
+            <div class="mt-3 space-y-2"><template x-for="item in catalogoCompatibilidade.discoveries" :key="item.discovery_id"><article class="rounded-xl border border-blue-100 bg-blue-50/50 p-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-xs font-bold text-gray-950" x-text="[item.make,item.model,item.variant].filter(Boolean).join(' ')"></p><a x-show="item.source_url" :href="item.source_url" target="_blank" rel="noopener noreferrer" class="mt-1 block truncate text-[10px] text-blue-700 underline" x-text="item.source_title || item.source_url"></a></div><span :class="item.status === 'pending' ? 'bg-amber-100 text-amber-800' : item.status === 'promoted' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'" class="shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold" x-text="item.status === 'pending' ? 'Pendente' : item.status === 'promoted' ? 'Aprovada' : item.status === 'rejected' ? 'Rejeitada' : item.status"></span></div><p class="mt-2 text-[10px] leading-4 text-gray-600" x-text="item.evidence_summary || 'Sem resumo'"></p><div x-show="item.status === 'pending' && adminUser?.role === 'owner'" class="mt-3 grid grid-cols-2 gap-2"><button type="button" @click="catalogoDiscoveryReview(item,'reject')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg border border-gray-300 bg-white px-2 py-2 text-[10px] font-semibold text-gray-600">Rejeitar</button><button type="button" @click="catalogoDiscoveryReview(item,'approve')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg bg-emerald-800 px-2 py-2 text-[10px] font-semibold text-white">Aprovar</button></div></article></template></div>
+          </section>
+
           <div x-show="catalogoCompatibilidade.loading" class="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Carregando compatibilidades...</div>
 
           <div x-show="catalogoCompatibilidade.error && !catalogoCompatibilidade.loading" class="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -8880,7 +8926,7 @@
                 </div>
                 <div class="mt-3 flex items-center justify-between gap-3 border-t border-gray-100 pt-3 text-[11px]">
                   <span class="inline-flex items-center gap-1.5 font-semibold text-emerald-800"><i data-lucide="circle-dot" class="h-3.5 w-3.5"></i><span x-text="catalogoCompatibilityPositionLabel(item.position)"></span></span>
-                  <span class="text-gray-400" x-text="catalogoCompatibilitySourceLabel(item.source)"></span>
+                  <span class="flex items-center gap-2"><span class="text-gray-400" x-text="catalogoCompatibilitySourceLabel(item.source)"></span><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoCompatibilityRemove(item)" :disabled="catalogoCompatibilidade.saving" class="rounded p-1 text-rose-500 hover:bg-rose-50" title="Remover associação"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button></span>
                 </div>
               </article>
             </template>

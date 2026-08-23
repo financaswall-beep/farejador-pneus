@@ -13,6 +13,7 @@ function loadCatalogModule() {
     setTimeout,
   };
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
+  vm.runInNewContext(readFileSync('painel/public/app.catalogo.bootstrap.js', 'utf8'), sandbox);
   vm.runInNewContext(
     readFileSync('painel/public/app.catalogo.compatibilidade.js', 'utf8'),
     sandbox,
@@ -20,6 +21,7 @@ function loadCatalogModule() {
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.marca.js', 'utf8'), sandbox);
   return {
     ...sandbox.window.PAINEL_MODULES.catalogo(),
+    ...sandbox.window.PAINEL_MODULES.catalogoBootstrap(),
     ...sandbox.window.PAINEL_MODULES.catalogoCompatibilidade(),
     ...sandbox.window.PAINEL_MODULES.catalogoMarca(),
     __integrity: integrity,
@@ -79,7 +81,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260822-bot-compact2');
-    expect(html).toContain('app.catalogo.js?v=20260822-continuity1');
+    expect(html).toContain('app.catalogo.js?v=20260823-fitment1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -181,6 +183,50 @@ describe('catalogo no painel', () => {
       ok: true,
       text: expect.stringContaining('defina o pre'),
     });
+  });
+
+  it('cadastra a medida antes da compra sem criar saldo e volta com a variante preenchida', async () => {
+    const module = loadCatalogModule();
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      catalogoCadastro: { open: false },
+      catalogoRows: [],
+      catalogoSelecionado: null,
+      compraForm: { items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }] },
+      compraMsg: null,
+      currentPage: 'catalogo',
+      apiPost: vi.fn().mockResolvedValue({
+        product_id: 'produto-1', tire_size: '90/90-18', brand: 'Levorin',
+        tire_condition: 'meia_vida', price_amount: 45,
+      }),
+      loadCatalogo: vi.fn(async function (this: { catalogoRows: unknown[] }) {
+        this.catalogoRows = [{ product_id: 'produto-1', catalogued: true }];
+      }),
+      comprasOpenTab: vi.fn(),
+      compraAddItem: vi.fn(),
+      $nextTick: vi.fn(),
+    };
+
+    module.catalogoCreateNew.call(context);
+    Object.assign(context.catalogoCadastro.form, {
+      measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
+      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin', price_amount: '45,00',
+    });
+    await module.catalogoCreateSave.call(context, true);
+
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
+      measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
+      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin',
+      creation_mode: 'manual', price_amount: 45,
+      price_reason: 'Preço inicial do cadastro',
+    });
+    expect(context.compraForm.items[0]).toMatchObject({
+      measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
+      quantity: 1, unit_cost: '',
+    });
+    expect(context.currentPage).toBe('compras');
+    expect(context.comprasOpenTab).toHaveBeenCalledWith('nova');
   });
 
   it('exibe o comando de cadastro e avisa que o preco ainda bloqueia a venda', () => {
@@ -311,6 +357,46 @@ describe('catalogo no painel', () => {
     expect(html).toContain('data-testid="catalog-compatibility-drawer"');
     expect(html).toContain(":disabled=\"row.product_type !== 'tire' || row.catalogued === false || !row.product_id\"");
     expect(html).toContain('Nenhuma moto associada');
+  });
+
+  it('salva compatibilidade oficial e mantém pesquisa da internet pendente', async () => {
+    const module = loadCatalogModule();
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      catalogoCompatibilidade: {
+        row: { product_id: 'produto-1' }, saving: false, message: null,
+        selectedVehicle: { vehicle_model_id: 'moto-1' }, search: 'Honda CG', searchRows: [],
+        form: { position: 'rear', is_oem: true, source: 'manufacturer', reason: 'Manual oficial' },
+        discoveryForm: {
+          source_url: 'https://fabricante.example/manual', source_title: 'Manual',
+          evidence_summary: 'Medida traseira confirmada', confidence_level: 0.9,
+        },
+        discoveries: [],
+      },
+      apiPost: vi.fn().mockResolvedValue({ status: 'pending' }),
+      catalogoCompatibilityLoad: vi.fn(),
+      catalogoDiscoveryLoad: vi.fn(),
+      loadCatalogo: vi.fn(),
+      $nextTick: vi.fn(),
+    };
+
+    await module.catalogoDiscoveryCreate.call(context);
+    expect(context.apiPost).toHaveBeenCalledWith(
+      '/admin/api/catalog/produto-1/fitment-discoveries',
+      expect.objectContaining({
+        vehicle_model_id: 'moto-1', source_url: 'https://fabricante.example/manual',
+        suggested_is_oem: true, confidence_level: 0.9,
+      }),
+    );
+    expect(context.catalogoCompatibilidade.message).toMatchObject({
+      ok: true, text: expect.stringContaining('ainda não usa'),
+    });
+
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('Pesquisa na internet para revisar');
+    expect(html).toContain('o Bot não usa antes de você aprovar');
+    expect(html).toContain('@click="catalogoDiscoveryReview(item,\'approve\')"');
   });
 
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {

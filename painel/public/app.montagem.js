@@ -54,6 +54,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.galpaoCorrecao, // transfere condição com trilha, sem editar histórico
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.catalogo,
+    window.PAINEL_MODULES.catalogoBootstrap,
     window.PAINEL_MODULES.catalogoCompatibilidade,
     window.PAINEL_MODULES.catalogoMarca,
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)
