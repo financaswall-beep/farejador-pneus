@@ -25,8 +25,9 @@
     "prova-instalador": "tsx scripts/prova-instalador.ts",
     "gerar-seed-regiao": "node scripts/gerar-seed-regiao.cjs",
     "checar-tamanho": "node scripts/checar-tamanho.cjs",
+    "prova-arquitetura-pools": "node scripts/prova-arquitetura-pools.cjs",
     "prova-vendas-roteamento": "tsx scripts/prova-vendas-roteamento.ts",
-    "prova-painel": "npm run prova-vendas-roteamento && node scripts/prova-paridade-painel.cjs && node scripts/prova-paridade-matriz.cjs && node scripts/prova-endpoints-painel.cjs && node scripts/checar-tamanho.cjs && tsx scripts/prova-rotas-matriz.ts",
+    "prova-painel": "npm run prova-arquitetura-pools && npm run prova-vendas-roteamento && node scripts/prova-paridade-painel.cjs && node scripts/prova-paridade-matriz.cjs && node scripts/prova-endpoints-painel.cjs && node scripts/checar-tamanho.cjs && tsx scripts/prova-rotas-matriz.ts",
     "enrich": "tsx --env-file=.env src/enrichment/cli.ts"
   },
   "dependencies": {

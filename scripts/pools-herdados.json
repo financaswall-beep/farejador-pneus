@@ -1,0 +1,19 @@
+{
+  "comentario": "Dívida técnica herdada: importadores do pool administrativo alcançáveis pelas rotas do parceiro em 2026-08-23. Esta lista só pode diminuir. Um importador novo reprova o CI; ao remover uma dependência, remova também sua exceção no mesmo commit.",
+  "importadoresPermitidosHerdados": [
+    "src/admin/painel/queries-parceiros-rede.ts",
+    "src/atendente-v2/photo-requests.ts",
+    "src/parceiro/auth.ts",
+    "src/parceiro/commission-ledger.ts",
+    "src/parceiro/my-sales.ts",
+    "src/parceiro/operation-commissions.ts",
+    "src/parceiro/operation-stock-detail.ts",
+    "src/parceiro/operation-stock-owner.ts",
+    "src/parceiro/operation-stock-update.ts",
+    "src/parceiro/operation-team-config.ts",
+    "src/parceiro/operation-team-permissions.ts",
+    "src/parceiro/operation-team.ts",
+    "src/parceiro/queries.ts",
+    "src/parceiro/simple-finance.ts"
+  ]
+}

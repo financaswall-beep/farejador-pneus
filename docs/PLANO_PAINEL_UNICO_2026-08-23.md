@@ -87,6 +87,12 @@ autorização por lá. `src/parceiro/queries.ts:3788-3800` **documenta** que tod
 a Config da loja roda no pool admin. `src/parceiro/route-coverage.ts:3` importa
 `admin/painel/queries-parceiros-rede.js`.
 
+O censo automático do PR 2 encontrou **14 importadores** do pool admin
+alcançáveis pelas 15 entradas `src/parceiro/route*.ts`, inclusive dois fora do
+módulo parceiro. Eles estão congelados em `scripts/pools-herdados.json`: a
+dívida pode diminuir, mas um novo importador reprova o CI e mostra a trilha
+completa da rota até `src/persistence/db.ts`.
+
 ### 2.4 Colisão silenciosa entre os dois conjuntos de módulos
 `painel/public/app.montagem.js:68-70` faz
 `Object.defineProperties(out, Object.getOwnPropertyDescriptors(f()))` sobre 56
@@ -129,6 +135,10 @@ paridade não vê** (nome e tipo idênticos ao baseline).
 Se uma tela da matriz precisa aparecer para o parceiro, nasce **endpoint novo**
 em `src/parceiro/` com a query escopada. **Reutiliza-se o componente visual,
 nunca o handler.**
+
+As 14 exceções herdadas do §2.3 são dívida explicitamente registrada, não
+precedente para código novo. O gate `prova-arquitetura-pools` impede que essa
+superfície aumente e exige reduzir o baseline quando uma exceção é corrigida.
 
 **Pool + GUC sempre em par:** as policies são estritas
 (`src/parceiro/db.ts:47-50`, `IS NOT NULL AND …`). Pool restrito **sem**
@@ -271,7 +281,7 @@ gate com tela.**
 | PR | Título | Arquivos | Aceite |
 |---|---|---|---|
 | **1** | corrigir o plano + prova de regressão do roteamento | `scripts/prova-vendas-roteamento.ts`, `package.json`, este plano | parceiro converge no motor com RLS; Matriz permanece no walk-in `main` |
-| **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json` | build falha ao adicionar import novo; exceções atuais congeladas |
+| **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json`, CI | CI falha ao adicionar import novo; 14 exceções atuais congeladas |
 | **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json` | trocar `requireAdminOwner`→`requireAdminAuth` reprova |
 | **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist | redefinição não declarada falha o build |
 | **5** | GRANT: hash + denylist + atributos | `scripts/prova-instalador.ts` (+CI) | baseline 70 grants; denylist zero |
