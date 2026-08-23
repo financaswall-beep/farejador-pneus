@@ -7,6 +7,7 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
   { id: 'resumo', label: 'Resumo', icon: 'layout-dashboard', requires: 'resumo' },
   { id: 'bot', label: 'Bot', icon: 'bot', requires: 'bot' },
   { id: 'vendas', label: 'Vendas', icon: 'shopping-bag', requires: 'vendas' },
+  { id: 'retiradas', label: 'Retiradas', icon: 'package-check', requires: 'retiradas' },
   { id: 'clientes', label: 'Clientes', icon: 'users', requires: 'clientes' },
   { id: 'compras', label: 'Compras', icon: 'shopping-cart', requires: 'compras' },
   { id: 'estoque', label: 'Estoque', icon: 'package', requires: 'estoque' },
@@ -30,6 +31,9 @@ window.PAINEL_PAGES = {
   ] },
   unidade: { scopes: ['matrix'], requires: 'rede', render: ['renderParceiroChart'] },
   vendas: { scopes: ['matrix'], requires: 'vendas', load: ['loadVendasData'] },
+  retiradas: {
+    scopes: ['partner'], requires: 'retiradas', partnerLoad: ['loadPartnerRetiradas'],
+  },
   clientes: { scopes: ['matrix'], requires: 'clientes', load: ['loadClientes'], enter: ['startClientesLive'] },
   compras: { scopes: ['matrix'], requires: 'compras', load: ['loadCompras'] },
   estoque: { scopes: ['matrix'], requires: 'estoque', load: [

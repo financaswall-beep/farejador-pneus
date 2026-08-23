@@ -51,25 +51,56 @@ window.PAINEL_MODULES.partnerApi = function () {
       return true;
     },
 
-    async partnerApiGet(resource) {
+    partnerApiResourceUrl(resource) {
       if (!this.adminAuthenticated || !this.isPartnerPanel()) {
         throw new Error('missing_partner_session');
       }
       if (!/^[a-z0-9][a-z0-9/_?=&.-]*$/i.test(resource) || resource.includes('..')) {
         throw new Error('invalid_partner_resource');
       }
-      const response = await fetch(
-        `/parceiro/${encodeURIComponent(this.panelPartnerSlug)}/api/${resource}`,
-        { credentials: 'same-origin', headers: { Authorization: `Bearer ${this.panelPartnerToken}` } },
-      );
+      return `/parceiro/${encodeURIComponent(this.panelPartnerSlug)}/api/${resource}`;
+    },
+
+    async partnerApiFetch(resource, options = {}) {
+      const method = String(options.method || 'GET').toUpperCase();
+      if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method)) {
+        throw new Error('invalid_partner_method');
+      }
+      const response = await fetch(this.partnerApiResourceUrl(resource), {
+        ...options,
+        method,
+        credentials: 'same-origin',
+        headers: { ...(options.headers || {}), Authorization: `Bearer ${this.panelPartnerToken}` },
+      });
       if (response.status === 401) this.partnerPanelUnauthorized(this.panelPartnerSlug);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        const error = new Error(payload.error || `api_${response.status}`);
+        const error = new Error(payload.message || payload.error || `api_${response.status}`);
+        error.code = payload.error || `api_${response.status}`;
         error.status = response.status;
         throw error;
       }
+      return response;
+    },
+
+    async partnerApiGet(resource) {
+      const response = await this.partnerApiFetch(resource);
       return response.json();
+    },
+
+    async partnerApiWrite(resource, method, body) {
+      if (!['POST', 'PUT', 'DELETE'].includes(method)) throw new Error('invalid_partner_write_method');
+      const response = await this.partnerApiFetch(resource, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      });
+      return response.json();
+    },
+
+    async partnerApiBlob(resource) {
+      const response = await this.partnerApiFetch(resource);
+      return response.blob();
     },
 
     partnerPanelUnauthorized(slug) {
