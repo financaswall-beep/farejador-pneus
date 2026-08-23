@@ -5,7 +5,8 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.core = function () {
   return {
     async loadRealData() {
-      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !this.isMatrixPanel()
+        || !location.pathname.startsWith('/admin/painel')) return;
       this.loadApplications(); // Etapa 3: badge de candidaturas (não bloqueia o resto)
 
       // Promise.allSettled: cada bloco é independente — um endpoint que falhe
@@ -51,7 +52,8 @@ window.PAINEL_MODULES.core = function () {
     },
 
     async loadRedeData() {
-      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !this.isMatrixPanel()
+        || !location.pathname.startsWith('/admin/painel')) return;
 
       try {
         const rede = await this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`);
@@ -82,15 +84,18 @@ window.PAINEL_MODULES.core = function () {
 
     async init() {
       if (!(await this.ensureCredentials())) return;
-      await this.loadNetworkMunicipalities();
-      void this.loadRealData();
+      if (!this.isMatrixPanel()) return;
+      if (this.hasPanelModule('rede')) await this.loadNetworkMunicipalities();
+      if (['resumo', 'vendas', 'rede'].some((module) => this.hasPanelModule(module))) {
+        void this.loadRealData();
+      }
       // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
       // (flag off = resposta enabled:false, barata; a consulta é somente leitura).
-      void this.loadComissoes();
+      if (this.hasPanelModule('rede')) void this.loadComissoes();
       // Sino (2026-07-06): notificações reais já no boot.
       void this.loadSino();
       // Campainha do bot (2026-07-06): cliente esperando é alarme — badge já no boot.
-      void this.loadBotCampainha();
+      if (this.hasPanelModule('bot')) void this.loadBotCampainha();
       this.$nextTick(() => {
         lucide.createIcons();
         this.renderChart();
@@ -106,56 +111,35 @@ window.PAINEL_MODULES.core = function () {
         this.renderParceiroChart();
       });
 
-      this.$watch('currentPage', (page) => {
-        this.$nextTick(() => {
-          lucide.createIcons();
-          this.renderCurrentPageCharts();
-        });
-        // Compras carrega relatórios independentes; falha de preço não apaga histórico.
-        if (page === 'compras') void this.loadCompras();
-        // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
-        // O filme (0128) carrega junto — é a mesma visita à aba.
-        if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(null, null); void this.loadStockReconciliation(); }
-        // Logística (0121): entregas da matriz + rota do dia do entregador.
-        if (page === 'logistica') void this.loadLogistica();
-        // Vendas: visão comercial unificada; custos e lucro permanecem no Financeiro.
-        if (page === 'vendas') void this.loadVendasData();
-        // Clientes: consolida Chatwoot, balcão, compradores, VIPs e parceiros existentes.
-        if (page === 'clientes') { void this.loadClientes(); this.startClientesLive(); }
-        else this.stopClientesLive();
-        // Rede: consulta o livro de comissões; a reconciliação roda no scheduler.
-        if (page === 'rede') void this.loadComissoes();
-        // Colaboradores (0124): o staff da matriz — vendedor/entregador.
-        if (page === 'colaboradores') void this.loadColaboradores();
-        // Financeiro: visão consolidada (Onda 1) + despesas (0120) num carregador só.
-        if (page === 'financeiro') {
-          void this.loadFinanceiro();
-          void this.loadFinExtrato();
-        }
-        // Bot (2026-07-06): visão (cards/mapa/radar) ao entrar na aba.
-        if (page === 'bot') { void this.loadBotVisao(); void this.loadBotMovement(); }
-        if (page === 'marketing') void this.loadMarketing();
-        if (page === 'catalogo') void this.loadCatalogo();
-      });
+      this.$watch('currentPage', (page) => { this.activatePanelPage(page); });
+      this.activatePanelPage(this.currentPage);
 
       this.startLiveRefresh();
     },
 
     renderCurrentPageCharts() {
       if (this.currentPage === 'resumo') this.renderChart();
-      if (this.currentPage === 'rede') {
-        this.renderRedeChart();
-        this.renderRedeLucroChart();
-        this.renderRedeComprasChart();
-        this.renderEstoqueParadoChart();
-        this.renderMargemChart();
-        this.renderVendaHojeChart();
-        this.renderPneusRedeChart();
-        this.renderRedeOrigemChart();
-        this.renderRedeSaudeChart();
-        this.renderParceiroChart();
+      const page = window.PAINEL_PAGES[this.currentPage];
+      for (const method of page?.render || []) {
+        if (typeof this[method] === 'function') this[method]();
       }
-      if (this.currentPage === 'unidade') this.renderParceiroChart();
+    },
+
+    activatePanelPage(pageId) {
+      if (!this.panelPageEnabled(pageId)) {
+        const fallback = this.firstPanelPage();
+        if (fallback && fallback !== pageId) this.currentPage = fallback;
+        return;
+      }
+      if (pageId !== 'clientes') this.stopClientesLive();
+      const page = window.PAINEL_PAGES[pageId];
+      for (const method of [...(page.enter || []), ...(page.load || [])]) {
+        if (typeof this[method] === 'function') void this[method]();
+      }
+      this.$nextTick(() => {
+        lucide.createIcons();
+        this.renderCurrentPageCharts();
+      });
     },
 
     // Atualização near real-time: a cada 15s rebusca os dados das telas vivas
@@ -168,11 +152,12 @@ window.PAINEL_MODULES.core = function () {
 
     async liveRefresh() {
       if (this.liveRefreshing || document.hidden) return;
-      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !this.isMatrixPanel()
+        || !location.pathname.startsWith('/admin/painel')) return;
       // Sino atualiza em QUALQUER página (aviso é aviso); tem try/catch próprio.
       void this.loadSino();
       // Campainha do bot idem: cliente esperando não pode depender da aba aberta.
-      void this.loadBotCampainha();
+      if (this.hasPanelModule('bot')) void this.loadBotCampainha();
       if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;

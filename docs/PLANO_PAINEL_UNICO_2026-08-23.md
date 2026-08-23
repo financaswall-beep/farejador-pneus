@@ -315,6 +315,10 @@ gate com tela.**
 | **9** | **Retiradas do parceiro** atrás de flag | `painel/public/app.partner-retiradas.js`, rotas existentes | permissão, escrita, idempotência, transação; A6/A8 passam |
 | **10** | canário + telemetria de divergência | flag por unidade | duas telas batendo com o painel antigo |
 
+Andamento: PR 6 incorporado com o broker `ms_`/`ps_` e `/auth/me` rico. PR 7
+implementa menu imutável derivado de `modules`, badges separados, boot exclusivo
+da Matriz e registro único de carregamento/renderização por página.
+
 **Migrations necessárias:** nenhuma prevista até o PR 10. Se o modelo de
 permissão exigir coluna nova, ela entra em PR próprio, **antes** do PR 6.
 
