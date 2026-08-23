@@ -12,6 +12,7 @@
 
 import pg from 'pg';
 import { verifyPassword } from '../src/parceiro/password.js';
+import { auditPartnerGrants } from './grants-parceiro-contract.js';
 
 const ambiente = (process.env.FAREJADOR_ENV?.trim() || 'prod') as 'prod' | 'test';
 const donoUsuario = process.env.OWNER_USERNAME?.trim();
@@ -48,25 +49,27 @@ async function main(): Promise<void> {
     `);
     checa('tabelas criadas', Number(tabelas.rows[0]!.n) >= 150, `${tabelas.rows[0]!.n} tabelas`);
 
-    const role = await client.query<{ ok: boolean }>(`
-      SELECT (rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolinherit) AS ok
-        FROM pg_roles WHERE rolname = 'farejador_partner_app'
-    `);
-    checa('role do parceiro com perfil restrito', role.rows[0]?.ok === true);
-
-    const grants = await client.query<{ n: string }>(`
-      SELECT count(*)::text AS n FROM information_schema.role_table_grants
-       WHERE grantee = 'farejador_partner_app'
-    `);
-    checa('permissões do parceiro aplicadas', Number(grants.rows[0]!.n) > 50, `${grants.rows[0]!.n} permissões`);
-
-    // A trava que separa parceiro de matriz: o galpão NUNCA é do parceiro.
-    const vazamento = await client.query<{ n: string }>(`
-      SELECT count(*)::text AS n FROM information_schema.role_table_grants
-       WHERE grantee = 'farejador_partner_app'
-         AND table_name IN ('wholesale_stock','wholesale_orders','matriz_expenses','commission_entries')
-    `);
-    checa('parceiro NÃO enxerga galpão/comissão', vazamento.rows[0]!.n === '0');
+    const grants = await auditPartnerGrants(client);
+    checa('role do parceiro com perfil restrito', grants.roleSafe,
+      grants.roleViolations.join(', '));
+    checa('baseline de permissões é íntegro', grants.baselineValid,
+      grants.expectedSha256);
+    checa('parceiro tem exatamente os grants aprovados',
+      grants.actualCount === grants.expectedCount
+        && grants.actualSha256 === grants.expectedSha256
+        && grants.missingGrants.length === 0
+        && grants.unexpectedGrants.length === 0,
+      `${grants.actualCount}/${grants.expectedCount}; hash ${grants.actualSha256}`);
+    if (grants.missingGrants.length > 0) {
+      console.log(`    ausentes: ${grants.missingGrants.join(', ')}`);
+    }
+    if (grants.unexpectedGrants.length > 0) {
+      console.log(`    inesperados: ${grants.unexpectedGrants.join(', ')}`);
+    }
+    checa('parceiro NÃO acessa dados exclusivos da Matriz',
+      grants.sensitivePrivileges.length === 0,
+      grants.sensitivePrivileges.map((item) =>
+        `${item.relation}:${item.scope}:${item.privilege}`).join(', '));
 
     console.log('\nDICIONÁRIO');
     const bairros = await client.query<{ n: string }>(

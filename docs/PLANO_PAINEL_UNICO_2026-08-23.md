@@ -157,17 +157,23 @@ superfície aumente e exige reduzir o baseline quando uma exceção é corrigida
 `withPartnerContext` (`db.ts:56-74`) = **zero linhas**, não "as do parceiro".
 
 ### 3.3 Política de GRANT
-- **Preservar hash/snapshot** do conjunto permitido — mesma disciplina de
+- **Preservar hash + lista exata** do conjunto permitido em
+  `scripts/baseline-grants-parceiro.json` — mesma disciplina de
   baseline que a casa usa em paridade e rotas: quem muda **regrava DE PROPÓSITO
   no mesmo commit**, com o delta na mensagem.
 - **Denylist explícita**, verificada além do hash: `commerce.wholesale_*`,
   `commerce.matriz_*`, `network.commission_entries`, `network.commission_entry_events`,
   `finance.matriz_ledger_*`. Zero grants — hoje confirmado.
-- **Conferir atributos da role**: `NOBYPASSRLS` e `NOINHERIT`.
+- **Conferir atributos da role**: `LOGIN`, `NOSUPERUSER`, `NOINHERIT`,
+  `NOCREATEROLE`, `NOCREATEDB`, `NOREPLICATION` e `NOBYPASSRLS`.
 - **Baseline atualizado conscientemente para 70 grants**, incluindo o
   `SELECT ON commerce.tire_specs` criado pela `0202`
   (`db/migrations/0202_catalog_bootstrap_fitment_workflow.sql:134`).
-  Hash atual do conjunto: `16bdb2433828b2a73d7134ad9e2a5f4b`.
+  SHA-256 atual: `bcd7da4d107d393b12fcdec35a2f2b15eebb12cb7688e26ba72c48157ab6abae`.
+  Algoritmo: ordenar `schema.tabela:PRIVILÉGIO:IS_GRANTABLE`, unir com LF e
+  calcular SHA-256 em UTF-8. A denylist verifica privilégios efetivos de tabela
+  **e de coluna**, inclusive os herdados de `PUBLIC`; portanto um grant parcial
+  não consegue passar escondido.
 
 ### 3.4 Proibições
 - **Não** conceder GRANT nas tabelas da denylist. Dado que a tela precisa vira
