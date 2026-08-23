@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#065f46" />
-  <title>Entrar na Matriz — Farejador</title>
-  <link rel="stylesheet" href="/admin/login.css?v=20260731-matriz-login1" />
-  <script defer src="/admin/login.js?v=20260731-matriz-login1"></script>
+  <title>Entrar na Central — Farejador</title>
+  <link rel="stylesheet" href="/admin/login.css?v=20260823-painel-unico1" />
+  <script defer src="/admin/login.js?v=20260823-painel-unico1"></script>
 </head>
 <body>
   <main class="login-shell">
@@ -15,7 +15,7 @@
         <span class="brand-mark">2W</span>
         <span class="brand-copy">
           <strong>2W PNEUS</strong>
-          <small>Farejador · Matriz</small>
+          <small>Farejador · Central</small>
         </span>
       </div>
 
@@ -55,9 +55,9 @@
     <section class="auth-region" aria-label="Autenticação da Matriz">
       <article class="card" aria-labelledby="title">
         <header class="card-header">
-          <p id="form-eyebrow" class="eyebrow">Acesso à Matriz</p>
+          <p id="form-eyebrow" class="eyebrow">Acesso à rede</p>
           <h1 id="title">Bem-vindo de volta!</h1>
-          <p id="form-subtitle" class="subtitle">Entre com seu usuário para acessar a gestão da 2W Pneus.</p>
+          <p id="form-subtitle" class="subtitle">Entre com seu usuário. O sistema identifica seu local de trabalho.</p>
         </header>
 
         <div id="loading" class="notice loading" role="status" aria-live="polite">
@@ -88,10 +88,19 @@
 
           <p id="login-error" class="error" role="alert" aria-live="assertive"></p>
           <button class="primary-button" type="submit">
-            <span class="button-label">Entrar na Matriz</span>
+            <span class="button-label">Entrar</span>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
           </button>
         </form>
+
+        <section id="workplace-chooser" class="hidden" aria-labelledby="workplace-title">
+          <p class="eyebrow">Local de trabalho</p>
+          <h2 id="workplace-title">Onde você vai entrar?</h2>
+          <p class="subtitle">Escolha somente entre os locais ligados à sua conta.</p>
+          <div id="workplace-list" class="workplace-list"></div>
+          <p id="workplace-error" class="error" role="alert" aria-live="assertive"></p>
+          <button id="workplace-back" class="secondary-button" type="button">Voltar</button>
+        </section>
 
         <form id="bootstrap-form" class="hidden bootstrap-form" novalidate>
           <div class="notice warning">

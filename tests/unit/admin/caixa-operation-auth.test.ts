@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  authenticatePanelAccess,
   authenticateOperation,
   listOperationWorkplaces,
   publicOperationWorkplace,
@@ -179,5 +180,24 @@ describe('resolução segura do local da Operação da Loja', () => {
       role: 'funcionario',
     });
     expect(safe).not.toHaveProperty('tokenId');
+  });
+
+  it('não oferece o painel da Matriz a vendedor/entregador sem panel_role', async () => {
+    vi.mocked(authenticatePersonCredentials).mockResolvedValue({ personId: 'person-2', username: 'operador' });
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        collaborator_id: 'seller-1', job: 'vendedor', work_area: 'sales', panel_role: null,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        token_id: 'partner-1', slug: 'rio-do-ouro', store_name: 'Rio do Ouro',
+        role: 'funcionario', display_name: 'Operador', allow_vendas: true,
+        allow_estoque: false, allow_entregas: false, allow_financeiro: false,
+      }] });
+    const dbPool = { query } as unknown as Pool;
+
+    const result = await authenticatePanelAccess('test', 'operador', 'senha', dbPool);
+
+    expect(result?.workplaces.map((workplace) => workplace.id))
+      .toEqual(['partner:rio-do-ouro']);
   });
 });

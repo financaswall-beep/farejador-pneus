@@ -104,6 +104,41 @@ export async function authenticateMatrizAdmin(
   };
 }
 
+/** Emite ms_ após o broker já ter validado a senha da pessoa. */
+export async function mintMatrizAdminSessionForPerson(
+  environment: 'prod' | 'test',
+  personId: string,
+  collaboratorId: string,
+  dbPool: Pool = defaultPool,
+): Promise<MatrizAdminLoginResult | null> {
+  const result = await dbPool.query<{
+    collaborator_id: string;
+    display_name: string;
+    username: string;
+    panel_role: MatrizAdminRole;
+  }>(
+    `SELECT mc.id AS collaborator_id, mc.display_name, pp.username, mc.panel_role
+       FROM network.matriz_collaborators mc
+       JOIN network.partner_people pp
+         ON pp.id = mc.person_id AND pp.environment = mc.environment
+      WHERE mc.environment = $1 AND mc.person_id = $2 AND mc.id = $3
+        AND mc.revoked_at IS NULL AND mc.panel_role IS NOT NULL
+        AND pp.revoked_at IS NULL
+      LIMIT 1`,
+    [environment, personId, collaboratorId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  const session = await insertSession(dbPool, environment, personId);
+  return {
+    ...session,
+    context: {
+      authType: 'session', personId, collaboratorId: row.collaborator_id,
+      displayName: row.display_name, username: row.username, role: row.panel_role,
+    },
+  };
+}
+
 export async function validateMatrizAdminSession(
   environment: 'prod' | 'test',
   sessionToken: string,

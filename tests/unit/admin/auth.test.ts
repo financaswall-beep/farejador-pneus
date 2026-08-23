@@ -57,6 +57,9 @@ describe('requireAdminAuth', () => {
     ['Basic abc', 'not bearer'],
     ['Bearer short', 'different length'],
     ['Bearer expected-admin-XXXX', 'wrong content'],
+    [`Bearer ps_${'a'.repeat(64)}`, 'partner session'],
+    [`Bearer cs_${'a'.repeat(64)}`, 'cashier session'],
+    [`Bearer es_${'a'.repeat(64)}`, 'courier session'],
   ])('returns 401 for %s (%s)', async (header) => {
     const { requireAdminAuth } = await loadAuth();
     const reply = createReply();

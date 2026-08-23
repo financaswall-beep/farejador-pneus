@@ -5,6 +5,11 @@
   const eyebrow = document.getElementById('form-eyebrow');
   const title = document.getElementById('title');
   const subtitle = document.getElementById('form-subtitle');
+  const workplaceChooser = document.getElementById('workplace-chooser');
+  const workplaceList = document.getElementById('workplace-list');
+  const workplaceError = document.getElementById('workplace-error');
+  const workplaceBack = document.getElementById('workplace-back');
+  let workplaceTicket = null;
 
   function setButtonBusy(button, busy, busyLabel) {
     const label = button.querySelector('.button-label');
@@ -27,16 +32,73 @@
 
   function show(form) {
     const bootstrap = form === bootstrapForm;
-    eyebrow.textContent = bootstrap ? 'Configuração inicial' : 'Acesso à Matriz';
+    eyebrow.textContent = bootstrap ? 'Configuração inicial' : 'Acesso à rede';
     title.textContent = bootstrap ? 'Prepare a conta proprietária' : 'Bem-vindo de volta!';
     subtitle.textContent = bootstrap
       ? 'Esta etapa aparece somente antes da criação da primeira conta da Matriz.'
-      : 'Entre com seu usuário para acessar a gestão da 2W Pneus.';
+      : 'Entre com seu usuário. O sistema identifica seu local de trabalho.';
     loading.classList.add('hidden');
     loginForm.classList.toggle('hidden', form !== loginForm);
     bootstrapForm.classList.toggle('hidden', form !== bootstrapForm);
+    workplaceChooser.classList.add('hidden');
     const firstInput = form.querySelector('input');
     if (firstInput) firstInput.focus({ preventScroll: true });
+  }
+
+  function enterSession(payload) {
+    if (payload.scope === 'partner') {
+      try {
+        localStorage.setItem(`farejador_partner_token_${payload.slug}`, payload.session_token);
+        sessionStorage.setItem('farejador_panel_workplace', JSON.stringify({
+          kind: 'partner', slug: payload.slug, id: payload.workplace.id,
+        }));
+      } catch {
+        throw new Error('storage_unavailable');
+      }
+      location.replace(`/parceiro/${encodeURIComponent(payload.slug)}/`);
+      return;
+    }
+    sessionStorage.removeItem('farejador_panel_workplace');
+    location.replace('/admin/painel');
+  }
+
+  function showWorkplaces(payload) {
+    workplaceTicket = payload.ticket;
+    workplaceList.textContent = '';
+    for (const workplace of payload.workplaces || []) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'workplace-option';
+      const copy = document.createElement('span');
+      const name = document.createElement('strong'); name.textContent = workplace.name;
+      const role = document.createElement('small'); role.textContent = workplace.role;
+      const kind = document.createElement('span'); kind.className = 'kind';
+      kind.textContent = workplace.kind === 'matrix' ? 'Matriz' : 'Parceiro';
+      copy.append(name, role); button.append(copy, kind);
+      button.addEventListener('click', () => chooseWorkplace(workplace.id, button));
+      workplaceList.appendChild(button);
+    }
+    loginForm.classList.add('hidden'); bootstrapForm.classList.add('hidden');
+    loading.classList.add('hidden'); workplaceChooser.classList.remove('hidden');
+  }
+
+  async function chooseWorkplace(workplaceId, button) {
+    if (!workplaceTicket) return show(loginForm);
+    workplaceError.textContent = ''; button.disabled = true;
+    try {
+      const response = await fetch('/admin/api/auth/login/escolher', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: workplaceTicket, workplace_id: workplaceId }),
+      });
+      const payload = await json(response);
+      if (!response.ok) throw new Error(payload.error || `api_${response.status}`);
+      enterSession(payload);
+    } catch (failure) {
+      workplaceTicket = null; workplaceError.textContent = message(
+        failure instanceof Error ? failure.message : 'unknown',
+      );
+      button.disabled = false;
+    }
   }
 
   function message(error) {
@@ -46,6 +108,7 @@
       invalid_emergency_token: 'O ADMIN_AUTH_TOKEN informado é inválido.',
       username_taken: 'Esse usuário já está em uso. Escolha outro.',
       owner_already_configured: 'A conta proprietária já foi criada. Entre normalmente.',
+      ticket_invalid: 'A escolha expirou. Entre novamente.',
     };
     return labels[error] || 'Não foi possível concluir. Tente novamente.';
   }
@@ -69,7 +132,8 @@
       });
       const payload = await json(response);
       if (!response.ok) throw new Error(payload.error || `api_${response.status}`);
-      location.replace('/admin/painel');
+      if (payload.mode === 'choose') showWorkplaces(payload);
+      else enterSession(payload);
     } catch (failure) {
       error.textContent = message(failure instanceof Error ? failure.message : 'unknown');
       setButtonBusy(button, false, 'Entrando…');
@@ -118,6 +182,10 @@
       loading.textContent = 'Não consegui verificar o login. Atualize a página em instantes.';
     }
   }
+
+  workplaceBack.addEventListener('click', () => {
+    workplaceTicket = null; workplaceError.textContent = ''; show(loginForm);
+  });
 
   void start();
 }());

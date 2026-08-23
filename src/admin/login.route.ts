@@ -20,12 +20,20 @@ import {
   ADMIN_SESSION_TTL_SECONDS,
   MatrizAdminUsernameTakenError,
   MatrizOwnerAlreadyConfiguredError,
-  authenticateMatrizAdmin,
   bootstrapMatrizOwner,
   hasMatrizOwner,
+  mintMatrizAdminSessionForPerson,
   revokeMatrizAdminSession,
   type MatrizAdminLoginResult,
 } from './session.js';
+import { mintPartnerSession } from '../parceiro/queries.js';
+import {
+  authenticatePanelAccess,
+  listOperationWorkplaces,
+  publicOperationWorkplace,
+  type OperationWorkplace,
+} from './caixa/operation-auth.js';
+import { consumePanelLoginTicket, newPanelLoginTicket } from './panel-login-ticket.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_PER_USER = 10;
@@ -34,6 +42,10 @@ const BOOTSTRAP_MAX_PER_IP = 5;
 
 const usernameField = z.string().trim().min(3).max(60).regex(/^[a-zA-Z0-9._-]+$/);
 const loginSchema = z.object({ username: usernameField, password: z.string().min(1).max(200) });
+const workplaceSchema = z.object({
+  ticket: z.string().regex(/^pt_[a-f0-9]{64}$/),
+  workplace_id: z.string().min(1).max(100).regex(/^(matrix|partner:[a-z0-9-]+)$/),
+});
 const bootstrapSchema = z.object({
   display_name: z.string().trim().min(2).max(120),
   username: usernameField,
@@ -65,6 +77,46 @@ function publicUser(result: MatrizAdminLoginResult) {
 function tooMany(reply: FastifyReply, key: string) {
   return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(key)))
     .status(429).send({ error: 'too_many_attempts' });
+}
+
+const MATRIX_OWNER_MODULES = [
+  'resumo', 'bot', 'vendas', 'clientes', 'compras', 'estoque', 'logistica',
+  'financeiro', 'rede', 'marketing', 'colaboradores', 'catalogo',
+];
+
+function matrixPanelModules(role: 'owner' | 'admin'): string[] {
+  return role === 'owner'
+    ? [...MATRIX_OWNER_MODULES]
+    : MATRIX_OWNER_MODULES.filter((module) => !['marketing', 'colaboradores'].includes(module));
+}
+
+async function issuePanelSession(
+  reply: FastifyReply,
+  personId: string,
+  username: string,
+  workplace: OperationWorkplace,
+) {
+  if (workplace.kind === 'matrix') {
+    const result = await mintMatrizAdminSessionForPerson(
+      env.FAREJADOR_ENV, personId, workplace.collaboratorId,
+    );
+    if (!result) return null;
+    setSessionCookie(reply, result.sessionToken);
+    return {
+      mode: 'direct' as const, scope: 'matrix' as const,
+      workplace: publicOperationWorkplace(workplace),
+      modules: matrixPanelModules(result.context.role), user: publicUser(result),
+    };
+  }
+  clearSessionCookie(reply);
+  const session = await mintPartnerSession(env.FAREJADOR_ENV, workplace.tokenId);
+  return {
+    mode: 'direct' as const, scope: 'partner' as const,
+    workplace: publicOperationWorkplace(workplace), slug: workplace.slug,
+    store_name: workplace.name, session_token: session.session_token,
+    expires_at: session.expires_at, modules: workplace.modules,
+    user: { display_name: workplace.displayName, username, role: workplace.role },
+  };
 }
 
 export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise<void> {
@@ -119,7 +171,7 @@ export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise
     const userKey = `admin-login:user:${parsed.data.username.toLowerCase()}`;
     if (rateLimitBlocked(userKey, LOGIN_MAX_PER_USER)) return tooMany(reply, userKey);
 
-    const result = await authenticateMatrizAdmin(
+    const result = await authenticatePanelAccess(
       env.FAREJADOR_ENV,
       parsed.data.username,
       parsed.data.password,
@@ -134,13 +186,49 @@ export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise
     rateLimitClear(ipKey);
     rateLimitClear(userKey);
     rateLimitClear(`admin-auth:${request.ip}`);
-    setSessionCookie(reply, result.sessionToken);
-    return reply.status(200).send({ user: publicUser(result) });
+    if (result.workplaces.length === 1) {
+      const session = await issuePanelSession(
+        reply, result.personId, result.username, result.workplaces[0]!,
+      );
+      if (!session) return reply.status(401).send({ error: 'invalid_credentials' });
+      return reply.status(200).send(session);
+    }
+    clearSessionCookie(reply);
+    return reply.status(200).send({
+      mode: 'choose',
+      ticket: newPanelLoginTicket(
+        env.FAREJADOR_ENV, result.personId, result.username, result.workplaces,
+      ),
+      workplaces: result.workplaces.map(publicOperationWorkplace),
+    });
+  });
+
+  fastify.post('/admin/api/auth/login/escolher', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const ipKey = `admin-login:ip:${request.ip}`;
+    if (rateLimitBlocked(ipKey, LOGIN_MAX_PER_IP)) return tooMany(reply, ipKey);
+    const parsed = workplaceSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return reply.status(401).send({ error: 'ticket_invalid' });
+    const ticket = consumePanelLoginTicket(parsed.data.ticket);
+    if (!ticket || ticket.environment !== env.FAREJADOR_ENV) {
+      return reply.status(401).send({ error: 'ticket_invalid' });
+    }
+    const workplace = ticket.workplaces.find((item) => item.id === parsed.data.workplace_id);
+    if (!workplace) return reply.status(401).send({ error: 'ticket_invalid' });
+    const session = await issuePanelSession(reply, ticket.personId, ticket.username, workplace);
+    if (!session) return reply.status(401).send({ error: 'ticket_invalid' });
+    rateLimitClear(ipKey);
+    return reply.status(200).send(session);
   });
 
   fastify.get('/admin/api/auth/me', { preHandler: requireAdminAuth }, async (request: AdminAuthedRequest, reply) => {
     reply.header('Cache-Control', 'no-store');
     const context = getAdminContext(request);
+    const workplaces = context.personId
+      ? await listOperationWorkplaces(env.FAREJADOR_ENV, context.personId)
+      : [];
+    const workplace = workplaces.find((item) => item.kind === 'matrix'
+      && item.collaboratorId === context.collaboratorId);
     return reply.status(200).send({
       user: {
         display_name: context.displayName,
@@ -148,6 +236,10 @@ export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise
         role: context.role,
         auth_type: context.authType,
       },
+      workplace: workplace ? publicOperationWorkplace(workplace) : {
+        id: 'matrix', kind: 'matrix', name: 'Matriz', role: context.role,
+      },
+      modules: matrixPanelModules(context.role),
     });
   });
 
