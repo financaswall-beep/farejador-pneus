@@ -21,6 +21,9 @@
     "test:all": "npm run test && npm run test:integration",
     "check:migrations": "node scripts/check-migrations.cjs",
     "replay:migrations": "node scripts/replay-migrations.cjs",
+    "instalar-projeto": "tsx scripts/instalar-projeto.ts",
+    "prova-instalador": "tsx scripts/prova-instalador.ts",
+    "gerar-seed-regiao": "node scripts/gerar-seed-regiao.cjs",
     "checar-tamanho": "node scripts/checar-tamanho.cjs",
     "prova-painel": "node scripts/prova-paridade-painel.cjs && node scripts/prova-paridade-matriz.cjs && node scripts/prova-endpoints-painel.cjs && node scripts/checar-tamanho.cjs && tsx scripts/prova-rotas-matriz.ts",
     "enrich": "tsx --env-file=.env src/enrichment/cli.ts"
