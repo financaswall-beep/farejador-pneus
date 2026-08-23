@@ -382,8 +382,10 @@ com o roteiro do ataque anexado.
 gera falha falsa em testes sensíveis a tempo (aconteceu em 2026-08-23:
 8 "falhas" que sumiram na execução limpa; 1306/1306).
 
-⚠️ `src/parceiro/queries.ts` está em **4298/4310** — sobram **12 linhas**.
-Qualquer adição exige fatiar antes.
+Após a implementação de Retiradas, o domínio foi extraído para
+`src/parceiro/pickup-queries.ts`; `src/parceiro/queries.ts` ficou em
+**4191/4310**. A regra continua: funcionalidade nova deve nascer em módulo
+próprio, sem engordar o arquivo herdado.
 
 ---
 

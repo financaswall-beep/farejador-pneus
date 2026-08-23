@@ -32,7 +32,8 @@ window.PAINEL_PAGES = {
   unidade: { scopes: ['matrix'], requires: 'rede', render: ['renderParceiroChart'] },
   vendas: { scopes: ['matrix'], requires: 'vendas', load: ['loadVendasData'] },
   retiradas: {
-    scopes: ['partner'], requires: 'retiradas', partnerLoad: ['loadPartnerRetiradas'],
+    scopes: ['matrix', 'partner'], requires: 'retiradas',
+    load: ['loadPartnerRetiradas'], partnerLoad: ['loadPartnerRetiradas'],
   },
   clientes: { scopes: ['matrix'], requires: 'clientes', load: ['loadClientes'], enter: ['startClientesLive'] },
   compras: { scopes: ['matrix'], requires: 'compras', load: ['loadCompras'] },

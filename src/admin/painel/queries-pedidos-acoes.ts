@@ -26,6 +26,8 @@ import {
   beginManualOrderIdempotency, recordManualOrderFingerprint,
 } from './manual-order-idempotency.js';
 import { assertRetailSaleMoney } from './sales-money.js';
+import type { PickupService } from '../../shared/pickup-services.js';
+import { materializeMatrizPickupServices } from '../../shared/pickup-service-persistence.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -218,13 +220,45 @@ export async function cancelManualOrder(
 
 /** Conclui retirada aberta do bot: reserva vira baixa fisica e o pagamento realiza. */
 export async function completeMatrizPickup(
-  input: { order_id: string; actor_label: string; environment?: 'prod' | 'test' },
+  input: {
+    order_id: string;
+    actor_label: string;
+    environment?: 'prod' | 'test';
+    payment_method?: string | null;
+    services?: PickupService[];
+  },
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string; status: 'paid'; retrieved_at: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
+    const locked = await client.query<{ pickup_services: PickupService[] }>(
+      `SELECT pickup_services FROM commerce.orders
+        WHERE environment=$1 AND id=$2 AND partner_order_id IS NULL
+          AND fulfillment_mode='pickup' AND status='open' FOR UPDATE`,
+      [environment, input.order_id],
+    );
+    if (!locked.rows[0]) throw new Error('pickup_not_found');
+    const services = input.services ?? locked.rows[0].pickup_services ?? [];
+    await client.query(
+      `UPDATE commerce.orders
+          SET pickup_arrived_at=COALESCE(pickup_arrived_at,now()),
+              pickup_services=$3::jsonb,
+              payment_method=COALESCE(NULLIF($4,''),payment_method),updated_at=now()
+        WHERE environment=$1 AND id=$2`,
+      [environment, input.order_id, JSON.stringify(services), input.payment_method ?? null],
+    );
+    const insertedServiceCents = await materializeMatrizPickupServices(
+      client, environment, input.order_id, services,
+    );
+    if (insertedServiceCents > 0) {
+      await client.query(
+        `UPDATE commerce.orders SET total_amount=total_amount+$3::numeric,updated_at=now()
+          WHERE environment=$1 AND id=$2`,
+        [environment, input.order_id, (insertedServiceCents / 100).toFixed(2)],
+      );
+    }
     const updated = await client.query<{ order_id: string; status: 'paid'; retrieved_at: string }>(
       `UPDATE commerce.orders o
           SET status='paid',retrieved_at=now(),closed_at=COALESCE(closed_at,now()),

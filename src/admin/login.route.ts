@@ -81,13 +81,13 @@ function tooMany(reply: FastifyReply, key: string) {
 
 const MATRIX_OWNER_MODULES = [
   'resumo', 'bot', 'vendas', 'clientes', 'compras', 'estoque', 'logistica',
-  'financeiro', 'rede', 'marketing', 'colaboradores', 'catalogo',
+  'financeiro', 'rede', 'marketing', 'colaboradores', 'catalogo', 'retiradas',
 ];
 
 function matrixPanelModules(role: 'owner' | 'admin'): string[] {
   return role === 'owner'
     ? [...MATRIX_OWNER_MODULES]
-    : MATRIX_OWNER_MODULES.filter((module) => !['marketing', 'colaboradores'].includes(module));
+    : MATRIX_OWNER_MODULES.filter((module) => !['marketing', 'colaboradores', 'retiradas'].includes(module));
 }
 
 async function issuePanelSession(

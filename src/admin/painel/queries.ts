@@ -23,6 +23,7 @@ export * from './queries-pedidos.js'; // tipos de pedido + getPainelPedidos/Prod
 export * from './queries-rede.js'; // getPainelRede — o agregado por parceiro da página Rede
 export * from './queries-rede-resumo.js'; // funil da Rede + resumo da matriz (getMatrizResumo)
 export * from './queries-pedidos-acoes.js'; // registrar pedido manual/walk-in + cancelar + raio de entrega
+export * from './queries-pickups.js'; // fila e etapas de retirada da Matriz
 export * from './queries-parceiros.js'; // criação transacional de parceiro
 export * from './queries-parceiros-rede.js'; // 0165: chave "recebe pedidos da Rede" (só sistema)
 export * from './queries-candidaturas.js'; // candidatura atômica/idempotente (Etapa 6)
