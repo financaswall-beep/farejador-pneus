@@ -72,11 +72,16 @@ As baterias existentes ainda comprovam os efeitos: `partner-portal.integration`
 verifica baixa/reserva, financeiro, auditoria, idempotência e isolamento; e
 `matriz-walkin-atomic.integration` verifica pedido, galpão e ledger da Matriz.
 
-### 2.2 As 145 rotas da matriz não têm noção de "dono"
-`grep preHandler` em `src/admin/painel/route-*.ts`: **145 handlers**
-(63+27 `requireAdminOwner`, 52+3 `requireAdminAuth`), **nenhum com `unit_id` no
+### 2.2 As 159 APIs da matriz não têm noção de "dono da unidade"
+O censo executável do PR 3 registra **159 APIs**: 104 com
+`requireAdminOwner` e 55 com `requireAdminAuth`, **nenhuma com `unit_id` no
 escopo**. E **94 arquivos** de `src/admin/painel/` importam `persistence/db.js`;
 **zero** usam `partnerPool`.
+
+O baseline agora inclui método, URL e o guarda exato, além do contrato de
+sessão `ms_`, papel e domínio da Matriz. Retirar o guarda ou trocar
+`requireAdminOwner` por `requireAdminAuth` reprova o CI mesmo que método e URL
+continuem idênticos.
 
 Trocar o pool **não conserta query que nunca teve cláusula de dono**. Este é o
 custo real da obra.
@@ -282,7 +287,7 @@ gate com tela.**
 |---|---|---|---|
 | **1** | corrigir o plano + prova de regressão do roteamento | `scripts/prova-vendas-roteamento.ts`, `package.json`, este plano | parceiro converge no motor com RLS; Matriz permanece no walk-in `main` |
 | **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json`, CI | CI falha ao adicionar import novo; 14 exceções atuais congeladas |
-| **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json` | trocar `requireAdminOwner`→`requireAdminAuth` reprova |
+| **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json`, CI | 104 rotas owner e 55 owner/admin congeladas; trocar `requireAdminOwner`→`requireAdminAuth` reprova |
 | **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist | redefinição não declarada falha o build |
 | **5** | GRANT: hash + denylist + atributos | `scripts/prova-instalador.ts` (+CI) | baseline 70 grants; denylist zero |
 | **6** | broker de login + `/auth/me` rico | `src/admin/login.route.ts`, `src/admin/session.ts`, `src/admin/caixa/operation-auth.ts` | `ms_` só com `panel_role`; parceiro recebe `ps_`; A3/A4/A11 passam |

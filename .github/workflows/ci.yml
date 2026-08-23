@@ -36,6 +36,9 @@ jobs:
       - name: Arquitetura de pools do parceiro
         run: npm run prova-arquitetura-pools
 
+      - name: Guardas e escopo das rotas da Matriz
+        run: npm run prova-rotas-matriz
+
       - name: Typecheck
         run: npm run typecheck
 
