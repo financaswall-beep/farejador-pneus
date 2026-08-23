@@ -13,7 +13,7 @@ afterAll(async () => {
 });
 
 describe('contrato de privilégios do parceiro', () => {
-  it('mantém exatamente os 70 grants aprovados e nenhuma permissão sensível', async () => {
+  it('mantém exatamente os 71 grants aprovados e nenhuma permissão sensível', async () => {
     const audit = await auditPartnerGrants(db.pool);
 
     expect(audit).toMatchObject({
@@ -21,8 +21,8 @@ describe('contrato de privilégios do parceiro', () => {
       roleExists: true,
       roleSafe: true,
       baselineValid: true,
-      expectedCount: 70,
-      actualCount: 70,
+      expectedCount: 71,
+      actualCount: 71,
       missingGrants: [],
       unexpectedGrants: [],
       sensitivePrivileges: [],

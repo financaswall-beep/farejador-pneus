@@ -1,5 +1,23 @@
 # Handoff - Farejador
 
+> **Atualização — 23/08/2026 — Painel único web (PRs 6–10):** o casco único
+> agora abre sessões separadas para Matriz (`ms_`), parceiro (`ps_`) e operação
+> móvel (`cs_`), sem afrouxar `panel_role`. O parceiro moderno recebeu Resumo e
+> Retiradas usando as mesmas rotas restritas do painel legado. O fechamento da
+> obra adiciona um canário **desligado por padrão**, ativado pelo dono por unidade,
+> com retorno imediato ao painel anterior e telemetria estritamente técnica das
+> últimas 24 horas (sem cliente, telefone, pedido, valor ou JSON livre). A mudança
+> de banco está em `0203_partner_modern_panel_canary.sql`: é aditiva, eleva
+> conscientemente o contrato do papel do parceiro de 70 para 71 grants e não
+> altera cálculos, estoque nem financeiro. Validação local: 1.340 testes
+> unitários, TypeScript, build, 204 migrations, prova do painel (1.211
+> propriedades), 95 contratos e 258 rotas administrativas aprovados. O Docker
+> local não respondeu; por isso a integração PostgreSQL deve ser confirmada pelo
+> CI antes do merge. A `0203` ainda deve ser aplicada no **banco novo correto**
+> antes do deploy; não usar a conexão `.env.pooler`, já identificada como outro
+> banco. Ordem: CI verde → merge → backup → aplicar `0203` no Supabase novo →
+> deploy → smoke → habilitar uma única unidade canário.
+
 > **Atualização mais recente — 23/08/2026:** implementado o cadastro inicial do
 > Catálogo antes da primeira compra e o fluxo auditável de compatibilidade por
 > medida. Criar produto não inventa estoque nem financeiro; o Bot falha fechado

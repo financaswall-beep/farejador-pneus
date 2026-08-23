@@ -172,10 +172,10 @@ superfície aumente e exige reduzir o baseline quando uma exceção é corrigida
   `finance.matriz_ledger_*`. Zero grants — hoje confirmado.
 - **Conferir atributos da role**: `LOGIN`, `NOSUPERUSER`, `NOINHERIT`,
   `NOCREATEROLE`, `NOCREATEDB`, `NOREPLICATION` e `NOBYPASSRLS`.
-- **Baseline atualizado conscientemente para 70 grants**, incluindo o
-  `SELECT ON commerce.tire_specs` criado pela `0202`
-  (`db/migrations/0202_catalog_bootstrap_fitment_workflow.sql:134`).
-  SHA-256 atual: `bcd7da4d107d393b12fcdec35a2f2b15eebb12cb7688e26ba72c48157ab6abae`.
+- **Baseline atualizado conscientemente para 71 grants**, incluindo o
+  `SELECT ON commerce.tire_specs` criado pela `0202` e o único `INSERT` na
+  telemetria técnica do canário criado pela `0203`.
+  SHA-256 atual: `59ef335494b84faa0b35855c18b14a1a386aa2962e2ddcf39ad93d2eaa8b3ff8`.
   Algoritmo: ordenar `schema.tabela:PRIVILÉGIO:IS_GRANTABLE`, unir com LF e
   calcular SHA-256 em UTF-8. A denylist verifica privilégios efetivos de tabela
   **e de coluna**, inclusive os herdados de `PUBLIC`; portanto um grant parcial
@@ -308,26 +308,32 @@ gate com tela.**
 | **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json`, CI | CI falha ao adicionar import novo; 14 exceções atuais congeladas |
 | **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json`, CI | 104 rotas owner e 55 owner/admin congeladas; trocar `requireAdminOwner`→`requireAdminAuth` reprova |
 | **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist explícita, CI | única colisão atual congelada; redefinição nova ou autorização obsoleta falha o build |
-| **5** | GRANT: hash + denylist + atributos | `scripts/prova-instalador.ts` (+CI) | baseline 70 grants; denylist zero |
+| **5** | GRANT: hash + denylist + atributos | `scripts/prova-instalador.ts` (+CI) | baseline 71 grants; denylist zero |
 | **6** | broker de login + `/auth/me` rico | `src/admin/login.route.ts`, `src/admin/session.ts`, `src/admin/caixa/operation-auth.ts` | `ms_` só com `panel_role`; parceiro recebe `ps_`; A3/A4/A11 passam |
 | **7** | menu derivado + boot condicional + registro por página | `painel/public/app.core.js`, `app.api.js`, `app.nav.js` | matriz sem regressão; paridade regravada de propósito |
 | **8** | **Resumo do parceiro** (read-only) atrás de flag | `painel/public/app.partner-resumo.js`, `src/parceiro/route-resumo*.ts`, `route-static.ts` | prova login+contexto+menu+escopo; A1/A2/A5/A12 passam |
 | **9** | **Retiradas do parceiro** atrás de flag | `painel/public/app.partner-retiradas.js`, rotas existentes | permissão, escrita, idempotência, transação; A6/A8 passam |
 | **10** | canário + telemetria de divergência | flag por unidade | duas telas batendo com o painel antigo |
 
-Andamento: PRs 6, 7 e 8 incorporados. O broker emite `ms_`/`ps_`, `/auth/me`
+Andamento: PRs 6, 7, 8 e 9 incorporados; o PR 10 fecha a obra. O broker emite `ms_`/`ps_`, `/auth/me`
 devolve o contexto calculado no servidor, o menu é derivado de `modules`, os
 badges não alteram a definição do menu e o boot administrativo só roda para a
 Matriz. O Resumo moderno do parceiro é somente leitura e permanece
 desligado por padrão: usa exclusivamente `resumo`, `comissao/equipe` e
 `meu-desempenho` sob sessão `ps_`; não refaz contas financeiras no navegador e
 mantém competência, caixa e títulos em aberto visualmente separados. A flag
-por unidade continua reservada ao PR 10, portanto o painel legado permanece o
-único caminho do parceiro até o canário ser habilitado conscientemente. O PR 9
+por unidade do PR 10 nasce desligada, portanto o painel legado permanece o
+caminho do parceiro até o dono habilitar uma unidade conscientemente. O PR 9
 implementa Retiradas no mesmo casco e preserva a operação auditada: fila
 escopada, pagamento no balcão, reserva→baixa física→caixa apenas na confirmação,
 cancelamento sem caixa e foto aprovada como apoio opcional. O navegador não
 refaz efeitos de estoque ou financeiro.
+
+O PR 10 acrescenta a chave owner-only na ficha da unidade, rollback sem deploy,
+leitura da flag no broker e no `/api/me`, e telemetria técnica de 24 horas
+(eventos, erros e latência p95). O evento é allowlisted, usa pool restrito + RLS
+e não contém PII, pedido, valor ou JSON livre. Resumo e Retiradas continuam
+chamando exatamente as mesmas rotas transacionais do painel legado.
 
 **Paridade fechada de Retiradas (PR 9):** listar somente pickups aguardando;
 mostrar cliente, telefone, itens, origem 2W, total e foto quando autorizada;
@@ -335,8 +341,9 @@ avisar por telefone/WhatsApp; escolher Pix/Dinheiro/Cartão; confirmar uma únic
 vez; cancelar com motivo obrigatório no fluxo 2W; liberar reserva sem entrada
 no caixa; respeitar `requireScreen('retiradas')` sem exigir acesso a Vendas.
 
-**Migrations necessárias:** nenhuma prevista até o PR 10. Se o modelo de
-permissão exigir coluna nova, ela entra em PR próprio, **antes** do PR 6.
+**Migration necessária:** `0203_partner_modern_panel_canary.sql`, aditiva e
+compatível com o código antigo. Aplicar no banco novo correto **antes** do deploy;
+não usar a `.env.pooler` enquanto ela apontar para o banco externo divergente.
 
 ---
 
@@ -441,9 +448,11 @@ canário. Sem checklist assinado, a tela não conta como migrada.
 
 ## 12. O que NÃO foi verificado
 
-- A prova somente leitura do banco novo confirmou **157 tabelas**, role do
-  parceiro restrita, **70 grants** e zero grant no galpão/comissão. A `0202`
-  cria uma tabela estrutural e declara explicitamente que não semeia negócio.
+- A prova somente leitura anterior confirmou **157 tabelas**, role do parceiro
+  restrita, **70 grants** e zero grant no galpão/comissão até a `0202`. Após
+  aplicar a `0203`, o contrato esperado passa conscientemente a **71 grants**
+  (somente `INSERT` na telemetria técnica) e precisa ser reconfirmado no banco
+  novo correto.
 - O banco não está mais zerado porque Wallace usou as telas após o deploy:
   cadastrou 1 produto/medida, 2 compatibilidades, 2 versões de preço e uma
   compra de 5 pneus. A compra gerou fornecedor, item, estoque, movimento,

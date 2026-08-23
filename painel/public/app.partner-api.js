@@ -33,6 +33,11 @@ window.PAINEL_MODULES.partnerApi = function () {
         this.partnerPanelUnauthorized(slug);
         return false;
       }
+      if (me.modern_panel_enabled !== true) {
+        sessionStorage.removeItem('farejador_panel_workplace');
+        location.replace(`/parceiro/${encodeURIComponent(slug)}/`);
+        return false;
+      }
       this.panelScope = 'partner';
       this.panelPartnerSlug = slug;
       this.panelPartnerToken = token;
@@ -101,6 +106,31 @@ window.PAINEL_MODULES.partnerApi = function () {
     async partnerApiBlob(resource) {
       const response = await this.partnerApiFetch(resource);
       return response.blob();
+    },
+
+    partnerPanelErrorCode(error) {
+      const raw = String(error?.code || error?.message || 'unknown_error');
+      return raw.replace(/[^a-zA-Z0-9_.:-]+/g, '_').slice(0, 80) || 'unknown_error';
+    },
+
+    async partnerPanelTelemetry(event) {
+      if (!this.adminAuthenticated || !this.isPartnerPanel()) return;
+      try {
+        const response = await fetch(this.partnerApiResourceUrl('panel-canary-events'), {
+          method: 'POST', credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.panelPartnerToken}`,
+          },
+          body: JSON.stringify(event),
+        });
+        if (response.status === 409) {
+          sessionStorage.removeItem('farejador_panel_workplace');
+          location.replace(`/parceiro/${encodeURIComponent(this.panelPartnerSlug)}/`);
+        }
+      } catch (_) {
+        // Telemetria nunca bloqueia leitura, retirada, estoque ou caixa.
+      }
     },
 
     partnerPanelUnauthorized(slug) {

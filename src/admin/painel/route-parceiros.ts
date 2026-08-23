@@ -8,8 +8,10 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
   createPartnerUnit,
+  getPartnerPanelCanaryHealth,
   setPartnerUnitCoverage,
   setPartnerUnitDeliveryRadius,
+  setPartnerUnitModernPanel,
   setPartnerUnitNetworkOrders,
 } from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
@@ -17,6 +19,8 @@ import {
   createPartnerSchema, setDeliveryRadiusBodySchema, setDeliveryRadiusParamsSchema,
   setNetworkOrdersBodySchema, setPartnerCoverageBodySchema,
 } from './route-schemas.js';
+
+const setModernPanelBodySchema = z.object({ modern_panel_enabled: z.boolean() });
 
 export async function registerPainelParceiros(fastify: FastifyInstance): Promise<void> {
   fastify.post('/admin/api/partners', { preHandler: requireAdminOwner }, async (request, reply) => {
@@ -94,6 +98,41 @@ export async function registerPainelParceiros(fastify: FastifyInstance): Promise
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel set network orders failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.put('/admin/api/partners/:partnerUnitId/modern-panel', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = setDeliveryRadiusParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_partner_unit_id' });
+    const body = setModernPanelBodySchema.safeParse(request.body ?? {});
+    if (!body.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await setPartnerUnitModernPanel(
+        env.FAREJADOR_ENV, params.data.partnerUnitId,
+        body.data.modern_panel_enabled, operatorLabel(request),
+      );
+      if (!result.updated) return reply.status(404).send({ error: 'partner_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel set partner modern panel failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.get('/admin/api/partners/:partnerUnitId/modern-panel/telemetry', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = setDeliveryRadiusParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_partner_unit_id' });
+    try {
+      const health = await getPartnerPanelCanaryHealth(
+        env.FAREJADOR_ENV, params.data.partnerUnitId,
+      );
+      if (!health) return reply.status(404).send({ error: 'partner_not_found' });
+      return reply.status(200).send(health);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel get partner modern telemetry failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

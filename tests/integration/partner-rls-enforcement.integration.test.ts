@@ -289,4 +289,56 @@ describe('Etapa 5 V2 — RLS enforcement com role farejador_partner_app', () => 
     );
     expect(crossLinked.rows[0]?.count).toBe(0);
   });
+
+  it('12. canário nasce desligado e a telemetria aceita só a própria unidade', async () => {
+    const a = await createPartnerFixture(db.pool, { slugSuffix: 'rls12a' + randomUUID().slice(0, 6) });
+    const b = await createPartnerFixture(db.pool, { slugSuffix: 'rls12b' + randomUUID().slice(0, 6) });
+    const defaults = await db.pool.query<{ id: string; enabled: boolean }>(
+      `SELECT id,modern_panel_enabled AS enabled
+         FROM network.partner_units WHERE id=ANY($1::uuid[]) ORDER BY id`,
+      [[a.partnerUnitId, b.partnerUnitId]],
+    );
+    expect(defaults.rows.every((row) => row.enabled === false)).toBe(true);
+
+    await db.pool.query(
+      `UPDATE network.partner_units SET modern_panel_enabled=true WHERE id=$1`,
+      [a.partnerUnitId],
+    );
+    await withRestrictedContext(a.partnerUnitId, async (client) => {
+      await client.query(
+        `INSERT INTO ops.partner_panel_canary_events
+           (environment,partner_unit_id,page,event_type,operation,outcome,duration_ms)
+         VALUES ('test',$1,'resumo','read','load_summary','success',12)`,
+        [a.partnerUnitId],
+      );
+    });
+    await expect(withRestrictedContext(a.partnerUnitId, async (client) => {
+      await client.query(
+        `INSERT INTO ops.partner_panel_canary_events
+           (environment,partner_unit_id,page,event_type,operation,outcome)
+         VALUES ('test',$1,'retiradas','read','load_pickups','success')`,
+        [b.partnerUnitId],
+      );
+    // O trigger de vínculo pode rejeitar antes da própria policy de RLS porque,
+    // sob a role restrita, a unidade alheia também é invisível. Ambos provam o
+    // mesmo contrato: nenhuma linha cruzada chega à tabela.
+    })).rejects.toThrow(/row-level security|violates|env_match/);
+
+    await expect(
+      restrictedPool.query('SELECT * FROM ops.partner_panel_canary_events'),
+    ).rejects.toThrow(/permission denied/);
+    const recorded = await db.pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM ops.partner_panel_canary_events
+        WHERE partner_unit_id=$1`,
+      [a.partnerUnitId],
+    );
+    expect(recorded.rows[0]?.count).toBe(1);
+    const columns = await db.pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema='ops' AND table_name='partner_panel_canary_events'`,
+    );
+    expect(columns.rows.map((row) => row.column_name)).not.toEqual(expect.arrayContaining([
+      'customer_id', 'order_id', 'phone', 'amount', 'payload',
+    ]));
+  });
 });

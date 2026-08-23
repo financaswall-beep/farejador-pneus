@@ -20,6 +20,8 @@ import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
 import { registerPartnerCoverageRoute } from './route-coverage.js';
 import { registerPartnerCreditRoutes } from './route-finance-credit.js';
+import { getPartnerModernPanelEnabled } from './panel-canary.js';
+import { registerPartnerPanelCanaryRoutes } from './route-panel-canary.js';
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -463,6 +465,7 @@ function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boole
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
   registerPartnerCoverageRoute(fastify);
   registerPartnerCreditRoutes(fastify);
+  registerPartnerPanelCanaryRoutes(fastify);
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
     if (retireLegacyMobile(request, reply)) return;
@@ -575,9 +578,10 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // linha). Nunca aceito do cliente. Configurações NÃO está aqui (segue isOwner).
   fastify.get('/parceiro/:slug/api/me', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const ctx = getPartnerContext(request);
-    const [permissions, self] = await Promise.all([
+    const [permissions, self, modernPanelEnabled] = await Promise.all([
       resolvePartnerPermissions(ctx),
       getPartnerSelfIdentity(ctx),
+      getPartnerModernPanelEnabled(ctx),
     ]);
     return reply.status(200).send({
       role: ctx.role,
@@ -587,6 +591,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       display_name: self.display_name,  // chip do topo (mata o "Caixa 01" chumbado)
       username: self.username,
       permissions,
+      modern_panel_enabled: modernPanelEnabled,
     });
   });
 

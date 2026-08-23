@@ -17,6 +17,10 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
 
     async loadPartnerRetiradas() {
       if (!this.isPartnerPanel() || !this.hasPanelModule('retiradas')) return;
+      const startedAt = performance.now();
+      void this.partnerPanelTelemetry({
+        page: 'retiradas', event_type: 'page_open', outcome: 'success',
+      });
       this.partnerRetiradasLoading = true;
       this.partnerRetiradasError = '';
       try {
@@ -31,8 +35,18 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
             if (row.photo_request_id) void this.partnerRetiradasLoadPhoto(row.photo_request_id);
           }
         }
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'read', operation: 'load_pickups',
+          outcome: 'success', duration_ms: Math.round(performance.now() - startedAt),
+        });
       } catch (err) {
         this.partnerRetiradasError = this.partnerRetiradasErrorMessage(err);
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'read', operation: 'load_pickups',
+          outcome: 'error', status_code: err?.status || null,
+          duration_ms: Math.round(performance.now() - startedAt),
+          error_code: this.partnerPanelErrorCode(err),
+        });
       } finally {
         this.partnerRetiradasLoading = false;
         this.$nextTick(() => lucide.createIcons());
@@ -82,6 +96,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
 
     async partnerRetiradasConfirm(row) {
       if (!row?.order_id || this.partnerRetiradasSavingId) return;
+      const startedAt = performance.now();
       this.partnerRetiradasSavingId = row.order_id;
       this.partnerRetiradasError = '';
       this.partnerRetiradasNotice = '';
@@ -92,9 +107,19 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
         this.partnerRetiradasRows = this.partnerRetiradasRows
           .filter((item) => item.order_id !== row.order_id);
         this.partnerRetiradasNotice = 'Retirada finalizada: estoque e caixa confirmados pelo servidor.';
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'write', operation: 'confirm_pickup',
+          outcome: 'success', duration_ms: Math.round(performance.now() - startedAt),
+        });
         await this.loadPartnerRetiradas();
       } catch (err) {
         this.partnerRetiradasError = this.partnerRetiradasErrorMessage(err);
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'write', operation: 'confirm_pickup',
+          outcome: 'error', status_code: err?.status || null,
+          duration_ms: Math.round(performance.now() - startedAt),
+          error_code: this.partnerPanelErrorCode(err),
+        });
       } finally {
         this.partnerRetiradasSavingId = '';
       }
@@ -118,6 +143,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
         this.partnerRetiradasError = 'Informe o motivo do cancelamento deste pedido da Rede.';
         return;
       }
+      const startedAt = performance.now();
       this.partnerRetiradasSavingId = row.order_id;
       this.partnerRetiradasError = '';
       this.partnerRetiradasNotice = '';
@@ -127,9 +153,19 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
           .filter((item) => item.order_id !== row.order_id);
         this.partnerRetiradasCloseCancel();
         this.partnerRetiradasNotice = 'Pedido cancelado: a reserva foi liberada sem entrada no caixa.';
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'write', operation: 'cancel_pickup',
+          outcome: 'success', duration_ms: Math.round(performance.now() - startedAt),
+        });
         await this.loadPartnerRetiradas();
       } catch (err) {
         this.partnerRetiradasError = this.partnerRetiradasErrorMessage(err);
+        void this.partnerPanelTelemetry({
+          page: 'retiradas', event_type: 'write', operation: 'cancel_pickup',
+          outcome: 'error', status_code: err?.status || null,
+          duration_ms: Math.round(performance.now() - startedAt),
+          error_code: this.partnerPanelErrorCode(err),
+        });
       } finally {
         this.partnerRetiradasSavingId = '';
       }

@@ -173,6 +173,11 @@ primeira compra, acrescenta a fila auditável de pesquisa/homologação de motos
 visão que denuncia divergência de compatibilidade entre produtos da mesma medida.
 Nenhum produto, estoque, preço ou fitment é criado automaticamente pela migration.
 
+`0203_partner_modern_panel_canary.sql` libera o painel moderno por unidade parceira,
+desligado por padrão, e cria telemetria técnica mínima com RLS. A telemetria não
+armazena cliente, pedido, telefone, valores nem payload livre; o rollback é desligar
+a chave da unidade e voltar ao painel legado no próximo acesso.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

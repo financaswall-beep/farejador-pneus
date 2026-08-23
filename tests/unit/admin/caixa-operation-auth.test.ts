@@ -22,7 +22,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       .mockResolvedValueOnce({ rows: [
         {
           token_id: 'token-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
-          role: 'funcionario', display_name: 'Wallace',
+          role: 'funcionario', display_name: 'Wallace', modern_panel_enabled: true,
           allow_vendas: true, allow_estoque: false, allow_entregas: false,
         },
         {
@@ -38,6 +38,7 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(workplaces.map((item) => item.id)).toEqual(['matrix', 'partner:rio-do-ouro']);
     expect(workplaces[1]).toMatchObject({
       displayName: 'Wallace',
+      modernPanelEnabled: true,
       modules: { vendas: true, estoque: false, entregas: false, financeiro: false },
     });
     expect(query).toHaveBeenCalledTimes(2);
@@ -171,6 +172,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       slug: 'rio-do-ouro',
       tokenId: 'secreto-no-servidor',
       displayName: 'Wallace',
+      modernPanelEnabled: false,
       modules: { vendas: true, estoque: true, entregas: true, financeiro: false },
     });
     expect(safe).toEqual({

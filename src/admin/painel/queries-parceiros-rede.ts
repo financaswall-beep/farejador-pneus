@@ -94,6 +94,102 @@ export async function setPartnerUnitNetworkOrders(
   }
 }
 
+export interface SetModernPanelResult {
+  updated: boolean;
+  changed?: boolean;
+  reason?: 'not_found';
+  modern_panel_enabled?: boolean;
+}
+
+/** Libera o painel moderno por unidade, com rollback imediato e trilha. */
+export async function setPartnerUnitModernPanel(
+  environment: 'prod' | 'test',
+  partnerUnitId: string,
+  enabled: boolean,
+  actorLabel: string,
+  dbPool: Pool = defaultPool,
+): Promise<SetModernPanelResult> {
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const before = await client.query<{ modern_panel_enabled: boolean; slug: string }>(
+      `SELECT modern_panel_enabled,slug
+         FROM network.partner_units
+        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL
+        FOR UPDATE`,
+      [partnerUnitId, environment],
+    );
+    if (before.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return { updated: false, reason: 'not_found' };
+    }
+    const previous = before.rows[0]!.modern_panel_enabled;
+    if (previous === enabled) {
+      await client.query('COMMIT');
+      return { updated: true, changed: false, modern_panel_enabled: enabled };
+    }
+    await client.query(
+      `UPDATE network.partner_units
+          SET modern_panel_enabled=$3
+        WHERE id=$1 AND environment=$2`,
+      [partnerUnitId, environment, enabled],
+    );
+    await client.query(
+      `INSERT INTO audit.events
+         (environment,domain,entity_table,entity_id,event_type,actor_label,
+          payload_before,payload_after)
+       VALUES ($1,'network','network.partner_units',$2,'partner_modern_panel_updated',$3,
+               $4::jsonb,$5::jsonb)`,
+      [
+        environment, partnerUnitId, actorLabel,
+        JSON.stringify({ modern_panel_enabled: previous }),
+        JSON.stringify({ modern_panel_enabled: enabled, slug: before.rows[0]!.slug }),
+      ],
+    );
+    await client.query('COMMIT');
+    return { updated: true, changed: true, modern_panel_enabled: enabled };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export interface PartnerPanelCanaryHealth {
+  modern_panel_enabled: boolean;
+  total_events_24h: number;
+  error_events_24h: number;
+  last_event_at: string | null;
+  last_error_at: string | null;
+  p95_duration_ms: number | null;
+}
+
+/** Agregado técnico de 24h; a tabela não possui PII nem valores de negócio. */
+export async function getPartnerPanelCanaryHealth(
+  environment: 'prod' | 'test',
+  partnerUnitId: string,
+  dbPool: Pool = defaultPool,
+): Promise<PartnerPanelCanaryHealth | null> {
+  const result = await dbPool.query<PartnerPanelCanaryHealth>(
+    `SELECT pu.modern_panel_enabled,
+            count(e.id)::int AS total_events_24h,
+            count(e.id) FILTER (WHERE e.outcome='error')::int AS error_events_24h,
+            max(e.created_at)::text AS last_event_at,
+            max(e.created_at) FILTER (WHERE e.outcome='error')::text AS last_error_at,
+            percentile_disc(0.95) WITHIN GROUP (ORDER BY e.duration_ms)
+              FILTER (WHERE e.duration_ms IS NOT NULL)::int AS p95_duration_ms
+       FROM network.partner_units pu
+       LEFT JOIN ops.partner_panel_canary_events e
+         ON e.environment=pu.environment AND e.partner_unit_id=pu.id
+        AND e.created_at >= now() - interval '24 hours'
+      WHERE pu.environment=$1 AND pu.id=$2 AND pu.deleted_at IS NULL
+      GROUP BY pu.modern_panel_enabled`,
+    [environment, partnerUnitId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export interface SetPartnerCoverageResult {
   updated: boolean;
   changed?: boolean;
