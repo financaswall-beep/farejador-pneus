@@ -44,6 +44,10 @@ function painelApp() {
     approveResult: null,
     adminAuthenticated: false,
     adminUser: null,
+    panelScope: 'matrix',
+    panelWorkplace: null,
+    panelModules: [],
+    menuBadges: {},
     operatorLabel: 'Operador',
     apiStatus: 'mock',
     apiError: null,
@@ -225,20 +229,8 @@ function painelApp() {
     marketingTab: 'visao', marketingPeriod: '30d', marketingVisao: null, marketingCampaignChannel: 'all', marketingCampaigns: null, marketingJourneys: null,
     marketingLoading: false, marketingError: null, marketingRequestSeq: 0, marketingCampaignsLoading: false, marketingCampaignsError: null, marketingCampaignRequestSeq: 0, marketingCampaignSearch: '', marketingCampaignDecision: 'all', marketingCampaignPage: 1, marketingCampaignDetailId: null, marketingCampaignDetail: null, marketingCampaignDetailLoading: false, marketingCampaignDetailError: null, marketingCampaignDetailRequestSeq: 0, marketingJourneysLoading: false, marketingJourneysError: null, marketingJourneysRequestSeq: 0, marketingIntegrations: null, marketingIntegrationsLoading: false, marketingIntegrationsError: null, marketingIntegrationsRequestSeq: 0, marketingIntegrationsMessage: '', marketingIntegrationActionLoading: '', marketingUtmForm: { base_url: '', source: 'meta', medium: 'paid_social', campaign: '', content: '' }, marketingUtmMessage: '',
     // ─── MENUS ──────────────────────────────────────
-    liveMenu: [
-      { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
-      { id: 'bot',        label: 'Bot',        icon: 'bot', badge: null },
-      { id: 'vendas',     label: 'Vendas',     icon: 'shopping-bag' },
-      { id: 'clientes',   label: 'Clientes',   icon: 'users' },
-      { id: 'compras',    label: 'Compras',    icon: 'shopping-cart' },
-      { id: 'estoque',    label: 'Estoque',    icon: 'package' },
-      { id: 'logistica',  label: 'Logística',  icon: 'truck' },
-      { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
-      { id: 'rede',       label: 'Rede',       icon: 'network' },
-      { id: 'marketing',  label: 'Marketing',  icon: 'megaphone' },
-      { id: 'colaboradores', label: 'Colaboradores', icon: 'users' },
-      { id: 'catalogo',   label: 'Catálogo',   icon: 'tag' },
-    ],
+    // `liveMenu` é um getter derivado dos módulos autorizados (app.nav.js).
+    // Os badges vivem fora do catálogo para o getter continuar imutável.
     futureMenu: [
       { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
     ],

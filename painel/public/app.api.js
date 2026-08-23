@@ -99,10 +99,13 @@ window.PAINEL_MODULES.api = function () {
       }
       const payload = await response.json();
       this.adminUser = payload.user;
+      this.panelScope = 'matrix';
+      this.panelWorkplace = payload.workplace || null;
+      this.panelModules = Array.isArray(payload.modules) ? payload.modules : [];
       this.operatorLabel = payload.user.display_name;
       this.adminAuthenticated = true;
-      if (payload.user.role !== 'owner') {
-        this.liveMenu = this.liveMenu.filter((item) => !['colaboradores', 'marketing'].includes(item.id));
+      if (!this.panelPageEnabled(this.currentPage)) {
+        this.currentPage = this.firstPanelPage() || 'resumo';
       }
       await recoverPendingIntegrityOperations(this);
       return true;

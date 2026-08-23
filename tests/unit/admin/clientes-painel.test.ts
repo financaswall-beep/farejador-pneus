@@ -51,7 +51,7 @@ describe('painel de clientes', () => {
 
   it('entrega as cinco subabas e mantém Clientes como item do menu existente', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
-    const app = readFileSync('painel/public/app.js', 'utf8');
+    const nav = readFileSync('painel/public/app.nav.js', 'utf8');
     const staticRoute = readFileSync('src/admin/painel/route-static.ts', 'utf8');
     const identityUi = readFileSync('painel/public/app.clientes.identity.js', 'utf8');
 
@@ -61,7 +61,7 @@ describe('painel de clientes', () => {
     for (const bloco of ['versão fiel ao board aprovado', 'Lead selecionado', 'Margem estimada', 'Mensagem sugerida', 'Vínculo com parceiro']) {
       expect(html).toContain(bloco);
     }
-    expect(app).toContain("{ id: 'clientes',   label: 'Clientes',   icon: 'users' }");
+    expect(nav).toContain("{ id: 'clientes', label: 'Clientes', icon: 'users', requires: 'clientes' }");
     expect(staticRoute).toContain("'app.clientes.js'");
     expect(staticRoute).toContain("'app.clientes.identity.js'");
     expect(html).toContain('Nomes, telefones');
@@ -106,12 +106,13 @@ describe('painel de clientes', () => {
   it('liga SSE com debounce de um segundo e fallback sem tirar os cards da tela', () => {
     const clientes = readFileSync('painel/public/app.clientes.js', 'utf8');
     const core = readFileSync('painel/public/app.core.js', 'utf8');
+    const nav = readFileSync('painel/public/app.nav.js', 'utf8');
     const route = readFileSync('src/admin/painel/route-clientes.ts', 'utf8');
 
     expect(clientes).toContain("new EventSource('/admin/api/clientes/stream')");
     expect(clientes).toContain('setTimeout(() => { void app.loadClientes(true); }, 1000)');
     expect(clientes).toContain('}, 15000)');
-    expect(core).toContain('this.startClientesLive()');
+    expect(nav).toContain("enter: ['startClientesLive']");
     expect(core).toContain('this.stopClientesLive()');
     expect(route).toContain("'Content-Type': 'text/event-stream'");
     expect(route).toContain("event: kanban");

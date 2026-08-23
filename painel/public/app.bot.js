@@ -19,11 +19,8 @@ window.PAINEL_MODULES.bot = function () {
         try { this.botResilience = await this.apiGet('/admin/api/bot/resiliencia'); }
         catch (err) { this.botResilience = null; }
       }
-      const item = this.liveMenu.find((i) => i.id === 'bot');
-      if (item) {
-        const n = this.botMudas.length + this.botEscalados.length;
-        item.badge = n > 0 ? String(n) : null;
-      }
+      const n = this.botMudas.length + this.botEscalados.length;
+      this.menuBadges.bot = n > 0 ? String(n) : null;
     },
 
     async loadBotVisao() {
