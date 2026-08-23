@@ -39,6 +39,9 @@ jobs:
       - name: Guardas e escopo das rotas da Matriz
         run: npm run prova-rotas-matriz
 
+      - name: Colisões do compositor do painel
+        run: npm run prova-colisoes-painel
+
       - name: Typecheck
         run: npm run typecheck
 

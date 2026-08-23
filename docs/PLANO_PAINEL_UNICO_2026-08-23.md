@@ -101,10 +101,17 @@ completa da rota até `src/persistence/db.ts`.
 ### 2.4 Colisão silenciosa entre os dois conjuntos de módulos
 `painel/public/app.montagem.js:68-70` faz
 `Object.defineProperties(out, Object.getOwnPropertyDescriptors(f()))` sobre 56
-fábricas. Existem nos DOIS painéis: `formatDateTime`, `init`, `saleForm`,
-`stockForm`, `clientes`, `compras`, `apiHeaders`, `waLink`, `deliveryAddr`,
-`mapsNavUrl`, `toE164Phone`. **O último ganha sem erro, sem warning, e a
-paridade não vê** (nome e tipo idênticos ao baseline).
+fábricas. O censo executável do PR 4 encontrou **uma colisão real no compositor
+atual**: `comprasResumo:compras->comprasRelatorios`. Ela foi declarada
+explicitamente porque o segundo módulo é hoje a fonte consolidada.
+
+Existem nomes repetidos entre os dois painéis (`formatDateTime`, `init`,
+`saleForm`, `stockForm`, `clientes`, `compras`, `apiHeaders`, `waLink`,
+`deliveryAddr`, `mapsNavUrl`, `toE164Phone`), mas eles **ainda não colidem em
+execução**, pois os painéis são montados separadamente. O risco aparece quando
+módulos do parceiro entram no compositor único. A partir do PR 4, qualquer
+colisão nova ou autorização que ficou obsoleta derruba o CI com origem e
+destino, em vez de aceitar silenciosamente o último valor.
 
 ---
 
@@ -288,7 +295,7 @@ gate com tela.**
 | **1** | corrigir o plano + prova de regressão do roteamento | `scripts/prova-vendas-roteamento.ts`, `package.json`, este plano | parceiro converge no motor com RLS; Matriz permanece no walk-in `main` |
 | **2** | gate de arquitetura (parceiro × pool admin) | `scripts/prova-arquitetura-pools.cjs`, `scripts/pools-herdados.json`, `package.json`, CI | CI falha ao adicionar import novo; 14 exceções atuais congeladas |
 | **3** | baseline de rotas com guard+pool+escopo | `scripts/prova-rotas-matriz.ts`, `scripts/baseline-rotas-matriz.json`, CI | 104 rotas owner e 55 owner/admin congeladas; trocar `requireAdminOwner`→`requireAdminAuth` reprova |
-| **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist | redefinição não declarada falha o build |
+| **4** | detector de colisão no compositor | `painel/public/app.montagem.js`, allowlist explícita, CI | única colisão atual congelada; redefinição nova ou autorização obsoleta falha o build |
 | **5** | GRANT: hash + denylist + atributos | `scripts/prova-instalador.ts` (+CI) | baseline 70 grants; denylist zero |
 | **6** | broker de login + `/auth/me` rico | `src/admin/login.route.ts`, `src/admin/session.ts`, `src/admin/caixa/operation-auth.ts` | `ms_` só com `panel_role`; parceiro recebe `ps_`; A3/A4/A11 passam |
 | **7** | menu derivado + boot condicional + registro por página | `painel/public/app.core.js`, `app.api.js`, `app.nav.js` | matriz sem regressão; paridade regravada de propósito |
