@@ -28,6 +28,7 @@ import { registerCaixaCommissionRoutes } from './route-commissions.js';
 import { registerCaixaTeamRoutes } from './route-team.js';
 import { registerCaixaNotificationRoutes } from './route-notifications.js';
 import { registerCaixaOperationStockRoutes } from './route-operation-stock.js';
+import { registerCaixaPickupRoutes } from './route-pickups.js';
 import { createCaixaSaleSchema } from './sale-schema.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
@@ -126,6 +127,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   const requireVendas = requireCaixaModule('vendas');
   const requireEstoque = requireCaixaModule('estoque');
   const requireEntregas = requireCaixaModule('entregas');
+  const requireRetiradas = requireCaixaModule('retiradas');
   const requireFinanceiro = requireCaixaModule('financeiro');
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
   registerCaixaDeliveryRoutes(fastify, flagGate, requireCaixaAuth, requireEntregas);
@@ -134,6 +136,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   registerCaixaTeamRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaNotificationRoutes(fastify, flagGate, requireCaixaAuth);
   registerCaixaOperationStockRoutes(fastify, flagGate, requireCaixaAuth, requireEstoque);
+  registerCaixaPickupRoutes(fastify, flagGate, requireCaixaAuth, requireRetiradas);
 
   fastify.get('/api/caixa/me', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

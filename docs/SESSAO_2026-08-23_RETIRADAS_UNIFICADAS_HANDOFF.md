@@ -1,14 +1,15 @@
 # Handoff — Retiradas unificadas Matriz + parceiro
 
 Data: 2026-08-23
-Estado: código implementado; migration 0204 aplicada e verificada no banco novo
-de São Paulo; publicação do código preparada nesta sessão.
+Estado: fluxo de banco e painel web incorporado à `main`; migration 0204 aplicada
+e verificada no banco novo de São Paulo. Incremento de Retiradas dentro do
+`/operacao` implementado localmente nesta sessão, ainda sem commit, push ou deploy.
 
 ## Decisão de arquitetura
 
 O Farejador continua sendo **um sistema só**: um repositório, um processo, um
-deploy e um banco. A tela de Retiradas também é uma só e responde para desktop
-e celular.
+deploy e um banco. O domínio de Retiradas tem uma só regra de servidor e agora
+possui duas apresentações intencionais: painel web e operação móvel.
 
 O que permanece separado de propósito é a fronteira de segurança:
 
@@ -51,7 +52,7 @@ Unificar a aparência não significa misturar estoque, caixa ou permissões.
   `(environment, order_id, pickup_service_code)`;
 - cancelamento bloqueia novo clique enquanto a primeira transação está em curso;
 - a forma de pagamento é obrigatória na confirmação final;
-- o aplicativo legado continua podendo concluir uma retirada sem enviar serviços;
+- clientes anteriores da API continuam podendo concluir uma retirada sem enviar serviços;
 - o servidor continua sendo a fonte da verdade; o navegador só mostra a prévia.
 
 ## Banco — migration 0204
@@ -73,35 +74,62 @@ o session pooler de São Paulo e sem usar a conexão antiga `.env.pooler`.
 Antes do commit foi executado um dry-run integral com rollback. Depois do
 commit, o smoke do banco confirmou 6 colunas de fluxo, 2 colunas de
 idempotência, 4 constraints, 4 índices e 6 produtos internos de serviço.
-Portanto, a etapa restante é: **publicar o código → deploy → smoke**.
+Nenhuma migration adicional foi criada para o incremento móvel: ele reutiliza
+integralmente o contrato da 0204. A etapa restante desse incremento é:
+**commit/push → deploy feito pelo dono → smoke autenticado**.
 
-## Interface
+## Interfaces
 
-- mesma página para Matriz e parceiro;
-- desktop em fila + detalhe;
-- celular em cards + folha inferior de atendimento;
+- `/admin/painel`: painel web moderno, com fila + detalhe;
+- `/operacao`: o aplicativo móvel/frente rápida já existente, agora incrementado
+  com a aba Retiradas, cards e folha inferior de atendimento;
+- o casco, login, cabeçalho, menu inferior e módulos que já funcionavam no
+  `/operacao` foram preservados; não houve reescrita do aplicativo;
+- Matriz e parceiro usam a mesma apresentação móvel, mas a rota é escolhida pelo
+  local autenticado: Matriz usa `/api/caixa/retiradas`; parceiro usa
+  `/parceiro/:slug/api/retiradas`;
+- na Matriz, Retiradas do `/operacao` é owner-only; no parceiro exige a permissão
+  explícita `retiradas`;
 - busca e filtros por etapa;
 - KPIs de aguardando, chegada, instalação e conclusão;
 - identidade visual verde; vermelho somente para cancelamento;
 - foto aprovada na conversa continua como apoio opcional;
 - WhatsApp permanece disponível quando há telefone.
 
+### Fluxo móvel acrescentado nesta sessão
+
+- aguardando → “Cliente chegou”: muda somente a etapa;
+- chegada → pagamento e serviços opcionais;
+- serviço pode ser cortesia ou cobrado, com total recalculado durante a digitação;
+- instalação é uma etapa opcional antes da conclusão;
+- conclusão usa a mesma transação auditada da Matriz ou do parceiro;
+- cancelamento da Matriz é estreito: só aceita pedido de retirada aberto, com
+  reserva auditada e sem vínculo de atacado. Uma venda comum não pode ser
+  cancelada por essa rota;
+- a folha de atendimento termina acima do menu inferior existente, sem esconder
+  ações nem alterar a navegação do aplicativo.
+
 ## Provas executadas
 
 - `npm run build`: aprovado;
 - `npm run check:migrations`: 205 migrations, aprovado;
-- `npm test`: 272 arquivos, 1.347 testes, aprovado;
+- `npm test`: 274 arquivos, 1.353 testes, aprovado;
 - `npm run prova-painel`: aprovado;
 - paridade do painel: 1.237 propriedades; baseline regravado conscientemente
   para os novos estados e a classificação pneu/serviço;
-- paridade de rotas: 260 rotas, incluindo dois endpoints novos da Matriz;
+- paridade de rotas: 260 rotas, incluindo os endpoints de Retiradas da Matriz;
 - fiscal de tamanho: aprovado; retirada do parceiro foi extraída para
-  `src/parceiro/pickup-queries.ts` e o arquivo herdado encolheu para 4.191 linhas.
+  `src/parceiro/pickup-queries.ts`; os três módulos novos do `/operacao` ficam
+  abaixo de 300 linhas e `caixa-core.js` permanece no teto de 300 linhas;
+- prova de navegador local: aba autorizada, 3 cards, KPIs 1/2/1/0, zero overflow
+  horizontal, folha de atendimento, formas de pagamento, inclusão de serviço e
+  cálculo R$ 89,00 + R$ 20,00 = R$ 109,00 aprovados.
 
 ## Prova PostgreSQL
 
-Foi criado `tests/integration/pickup-service-workflow.integration.test.ts`, com
-cenário real para parceiro e Matriz. A execução não chegou aos cenários porque
+`tests/integration/pickup-service-workflow.integration.test.ts` agora cobre
+parceiro, Matriz e a proteção que impede cancelar uma venda comum pela rota de
+Retiradas. A nova execução local não chegou aos cenários porque
 o Docker Desktop deixou de responder: `docker version` também ficou pendurado,
 e o hook expirou durante a criação do PostgreSQL 17. Isso é **pendência**, não
 aprovação nem reprovação do fluxo local.
@@ -119,12 +147,19 @@ da Matriz. A consulta passou a tipar o ambiente explicitamente como
 `public.env_t`. Essa foi uma correção real do caminho Matriz, e o merge continua
 condicionado a um ciclo integralmente verde.
 
+No primeiro ciclo do incremento móvel, os cenários transacionais de parceiro e
+Matriz passaram. O cenário novo de proteção de cancelamento não chegou à função:
+a fixture criou uma entrega sem endereço e o CHECK histórico de `commerce.orders`
+barrou corretamente a linha. A fixture passou a informar endereço de entrega;
+isso corrige somente o teste, sem afrouxar regra do banco. O novo merge continua
+condicionado à repetição integralmente verde do CI.
+
 Para repetir a mesma prova localmente depois de recuperar o Docker Desktop:
 
 ```text
 npm run test:integration -- tests/integration/pickup-service-workflow.integration.test.ts
 ```
 
-A 0204 já foi aplicada no banco correto. Depois do CI verde, resta executar o
-deploy e fazer smoke real com uma retirada de teste na Matriz e uma unidade
-canário.
+A 0204 já foi aplicada no banco correto. Para o incremento móvel, resta publicar
+o código, obter o CI PostgreSQL verde e fazer smoke real no `/operacao` com uma
+retirada da Matriz e outra de unidade canário.

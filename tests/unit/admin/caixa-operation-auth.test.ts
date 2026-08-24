@@ -23,12 +23,12 @@ describe('resolução segura do local da Operação da Loja', () => {
         {
           token_id: 'token-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
           role: 'funcionario', display_name: 'Wallace', modern_panel_enabled: true,
-          allow_vendas: true, allow_estoque: false, allow_entregas: false,
+          allow_vendas: true, allow_estoque: false, allow_entregas: false, allow_retiradas: false,
         },
         {
           token_id: 'token-bloqueado', slug: 'loja-bloqueada', store_name: 'Loja Bloqueada',
           role: 'funcionario', display_name: 'Bloqueado',
-          allow_vendas: false, allow_estoque: false, allow_entregas: false,
+          allow_vendas: false, allow_estoque: false, allow_entregas: false, allow_retiradas: false,
         },
       ] });
     const dbPool = { query } as unknown as Pool;
@@ -39,7 +39,7 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(workplaces[1]).toMatchObject({
       displayName: 'Wallace',
       modernPanelEnabled: true,
-      modules: { vendas: true, estoque: false, entregas: false, financeiro: false },
+      modules: { vendas: true, estoque: false, entregas: false, retiradas: false, financeiro: false },
     });
     expect(query).toHaveBeenCalledTimes(2);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
@@ -65,7 +65,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       name: 'Matriz',
       role: 'entregador',
       collaboratorId: 'courier-1',
-      modules: { vendas: false, estoque: false, entregas: true, financeiro: false },
+      modules: { vendas: false, estoque: false, entregas: true, retiradas: false, financeiro: false },
     }]);
   });
 
@@ -81,7 +81,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
     expect(workplaces).toEqual([{
       id: 'matrix', kind: 'matrix', name: 'Matriz', role: 'admin', collaboratorId: 'admin-1',
-      modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+      modules: { vendas: false, estoque: false, entregas: false, retiradas: false, financeiro: true },
     }]);
     expect(String(query.mock.calls[0]?.[0])).toContain('mc.panel_role IS NOT NULL');
   });
@@ -99,7 +99,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
     expect(workplaces[0]).toMatchObject({
       role: 'owner',
-      modules: { vendas: true, estoque: true, entregas: true, financeiro: true },
+      modules: { vendas: true, estoque: true, entregas: true, retiradas: true, financeiro: true },
     });
   });
 
@@ -115,7 +115,7 @@ describe('resolução segura do local da Operação da Loja', () => {
     const workplaces = await listOperationWorkplaces('test', 'person-override', dbPool);
 
     expect(workplaces[0]).toMatchObject({
-      modules: { vendas: false, estoque: false, entregas: true, financeiro: false },
+      modules: { vendas: false, estoque: false, entregas: true, retiradas: false, financeiro: false },
     });
     expect(String(query.mock.calls[0]?.[0])).toContain('matriz_collaborator_operation_permissions');
   });
@@ -126,14 +126,16 @@ describe('resolução segura do local da Operação da Loja', () => {
       .mockResolvedValueOnce({ rows: [{
         token_id: 'finance-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
         role: 'funcionario', display_name: 'Wallace', allow_vendas: false,
-        allow_estoque: false, allow_entregas: false, allow_financeiro: true,
+        allow_estoque: false, allow_entregas: false, allow_retiradas: false, allow_financeiro: true,
       }] });
     const dbPool = { query } as unknown as Pool;
 
     const workplaces = await listOperationWorkplaces('test', 'person-finance', dbPool);
 
     expect(workplaces[0]).toMatchObject({
-      role: 'funcionario', modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+      role: 'funcionario', modules: {
+        vendas: false, estoque: false, entregas: false, retiradas: false, financeiro: true,
+      },
     });
   });
 
@@ -143,7 +145,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       .mockResolvedValueOnce({ rows: [{
         token_id: 'owner-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
         role: 'owner', display_name: 'Dono', allow_vendas: false,
-        allow_estoque: false, allow_entregas: false,
+        allow_estoque: false, allow_entregas: false, allow_retiradas: true,
       }] });
     const dbPool = { query } as unknown as Pool;
 
@@ -151,7 +153,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
     expect(workplaces[0]).toMatchObject({
       role: 'owner',
-      modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+      modules: { vendas: false, estoque: false, entregas: false, retiradas: true, financeiro: true },
     });
   });
 
@@ -173,7 +175,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       tokenId: 'secreto-no-servidor',
       displayName: 'Wallace',
       modernPanelEnabled: false,
-      modules: { vendas: true, estoque: true, entregas: true, financeiro: false },
+      modules: { vendas: true, estoque: true, entregas: true, retiradas: true, financeiro: false },
     });
     expect(safe).toEqual({
       id: 'partner:rio-do-ouro',
@@ -193,7 +195,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       .mockResolvedValueOnce({ rows: [{
         token_id: 'partner-1', slug: 'rio-do-ouro', store_name: 'Rio do Ouro',
         role: 'funcionario', display_name: 'Operador', allow_vendas: true,
-        allow_estoque: false, allow_entregas: false, allow_financeiro: false,
+        allow_estoque: false, allow_entregas: false, allow_retiradas: false, allow_financeiro: false,
       }] });
     const dbPool = { query } as unknown as Pool;
 

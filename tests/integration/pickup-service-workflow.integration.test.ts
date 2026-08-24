@@ -168,4 +168,37 @@ describe('retirada com serviços na mesma verdade comercial', () => {
       quantity_reserved: 0, services: 1,
     });
   });
+
+  it('rota operacional de Retiradas não cancela uma venda comum da Matriz', async () => {
+    const cancellation = await import('../../src/admin/painel/queries-pickup-cancel.js');
+    const unit = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.units(environment,slug,name,is_active)
+       VALUES ('test','main','Matriz',true)
+       ON CONFLICT (environment,slug) DO UPDATE SET name=EXCLUDED.name RETURNING id`,
+    );
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
+       VALUES ('test',$1,'Venda comum') RETURNING id`,
+      [Math.floor(Math.random() * 1_000_000_000)],
+    );
+    const order = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
+         payment_method,delivery_address,unit_id,source,idempotency_key)
+       VALUES ('test',$1,50,'open','delivery','Pix','Rua Teste, 10',$2,'manual',$3) RETURNING id`,
+      [contact.rows[0]!.id, unit.rows[0]!.id, `ordinary-sale-${randomUUID()}`],
+    );
+
+    await expect(cancellation.cancelMatrizPickup({
+      order_id: order.rows[0]!.id,
+      actor_label: 'integration',
+      reason: 'não deve cancelar',
+      environment: 'test',
+    }, db.pool)).rejects.toThrow('pickup_not_found');
+
+    const preserved = await db.pool.query<{ status: string }>(
+      `SELECT status FROM commerce.orders WHERE environment='test' AND id=$1`,
+      [order.rows[0]!.id],
+    );
+    expect(preserved.rows[0]?.status).toBe('open');
+  });
 });
