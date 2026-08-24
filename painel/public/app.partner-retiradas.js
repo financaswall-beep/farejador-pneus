@@ -12,6 +12,12 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     partnerRetiradasCancelReason: '',
     partnerRetiradasPhotoUrls: {}, partnerRetiradasPhotoOpen: false,
     partnerRetiradasPhotoUrl: '',
+    partnerRetiradasWorkflowSteps: [
+      { id: 'arrived', label: 'Chegou', icon: 'store' },
+      { id: 'payment', label: 'Pagamento', icon: 'wallet-cards' },
+      { id: 'installing', label: 'Instalação', icon: 'wrench' },
+      { id: 'completed', label: 'Conclusão', icon: 'circle-check' },
+    ],
 
     async loadPartnerRetiradas() {
       if (!this.hasPanelModule('retiradas')) return;
@@ -120,9 +126,22 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
       return this.partnerRetiradasRows.find((row) => row.order_id === this.partnerRetiradasSelectedId) || null;
     },
     partnerRetiradasSelect(row) { this.partnerRetiradasSelectedId = row.order_id; },
+    partnerRetiradasProductItems(row) {
+      return Array.isArray(row?.items)
+        ? row.items.filter((item) => !item.pickup_service_code) : [];
+    },
+    partnerRetiradasItemLabel(item) {
+      return `${this.partnerRetiradasNumber(item?.quantity)}× ${item?.tire_size
+        || item?.product_name || item?.item_name || 'item'}`;
+    },
+    partnerRetiradasBrandLogo(item) {
+      return typeof this.catalogoBrandLogo === 'function'
+        ? this.catalogoBrandLogo(item?.brand) : null;
+    },
     partnerRetiradasItemsLabel(row) {
-      const items = Array.isArray(row?.items) ? row.items.filter((item) => !item.pickup_service_code) : [];
-      return items.length ? items.map((item) => `${this.partnerRetiradasNumber(item.quantity)}× ${item.tire_size || item.product_name || item.item_name || 'item'}${item.brand ? ` ${item.brand}` : ''}`).join(' · ') : 'Itens não informados';
+      const items = this.partnerRetiradasProductItems(row);
+      return items.length ? items.map((item) => `${this.partnerRetiradasItemLabel(item)}${
+        item.brand ? ` ${item.brand}` : ''}`).join(' · ') : 'Itens não informados';
     },
     partnerRetiradasPhone(row) { return String(row?.customer_phone || '').replace(/\D/g, ''); },
     partnerRetiradasIsTwoW(row) {
