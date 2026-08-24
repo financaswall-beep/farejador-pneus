@@ -183,8 +183,8 @@ describe('retirada com serviços na mesma verdade comercial', () => {
     );
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
-         payment_method,unit_id,source,idempotency_key)
-       VALUES ('test',$1,50,'open','delivery','Pix',$2,'manual',$3) RETURNING id`,
+         payment_method,delivery_address,unit_id,source,idempotency_key)
+       VALUES ('test',$1,50,'open','delivery','Pix','Rua Teste, 10',$2,'manual',$3) RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id, `ordinary-sale-${randomUUID()}`],
     );
 

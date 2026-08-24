@@ -147,6 +147,13 @@ da Matriz. A consulta passou a tipar o ambiente explicitamente como
 `public.env_t`. Essa foi uma correção real do caminho Matriz, e o merge continua
 condicionado a um ciclo integralmente verde.
 
+No primeiro ciclo do incremento móvel, os cenários transacionais de parceiro e
+Matriz passaram. O cenário novo de proteção de cancelamento não chegou à função:
+a fixture criou uma entrega sem endereço e o CHECK histórico de `commerce.orders`
+barrou corretamente a linha. A fixture passou a informar endereço de entrega;
+isso corrige somente o teste, sem afrouxar regra do banco. O novo merge continua
+condicionado à repetição integralmente verde do CI.
+
 Para repetir a mesma prova localmente depois de recuperar o Docker Desktop:
 
 ```text
