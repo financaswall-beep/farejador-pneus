@@ -26,7 +26,7 @@ describe('retiradas no painel único', () => {
     expect(nav).toContain("scopes: ['matrix', 'partner'], requires: 'retiradas'");
     expect(nav).toContain("partnerLoad: ['loadPartnerRetiradas']");
     expect(html).toContain("currentPage === 'retiradas'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260823-pickups-layout2');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260824-pickups-hotfix1');
     expect(html).toContain('data-pickup-workspace');
     expect(html).toContain('data-pickup-detail-panel');
     expect(html).toContain('[data-pickup-detail-panel]{position:static!important');
@@ -195,8 +195,11 @@ describe('retiradas no painel único', () => {
       expect.objectContaining({ pickup_label: '2× 80/100-14', pickup_brand_logo: null }),
     ]);
     expect(app.partnerRetiradasItemsLabel(row)).toBe('1× 90/90-18 Pirelli · 2× 80/100-14 Marca futura');
-    expect(html).toContain('Etapa ${stepIndex+1}: ${step.label}');
-    expect(html).toContain("icon:'wallet-cards'");
+    expect(html).toContain('data-pickup-card-actions');
+    expect(html).toContain('data-pickup-brand-logo');
+    expect(html).toContain('data-pickup-step-number>1</b>Chegou');
+    expect(html).toContain('data-lucide="wallet-cards"');
+    expect(html).not.toContain('absolute -right-1 -top-1');
     expect(html).toContain('item.pickup_brand_logo');
     expect(html).toContain('partnerRetiradasWaLink(row)');
     expect(html).toContain('Sem WhatsApp');
