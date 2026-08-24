@@ -97,6 +97,12 @@
     const pending = pickupStage(row) === 'completed' ? 0 : servicesCents(row) / 100;
     return Number(row && row.total_amount || 0) + pending;
   }
+  function reservationLabel(row) {
+    if (!row || !row.created_at) return 'Reserva ativa';
+    const instant = new Date(row.created_at);
+    if (Number.isNaN(instant.getTime())) return 'Reserva ativa';
+    return 'Reservado em ' + Caixa.dateTime.format(instant);
+  }
   function setStateView(kind) {
     elements.loading.classList.toggle('hidden', kind !== 'loading');
     elements.error.classList.toggle('hidden', kind !== 'error');
@@ -166,13 +172,21 @@
     items.append(svg('M7 3c3 0 4 4 4 9s-1 9-4 9-4-4-4-9 1-9 4-9Zm10 0c3 0 4 4 4 9s-1 9-4 9-4-4-4-9 1-9 4-9Z'),
       document.createTextNode(itemsLabel(row)));
     card.appendChild(items);
+    const reservation = node('p', 'pickup-card-reservation');
+    reservation.append(svg('M12 7v5l3 2'), document.createTextNode(reservationLabel(row)));
+    card.appendChild(reservation);
     const footer = node('footer');
-    footer.appendChild(node('strong', '', money(fullTotal(row))));
+    const total = node('span', 'pickup-card-total');
+    total.append(node('small', '', 'Total'), node('strong', '', money(fullTotal(row))));
+    footer.appendChild(total);
     const actions = node('div');
     const wa = whatsappLink(row);
     if (wa) {
       const link = node('a', 'pickup-card-whatsapp', 'WhatsApp');
       link.href = wa; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.appendChild(link);
+    } else {
+      const unavailable = node('button', 'pickup-card-whatsapp pickup-card-whatsapp--disabled', 'Sem WhatsApp');
+      unavailable.type = 'button'; unavailable.disabled = true; actions.appendChild(unavailable);
     }
     const open = node('button', 'pickup-card-open', pickupStage(row) === 'waiting' ? 'Cliente chegou' : 'Abrir atendimento');
     open.type = 'button'; open.dataset.openPickup = row.order_id; actions.appendChild(open);
@@ -192,7 +206,7 @@
     elements: elements, state: state, node: node, money: money, orderLabel: orderLabel,
     pickupStage: pickupStage, stageLabel: stageLabel, itemsLabel: itemsLabel,
     selected: selected, normalizedPayment: normalizedPayment, draftServices: draftServices,
-    servicesCents: servicesCents, fullTotal: fullTotal, setStateView: setStateView,
+    servicesCents: servicesCents, fullTotal: fullTotal, reservationLabel: reservationLabel, setStateView: setStateView,
     renderList: renderList, openSelected: openSelected, closeSheet: closeSheet,
   };
 }());
