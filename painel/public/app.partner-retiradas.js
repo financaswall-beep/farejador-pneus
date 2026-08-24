@@ -2,6 +2,13 @@
 // separado: ps_ usa rotas RLS do parceiro e ms_ usa rotas administrativas.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.partnerRetiradas = function () {
+  const productItems = (row) => Array.isArray(row?.items)
+    ? row.items.filter((item) => !item.pickup_service_code) : [];
+  const itemLabel = (item) => {
+    const parsed = Number(item?.quantity ?? 0);
+    const quantity = Number.isFinite(parsed) ? parsed : 0;
+    return `${quantity}× ${item?.tire_size || item?.product_name || item?.item_name || 'item'}`;
+  };
   return {
     partnerRetiradasRows: [], partnerRetiradasLoading: false,
     partnerRetiradasError: '', partnerRetiradasNotice: '',
@@ -20,7 +27,16 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
       try {
         const payload = this.isPartnerPanel()
           ? await this.partnerApiGet('retiradas') : await this.apiGet('/admin/api/retiradas');
-        this.partnerRetiradasRows = Array.isArray(payload.rows) ? payload.rows : [];
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        this.partnerRetiradasRows = rows.map((row) => ({
+          ...row,
+          pickup_card_items: productItems(row).map((item) => ({
+            ...item,
+            pickup_label: itemLabel(item),
+            pickup_brand_logo: typeof this.catalogoBrandLogo === 'function'
+              ? this.catalogoBrandLogo(item.brand) : null,
+          })),
+        }));
         this.partnerRetiradasServiceCatalog = Array.isArray(payload.service_catalog)
           ? payload.service_catalog : [];
         const payments = { ...this.partnerRetiradasPayments };
@@ -121,8 +137,9 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     },
     partnerRetiradasSelect(row) { this.partnerRetiradasSelectedId = row.order_id; },
     partnerRetiradasItemsLabel(row) {
-      const items = Array.isArray(row?.items) ? row.items.filter((item) => !item.pickup_service_code) : [];
-      return items.length ? items.map((item) => `${this.partnerRetiradasNumber(item.quantity)}× ${item.tire_size || item.product_name || item.item_name || 'item'}${item.brand ? ` ${item.brand}` : ''}`).join(' · ') : 'Itens não informados';
+      const items = productItems(row);
+      return items.length ? items.map((item) => `${itemLabel(item)}${
+        item.brand ? ` ${item.brand}` : ''}`).join(' · ') : 'Itens não informados';
     },
     partnerRetiradasPhone(row) { return String(row?.customer_phone || '').replace(/\D/g, ''); },
     partnerRetiradasIsTwoW(row) {

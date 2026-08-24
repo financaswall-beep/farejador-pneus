@@ -30,7 +30,7 @@ describe('retiradas no painel único', () => {
     expect(html).toContain('data-pickup-workspace');
     expect(html).toContain('data-pickup-detail-panel');
     expect(html).toContain('[data-pickup-detail-panel]{position:static!important');
-    expect(html).toContain('app.partner-retiradas.js?v=20260823-pickup-workflow1');
+    expect(html).toContain('app.partner-retiradas.js?v=20260824-pickup-cards1');
     expect(staticRoute).toContain("'app.partner-retiradas.js'");
     expect(partnerRoute).toContain("fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
     expect(partnerRoute).toContain("fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
@@ -172,6 +172,35 @@ describe('retiradas no painel único', () => {
     expect(app.partnerRetiradasStepReached(installing, 'payment')).toBe(true);
     expect(app.partnerRetiradasStepReached(installing, 'installing')).toBe(true);
     expect(app.partnerRetiradasStepReached(installing, 'completed')).toBe(false);
+  });
+
+  it('apresenta etapas numeradas com ícones, logos das marcas e WhatsApp nos cards web', async () => {
+    const html = source('painel/public/index.html');
+    const row = { items: [
+      { quantity: 1, tire_size: '90/90-18', brand: 'Pirelli' },
+      { quantity: 2, tire_size: '80/100-14', brand: 'Marca futura' },
+      { quantity: 1, item_name: 'Montagem', pickup_service_code: 'mounting' },
+    ] };
+    const app: any = {
+      catalogoBrandLogo: (brand: string) => brand === 'Pirelli' ? '/pirelli.webp' : null,
+      isPartnerPanel: () => false, hasPanelModule: () => true,
+      apiGet: vi.fn().mockResolvedValue({ rows: [row], service_catalog: [] }),
+      $nextTick: (callback: () => void) => callback(),
+    };
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(pickupModule()));
+    await app.loadPartnerRetiradas();
+
+    expect(app.partnerRetiradasRows[0].pickup_card_items).toEqual([
+      expect.objectContaining({ pickup_label: '1× 90/90-18', pickup_brand_logo: '/pirelli.webp' }),
+      expect.objectContaining({ pickup_label: '2× 80/100-14', pickup_brand_logo: null }),
+    ]);
+    expect(app.partnerRetiradasItemsLabel(row)).toBe('1× 90/90-18 Pirelli · 2× 80/100-14 Marca futura');
+    expect(html).toContain('Etapa ${stepIndex+1}: ${step.label}');
+    expect(html).toContain("icon:'wallet-cards'");
+    expect(html).toContain('item.pickup_brand_logo');
+    expect(html).toContain('partnerRetiradasWaLink(row)');
+    expect(html).toContain('Sem WhatsApp');
+    expect(html).toContain('Abrir atendimento');
   });
 
   it('Vendas apenas encaminha a retirada para o fluxo único', () => {
