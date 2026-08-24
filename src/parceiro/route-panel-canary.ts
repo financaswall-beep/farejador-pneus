@@ -8,10 +8,11 @@ import { recordPartnerPanelCanaryEvent } from './panel-canary.js';
 
 const operationSchema = z.enum([
   'load_summary', 'load_pickups', 'confirm_pickup', 'cancel_pickup',
+  'load_stock', 'load_stock_detail', 'request_stock_count',
 ]);
 
 const canaryEventSchema = z.object({
-  page: z.enum(['resumo', 'retiradas']),
+  page: z.enum(['resumo', 'retiradas', 'estoque']),
   event_type: z.enum(['page_open', 'read', 'write']),
   operation: operationSchema.nullable().optional(),
   outcome: z.enum(['success', 'error']),
@@ -32,8 +33,20 @@ const canaryEventSchema = z.object({
   if (event.page === 'retiradas' && operation === 'load_summary') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'operation_page_mismatch' });
   }
-  if (event.event_type === 'write' && !['confirm_pickup', 'cancel_pickup'].includes(operation ?? '')) {
+  const stockOperations = ['load_stock', 'load_stock_detail', 'request_stock_count'];
+  if (event.page === 'estoque' && operation && !stockOperations.includes(operation)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'operation_page_mismatch' });
+  }
+  if (event.page !== 'estoque' && stockOperations.includes(operation ?? '')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'operation_page_mismatch' });
+  }
+  if (event.event_type === 'write' && ![
+    'confirm_pickup', 'cancel_pickup', 'request_stock_count',
+  ].includes(operation ?? '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'write_operation_invalid' });
+  }
+  if (event.event_type === 'read' && operation === 'request_stock_count') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read_operation_invalid' });
   }
   if (event.outcome === 'success' && event.error_code) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'success_has_no_error' });

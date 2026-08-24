@@ -48,6 +48,32 @@ describe('rota de telemetria do canário parceiro', () => {
     }));
   });
 
+  it('aceita leitura e pedido de contagem apenas para Estoque autorizado', async () => {
+    resolvePermissions.mockResolvedValue({ resumo: false, retiradas: false, estoque: true });
+    recordEvent.mockResolvedValue(true);
+    const fastify = await app();
+    const read = await fastify.inject({
+      method: 'POST', url: '/parceiro/loja-a/api/panel-canary-events',
+      payload: {
+        page: 'estoque', event_type: 'read', operation: 'load_stock',
+        outcome: 'success', status_code: 200, duration_ms: 12,
+      },
+    });
+    const write = await fastify.inject({
+      method: 'POST', url: '/parceiro/loja-a/api/panel-canary-events',
+      payload: {
+        page: 'estoque', event_type: 'write', operation: 'request_stock_count',
+        outcome: 'success', status_code: 202, duration_ms: 20,
+      },
+    });
+    await fastify.close();
+    expect(read.statusCode).toBe(202);
+    expect(write.statusCode).toBe(202);
+    expect(recordEvent).toHaveBeenCalledWith(context, expect.objectContaining({
+      page: 'estoque', operation: 'request_stock_count',
+    }));
+  });
+
   it('recusa payload com PII/campo livre e operação incompatível', async () => {
     resolvePermissions.mockResolvedValue({ resumo: true, retiradas: true });
     const fastify = await app();

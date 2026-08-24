@@ -66,7 +66,10 @@ describe('resumo do parceiro no painel único', () => {
       headers: { Authorization: `Bearer ${token}` },
     }));
     expect(app.panelScope).toBe('partner');
-    expect(app.panelModules).toEqual(['resumo']);
+    expect(app.panelModules).toEqual(['resumo', 'colaboradores', 'catalogo']);
+    expect(app.panelModules).not.toContain('marketing');
+    expect(app.panelModules).not.toContain('bot');
+    expect(app.panelModules).not.toContain('rede');
     expect(app.adminUser).toBeNull();
   });
 

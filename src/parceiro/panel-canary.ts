@@ -2,9 +2,10 @@ import { withPartnerContext } from './db.js';
 import type { PartnerContext } from './auth.js';
 
 export type PartnerPanelCanaryEvent = {
-  page: 'resumo' | 'retiradas';
+  page: 'resumo' | 'retiradas' | 'estoque';
   eventType: 'page_open' | 'read' | 'write';
-  operation: 'load_summary' | 'load_pickups' | 'confirm_pickup' | 'cancel_pickup' | null;
+  operation: 'load_summary' | 'load_pickups' | 'confirm_pickup' | 'cancel_pickup'
+    | 'load_stock' | 'load_stock_detail' | 'request_stock_count' | null;
   outcome: 'success' | 'error';
   statusCode: number | null;
   durationMs: number | null;

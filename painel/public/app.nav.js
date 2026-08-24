@@ -30,22 +30,24 @@ window.PAINEL_PAGES = {
     'renderParceiroChart',
   ] },
   unidade: { scopes: ['matrix'], requires: 'rede', render: ['renderParceiroChart'] },
-  vendas: { scopes: ['matrix'], requires: 'vendas', load: ['loadVendasData'] },
+  vendas: { scopes: ['matrix', 'partner'], requires: 'vendas', load: ['loadVendasData'], partnerLoad: ['loadPartnerVendas'] },
   retiradas: {
     scopes: ['matrix', 'partner'], requires: 'retiradas',
     load: ['loadPartnerRetiradas'], partnerLoad: ['loadPartnerRetiradas'],
   },
   clientes: { scopes: ['matrix'], requires: 'clientes', load: ['loadClientes'], enter: ['startClientesLive'] },
-  compras: { scopes: ['matrix'], requires: 'compras', load: ['loadCompras'] },
-  estoque: { scopes: ['matrix'], requires: 'estoque', load: [
-    'loadAtacado', 'loadGalpaoFilme', 'loadStockReconciliation',
-  ] },
-  logistica: { scopes: ['matrix'], requires: 'logistica', load: ['loadLogistica'] },
-  financeiro: { scopes: ['matrix'], requires: 'financeiro', load: ['loadFinanceiro', 'loadFinExtrato'] },
+  compras: { scopes: ['matrix', 'partner'], requires: 'compras', load: ['loadCompras'], partnerLoad: ['loadPartnerCompras'] },
+  estoque: {
+    scopes: ['matrix', 'partner'], requires: 'estoque',
+    load: ['loadAtacado', 'loadGalpaoFilme', 'loadStockReconciliation'],
+    partnerLoad: ['loadPartnerEstoque'],
+  },
+  logistica: { scopes: ['matrix', 'partner'], requires: 'logistica', load: ['loadLogistica'], partnerLoad: ['loadPartnerLogistica'] },
+  financeiro: { scopes: ['matrix', 'partner'], requires: 'financeiro', load: ['loadFinanceiro', 'loadFinExtrato'], partnerLoad: ['loadPartnerFinanceiro'] },
   bot: { scopes: ['matrix'], requires: 'bot', load: ['loadBotVisao', 'loadBotMovement'] },
   marketing: { scopes: ['matrix'], requires: 'marketing', load: ['loadMarketing'] },
-  colaboradores: { scopes: ['matrix'], requires: 'colaboradores', load: ['loadColaboradores'] },
-  catalogo: { scopes: ['matrix'], requires: 'catalogo', load: ['loadCatalogo'] },
+  colaboradores: { scopes: ['matrix', 'partner'], requires: 'colaboradores', load: ['loadColaboradores'], partnerLoad: ['loadPartnerColaboradores'] },
+  catalogo: { scopes: ['matrix', 'partner'], requires: 'catalogo', load: ['loadCatalogo'], partnerLoad: ['loadPartnerCatalogo'] },
 };
 
 window.PAINEL_MODULES.nav = function () {

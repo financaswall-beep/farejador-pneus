@@ -427,14 +427,18 @@ export async function getPartnerVendas(ctx: PartnerContext, opts: PartnerListOpt
               status, payment_method, fulfillment_mode, delivery_address,
               delivery_status, delivery_courier, dispatched_at, delivered_at,
               awaiting_pickup, retrieved_at,
-              total_amount, received_amount, notes, items
-       FROM commerce.partner_orders_full
+              total_amount, received_amount, notes,
+              COALESCE((
+                SELECT jsonb_agg(item - 'unit_cost_snapshot' - 'cost_status')
+                  FROM jsonb_array_elements(pof.items) AS item
+              ), '[]'::jsonb) AS items
+       FROM commerce.partner_orders_full pof
        WHERE environment = $1 AND unit_id = $2
          AND ($3 OR NOT EXISTS (
            SELECT 1 FROM commerce.partner_dismissed_items d
             WHERE d.environment = $1 AND d.unit_id = $2
-              AND d.item_type = 'order' AND d.item_id = order_id::text))
-       ORDER BY created_at DESC
+              AND d.item_type = 'order' AND d.item_id = pof.order_id::text))
+       ORDER BY pof.created_at DESC
        LIMIT 500`,
       [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
@@ -714,7 +718,7 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
       `SELECT id AS stock_id,
               item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
-              brand, sale_price, average_cost, quantity_on_hand, quantity_reserved,
+              brand, sale_price, quantity_on_hand, quantity_reserved,
               is_tracked, stock_status, local_sku
        FROM commerce.partner_stock_levels
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
