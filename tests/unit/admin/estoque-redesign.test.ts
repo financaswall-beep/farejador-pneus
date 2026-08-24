@@ -10,8 +10,8 @@ describe('Estoque — lista com painel da medida', () => {
     readFileSync(resolve('painel/public/app.galpao.js'), 'utf8'),
   ].join('\n');
   const atacado = readFileSync(resolve('painel/public/app.atacado.js'), 'utf8');
-  const stockStart = html.indexOf('<div x-show="currentPage === \'estoque\'"');
-  const stockEnd = html.indexOf('<div x-show="currentPage === \'logistica\'"', stockStart);
+  const stockStart = html.indexOf('<div x-show="currentPage === \'estoque\' && isMatrixPanel()"');
+  const stockEnd = html.indexOf('<div x-show="currentPage === \'logistica\' && isPartnerPanel()"', stockStart);
   const stockHtml = html.slice(stockStart, stockEnd);
 
   it('mantém os quatro indicadores derivados da mesma lista oficial', () => {

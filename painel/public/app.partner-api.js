@@ -47,6 +47,14 @@ window.PAINEL_MODULES.partnerApi = function () {
       };
       this.panelModules = Object.entries(me.permissions)
         .filter(([, allowed]) => allowed === true).map(([module]) => module);
+      const partnerOnlyModules = [];
+      if (me.permissions.financeiro === true) partnerOnlyModules.push('compras');
+      if (me.permissions.entregas === true) partnerOnlyModules.push('logistica');
+      if (me.role === 'owner') {
+        partnerOnlyModules.push('colaboradores', 'catalogo');
+      }
+      this.panelModules = [...new Set([...this.panelModules, ...partnerOnlyModules])];
+      // Marketing, Bot e Rede não entram: não existem na projeção da unidade.
       this.adminUser = null;
       this.operatorLabel = me.display_name || me.username || 'Operador';
       this.adminAuthenticated = true;
@@ -68,7 +76,7 @@ window.PAINEL_MODULES.partnerApi = function () {
 
     async partnerApiFetch(resource, options = {}) {
       const method = String(options.method || 'GET').toUpperCase();
-      if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method)) {
+      if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         throw new Error('invalid_partner_method');
       }
       const response = await fetch(this.partnerApiResourceUrl(resource), {
@@ -94,7 +102,7 @@ window.PAINEL_MODULES.partnerApi = function () {
     },
 
     async partnerApiWrite(resource, method, body) {
-      if (!['POST', 'PUT', 'DELETE'].includes(method)) throw new Error('invalid_partner_write_method');
+      if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('invalid_partner_write_method');
       const response = await this.partnerApiFetch(resource, {
         method,
         headers: { 'Content-Type': 'application/json' },

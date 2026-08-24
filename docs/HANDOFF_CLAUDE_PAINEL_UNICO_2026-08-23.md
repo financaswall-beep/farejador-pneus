@@ -1,5 +1,10 @@
 # Handoff para Claude — Painel único web
 
+> **Atualização de 24/08/2026:** a expansão local para Vendas, Compras, Estoque,
+> Logística, Financeiro, Colaboradores e Catálogo está documentada em
+> `SESSAO_2026-08-24_PAINEL_PARCEIRO_SUITE_HANDOFF.md`. Esta página abaixo
+> preserva o estado histórico do primeiro canário (Resumo + Retiradas).
+
 **Data:** 23/08/2026
 **Estado:** 10 de 10 PRs incorporados; migration `0203` aplicada; deploy pendente.
 

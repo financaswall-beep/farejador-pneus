@@ -12,6 +12,11 @@ import {
 } from './operation-deliveries.js';
 
 const photoParamsSchema = z.object({ photoRequestId: z.string().uuid() });
+const feedQuerySchema = z.object({
+  view: z.enum(['active', 'history']).default('active'),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(100),
+});
 
 export function registerPartnerOperationDeliveryRoutes(fastify: FastifyInstance): void {
   const deliveriesScreen = [requirePartnerAuth, requireScreen('entregas')];
@@ -20,8 +25,10 @@ export function registerPartnerOperationDeliveryRoutes(fastify: FastifyInstance)
     preHandler: deliveriesScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     reply.header('Cache-Control', 'no-store');
+    const parsed = feedQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send(
-      await getPartnerOperationDeliveries(getPartnerContext(request)),
+      await getPartnerOperationDeliveries(getPartnerContext(request), parsed.data),
     );
   });
 

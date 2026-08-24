@@ -23,6 +23,7 @@ import { registerPartnerCoverageRoute } from './route-coverage.js';
 import { registerPartnerCreditRoutes } from './route-finance-credit.js';
 import { getPartnerModernPanelEnabled } from './panel-canary.js';
 import { registerPartnerPanelCanaryRoutes } from './route-panel-canary.js';
+import { registerPartnerPanelCatalogRoutes } from './route-panel-catalog.js';
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -474,6 +475,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   registerPartnerCoverageRoute(fastify);
   registerPartnerCreditRoutes(fastify);
   registerPartnerPanelCanaryRoutes(fastify);
+  registerPartnerPanelCatalogRoutes(fastify);
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
     if (retireLegacyMobile(request, reply)) return;

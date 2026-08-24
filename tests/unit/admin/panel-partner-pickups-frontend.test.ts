@@ -112,7 +112,7 @@ describe('retiradas no painel único', () => {
 
   it('cliente HTTP restringe método, caminho e token à API do parceiro', () => {
     const api = source('painel/public/app.partner-api.js');
-    expect(api).toContain("['GET', 'POST', 'PUT', 'DELETE'].includes(method)");
+    expect(api).toContain("['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)");
     expect(api).toContain('partnerApiResourceUrl(resource)');
     expect(api).toContain('Authorization: `Bearer ${this.panelPartnerToken}`');
     expect(api).not.toMatch(/panelPartnerToken[\s\S]{0,120}\/admin\/api/);

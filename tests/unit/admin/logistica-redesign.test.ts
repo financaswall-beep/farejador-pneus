@@ -7,7 +7,7 @@ const readModule = readFileSync(resolve('painel/public/app.logistica.js'), 'utf8
 const resultModule = readFileSync(resolve('painel/public/app.logistica.resultado.js'), 'utf8');
 
 function logisticsHtml(): string {
-  const start = html.indexOf('<div x-show="currentPage === \'logistica\'"');
+  const start = html.indexOf('<div x-show="currentPage === \'logistica\' && isMatrixPanel()"');
   const end = html.indexOf('<!-- ═══ TELA: FINANCEIRO', start);
   return html.slice(start, end);
 }
