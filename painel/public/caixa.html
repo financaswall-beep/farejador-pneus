@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260823-pickups-layout2" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260824-operation-catalog1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20260816-paineis-alinhados1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260823-pickups-mobile1"></script>
-  <script defer src="/operacao/caixa-brand-catalog.js?v=20260822-caixa-brand-select1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260820-negociacao1"></script>
@@ -18,7 +18,9 @@
   <script defer src="/operacao/caixa-sales-view.js?v=20260816-sales-day1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-stock-price.js?v=20260820-preco-oficial1"></script>
+  <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-catalog.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-catalog-view.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-stock-edit.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
@@ -26,7 +28,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260822-caixa-brand1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
@@ -457,6 +459,69 @@
               <label>Conte o motivo<textarea id="delivery-failure-reason" maxlength="500" rows="4" placeholder="Ex.: cliente ausente"></textarea></label>
               <p id="delivery-failure-error" role="alert"></p>
               <button id="delivery-failure-submit" type="button">Registrar ocorrência</button>
+            </article>
+          </div>
+        </div>
+
+        <div id="operation-catalog-panel" class="app-panel operation-catalog-panel hidden" aria-labelledby="operation-catalog-title">
+          <section id="operation-catalog-hero" class="operation-catalog-hero">
+            <div class="operation-catalog-hero-copy">
+              <small>CATÁLOGO DA REDE</small>
+              <h2 id="operation-catalog-title">Encontre o pneu certo</h2>
+              <p>Consulte medidas, marcas e motos compatíveis. O preço e o estoque exibidos são somente desta unidade.</p>
+            </div>
+            <div class="operation-catalog-hero-art" aria-hidden="true">
+              <img src="/operacao/catalog-tire.webp" alt="" />
+            </div>
+            <div class="operation-catalog-kpis" aria-label="Resumo do catálogo">
+              <p><strong id="operation-catalog-kpi-products">—</strong><span>produtos</span></p>
+              <p><strong id="operation-catalog-kpi-brands">—</strong><span>marcas</span></p>
+              <p><strong id="operation-catalog-kpi-available">—</strong><span>com estoque</span></p>
+              <p><strong id="operation-catalog-kpi-no-price">—</strong><span>sem preço</span></p>
+            </div>
+          </section>
+
+          <section class="operation-catalog-toolbar" aria-label="Busca e filtros do catálogo">
+            <label class="operation-catalog-search" for="operation-catalog-search">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <input id="operation-catalog-search" type="search" maxlength="100" autocomplete="off" placeholder="Buscar medida, marca ou produto" />
+              <button id="operation-catalog-search-clear" class="hidden" type="button" aria-label="Limpar busca">×</button>
+            </label>
+          </section>
+
+          <section class="operation-catalog-brands" aria-labelledby="operation-catalog-brands-title">
+            <header><h3 id="operation-catalog-brands-title">Marcas</h3><small>Toque no logotipo para filtrar</small></header>
+            <div id="operation-catalog-brand-filters" role="list" aria-label="Filtrar por marca"></div>
+          </section>
+
+          <nav id="operation-catalog-filters" class="operation-catalog-filters" aria-label="Disponibilidade no catálogo">
+            <button class="active" type="button" data-operation-catalog-filter="all" aria-pressed="true">Todos</button>
+            <button type="button" data-operation-catalog-filter="stock" aria-pressed="false">Com estoque</button>
+            <button type="button" data-operation-catalog-filter="no_price" aria-pressed="false">Sem preço</button>
+          </nav>
+
+          <div id="operation-catalog-loading" class="operation-catalog-message" role="status">Carregando catálogo…</div>
+          <div id="operation-catalog-error" class="operation-catalog-message operation-catalog-message--error hidden" role="alert">
+            <strong>Não foi possível carregar o catálogo.</strong>
+            <span>Tente novamente em instantes.</span>
+            <button id="operation-catalog-retry" type="button">Tentar novamente</button>
+          </div>
+          <div id="operation-catalog-empty" class="operation-catalog-message hidden">
+            <strong>Nenhum pneu encontrado</strong>
+            <span>Revise a busca ou escolha outra marca.</span>
+          </div>
+          <div id="operation-catalog-list" class="operation-catalog-list hidden" aria-live="polite"></div>
+
+          <div id="operation-catalog-fitment-modal" class="operation-catalog-fitment-modal hidden" role="dialog" aria-modal="true" aria-labelledby="operation-catalog-fitment-title">
+            <button class="operation-catalog-fitment-backdrop" type="button" data-close-operation-catalog-fitment aria-label="Fechar compatibilidades"></button>
+            <article class="operation-catalog-fitment-sheet">
+              <header class="operation-catalog-fitment-head">
+                <div><small>COMPATIBILIDADE</small><h3 id="operation-catalog-fitment-title">Motos compatíveis</h3><p id="operation-catalog-fitment-subtitle"></p></div>
+                <button id="operation-catalog-fitment-close" type="button" data-close-operation-catalog-fitment aria-label="Fechar">×</button>
+              </header>
+              <div id="operation-catalog-fitment-loading" class="operation-catalog-message" role="status">Buscando motos compatíveis…</div>
+              <div id="operation-catalog-fitment-error" class="operation-catalog-message operation-catalog-message--error hidden" role="alert">Não foi possível carregar as compatibilidades.</div>
+              <div id="operation-catalog-fitment-list" class="operation-catalog-fitment-list hidden"></div>
             </article>
           </div>
         </div>
@@ -1041,6 +1106,10 @@
           <button id="nav-pickups" type="button" data-tab="pickups">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6h18l-1 4H4L3 6Z"/><path d="M9 20v-6h6v6"/></svg>
             <span>Retiradas</span>
+          </button>
+          <button id="nav-catalog" type="button" data-tab="catalog">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h10l6 6-9 9-7-7V5Z"/><circle cx="9" cy="10" r="1.5"/></svg>
+            <span>Catálogo</span>
           </button>
           <button id="nav-stock" type="button" data-tab="stock">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>

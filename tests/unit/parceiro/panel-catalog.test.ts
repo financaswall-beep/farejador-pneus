@@ -56,6 +56,14 @@ describe('catálogo seguro do painel parceiro', () => {
         local_quantity_on_hand: 10, local_quantity_reserved: 2,
         local_quantity_available: 8, local_sale_price_min: '89.00',
         local_sale_price_max: '89.00', compatibility_count: 3,
+        local_stock_entries: [{
+          stock_id: '99999999-9999-4999-8999-999999999999',
+          local_sku: 'LEV-01', item_name: 'Pneu Levorin 90/90-18',
+          supplier_name: 'Fornecedor A', tire_condition: 'meia_vida',
+          shelf_location: 'A-01', quantity_on_hand: '10', quantity_reserved: '2',
+          quantity_available: '8', sale_price: '89.00',
+          average_cost: '42.00',
+        }],
       }] });
 
     const result = await getPartnerPanelCatalog(context, {
@@ -78,6 +86,13 @@ describe('catálogo seguro do painel parceiro', () => {
       local_quantity_reserved: 2, local_quantity_available: 8,
       local_sale_price_min: 89, local_sale_price_max: 89,
       compatibility_count: 3,
+      local_stock_entries: [{
+        stock_id: '99999999-9999-4999-8999-999999999999',
+        local_sku: 'LEV-01', item_name: 'Pneu Levorin 90/90-18',
+        tire_condition: 'meia_vida',
+        shelf_location: 'A-01', quantity_on_hand: 10, quantity_reserved: 2,
+        quantity_available: 8, sale_price: 89,
+      }],
     }));
     expect(mocks.query.mock.calls[3]?.[1]).toEqual([
       'prod', '%90/90%', null, 'tire', 'all', context.unitId, 20, 20,
@@ -85,7 +100,36 @@ describe('catálogo seguro do painel parceiro', () => {
     const sql = mocks.query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain('psl.unit_id=$6');
     expect(sql).toContain('psl.environment=p.environment');
-    expect(sql).not.toMatch(/average_cost|unit_cost|wholesale_stock|matriz_current_prices|gross_profit|internal_notes/i);
+    expect(sql).toContain('psl.product_id IS NULL');
+    expect(sql).toContain('psl.tire_condition IS NOT DISTINCT FROM p.tire_condition');
+    expect(sql).not.toMatch(/supplier_name|average_cost|unit_cost|wholesale_stock|matriz_current_prices|gross_profit|internal_notes/i);
+  });
+
+  it('não entrega linhas comerciais detalhadas ao funcionário de estoque', async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{
+        products: 1, brands: 1, with_local_stock: 1,
+        without_local_price: 0, local_units_available: 8,
+      }] })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ brand: 'Levorin', product_count: 1 }] })
+      .mockResolvedValueOnce({ rows: [{
+        product_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin',
+        product_type: 'tire', tire_condition: 'meia_vida', brand: 'Levorin',
+        tire_size: '90/90-18', tire_position: 'rear', local_stock_rows: 1,
+        local_quantity_on_hand: 10, local_quantity_reserved: 2,
+        local_quantity_available: 8, local_sale_price_min: '89.00',
+        local_sale_price_max: '89.00', compatibility_count: 3,
+        local_stock_entries: [{ stock_id: 'stock-a', item_name: 'Lote A', sale_price: '89' }],
+      }] });
+
+    const result = await getPartnerPanelCatalog({ ...context, role: 'funcionario' });
+    expect(result.rows[0]).toMatchObject({
+      local_quantity_available: 8,
+      local_sale_price_min: 89,
+      local_stock_entries: [],
+    });
   });
 
   it('escapa curingas de busca e limita valores hostis do cliente', async () => {
@@ -146,12 +190,12 @@ describe('catálogo seguro do painel parceiro', () => {
     expect(mocks.query).toHaveBeenCalledTimes(1);
   });
 
-  it('publica as duas rotas somente para dono até existir permissão canônica', () => {
+  it('publica as duas rotas para quem possui a permissão canônica de estoque', () => {
     const route = readFileSync(resolve('src/parceiro/route-panel-catalog.ts'), 'utf8');
-    expect(route).toContain('const ownerOnly = [requirePartnerAuth, requireOwner]');
+    expect(route).toContain("const stockScreen = [requirePartnerAuth, requireScreen('estoque')]");
     expect(route).toContain("'/parceiro/:slug/api/painel/catalogo'");
     expect(route).toContain("'/parceiro/:slug/api/painel/catalogo/:productId/compatibilidade'");
-    expect(route.match(/preHandler: ownerOnly/g)).toHaveLength(2);
+    expect(route.match(/preHandler: stockScreen/g)).toHaveLength(2);
     expect(route).toContain("reply.header('Cache-Control', 'no-store')");
   });
 });

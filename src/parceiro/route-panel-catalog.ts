@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   getPartnerContext,
-  requireOwner,
   requirePartnerAuth,
+  requireScreen,
   type PartnerAuthedRequest,
 } from './auth.js';
 import {
@@ -12,7 +12,7 @@ import {
   PartnerPanelCatalogNotFoundError,
 } from './panel-catalog.js';
 
-const ownerOnly = [requirePartnerAuth, requireOwner];
+const stockScreen = [requirePartnerAuth, requireScreen('estoque')];
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).max(1_000_000).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(40),
@@ -23,10 +23,10 @@ const querySchema = z.object({
 });
 const productParams = z.object({ productId: z.string().uuid() });
 
-/** Catálogo moderno do parceiro. Owner-only até existir permissão canônica própria. */
+/** Catálogo da unidade: leitura segue a permissão canônica de Estoque. */
 export function registerPartnerPanelCatalogRoutes(fastify: FastifyInstance): void {
   fastify.get('/parceiro/:slug/api/painel/catalogo', {
-    preHandler: ownerOnly,
+    preHandler: stockScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_catalog_query' });
@@ -37,7 +37,7 @@ export function registerPartnerPanelCatalogRoutes(fastify: FastifyInstance): voi
   });
 
   fastify.get('/parceiro/:slug/api/painel/catalogo/:productId/compatibilidade', {
-    preHandler: ownerOnly,
+    preHandler: stockScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = productParams.safeParse(request.params ?? {});
     if (!parsed.success) return reply.status(404).send({ error: 'catalog_product_not_found' });

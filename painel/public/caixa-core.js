@@ -45,7 +45,7 @@
     passwordToggle: byId('password-toggle'),
     app: document.querySelector('.caixa-app'),
     cashPanel: byId('cash-panel'),
-    salesPanel: byId('sales-panel'), pickupsPanel: byId('pickups-panel'),
+    salesPanel: byId('sales-panel'), pickupsPanel: byId('pickups-panel'), catalogPanel: byId('operation-catalog-panel'),
     deliveriesPanel: byId('deliveries-panel'),
     financePanel: byId('finance-panel'), notificationsPanel: byId('notifications-panel'),
     profilePanel: byId('profile-panel'),
@@ -192,7 +192,7 @@
     const initialTab = Caixa.initialOperationTab ? Caixa.initialOperationTab() : 'cash';
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
-    else if (initialTab === 'stock' && Caixa.loadStock) void Caixa.loadStock();
+    else if (initialTab === 'catalog' && Caixa.loadOperationCatalog) void Caixa.loadOperationCatalog(); else if (initialTab === 'stock' && Caixa.loadStock) void Caixa.loadStock();
     else if (initialTab === 'pickups' && Caixa.loadPickups) void Caixa.loadPickups(); else if (initialTab === 'deliveries' && Caixa.loadDeliveries) void Caixa.loadDeliveries(); else if (initialTab === 'finance' && Caixa.loadFinance) void Caixa.loadFinance();
     else if (initialTab === 'cash') void Caixa.loadCatalog();
   }

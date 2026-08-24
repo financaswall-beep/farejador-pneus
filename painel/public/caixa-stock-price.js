@@ -68,6 +68,7 @@
       Caixa.showToast(payload.changed ? 'Preço oficial atualizado.' : 'Esse já era o preço oficial.');
       if (Caixa.loadStock) await Caixa.loadStock();
       if (Caixa.isPartner() && Caixa.refreshStockDetail) await Caixa.refreshStockDetail();
+      if (Caixa.loadOperationCatalog) await Caixa.loadOperationCatalog(1);
       if (Caixa.loadCatalog) void Caixa.loadCatalog();
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;

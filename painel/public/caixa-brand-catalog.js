@@ -25,6 +25,9 @@
   }
 
   Caixa.catalogBrandOptions = BRANDS;
+  Caixa.catalogLogoBrands = Object.freeze(BRANDS.filter(function (brand) {
+    return Boolean(ASSETS[key(brand)]);
+  }));
   Caixa.canonicalCatalogBrand = function (brand) { return NAMES[key(brand)] || ''; };
   Caixa.populateCatalogBrandSelect = function (select) {
     if (!select || select.dataset.brandOptionsReady === 'true') return;

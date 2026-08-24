@@ -21,6 +21,7 @@
     cash: 'vendas',
     sales: 'vendas',
     pickups: 'retiradas',
+    catalog: 'estoque',
     stock: 'estoque',
     'stock-detail': 'estoque',
     'stock-receipts': 'estoque',
@@ -78,6 +79,7 @@
     setNavigationVisibility('nav-cash', canModule('vendas'));
     setNavigationVisibility('nav-sales', canModule('vendas'));
     setNavigationVisibility('nav-pickups', canModule('retiradas'));
+    setNavigationVisibility('nav-catalog', canModule('estoque'));
     setNavigationVisibility('nav-stock', canModule('estoque'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
@@ -100,6 +102,7 @@
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('retiradas') && window.location.hash === '#retiradas') return 'pickups';
+    if (canModule('estoque') && window.location.hash === '#catalogo') return 'catalog';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';
     return firstAllowedTab();
   }

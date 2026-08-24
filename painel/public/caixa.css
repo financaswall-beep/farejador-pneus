@@ -2404,3 +2404,128 @@ form { display: grid; gap: 16px; }
   .team-permission-row > b { width: 37px; height: 37px; }
   .team-create-passwords { grid-template-columns: 1fr; }
 }
+
+/* Catálogo mobile da Operação: catálogo central, estoque e preço locais. */
+.operation-catalog-panel { min-width: 0; min-height: 690px; padding: 0 14px 112px; overflow: visible; color: #111b17; background: #fff; }
+.operation-catalog-panel *,.operation-catalog-fitment-modal *,.operation-catalog-stock-modal * { min-width: 0; }
+.operation-catalog-hero {
+  position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0,1fr) 112px;
+  align-items: center; gap: 10px; margin: 0 -14px; padding: 22px 18px 18px; overflow: hidden; color: #fff;
+  background: radial-gradient(circle at 84% 25%,rgba(75,200,139,.25),transparent 32%),linear-gradient(135deg,#014635,#006143 52%,#033b2e);
+  box-shadow: 0 14px 28px rgba(4,67,47,.16);
+}
+.operation-catalog-hero::before { position: absolute; z-index: -1; inset: 0; opacity: .22; background: repeating-linear-gradient(145deg,transparent 0 24px,rgba(255,255,255,.05) 25px 26px); content: ""; }
+.operation-catalog-hero-copy { position: relative; z-index: 1; }
+.operation-catalog-hero-copy small { display: block; color: #afe9cb; font-size: 10px; font-weight: 820; letter-spacing: .1em; text-transform: uppercase; }
+.operation-catalog-hero-copy h2 { margin: 5px 0 0; font-size: clamp(25px,7.4vw,32px); line-height: 1; letter-spacing: -.045em; }
+.operation-catalog-hero-copy p { max-width: 235px; margin: 9px 0 0; color: rgba(236,255,246,.8); font-size: 12px; line-height: 1.4; }
+.operation-catalog-hero-art { position: relative; display: grid; width: 108px; height: 118px; place-items: center; justify-self: end; }
+.operation-catalog-hero-art::before { position: absolute; width: 96px; height: 96px; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; background: rgba(225,255,238,.08); content: ""; }
+.operation-catalog-hero-art img { position: relative; display: block; width: 98px; height: 116px; object-fit: contain; filter: drop-shadow(0 12px 14px rgba(0,25,18,.35)); }
+.operation-catalog-kpis { z-index: 2; display: grid; grid-column: 1/-1; grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: 5px; overflow: hidden; border: 1px solid #dce7e1; border-radius: 15px; color: #14231c; background: rgba(255,255,255,.97); box-shadow: 0 8px 20px rgba(8,46,31,.12); }
+.operation-catalog-kpis p { display: grid; min-height: 61px; place-content: center; justify-items: center; margin: 0; padding: 8px 3px; }
+.operation-catalog-kpis p + p { border-left: 1px solid #e2e9e5; }
+.operation-catalog-kpis strong { max-width: 100%; overflow: hidden; color: #08724a; font-size: 22px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.operation-catalog-kpis span { max-width: 100%; margin-top: 4px; overflow: hidden; color: #67736c; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+
+.operation-catalog-toolbar { display: grid; gap: 10px; margin-top: 14px; }
+.operation-catalog-search { position: relative; display: flex; width: 100%; align-items: center; }
+.operation-catalog-search svg { position: absolute; left: 15px; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; color: #637169; pointer-events: none; }
+#operation-catalog-search { width: 100%; height: 51px; padding: 0 47px; border: 1px solid #d1dbd6; border-radius: 14px; outline: 0; color: #15231d; background: #fff; font-size: 14px; }
+#operation-catalog-search:focus { border-color: #128157; box-shadow: 0 0 0 4px rgba(18,129,87,.1); }
+#operation-catalog-search-clear { position: absolute; right: 7px; display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 0; border-radius: 10px; color: #526159; background: #f2f6f4; font-size: 21px; cursor: pointer; }
+.operation-catalog-brands { display: grid; gap: 9px; margin-top: 14px; }
+.operation-catalog-brands header { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.operation-catalog-brands h3 { margin: 0; color: #17231d; font-size: 17px; }
+.operation-catalog-brands header small { color: #6d7872; font-size: 9px; text-align: right; }
+#operation-catalog-brand-filters { display: flex; width: calc(100% + 28px); gap: 8px; margin-inline: -14px; padding: 1px 14px 5px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+#operation-catalog-brand-filters::-webkit-scrollbar { display: none; }
+.operation-catalog-brand-filter { display: grid; min-width: 76px; height: 50px; flex: 0 0 auto; place-items: center; scroll-snap-align: start; padding: 6px 10px; overflow: hidden; border: 1px solid #dce4e0; border-radius: 13px; color: #44524a; background: #fff; font-size: 11px; font-weight: 760; cursor: pointer; }
+.operation-catalog-brand-filter.active { border-color: #148158; color: #075f3e; background: #edf8f2; box-shadow: inset 0 0 0 1px rgba(20,129,88,.12); }
+.operation-catalog-brand { display: grid; max-width: 100%; place-items: center; }
+.operation-catalog-brand-logo { display: block; width: 68px; height: 27px; object-fit: contain; }
+.operation-catalog-brand-fallback { display: inline-flex; max-width: 100%; min-height: 23px; align-items: center; padding: 3px 7px; overflow: hidden; border-radius: 7px; color: #47564e; background: #eef2f0; font-size: 9px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.operation-catalog-filters { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #e0e7e3; border-radius: 14px; background: #f3f6f4; }
+.operation-catalog-filters button { min-height: 42px; padding: 0 6px; overflow: hidden; border: 0; border-radius: 10px; color: #59665f; background: transparent; font-size: 12px; font-weight: 690; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.operation-catalog-filters button.active { color: #fff; background: linear-gradient(135deg,#0a8658,#006341); box-shadow: 0 5px 12px rgba(3,101,65,.18); }
+
+.operation-catalog-message { display: grid; min-height: 205px; place-content: center; justify-items: center; gap: 8px; padding: 24px 16px; color: #66736c; text-align: center; font-size: 13px; }
+.operation-catalog-message strong { color: #2f4037; font-size: 15px; }
+.operation-catalog-message--error { color: #953c35; }
+.operation-catalog-message button { min-height: 43px; margin-top: 5px; padding: 0 17px; border: 1px solid #08754c; border-radius: 11px; color: #08754c; background: #fff; font-weight: 720; cursor: pointer; }
+.operation-catalog-list { display: grid; gap: 11px; margin-top: 13px; }
+.operation-catalog-card { display: grid; width: 100%; grid-template-columns: minmax(0,1fr) minmax(105px,.74fr); grid-template-areas: "main status" "stock price" "actions actions"; align-items: start; gap: 10px; padding: 12px; overflow: hidden; border: 1px solid #dce5e0; border-radius: 17px; background: #fff; box-shadow: 0 6px 17px rgba(17,50,36,.055); }
+.operation-catalog-card-main { display: grid; grid-area: main; align-content: start; gap: 7px; }
+.operation-catalog-card-main .operation-catalog-brand { justify-items: start; }
+.operation-catalog-identity { display: grid; gap: 2px; }
+.operation-catalog-identity > * { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operation-catalog-identity strong { color: #14221b; font-size: 18px; line-height: 1.12; }
+.operation-catalog-identity span { color: #44534b; font-size: 11px; }
+.operation-catalog-identity .operation-catalog-meta { margin-top: 3px; color: #6a766f; font-size: 9px; }
+.operation-catalog-status { display: inline-flex; max-width: 115px; min-height: 28px; grid-area: status; align-items: center; justify-self: end; padding: 5px 8px; border-radius: 8px; color: #08643f; background: #e8f7ee; font-size: 9px; font-weight: 700; line-height: 1.2; text-align: center; }
+.operation-catalog-stock,.operation-catalog-price { display: grid; min-height: 57px; align-content: center; gap: 3px; padding: 8px 10px; overflow: hidden; border-radius: 11px; background: #f2f7f4; }
+.operation-catalog-stock { grid-area: stock; }
+.operation-catalog-price { grid-area: price; }
+.operation-catalog-stock small,.operation-catalog-price small { color: #67736c; font-size: 9px; }
+.operation-catalog-stock strong,.operation-catalog-price strong { overflow: hidden; color: #075f3e; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.operation-catalog-price strong { font-size: 18px; letter-spacing: -.025em; }
+.operation-catalog-actions { display: grid; grid-area: actions; grid-template-columns: 1fr 1.18fr; gap: 8px; }
+.operation-catalog-actions button { min-height: 45px; padding: 0 8px; overflow: hidden; border: 1px solid #94c2aa; border-radius: 11px; color: #08704a; background: #fff; font-size: 11px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.operation-catalog-actions button:last-child { border-color: #08734a; color: #fff; background: #08734a; }
+.operation-catalog-actions button:only-child { grid-column: 1/-1; }
+.operation-catalog-load-more { width: 100%; min-height: 47px; border: 1px solid #8ebda5; border-radius: 12px; color: #08704a; background: #fff; font-size: 13px; font-weight: 760; cursor: pointer; }
+
+.operation-catalog-fitment-modal,.operation-catalog-stock-modal { position: fixed; z-index: 90; inset: 0; display: grid; align-items: end; background: rgba(4,20,14,.62); backdrop-filter: blur(2px); }
+.operation-catalog-fitment-backdrop { position: absolute; inset: 0; padding: 0; border: 0; background: transparent; }
+.operation-catalog-fitment-sheet,.operation-catalog-stock-sheet { position: relative; z-index: 1; width: min(100%,480px); max-height: min(88svh,780px); margin: 0 auto; padding: 13px 16px max(20px,env(safe-area-inset-bottom)); overflow-x: hidden; overflow-y: auto; border-radius: 24px 24px 0 0; background: #fff; box-shadow: 0 -18px 48px rgba(0,24,17,.25); }
+.operation-catalog-fitment-sheet::before,.operation-catalog-stock-sheet::before { display: block; width: 43px; height: 5px; margin: 0 auto 14px; border-radius: 99px; background: #cbd4cf; content: ""; }
+.operation-catalog-fitment-head,.operation-catalog-stock-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 10px; padding-bottom: 13px; border-bottom: 1px solid #e3e9e6; }
+.operation-catalog-fitment-head small { color: #08744b; font-size: 9px; font-weight: 820; letter-spacing: .08em; }
+.operation-catalog-fitment-head h3 { margin: 3px 0 0; color: #14231c; font-size: 21px; }
+.operation-catalog-fitment-head p { margin: 4px 0 0; color: #66736c; font-size: 12px; }
+.operation-catalog-fitment-head button,.operation-catalog-stock-close { min-height: 40px; padding: 0 12px; border: 1px solid #d5dfda; border-radius: 11px; color: #405048; background: #fff; font-size: 11px; font-weight: 720; cursor: pointer; }
+.operation-catalog-stock-heading > div { color: #14231c; font-size: 18px; font-weight: 780; line-height: 1.2; }
+.operation-catalog-fitment-list,.operation-catalog-stock-list { display: grid; gap: 9px; margin-top: 13px; }
+.operation-catalog-fitment,.operation-catalog-stock-option { display: grid; min-height: 60px; align-content: center; gap: 4px; padding: 10px 12px; border: 1px solid #dfe7e2; border-radius: 13px; background: #fff; }
+.operation-catalog-fitment strong,.operation-catalog-fitment span,.operation-catalog-stock-option strong,.operation-catalog-stock-option span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operation-catalog-fitment strong,.operation-catalog-stock-option strong { color: #17251e; font-size: 14px; }
+.operation-catalog-fitment span,.operation-catalog-stock-option span { color: #68756e; font-size: 10px; }
+.operation-catalog-stock-option { width: 100%; text-align: left; cursor: pointer; }
+.operation-catalog-stock-option span:last-child { color: #08704a; font-weight: 730; }
+.operation-catalog-fitment-empty { margin: 0; padding: 28px 14px; color: #68756e; text-align: center; font-size: 12px; }
+
+@media (max-width: 430px) {
+  .operation-catalog-panel { padding-inline: 13px; }
+  .operation-catalog-hero { margin-inline: -13px; }
+  #operation-catalog-brand-filters { width: calc(100% + 26px); margin-inline: -13px; padding-inline: 13px; }
+}
+@media (max-width: 360px) {
+  .operation-catalog-panel { padding-inline: 11px; }
+  .operation-catalog-hero { grid-template-columns: minmax(0,1fr) 82px; margin-inline: -11px; padding-inline: 13px; }
+  .operation-catalog-hero-copy h2 { font-size: 25px; }
+  .operation-catalog-hero-copy p { max-width: 200px; font-size: 11px; }
+  .operation-catalog-hero-art { width: 80px; height: 105px; }
+  .operation-catalog-hero-art::before { width: 74px; height: 74px; }
+  .operation-catalog-hero-art img { width: 75px; height: 96px; }
+  .operation-catalog-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .operation-catalog-kpis p { min-height: 54px; }
+  .operation-catalog-kpis p:nth-child(3) { border-top: 1px solid #e2e9e5; border-left: 0; }
+  .operation-catalog-kpis p:nth-child(4) { border-top: 1px solid #e2e9e5; }
+  #operation-catalog-brand-filters { width: calc(100% + 22px); margin-inline: -11px; padding-inline: 11px; }
+  .operation-catalog-filters button { font-size: 10px; }
+  .operation-catalog-card { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "main status" "stock stock" "price price" "actions actions"; }
+  .operation-catalog-status { max-width: 96px; font-size: 8px; }
+  .operation-catalog-actions { grid-template-columns: 1fr; }
+  .operation-catalog-fitment-sheet,.operation-catalog-stock-sheet { padding-inline: 13px; }
+}
+@media (max-width: 320px) {
+  .operation-catalog-panel { padding-inline: 9px; }
+  .operation-catalog-hero { grid-template-columns: minmax(0,1fr) 66px; margin-inline: -9px; padding-inline: 11px; }
+  .operation-catalog-hero-art { width: 64px; }
+  .operation-catalog-hero-art::before { width: 62px; height: 62px; }
+  .operation-catalog-hero-art img { width: 64px; height: 86px; }
+  #operation-catalog-brand-filters { width: calc(100% + 18px); margin-inline: -9px; padding-inline: 9px; }
+  .operation-catalog-card { padding-inline: 9px; }
+  .operation-catalog-identity strong { font-size: 16px; }
+  .operation-catalog-stock,.operation-catalog-price { padding-inline: 8px; }
+}

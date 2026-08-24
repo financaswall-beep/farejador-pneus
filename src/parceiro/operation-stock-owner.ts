@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import type { PartnerContext } from './auth.js';
+import { resolveCatalogProductForStock } from './operation-stock-catalog-link.js';
 
 export interface RegistrationApprovalInput {
   average_cost: number;
@@ -162,6 +163,7 @@ export async function approveOperationRegistration(
       }
       const quantity = tracked ? input.quantity_on_hand! : null;
       const minimum = tracked ? (input.minimum_quantity ?? row.minimum_quantity) : null;
+      const productId = await resolveCatalogProductForStock(client, ctx, row);
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO commerce.partner_stock_levels (
            environment, unit_id, product_id, local_sku, item_name, item_type,
@@ -170,14 +172,14 @@ export async function approveOperationRegistration(
            average_cost, sale_price, tire_condition, shelf_location,
            tire_position, is_tracked, stock_status, updated_by
          ) VALUES (
-           $1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+           $1,$2,$21,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
            $16,$17,$18,$19,commerce.partner_stock_status($12,0,$13,$19),$20
          ) RETURNING id`,
         [ctx.environment, ctx.unitId, row.local_sku, row.item_name, row.item_type,
           row.tire_size, row.tire_width_mm, row.tire_aspect_ratio,
           row.tire_rim_diameter, row.brand, clean(input.supplier_name), quantity,
           minimum, input.average_cost, input.sale_price, row.tire_condition,
-          row.shelf_location, row.tire_position, tracked, actor],
+          row.shelf_location, row.tire_position, tracked, actor, productId],
       );
       const stockId = inserted.rows[0]!.id;
       await client.query(
@@ -190,7 +192,7 @@ export async function approveOperationRegistration(
       await audit(client, ctx, 'commerce.partner_item_registration_requests', requestId,
         'partner_item_registration_approved', actor, {
           request_id: requestId, stock_id: stockId, item_name: row.item_name,
-          item_type: row.item_type, quantity_on_hand: quantity,
+          item_type: row.item_type, product_id: productId, quantity_on_hand: quantity,
           average_cost: input.average_cost, sale_price: input.sale_price,
         });
       return { id: requestId, stock_id: stockId, status: 'approved' as const };

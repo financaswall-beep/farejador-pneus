@@ -1,5 +1,11 @@
 import type { PartnerContext } from './auth.js';
 import { withPartnerContext } from './db.js';
+import { safeLocalStockEntries } from './panel-catalog-stock.js';
+import {
+  CATALOG_STOCK_MATCH,
+  CATALOG_WHERE,
+  catalogStockMatch,
+} from './panel-catalog-query.js';
 
 export type PartnerPanelCatalogType = 'all' | 'tire' | 'service';
 export type PartnerPanelCatalogFilter = 'all' | 'stock' | 'no_price';
@@ -28,6 +34,7 @@ type CatalogRow = {
   local_quantity_available: number | string;
   local_sale_price_min: string | null;
   local_sale_price_max: string | null;
+  local_stock_entries: unknown;
   compatibility_count: number | string;
 };
 
@@ -41,33 +48,6 @@ type CompatibilityRow = {
   position: 'front' | 'rear' | 'both';
   is_oem: boolean;
 };
-
-const CATALOG_WHERE = `p.environment=$1 AND p.deleted_at IS NULL
-  AND ($2::text IS NULL OR p.product_code ILIKE $2 ESCAPE '\\'
-    OR p.product_name ILIKE $2 ESCAPE '\\'
-    OR COALESCE(p.brand,'') ILIKE $2 ESCAPE '\\'
-    OR COALESCE(ts.tire_size,'') ILIKE $2 ESCAPE '\\')
-  AND ($3::text IS NULL OR lower(p.brand)=lower($3))
-  AND ($4::text='all' OR ($4='tire' AND p.product_type='tire')
-    OR ($4='service' AND p.product_type='service'))
-  AND ($5::text='all'
-    OR ($5='stock' AND EXISTS (
-      SELECT 1 FROM commerce.partner_stock_levels scoped_stock
-       WHERE scoped_stock.environment=p.environment AND scoped_stock.unit_id=$6
-         AND scoped_stock.product_id=p.id AND scoped_stock.deleted_at IS NULL
-         AND GREATEST(COALESCE(scoped_stock.quantity_on_hand,0)
-           - COALESCE(scoped_stock.quantity_reserved,0),0)>0
-    ))
-    OR ($5='no_price' AND EXISTS (
-      SELECT 1 FROM commerce.partner_stock_levels scoped_stock
-       WHERE scoped_stock.environment=p.environment AND scoped_stock.unit_id=$6
-         AND scoped_stock.product_id=p.id AND scoped_stock.deleted_at IS NULL
-    ) AND NOT EXISTS (
-      SELECT 1 FROM commerce.partner_stock_levels priced_stock
-       WHERE priced_stock.environment=p.environment AND priced_stock.unit_id=$6
-         AND priced_stock.product_id=p.id AND priced_stock.deleted_at IS NULL
-         AND priced_stock.sale_price>0
-    )))`;
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
@@ -119,22 +99,31 @@ export async function getPartnerPanelCatalog(
          (SELECT count(DISTINCT lower(btrim(p.brand)))::int FROM commerce.products p
            WHERE p.environment=$1 AND p.deleted_at IS NULL
              AND p.brand IS NOT NULL AND btrim(p.brand)<>'') brands,
-         (SELECT count(DISTINCT psl.product_id)::int
-            FROM commerce.partner_stock_levels psl
-           WHERE psl.environment=$1 AND psl.unit_id=$2 AND psl.deleted_at IS NULL
-             AND psl.product_id IS NOT NULL
-             AND GREATEST(COALESCE(psl.quantity_on_hand,0)
-               - COALESCE(psl.quantity_reserved,0),0)>0) with_local_stock,
-         (SELECT count(DISTINCT psl.product_id)::int
-            FROM commerce.partner_stock_levels psl
-           WHERE psl.environment=$1 AND psl.unit_id=$2 AND psl.deleted_at IS NULL
-             AND psl.product_id IS NOT NULL
-             AND NOT EXISTS (
-               SELECT 1 FROM commerce.partner_stock_levels priced
-                WHERE priced.environment=psl.environment AND priced.unit_id=psl.unit_id
-                  AND priced.product_id=psl.product_id AND priced.deleted_at IS NULL
-                  AND priced.sale_price>0
-             )) without_local_price,
+         (SELECT count(*)::int
+            FROM commerce.products p
+            LEFT JOIN commerce.tire_specs ts
+              ON ts.environment=p.environment AND ts.product_id=p.id
+           WHERE p.environment=$1 AND p.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM commerce.partner_stock_levels psl
+              WHERE psl.environment=p.environment AND psl.unit_id=$2
+                AND ${CATALOG_STOCK_MATCH} AND psl.deleted_at IS NULL
+                AND GREATEST(COALESCE(psl.quantity_on_hand,0)
+                  - COALESCE(psl.quantity_reserved,0),0)>0
+           )) with_local_stock,
+         (SELECT count(*)::int
+            FROM commerce.products p
+            LEFT JOIN commerce.tire_specs ts
+              ON ts.environment=p.environment AND ts.product_id=p.id
+           WHERE p.environment=$1 AND p.deleted_at IS NULL AND EXISTS (
+             SELECT 1 FROM commerce.partner_stock_levels psl
+              WHERE psl.environment=p.environment AND psl.unit_id=$2
+                AND ${CATALOG_STOCK_MATCH} AND psl.deleted_at IS NULL
+           ) AND NOT EXISTS (
+             SELECT 1 FROM commerce.partner_stock_levels priced_stock
+              WHERE priced_stock.environment=p.environment AND priced_stock.unit_id=$2
+                AND ${catalogStockMatch('priced_stock')}
+                AND priced_stock.deleted_at IS NULL AND priced_stock.sale_price>0
+           )) without_local_price,
          (SELECT COALESCE(sum(GREATEST(COALESCE(psl.quantity_on_hand,0)
                     - COALESCE(psl.quantity_reserved,0),0)),0)::int
             FROM commerce.partner_stock_levels psl
@@ -168,6 +157,7 @@ export async function getPartnerPanelCatalog(
               COALESCE(local.quantity_available,0)::int local_quantity_available,
               local.sale_price_min::text local_sale_price_min,
               local.sale_price_max::text local_sale_price_max,
+              COALESCE(local.stock_entries,'[]'::jsonb) local_stock_entries,
               COALESCE((SELECT count(*)::int
                           FROM commerce.vehicle_fitments vf
                          WHERE vf.environment=ts.environment
@@ -180,10 +170,18 @@ export async function getPartnerPanelCatalog(
                   sum(COALESCE(psl.quantity_on_hand,0))::int quantity_on_hand,
                   sum(COALESCE(psl.quantity_reserved,0))::int quantity_reserved,
                   sum(GREATEST(COALESCE(psl.quantity_on_hand,0)-COALESCE(psl.quantity_reserved,0),0))::int quantity_available,
-                  min(psl.sale_price) sale_price_min,max(psl.sale_price) sale_price_max
+                  min(psl.sale_price) sale_price_min,max(psl.sale_price) sale_price_max,
+                  jsonb_agg(jsonb_build_object(
+                    'stock_id',psl.id,'local_sku',psl.local_sku,'item_name',psl.item_name,
+                    'tire_condition',psl.tire_condition,'shelf_location',psl.shelf_location,
+                    'quantity_on_hand',COALESCE(psl.quantity_on_hand,0),
+                    'quantity_reserved',COALESCE(psl.quantity_reserved,0),
+                    'quantity_available',GREATEST(COALESCE(psl.quantity_on_hand,0)-COALESCE(psl.quantity_reserved,0),0),
+                    'sale_price',psl.sale_price
+                  ) ORDER BY psl.created_at,psl.id) stock_entries
              FROM commerce.partner_stock_levels psl
             WHERE psl.environment=p.environment AND psl.unit_id=$6
-              AND psl.product_id=p.id AND psl.deleted_at IS NULL
+              AND ${CATALOG_STOCK_MATCH} AND psl.deleted_at IS NULL
          ) local ON true
         WHERE ${CATALOG_WHERE}
         ORDER BY p.brand NULLS LAST,ts.tire_size NULLS LAST,p.product_name,p.id
@@ -224,6 +222,8 @@ export async function getPartnerPanelCatalog(
         local_quantity_available: finiteNumber(row.local_quantity_available),
         local_sale_price_min: moneyOrNull(row.local_sale_price_min),
         local_sale_price_max: moneyOrNull(row.local_sale_price_max),
+        local_stock_entries: ctx.role === 'owner'
+          ? safeLocalStockEntries(row.local_stock_entries) : [],
         compatibility_count: finiteNumber(row.compatibility_count),
       })),
     };

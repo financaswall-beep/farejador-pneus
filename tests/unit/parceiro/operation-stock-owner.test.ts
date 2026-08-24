@@ -62,6 +62,7 @@ describe('aprovação de estoque pelo dono', () => {
         brand: 'Maggion', minimum_quantity: 2, tire_condition: 'novo',
         shelf_location: 'A1', tire_position: 'Dianteiro', status: 'pending',
       }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'product-a' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'stock-a' }] })
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
@@ -74,8 +75,14 @@ describe('aprovação de estoque pelo dono', () => {
 
     const sql = mocks.clientQuery.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain('INSERT INTO commerce.partner_stock_levels');
+    expect(sql).toContain('commerce.catalog_measure_identity');
     expect(sql).toContain("SET status='approved'");
-    expect(mocks.clientQuery.mock.calls[4]?.[1]).toContain('partner_item_registration_approved');
+    const insertCall = mocks.clientQuery.mock.calls.find((call) =>
+      String(call[0]).includes('INSERT INTO commerce.partner_stock_levels'));
+    expect(insertCall?.[1]?.[20]).toBe('product-a');
+    const auditCall = mocks.clientQuery.mock.calls.find((call) =>
+      String(call[0]).includes('INSERT INTO audit.events'));
+    expect(auditCall?.[1]).toContain('partner_item_registration_approved');
     expect(sql).toContain('COMMIT');
     expect(mocks.release).toHaveBeenCalledOnce();
   });

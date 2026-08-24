@@ -81,6 +81,7 @@
     const profile = tab === 'profile';
     const sales = tab === 'sales';
     const pickups = tab === 'pickups';
+    const catalog = tab === 'catalog';
     const stock = tab === 'stock';
     const stockDetail = tab === 'stock-detail';
     const stockReceipts = tab === 'stock-receipts';
@@ -104,6 +105,7 @@
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.pickupsPanel.classList.toggle('hidden', !pickups);
+    elements.catalogPanel.classList.toggle('hidden', !catalog);
     elements.deliveriesPanel.classList.toggle('hidden', !deliveries);
     elements.financePanel.classList.toggle('hidden', !finance);
     document.getElementById('finance-entries-panel').classList.toggle('hidden', !financeEntries);
@@ -122,6 +124,7 @@
     elements.sessionView.classList.toggle('is-cash', cash);
     elements.sessionView.classList.toggle('is-sales', sales);
     elements.sessionView.classList.toggle('is-pickups', pickups);
+    elements.sessionView.classList.toggle('is-catalog', catalog);
     elements.sessionView.classList.toggle('is-stock', stock || stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-stock-detail', stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-deliveries', deliveries);
@@ -133,13 +136,14 @@
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
-          : stock ? 'Estoque' : pickups ? 'Retiradas' : deliveries ? 'Entregas'
+          : stock ? 'Estoque' : catalog ? 'Catálogo' : pickups ? 'Retiradas' : deliveries ? 'Entregas'
             : (team || teamRemuneration || teamCommission || teamPermissions) ? 'Equipe'
               : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro'
                 : notifications ? 'Notificações' : cash ? 'Caixa' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-pickups').classList.toggle('active', pickups);
+    document.getElementById('nav-catalog').classList.toggle('active', catalog);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
     document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries || financeCommissions || financeCommissionDetail);
@@ -148,6 +152,7 @@
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-pickups').toggleAttribute('aria-current', pickups);
+    document.getElementById('nav-catalog').toggleAttribute('aria-current', catalog);
     document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
     document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries || financeCommissions || financeCommissionDetail);
@@ -169,6 +174,10 @@
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
     if (!pickups && window.location.hash === '#retiradas') {
+      const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
+      window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+    }
+    if (!catalog && window.location.hash === '#catalogo') {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
@@ -229,6 +238,15 @@
     }
     window.location.hash = '#retiradas';
     showTab('pickups');
+  });
+  document.getElementById('nav-catalog').addEventListener('click', function () {
+    if (!Caixa.canModule('estoque')) {
+      Caixa.showToast('Catálogo não está disponível para este acesso.');
+      return;
+    }
+    window.location.hash = '#catalogo';
+    showTab('catalog');
+    if (Caixa.loadOperationCatalog) void Caixa.loadOperationCatalog();
   });
   document.getElementById('nav-stock').addEventListener('click', function () {
     if (!Caixa.canModule('estoque')) {
