@@ -174,26 +174,30 @@ describe('retiradas no painel único', () => {
     expect(app.partnerRetiradasStepReached(installing, 'completed')).toBe(false);
   });
 
-  it('apresenta etapas numeradas com ícones, logos das marcas e WhatsApp nos cards web', () => {
+  it('apresenta etapas numeradas com ícones, logos das marcas e WhatsApp nos cards web', async () => {
     const html = source('painel/public/index.html');
-    const app: any = { catalogoBrandLogo: (brand: string) => brand === 'Pirelli' ? '/pirelli.webp' : null };
-    Object.defineProperties(app, Object.getOwnPropertyDescriptors(pickupModule()));
     const row = { items: [
       { quantity: 1, tire_size: '90/90-18', brand: 'Pirelli' },
       { quantity: 2, tire_size: '80/100-14', brand: 'Marca futura' },
       { quantity: 1, item_name: 'Montagem', pickup_service_code: 'mounting' },
     ] };
+    const app: any = {
+      catalogoBrandLogo: (brand: string) => brand === 'Pirelli' ? '/pirelli.webp' : null,
+      isPartnerPanel: () => false, hasPanelModule: () => true,
+      apiGet: vi.fn().mockResolvedValue({ rows: [row], service_catalog: [] }),
+      $nextTick: (callback: () => void) => callback(),
+    };
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(pickupModule()));
+    await app.loadPartnerRetiradas();
 
-    expect(Array.from(app.partnerRetiradasWorkflowSteps, (step: any) => [step.id, step.icon])).toEqual([
-      ['arrived', 'store'], ['payment', 'wallet-cards'],
-      ['installing', 'wrench'], ['completed', 'circle-check'],
+    expect(app.partnerRetiradasRows[0].pickup_card_items).toEqual([
+      expect.objectContaining({ pickup_label: '1× 90/90-18', pickup_brand_logo: '/pirelli.webp' }),
+      expect.objectContaining({ pickup_label: '2× 80/100-14', pickup_brand_logo: null }),
     ]);
-    expect(app.partnerRetiradasProductItems(row)).toHaveLength(2);
-    expect(app.partnerRetiradasItemLabel(row.items[0])).toBe('1× 90/90-18');
-    expect(app.partnerRetiradasBrandLogo(row.items[0])).toBe('/pirelli.webp');
     expect(app.partnerRetiradasItemsLabel(row)).toBe('1× 90/90-18 Pirelli · 2× 80/100-14 Marca futura');
     expect(html).toContain('Etapa ${stepIndex+1}: ${step.label}');
-    expect(html).toContain('partnerRetiradasBrandLogo(item)');
+    expect(html).toContain("icon:'wallet-cards'");
+    expect(html).toContain('item.pickup_brand_logo');
     expect(html).toContain('partnerRetiradasWaLink(row)');
     expect(html).toContain('Sem WhatsApp');
     expect(html).toContain('Abrir atendimento');
