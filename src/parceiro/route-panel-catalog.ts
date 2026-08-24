@@ -19,6 +19,7 @@ const querySchema = z.object({
   q: z.string().trim().max(120).optional(),
   brand: z.string().trim().max(80).optional(),
   type: z.enum(['all', 'tire', 'service']).default('all'),
+  filter: z.enum(['all', 'stock', 'no_price']).default('all'),
 });
 const productParams = z.object({ productId: z.string().uuid() });
 

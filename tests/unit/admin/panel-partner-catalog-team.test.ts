@@ -38,11 +38,12 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
     app.partnerCatalogo.q = '130/70';
     app.partnerCatalogo.brand = 'Pirelli';
     app.partnerCatalogo.type = 'tire';
+    app.partnerCatalogo.filter = 'stock';
 
     await app.loadPartnerCatalogo(1);
 
     expect(api).toHaveBeenCalledWith(
-      'painel/catalogo?page=1&limit=40&q=130%2F70&brand=Pirelli&type=tire',
+      'painel/catalogo?page=1&limit=40&q=130%2F70&brand=Pirelli&type=tire&filter=stock',
     );
     expect(app.partnerCatalogo.rows).toHaveLength(1);
     expect(app.partnerCatalogo.total).toBe(1);

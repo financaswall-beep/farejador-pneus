@@ -5,7 +5,12 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
   return {
     partnerCatalogo: {
       rows: [], brands: [], page: 1, limit: 40, total: 0, pages: 1,
-      q: '', brand: '', type: 'all', loading: false, error: null, request: 0,
+      q: '', brand: '', type: 'all', filter: 'all', loading: false, error: null, request: 0,
+      brandCounts: {},
+      summary: {
+        products: 0, brands: 0, with_local_stock: 0,
+        without_local_price: 0, local_units_available: 0,
+      },
       selected: null, compatibility: [], compatibilitySummary: null,
       compatibilityLoading: false, compatibilityError: null,
     },
@@ -23,6 +28,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
       if (String(state.q || '').trim()) parts.push(`q=${encodeURIComponent(String(state.q).trim())}`);
       if (state.brand) parts.push(`brand=${encodeURIComponent(state.brand)}`);
       if (state.type !== 'all') parts.push(`type=${encodeURIComponent(state.type)}`);
+      if (state.filter !== 'all') parts.push(`filter=${encodeURIComponent(state.filter)}`);
       state.loading = true;
       state.error = null;
       try {
@@ -30,6 +36,8 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
         if (request !== state.request) return;
         state.rows = Array.isArray(payload.rows) ? payload.rows : [];
         state.brands = Array.isArray(payload.brands) ? payload.brands : [];
+        state.brandCounts = payload.brand_counts || {};
+        state.summary = payload.summary || state.summary;
         state.page = Number(payload.page || requestedPage);
         state.total = Number(payload.total || 0);
         state.pages = Math.max(1, Number(payload.pages || 1));
@@ -48,6 +56,10 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
     },
     partnerCatalogoSetType(type) {
       this.partnerCatalogo.type = ['tire', 'service'].includes(type) ? type : 'all';
+      return this.loadPartnerCatalogo(1);
+    },
+    partnerCatalogoSetFilter(filter) {
+      this.partnerCatalogo.filter = ['stock', 'no_price'].includes(filter) ? filter : 'all';
       return this.loadPartnerCatalogo(1);
     },
     partnerCatalogoPrevious() {
@@ -76,6 +88,39 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
     },
     partnerCatalogoBrandLogo(brand) {
       return typeof this.catalogoBrandLogo === 'function' ? this.catalogoBrandLogo(brand) : null;
+    },
+    partnerCatalogoBrandCount(brand) {
+      return Number(this.partnerCatalogo.brandCounts?.[brand] || 0);
+    },
+    partnerCatalogoStatus(row) {
+      if (row.product_type === 'service') {
+        return { label: 'Serviço', cls: 'bg-gray-100 text-gray-600' };
+      }
+      if (!row.has_local_stock) {
+        return { label: 'Fora do estoque', cls: 'bg-gray-100 text-gray-600' };
+      }
+      if (!this.partnerCatalogoPrice(row)) {
+        return { label: 'Sem preço local', cls: 'bg-amber-50 text-amber-700' };
+      }
+      if (Number(row.local_quantity_available || 0) <= 0) {
+        return { label: 'Sem saldo', cls: 'bg-rose-50 text-rose-700' };
+      }
+      return { label: 'Disponível', cls: 'bg-emerald-50 text-emerald-700' };
+    },
+    partnerCatalogoPriceLabel(row) {
+      const price = this.partnerCatalogoPrice(row);
+      if (!price) return '—';
+      return price.max > price.min
+        ? `${this.formatCurrency(price.min)} a ${this.formatCurrency(price.max)}`
+        : this.formatCurrency(price.min);
+    },
+    partnerCatalogoOpenStock(row) {
+      if (!row?.has_local_stock || !this.hasPanelModule?.('estoque')) return;
+      if (this.partnerEstoque) {
+        this.partnerEstoque.busca = row.tire_size || row.product_name || row.product_code || '';
+        this.partnerEstoque.filtro = 'todos';
+      }
+      this.currentPage = 'estoque';
     },
 
     async partnerCatalogoOpenCompatibility(row) {
