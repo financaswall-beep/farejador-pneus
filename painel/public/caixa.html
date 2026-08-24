@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260822-caixa-brand1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260823-pickups-mobile1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260816-paineis-alinhados1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260816-permissions-header1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260823-pickups-mobile1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
@@ -23,6 +23,9 @@
   <script defer src="/operacao/caixa-stock.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-receipts.js?v=20260817-arrival-adjustment1"></script>
+  <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-mobile1"></script>
+  <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-mobile1"></script>
+  <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-mobile1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20260822-caixa-brand1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
@@ -315,6 +318,82 @@
             <span>Suas vendas desta semana aparecerão aqui.</span>
           </div>
           <div id="sales-list" class="sales-list" aria-live="polite"></div>
+        </div>
+
+        <div id="pickups-panel" class="app-panel pickups-panel hidden">
+          <section class="pickups-kpis" aria-label="Resumo das retiradas">
+            <div><span class="pickups-kpi-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><small>Aguardando</small><strong id="pickups-count-waiting">0</strong></div>
+            <div><span class="pickups-kpi-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span><small>Na loja</small><strong id="pickups-count-arrived">0</strong></div>
+            <div><span class="pickups-kpi-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z"/></svg></span><small>Instalação</small><strong id="pickups-count-installing">0</strong></div>
+            <div><span class="pickups-kpi-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span><small>Concluídas</small><strong id="pickups-count-completed">0</strong></div>
+          </section>
+
+          <div class="pickups-search-row">
+            <label class="pickups-search" for="pickups-search">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <input id="pickups-search" type="search" maxlength="100" autocomplete="off" placeholder="Buscar cliente ou pedido" />
+            </label>
+            <button id="pickups-refresh" type="button" aria-label="Atualizar retiradas"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 6.5L4 9m16 6-2 2.5A7 7 0 0 1 5.5 15"/></svg></button>
+          </div>
+          <nav class="pickups-filters" aria-label="Filtrar retiradas">
+            <button class="active" type="button" data-pickup-filter="all" aria-pressed="true">Todos</button>
+            <button type="button" data-pickup-filter="waiting" aria-pressed="false">Aguardando</button>
+            <button type="button" data-pickup-filter="arrived" aria-pressed="false">Na loja</button>
+            <button type="button" data-pickup-filter="installing" aria-pressed="false">Instalação</button>
+            <button type="button" data-pickup-filter="completed" aria-pressed="false">Concluídas</button>
+          </nav>
+
+          <div id="pickups-loading" class="pickups-message" role="status">Carregando retiradas…</div>
+          <div id="pickups-error" class="pickups-message pickups-message--error hidden" role="alert"><strong>Não foi possível carregar as retiradas.</strong><button id="pickups-retry" type="button">Tentar novamente</button></div>
+          <div id="pickups-empty" class="pickups-message hidden"><strong>Nenhuma retirada encontrada</strong><span>Os pedidos reservados pelo bot aparecerão aqui.</span></div>
+          <div id="pickups-list" class="pickups-list hidden" aria-live="polite"></div>
+
+          <div id="pickups-sheet" class="pickups-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="pickups-sheet-title">
+            <button class="pickups-sheet-backdrop" type="button" data-close-pickup aria-label="Fechar atendimento"></button>
+            <article>
+              <button class="pickups-sheet-handle" type="button" data-close-pickup aria-label="Fechar atendimento"><span></span></button>
+              <header><div><small>ATENDIMENTO DO PEDIDO</small><h3 id="pickups-sheet-title">Retirada</h3><p id="pickups-sheet-customer"></p></div><button type="button" data-close-pickup aria-label="Fechar">×</button></header>
+              <ol class="pickups-steps" aria-label="Etapas da retirada">
+                <li data-pickup-step="arrived"><b>1</b><span>Chegou</span></li>
+                <li data-pickup-step="payment"><b>2</b><span>Pagamento</span></li>
+                <li data-pickup-step="installing"><b>3</b><span>Instalação</span></li>
+                <li data-pickup-step="completed"><b>4</b><span>Conclusão</span></li>
+              </ol>
+              <section class="pickups-sheet-summary">
+                <span id="pickups-sheet-status" class="pickup-status"></span>
+                <p id="pickups-sheet-items"></p>
+              </section>
+              <section class="pickups-payment" aria-labelledby="pickups-payment-title">
+                <h4 id="pickups-payment-title">Pagamento na loja</h4>
+                <div role="radiogroup" aria-label="Forma de pagamento da retirada">
+                  <button class="active" type="button" data-pickup-payment="Pix" role="radio" aria-checked="true">Pix</button>
+                  <button type="button" data-pickup-payment="Dinheiro" role="radio" aria-checked="false">Dinheiro</button>
+                  <button type="button" data-pickup-payment="Cartão" role="radio" aria-checked="false">Cartão</button>
+                </div>
+              </section>
+              <section class="pickups-services" aria-labelledby="pickups-services-title">
+                <header><div><h4 id="pickups-services-title">Serviços do atendimento</h4><small>Cortesia fica registrada com valor zero.</small></div><button id="pickups-add-service" type="button">＋ Incluir</button></header>
+                <div id="pickups-services-list"></div>
+              </section>
+              <section class="pickups-totals">
+                <p><span>Produtos</span><strong id="pickups-product-total">R$ 0,00</strong></p>
+                <p><span>Serviços</span><strong id="pickups-services-total">R$ 0,00</strong></p>
+                <p><span>Total</span><strong id="pickups-grand-total">R$ 0,00</strong></p>
+                <small>Estoque e caixa só mudam após a confirmação final.</small>
+              </section>
+              <p id="pickups-sheet-error" class="pickups-sheet-error" role="alert"></p>
+              <div class="pickups-sheet-actions">
+                <button id="pickups-back-stage" class="pickups-secondary hidden" type="button">Voltar etapa</button>
+                <button id="pickups-stage-action" class="pickups-primary" type="button">Cliente chegou</button>
+                <button id="pickups-complete-action" class="pickups-primary hidden" type="button">Confirmar retirada e pagamento</button>
+                <button id="pickups-cancel-open" class="pickups-danger-link" type="button">Cancelar e liberar reserva</button>
+              </div>
+              <form id="pickups-cancel-form" class="pickups-cancel-form hidden">
+                <label>Motivo do cancelamento<textarea id="pickups-cancel-reason" maxlength="500" rows="3" required placeholder="Ex.: cliente desistiu da retirada"></textarea></label>
+                <div><button id="pickups-cancel-back" type="button">Voltar</button><button id="pickups-cancel-confirm" type="submit">Confirmar cancelamento</button></div>
+              </form>
+            </article>
+          </div>
         </div>
 
         <div id="deliveries-panel" class="app-panel deliveries-panel hidden">
@@ -958,6 +1037,10 @@
           <button id="nav-sales" type="button" data-tab="sales">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z"/><path d="M9 8h6m-6 4h6m-6 4h4"/></svg>
             <span>Vendas</span>
+          </button>
+          <button id="nav-pickups" type="button" data-tab="pickups">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6h18l-1 4H4L3 6Z"/><path d="M9 20v-6h6v6"/></svg>
+            <span>Retiradas</span>
           </button>
           <button id="nav-stock" type="button" data-tab="stock">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>

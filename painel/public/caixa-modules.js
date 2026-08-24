@@ -20,6 +20,7 @@
   const tabModules = Object.freeze({
     cash: 'vendas',
     sales: 'vendas',
+    pickups: 'retiradas',
     stock: 'estoque',
     'stock-detail': 'estoque',
     'stock-receipts': 'estoque',
@@ -39,6 +40,7 @@
     if (canModule('vendas')) return 'cash';
     if (canModule('estoque')) return 'stock';
     if (canModule('entregas')) return 'deliveries';
+    if (canModule('retiradas')) return 'pickups';
     if (canModule('financeiro')) return 'finance';
     if (canModule('team')) return 'team';
     return 'profile';
@@ -57,6 +59,7 @@
     const effective = data.modules || (data.permissions ? {
       vendas: !!data.permissions.vendas, estoque: !!data.permissions.estoque,
       entregas: !!data.permissions.entregas, financeiro: !!data.permissions.financeiro,
+      retiradas: !!data.permissions.retiradas,
     } : null);
     if (data.display_name) storage.setItem(keys.name, data.display_name);
     if (data.username) storage.setItem(keys.user, data.username);
@@ -74,6 +77,7 @@
   function applyModuleNavigation() {
     setNavigationVisibility('nav-cash', canModule('vendas'));
     setNavigationVisibility('nav-sales', canModule('vendas'));
+    setNavigationVisibility('nav-pickups', canModule('retiradas'));
     setNavigationVisibility('nav-stock', canModule('estoque'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
@@ -95,6 +99,7 @@
     if (canModule('team') && window.location.hash.startsWith('#equipe/permissoes/')) return 'team-permissions';
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
+    if (canModule('retiradas') && window.location.hash === '#retiradas') return 'pickups';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';
     return firstAllowedTab();
   }

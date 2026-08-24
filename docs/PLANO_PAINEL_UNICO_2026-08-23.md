@@ -22,9 +22,11 @@ Clientes, Financeiro, Entregas, Equipe e Configurações, mais as exclusivas
 **Retiradas** e **Bate-papo**.
 
 ### 1.2 O que NÃO entra
-**`/operacao` permanece como está.** Continua sendo a interface operacional e
-móvel, já unificada entre matriz e parceiros. **Não reescrever** os ~30 módulos
-`painel/public/caixa-*.js`.
+**`/operacao` permanece como a base móvel pronta.** Continua sendo a interface
+operacional já unificada entre Matriz e parceiros. Não reescrever nem substituir
+os módulos que já funcionam. Funcionalidades novas podem ser acrescentadas como
+módulos pequenos dentro do mesmo casco quando reutilizarem o contrato único do
+servidor — Retiradas passou a seguir exatamente essa regra.
 
 ### 1.3 Estado final
 Duas interfaces com **finalidades diferentes**, não duas implementações do
@@ -257,8 +259,9 @@ Categorias (decisão do dono, item 5, com o ajuste do Codex):
 - **ADAPTAR** — existe na matriz, mas precisa de API/escopo do parceiro
 - **CRIAR NO CASCO** — exclusiva do parceiro
 - **DESCARTAR** — duplicada, morta ou inferior ao equivalente atual
-- **MANTER NO `/operacao` E USAR COMO REFERÊNCIA** — o mobile fica intacto e
-  serve de referência funcional; **não elimina a versão desktop**
+- **MANTER/INCREMENTAR NO `/operacao` E USAR COMO REFERÊNCIA** — o casco e os
+  módulos existentes ficam intactos; módulos adicionais podem ser acoplados sem
+  duplicar regra de negócio; **não elimina a versão desktop**
 
 | Tela | Endpoints (`/parceiro/:slug/api/…`) | Acopl. | Categoria |
 |---|---|---|---|
@@ -266,7 +269,7 @@ Categorias (decisão do dono, item 5, com o ajuste do Codex):
 | **vendas** (PDV) | `produtos`,`estoque`,`clientes/buscar`, POST `vendas`, DELETE `vendas/:id` | **ALTO** | ADAPTAR + referência `/operacao` |
 | **pedidos** | `vendas`,`clientes/buscar`, POST `entregas/:orderId` | **ALTO** | ADAPTAR |
 | **entrega** | POST `entregas/:id`, `…/confirmar-retorno` | **ALTO** | ADAPTAR + referência `/operacao` |
-| **retiradas** | `retiradas`, POST/DELETE `retiradas/:orderId` | **ALTO** | **CRIAR NO CASCO** |
+| **retiradas** | `retiradas`, PUT etapa, POST/DELETE `retiradas/:orderId` | **ALTO** | **CRIAR NO CASCO WEB + INCREMENTAR `/operacao`** |
 | **clientes** | `clientes` (CRUD), `clientes/buscar` | MÉDIO | ADAPTAR |
 | **estoque** | `estoque`,`catalogo/busca`, `operacao/estoque/*` (7 rotas) | **ALTO** | ADAPTAR + referência `/operacao` |
 | **financeiro** | `fluxo-caixa`,`compras`,`despesas`,`contas-a-*`, `route-finance-credit.ts` | **ALTO** | ADAPTAR |

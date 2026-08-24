@@ -6,6 +6,7 @@ export interface OperationModules {
   vendas: boolean;
   estoque: boolean;
   entregas: boolean;
+  retiradas: boolean;
   financeiro: boolean;
 }
 
@@ -61,6 +62,7 @@ type PartnerRow = {
   allow_vendas: boolean;
   allow_estoque: boolean;
   allow_entregas: boolean;
+  allow_retiradas: boolean;
   allow_financeiro: boolean;
 };
 
@@ -69,8 +71,8 @@ type PartnerRow = {
  *
  * O identificador técnico do vínculo nunca sai no JSON. Para parceiros, a
  * permissão por pessoa prevalece sobre a permissão da loja e os defaults atuais
- * são mantidos. Um funcionário sem Vendas, Estoque e Entregas não recebe a porta
- * operacional, mesmo que ainda possua acesso a outras telas administrativas.
+ * são mantidos. Um funcionário sem nenhum módulo da Operação não recebe esta
+ * porta, mesmo que ainda possua acesso a outras telas administrativas.
  */
 export async function listOperationWorkplaces(
   environment: string,
@@ -111,6 +113,8 @@ export async function listOperationWorkplaces(
               CASE WHEN pat.role = 'owner' THEN true
                    ELSE COALESCE(ptp.allow_entregas, pup.allow_entregas, true) END AS allow_entregas
               ,CASE WHEN pat.role = 'owner' THEN true
+                    ELSE COALESCE(ptp.allow_retiradas, pup.allow_retiradas, true) END AS allow_retiradas
+              ,CASE WHEN pat.role = 'owner' THEN true
                     ELSE COALESCE(ptp.allow_financeiro, pup.allow_financeiro, false) END AS allow_financeiro
          FROM network.partner_access_tokens pat
          JOIN network.partner_units pu
@@ -141,14 +145,15 @@ export async function listOperationWorkplaces(
     const canSell = matrixRow.job === 'vendedor' && matrixRow.work_area === 'sales';
     const panelRole = matrixRow.panel_role ?? null;
     const modules = matrixRow.panel_role === 'owner' ? {
-      vendas: true, estoque: true, entregas: true, financeiro: true,
+      vendas: true, estoque: true, entregas: true, retiradas: true, financeiro: true,
     } : {
       vendas: matrixRow.allow_vendas ?? canSell,
       estoque: matrixRow.allow_estoque ?? canSell,
       entregas: matrixRow.allow_entregas ?? isCourier,
+      retiradas: false,
       financeiro: matrixRow.allow_financeiro ?? (panelRole !== null),
     };
-    if (modules.vendas || modules.estoque || modules.entregas || modules.financeiro) workplaces.push({
+    if (modules.vendas || modules.estoque || modules.entregas || modules.retiradas || modules.financeiro) workplaces.push({
       id: 'matrix',
       kind: 'matrix',
       name: 'Matriz',
@@ -160,7 +165,9 @@ export async function listOperationWorkplaces(
 
   for (const row of partners.rows) {
     const canSeeFinance = row.role === 'owner' || row.allow_financeiro === true;
-    if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas && !canSeeFinance) continue;
+    const canSeePickups = row.allow_retiradas === true;
+    if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas
+      && !canSeePickups && !canSeeFinance) continue;
     workplaces.push({
       id: `partner:${row.slug}`,
       kind: 'partner',
@@ -174,6 +181,7 @@ export async function listOperationWorkplaces(
         vendas: row.allow_vendas,
         estoque: row.allow_estoque,
         entregas: row.allow_entregas,
+        retiradas: canSeePickups,
         financeiro: canSeeFinance,
       },
     });

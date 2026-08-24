@@ -12,6 +12,7 @@ export interface CaixaModules {
   vendas: boolean;
   estoque: boolean;
   entregas: boolean;
+  retiradas: boolean;
   financeiro: boolean;
 }
 
@@ -47,13 +48,17 @@ function modulesForAccess(
     vendas: job === 'vendedor' && workArea === 'sales',
     estoque: job === 'vendedor' && workArea === 'sales',
     entregas: job === 'entregador',
+    retiradas: false,
     financeiro: panelRole !== null,
   };
-  if (panelRole === 'owner') return { vendas: true, estoque: true, entregas: true, financeiro: true };
+  if (panelRole === 'owner') return {
+    vendas: true, estoque: true, entregas: true, retiradas: true, financeiro: true,
+  };
   return {
     vendas: overrides?.vendas ?? legacy.vendas,
     estoque: overrides?.estoque ?? legacy.estoque,
     entregas: overrides?.entregas ?? legacy.entregas,
+    retiradas: legacy.retiradas,
     financeiro: overrides?.financeiro ?? legacy.financeiro,
   };
 }

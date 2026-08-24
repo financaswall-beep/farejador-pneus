@@ -9,7 +9,7 @@ import type { OperationWorkplace } from '../../../src/admin/caixa/operation-auth
 const WORKPLACES: OperationWorkplace[] = [
   {
     id: 'matrix', kind: 'matrix', name: 'Matriz', role: 'vendedor', collaboratorId: 'collab-1',
-    modules: { vendas: true, estoque: false, entregas: false },
+    modules: { vendas: true, estoque: false, entregas: false, retiradas: false, financeiro: false },
   },
   {
     id: 'partner:rio-do-ouro',
@@ -19,7 +19,7 @@ const WORKPLACES: OperationWorkplace[] = [
     slug: 'rio-do-ouro',
     tokenId: 'token-1',
     displayName: 'Wallace',
-    modules: { vendas: true, estoque: true, entregas: true },
+    modules: { vendas: true, estoque: true, entregas: true, retiradas: true, financeiro: false },
   },
 ];
 
