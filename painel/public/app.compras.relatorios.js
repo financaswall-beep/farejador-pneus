@@ -48,6 +48,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         period: f.period, status: f.status, payment: f.payment,
         page: String(f.page), page_size: String(f.pageSize),
       });
+      if (f.supplierId) qs.set('supplier_id', f.supplierId);
       if (f.search.trim()) qs.set('search', f.search.trim());
       return qs.toString();
     },
@@ -56,9 +57,13 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
       this.comprasLoading.history = true;
       this.comprasErrors.history = null;
       try {
-        this.comprasHistory = await this.apiGet(
-          '/admin/api/wholesale/purchases/report?' + this.comprasHistoryQuery(),
-        );
+        const query = this.comprasHistoryQuery();
+        const [report, analytics] = await Promise.all([
+          this.apiGet('/admin/api/wholesale/purchases/report?' + query),
+          this.apiGet('/admin/api/wholesale/purchases/analytics?' + query),
+        ]);
+        this.comprasHistory = report;
+        this.comprasHistoryAnalytics = analytics;
       } catch (err) {
         this.comprasErrors.history = err.message;
       } finally {
@@ -167,20 +172,8 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
       if (row.status === 'cancelled') return row.stock_applied ? 'Recebida antes do cancelamento' : 'Não recebida';
       return row.stock_applied ? 'Recebido' : 'Aguardando';
     },
-    comprasHistoryPageNumbers() {
-      const current = Number(this.comprasHistory.pagination?.page || 1);
-      const pages = Number(this.comprasHistory.pagination?.pages || 1);
-      const start = Math.max(1, Math.min(current - 2, pages - 4));
-      return Array.from({ length: Math.min(5, pages) }, (_, index) => start + index);
-    },
-    comprasHistoryPage(page) {
-      if (page < 1 || page > Number(this.comprasHistory.pagination?.pages || 1)) return;
-      this.comprasHistoryFilters.page = page;
-      void this.loadComprasHistory();
-    },
     comprasSupplierRows() {
-      const search = this.comprasSupplierSearch.trim().toLowerCase();
-      if (!search) return this.comprasSuppliers;
+      const search = this.comprasSupplierSearch.trim().toLowerCase(); if (!search) return this.comprasSuppliers;
       return this.comprasSuppliers.filter((row) =>
         [row.name, row.phone, row.document].some((value) =>
           String(value || '').toLowerCase().includes(search)));
@@ -206,7 +199,8 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
     },
     comprasSupplierHistory(row) {
       this.comprasHistoryFilters = {
-        ...this.comprasHistoryFilters, search: row.name, status: 'all', payment: 'all', page: 1,
+        ...this.comprasHistoryFilters, supplierId: row.supplier_id,
+        search: '', status: 'all', payment: 'all', page: 1,
       };
       this.comprasOpenTab('historico');
     },

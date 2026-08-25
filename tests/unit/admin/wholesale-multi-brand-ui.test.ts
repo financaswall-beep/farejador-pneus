@@ -156,6 +156,37 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
 });
 
 describe('Relatórios de compra com duas marcas na mesma medida', () => {
+  it('mantém custo médio geral ponderado e desenha a série dinâmica do histórico', () => {
+    const state: any = {
+      ...moduleState(),
+      ...painelModule('app.compras.relatorios.js', 'comprasRelatorios'),
+      ...painelModule('app.compras.historico.js', 'comprasHistorico'),
+      comprasHistoryAnalytics: {
+        summary: {
+          total_committed: '22.00', paid_amount: '0.00', open_amount: '22.00',
+          tires: 2, received_tires: 0, in_transit_tires: 2, active_suppliers: 1,
+          average_cost: '11.00', previous_average_cost: '10.00',
+          average_change_pct: '10.0', minimum_item_cost: '11.00',
+          maximum_item_cost: '11.00', purchases_count: 1,
+        },
+        timeline: [
+          { bucket: '2026-08-01', total_committed: '10.00', tires: 1,
+            received_tires: 1, average_cost: '10.00' },
+          { bucket: '2026-08-25', total_committed: '22.00', tires: 2,
+            received_tires: 0, average_cost: '11.00' },
+        ],
+      },
+      comprasHistoryFilters: { period: '30d', supplierId: '' },
+    };
+
+    expect(state.comprasHistorySummary()).toMatchObject({
+      committed: 22, open: 22, tires: 2, average: 11, previousAverage: 10,
+      averageChange: 10,
+    });
+    expect(state.comprasHistoryChartPoints('average_cost')).toMatch(/,/);
+    expect(state.comprasHistoryAverageChangeLabel()).toContain('10,0%');
+  });
+
   it('separa as variantes também no resumo de melhores preços', () => {
     const state: any = {
       ...moduleState(),

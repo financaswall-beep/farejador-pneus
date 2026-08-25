@@ -1,6 +1,8 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+export { getWholesalePurchaseAnalytics } from './queries-compras-historico.js';
+export type { PurchaseHistoryAnalytics } from './queries-compras-historico.js';
 
 export type PurchaseReportPeriod = '30d' | '90d' | 'year' | 'all';
 export type PurchaseReportStatus = 'all' | 'pending' | 'confirmed' | 'cancelled';
@@ -10,6 +12,7 @@ export interface PurchaseReportFilters {
   period: PurchaseReportPeriod;
   status: PurchaseReportStatus;
   payment: PurchaseReportPayment;
+  supplierId?: string;
   search?: string;
   page: number;
   pageSize: number;
@@ -55,6 +58,10 @@ function purchaseWhere(
   if (filters.payment !== 'all') {
     params.push(filters.payment);
     where.push(`p.payment_status=$${params.length}`);
+  }
+  if (filters.supplierId) {
+    params.push(filters.supplierId);
+    where.push(`p.supplier_id=$${params.length}`);
   }
   const search = filters.search?.trim().toLowerCase();
   if (search) {

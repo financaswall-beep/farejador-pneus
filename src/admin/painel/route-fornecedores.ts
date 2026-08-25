@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, linkWholesalePurchaseOrder, listWholesalePurchaseOrders, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
+import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseAnalytics, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, linkWholesalePurchaseOrder, listWholesalePurchaseOrders, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 
@@ -14,6 +14,7 @@ const purchaseReportQuerySchema = z.object({
   period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
   status: z.enum(['all', 'pending', 'confirmed', 'cancelled']).default('all'),
   payment: z.enum(['all', 'paid', 'pending']).default('all'),
+  supplier_id: z.string().uuid().optional(),
   search: z.string().trim().max(80).optional(),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   page_size: z.coerce.number().int().min(4).max(100).default(10),
@@ -94,11 +95,29 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
       period: parsed.data.period,
       status: parsed.data.status,
       payment: parsed.data.payment,
+      supplierId: parsed.data.supplier_id,
       search: parsed.data.search,
       page: parsed.data.page,
       pageSize: parsed.data.page_size,
     });
     return reply.status(200).send({ environment: env.FAREJADOR_ENV, ...report });
+  });
+
+  fastify.get('/admin/api/wholesale/purchases/analytics', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = purchaseReportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_query' });
+    }
+    const analytics = await getWholesalePurchaseAnalytics({
+      period: parsed.data.period,
+      status: parsed.data.status,
+      payment: parsed.data.payment,
+      supplierId: parsed.data.supplier_id,
+      search: parsed.data.search,
+      page: 1,
+      pageSize: 10,
+    });
+    return reply.status(200).send({ environment: env.FAREJADOR_ENV, ...analytics });
   });
 
   // Registra compra: recebida alimenta o galpão na transação; pendente não toca estoque.

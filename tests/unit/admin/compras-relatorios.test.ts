@@ -1,4 +1,6 @@
 import type { Pool } from 'pg';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
@@ -6,6 +8,7 @@ vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'tes
 
 import {
   getWholesalePriceReport,
+  getWholesalePurchaseAnalytics,
   getWholesalePurchaseReport,
   getWholesaleSupplierInsights,
 } from '../../../src/admin/painel/queries-compras-relatorios.js';
@@ -14,6 +17,17 @@ import {
 } from '../../../src/admin/painel/queries-fornecedores.js';
 
 describe('relatórios conciliados de compras', () => {
+  it('expõe a análise visual do histórico e o detalhamento clicável de custo', () => {
+    const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
+    expect(html).toContain('Total contratado');
+    expect(html).toContain('Compras e recebimentos');
+    expect(html).toContain('Custo médio geral');
+    expect(html).toContain('@click="comprasOpenCostDialog()"');
+    expect(html).toContain('Evolução do custo médio');
+    expect(html).toContain('Compras canceladas ficam fora');
+    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-purchase-history1');
+  });
+
   it('pagina o histórico e mantém recebimento separado do compromisso financeiro', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{
@@ -49,6 +63,41 @@ describe('relatórios conciliados de compras', () => {
     expect(query.mock.calls[0]![0]).toContain(`p.status<>'cancelled'`);
     expect(query.mock.calls[0]![0]).toContain(`cp.status='confirmed'`);
     expect(query.mock.calls[0]![1]).toEqual(['test']);
+  });
+
+  it('calcula custo ponderado, caixa e obrigação sem misturar recebimento', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        purchases_count: 1, total_committed: '22.00', paid_amount: '0.00',
+        open_amount: '22.00', tires: 2, received_tires: 0, in_transit_tires: 2,
+        active_suppliers: 1, average_cost: '11.00', minimum_item_cost: '11.00',
+        maximum_item_cost: '11.00',
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        bucket: '2026-08-25', total_committed: '22.00', tires: 2,
+        received_tires: 0, average_cost: '11.00',
+      }] })
+      .mockResolvedValueOnce({ rows: [{ average_cost: '10.00' }] });
+    const analytics = await getWholesalePurchaseAnalytics({
+      period: '30d', status: 'all', payment: 'all',
+      supplierId: '11111111-1111-4111-8111-111111111111',
+      page: 1, pageSize: 10,
+    }, 'test', { query } as unknown as Pool);
+
+    expect(analytics.summary).toMatchObject({
+      total_committed: '22.00', paid_amount: '0.00', open_amount: '22.00',
+      tires: 2, in_transit_tires: 2, average_cost: '11.00',
+      previous_average_cost: '10.00', average_change_pct: '10.0',
+    });
+    expect(analytics.timeline).toHaveLength(1);
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls[0]![0]).toContain('matriz_ledger_obligation_balance');
+    expect(query.mock.calls[0]![0]).toContain('sum(allocated)');
+    expect(query.mock.calls[1]![0]).toContain("date_trunc('day'");
+    expect(query.mock.calls[2]![0]).toContain("interval '60 days'");
+    expect(query.mock.calls[0]![1]).toEqual([
+      'test', '11111111-1111-4111-8111-111111111111',
+    ]);
   });
 
   it('compara preço somente de compra recebida e aceita recorte seguro', async () => {
