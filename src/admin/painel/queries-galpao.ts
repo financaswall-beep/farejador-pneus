@@ -11,54 +11,9 @@ import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailC
 import { hashPassword } from '../../parceiro/password.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { requireTireCondition, type TireCondition } from '../../shared/tire-condition.js';
-export interface WholesaleStockRow {
-  measure: string;
-  brand: string;
-  tire_condition: TireCondition;
-  quantity_on_hand: number;
-  quantity_reserved: number;
-  quantity_available: number;
-  unit_cost: number;
-  sales_30d?: number;
-  min_quantity: number | null;
-  notes: string | null;
-  updated_at: string;
-  tire_width_mm: number | null;
-  tire_aspect_ratio: number | null;
-  tire_rim_diameter: number | null;
-}
-/** Lista o estoque do galpão (uma linha por medida, marca e condição). */
-export async function listWholesaleStock(
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<WholesaleStockRow[]> {
-  const r = await dbPool.query<WholesaleStockRow>(
-    `WITH sales_30d AS (
-       SELECT environment,measure,brand,tire_condition,
-              GREATEST(0,-COALESCE(sum(qty_delta),0))::int AS units
-         FROM commerce.wholesale_stock_movements
-        WHERE source IN (
-          'venda_atacado','varejo','cancelamento_venda','cancelamento_varejo'
-        )
-          AND created_at>=now()-INTERVAL '30 days'
-        GROUP BY environment,measure,brand,tire_condition
-     )
-     SELECT ws.measure, ws.brand, ws.tire_condition, ws.quantity_on_hand,
-            ws.quantity_reserved,
-            (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,
-            ws.unit_cost, COALESCE(s.units,0)::int AS sales_30d,
-            ws.min_quantity, ws.notes,
-            ws.updated_at, ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter
-       FROM commerce.wholesale_stock ws
-       LEFT JOIN sales_30d s
-         ON s.environment=ws.environment AND s.measure=ws.measure
-        AND s.brand=ws.brand AND s.tire_condition=ws.tire_condition
-      WHERE ws.environment = $1
-      ORDER BY ws.measure, ws.brand, ws.tire_condition`,
-    [environment],
-  );
-  return r.rows;
-}
+import type { WholesaleStockRow } from './queries-galpao-list.js';
+export { listWholesaleStock } from './queries-galpao-list.js';
+export type { WholesaleStockRow } from './queries-galpao-list.js';
 
 /** Define saldo, custo e mínimo da variante; null limpa o mínimo. */
 export async function setWholesaleStock(

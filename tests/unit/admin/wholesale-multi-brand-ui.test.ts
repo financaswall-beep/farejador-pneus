@@ -145,6 +145,19 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
       .toEqual(['Metzeler']);
   });
 
+  it('não recomenda comprar de novo o que já está em trânsito', () => {
+    const state = moduleState();
+    const pirelli = state.atacadoStock[0];
+    Object.assign(pirelli, {
+      quantity_on_hand: 10, quantity_reserved: 8, quantity_available: 2,
+      min_quantity: 5, in_transit_quantity: 2,
+    });
+    expect(state.repoSugestao(pirelli)).toBe(1);
+    Object.assign(pirelli, { in_transit_quantity: 3 });
+    expect(state.repoSugestao(pirelli)).toBe(0);
+    expect(state.repoRows()).not.toContain(pirelli);
+  });
+
   it('considera medida e marca ao decidir qual histórico pertence à seleção', () => {
     const state = moduleState();
     state.galpaoFilme.measure = '90/90-18';

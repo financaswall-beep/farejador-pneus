@@ -102,8 +102,8 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     },
     repoSugestao(row) {
       const balance = this.measureAvailable(row) ?? 0;
-      const minimum = row.min_quantity == null ? 0 : Math.max(0, Number(row.min_quantity) || 0);
-      return Math.max(1, minimum - balance);
+      const minimum = row.min_quantity == null ? 0 : Math.max(0, Number(row.min_quantity) || 0), inTransit = Math.max(0, Number(row.in_transit_quantity) || 0);
+      return Math.max(0, minimum - balance - inTransit);
     },
     repoQuantidade(row) {
       const defined = Number(this.repoQuantidades[this.repoKey(row)]);
@@ -115,7 +115,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     },
     repoRows() {
       return [...this.atacadoStock]
-        .filter((row) => this.measureAvailable(row) === 0 || this.stockPrecisaRepor(row))
+        .filter((row) => this.repoSugestao(row) > 0)
         .sort((a, b) => {
           const priorityA = this.measureAvailable(a) === 0 ? 0 : 1;
           const priorityB = this.measureAvailable(b) === 0 ? 0 : 1;

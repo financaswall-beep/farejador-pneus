@@ -26,7 +26,7 @@ describe('guardas finais das auditorias de Compras', () => {
   });
 
   it('calcula giro de 30 dias no banco e o front usa esse valor', () => {
-    const backend = source('src/admin/painel/queries-galpao.ts');
+    const backend = source('src/admin/painel/queries-galpao-list.ts');
     const frontend = source('painel/public/app.galpao.multibrand.js');
     expect(backend).toContain("created_at>=now()-INTERVAL '30 days'");
     for (const sourceName of [
@@ -34,6 +34,17 @@ describe('guardas finais das auditorias de Compras', () => {
     ]) expect(backend).toContain(`'${sourceName}'`);
     expect(backend).toContain('GREATEST(0,-COALESCE(sum(qty_delta),0))');
     expect(frontend).toContain("row?.sales_30d != null");
+  });
+
+  it('desconta compras pendentes do plano sem alterar o saldo oficial', () => {
+    const backend = source('src/admin/painel/queries-galpao-list.ts');
+    const frontend = source('painel/public/app.galpao.multibrand.js');
+    expect(backend).toContain('pending_receipts AS');
+    expect(backend).toContain("WHERE p.status='pending'");
+    expect(backend).toContain('i.quantity-COALESCE(i.accepted_quantity,0)');
+    expect(backend).toContain('COALESCE(pr.units,0)::int AS in_transit_quantity');
+    expect(frontend).toContain('minimum - balance - inTransit');
+    expect(frontend).toContain('this.repoSugestao(row) > 0');
   });
 
   it('recusa estouro também para chamadas internas que contornem a rota', () => {

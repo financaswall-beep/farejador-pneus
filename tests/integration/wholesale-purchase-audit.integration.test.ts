@@ -258,4 +258,20 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
       item.measure === measure && item.brand === brand && item.tire_condition === 'novo');
     expect(row?.sales_30d).toBe(75);
   });
+
+  it('relatorio de reposicao enxerga compra pendente sem somar ao estoque', async () => {
+    const before = (await listStock('test', db.pool)).find((item) =>
+      item.measure === measure && item.brand === brand && item.tire_condition === 'novo');
+    await registerPurchase({
+      environment: 'test', supplier_id: supplierId, created_by: 'owner:audit',
+      purchased_at: '2026-08-25T10:00:00-03:00', payment_status: 'paid',
+      receipt_status: 'pending', idempotency_key: randomUUID(),
+      items: [{ measure, brand, tire_condition: 'novo', quantity: 4, unit_cost: 20 }],
+    }, db.pool);
+
+    const after = (await listStock('test', db.pool)).find((item) =>
+      item.measure === measure && item.brand === brand && item.tire_condition === 'novo');
+    expect(after?.quantity_on_hand).toBe(before?.quantity_on_hand);
+    expect(after?.in_transit_quantity).toBe((before?.in_transit_quantity ?? 0) + 4);
+  });
 });

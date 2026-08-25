@@ -58,7 +58,7 @@ describe('relatórios conciliados de compras', () => {
     expect(html).toContain('comprasHistoryHoverDetail(comprasHistoryHoveredRow())');
   });
 
-  it('entrega comparação de preços real e deixa o plano como próxima tela explícita', () => {
+  it('entrega comparação de preços real e o relatório de reposição sob demanda', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
     const start = html.indexOf('<!-- PREÇOS:');
     const end = html.indexOf('<!-- ═══ TELA: ESTOQUE', start);
@@ -68,6 +68,11 @@ describe('relatórios conciliados de compras', () => {
     expect(prices).toContain("comprasPriceMode === 'plan'");
     expect(prices).toContain('Adicionar ao plano de reposição');
     expect(prices).toContain('Nada será comprado sozinho');
+    expect(prices).toContain('Gerar relatório agora');
+    expect(prices).toContain('estoque mínimo − disponível − em trânsito');
+    expect(prices).toContain('Enviar pelo WhatsApp');
+    expect(prices).toContain('você escolhe o contato e envia');
+    expect(prices).toContain('Preparar compra deste fornecedor');
     expect(prices).toContain('Frete e desconto não incluídos');
     expect(prices).toContain('Simulação; nenhum lançamento é criado aqui.');
     expect(prices).toContain('bg-sky-800');
