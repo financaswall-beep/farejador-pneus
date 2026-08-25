@@ -76,7 +76,8 @@ export async function getWholesalePurchaseReport(
   const summary = await dbPool.query<PurchaseReportSummary>(
     `WITH filtered AS (
        SELECT p.id,p.status,p.payment_status,p.total_amount,
-              COALESCE((SELECT sum(i.quantity) FROM commerce.wholesale_purchase_items i
+              COALESCE((SELECT sum(COALESCE(i.accepted_quantity,i.quantity))
+                FROM commerce.wholesale_purchase_items i
                 WHERE i.environment=p.environment AND i.purchase_id=p.id),0)::int AS tires
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s
@@ -96,22 +97,38 @@ export async function getWholesalePurchaseReport(
   const rowParams = [...query.params, filters.pageSize, offset];
   const rows = await dbPool.query(
     `SELECT p.id,p.supplier_id,s.name AS supplier_name,s.deleted_at AS supplier_archived_at,
-            p.purchased_at,p.total_amount,p.payment_status,p.due_date,p.paid_at,
+            p.purchased_at,p.total_amount,p.products_amount,p.freight_amount,
+            p.discount_amount,p.payment_status,p.payment_method,p.due_date,p.paid_at,
+            p.supplier_reference,p.purchase_order_id,
+            CASE WHEN o.id IS NULL THEN NULL ELSE
+              'OC-'||to_char(o.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY')
+                ||'-'||lpad(o.order_number::text,6,'0') END AS order_code,
             p.status,p.stock_applied,p.stock_applied_at,p.created_by,p.notes,
             p.cancelled_at,p.cancelled_by,p.cancel_reason,
-            COALESCE(sum(i.quantity),0)::int AS items_count,
+            COALESCE(sum(COALESCE(i.accepted_quantity,i.quantity)),0)::int AS items_count,
             COALESCE(jsonb_agg(jsonb_build_object(
               'id',i.id,'measure',i.measure,'brand',i.brand,
               'tire_condition',i.tire_condition,'quantity',i.quantity,
-              'unit_cost',i.unit_cost,'line_total',i.line_total
+              'ordered_quantity',i.ordered_quantity,
+              'accepted_quantity',i.accepted_quantity,
+              'unit_cost',i.unit_cost,'line_total',i.line_total,
+              'allocated_cost',i.allocated_cost
             ) ORDER BY i.measure,i.id) FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
+            ,COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                'id',pi.id,'number',pi.installment_number,'due_date',pi.due_date,
+                'amount',pi.amount) ORDER BY pi.installment_number)
+              FROM commerce.wholesale_purchase_installments pi
+             WHERE pi.environment=p.environment AND pi.purchase_id=p.id),'[]'::jsonb)
+              AS installments
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s
          ON s.id=p.supplier_id AND s.environment=p.environment
        LEFT JOIN commerce.wholesale_purchase_items i
          ON i.purchase_id=p.id AND i.environment=p.environment
+       LEFT JOIN commerce.wholesale_purchase_orders o
+         ON o.environment=p.environment AND o.id=p.purchase_order_id
       WHERE ${query.sql}
-      GROUP BY p.id,s.id
+      GROUP BY p.id,s.id,o.id
       ORDER BY p.purchased_at DESC,p.id DESC
       LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`,
     rowParams,
@@ -149,7 +166,8 @@ export async function getWholesaleSupplierInsights(
             COALESCE((
               SELECT jsonb_agg(m ORDER BY m.qty_total DESC,m.measure)
                 FROM (
-                  SELECT i.measure,sum(i.quantity)::int AS qty_total
+                  SELECT i.measure,
+                         sum(COALESCE(i.accepted_quantity,i.quantity))::int AS qty_total
                     FROM commerce.wholesale_purchase_items i
                     JOIN commerce.wholesale_purchases cp
                       ON cp.id=i.purchase_id AND cp.environment=i.environment
@@ -192,8 +210,9 @@ export async function getWholesalePriceReport(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,
             s.deleted_at IS NOT NULL AS supplier_archived,i.measure,i.brand,
             i.tire_condition,
-            sum(i.quantity)::int AS qty_total,
-            round(sum(i.line_total)/NULLIF(sum(i.quantity),0),2) AS avg_cost,
+            sum(COALESCE(i.accepted_quantity,i.quantity))::int AS qty_total,
+            round(sum(COALESCE(i.accepted_quantity,i.quantity)*i.unit_cost)
+              /NULLIF(sum(COALESCE(i.accepted_quantity,i.quantity)),0),2) AS avg_cost,
             max(p.purchased_at) AS last_purchased_at,
             count(DISTINCT p.id)::int AS purchases_count
        FROM commerce.wholesale_purchase_items i

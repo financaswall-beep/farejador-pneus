@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
 const { auditMigrationManifest } = require('./check-migrations.cjs');
+const { stripEmbeddedTransactionControl } = require('./migration-compat.cjs');
 
 const migrationPath = process.argv[2];
 const commit = process.argv.includes('--commit');
@@ -28,7 +29,9 @@ async function main() {
   }
   const audit = auditMigrationManifest(root);
   if (!audit.ok) throw new Error(`manifesto de migrations invalido: ${audit.errors.join('; ')}`);
-  const sql = fs.readFileSync(resolved, 'utf8');
+  // A transação pertence ao executor. Sem remover BEGIN/COMMIT históricos do
+  // arquivo, um COMMIT interno furaria o rollback prometido pelo modo dry-run.
+  const sql = stripEmbeddedTransactionControl(fs.readFileSync(resolved, 'utf8'));
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },

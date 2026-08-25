@@ -118,6 +118,85 @@ export async function postWholesalePurchaseReceipt(
   });
 }
 
+/**
+ * Ajusta, sem editar o livro, a diferença encontrada na conferência física.
+ * A redução primeiro baixa o saldo ainda aberto; qualquer valor já pago a
+ * maior vira crédito real contra o fornecedor.
+ */
+export async function postWholesalePurchaseQuantityAdjustment(
+  client: PoolClient,
+  purchase: WholesalePurchaseLedgerState,
+  acceptedTotal: number,
+  adjustedBy: string,
+): Promise<string | null> {
+  if (!env.MATRIZ_CENTRAL_LEDGER) return null;
+  const originalCents = Math.round(matrizLedgerAmount(
+    purchase.totalAmount, 'purchase_ledger_amount_invalid',
+  ) * 100);
+  const acceptedCents = Math.round(matrizLedgerAmount(
+    acceptedTotal, 'purchase_ledger_amount_invalid',
+  ) * 100);
+  if (acceptedCents > originalCents) throw new Error('purchase_receipt_exceeds_order');
+  const reductionCents = originalCents - acceptedCents;
+  if (reductionCents === 0) return null;
+  const obligationId = await ensureWholesalePurchaseAccrual(client, purchase);
+  if (!obligationId) return null;
+  let payableCents = 0;
+  if (purchase.paymentStatus === 'pending') {
+    const balance = await client.query<{ balance: string }>(
+      `SELECT finance.matriz_ledger_obligation_balance($1::env_t,$2)::text balance`,
+      [purchase.environment, obligationId],
+    );
+    payableCents = Math.min(reductionCents,
+      Math.max(0, Math.round(Number(balance.rows[0]?.balance ?? 0) * 100)));
+  }
+  const refundCents = reductionCents - payableCents;
+  const amount = reductionCents / 100;
+  const lines: import('./matriz-ledger-posting.js').MatrizLedgerLine[] = [];
+  if (payableCents > 0) lines.push({ account_code: 'accounts_payable',
+    account_class: 'liability', side: 'debit', amount: payableCents / 100 });
+  if (refundCents > 0) lines.push({ account_code: 'supplier_refund_receivable',
+    account_class: 'asset', side: 'debit', amount: refundCents / 100 });
+  lines.push({ account_code: purchase.stockApplied ? 'inventory' : 'inventory_in_transit',
+    account_class: 'asset', side: 'credit', amount });
+  const occurredAt = new Date().toISOString();
+  const adjustmentId = await postMatrizLedgerTransaction(client, {
+    environment: purchase.environment,
+    sourceType: 'commerce.wholesale_purchase.adjustment',
+    sourceId: purchase.purchaseId,
+    kind: 'purchase_quantity_adjustment', amount,
+    occurredAt,
+    description: 'Ajuste da compra pela quantidade aceita no recebimento',
+    createdBy: matrizLedgerActor(adjustedBy), lines,
+    metadata: { purchase_id: purchase.purchaseId, supplier_id: purchase.supplierId,
+      original_total: originalCents / 100, accepted_total: acceptedCents / 100,
+      payable_reduction: payableCents / 100, supplier_refund: refundCents / 100 },
+  });
+  if (payableCents > 0) {
+    await client.query(
+      `INSERT INTO finance.matriz_ledger_payments
+        (environment,obligation_transaction_id,payment_transaction_id,
+         payment_kind,amount,paid_at,created_by)
+       VALUES ($1,$2,$3,'writeoff',$4,$5::timestamptz,$6)`,
+      [purchase.environment, obligationId, adjustmentId, payableCents / 100,
+       occurredAt, matrizLedgerActor(adjustedBy)],
+    );
+    const remaining = await client.query<{ balance: string }>(
+      `SELECT finance.matriz_ledger_obligation_balance($1::env_t,$2)::text balance`,
+      [purchase.environment, obligationId],
+    );
+    if (Number(remaining.rows[0]?.balance ?? 0) === 0) {
+      await client.query(
+        `UPDATE commerce.wholesale_purchases
+            SET payment_status='paid',paid_at=COALESCE(paid_at,$3::timestamptz)
+          WHERE environment=$1 AND id=$2`,
+        [purchase.environment, purchase.purchaseId, occurredAt],
+      );
+    }
+  }
+  return adjustmentId;
+}
+
 /** Quita uma compra a prazo e liga a saida de caixa a obrigacao original. */
 export async function postWholesalePurchasePayment(
   client: PoolClient,
@@ -203,6 +282,26 @@ export async function postWholesalePurchaseCancellation(
           ],
         );
       }
+    }
+    const adjustment = await client.query<{ id: string }>(
+      `SELECT id FROM finance.matriz_ledger_transactions
+        WHERE environment=$1
+          AND source_type='commerce.wholesale_purchase.adjustment'
+          AND source_id=$2`,
+      [purchase.environment, purchase.purchaseId],
+    );
+    if (adjustment.rows[0]) {
+      await client.query(
+        `SELECT finance.reverse_matriz_ledger_transaction(
+           $1::env_t,$2,'commerce.wholesale_purchase.adjustment_cancel',$3,
+           ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date,
+           $5,$6,NULL,$7::jsonb
+         )`,
+        [purchase.environment, adjustment.rows[0].id, purchase.purchaseId,
+         cancelledAt, 'Estorno do ajuste de quantidade da compra',
+         matrizLedgerActor(cancelledBy), JSON.stringify({ purchase_id: purchase.purchaseId,
+           reason })],
+      );
     }
     const reversed = await client.query<{ id: string }>(
       `SELECT finance.reverse_matriz_ledger_transaction(

@@ -39,6 +39,7 @@ export * from './queries-galpao-filme.js';
 export * from './queries-galpao-medidas.js';
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)
 export * from './queries-fornecedores-cancel.js'; // cancelar compra (0127) + arquivar fornecedor
+export * from './queries-purchase-orders.js'; // ordens internas e vínculo sem efeito financeiro (0208)
 export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despesas da matriz (0120)
 export * from './queries-despesas-categorias.js'; // modalidades de despesa cadastráveis pelo dono (0130)
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)

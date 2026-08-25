@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { moneyCents } from './stage5-integrity.js';
+import { businessDateSaoPaulo } from '../../shared/business-time.js';
 
 export type FinanceiroSettlementMode =
   | 'wholesale_sale' | 'retail_sale' | 'commission' | 'monthly_fee'
@@ -59,6 +60,10 @@ interface OpenRow {
   customer_name: string | null;
   customer_phone: string | null;
   supplier_name: string | null;
+  original_amount: string;
+  settled_amount: string;
+  installment_number?: number;
+  installments_count?: number;
 }
 
 const RECEIVABLE_ACCOUNTS = new Set([
@@ -120,7 +125,10 @@ function payable(row: OpenRow): FinanceiroPayableItem {
     categoria: 'devolucao_cliente', settlement_mode: 'central_obligation',
   };
   if (row.source_type === 'commerce.wholesale_purchase.accrual') return {
-    ...base, tipo: 'fornecedor', nome: row.supplier_name ?? row.description,
+    ...base, tipo: 'fornecedor',
+    nome: row.installment_number
+      ? `${row.supplier_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
+      : row.supplier_name ?? row.description,
     settlement_mode: 'wholesale_purchase',
   };
   const payroll = row.category === 'funcionario';
@@ -147,12 +155,16 @@ export async function getMatrizLedgerOpenItems(
     `WITH paid AS (
        SELECT obligation_transaction_id,
               sum(CASE WHEN payment_kind IN ('settlement','writeoff')
-                THEN amount ELSE -amount END) amount
+                THEN amount ELSE -amount END) amount,
+              sum(CASE WHEN payment_kind='settlement' THEN amount
+                WHEN payment_kind='reversal' THEN -amount ELSE 0 END) settled_amount
          FROM finance.matriz_ledger_payments WHERE environment=$1
         GROUP BY obligation_transaction_id
      )
      SELECT t.id obligation_id,t.source_type,t.source_id,e.account_code,
             (e.amount-COALESCE(paid.amount,0))::numeric(14,2)::text balance,
+            e.amount::numeric(14,2)::text original_amount,
+            COALESCE(paid.settled_amount,0)::numeric(14,2)::text settled_amount,
             t.due_on::text due_date,
             (t.due_on IS NOT NULL
               AND t.due_on<(now() AT TIME ZONE 'America/Sao_Paulo')::date) overdue,
@@ -195,7 +207,48 @@ export async function getMatrizLedgerOpenItems(
   const recebiveis: FinanceiroReceivableItem[] = [];
   const pagaveis: FinanceiroPayableItem[] = [];
   const commissions = new Map<string, FinanceiroReceivableItem>();
+  const purchaseIds = result.rows
+    .filter((row) => row.source_type === 'commerce.wholesale_purchase.accrual')
+    .map((row) => row.source_id);
+  const installmentRows = purchaseIds.length ? await dbPool.query<{
+    purchase_id: string; installment_number: number; due_date: string; amount: string;
+  }>(
+    `SELECT purchase_id,installment_number,due_date::text,amount::text
+       FROM commerce.wholesale_purchase_installments
+      WHERE environment=$1 AND purchase_id=ANY($2::uuid[])
+      ORDER BY purchase_id,installment_number`, [environment, purchaseIds],
+  ) : { rows: [] };
+  const installments = new Map<string, typeof installmentRows.rows>();
+  for (const row of installmentRows.rows) {
+    const list = installments.get(row.purchase_id) ?? [];
+    list.push(row);
+    installments.set(row.purchase_id, list);
+  }
+  const today = businessDateSaoPaulo(new Date());
+  const expanded: OpenRow[] = [];
   for (const row of result.rows) {
+    const schedule = installments.get(row.source_id);
+    if (!schedule?.length || row.source_type !== 'commerce.wholesale_purchase.accrual') {
+      expanded.push(row);
+      continue;
+    }
+    let paidCents = moneyCents(Number(row.settled_amount));
+    for (const installment of schedule) {
+      const amountCents = moneyCents(Number(installment.amount));
+      const applied = Math.min(amountCents, paidCents);
+      paidCents -= applied;
+      const openCents = amountCents - applied;
+      if (openCents <= 0) continue;
+      expanded.push({ ...row,
+        source_id: `${row.source_id}:${installment.installment_number}`,
+        balance: (openCents / 100).toFixed(2), due_date: installment.due_date,
+        overdue: installment.due_date < today,
+        installment_number: installment.installment_number,
+        installments_count: schedule.length,
+      });
+    }
+  }
+  for (const row of expanded) {
     if (row.account_code === 'network_commission_receivable') {
       const id = row.partner_id ?? row.source_id;
       const current = commissions.get(id);

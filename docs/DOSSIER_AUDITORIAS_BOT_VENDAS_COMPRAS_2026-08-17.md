@@ -990,3 +990,52 @@ rotas e fiscal de tamanho. O teste visual automatizado no navegador
 local ficou indisponível por falha da conexão de controle nesta estação; portanto, o smoke
 visual autenticado continua obrigatório depois do deploy manual. Código, commit e push ainda
 estão pendentes neste ponto do documento.
+
+## 22. Evolução segura de Compras — ordem, parcelas, custo completo e recebimento parcial
+
+Em 25/08/2026, a tela **Nova compra** foi redesenhada sem trocar os motores já auditados. A
+medida, a marca e a condição continuam separadas para preservar Catálogo, Bot, Estoque e
+custo médio. O cabeçalho superior e o menu lateral da Matriz permanecem independentes do
+banner de Compras.
+
+### Contrato implementado
+
+- toda compra nova recebe automaticamente uma ordem `OC-AAAA-NNNNNN`;
+- compra antiga pode ser vinculada posteriormente, pelo dono, sem repostar estoque ou
+  Financeiro;
+- referência do fornecedor, forma de pagamento, frete, desconto e parcelas passam a ser
+  campos estruturados;
+- o total é `produtos + frete - desconto`, sempre em centavos;
+- frete e desconto são rateados deterministicamente entre os itens, e a soma dos custos
+  alocados fecha exatamente com o total da compra;
+- no recebimento, cada item informa quantidade aceita; recusados não entram no galpão e a
+  obrigação e as parcelas são reduzidas na mesma transação;
+- se a compra já tiver sido paga, a diferença vira valor a recuperar do fornecedor, sem
+  inventar caixa;
+- histórico, Fornecedores, Contas a pagar, lançamentos, reconciliação financeira e custo
+  médio passaram a ler o mesmo contrato.
+
+A migration aditiva `0208_purchase_orders_installments_and_landed_cost.sql` cria ordens e
+parcelas, acrescenta os componentes monetários e instala invariantes diferidas que recusam
+COMMIT quando parcelas, total e custo alocado não fecham. As tabelas novas da Matriz não são
+concedidas ao papel do parceiro.
+
+### Evidência antes de publicação
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.400/1.400**, 282 arquivos |
+| TypeScript e build | aprovados |
+| Manifesto | **209 migrations**, última `0208`, gap histórico `0071` documentado |
+| PostgreSQL do banco-alvo | dry-run com `ROLLBACK` e aplicação com `COMMIT` aprovados |
+| Reconciliação pós-migration | 2 tabelas, 6 colunas e 3 gatilhos presentes; zero divergência de total, rateio ou parcelas; parceiro sem leitura |
+| Diff | sem erro de whitespace |
+
+O Docker Desktop estava com o serviço parado e o Windows negou iniciá-lo sem privilégio
+administrativo. Por isso, a nova ampliação do cenário Testcontainers não é contabilizada como
+aprovada. O SQL real foi validado com rollback e a regressão unitária completa passou, mas a
+integração descartável e o smoke autenticado continuam obrigatórios antes da homologação.
+
+**Situação:** implementação concluída; migration `0208` aplicada e reconciliada no
+banco-alvo. O código está preparado para commit/push e para o deploy manual do responsável.
+O smoke autenticado após o deploy continua obrigatório.

@@ -12,10 +12,37 @@ window.PAINEL_MODULES.compras = function () {
       if (this.adminUser?.role !== 'owner') return;
       if (this.compraForm.items.length > 1) this.compraForm.items.splice(i, 1);
     },
-    compraFormTotal() {
+    compraFormProductsTotal() {
       return this.compraForm.items.reduce(
         (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_cost) || 0), 0,
       );
+    },
+    compraFormTotal() {
+      return Math.round((this.compraFormProductsTotal()
+        + (Number(this.compraForm.freight_amount) || 0)
+        - (Number(this.compraForm.discount_amount) || 0)) * 100) / 100;
+    },
+    compraSetPaymentStatus(status) {
+      this.compraForm.payment_status = status;
+      if (status === 'paid') {
+        this.compraForm.due_date = '';
+        this.compraForm.installments = [{ due_date: '', amount: '' }];
+      } else if (!this.compraForm.installments?.length) {
+        this.compraForm.installments = [{ due_date: '', amount: '' }];
+      }
+    },
+    compraAddInstallment() {
+      if (this.compraForm.installments.length >= 60) return;
+      this.compraForm.installments.push({ due_date: '', amount: '' });
+    },
+    compraRemoveInstallment(index) {
+      if (this.compraForm.installments.length > 1) this.compraForm.installments.splice(index, 1);
+    },
+    compraFillInstallmentBalance(index) {
+      const others = this.compraForm.installments.reduce((sum, row, rowIndex) =>
+        sum + (rowIndex === index ? 0 : (Number(row.amount) || 0)), 0);
+      this.compraForm.installments[index].amount = Math.max(0,
+        Math.round((this.compraFormTotal() - others) * 100) / 100).toFixed(2);
     },
     comprasResumo() { const ativas = this.compras.filter((c) => c.status === 'confirmed'); return { registradas: this.fornecedorRanking.reduce((n, f) => n + Number(f.purchases_count || 0), 0), pneus: this.fornecedorBreakdown.reduce((n, r) => n + Number(r.qty_total || 0), 0), total: this.fornecedorRanking.reduce((n, f) => n + Number(f.total_spent || 0), 0), prazo: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_total || 0) : ativas.filter((c) => c.payment_status === 'pending').reduce((n, c) => n + Number(c.total_amount || 0), 0), prazoCount: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_count || 0) : ativas.filter((c) => c.payment_status === 'pending').length }; },
     fornecedorLastPurchase(s) {
@@ -60,7 +87,10 @@ window.PAINEL_MODULES.compras = function () {
         return null;
       }
       const f = this.compraForm;
-      const body = { items: [], notes: f.notes ? f.notes.trim() : null };
+      const body = { items: [], notes: f.notes ? f.notes.trim() : null,
+        supplier_reference: f.supplier_reference?.trim() || null,
+        freight_amount: Number(f.freight_amount) || 0,
+        discount_amount: Number(f.discount_amount) || 0 };
       const purchasedDate = f.purchased_at || this.finHoje();
       body.purchased_at = this.businessFactInstant(purchasedDate);
       if (f.supplierKey === 'new') {
@@ -106,15 +136,29 @@ window.PAINEL_MODULES.compras = function () {
           || Number(it.quantity) !== 1;
       });
       body.items = items;
+      if (body.discount_amount > this.compraFormProductsTotal() + body.freight_amount + 0.001) {
+        this.compraMsg = { ok: false, text: 'O desconto não pode ultrapassar produtos mais frete.' };
+        return null;
+      }
       if (this.atacadoFinance && f.payment_status === 'pending') {
-        if (!f.due_date) {
-          this.compraMsg = { ok: false, text: 'Informe o vencimento da compra a prazo.' };
+        const installments = (f.installments || []).map((row) => ({
+          due_date: row.due_date, amount: Number(row.amount),
+        }));
+        if (!installments.length || installments.some((row) => !row.due_date || !(row.amount > 0))) {
+          this.compraMsg = { ok: false, text: 'Confira o vencimento e o valor de cada parcela.' };
+          return null;
+        }
+        const installmentsTotal = installments.reduce((sum, row) => sum + row.amount, 0);
+        if (Math.abs(installmentsTotal - this.compraFormTotal()) > 0.001) {
+          this.compraMsg = { ok: false, text: 'A soma das parcelas precisa fechar exatamente com o total da compra.' };
           return null;
         }
         body.payment_status = 'pending';
-        body.due_date = f.due_date;
+        body.installments = installments;
+        body.due_date = [...installments].sort((a, b) => a.due_date.localeCompare(b.due_date))[0].due_date;
       } else {
         body.payment_status = 'paid';
+        body.payment_method = f.payment_method || 'Não informado';
         const paidDate = f.payment_date || purchasedDate;
         body.paid_at = this.businessFactInstant(paidDate);
       }
@@ -151,11 +195,14 @@ window.PAINEL_MODULES.compras = function () {
         const estoqueTxt = result.stock_applied ? ' O galpão já recebeu.' : ' Aguardando recebimento; o galpão não mudou.';
         const catalogoTxt = result.catalog_blockers?.length
           ? ` Atenção: ${result.catalog_blockers.length} variante(s) precisam de produto ou preço no Catálogo antes da venda.` : '';
-        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
+        this.compraMsg = { ok: true, text: `${result.order_code} · compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
         this.compraForm = {
           supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
-          purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
+          supplier_reference: '', purchased_at: '', payment_status: 'paid',
+          payment_method: 'Pix', payment_date: '', due_date: '',
+          freight_amount: '', discount_amount: '',
+          installments: [{ due_date: '', amount: '' }],
           receipt_status: 'received', idempotency_key: '',
           items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }],
         };
@@ -184,6 +231,10 @@ window.PAINEL_MODULES.compras = function () {
         purchased_at_future: 'A data da compra não pode estar no futuro.',
         paid_at_future: 'A data do pagamento não pode estar no futuro.',
         due_date_before_purchase: 'O vencimento não pode ser anterior à data da compra.',
+        installments_total_mismatch: 'A soma das parcelas não fecha com o total da compra.',
+        discount_exceeds_purchase: 'O desconto não pode ultrapassar produtos mais frete.',
+        freight_amount_invalid: 'Confira o valor do frete.',
+        discount_amount_invalid: 'Confira o valor do desconto.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },

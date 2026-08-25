@@ -41,7 +41,8 @@ async function reversePurchaseStock(
 ): Promise<PurchaseStockRemoval[]> {
   const items = await client.query<PurchaseStockRemoval>(
     `WITH purchased AS (
-       SELECT measure,brand,tire_condition,sum(quantity)::int AS quantity
+       SELECT measure,brand,tire_condition,
+              sum(COALESCE(accepted_quantity,quantity))::int AS quantity
          FROM commerce.wholesale_purchase_items
         WHERE environment=$1 AND purchase_id=$2 GROUP BY measure,brand,tire_condition
      )

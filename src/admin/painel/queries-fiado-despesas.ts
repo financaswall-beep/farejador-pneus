@@ -42,13 +42,42 @@ export async function getWholesaleFinance(
           OR o.partner_transfer_status IN ('settled','received'))
       ORDER BY (o.due_date IS NULL),o.due_date,o.sold_at`, [environment]);
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
-    `SELECT p.id,s.name AS counterparty,s.phone,p.total_amount,p.purchased_at AS registered_at,
-            p.due_date,(p.due_date IS NOT NULL
-              AND p.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
+    `WITH settled AS (
+       SELECT t.source_id purchase_id,
+              COALESCE(sum(CASE WHEN pay.payment_kind IN ('settlement','writeoff')
+                THEN pay.amount ELSE -pay.amount END),0) paid
+         FROM finance.matriz_ledger_transactions t
+         LEFT JOIN finance.matriz_ledger_payments pay
+           ON pay.environment=t.environment AND pay.obligation_transaction_id=t.id
+        WHERE t.environment=$1
+          AND t.source_type='commerce.wholesale_purchase.accrual'
+        GROUP BY t.source_id
+     )
+     SELECT p.id,s.name AS counterparty,s.phone,
+            (p.total_amount-COALESCE(st.paid,0))::numeric(12,2)::text AS total_amount,
+            p.purchased_at AS registered_at,COALESCE(next_due.due_date,p.due_date) due_date,
+            (COALESCE(next_due.due_date,p.due_date) IS NOT NULL
+              AND COALESCE(next_due.due_date,p.due_date)
+                <(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.wholesale_purchases p
-       JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment
+       JOIN commerce.wholesale_suppliers s
+         ON s.id=p.supplier_id AND s.environment=p.environment
+       LEFT JOIN settled st ON st.purchase_id=p.id::text
+       LEFT JOIN LATERAL (
+         SELECT schedule.due_date
+           FROM (
+             SELECT i.due_date,i.installment_number,
+                    sum(i.amount) OVER (ORDER BY i.installment_number) cumulative
+               FROM commerce.wholesale_purchase_installments i
+              WHERE i.environment=p.environment AND i.purchase_id=p.id
+           ) schedule
+          WHERE schedule.cumulative>COALESCE(st.paid,0)
+          ORDER BY schedule.installment_number LIMIT 1
+       ) next_due ON true
       WHERE p.environment=$1 AND p.status<>'cancelled' AND p.payment_status='pending'
-      ORDER BY (p.due_date IS NULL),p.due_date,p.purchased_at`, [environment]);
+        AND p.total_amount-COALESCE(st.paid,0)>0
+      ORDER BY (COALESCE(next_due.due_date,p.due_date) IS NULL),
+               COALESCE(next_due.due_date,p.due_date),p.purchased_at`, [environment]);
   const sum = (rows: WholesaleFinanceOpenRow[]) =>
     (rows.reduce((total, row) => total + moneyCents(Number(row.total_amount)), 0) / 100)
       .toFixed(2);

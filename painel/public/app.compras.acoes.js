@@ -16,11 +16,14 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       const formatted = window.FarejadorTime.formatDate(value);
       return formatted === '-' ? 'sem data' : formatted;
     },
-    compraOpenDetails(purchase) {
+    async compraOpenDetails(purchase) {
       this.compraDetalhe = purchase;
+      this.compraOrderSelection = '';
+      this.compraOrderOptions = [];
       this.compraDialog = {
         open: true, kind: 'details', purchase, supplier: null, reason: '', error: '',
       };
+      if (!purchase.purchase_order_id) await this.compraLoadOrderOptions(purchase);
     },
     compraOpenAction(purchase, kind) {
       if (this.adminUser?.role !== 'owner') return;
@@ -29,6 +32,16 @@ window.PAINEL_MODULES.comprasAcoes = function () {
         const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-cancel', purchase.id);
         reason = operation.reason || '';
       }
+      this.compraReceiptItems = kind === 'confirm'
+        ? (purchase.items || []).map((item) => ({
+          item_id: item.id,
+          measure: item.measure,
+          brand: item.brand,
+          tire_condition: item.tire_condition,
+          ordered_quantity: Number(item.ordered_quantity ?? item.quantity ?? 0),
+          accepted_quantity: Number(item.ordered_quantity ?? item.quantity ?? 0),
+          unit_cost: Number(item.unit_cost || 0),
+        })) : [];
       this.compraDialog = {
         open: true, kind, purchase, supplier: null, reason, error: '',
       };
@@ -59,6 +72,9 @@ window.PAINEL_MODULES.comprasAcoes = function () {
         open: false, kind: null, purchase: null, supplier: null, reason: '', error: '',
       };
       this.compraDetalhe = null;
+      this.compraReceiptItems = [];
+      this.compraOrderOptions = [];
+      this.compraOrderSelection = '';
     },
     compraDialogTitle() {
       const titles = {
@@ -74,7 +90,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
     compraDialogDescription() {
       const row = this.compraDialog.purchase;
       if (this.compraDialog.kind === 'confirm') {
-        return `Os pneus de ${row?.supplier_name || 'fornecedor'} entrarão no galpão e o custo médio será recalculado uma única vez.`;
+        return `Confira o que realmente chegou de ${row?.supplier_name || 'fornecedor'}. Só a quantidade aceita entrará no galpão e no custo.`;
       }
       if (this.compraDialog.kind === 'cancel') {
         return row?.stock_applied
@@ -121,10 +137,32 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       if (this.adminUser?.role !== 'owner') return;
       const purchase = this.compraDialog.purchase;
       const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-confirm', purchase.id);
+      const items = this.compraReceiptItems.map((item) => ({
+        item_id: item.item_id,
+        accepted_quantity: Number(item.accepted_quantity),
+      }));
+      if (!items.length || items.some((item) => !Number.isInteger(item.accepted_quantity)
+        || item.accepted_quantity < 0)) {
+        this.compraDialog.error = 'Confira as quantidades recebidas. Use somente números inteiros iguais ou maiores que zero.';
+        return;
+      }
+      if (items.some((item, index) => item.accepted_quantity
+        > Number(this.compraReceiptItems[index]?.ordered_quantity || 0))) {
+        this.compraDialog.error = 'A quantidade recebida não pode ser maior que a quantidade comprada.';
+        return;
+      }
+      if (!items.some((item) => item.accepted_quantity > 0)) {
+        this.compraDialog.error = 'Informe pelo menos um pneu recebido. Para recusar tudo, cancele a compra.';
+        return;
+      }
+      if (this.compraReceiptFinalTotal() < -0.001) {
+        this.compraDialog.error = 'Com as recusas, o desconto ficou maior que produtos e frete. Cancele esta compra e registre os valores corretos.';
+        return;
+      }
       this.compraActionSaving = true;
       try {
         const result = await this.apiPost('/admin/api/wholesale/purchases/confirm', {
-          purchase_id: purchase.id, idempotency_key: operation.key,
+          purchase_id: purchase.id, items, idempotency_key: operation.key,
         });
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-confirm', purchase.id);
         this.compraCloseDialog(true);
@@ -134,6 +172,52 @@ window.PAINEL_MODULES.comprasAcoes = function () {
         await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);
       } catch (err) {
         this.compraDialog.error = `Não consegui confirmar o recebimento (${err.message}).`;
+      } finally {
+        this.compraActionSaving = false;
+      }
+    },
+    compraReceiptTotal() {
+      return this.compraReceiptItems.reduce((sum, item) => sum
+        + Number(item.accepted_quantity || 0) * Number(item.unit_cost || 0), 0);
+    },
+    compraReceiptFinalTotal() {
+      const purchase = this.compraDialog.purchase || {};
+      return this.compraReceiptTotal() + Number(purchase.freight_amount || 0)
+        - Number(purchase.discount_amount || 0);
+    },
+    async compraLoadOrderOptions(purchase) {
+      if (!purchase?.supplier_id || purchase.purchase_order_id) return;
+      this.compraOrderLoading = true;
+      try {
+        const qs = new URLSearchParams({ supplier_id: purchase.supplier_id, status: 'open' });
+        this.compraOrderOptions = await this.apiGet('/admin/api/wholesale/purchase-orders?' + qs.toString());
+      } catch (err) {
+        this.compraDialog.error = `Não consegui carregar as ordens abertas (${err.message}).`;
+      } finally {
+        this.compraOrderLoading = false;
+      }
+    },
+    async compraLinkOrder() {
+      const purchase = this.compraDetalhe;
+      if (!purchase?.id || !this.compraOrderSelection || this.compraActionSaving) return;
+      const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-link-order', purchase.id);
+      this.compraActionSaving = true;
+      this.compraDialog.error = '';
+      try {
+        const result = await this.apiPost('/admin/api/wholesale/purchases/link-order', {
+          purchase_id: purchase.id,
+          order_id: this.compraOrderSelection,
+          idempotency_key: operation.key,
+        });
+        window.PAINEL_INTEGRITY.complete('wholesale-purchase-link-order', purchase.id);
+        purchase.purchase_order_id = result.order_id;
+        purchase.order_code = result.order_code;
+        this.compraOrderOptions = [];
+        this.compraOrderSelection = '';
+        this.compraMsg = { ok: true, text: `Compra vinculada à ${result.order_code}. Nenhum valor ou estoque foi alterado.` };
+        await Promise.allSettled([this.loadComprasHistory(true), this.loadComprasOverview()]);
+      } catch (err) {
+        this.compraDialog.error = `Não consegui vincular a ordem (${err.message}).`;
       } finally {
         this.compraActionSaving = false;
       }

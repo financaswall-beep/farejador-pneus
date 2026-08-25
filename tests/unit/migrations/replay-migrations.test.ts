@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
@@ -64,5 +65,12 @@ describe('replay imutavel das migrations historicas', () => {
     expect(result).not.toMatch(/^COMMIT;$/m);
     expect(result).toContain('CREATE TABLE example');
     expect(result).toContain('DO $$\nBEGIN\n');
+  });
+
+  it('obriga o executor avulso a remover COMMIT interno antes do dry-run', () => {
+    const runner = readFileSync('scripts/apply-migration-file.cjs', 'utf8');
+    expect(runner).toContain("require('./migration-compat.cjs')");
+    expect(runner).toContain("stripEmbeddedTransactionControl(fs.readFileSync(resolved, 'utf8'))");
+    expect(runner.indexOf('stripEmbeddedTransactionControl')).toBeLessThan(runner.indexOf("client.query('BEGIN')"));
   });
 });

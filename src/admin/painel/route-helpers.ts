@@ -65,6 +65,11 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (['purchase_quantity_invalid', 'purchase_unit_cost_invalid',
        'unit_cost_cent_precision', 'purchase_line_total_too_large',
        'purchase_total_too_large', 'purchased_at_future', 'paid_at_future',
+       'freight_amount_invalid', 'discount_amount_invalid',
+       'discount_exceeds_purchase', 'installments_total_mismatch',
+       'installment_amount_invalid', 'purchase_allocation_failed',
+       'purchase_received_quantity_invalid', 'purchase_receipt_items_incomplete',
+       'purchase_receipt_empty', 'purchase_receipt_exceeds_order',
        'occurred_at_future', 'document_date_future', 'competence_month_future',
        'received_at_future', 'settled_at_future', 'refunded_at_future',
        'business_date_future', 'due_date_before_purchase'].includes(err.message)) {
@@ -86,6 +91,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
       || err.message === 'stock_measure_brand_conflict'
       || err.message === 'stock_has_reservations'
       || err.message === 'catalog_product_not_found'
+      || err.message === 'purchase_order_not_open'
+      || err.message === 'purchase_already_linked'
       || err.message === 'payroll_payment_conflict') {
     return { status: 409, error: err.message };
   }

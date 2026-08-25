@@ -116,7 +116,7 @@ export async function getLegacyMatrizFinancialTruth(
           OR o.partner_transfer_status IN ('settled','received')) GROUP BY o.id
      ), purchases AS (
        SELECT p.id,p.created_at,p.total_amount,p.status,p.payment_status,p.paid_at,p.purchased_at,p.created_by,
-              COALESCE(SUM(i.line_total),0) item_total
+               COALESCE(SUM(i.allocated_cost),0) item_total
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_purchase_items i ON i.purchase_id=p.id AND i.environment=p.environment
         WHERE p.environment=$1 GROUP BY p.id

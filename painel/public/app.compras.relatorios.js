@@ -137,7 +137,10 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         item.measure && Number(item.quantity) > 0);
       return {
         tires: valid.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-        measures: new Set(valid.map((item) => item.measure.trim())).size,
+        variants: valid.length,
+        products: this.compraFormProductsTotal(),
+        freight: Number(this.compraForm.freight_amount) || 0,
+        discount: Number(this.compraForm.discount_amount) || 0,
         total: this.compraFormTotal(),
       };
     },
@@ -150,7 +153,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         rows.push({ label: 'Galpão não muda até o recebimento', active: false });
       }
       if (this.compraForm.payment_status === 'pending' && this.atacadoFinance) {
-        rows.push({ label: 'Título criado em Contas a pagar', active: true });
+        rows.push({ label: `${this.compraForm.installments.length} parcela(s) em Contas a pagar`, active: true });
       } else {
         rows.push({ label: 'Pagamento registrado no caixa', active: true });
       }
@@ -282,9 +285,12 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         page += 1;
       } while (page <= pages);
       const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
-      const header = ['Data', 'Fornecedor', 'Pneus', 'Total', 'Pagamento', 'Recebimento', 'Status'];
+      const header = ['Ordem', 'Referência', 'Data', 'Fornecedor', 'Pneus',
+        'Produtos', 'Frete', 'Desconto', 'Total', 'Pagamento', 'Recebimento', 'Status'];
       const lines = rows.map((row) => [
-        this.compraData(row), row.supplier_name, row.items_count, row.total_amount,
+        row.order_code || '', row.supplier_reference || '', this.compraData(row),
+        row.supplier_name, row.items_count, row.products_amount, row.freight_amount,
+        row.discount_amount, row.total_amount,
         row.payment_status === 'paid' ? 'Pago' : 'A pagar',
         row.stock_applied ? 'Recebido' : 'Aguardando', row.status,
       ].map(quote).join(';'));

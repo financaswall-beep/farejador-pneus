@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
+import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, linkWholesalePurchaseOrder, listWholesalePurchaseOrders, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
+import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 
 const purchaseReportQuerySchema = z.object({
   period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
@@ -26,6 +26,13 @@ const priceReportQuerySchema = z.object({
 });
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/admin/api/wholesale/purchase-orders', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = z.object({ supplier_id: z.string().uuid().optional(),
+      status: z.enum(['open', 'closed', 'cancelled']).optional() }).safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    return reply.status(200).send(dashboardPayload(await listWholesalePurchaseOrders(parsed.data)));
+  });
+
   fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleSuppliers()));
   });
@@ -128,6 +135,21 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
       }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale purchase confirm failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/wholesale/purchases/link-order', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = linkWholesalePurchaseOrderSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      return reply.status(200).send(await linkWholesalePurchaseOrder({
+        ...parsed.data, linked_by: operatorLabel(request),
+      }));
+    } catch (err) {
+      const mapped = mapWriteError(err);
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

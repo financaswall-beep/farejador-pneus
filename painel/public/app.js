@@ -81,7 +81,7 @@ function painelApp() {
     vendaVarejoSelecionada: null,
     vendaMenuOpen: false,
     comprasTab: 'visao', // sub-abas: visao | nova | historico | fornecedores | precos
-    comprasLoading: { overview: false, history: false, suppliers: false, prices: false }, comprasErrors: { overview: null, history: null, suppliers: null, prices: null }, comprasOverview: { rows: [], summary: null, pagination: null }, comprasHistory: { rows: [], summary: null, pagination: null }, comprasHistoryFilters: { period: '30d', status: 'all', payment: 'all', search: '', page: 1, pageSize: 10 }, comprasSuppliers: [], comprasSupplierSearch: '', comprasSupplierSelectedId: null, comprasPriceRows: [], comprasPriceFilters: { period: '90d', supplierId: '', search: '' }, comprasPriceSelectedMeasure: null, compraDetalhe: null, compraPendingSubmission: null, compraActionSaving: false, compraDialog: { open: false, kind: null, purchase: null, supplier: null, reason: '', error: '' }, fornecedorForm: { name: '', phone: '', document: '', notes: '' },
+    comprasLoading: { overview: false, history: false, suppliers: false, prices: false }, comprasErrors: { overview: null, history: null, suppliers: null, prices: null }, comprasOverview: { rows: [], summary: null, pagination: null }, comprasHistory: { rows: [], summary: null, pagination: null }, comprasHistoryFilters: { period: '30d', status: 'all', payment: 'all', search: '', page: 1, pageSize: 10 }, comprasSuppliers: [], comprasSupplierSearch: '', comprasSupplierSelectedId: null, comprasPriceRows: [], comprasPriceFilters: { period: '90d', supplierId: '', search: '' }, comprasPriceSelectedMeasure: null, compraDetalhe: null, compraPendingSubmission: null, compraActionSaving: false, compraReceiptItems: [], compraOrderOptions: [], compraOrderSelection: '', compraOrderLoading: false, compraDialog: { open: false, kind: null, purchase: null, supplier: null, reason: '', error: '' }, fornecedorForm: { name: '', phone: '', document: '', notes: '' },
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
     atacadoBuyers: [],
     atacadoRanking: [],
@@ -199,10 +199,13 @@ function painelApp() {
     compraMsg: null,
     compraForm: {
       supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
-      purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
+      supplier_reference: '', purchased_at: '', payment_status: 'paid',
+      payment_method: 'Pix', payment_date: '', due_date: '',
+      freight_amount: '', discount_amount: '', installments: [{ due_date: '', amount: '' }],
       receipt_status: 'received', idempotency_key: '',
       items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }],
     },
+    compraOrderOptions: [], compraOrderSelection: '', compraOrderLoading: false,
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month', redeFunnelUnassigned: 0,
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [{ id: 'today', label: 'Hoje' }, { id: '7d', label: '7 dias' },

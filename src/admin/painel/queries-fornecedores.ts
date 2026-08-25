@@ -55,8 +55,9 @@ export async function getWholesaleSupplierMeasureBreakdown(
   const result = await dbPool.query(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,pi.measure,pi.brand,
             pi.tire_condition,
-            SUM(pi.quantity) AS qty_total,
-            ROUND(SUM(pi.line_total)/NULLIF(SUM(pi.quantity),0),2) AS avg_cost,
+            SUM(COALESCE(pi.accepted_quantity,pi.quantity)) AS qty_total,
+            ROUND(SUM(COALESCE(pi.accepted_quantity,pi.quantity)*pi.unit_cost)
+              /NULLIF(SUM(COALESCE(pi.accepted_quantity,pi.quantity)),0),2) AS avg_cost,
             MAX(p.purchased_at) AS last_purchased_at
        FROM commerce.wholesale_purchase_items pi
        JOIN commerce.wholesale_purchases p ON p.id=pi.purchase_id AND p.environment=pi.environment
@@ -78,6 +79,11 @@ export interface WholesalePurchaseRow {
   status: 'pending' | 'confirmed' | 'cancelled';
   stock_applied: boolean;
   cancelled_at: string | null;
+  order_code: string | null;
+  purchase_order_id: string | null;
+  products_amount: string;
+  freight_amount: string;
+  discount_amount: string;
 }
 
 export async function listWholesalePurchases(
@@ -87,11 +93,18 @@ export async function listWholesalePurchases(
 ): Promise<WholesalePurchaseRow[]> {
   const result = await dbPool.query<WholesalePurchaseRow>(
     `SELECT p.id,s.name AS supplier_name,p.purchased_at,p.total_amount,
-            (SELECT COALESCE(sum(i.quantity),0) FROM commerce.wholesale_purchase_items i
+            p.products_amount,p.freight_amount,p.discount_amount,p.purchase_order_id,
+            CASE WHEN o.id IS NULL THEN NULL ELSE
+              'OC-'||to_char(o.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY')
+                ||'-'||lpad(o.order_number::text,6,'0') END AS order_code,
+            (SELECT COALESCE(sum(COALESCE(i.accepted_quantity,i.quantity)),0)
+               FROM commerce.wholesale_purchase_items i
               WHERE i.purchase_id=p.id)::int AS items_count,
             p.payment_status,p.due_date,p.status,p.stock_applied,p.cancelled_at
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment
+       LEFT JOIN commerce.wholesale_purchase_orders o
+         ON o.environment=p.environment AND o.id=p.purchase_order_id
       WHERE p.environment=$1 ORDER BY p.purchased_at DESC LIMIT $2`, [environment, limit]);
   return result.rows;
 }

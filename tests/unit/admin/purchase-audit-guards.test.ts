@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  assertWholesalePurchaseMoney,
+  assertWholesalePurchaseMoney, calculateWholesalePurchaseMoney,
 } from '../../../src/admin/painel/purchase-money.js';
 
 function source(path: string): string {
@@ -16,6 +16,7 @@ describe('guardas finais das auditorias de Compras', () => {
       '/admin/api/wholesale/suppliers',
       '/admin/api/wholesale/purchases',
       '/admin/api/wholesale/purchases/confirm',
+      '/admin/api/wholesale/purchases/link-order',
       '/admin/api/wholesale/purchases/cancel',
       '/admin/api/wholesale/suppliers/archive',
     ]) {
@@ -42,6 +43,31 @@ describe('guardas finais das auditorias de Compras', () => {
     expect(() => assertWholesalePurchaseMoney([
       { quantity: 1, unit_cost: 2.135 },
     ])).toThrow('unit_cost_cent_precision');
+  });
+
+  it('fecha produtos, frete e desconto em centavos sem perder valor no rateio', () => {
+    const result = calculateWholesalePurchaseMoney([
+      { quantity: 2, unit_cost: 45.01 },
+      { quantity: 1, unit_cost: 45 },
+    ], 10, 0.02);
+    expect(result).toMatchObject({
+      productsCents: 13_502, freightCents: 1_000,
+      discountCents: 2, totalCents: 14_500,
+    });
+    expect(result.allocatedItemCents.reduce((sum, value) => sum + value, 0)).toBe(14_500);
+  });
+
+  it('rateia por quantidade quando todos os itens têm custo zero', () => {
+    const result = calculateWholesalePurchaseMoney([
+      { quantity: 1, unit_cost: 0 }, { quantity: 3, unit_cost: 0 },
+    ], 1, 0);
+    expect(result.allocatedItemCents).toEqual([25, 75]);
+  });
+
+  it('recusa desconto superior a produtos mais frete', () => {
+    expect(() => calculateWholesalePurchaseMoney([
+      { quantity: 1, unit_cost: 5 },
+    ], 1, 6.01)).toThrow('discount_exceeds_purchase');
   });
 
   it('mantém Compras somente leitura no front para não proprietários', () => {

@@ -10,6 +10,9 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
   let registerPurchase: typeof import(
     '../../src/admin/painel/queries-fornecedores-registro.js'
   ).registerWholesalePurchase;
+  let confirmPurchase: typeof import(
+    '../../src/admin/painel/queries-fornecedores-registro.js'
+  ).confirmWholesalePurchase;
   let settlePurchase: typeof import(
     '../../src/admin/painel/queries-financeiro-integridade.js'
   ).settleWholesalePurchasePayment;
@@ -23,7 +26,7 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
     });
     vi.resetModules();
     db = await startPostgres();
-    ({ registerWholesalePurchase: registerPurchase }
+    ({ registerWholesalePurchase: registerPurchase, confirmWholesalePurchase: confirmPurchase }
       = await import('../../src/admin/painel/queries-fornecedores-registro.js'));
     ({ settleWholesalePurchasePayment: settlePurchase }
       = await import('../../src/admin/painel/queries-financeiro-integridade.js'));
@@ -137,6 +140,105 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
       `SELECT payment_status FROM commerce.wholesale_purchases WHERE id=$1`,
       [payable.purchase_id],
     )).rows[0]?.payment_status).toBe('pending');
+  });
+
+  it('gera ordem, parcela o compromisso e concilia recusa parcial no recebimento', async () => {
+    const purchase = await registerPurchase({
+      environment: 'test', supplier_id: supplierId, created_by: 'owner:audit',
+      purchased_at: '2026-08-20T12:00:00-03:00', payment_status: 'pending',
+      receipt_status: 'pending', freight_amount: 5, discount_amount: 2,
+      installments: [
+        { due_date: '2026-09-20', amount: 15 },
+        { due_date: '2026-10-20', amount: 18 },
+      ],
+      idempotency_key: randomUUID(), items: [{ measure, brand, tire_condition: 'novo',
+        quantity: 3, unit_cost: 10 }],
+    }, db.pool);
+    expect(purchase).toMatchObject({
+      order_code: expect.stringMatching(/^OC-2026-\d{6}$/),
+      products_amount: '30.00', freight_amount: '5.00',
+      discount_amount: '2.00', total_amount: '33.00',
+    });
+    const item = await db.pool.query<{ id: string }>(
+      `SELECT id FROM commerce.wholesale_purchase_items
+        WHERE environment='test' AND purchase_id=$1`, [purchase.purchase_id],
+    );
+    await confirmPurchase({
+      environment: 'test', purchase_id: purchase.purchase_id,
+      confirmed_by: 'owner:conference', idempotency_key: randomUUID(),
+      items: [{ item_id: item.rows[0]!.id, accepted_quantity: 2 }],
+    }, db.pool);
+
+    const proof = await db.pool.query<{
+      total_amount: string; products_amount: string; accepted_quantity: number;
+      allocated_cost: string; installments_total: string; installments: string[];
+      obligation_balance: string; stock_delta: number;
+    }>(
+      `SELECT p.total_amount::text,p.products_amount::text,i.accepted_quantity,
+              i.allocated_cost::text,
+              (SELECT sum(amount)::text FROM commerce.wholesale_purchase_installments pi
+                WHERE pi.environment=p.environment AND pi.purchase_id=p.id) installments_total,
+              (SELECT array_agg(amount::text ORDER BY installment_number)
+                 FROM commerce.wholesale_purchase_installments pi
+                WHERE pi.environment=p.environment AND pi.purchase_id=p.id) installments,
+              (SELECT finance.matriz_ledger_obligation_balance('test',t.id)::text
+                 FROM finance.matriz_ledger_transactions t
+                WHERE t.environment='test'
+                  AND t.source_type='commerce.wholesale_purchase.accrual'
+                  AND t.source_id=p.id::text) obligation_balance,
+              (SELECT COALESCE(sum(m.qty_delta),0)::int
+                 FROM commerce.wholesale_stock_movements m
+                WHERE m.environment=p.environment AND m.ref=p.id::text) stock_delta
+         FROM commerce.wholesale_purchases p
+         JOIN commerce.wholesale_purchase_items i
+           ON i.environment=p.environment AND i.purchase_id=p.id
+        WHERE p.environment='test' AND p.id=$1`, [purchase.purchase_id],
+    );
+    expect(proof.rows[0]).toEqual({
+      total_amount: '23.00', products_amount: '20.00', accepted_quantity: 2,
+      allocated_cost: '23.00', installments_total: '23.00',
+      installments: ['15.00', '8.00'], obligation_balance: '23.00', stock_delta: 2,
+    });
+
+    const { getMatrizLedgerOpenItems } = await import(
+      '../../src/admin/painel/matriz-ledger-open-items.js');
+    const agenda = (await getMatrizLedgerOpenItems('test', db.pool)).a_pagar.itens
+      .filter((row) => row.obligation_id && row.id.startsWith(purchase.purchase_id));
+    expect(agenda.map((row) => ({ valor: row.valor, due: row.due_date }))).toEqual([
+      { valor: '15.00', due: '2026-09-20' },
+      { valor: '8.00', due: '2026-10-20' },
+    ]);
+
+    // Simula uma compra antiga sem ordem e prova que o vínculo posterior é só
+    // organizacional: não reposta livro nem toca no galpão.
+    await db.pool.query(
+      `UPDATE commerce.wholesale_purchases SET purchase_order_id=NULL
+        WHERE environment='test' AND id=$1`, [purchase.purchase_id],
+    );
+    const beforeLink = await db.pool.query<{ ledger: number; movements: number }>(
+      `SELECT (SELECT count(*)::int FROM finance.matriz_ledger_transactions
+                WHERE environment='test' AND source_id=$1) ledger,
+              (SELECT count(*)::int FROM commerce.wholesale_stock_movements
+                WHERE environment='test' AND ref=$1) movements`, [purchase.purchase_id],
+    );
+    const { linkWholesalePurchaseOrder } = await import(
+      '../../src/admin/painel/queries-purchase-orders.js');
+    const linked = await linkWholesalePurchaseOrder({
+      environment: 'test', purchase_id: purchase.purchase_id,
+      order_id: purchase.order_id, linked_by: 'owner:audit',
+      idempotency_key: randomUUID(),
+    }, db.pool);
+    expect(linked.order_code).toBe(purchase.order_code);
+    const afterLink = await db.pool.query<{ ledger: number; movements: number; order_id: string }>(
+      `SELECT (SELECT count(*)::int FROM finance.matriz_ledger_transactions
+                WHERE environment='test' AND source_id=$1) ledger,
+              (SELECT count(*)::int FROM commerce.wholesale_stock_movements
+                WHERE environment='test' AND ref=$1) movements,
+              purchase_order_id order_id
+         FROM commerce.wholesale_purchases WHERE environment='test' AND id=$1`,
+      [purchase.purchase_id],
+    );
+    expect(afterLink.rows[0]).toEqual({ ...beforeLink.rows[0], order_id: purchase.order_id });
   });
 
   it('giro de reposicao usa todas as vendas dos ultimos 30 dias, nao as ultimas 50 linhas', async () => {
