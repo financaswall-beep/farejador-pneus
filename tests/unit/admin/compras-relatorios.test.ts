@@ -30,6 +30,7 @@ describe('relatórios conciliados de compras', () => {
 
   it('mantém filtros compactos nas ordens e separa o custo do gráfico principal', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
+    const css = readFileSync(resolve('painel/public/tailwind.css'), 'utf8');
     const tableStart = html.indexOf('id="compras-history-table"');
     const tableTag = html.indexOf('<table', tableStart);
     const filters = html.slice(tableStart, tableTag);
@@ -46,6 +47,9 @@ describe('relatórios conciliados de compras', () => {
     expect(filters).toContain('x-model="comprasHistoryFilters.status"');
     expect(filters).toContain('x-model="comprasHistoryFilters.payment"');
     expect(filters).toContain('border-emerald-800 bg-emerald-800');
+    expect(css).toContain(
+      'grid-template-columns:minmax(180px,240px) minmax(160px,200px) 150px 150px 96px',
+    );
     expect(costDialog).toContain('x-model="comprasCost.filters.supplierId"');
     expect(costDialog).toContain('loadComprasCostAnalysis()');
     expect(costDialog).toContain('Este filtro não altera compras, recebimentos nem a tabela.');
