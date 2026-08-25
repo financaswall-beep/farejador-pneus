@@ -99,12 +99,12 @@ describe('catalogo no painel', () => {
     const module = loadCatalogModule();
     const brands = [
       'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
-      'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+      'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda', 'CEAT', 'IRA', 'IRC',
     ];
 
     for (const brand of brands) {
       expect(module.catalogoBrandLogo(brand)).toMatch(
-        /^\/admin\/painel\/assets\/catalog-brands\/[a-z]+\.webp\?v=20260729-catalogo2$/,
+        /^\/admin\/painel\/assets\/catalog-brands\/[a-z]+\.webp\?v=20260824-catalog-brand3$/,
       );
       const file = module.catalogoBrandLogo(brand).match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
       if (!file) throw new Error(`Logo não mapeado: ${brand}`);
@@ -163,7 +163,7 @@ describe('catalogo no painel', () => {
       open: true,
       form: {
         product_code: 'MET-909018-MV',
-        product_name: 'Pneu Metzeler',
+        product_name: 'Pneu Metzeler 90/90-18',
       },
     });
 
@@ -173,7 +173,7 @@ describe('catalogo no painel', () => {
       brand: 'Metzeler',
       tire_condition: 'meia_vida',
       product_code: 'MET-909018-MV',
-      product_name: 'Pneu Metzeler',
+      product_name: 'Pneu Metzeler 90/90-18',
     });
     expect(context.catalogoSelecionado).toMatchObject({
       product_id: 'produto-metzeler',
@@ -211,13 +211,13 @@ describe('catalogo no painel', () => {
     module.catalogoCreateNew.call(context);
     Object.assign(context.catalogoCadastro.form, {
       measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
-      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin', price_amount: '45,00',
+      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin 90/90-18', price_amount: '45,00',
     });
     await module.catalogoCreateSave.call(context, true);
 
     expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
       measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
-      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin',
+      product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin 90/90-18',
       creation_mode: 'manual', price_amount: 45,
       price_reason: 'Preço inicial do cadastro',
     });

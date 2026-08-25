@@ -1,7 +1,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 const CATALOGO_KNOWN_BRANDS = Object.freeze([
-  'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
-  'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+  'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'CEAT', 'Dunlop', 'IRA', 'IRC',
+  'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
 ]);
 const catalogoMoneyValue = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 window.PAINEL_MODULES.catalogo = function () {
@@ -80,10 +80,14 @@ window.PAINEL_MODULES.catalogo = function () {
         vipal: 'vipal',
         mitas: 'mitas',
         kenda: 'kenda',
+        ceat: 'ceat',
+        ciat: 'ceat',
+        ira: 'ira',
+        irc: 'irc',
       };
       const asset = aliases[key];
       return asset
-        ? `/admin/painel/assets/catalog-brands/${asset}.webp?v=20260729-catalogo2`
+        ? `/admin/painel/assets/catalog-brands/${asset}.webp?v=20260824-catalog-brand3`
         : null;
     },
 

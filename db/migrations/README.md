@@ -178,6 +178,10 @@ desligado por padrão, e cria telemetria técnica mínima com RLS. A telemetria 
 armazena cliente, pedido, telefone, valores nem payload livre; o rollback é desligar
 a chave da unidade e voltar ao painel legado no próximo acesso.
 
+`0207_catalog_brand_identity_and_names.sql` normaliza os aliases CEAT/IRA/IRC e os
+nomes dos pneus ativos para `Pneu + Marca + Medida`, com auditoria. Não altera preço,
+estoque, compras, pedidos, custos ou financeiro.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

@@ -36,11 +36,12 @@ describe('Catálogo na Operação da Loja', () => {
     expect(navigation).toContain("showTab('catalog')");
   });
 
-  it('usa exatamente os mesmos 12 arquivos de logo já usados pela Matriz', () => {
+  it('usa exatamente os mesmos 15 arquivos de logo já usados pela Matriz', () => {
     const assets = readdirSync(resolve('painel/public/assets/catalog-brands'))
       .filter((file) => file.endsWith('.webp')).sort();
     expect(assets).toEqual([
-      'bridgestone.webp', 'dunlop.webp', 'kenda.webp', 'levorin.webp',
+      'bridgestone.webp', 'ceat.webp', 'dunlop.webp', 'ira.webp', 'irc.webp',
+      'kenda.webp', 'levorin.webp',
       'maggion.webp', 'metzeler.webp', 'michelin.webp', 'mitas.webp',
       'pirelli.webp', 'rinaldi.webp', 'technic.webp', 'vipal.webp',
     ]);

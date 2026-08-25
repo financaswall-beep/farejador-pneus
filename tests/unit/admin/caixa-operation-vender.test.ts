@@ -38,10 +38,10 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     const brandLogo = sandbox.window.Caixa.catalogBrandLogo as (brand: string) => string | null;
     for (const brand of [
       'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
-      'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+      'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda', 'CEAT', 'IRA', 'IRC',
     ]) {
       const url = brandLogo(brand);
-      expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260822-caixa-brand2$/);
+      expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260824-catalog-brand3$/);
       const asset = url?.match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
       if (!asset) throw new Error(`Logo não mapeado: ${brand}`);
       expect(statSync(resolve('painel/public/assets/catalog-brands', asset)).size).toBeGreaterThan(500);
@@ -49,14 +49,19 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(brandLogo('Magion')).toBe(brandLogo('Maggion'));
     expect(brandLogo('Levorim')).toBe(brandLogo('Levorin'));
     expect(brandLogo('Michellin')).toBe(brandLogo('Michelin'));
-    expect(brandLogo('Ira')).toBeNull();
+    expect(brandLogo('Ira')).toBe(brandLogo('IRA'));
+    expect(brandLogo('Ciat')).toBe(brandLogo('CEAT'));
     const canonical = sandbox.window.Caixa.canonicalCatalogBrand as (brand: string) => string;
     const options = sandbox.window.Caixa.catalogBrandOptions as string[];
     expect(canonical('Levorim')).toBe('Levorin');
     expect(canonical('Michellin')).toBe('Michelin');
     expect(canonical('ira')).toBe('IRA');
+    expect(canonical('ciat')).toBe('CEAT');
+    expect(canonical('irc')).toBe('IRC');
     expect(options).toContain('IRA');
-    expect(new Set(options).size).toBe(13);
+    expect(options).toContain('CEAT');
+    expect(options).toContain('IRC');
+    expect(new Set(options).size).toBe(15);
     expect(brandLogo('Marca futura')).toBeNull();
     expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });

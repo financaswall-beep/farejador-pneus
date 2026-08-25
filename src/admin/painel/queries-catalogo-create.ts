@@ -74,9 +74,9 @@ export async function createCatalogProduct(
   const brand = canonicalCatalogBrand(input.brand);
   const tireCondition = requireTireCondition(input.tireCondition ?? 'meia_vida');
   const productCode = normalizeCode(input.productCode);
-  const productName = normalizeName(input.productName);
   const initialPrice = validateInitialPrice(input);
   if (!brand || brand.toLowerCase() === 'sem marca') throw new Error('catalog_brand_required');
+  const productName = normalizeName(`Pneu ${brand} ${parsedMeasure.canonical}`);
   if (!/^[A-Z0-9][A-Z0-9._/-]{1,79}$/.test(productCode)) {
     throw new Error('catalog_product_code_invalid');
   }

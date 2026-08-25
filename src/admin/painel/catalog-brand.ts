@@ -12,6 +12,10 @@ const KNOWN_BRANDS = new Map<string, string>([
   ['vipal', 'Vipal'],
   ['mitas', 'Mitas'],
   ['kenda', 'Kenda'],
+  ['ira', 'IRA'],
+  ['irc', 'IRC'],
+  ['ceat', 'CEAT'],
+  ['ciat', 'CEAT'],
 ]);
 
 function brandKey(value: string): string {

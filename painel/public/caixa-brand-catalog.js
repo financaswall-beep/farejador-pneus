@@ -3,11 +3,12 @@
 
   const Caixa = window.Caixa;
   const BRANDS = Object.freeze([
-    'Bridgestone', 'Dunlop', 'IRA', 'Kenda', 'Levorin', 'Maggion', 'Metzeler',
-    'Michelin', 'Mitas', 'Pirelli', 'Rinaldi', 'Technic', 'Vipal',
+    'Bridgestone', 'CEAT', 'Dunlop', 'IRA', 'IRC', 'Kenda', 'Levorin', 'Maggion',
+    'Metzeler', 'Michelin', 'Mitas', 'Pirelli', 'Rinaldi', 'Technic', 'Vipal',
   ]);
   const NAMES = Object.freeze({
-    bridgestone: 'Bridgestone', dunlop: 'Dunlop', ira: 'IRA', kenda: 'Kenda',
+    bridgestone: 'Bridgestone', ceat: 'CEAT', ciat: 'CEAT', dunlop: 'Dunlop',
+    ira: 'IRA', irc: 'IRC', kenda: 'Kenda',
     levorin: 'Levorin', levorim: 'Levorin', maggion: 'Maggion', magion: 'Maggion',
     metzeler: 'Metzeler', michelin: 'Michelin', michellin: 'Michelin', mitas: 'Mitas',
     pirelli: 'Pirelli', rinaldi: 'Rinaldi', technic: 'Technic', vipal: 'Vipal',
@@ -16,7 +17,8 @@
     pirelli: 'pirelli', metzeler: 'metzeler', michelin: 'michelin', michellin: 'michelin',
     bridgestone: 'bridgestone', dunlop: 'dunlop', levorin: 'levorin', levorim: 'levorin',
     rinaldi: 'rinaldi', maggion: 'maggion', magion: 'maggion', technic: 'technic',
-    vipal: 'vipal', mitas: 'mitas', kenda: 'kenda',
+    vipal: 'vipal', mitas: 'mitas', kenda: 'kenda', ceat: 'ceat', ciat: 'ceat',
+    ira: 'ira', irc: 'irc',
   });
 
   function key(brand) {
@@ -41,6 +43,6 @@
   };
   Caixa.catalogBrandLogo = function (brand) {
     const asset = ASSETS[key(brand)];
-    return asset ? '/operacao/catalog-brands/' + asset + '.webp?v=20260822-caixa-brand2' : null;
+    return asset ? '/operacao/catalog-brands/' + asset + '.webp?v=20260824-catalog-brand3' : null;
   };
 }());

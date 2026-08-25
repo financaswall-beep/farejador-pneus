@@ -18,7 +18,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
           brand: row.brand,
           tire_condition: row.tire_condition,
           product_code: `${brandCode}-${measureCode}-${conditionCode}`,
-          product_name: `Pneu ${row.brand}`,
+          product_name: `Pneu ${row.brand} ${row.tire_size}`,
           price_amount: '',
         },
         saving: false,
@@ -60,9 +60,8 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
       const conditionCode = form.tire_condition === 'novo' ? 'NOV'
         : form.tire_condition === 'remold' ? 'REM' : 'MV';
       form.product_code = `${brandCode}-${measureCode}-${conditionCode}`;
-      if (!String(form.product_name || '').trim()) {
-        form.product_name = `Pneu ${String(form.brand || '').trim()}`.trim();
-      }
+      form.product_name = `Pneu ${String(form.brand || '').trim()} ${String(form.measure || '').trim()}`
+        .trim().replace(/\s+/g, ' ');
     },
 
     catalogoCreateClose() {

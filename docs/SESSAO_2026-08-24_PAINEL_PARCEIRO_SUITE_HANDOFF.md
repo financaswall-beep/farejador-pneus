@@ -106,3 +106,23 @@ O banco já está preparado com `0205` e `0206`. O código correspondente deve s
 incorporado à `main` somente após o CI, e o deploy continua manual, sob controle
 do proprietário. Depois do deploy, o fechamento exige smoke autenticado de
 Matriz e parceiro.
+
+## Complemento — identidade do Catálogo (0207)
+
+- adicionados os logotipos fornecidos de **CEAT, IRA e IRC** à pasta compartilhada
+  pela Matriz, painel parceiro e `/operacao`;
+- aliases `Ciat → CEAT`, `Ira → IRA` e `irc → IRC` são canônicos no servidor e
+  nas duas interfaces;
+- o cadastro gera e o servidor impõe `Pneu + Marca + Medida`, sem modelo ou
+  condição dentro do nome comercial;
+- a migration `0207_catalog_brand_identity_and_names.sql` foi aplicada no banco
+  novo de produção e normalizou 48 pneus ativos com 48 eventos de auditoria;
+- preço, estoque, compras, pedidos e livro financeiro conservaram exatamente as
+  mesmas contagens antes, dentro e depois da transação;
+- backup direcionado dos 48 cadastros foi criado em `.codex-tmp/backups/` e não
+  entra no Git;
+- validação: build aprovado, manifesto com 208 migrations, 1.396 testes unitários
+  em 282 arquivos aprovados em execução sequencial;
+- Testcontainers não concluiu porque o daemon Docker local ficou sem responder
+  até para `docker container ls`; a migration foi adicionalmente validada no
+  banco real por dry-run transacional com rollback integral antes do commit.

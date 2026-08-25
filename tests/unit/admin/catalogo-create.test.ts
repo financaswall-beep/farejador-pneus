@@ -43,7 +43,7 @@ describe('cadastro inicial antes da compra', () => {
       environment: 'test',
     }, pool)).resolves.toEqual({
       product_id: 'produto-novo', product_code: 'LEV-909018-MV',
-      product_name: 'Pneu Levorin', brand: 'Levorin',
+      product_name: 'Pneu Levorin 90/90-18', brand: 'Levorin',
       tire_condition: 'meia_vida', tire_size: '90/90-18', price_amount: 45,
     });
 
