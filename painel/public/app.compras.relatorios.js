@@ -54,7 +54,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
     },
     async loadComprasHistory(resetPage = false) {
       if (resetPage) this.comprasHistoryFilters.page = 1;
-      this.comprasLoading.history = true;
+      this.comprasHistoryHoverIndex = null; this.comprasLoading.history = true;
       this.comprasErrors.history = null;
       try {
         const query = this.comprasHistoryQuery();

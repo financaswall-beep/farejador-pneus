@@ -25,7 +25,31 @@ describe('relatórios conciliados de compras', () => {
     expect(html).toContain('@click="comprasOpenCostDialog()"');
     expect(html).toContain('Evolução do custo médio');
     expect(html).toContain('Compras canceladas ficam fora');
-    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-purchase-history1');
+    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-purchase-history2');
+  });
+
+  it('mantém filtros compactos nas ordens e separa o custo do gráfico principal', () => {
+    const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
+    const tableStart = html.indexOf('id="compras-history-table"');
+    const tableTag = html.indexOf('<table', tableStart);
+    const filters = html.slice(tableStart, tableTag);
+    const costStart = html.indexOf('x-show="comprasCostDialogOpen"');
+    const costEnd = html.indexOf('<!-- FORNECEDORES', costStart);
+    const costDialog = html.slice(costStart, costEnd);
+
+    expect(tableStart).toBeGreaterThan(0);
+    expect(filters).toContain('Ordens e compras');
+    expect(filters).toContain('xl:grid-cols-[minmax(190px,1.35fr)');
+    expect(filters).toContain('x-model="comprasHistoryFilters.search"');
+    expect(filters).toContain('x-model="comprasHistoryFilters.supplierId"');
+    expect(filters).toContain('x-model="comprasHistoryFilters.status"');
+    expect(filters).toContain('x-model="comprasHistoryFilters.payment"');
+    expect(costDialog).toContain('x-model="comprasCost.filters.supplierId"');
+    expect(costDialog).toContain('loadComprasCostAnalysis()');
+    expect(costDialog).toContain('Este filtro não altera compras, recebimentos nem a tabela.');
+    expect(costDialog).not.toContain('comprasHistoryFilters');
+    expect(html).toContain('@mouseenter="comprasHistoryHoverIndex=index"');
+    expect(html).toContain('comprasHistoryHoverDetail(comprasHistoryHoveredRow())');
   });
 
   it('pagina o histórico e mantém recebimento separado do compromisso financeiro', async () => {

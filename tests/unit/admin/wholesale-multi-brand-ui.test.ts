@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 function painelModule(file: string, name: string) {
-  const sandbox: any = { window: { PAINEL_MODULES: {} }, console };
+  const sandbox: any = { window: { PAINEL_MODULES: {} }, console, URLSearchParams };
   vm.runInNewContext(readFileSync(resolve(`painel/public/${file}`), 'utf8'), sandbox);
   return sandbox.window.PAINEL_MODULES[name]();
 }
@@ -185,6 +185,66 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
     });
     expect(state.comprasHistoryChartPoints('average_cost')).toMatch(/,/);
     expect(state.comprasHistoryAverageChangeLabel()).toContain('10,0%');
+  });
+
+  it('mantém a análise de custo isolada dos filtros e dados do gráfico principal', async () => {
+    const methods = painelModule('app.compras.historico.js', 'comprasHistorico');
+    const mainAnalytics = {
+      summary: { total_committed: '80.00', average_cost: '20.00' },
+      timeline: [{ bucket: '2026-08-01', total_committed: '80.00', tires: 4,
+        received_tires: 4, average_cost: '20.00' }],
+    };
+    const costAnalytics = {
+      summary: { total_committed: '30.00', average_cost: '10.00' },
+      timeline: [{ bucket: '2026-06-01', total_committed: '30.00', tires: 3,
+        received_tires: 2, average_cost: '10.00' }],
+    };
+    const apiGet = vi.fn().mockResolvedValue(costAnalytics);
+    const state: any = {
+      ...methods,
+      comprasHistoryAnalytics: mainAnalytics,
+      comprasHistoryFilters: { period: '30d', supplierId: 'fornecedor-principal' },
+      comprasCost: {
+        analytics: { summary: null, timeline: [] },
+        filters: { period: '90d', supplierId: 'fornecedor-custo' },
+        loading: false,
+        error: null,
+      },
+      apiGet,
+    };
+
+    await state.loadComprasCostAnalysis();
+
+    expect(apiGet).toHaveBeenCalledWith(expect.stringContaining('period=90d'));
+    expect(apiGet).toHaveBeenCalledWith(expect.stringContaining(
+      'supplier_id=fornecedor-custo',
+    ));
+    expect(state.comprasCost.analytics).toEqual(costAnalytics);
+    expect(state.comprasHistoryAnalytics).toBe(mainAnalytics);
+    expect(state.comprasHistoryFilters).toEqual({
+      period: '30d', supplierId: 'fornecedor-principal',
+    });
+  });
+
+  it('mostra no ponto do gráfico o valor e a situação do recebimento', () => {
+    const methods = painelModule('app.compras.historico.js', 'comprasHistorico');
+    const state: any = {
+      ...methods,
+      comprasHistoryHoverIndex: 1,
+      comprasHistoryAnalytics: {
+        timeline: [
+          { bucket: '2026-08-01', total_committed: '10.00', tires: 1,
+            received_tires: 1 },
+          { bucket: '2026-08-25', total_committed: '44.00', tires: 4,
+            received_tires: 2 },
+        ],
+      },
+    };
+
+    expect(state.comprasHistoryHoveredRow().bucket).toBe('2026-08-25');
+    expect(state.comprasHistoryHoverDetail(state.comprasHistoryHoveredRow()))
+      .toBe('2 recebidos · 2 em trânsito');
+    expect(state.comprasHistoryHoverStyle()).toMatch(/^left:\d+(?:\.\d+)?%$/);
   });
 
   it('separa as variantes também no resumo de melhores preços', () => {

@@ -406,7 +406,7 @@ describe('catalogo no painel', () => {
       "discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 }",
     );
     const html = readFileSync('painel/public/index.html', 'utf8');
-    expect(html).toContain('app.js?v=20260825-purchase-history1');
+    expect(html).toContain('app.js?v=20260825-purchase-history2');
   });
 
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {
