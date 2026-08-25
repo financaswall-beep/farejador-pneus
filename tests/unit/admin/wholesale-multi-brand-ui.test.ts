@@ -299,6 +299,33 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
     expect(state.comprasPriceCards().variants).toBe(2);
   });
 
+  it('simula economia somente entre fornecedores da variante selecionada', () => {
+    const state: any = {
+      ...moduleState(),
+      ...painelModule('app.compras.relatorios.js', 'comprasRelatorios'),
+      comprasPriceRows: [
+        { measure: '110/70-13', brand: 'IRA', tire_condition: 'meia_vida',
+          supplier_id: 'a', supplier_name: 'Thiago', avg_cost: 5, qty_total: 5 },
+        { measure: '110/70-13', brand: 'IRA', tire_condition: 'meia_vida',
+          supplier_id: 'b', supplier_name: 'Cicero', avg_cost: 10, qty_total: 1 },
+        { measure: '110/70-13', brand: 'Pirelli', tire_condition: 'meia_vida',
+          supplier_id: 'c', supplier_name: 'Outro', avg_cost: 1, qty_total: 9 },
+      ],
+      comprasPriceSelectedMeasure: '110/70-13\u0000ira\u0000meia_vida',
+      comprasPriceQuantity: 10,
+    };
+
+    const selected = state.comprasPriceGroups().find((row: { brand: string }) => row.brand === 'IRA');
+    state.comprasPriceSelectedMeasure = selected.variant_key;
+    const cards = state.comprasPriceCards();
+
+    expect(cards.suppliers).toBe(2);
+    expect(cards.best.supplier_name).toBe('Thiago');
+    expect(cards.difference).toBe(5);
+    expect(cards.total).toBe(50);
+    expect(cards.savings).toBe(50);
+  });
+
   it('leva a marca escolhida junto da medida para a nova compra', () => {
     const state: any = {
       ...moduleState(),

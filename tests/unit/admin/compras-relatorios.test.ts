@@ -25,7 +25,7 @@ describe('relatórios conciliados de compras', () => {
     expect(html).toContain('@click="comprasOpenCostDialog()"');
     expect(html).toContain('Evolução do custo médio');
     expect(html).toContain('Compras canceladas ficam fora');
-    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-purchase-history2');
+    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1');
   });
 
   it('mantém filtros compactos nas ordens e separa o custo do gráfico principal', () => {
@@ -56,6 +56,22 @@ describe('relatórios conciliados de compras', () => {
     expect(costDialog).not.toContain('comprasHistoryFilters');
     expect(html).toContain('@mouseenter="comprasHistoryHoverIndex=index"');
     expect(html).toContain('comprasHistoryHoverDetail(comprasHistoryHoveredRow())');
+  });
+
+  it('entrega comparação de preços real e deixa o plano como próxima tela explícita', () => {
+    const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
+    const start = html.indexOf('<!-- PREÇOS:');
+    const end = html.indexOf('<!-- ═══ TELA: ESTOQUE', start);
+    const prices = html.slice(start, end);
+
+    expect(prices).toContain("comprasPriceMode === 'comparison'");
+    expect(prices).toContain("comprasPriceMode === 'plan'");
+    expect(prices).toContain('Adicionar ao plano de reposição');
+    expect(prices).toContain('Nada será comprado sozinho');
+    expect(prices).toContain('Frete e desconto não incluídos');
+    expect(prices).toContain('Simulação; nenhum lançamento é criado aqui.');
+    expect(prices).toContain('bg-sky-800');
+    expect(prices).not.toContain('bg-amber-50');
   });
 
   it('pagina o histórico e mantém recebimento separado do compromisso financeiro', async () => {

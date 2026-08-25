@@ -455,6 +455,8 @@
     "comprasPriceCards": "function",
     "comprasPriceFilters": "value:object",
     "comprasPriceGroups": "function",
+    "comprasPriceMode": "value:string",
+    "comprasPriceQuantity": "value:number",
     "comprasPriceRows": "value:array",
     "comprasPriceSelected": "function",
     "comprasPriceSelectedMeasure": "value:null",

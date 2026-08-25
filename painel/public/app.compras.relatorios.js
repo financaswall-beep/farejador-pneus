@@ -234,21 +234,20 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
     },
     comprasPriceCards() {
       const groups = this.comprasPriceGroups();
-      const wins = new Map();
-      const spreads = [];
-      for (const group of groups) {
-        const first = group.suppliers[0];
-        if (first) wins.set(first.supplier_name, (wins.get(first.supplier_name) || 0) + 1);
-        if (group.suppliers.length > 1 && Number(first?.avg_cost) > 0) {
-          const last = group.suppliers[group.suppliers.length - 1];
-          spreads.push(((Number(last.avg_cost) - Number(first.avg_cost)) / Number(first.avg_cost)) * 100);
-        }
-      }
-      const top = [...wins.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+      const suppliers = this.comprasPriceSelected()?.suppliers || [];
+      const best = suppliers[0] || null;
+      const alternative = suppliers[1] || null;
+      const bestCost = Number(best?.avg_cost || 0);
+      const alternativeCost = Number(alternative?.avg_cost || 0);
+      const quantity = Math.min(100000, Math.max(1,
+        Math.round(Number(this.comprasPriceQuantity) || 1)));
+      const difference = alternative ? Math.max(0, alternativeCost - bestCost) : 0;
       return {
         variants: groups.length,
-        top: top ? { name: top[0], count: top[1] } : null,
-        spread: spreads.length ? spreads.reduce((sum, value) => sum + value, 0) / spreads.length : 0,
+        compared: groups.filter((group) => group.suppliers.length > 1).length,
+        withoutCompetition: groups.filter((group) => group.suppliers.length < 2).length,
+        suppliers: suppliers.length, best, alternative, difference, quantity,
+        total: bestCost * quantity, savings: difference * quantity,
       };
     },
     comprasUsePrice(row) {
