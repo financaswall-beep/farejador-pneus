@@ -73,6 +73,16 @@ describe('relatórios conciliados de compras', () => {
     expect(prices).toContain('Enviar pelo WhatsApp');
     expect(prices).toContain('você escolhe o contato e envia');
     expect(prices).toContain('Preparar compra deste fornecedor');
+    expect(prices).toContain('Somente com concorrência');
+    expect(prices).toContain('Giro 30d');
+    expect(prices).toContain('Confiança');
+    expect(prices).toContain('Divisão recomendada por fornecedor');
+    expect(prices).toContain('Regras consideradas');
+    expect(prices).toContain('Exportar relatório');
+    expect(prices).toContain('Revisar quantidades');
+    expect(prices).toContain('Gerar cotações');
+    expect(prices).toContain('comprasReplenishmentSetQuantity');
+    expect(prices).toContain('comprasReplenishmentToggleVisible');
     expect(prices).toContain('Frete e desconto não incluídos');
     expect(prices).toContain('Simulação; nenhum lançamento é criado aqui.');
     expect(prices).toContain('bg-sky-800');

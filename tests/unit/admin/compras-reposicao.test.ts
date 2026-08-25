@@ -14,6 +14,7 @@ function moduleState(open = vi.fn()) {
     ...methods,
     comprasReplenishment: {
       rows: [], generatedAt: null, loading: false, error: null, noMinimum: 0,
+      search: '', condition: 'all', period: 'all', onlyCompetition: false,
     },
     atacadoStock: [],
     stockVariantKey: (row: any) => [row.measure, String(row.brand).toLowerCase(),
@@ -84,6 +85,7 @@ describe('relatório sob demanda do plano de reposição', () => {
       rows: state.comprasReplenishmentBuild(stock, prices),
       generatedAt: '2026-08-25T13:00:00.000Z', loading: false, error: null,
       noMinimum: 1,
+      search: '', condition: 'all', period: 'all', onlyCompetition: false,
     };
 
     const url = state.comprasShareReplenishment();
@@ -94,5 +96,32 @@ describe('relatório sob demanda do plano de reposição', () => {
     expect(message).toContain('Fornecedor B');
     expect(message).toContain('Confirme preços, disponibilidade e frete');
     expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer');
+  });
+
+  it('recalcula totais quando o comprador revisa quantidade e seleção', () => {
+    const state = moduleState();
+    state.comprasReplenishment.rows = state.comprasReplenishmentBuild(stock, prices);
+    const row = state.comprasReplenishment.rows[0];
+
+    state.comprasReplenishmentSetQuantity(row, 4);
+    expect(state.comprasReplenishmentSummary()).toMatchObject({
+      variants: 1, tires: 4, estimated: 20, savings: 8, suppliers: 1,
+    });
+
+    row.selected = false;
+    expect(state.comprasReplenishmentSummary()).toMatchObject({
+      variants: 0, tires: 0, estimated: 0, savings: 0,
+    });
+  });
+
+  it('filtra sem modificar a fotografia original do estoque', () => {
+    const state = moduleState();
+    state.comprasReplenishment.rows = state.comprasReplenishmentBuild(stock, prices);
+    state.comprasReplenishment.search = '110/70';
+    state.comprasReplenishment.onlyCompetition = true;
+
+    expect(state.comprasReplenishmentVisibleRows()).toHaveLength(1);
+    state.comprasReplenishment.search = 'pirelli';
+    expect(state.comprasReplenishmentVisibleRows()).toHaveLength(0);
   });
 });
