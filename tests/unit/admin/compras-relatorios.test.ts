@@ -39,11 +39,13 @@ describe('relatórios conciliados de compras', () => {
 
     expect(tableStart).toBeGreaterThan(0);
     expect(filters).toContain('Ordens e compras');
-    expect(filters).toContain('xl:grid-cols-[minmax(190px,1.35fr)');
+    expect(filters).toContain('lg:grid-cols-[minmax(180px,240px)');
+    expect(filters).toContain('lg:justify-start');
     expect(filters).toContain('x-model="comprasHistoryFilters.search"');
     expect(filters).toContain('x-model="comprasHistoryFilters.supplierId"');
     expect(filters).toContain('x-model="comprasHistoryFilters.status"');
     expect(filters).toContain('x-model="comprasHistoryFilters.payment"');
+    expect(filters).toContain('border-emerald-800 bg-emerald-800');
     expect(costDialog).toContain('x-model="comprasCost.filters.supplierId"');
     expect(costDialog).toContain('loadComprasCostAnalysis()');
     expect(costDialog).toContain('Este filtro não altera compras, recebimentos nem a tabela.');
