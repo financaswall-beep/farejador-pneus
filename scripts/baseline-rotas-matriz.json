@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-26T06:26:48.715Z",
-  "total": 280,
+  "geradoEm": "2026-08-26T14:25:46.924Z",
+  "total": 283,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -20,6 +20,7 @@
     "GET /admin/api/clientes/stream GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/colaboradores GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/colaboradores/:collaboratorId/permissoes-operacao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/colaboradores/desempenho GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/colaboradores/gestao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/dashboard/matriz-resumo GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/dashboard/pedidos GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -95,6 +96,7 @@
     "GET /admin/painel/app.colaboradores.finance.js PUBLICA",
     "GET /admin/painel/app.colaboradores.gestao.js PUBLICA",
     "GET /admin/painel/app.colaboradores.js PUBLICA",
+    "GET /admin/painel/app.colaboradores.performance.js PUBLICA",
     "GET /admin/painel/app.colaboradores.permissions.js PUBLICA",
     "GET /admin/painel/app.comissoes.js PUBLICA",
     "GET /admin/painel/app.compras.acoes.js PUBLICA",
@@ -156,6 +158,7 @@
     "GET /admin/painel/assets/catalog-brands/:asset PUBLICA",
     "GET /admin/painel/assets/catalog-tire.webp PUBLICA",
     "GET /admin/painel/assets/clientes-hero.webp PUBLICA",
+    "GET /admin/painel/assets/colaboradores-hero-v2.webp PUBLICA",
     "GET /admin/painel/assets/colaboradores-hero.webp PUBLICA",
     "GET /admin/painel/assets/compras-hero.webp PUBLICA",
     "GET /admin/painel/assets/estoque-hero.webp PUBLICA",

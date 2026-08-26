@@ -42,6 +42,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.colaboradoresGestao, // 0133: remuneração, comissão, folha e desempenho
     window.PAINEL_MODULES.colaboradoresPermissions, // acesso ao painel, allowlist operacional e sessões
     window.PAINEL_MODULES.colaboradoresFinance, // remuneração e comissão unificadas, com gravação atômica
+    window.PAINEL_MODULES.colaboradoresPerformance, // desempenho operacional comum à Matriz e ao parceiro
     window.PAINEL_MODULES.sino, // app.sino.js (2026-07-06): sino vivo — getter notificacoes derivado + lidas em localStorage
     window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
     window.PAINEL_MODULES.botMovimento, // recorte diário/semanal único dos movimentos do Bot

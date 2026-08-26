@@ -38,6 +38,7 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       if (tab === 'permissoes' && this.colabAtivos[0]) {
         this.colabOpenPermissions(this.colabAtivos[0]);
       }
+      if (tab === 'desempenho') void this.loadTeamPerformance();
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async colabMesMudou() {

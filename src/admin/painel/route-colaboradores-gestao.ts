@@ -16,8 +16,10 @@ import {
   saveMatrizOperationPermissions,
 } from '../caixa/operation-team-permissions.js';
 import { saveMatrizFinancialConfiguration } from './matriz-financial-configuration.js';
+import { getMatrizTeamPerformance } from './queries-colaboradores-desempenho.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
+const performanceRange = z.enum(['7d', '30d', 'month']);
 const money = z.number().finite().min(0).max(10_000_000)
   .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
     'money_cent_precision');
@@ -125,6 +127,14 @@ export async function registerPainelColaboradoresGestao(fastify: FastifyInstance
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_competence' });
     try { return reply.status(200).send(await getMatrizCollaboratorManagement(parsed.data.competencia)); }
     catch (err) { return managementError(reply, err, 'collaborator management read failed'); }
+  });
+
+  fastify.get('/admin/api/colaboradores/desempenho', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = z.object({ range: performanceRange.default('month') }).safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_range' });
+    reply.header('Cache-Control', 'no-store');
+    try { return reply.status(200).send(await getMatrizTeamPerformance(parsed.data.range)); }
+    catch (err) { return managementError(reply, err, 'collaborator performance read failed'); }
   });
 
   fastify.post('/admin/api/colaboradores/remuneracao', { preHandler: requireAdminOwner }, async (request, reply) => {

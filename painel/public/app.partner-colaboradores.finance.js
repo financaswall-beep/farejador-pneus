@@ -5,11 +5,14 @@ window.PAINEL_MODULES.partnerColaboradoresFinance = function () {
   return {
     partnerColaboradoresSetTab(tab) {
       const state = this.partnerColaboradores;
-      if (!['equipe', 'remuneracao', 'permissoes'].includes(tab)) return;
+      if (!['equipe', 'remuneracao', 'permissoes', 'desempenho'].includes(tab)) return;
       state.tab = tab;
       state.notice = '';
       if (tab === 'equipe') state.selected = null;
-      else if (!state.selected) {
+      else if (tab === 'desempenho') {
+        state.selected = null;
+        void this.loadTeamPerformance();
+      } else if (!state.selected) {
         const first = state.rows.find((row) => row.active);
         if (first) {
           if (tab === 'permissoes') this.partnerColaboradoresOpenPermissions(first);

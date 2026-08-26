@@ -13,10 +13,12 @@ import {
   savePartnerOperationPermissions,
 } from './operation-team-permissions.js';
 import { savePartnerOperationConfiguration } from './operation-team-config.js';
+import { getPartnerTeamPerformance } from './operation-team-performance.js';
 
 const owner = [requirePartnerAuth, requireOwner];
 const teamScreen = [requirePartnerAuth, requireScreen('colaboradores')];
 const params = z.object({ collaboratorId: z.string().uuid() });
+const performanceRange = z.enum(['7d', '30d', 'month']);
 const centMoney = (maximum: number) => z.number().finite().min(0).max(maximum)
   .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
     'money_cent_precision');
@@ -93,6 +95,17 @@ export function registerPartnerOperationTeamRoutes(fastify: FastifyInstance): vo
     reply.header('Cache-Control', 'no-store');
     try { return reply.status(200).send(await getPartnerOperationTeam(getPartnerContext(request))); }
     catch (error) { return bad(reply, error, 'partner operation team unavailable'); }
+  });
+
+  fastify.get('/parceiro/:slug/api/equipe/desempenho', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = z.object({ range: performanceRange.default('month') }).safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_range' });
+    reply.header('Cache-Control', 'no-store');
+    try {
+      return reply.status(200).send(await getPartnerTeamPerformance(
+        getPartnerContext(request), parsed.data.range,
+      ));
+    } catch (error) { return bad(reply, error, 'partner team performance unavailable'); }
   });
 
   fastify.post('/parceiro/:slug/api/equipe', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {

@@ -80,7 +80,7 @@ describe('catalogo no painel', () => {
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260826-colab-layout2');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260826-performance1');
     expect(html).toContain('app.catalogo.js?v=20260823-fitment1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
