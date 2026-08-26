@@ -13,7 +13,8 @@ describe('Colaboradores — cabeçalho panorâmico', () => {
     expect(html).toContain('id="colaboradores-heading"');
     expect(html).toContain('aria-label="Seções de Colaboradores"');
     expect(html).not.toContain('style="aspect-ratio: 5 / 1;"');
-    expect(html).toContain('sm:min-h-[148px]');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260826-colab-banner3');
+    expect(html.match(/style="min-height: 148px;"/g)).toHaveLength(2);
     expect(html).toContain('class="absolute inset-0 h-full w-full object-fill object-center"');
     expect(html).toContain('class="grid items-start gap-4 md:grid-cols-5 xl:grid-cols-3"');
     expect(html).toContain('md:col-span-2 xl:col-span-1');
