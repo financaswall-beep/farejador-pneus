@@ -86,6 +86,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   });
   fastify.get('/admin/painel/assets/colaboradores-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/colaboradores-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/colaboradores-hero-v2.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/colaboradores-hero-v2.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/clientes-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/clientes-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/vendas-hero.webp', async (_request, reply) =>
