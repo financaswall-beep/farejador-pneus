@@ -114,8 +114,9 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       this.repoQuantidades = { ...this.repoQuantidades, [this.repoKey(row)]: next };
     },
     repoRows() {
-      return [...this.atacadoStock]
-        .filter((row) => this.repoSugestao(row) > 0)
+      return this.comprasReplenishmentBuild(this.atacadoStock, this.fornecedorBreakdown)
+        .filter((row) => row.suggested_quantity > 0)
+        .map((row) => ({ ...row, unit_cost: row.historical_unit_cost ?? 0 }))
         .sort((a, b) => {
           const priorityA = this.measureAvailable(a) === 0 ? 0 : 1;
           const priorityB = this.measureAvailable(b) === 0 ? 0 : 1;
@@ -290,9 +291,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       return total <= 0 ? 0 : this.custoRowsBase().slice(0, 3)
         .reduce((sum, row) => sum + this.custoCapital(row), 0) / total * 100;
     },
-    custoLider() {
-      return this.custoRowsBase()[0] || null;
-    },
+    custoLider() { return this.custoRowsBase()[0] || null; },
     custoComCusto() {
       return this.custoRowsBase().filter((row) => this.custoValido(row)).length;
     },

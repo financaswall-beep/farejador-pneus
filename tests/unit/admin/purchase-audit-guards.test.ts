@@ -44,7 +44,8 @@ describe('guardas finais das auditorias de Compras', () => {
     expect(backend).toContain('i.quantity-COALESCE(i.accepted_quantity,0)');
     expect(backend).toContain('COALESCE(pr.units,0)::int AS in_transit_quantity');
     expect(frontend).toContain('minimum - balance - inTransit');
-    expect(frontend).toContain('this.repoSugestao(row) > 0');
+    expect(frontend).toContain('this.comprasReplenishmentBuild');
+    expect(frontend).toContain('row.suggested_quantity > 0');
   });
 
   it('recusa estouro também para chamadas internas que contornem a rota', () => {

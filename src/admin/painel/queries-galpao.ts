@@ -11,6 +11,7 @@ import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailC
 import { hashPassword } from '../../parceiro/password.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { requireTireCondition, type TireCondition } from '../../shared/tire-condition.js';
+import { setWholesaleReplenishmentPolicy } from './queries-replenishment-policy.js';
 import type { WholesaleStockRow } from './queries-galpao-list.js';
 export { listWholesaleStock } from './queries-galpao-list.js';
 export type { WholesaleStockRow } from './queries-galpao-list.js';
@@ -60,6 +61,10 @@ export async function setWholesaleStock(
      unitCost, minQuantity,
      input.notes?.trim() || null, cat.width, cat.aspect, cat.rim],
   );
+  await setWholesaleReplenishmentPolicy(dbPool, {
+    environment, measure: cat.measure, tireCondition, minQuantity,
+    actorLabel: input.actor_label,
+  });
   return r.rows[0]!;
 }
 

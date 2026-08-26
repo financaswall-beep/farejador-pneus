@@ -31,6 +31,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.comprasRelatorios, // histórico paginado + fornecedores + preços, sem fonte financeira paralela
     window.PAINEL_MODULES.comprasPrecos, // busca local + histórico real por compra na comparação de preços
     window.PAINEL_MODULES.comprasReposicao, // relatório sob demanda: mínimo - disponível - em trânsito
+    window.PAINEL_MODULES.comprasReposicaoPdf, // PDF A4 do mesmo plano revisado na tela
     window.PAINEL_MODULES.comprasHistorico, // indicadores, gráficos e análise do custo médio
     window.PAINEL_MODULES.comprasAcoes, // Etapa 5: mutacoes com idempotencia persistente
     window.PAINEL_MODULES.logistica, // app.logistica.js (linhas 1233-1405 pré-obra): logística (0121) leitura: cards, rota, datas D+1, deep-links

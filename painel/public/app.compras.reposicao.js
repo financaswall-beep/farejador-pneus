@@ -4,12 +4,15 @@ window.PAINEL_MODULES.comprasReposicao = function () {
   const ageDays = (value) => value
     ? Math.floor((Date.now() - new Date(value).getTime()) / 86400000) : Infinity;
   return {
+    comprasReplenishmentKey(row) {
+      return [String(row.measure || '').trim().toLowerCase(), row.tire_condition].join('\0');
+    },
     comprasReplenishmentPriceGroups(priceRows) {
       const groups = new Map();
       for (const row of priceRows || []) {
         const cost = number(row.avg_cost);
         if (!cost || row.supplier_archived) continue;
-        const key = this.stockVariantKey(row);
+        const key = this.comprasReplenishmentKey(row);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(row);
       }
@@ -22,20 +25,48 @@ window.PAINEL_MODULES.comprasReposicao = function () {
       return new Map([...this.comprasReplenishmentPriceGroups(priceRows)]
         .map(([key, rows]) => [key, rows[0]]));
     },
+    comprasReplenishmentStockGroups(stockRows) {
+      const groups = new Map();
+      for (const stock of stockRows || []) {
+        const key = this.comprasReplenishmentKey(stock);
+        if (!groups.has(key)) groups.set(key, {
+          measure: stock.measure, tire_condition: stock.tire_condition,
+          quantity_available: 0, in_transit_quantity: 0, sales_30d: 0,
+          min_quantity: null, brands: [],
+        });
+        const group = groups.get(key);
+        group.quantity_available += number(this.measureAvailable(stock));
+        group.in_transit_quantity += number(stock.in_transit_quantity);
+        group.sales_30d += number(stock.sales_30d);
+        if (stock.min_quantity != null) {
+          group.min_quantity = Math.max(number(group.min_quantity), number(stock.min_quantity));
+        }
+        if (!group.brands.includes(stock.brand)) group.brands.push(stock.brand);
+      }
+      for (const group of groups.values()) group.brands.sort((a, b) => a.localeCompare(b));
+      return [...groups.values()];
+    },
+    comprasReplenishmentMissingMinimum(stockRows) {
+      return this.comprasReplenishmentStockGroups(stockRows)
+        .filter((row) => row.min_quantity == null).length;
+    },
     comprasReplenishmentBuild(stockRows, priceRows) {
       const prices = this.comprasReplenishmentPriceGroups(priceRows);
-      return (stockRows || []).map((stock) => {
-        const available = this.measureAvailable(stock) ?? 0;
-        const minimum = stock.min_quantity == null ? null : number(stock.min_quantity);
+      return this.comprasReplenishmentStockGroups(stockRows).map((stock) => {
+        const available = number(stock.quantity_available);
+        const minimum = stock.min_quantity;
         const inTransit = number(stock.in_transit_quantity);
         const suggested = minimum == null
           ? 0 : Math.max(0, Math.ceil(minimum - available - inTransit));
-        const references = prices.get(this.stockVariantKey(stock)) || [];
+        const references = prices.get(this.comprasReplenishmentKey(stock)) || [];
         const best = references[0] || null;
-        const alternative = references[1] || null;
+        const alternative = references.find((row) => row.supplier_id !== best?.supplier_id) || null;
         const cost = best ? number(best.avg_cost) : null;
+        const brand = best?.brand || stock.brands[0] || '';
         return {
-          ...stock, quantity_available: available, min_quantity: minimum,
+          ...stock, brand, recommended_brand: brand,
+          brand_summary: stock.brands.join(', '), quantity_available: available,
+          min_quantity: minimum,
           in_transit_quantity: inTransit, suggested_quantity: suggested,
           planned_quantity: suggested, selected: suggested > 0,
           supplier_id: best?.supplier_id || null,
@@ -51,7 +82,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
         .sort((a, b) => (a.quantity_available === 0 ? 0 : 1)
           - (b.quantity_available === 0 ? 0 : 1)
           || number(b.sales_30d) - number(a.sales_30d)
-          || this.stockVariantKey(a).localeCompare(this.stockVariantKey(b)));
+          || this.comprasReplenishmentKey(a).localeCompare(this.comprasReplenishmentKey(b)));
     },
     async comprasGenerateReplenishment() {
       const previous = this.comprasReplenishment || {};
@@ -69,7 +100,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
         this.comprasReplenishment = {
           ...previous, rows: this.comprasReplenishmentBuild(stockRows, pricePayload.rows || []),
           generatedAt: new Date().toISOString(), loading: false, error: null,
-          noMinimum: stockRows.filter((row) => row.min_quantity == null).length, period,
+          noMinimum: this.comprasReplenishmentMissingMinimum(stockRows), period,
         };
       } catch (error) {
         previous.loading = false;
@@ -85,7 +116,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
       return (state.rows || []).filter((row) => {
         if (condition !== 'all' && row.tire_condition !== condition) return false;
         if (state.onlyCompetition && !row.alternative_supplier_name) return false;
-        return !search || `${row.measure} ${row.brand} ${row.supplier_name || ''}`
+        return !search || `${row.measure} ${row.brand_summary} ${row.recommended_brand} ${row.supplier_name || ''}`
           .toLowerCase().includes(search);
       });
     },
@@ -107,6 +138,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
       const rows = this.comprasReplenishmentSelectedRows();
       return {
         variants: rows.length,
+        measures: rows.length,
         tires: rows.reduce((sum, row) => sum + number(row.planned_quantity), 0),
         transit: rows.reduce((sum, row) => sum + number(row.in_transit_quantity), 0),
         estimated: rows.reduce((sum, row) => sum
@@ -157,11 +189,12 @@ window.PAINEL_MODULES.comprasReposicao = function () {
       const generated = this.comprasReplenishment.generatedAt
         ? this.formatDateTime(this.comprasReplenishment.generatedAt) : 'agora';
       const lines = ['*PLANO DE REPOSIÇÃO — FAREJADOR*', `Gerado em ${generated}`,
-        `Comprar: ${summary.tires} pneu(s) em ${summary.variants} variante(s)`, ''];
+        `Comprar: ${summary.tires} pneu(s) em ${summary.measures} medida(s)`, ''];
       for (const group of this.comprasReplenishmentSuppliers()) {
         lines.push(`*${group.supplier_name}*`);
         for (const row of group.rows) {
-          lines.push(`• ${row.planned_quantity}x ${row.brand} ${row.measure} · ${this.comprasReplenishmentCondition(row.tire_condition)}`);
+          lines.push(`• ${row.planned_quantity}x ${row.measure} · ${this.comprasReplenishmentCondition(row.tire_condition)}`);
+          lines.push(`  Marca sugerida: ${row.recommended_brand || 'a definir'}`);
           lines.push(`  Disponível ${row.quantity_available} | Mínimo ${row.min_quantity} | Em trânsito ${row.in_transit_quantity}`);
           lines.push(row.historical_unit_cost == null
             ? '  Sem preço histórico — cotar antes de comprar'
@@ -190,10 +223,11 @@ window.PAINEL_MODULES.comprasReposicao = function () {
         const guarded = /^[=+@-]/.test(text) ? `'${text}` : text;
         return `"${guarded.replaceAll('"', '""')}"`;
       };
-      const csv = [['Medida', 'Marca', 'Condição', 'Estoque', 'Mínimo', 'Giro 30d',
+      const csv = [['Medida', 'Condição', 'Marcas no estoque', 'Marca sugerida', 'Estoque', 'Mínimo', 'Giro 30d',
         'Comprar', 'Fornecedor', 'Preço unitário', 'Subtotal']]
-        .concat(rows.map((row) => [row.measure, row.brand,
-          this.comprasReplenishmentCondition(row.tire_condition), row.quantity_available,
+        .concat(rows.map((row) => [row.measure,
+          this.comprasReplenishmentCondition(row.tire_condition), row.brand_summary,
+          row.recommended_brand, row.quantity_available,
           row.min_quantity, number(row.sales_30d), row.planned_quantity,
           row.supplier_name || 'A cotar', row.historical_unit_cost ?? '',
           row.historical_unit_cost == null ? ''

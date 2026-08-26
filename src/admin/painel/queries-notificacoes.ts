@@ -21,7 +21,10 @@ export interface MatrizNotificacoesPayload {
   entregas_falhadas: Array<{ order_id: string; customer_name: string | null; reason: string | null }>;
   fiado_vencido: { count: number; total: string };
   a_pagar_vencido: { count: number; total: string };
-  galpao_repor: Array<{ measure: string; quantity_on_hand: number; min_quantity: number }>;
+  galpao_repor: Array<{
+    measure: string; tire_condition: string;
+    quantity_on_hand: number; min_quantity: number;
+  }>;
   bot_resilience: { enabled: boolean; dead_letters: number; api_ack_unconfirmed: number };
 }
 
@@ -80,14 +83,21 @@ export async function getMatrizNotificacoes(
            AND p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS pagar_total,
 
        (SELECT json_agg(json_build_object(
-                 'measure', s.measure, 'brand', s.brand,
-                 'tire_condition', s.tire_condition,
-                 'quantity_on_hand', s.quantity_on_hand,
-                 'min_quantity', s.min_quantity)
-               ORDER BY s.quantity_on_hand::numeric / NULLIF(s.min_quantity, 0))
-          FROM commerce.wholesale_stock s
-         WHERE s.environment = $1 AND s.min_quantity IS NOT NULL
-           AND (s.quantity_on_hand-s.quantity_reserved) <= s.min_quantity) AS galpao_repor`,
+                 'measure', p.measure, 'tire_condition', p.tire_condition,
+                 'quantity_on_hand', COALESCE(s.quantity_available,0),
+                 'min_quantity', p.min_quantity)
+               ORDER BY COALESCE(s.quantity_available,0)::numeric
+                 / NULLIF(p.min_quantity,0), p.measure, p.tire_condition)
+          FROM commerce.wholesale_replenishment_policies p
+          LEFT JOIN (
+            SELECT environment,measure,tire_condition,
+                   sum(quantity_on_hand-quantity_reserved)::int AS quantity_available
+              FROM commerce.wholesale_stock
+             GROUP BY environment,measure,tire_condition
+          ) s ON s.environment=p.environment AND s.measure=p.measure
+             AND s.tire_condition=p.tire_condition
+         WHERE p.environment=$1
+           AND COALESCE(s.quantity_available,0) <= p.min_quantity) AS galpao_repor`,
     [environment],
   );
   const row = r.rows[0]!;

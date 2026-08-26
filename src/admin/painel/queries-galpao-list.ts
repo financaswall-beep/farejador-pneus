@@ -14,6 +14,7 @@ export interface WholesaleStockRow {
   unit_cost: number;
   sales_30d?: number;
   min_quantity: number | null;
+  replenishment_quantity_available?: number;
   notes: string | null;
   updated_at: string;
   tire_width_mm: number | null;
@@ -36,6 +37,11 @@ export async function listWholesaleStock(
         )
           AND created_at>=now()-INTERVAL '30 days'
         GROUP BY environment,measure,brand,tire_condition
+     ), stock_by_measure AS (
+       SELECT environment,measure,tire_condition,
+              sum(quantity_on_hand-quantity_reserved)::int AS units
+         FROM commerce.wholesale_stock
+        GROUP BY environment,measure,tire_condition
      ), pending_receipts AS (
        SELECT i.environment,i.measure,COALESCE(i.brand,'Sem marca') brand,i.tire_condition,
               COALESCE(sum(GREATEST(i.quantity-COALESCE(i.accepted_quantity,0),0)),0)::int units
@@ -49,7 +55,9 @@ export async function listWholesaleStock(
             ws.quantity_reserved,
             (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,
             COALESCE(pr.units,0)::int AS in_transit_quantity,
-            ws.unit_cost,COALESCE(s.units,0)::int AS sales_30d,ws.min_quantity,ws.notes,
+            ws.unit_cost,COALESCE(s.units,0)::int AS sales_30d,
+            COALESCE(rp.min_quantity,ws.min_quantity) AS min_quantity,
+            COALESCE(sm.units,0)::int AS replenishment_quantity_available,ws.notes,
             ws.updated_at,ws.tire_width_mm,ws.tire_aspect_ratio,ws.tire_rim_diameter
        FROM commerce.wholesale_stock ws
        LEFT JOIN sales_30d s
@@ -58,6 +66,12 @@ export async function listWholesaleStock(
        LEFT JOIN pending_receipts pr
          ON pr.environment=ws.environment AND pr.measure=ws.measure
         AND pr.brand=ws.brand AND pr.tire_condition=ws.tire_condition
+       LEFT JOIN stock_by_measure sm
+         ON sm.environment=ws.environment AND sm.measure=ws.measure
+        AND sm.tire_condition=ws.tire_condition
+       LEFT JOIN commerce.wholesale_replenishment_policies rp
+         ON rp.environment=ws.environment AND rp.measure=ws.measure
+        AND rp.tire_condition=ws.tire_condition
       WHERE ws.environment=$1
       ORDER BY ws.measure,ws.brand,ws.tire_condition`,
     [environment],

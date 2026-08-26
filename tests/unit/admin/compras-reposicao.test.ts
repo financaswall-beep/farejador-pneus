@@ -30,7 +30,9 @@ function moduleState(open = vi.fn()) {
 describe('relatório sob demanda do plano de reposição', () => {
   const stock = [
     { measure: '110/70-13', brand: 'IRA', tire_condition: 'meia_vida',
-      quantity_available: 2, min_quantity: 5, in_transit_quantity: 1, sales_30d: 4 },
+      quantity_available: 2, min_quantity: 8, in_transit_quantity: 1, sales_30d: 4 },
+    { measure: '110/70-13', brand: 'Pirelli', tire_condition: 'meia_vida',
+      quantity_available: 3, min_quantity: 8, in_transit_quantity: 0, sales_30d: 2 },
     { measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
       quantity_available: 0, min_quantity: 3, in_transit_quantity: 3, sales_30d: 2 },
     { measure: '100/90-18', brand: 'Maggion', tire_condition: 'meia_vida',
@@ -46,19 +48,36 @@ describe('relatório sob demanda do plano de reposição', () => {
     { measure: '110/70-13', brand: 'IRA', tire_condition: 'meia_vida',
       supplier_id: 'c', supplier_name: 'Arquivado', avg_cost: 1,
       supplier_archived: true, last_purchased_at: '2026-08-25' },
+    { measure: '110/70-13', brand: 'Pirelli', tire_condition: 'meia_vida',
+      supplier_id: 'd', supplier_name: 'Fornecedor Pirelli', avg_cost: 4,
+      supplier_archived: false, last_purchased_at: '2026-08-25' },
   ];
 
-  it('desconta o trânsito, respeita a variante e recomenda o menor histórico ativo', () => {
+  it('soma marcas, desconta o trânsito e recomenda a compra exata mais barata', () => {
     const state = moduleState();
     const rows = state.comprasReplenishmentBuild(stock, prices);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      measure: '110/70-13', brand: 'IRA', quantity_available: 2,
-      min_quantity: 5, in_transit_quantity: 1, suggested_quantity: 2,
-      supplier_id: 'b', supplier_name: 'Fornecedor B',
-      historical_unit_cost: 5, estimated_amount: 10,
+      measure: '110/70-13', brand: 'Pirelli', recommended_brand: 'Pirelli',
+      brand_summary: 'IRA, Pirelli', quantity_available: 5,
+      min_quantity: 8, in_transit_quantity: 1, suggested_quantity: 2,
+      supplier_id: 'd', supplier_name: 'Fornecedor Pirelli',
+      historical_unit_cost: 4, estimated_amount: 8,
     });
+  });
+
+  it('não mistura novo, meia-vida e remold da mesma medida', () => {
+    const state = moduleState();
+    const rows = state.comprasReplenishmentBuild([
+      ...stock,
+      { measure: '110/70-13', brand: 'IRA', tire_condition: 'novo',
+        quantity_available: 0, min_quantity: 3, in_transit_quantity: 0, sales_30d: 0 },
+    ], prices);
+
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row: any) => row.tire_condition === 'meia_vida')?.suggested_quantity).toBe(2);
+    expect(rows.find((row: any) => row.tire_condition === 'novo')?.suggested_quantity).toBe(3);
   });
 
   it('busca uma fotografia nova e não altera compra, estoque ou financeiro', async () => {
@@ -92,8 +111,9 @@ describe('relatório sob demanda do plano de reposição', () => {
     const message = decodeURIComponent(url.split('?text=')[1]);
 
     expect(url).toMatch(/^https:\/\/wa\.me\/\?text=/);
-    expect(message).toContain('2x IRA 110/70-13');
-    expect(message).toContain('Fornecedor B');
+    expect(message).toContain('2x 110/70-13');
+    expect(message).toContain('Marca sugerida: Pirelli');
+    expect(message).toContain('Fornecedor Pirelli');
     expect(message).toContain('Confirme preços, disponibilidade e frete');
     expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer');
   });
@@ -105,7 +125,7 @@ describe('relatório sob demanda do plano de reposição', () => {
 
     state.comprasReplenishmentSetQuantity(row, 4);
     expect(state.comprasReplenishmentSummary()).toMatchObject({
-      variants: 1, tires: 4, estimated: 20, savings: 8, suppliers: 1,
+      variants: 1, measures: 1, tires: 4, estimated: 16, savings: 4, suppliers: 1,
     });
 
     row.selected = false;
@@ -122,6 +142,6 @@ describe('relatório sob demanda do plano de reposição', () => {
 
     expect(state.comprasReplenishmentVisibleRows()).toHaveLength(1);
     state.comprasReplenishment.search = 'pirelli';
-    expect(state.comprasReplenishmentVisibleRows()).toHaveLength(0);
+    expect(state.comprasReplenishmentVisibleRows()).toHaveLength(1);
   });
 });

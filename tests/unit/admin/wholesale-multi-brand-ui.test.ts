@@ -10,7 +10,10 @@ function painelModule(file: string, name: string) {
 }
 
 function moduleState() {
-  const methods = painelModule('app.galpao.multibrand.js', 'galpaoMultibrand');
+  const methods = {
+    ...painelModule('app.compras.reposicao.js', 'comprasReposicao'),
+    ...painelModule('app.galpao.multibrand.js', 'galpaoMultibrand'),
+  };
   const stock = [
     {
       measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
@@ -102,7 +105,21 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     expect(state.custoPneusComCusto()).toBe(65);
   });
 
-  it('separa giro e quantidades de reposição e preserva a marca na compra', () => {
+  it('conta a necessidade do estoque uma vez por medida e condição', () => {
+    const state: any = {
+      ...moduleState(),
+      ...painelModule('app.galpao.js', 'galpao'),
+    };
+    state.atacadoStock.forEach((row: any) => { row.min_quantity = 80; });
+
+    expect(state.stockResumo()).toMatchObject({
+      pneus: 65, capital: 1030, repor: 1, zeradas: 0,
+    });
+    state.atacadoStock.forEach((row: any) => { row.min_quantity = 65; });
+    expect(state.stockResumo().repor).toBe(0);
+  });
+
+  it('soma marcas na reposição e preserva a marca recomendada na compra', () => {
     const state = moduleState();
     const pirelli = state.atacadoStock[0];
     const metzeler = state.atacadoStock[1];
@@ -112,20 +129,25 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
       tire_condition: 'meia_vida', source: 'venda_atacado', qty_delta: -999 });
     expect(state.repoGiro(pirelli)).toBe(5);
 
-    state.repoDefinirQuantidade(pirelli, 11);
-    state.repoDefinirQuantidade(metzeler, 7);
-    expect(state.repoQuantidade(pirelli)).toBe(11);
-    expect(state.repoQuantidade(metzeler)).toBe(7);
+    Object.assign(pirelli, { min_quantity: 80 });
+    Object.assign(metzeler, { min_quantity: 80 });
+    state.fornecedorBreakdown = [{
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+      supplier_id: 's1', supplier_name: 'Fornecedor B', avg_cost: 12, qty_total: 3,
+    }];
+    const plan = state.repoRows();
+    expect(plan).toHaveLength(1);
+    expect(plan[0]).toMatchObject({
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+      quantity_available: 65, suggested_quantity: 15,
+    });
+    state.repoDefinirQuantidade(plan[0], 11);
+    expect(state.repoQuantidade(plan[0])).toBe(11);
 
-    state.repoAbrirCompra([
-      { ...pirelli, suggested_quantity: 11 },
-      { ...metzeler, suggested_quantity: 7 },
-    ]);
+    state.repoAbrirCompra([{ ...plan[0], suggested_quantity: 11 }]);
     expect(state.compraForm.items).toEqual([
-      { measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
-        quantity: 11, unit_cost: '' },
       { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
-        quantity: 7, unit_cost: '' },
+        quantity: 11, unit_cost: '' },
     ]);
   });
 
@@ -136,7 +158,8 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
       quantity_on_hand: 10, quantity_reserved: 8, quantity_available: 2,
       min_quantity: 5,
     });
-    expect(state.repoSugestao(pirelli)).toBe(3);
+    Object.assign(pirelli, { replenishment_quantity_available: 2 });
+    expect(state.repoSugestao({ ...pirelli, quantity_available: 2 })).toBe(3);
     expect(state.repoCobertura(pirelli)).toBe(30);
 
     Object.assign(pirelli, { quantity_reserved: 10, quantity_available: 0 });

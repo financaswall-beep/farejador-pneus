@@ -30,6 +30,8 @@ describe('contrato monetário da compra do parceiro', () => {
   });
 
   it('exige chave idempotente e vencimento em compra a prazo', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-18T12:00:00.000Z'));
     const { idempotency_key: _ignored, ...withoutKey } = purchase;
     expect(partnerPurchaseSchema.safeParse(withoutKey).success).toBe(false);
     expect(partnerPurchaseSchema.safeParse({

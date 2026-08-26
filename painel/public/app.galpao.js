@@ -20,7 +20,8 @@ window.PAINEL_MODULES.galpao = function () {
     },
     stockPrecisaRepor(row) {
       return row.min_quantity != null
-        && Number(row.quantity_available ?? row.quantity_on_hand) <= Number(row.min_quantity);
+        && Number(row.replenishment_quantity_available
+          ?? row.quantity_available ?? row.quantity_on_hand) < Number(row.min_quantity);
     },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
@@ -160,8 +161,10 @@ window.PAINEL_MODULES.galpao = function () {
         const q = Number(r.quantity_on_hand) || 0;
         pneus += q;
         capital += q * (Number(r.unit_cost) || 0);
-        if (this.measureAvailable(r) === 0) zeradas++;
-        else if (this.stockPrecisaRepor(r)) repor++;
+      }
+      for (const group of this.comprasReplenishmentStockGroups(this.atacadoStock)) {
+        if (group.quantity_available === 0) zeradas++;
+        else if (group.min_quantity != null && group.quantity_available < group.min_quantity) repor++;
       }
       return { pneus, capital, zeradas, repor };
     },
@@ -284,9 +287,7 @@ window.PAINEL_MODULES.galpao = function () {
       else if (m.source === 'compra' && m.reason) t += ' (' + m.reason + ')';
       return t;
     },
-    movQuando(m) {
-      return window.FarejadorTime.formatDateTime(m.created_at);
-    },
+    movQuando(m) { return window.FarejadorTime.formatDateTime(m.created_at); },
     // Custo médio só aparece no filme quando MUDOU (entrada/compra recalculam; baixa não).
     movCustoTexto(m) {
       const b = m.cost_before == null ? null : Number(m.cost_before);
