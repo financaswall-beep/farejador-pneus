@@ -29,6 +29,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.atacadoTransfer, // ponte Matriz → parceiro e acréscimos após a saída
     window.PAINEL_MODULES.compras, // app.compras.js (linhas 1059-1232 pré-obra): compras/fornecedores + fiado (0115) + loads financeiro/despesas
     window.PAINEL_MODULES.comprasRelatorios, // histórico paginado + fornecedores + preços, sem fonte financeira paralela
+    window.PAINEL_MODULES.comprasPrecos, // busca local + histórico real por compra na comparação de preços
     window.PAINEL_MODULES.comprasReposicao, // relatório sob demanda: mínimo - disponível - em trânsito
     window.PAINEL_MODULES.comprasHistorico, // indicadores, gráficos e análise do custo médio
     window.PAINEL_MODULES.comprasAcoes, // Etapa 5: mutacoes com idempotencia persistente

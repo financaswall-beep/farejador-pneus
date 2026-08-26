@@ -26,6 +26,7 @@ describe('relatórios conciliados de compras', () => {
     expect(html).toContain('Evolução do custo médio');
     expect(html).toContain('Compras canceladas ficam fora');
     expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1');
+    expect(html).toContain('/admin/painel/app.compras.precos.js?v=20260825-price-history1');
   });
 
   it('mantém filtros compactos nas ordens e separa o custo do gráfico principal', () => {
@@ -66,7 +67,14 @@ describe('relatórios conciliados de compras', () => {
 
     expect(prices).toContain("comprasPriceMode === 'comparison'");
     expect(prices).toContain("comprasPriceMode === 'plan'");
-    expect(prices).toContain('Adicionar ao plano de reposição');
+    expect(prices).toContain('Adicionar ao plano');
+    expect(prices).toContain('Buscar variante');
+    expect(prices).toContain('Histórico do custo por unidade');
+    expect(prices).toContain('Fornecedor recomendado');
+    expect(prices).toContain('Amostra:');
+    expect(prices).toContain('Iniciar cotação');
+    expect(prices).toContain('class="mt-1 block w-28');
+    expect(prices).toContain('class="mt-5 grid grid-cols-2 gap-2"');
     expect(prices).toContain('Nada será comprado sozinho');
     expect(prices).toContain('Gerar relatório agora');
     expect(prices).toContain('estoque mínimo − disponível − em trânsito');
@@ -162,12 +170,24 @@ describe('relatórios conciliados de compras', () => {
   });
 
   it('compara preço somente de compra recebida e aceita recorte seguro', async () => {
-    const query = vi.fn().mockResolvedValue({ rows: [] });
-    await getWholesalePriceReport({
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        supplier_id: '11111111-1111-4111-8111-111111111111',
+        supplier_name: 'Fornecedor A', measure: '100/80-18', brand: 'Pirelli',
+        tire_condition: 'meia_vida', avg_cost: '10.00', qty_total: 2,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        purchase_id: 'purchase-1', purchased_at: '2026-08-25T12:00:00.000Z',
+        supplier_id: '11111111-1111-4111-8111-111111111111',
+        supplier_name: 'Fornecedor A', measure: '100/80-18', brand: 'Pirelli',
+        tire_condition: 'meia_vida', quantity: 2, unit_cost: '10.00',
+      }] });
+    const rows = await getWholesalePriceReport({
       period: '90d', supplierId: '11111111-1111-4111-8111-111111111111',
       search: '100/80',
     }, 'test', { query } as unknown as Pool);
 
+    expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]![0]).toContain(`p.status='confirmed'`);
     expect(query.mock.calls[0]![0]).toContain(`interval '90 days'`);
     expect(query.mock.calls[0]![0]).toContain(`i.measure,i.brand`);
@@ -176,6 +196,15 @@ describe('relatórios conciliados de compras', () => {
     expect(query.mock.calls[0]![1]).toEqual([
       'test', '11111111-1111-4111-8111-111111111111', '%100/80%',
     ]);
+    expect(query.mock.calls[1]![0]).toContain('p.id AS purchase_id');
+    expect(query.mock.calls[1]![0]).toContain(
+      'GROUP BY p.id,p.purchased_at,s.id,s.name,i.measure,i.brand,i.tire_condition',
+    );
+    expect(query.mock.calls[1]![1]).toEqual(query.mock.calls[0]![1]);
+    expect(rows[0]).toMatchObject({
+      measure: '100/80-18',
+      history: [{ purchase_id: 'purchase-1', unit_cost: '10.00', quantity: 2 }],
+    });
   });
 
   it('mantém marca na comparação resumida de fornecedores', async () => {

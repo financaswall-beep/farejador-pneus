@@ -33,6 +33,26 @@ export interface PurchaseReport {
   pagination: { page: number; page_size: number; total: number; pages: number };
 }
 
+interface WholesalePriceHistoryRow {
+  purchase_id: string;
+  purchased_at: string;
+  supplier_id: string;
+  supplier_name: string;
+  measure: string;
+  brand: string;
+  tire_condition: string;
+  quantity: number;
+  unit_cost: string;
+}
+
+interface WholesalePriceAggregateRow {
+  supplier_id: string;
+  measure: string;
+  brand: string;
+  tire_condition: string;
+  [key: string]: unknown;
+}
+
 function periodClause(period: PurchaseReportPeriod, column: string): string | null {
   const local = `(${column} AT TIME ZONE 'America/Sao_Paulo')`;
   if (period === '30d') return `${local} >= (now() AT TIME ZONE 'America/Sao_Paulo') - interval '30 days'`;
@@ -213,7 +233,7 @@ export async function getWholesalePriceReport(
     where.push(`(lower(i.measure) LIKE $${params.length}
       OR lower(i.brand) LIKE $${params.length})`);
   }
-  const result = await dbPool.query(
+  const result = await dbPool.query<WholesalePriceAggregateRow>(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,
             s.deleted_at IS NOT NULL AS supplier_archived,i.measure,i.brand,
             i.tire_condition,
@@ -233,5 +253,35 @@ export async function getWholesalePriceReport(
       LIMIT 1000`,
     params,
   );
-  return result.rows;
+  const history = await dbPool.query<WholesalePriceHistoryRow>(
+    `SELECT p.id AS purchase_id,p.purchased_at,
+            s.id AS supplier_id,s.name AS supplier_name,
+            i.measure,i.brand,i.tire_condition,
+            sum(COALESCE(i.accepted_quantity,i.quantity))::int AS quantity,
+            round(sum(COALESCE(i.accepted_quantity,i.quantity)*i.unit_cost)
+              /NULLIF(sum(COALESCE(i.accepted_quantity,i.quantity)),0),2) AS unit_cost
+       FROM commerce.wholesale_purchase_items i
+       JOIN commerce.wholesale_purchases p
+         ON p.id=i.purchase_id AND p.environment=i.environment
+       JOIN commerce.wholesale_suppliers s
+         ON s.id=p.supplier_id AND s.environment=p.environment
+      WHERE ${where.join(' AND ')}
+      GROUP BY p.id,p.purchased_at,s.id,s.name,i.measure,i.brand,i.tire_condition
+      ORDER BY p.purchased_at,p.id
+      LIMIT 5000`,
+    params,
+  );
+  const key = (row: Pick<WholesalePriceHistoryRow,
+    'supplier_id' | 'measure' | 'brand' | 'tire_condition'>) =>
+    [row.supplier_id, row.measure, row.brand, row.tire_condition].join('\u0000');
+  const historyByVariant = new Map<string, WholesalePriceHistoryRow[]>();
+  for (const row of history.rows) {
+    const rowKey = key(row);
+    if (!historyByVariant.has(rowKey)) historyByVariant.set(rowKey, []);
+    historyByVariant.get(rowKey)!.push(row);
+  }
+  return result.rows.map((row) => ({
+    ...row,
+    history: historyByVariant.get(key(row)) || [],
+  }));
 }

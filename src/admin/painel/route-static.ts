@@ -29,7 +29,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
     'app.nav.js', 'app.rede.kpis.js', 'app.rede.operacao.js', 'app.rede.canario.js', 'app.unidade.kpis.js', 'app.venda.modal.js', 'app.api.js', 'app.partner-api.js', 'app.partner-resumo.js', 'app.partner-retiradas.js', 'app.partner-estoque.js', 'app.partner-vendas.js', 'app.partner-compras.js', 'app.partner-logistica.js', 'app.partner-financeiro.js', 'app.partner-colaboradores.js', 'app.partner-catalogo.js', 'app.municipios.js',
-    'business-time.js', 'app.format.js', 'app.varejo.js', 'app.vendas.marcas.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.atacado.transfer.js', 'app.compras.js', 'app.compras.relatorios.js', 'app.compras.reposicao.js', 'app.compras.historico.js', 'app.compras.acoes.js',
+    'business-time.js', 'app.format.js', 'app.varejo.js', 'app.vendas.marcas.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.atacado.transfer.js', 'app.compras.js', 'app.compras.relatorios.js', 'app.compras.precos.js', 'app.compras.reposicao.js', 'app.compras.historico.js', 'app.compras.acoes.js',
     'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
     'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.gestao.js', 'app.sino.js', 'app.financeiro.js',
     'app.financeiro.baixas.js',

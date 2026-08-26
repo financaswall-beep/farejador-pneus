@@ -83,6 +83,7 @@ describe('seguranca de inicializacao do painel', () => {
     expect(purchaseActions).not.toContain('window.alert');
     expect(html).toContain('aria-labelledby="compra-dialog-title"');
     expect(staticRoute).toContain("'app.compras.relatorios.js'");
+    expect(staticRoute).toContain("'app.compras.precos.js'");
     expect(staticRoute).toContain("'app.compras.reposicao.js'");
   });
 
@@ -92,6 +93,7 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('app.atacado.js?v=20260822-continuity1');
     expect(html).toContain('app.atacado.transfer.js?v=20260818-business-time1');
     expect(html).toContain('app.compras.relatorios.js?v=20260825-price-compare1');
+    expect(html).toContain('app.compras.precos.js?v=20260825-price-history1');
     expect(html).toContain('app.compras.reposicao.js?v=20260825-replenishment2');
     expect(html).toContain('app.compras.acoes.js?v=20260825-purchase-orders1');
     expect(html).toContain('app.core.js?v=20260823-partner-summary1');
