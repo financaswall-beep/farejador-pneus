@@ -35,6 +35,7 @@ export interface OperationTeamMember {
   commission_value: number;
   commission_active: boolean;
   commission_amount: number;
+  permissions?: Partial<Record<OperationPermissionKey, boolean>>;
 }
 
 export interface OperationTeamPayload {

@@ -31,6 +31,10 @@ type PartnerMemberRow = {
   benefits: unknown; commission_kind: 'percent' | 'fixed' | null;
   commission_value: string; commission_active: boolean; commission_starts_on: string | null;
   commission_amount: string;
+  permissions: Partial<Record<
+    'vendas' | 'estoque' | 'pedidos' | 'clientes' | 'entregas'
+    | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro', boolean
+  >>;
 };
 
 function localDate(): string {
@@ -56,6 +60,7 @@ function memberOf(row: PartnerMemberRow): OperationTeamMember {
     commission_basis: row.commission_kind === 'fixed' ? 'sale' : 'revenue',
     commission_value: money(row.commission_value), commission_active: row.commission_active,
     commission_amount: money(row.commission_amount),
+    permissions: row.permissions ?? {},
   };
 }
 
@@ -71,8 +76,22 @@ async function rows(ctx: PartnerContext, db: Queryable): Promise<PartnerMemberRo
             COALESCE(hist.kind,legacy.kind) commission_kind,
             COALESCE(hist.value,legacy.value,0)::text commission_value,
             COALESCE(hist.active,legacy.active,false) commission_active,hist.starts_on commission_starts_on,
-            COALESCE(facts.commission_amount,0)::text commission_amount
+              COALESCE(facts.commission_amount,0)::text commission_amount,
+              jsonb_build_object(
+              'vendas',COALESCE(perms.allow_vendas,false),
+              'estoque',COALESCE(perms.allow_estoque,false),
+              'pedidos',COALESCE(perms.allow_pedidos,false),
+              'clientes',COALESCE(perms.allow_clientes,false),
+              'entregas',COALESCE(perms.allow_entregas,false),
+              'retiradas',COALESCE(perms.allow_retiradas,false),
+              'batepapo',COALESCE(perms.allow_batepapo,false),
+              'resumo',COALESCE(perms.allow_resumo,false),
+              'financeiro',COALESCE(perms.allow_financeiro,false)
+            ) permissions
        FROM network.partner_access_tokens pat
+       LEFT JOIN network.partner_token_permissions perms
+         ON perms.environment=pat.environment AND perms.partner_unit_id=pat.partner_unit_id
+        AND perms.token_id=pat.id
        LEFT JOIN LATERAL (
          SELECT c.* FROM network.partner_collaborator_compensation c
           WHERE c.environment=pat.environment AND c.token_id=pat.id

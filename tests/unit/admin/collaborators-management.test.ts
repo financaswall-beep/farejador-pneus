@@ -54,7 +54,8 @@ describe('gestão de colaboradores da matriz', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
     const tela = html.split('TELA: COLABORADORES')[1]!.split('TELA: BOT')[0]!;
     const migration = readFileSync(resolve('db/migrations/0133_matriz_collaborator_management.sql'), 'utf8');
-    expect(tela).toContain('Cargos cadastrados');
+    expect(tela).toContain('Com resultado no mês');
+    expect(tela).toContain('Resumo da competência');
     expect(tela).toContain("{id:'remuneracao',label:'Remuneração'}");
     expect(html).toContain('Folha de pagamento');
     expect(tela).not.toContain('<p class="text-xs text-gray-500">Vendedores</p>');

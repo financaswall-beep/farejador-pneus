@@ -4,14 +4,13 @@ import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
 import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
 import { commissionItemRulesOf, type OperationCommissionItemRules } from '../../shared/operation-team.js';
-
 type Queryable = Pick<Pool, 'query'>;
 type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
 type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
-
 export interface CollaboratorManagementRow {
   id: string; display_name: string; username: string; job: string; job_title: string;
   work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean;
+  allow_vendas: boolean; allow_estoque: boolean; allow_entregas: boolean; allow_financeiro: boolean;
   eligible_in_competence: boolean;
   employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
   salary_frequency: 'weekly' | 'monthly';
@@ -30,8 +29,7 @@ export interface CollaboratorManagementRow {
 
 function n(value: unknown): number { return Number(value ?? 0); }
 async function runSequential(queries: Array<() => Promise<any>>): Promise<any[]> {
-  const results = [];
-  for (const query of queries) results.push(await query());
+  const results = []; for (const query of queries) results.push(await query());
   return results;
 }
 export async function getMatrizCollaboratorManagement(
@@ -47,6 +45,10 @@ export async function getMatrizCollaboratorManagement(
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
               mc.panel_role, mc.revoked_at IS NULL AS active,
+              CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_vendas,mc.job='vendedor' AND mc.work_area='sales') END AS allow_vendas,
+              CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_estoque,mc.job='vendedor' AND mc.work_area='sales') END AS allow_estoque,
+              CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_entregas,mc.job='entregador') END AS allow_entregas,
+              CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_financeiro,mc.panel_role IS NOT NULL) END AS allow_financeiro,
               finance.matriz_collaborator_employed_in_competence(
                 mc.environment,mc.id,$2::date) AS eligible_in_competence,
               cp.employment_type, COALESCE(cp.base_salary, 0) AS monthly_base_salary,
@@ -62,6 +64,7 @@ export async function getMatrizCollaboratorManagement(
               COALESCE(cr.settlement_frequency,'monthly') AS commission_settlement_frequency
          FROM network.matriz_collaborators mc
          JOIN network.partner_people pp ON pp.id = mc.person_id
+         LEFT JOIN network.matriz_collaborator_operation_permissions op ON op.collaborator_id=mc.id AND op.environment=mc.environment
          LEFT JOIN LATERAL (
            SELECT h.* FROM network.matriz_collaborator_compensation h
             WHERE h.collaborator_id=mc.id AND h.environment=mc.environment
@@ -241,6 +244,8 @@ export async function getMatrizCollaboratorManagement(
     const benefits = benefitsOf(p.benefits);
     const row: CollaboratorManagementRow = {
       ...p, active: Boolean(p.active),
+      allow_vendas: Boolean(p.allow_vendas), allow_estoque: Boolean(p.allow_estoque), allow_entregas: Boolean(p.allow_entregas),
+      allow_financeiro: Boolean(p.allow_financeiro),
       eligible_in_competence: Boolean(p.eligible_in_competence ?? p.active),
       base_salary: n(p.base_salary), monthly_base_salary: n(p.monthly_base_salary),
       payment_day: p.payment_day === null ? null : n(p.payment_day),

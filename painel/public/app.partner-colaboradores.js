@@ -27,6 +27,7 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
   return {
     partnerColaboradores: {
       rows: [], activeCount: 0, loading: false, error: null, notice: '', request: 0,
+      unitName: '', commissionTotal: 0,
       q: '', filter: 'active', selected: null, detail: emptyDetail(),
       detailLoading: false, detailError: null, saving: false,
       create: { open: false, name: '', username: '', password: '', role: 'colaborador', error: '' },
@@ -52,6 +53,8 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
         state.rows = (team.members || []).map((member) => ({
           ...member, ...(byId.get(member.id) || {}), active: member.active !== false && !byId.get(member.id)?.revoked_at,
         }));
+        state.unitName = team.unit_name || this.panelWorkplace?.unit_name || this.panelWorkplace?.name || 'Unidade';
+        state.commissionTotal = Number(team.commission_total || 0);
         state.activeCount = state.rows.filter((row) => row.active).length;
       } catch (_) {
         if (request === state.request) state.error = 'Não foi possível carregar os colaboradores.';
@@ -75,6 +78,46 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
     partnerColaboradoresInitials(row) {
       return String(row.name || row.label || row.username || '?').trim().split(/\s+/)
         .slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+    },
+    partnerColaboradoresAccessCount() {
+      return this.partnerColaboradores.rows.filter((row) => row.active && row.username).length;
+    },
+    partnerColaboradoresConfiguredCount() {
+      return this.partnerColaboradores.rows.filter((row) => row.active
+        && Boolean(row.compensation_starts_on)).length;
+    },
+    partnerColaboradoresSalaryTotal() {
+      return this.partnerColaboradores.rows.filter((row) => row.active)
+        .reduce((sum, row) => sum + Number(row.base_salary || 0), 0);
+    },
+    partnerColaboradoresBenefitsTotal() {
+      return this.partnerColaboradores.rows.filter((row) => row.active)
+        .reduce((sum, row) => sum + Number(row.benefits_total || 0), 0);
+    },
+    partnerColaboradoresPredictedCost() {
+      return this.partnerColaboradoresSalaryTotal() + this.partnerColaboradoresBenefitsTotal()
+        + Number(this.partnerColaboradores.commissionTotal || 0);
+    },
+    partnerColaboradoresWithoutCompensation() {
+      return this.partnerColaboradores.rows.filter((row) => row.active
+        && !row.compensation_starts_on).length;
+    },
+    partnerColaboradoresWithoutCommission() {
+      return this.partnerColaboradores.rows.filter((row) => row.active
+        && row.job_role === 'vendedor' && !row.commission_active).length;
+    },
+    partnerColaboradoresPermissionLabels(row) {
+      const labels = { vendas: 'Vendas', estoque: 'Estoque', pedidos: 'Pedidos', clientes: 'Clientes',
+        entregas: 'Entregas', retiradas: 'Retiradas', batepapo: 'Bate-papo', resumo: 'Resumo', financeiro: 'Financeiro' };
+      return Object.entries(row.permissions || {}).filter(([, enabled]) => enabled)
+        .map(([key]) => labels[key] || key).slice(0, 3);
+    },
+    partnerColaboradoresResult(row) {
+      const value = Number(row.commission_amount || 0);
+      return value > 0 ? `${this.formatCurrency(value)} de comissão` : 'Sem comissão no mês';
+    },
+    partnerColaboradoresMonthLabel() {
+      return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date());
     },
     partnerColaboradoresPermissionCount() {
       return Object.values(this.partnerColaboradores.detail.permissions).filter(Boolean).length;

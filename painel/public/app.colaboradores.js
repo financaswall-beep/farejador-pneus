@@ -54,6 +54,23 @@ window.PAINEL_MODULES.colaboradores = function () {
     get colabAcessoCount() {
       return this.colabAtivos.filter((c) => c.panel_role).length;
     },
+    get colabEmOperacaoCount() {
+      return this.colabAtivos.filter((c) => Number(c.sales_count || 0) > 0
+        || Number(c.deliveries_count || 0) > 0 || Number(c.trips_count || 0) > 0).length;
+    },
+    get colabBenefitsTotal() {
+      return this.colabAtivos.reduce((sum, c) => sum + Number(c.benefits_total || 0), 0);
+    },
+    get colabPredictedCost() {
+      return Number(this.colabSummary.base_salary_total || 0) + this.colabBenefitsTotal
+        + Number(this.colabSummary.commission_total || 0);
+    },
+    get colabSemRemuneracaoCount() {
+      return this.colabAtivos.filter((c) => !c.employment_type).length;
+    },
+    get colabSemComissaoCount() {
+      return this.colabAtivos.filter((c) => c.work_area === 'sales' && !c.commission_active).length;
+    },
     /** Quantos proprietários ATIVOS existem — com 1 só, o select dele tranca
      *  (espelho visual da trava last_owner_required do servidor, 0132). */
     get colabOwnersAtivos() {
@@ -83,6 +100,28 @@ window.PAINEL_MODULES.colaboradores = function () {
       let soma = 0;
       for (const ch of String(nome || '')) soma += ch.charCodeAt(0);
       return paleta[soma % paleta.length];
+    },
+    colabAccessChips(c) {
+      const chips = [];
+      if (c.panel_role === 'owner') chips.push('Todos os módulos');
+      else if (c.panel_role === 'admin') chips.push('Painel administrativo');
+      if (c.allow_vendas) chips.push('Vendas');
+      if (c.allow_estoque) chips.push('Estoque');
+      if (c.allow_entregas) chips.push('Logística');
+      if (c.allow_financeiro) chips.push('Financeiro');
+      return [...new Set(chips)].slice(0, 3);
+    },
+    colabResultLabel(c) {
+      if (Number(c.sales_count || 0) > 0) return `${c.sales_count} vendas · ${this.formatCurrency(c.revenue || 0)}`;
+      if (Number(c.deliveries_count || 0) > 0) return `${c.deliveries_count} entregas`;
+      if (Number(c.trips_count || 0) > 0) return `${c.trips_count} rotas`;
+      return 'Sem movimento no mês';
+    },
+    colabCompetenceLabel() {
+      const [year, month] = String(this.colabMes || '').split('-').map(Number);
+      if (!year || !month) return 'Competência atual';
+      return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' })
+        .format(new Date(Date.UTC(year, month - 1, 1)));
     },
     abrirNovoColaborador() {
       this.colabMsg = null;
