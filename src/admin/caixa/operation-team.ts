@@ -111,7 +111,7 @@ export async function saveMatrizOperationCompensation(input: {
   base_salary: number; salary_frequency: OperationCompensationPayload['salary_frequency'];
   payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
   starts_on: string; benefits: OperationBenefit[]; actor_label: string;
-}, db: Pool = defaultPool): Promise<OperationCompensationPayload> {
+}, db: Queryable = defaultPool): Promise<OperationCompensationPayload> {
   await saveMatrizCollaboratorCompensation({
     ...input, environment: env.FAREJADOR_ENV, payment_note: null,
   }, db);
@@ -156,7 +156,7 @@ export async function saveMatrizOperationCommissionRule(input: {
   value: number; active: boolean; starts_on: string; actor_label: string;
   itemized: boolean; item_rules: OperationCommissionItemRules;
   settlement_frequency: 'weekly' | 'monthly';
-}, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
+}, db: Queryable = defaultPool): Promise<OperationCommissionRulePayload> {
   const found = await findMember(input.collaborator_id, db);
   const salesRule = input.itemized && found?.source.work_area !== 'delivery';
   if (!found || (input.itemized && !salesRule)

@@ -15,6 +15,7 @@ import {
   getMatrizOperationPermissions,
   saveMatrizOperationPermissions,
 } from '../caixa/operation-team-permissions.js';
+import { saveMatrizFinancialConfiguration } from './matriz-financial-configuration.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
 const money = z.number().finite().min(0).max(10_000_000)
@@ -65,6 +66,14 @@ const commissionSchema = z.object({
   }
   if (!v.itemized && v.kind === 'fixed' && !['sale', 'delivery', 'trip'].includes(v.basis)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_rule' });
+  }
+});
+const financialConfigurationSchema = z.object({
+  compensation: compensationSchema,
+  commission: commissionSchema,
+}).superRefine((value, ctx) => {
+  if (value.compensation.collaborator_id !== value.commission.collaborator_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'collaborator_mismatch' });
   }
 });
 const operationPermissions = z.object({
@@ -130,6 +139,20 @@ export async function registerPainelColaboradoresGestao(fastify: FastifyInstance
     try {
       return reply.status(200).send(await saveMatrizOperationCommissionRule({ ...parsed.data, actor_label: operatorLabel(request) }));
     } catch (err) { return managementError(reply, err, 'collaborator commission save failed'); }
+  });
+
+  fastify.post('/admin/api/colaboradores/configuracao-financeira', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = financialConfigurationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    const actor = operatorLabel(request);
+    try {
+      return reply.status(200).send(await saveMatrizFinancialConfiguration(
+        { ...parsed.data.compensation, actor_label: actor },
+        { ...parsed.data.commission, actor_label: actor },
+      ));
+    } catch (err) { return managementError(reply, err, 'collaborator financial configuration save failed'); }
   });
 
   fastify.get('/admin/api/colaboradores/:collaboratorId/permissoes-operacao', {

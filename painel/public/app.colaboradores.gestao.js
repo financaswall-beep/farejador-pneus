@@ -29,15 +29,20 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       return this.colabAtivos.filter((c) => c.trips_count > 0 || c.work_area === 'delivery').sort((a, b) => b.deliveries_count - a.deliveries_count);
     },
     colabSetTab(tab) {
+      if (tab === 'comissoes') tab = 'remuneracao';
       this.colabTab = tab; this.colabDrawer = null; this.colabSelectedId = null;
       this.colabBusca = ''; this.colabCargoFiltro = ''; this.colabAcessoFiltro = '';
+      if (tab === 'remuneracao' && this.colabAtivos[0]) {
+        this.colabOpen(this.colabAtivos[0], 'financeiro-inline');
+      }
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async colabMesMudou() {
       this.colabDrawer = null; this.colabSelectedId = null; await this.loadColaboradores();
     },
     colabOpen(c, drawer) {
-      this.colabSelectedId = c.id; this.colabDrawer = drawer;
+      this.colabSelectedId = c.id;
+      this.colabDrawer = drawer === 'financeiro-inline' ? null : drawer;
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
       this.colabPerfilForm = { job_title: c.job_title || '', work_area: c.work_area || 'other' };
       this.colabRemForm = {
@@ -48,7 +53,8 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
         benefits: JSON.parse(JSON.stringify(c.benefits || [])),
       };
       this.colabComForm = {
-        kind: c.commission_kind || 'percent', basis: c.commission_basis || (c.work_area === 'delivery' ? 'delivery' : 'margin'),
+        kind: c.commission_kind || (c.work_area === 'delivery' ? 'fixed' : 'percent'),
+        basis: c.commission_basis || (c.work_area === 'delivery' ? 'delivery' : 'margin'),
         value: c.commission_value || '', starts_on: c.commission_starts_on ? String(c.commission_starts_on).slice(0, 10) : today,
         active: c.commission_active !== false, settlement_frequency: c.commission_settlement_frequency || 'monthly',
         itemized: c.work_area !== 'delivery' && !!c.commission_itemized,

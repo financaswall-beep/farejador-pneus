@@ -5,6 +5,8 @@ import type {
   OperationBenefit, OperationCommissionItemRules,
 } from '../../shared/operation-team.js';
 
+type Queryable = Pick<Pool, 'query'>;
+
 export interface MatrizCompensationInput {
   collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
   base_salary: number; payment_day: number; payment_method: 'pix' | 'transferencia' | 'dinheiro' | 'outro';
@@ -14,7 +16,7 @@ export interface MatrizCompensationInput {
 }
 
 export async function saveMatrizCollaboratorCompensation(
-  input: MatrizCompensationInput, dbPool: Pool = defaultPool,
+  input: MatrizCompensationInput, dbPool: Queryable = defaultPool,
 ) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const r = await dbPool.query(
@@ -50,7 +52,7 @@ export interface MatrizCommissionInput {
 }
 
 export async function saveMatrizCollaboratorCommission(
-  input: MatrizCommissionInput, dbPool: Pool = defaultPool,
+  input: MatrizCommissionInput, dbPool: Queryable = defaultPool,
 ) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const r = await dbPool.query(

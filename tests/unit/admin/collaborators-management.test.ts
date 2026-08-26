@@ -56,7 +56,8 @@ describe('gestão de colaboradores da matriz', () => {
     const migration = readFileSync(resolve('db/migrations/0133_matriz_collaborator_management.sql'), 'utf8');
     expect(tela).toContain('Com resultado no mês');
     expect(tela).toContain('Resumo da competência');
-    expect(tela).toContain("{id:'remuneracao',label:'Remuneração'}");
+    expect(tela).toContain("{id:'remuneracao',label:'Remuneração e comissões'}");
+    expect(tela).not.toContain("{id:'comissoes',label:'Comissões'}");
     expect(html).toContain('Folha de pagamento');
     expect(tela).not.toContain('<p class="text-xs text-gray-500">Vendedores</p>');
     expect(migration).toContain('sync_matriz_payroll_payment');

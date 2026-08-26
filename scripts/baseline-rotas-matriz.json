@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-26T04:58:43.709Z",
-  "total": 275,
+  "geradoEm": "2026-08-26T05:18:51.374Z",
+  "total": 277,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -92,6 +92,7 @@
     "GET /admin/painel/app.clientes.identity.js PUBLICA",
     "GET /admin/painel/app.clientes.js PUBLICA",
     "GET /admin/painel/app.clientes.kanban.js PUBLICA",
+    "GET /admin/painel/app.colaboradores.finance.js PUBLICA",
     "GET /admin/painel/app.colaboradores.gestao.js PUBLICA",
     "GET /admin/painel/app.colaboradores.js PUBLICA",
     "GET /admin/painel/app.comissoes.js PUBLICA",
@@ -196,6 +197,7 @@
     "POST /admin/api/colaboradores/ajustes/causal/revisar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/ajustes/remover GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/comissao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/colaboradores/configuracao-financeira GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/folha/fechar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/folha/pagar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/funcao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
