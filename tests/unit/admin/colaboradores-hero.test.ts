@@ -14,9 +14,9 @@ describe('Colaboradores — cabeçalho panorâmico', () => {
     expect(html).toContain('aria-label="Seções de Colaboradores"');
     expect(html).toContain('style="aspect-ratio: 5 / 1;"');
     expect(html).toContain('class="absolute inset-0 h-full w-full object-fill object-center"');
-    expect(html).toContain('class="grid items-start gap-4 lg:grid-cols-5 xl:grid-cols-3"');
-    expect(html).toContain('lg:col-span-2 xl:col-span-1');
-    expect(html).toContain('lg:col-span-3 xl:col-span-2');
+    expect(html).toContain('class="grid items-start gap-4 md:grid-cols-5 xl:grid-cols-3"');
+    expect(html).toContain('md:col-span-2 xl:col-span-1');
+    expect(html).toContain('md:col-span-3 xl:col-span-2');
     expect(html).toContain('class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center"');
     expect(html).toContain('@click="abrirNovoColaborador()"');
     expect(html).toContain('@click="colabSetTab(tab.id)"');
