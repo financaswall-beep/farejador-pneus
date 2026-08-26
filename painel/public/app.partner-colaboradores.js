@@ -225,10 +225,19 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
         open: true, name: '', username: '', password: '', role: 'colaborador', error: '',
       };
     },
+    partnerColaboradoresNormalizeUsername(value) {
+      return String(value || '').trim().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/\s+/g, '.').replace(/[^a-z0-9._-]+/g, '')
+        .replace(/\.{2,}/g, '.').replace(/^[._-]+|[._-]+$/g, '')
+        .slice(0, 60);
+    },
     async partnerColaboradoresCreate() {
       const state = this.partnerColaboradores;
       const form = state.create;
-      if (String(form.name).trim().length < 2 || String(form.username).trim().length < 3
+      const username = this.partnerColaboradoresNormalizeUsername(form.username);
+      form.username = username;
+      if (String(form.name).trim().length < 2 || username.length < 3
           || String(form.password).length < 12) {
         form.error = 'Preencha nome, usuário e uma senha com pelo menos 12 caracteres.';
         return;
@@ -237,7 +246,7 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
       form.error = '';
       try {
         await this.partnerApiWrite('equipe', 'POST', {
-          name: String(form.name).trim(), username: String(form.username).trim(),
+          name: String(form.name).trim(), username,
           password: form.password, role: form.role,
         });
         form.open = false;
@@ -245,7 +254,10 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
         state.notice = 'Colaborador criado.';
         await this.loadPartnerColaboradores();
       } catch (error) {
-        form.error = error?.code === 'username_taken' ? 'Este usuário já está em uso.' : 'Não foi possível criar o colaborador.';
+        const code = error?.code || error?.message;
+        form.error = code === 'username_taken' ? 'Este usuário já está em uso.'
+          : code === 'usuario_invalido' ? 'Use letras, números, ponto, traço ou sublinhado no usuário.'
+            : 'Não foi possível criar o colaborador.';
       } finally { state.saving = false; }
     },
 

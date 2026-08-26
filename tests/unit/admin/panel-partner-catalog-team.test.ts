@@ -163,7 +163,7 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
       'painel/public/app.partner-colaboradores.js', 'partnerColaboradores',
     ), { partnerApiWrite: write, partnerApiGet: get });
     app.partnerColaboradores.create = {
-      open: true, name: 'Ana Souza', username: 'ana', password: 'Senha-forte-123',
+      open: true, name: 'Ana Souza', username: 'Ána Souza', password: 'Senha-forte-123',
       role: 'vendedor', error: '',
     };
     await app.partnerColaboradoresCreate();
@@ -172,7 +172,7 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
     await app.partnerColaboradoresResetPassword();
     await app.partnerColaboradoresSetActive({ id: 'u1' }, false);
 
-    expect(write).toHaveBeenCalledWith('equipe', 'POST', expect.objectContaining({ username: 'ana' }));
+    expect(write).toHaveBeenCalledWith('equipe', 'POST', expect.objectContaining({ username: 'ana.souza' }));
     expect(write).toHaveBeenCalledWith('funcionarios/u1/reset-senha', 'POST', { password: 'Outra-senha-123' });
     expect(write).toHaveBeenCalledWith('funcionarios/u1', 'DELETE', {});
   });

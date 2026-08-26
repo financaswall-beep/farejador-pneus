@@ -11,6 +11,12 @@ function loadGestao(integrity: object = {}) {
   return (sandbox.window.PAINEL_MODULES as Record<string, () => Record<string, Function>>).colaboradoresGestao();
 }
 
+function loadColaboradores() {
+  const sandbox = { window: { PAINEL_MODULES: {} } };
+  vm.runInNewContext(source('painel/public/app.colaboradores.js'), sandbox);
+  return (sandbox.window.PAINEL_MODULES as Record<string, () => Record<string, Function>>).colaboradores();
+}
+
 describe('Colaboradores - dialogos e carregamento confiaveis', () => {
   const colaboradores = source('painel/public/app.colaboradores.js');
   const gestao = source('painel/public/app.colaboradores.gestao.js');
@@ -117,8 +123,25 @@ describe('Colaboradores - dialogos e carregamento confiaveis', () => {
     expect(html).toContain('x-show="!colabLoading && !colabLoadError && colabLoaded"');
   });
 
+  it('normaliza nome de usuário antes de cadastrar na Matriz', async () => {
+    const module = loadColaboradores();
+    const apiPost = vi.fn().mockResolvedValue({ created: true });
+    const context = {
+      colabForm: { display_name: 'João Silva', username: 'João Silva', password: 'Senha-forte-123', job_title: 'Vendedor', work_area: 'sales', panel_role: null },
+      colabSaving: false, colabMsg: null, colabShowForm: true,
+      apiPost, loadColaboradores: vi.fn(),
+      colabOperationalJob: module.colabOperationalJob,
+      colabNormalizeUsername: module.colabNormalizeUsername,
+    };
+
+    await module.criarColaborador.call(context);
+
+    expect(apiPost).toHaveBeenCalledWith('/admin/api/colaboradores', expect.objectContaining({ username: 'joao.silva' }));
+    expect(context.colabShowForm).toBe(false);
+  });
+
   it('invalida o cache dos tres scripts alterados', () => {
-    expect(html).toContain('app.colaboradores.js?v=20260826-permissions2');
+    expect(html).toContain('app.colaboradores.js?v=20260826-username1');
     expect(html).toContain('app.colaboradores.gestao.js?v=20260826-permissions2');
     expect(html).toContain('app.colaboradores.permissions.js?v=20260826-permissions2');
     expect(html).toContain('app.js?v=20260826-permissions2');

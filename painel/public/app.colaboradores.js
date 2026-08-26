@@ -35,6 +35,13 @@ window.PAINEL_MODULES.colaboradores = function () {
     colabOperationalJob(area) {
       return area === 'sales' ? 'vendedor' : area === 'delivery' ? 'entregador' : 'colaborador';
     },
+    colabNormalizeUsername(value) {
+      return String(value || '').trim().normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/\s+/g, '.').replace(/[^a-z0-9._-]+/g, '')
+        .replace(/\.{2,}/g, '.').replace(/^[._-]+|[._-]+$/g, '')
+        .slice(0, 60);
+    },
     colabAccessLabel(role) {
       if (role === 'owner') return 'Proprietário';
       if (role === 'admin') return 'Administrador';
@@ -131,7 +138,9 @@ window.PAINEL_MODULES.colaboradores = function () {
 
     async criarColaborador() {
       const f = this.colabForm;
-      if (!f.display_name.trim() || !f.username.trim() || !f.password) {
+      const username = this.colabNormalizeUsername(f.username);
+      f.username = username;
+      if (!f.display_name.trim() || username.length < 3 || !f.password) {
         this.colabMsg = { ok: false, text: 'Preenche nome, usuário e senha.' };
         return;
       }
@@ -144,7 +153,7 @@ window.PAINEL_MODULES.colaboradores = function () {
       try {
         await this.apiPost('/admin/api/colaboradores', {
           display_name: f.display_name.trim(),
-          username: f.username.trim(),
+          username,
           password: f.password,
           job: this.colabOperationalJob(f.work_area),
           job_title: f.job_title.trim(),
@@ -158,7 +167,9 @@ window.PAINEL_MODULES.colaboradores = function () {
       } catch (err) {
         this.colabMsg = err.message === 'username_taken'
           ? { ok: false, text: 'Esse usuário já existe na rede — escolhe outro.' }
-          : { ok: false, text: `Não consegui cadastrar (${err.message}).` };
+          : err.message === 'usuario_invalido'
+            ? { ok: false, text: 'Usuário inválido. Use letras, números, ponto, traço ou sublinhado.' }
+            : { ok: false, text: `Não consegui cadastrar (${err.message}).` };
       } finally {
         this.colabSaving = false;
       }
