@@ -28,7 +28,8 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
     partnerColaboradores: {
       rows: [], activeCount: 0, loading: false, error: null, notice: '', request: 0,
       unitName: '', commissionTotal: 0,
-      q: '', filter: 'active', selected: null, detail: emptyDetail(),
+      tab: 'equipe', q: '', filter: 'active', remunerationFilter: 'all',
+      selected: null, detail: emptyDetail(),
       detailLoading: false, detailError: null, saving: false,
       create: { open: false, name: '', username: '', password: '', role: 'colaborador', error: '' },
       password: { open: false, value: '', error: '' },
@@ -56,6 +57,7 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
         state.unitName = team.unit_name || this.panelWorkplace?.unit_name || this.panelWorkplace?.name || 'Unidade';
         state.commissionTotal = Number(team.commission_total || 0);
         state.activeCount = state.rows.filter((row) => row.active).length;
+        if (state.selected?.id) state.selected = state.rows.find((row) => row.id === state.selected.id) || null;
       } catch (_) {
         if (request === state.request) state.error = 'Não foi possível carregar os colaboradores.';
       } finally {

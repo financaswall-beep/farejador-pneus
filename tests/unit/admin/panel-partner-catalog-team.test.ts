@@ -120,6 +120,42 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
     }));
   });
 
+  it('calcula a remuneração mensal sem misturar colaboradores inativos', () => {
+    const finance = moduleOf(
+      'painel/public/app.partner-colaboradores.finance.js', 'partnerColaboradoresFinance',
+    );
+    const app = appWith(finance, {
+      formatCurrency: (value: number) => `R$ ${value}`,
+      partnerColaboradores: {
+        q: '', remunerationFilter: 'all', selected: null,
+        commissionTotal: 80,
+        rows: [
+          { id: 'u1', active: true, base_salary: 1_200, salary_frequency: 'monthly', benefits_total: 100, commission_amount: 50 },
+          { id: 'u2', active: true, base_salary: 300, salary_frequency: 'weekly', benefits_total: 25, commission_amount: 30 },
+          { id: 'u3', active: false, base_salary: 9_000, salary_frequency: 'monthly', benefits_total: 0, commission_amount: 0 },
+        ],
+        detail: { compensation: { base_salary: 0, salary_frequency: 'monthly', benefits: [] } },
+      },
+    });
+
+    expect(app.partnerColaboradoresMonthlySalaryTotal()).toBe(2_500);
+    expect(app.partnerColaboradoresFinancialTotal(app.partnerColaboradores.rows[0])).toBe(1_350);
+    expect(app.partnerColaboradoresRemunerationRows().map((row: any) => row.id)).toEqual(['u1', 'u2']);
+  });
+
+  it('expõe a subaba completa e libera seu módulo estático', () => {
+    const html = source('painel/public/index.html');
+    const staticRoute = source('src/admin/painel/route-static.ts');
+    const montagem = source('painel/public/app.montagem.js');
+
+    expect(html).toContain('Remuneração e comissões');
+    expect(html).toContain('Remuneração da equipe');
+    expect(html).toContain('Total previsto no mês');
+    expect(html).toContain('partnerColaboradoresSave()');
+    expect(staticRoute).toContain('app.partner-colaboradores.finance.js');
+    expect(montagem).toContain('window.PAINEL_MODULES.partnerColaboradoresFinance');
+  });
+
   it('cria, redefine senha e revoga usando só partnerApiWrite', async () => {
     const write = vi.fn().mockResolvedValue({ ok: true });
     const get = vi.fn().mockResolvedValue({ members: [], rows: [] });
@@ -144,9 +180,11 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
   it('mantém os adaptadores pequenos e sem rotas/dados administrativos', () => {
     const catalog = source('painel/public/app.partner-catalogo.js');
     const team = source('painel/public/app.partner-colaboradores.js');
+    const finance = source('painel/public/app.partner-colaboradores.finance.js');
     expect(catalog.split(/\r?\n/).length).toBeLessThanOrEqual(300);
     expect(team.split(/\r?\n/).length).toBeLessThanOrEqual(300);
-    for (const body of [catalog, team]) {
+    expect(finance.split(/\r?\n/).length).toBeLessThanOrEqual(120);
+    for (const body of [catalog, team, finance]) {
       expect(body).not.toContain('/admin/api');
       expect(body).not.toMatch(/\bapiGet\b|\bapiPost\b|\bapiPut\b/);
     }
