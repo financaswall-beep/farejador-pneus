@@ -84,6 +84,7 @@ describe('remuneração e comissões unificadas', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
     const sideBySide = 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]';
     expect(html.split(sideBySide)).toHaveLength(3);
+    expect(html).toContain('tailwind.css?v=20260826-colab-layout1');
     expect(html).toContain('partnerColaboradores.detail.compensation.employment_type');
     expect(html).toContain('colabRemForm.employment_type');
     expect(html.split('mt-2 grid grid-cols-4 gap-1.5').length).toBeGreaterThanOrEqual(4);
