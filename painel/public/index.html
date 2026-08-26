@@ -6240,13 +6240,13 @@
     <!-- ═══ TELA: COLABORADORES — equipe, remuneração, comissão, folha e desempenho (0133) ═══ -->
     <!-- ═══ COLABORADORES — PARCEIRO / OWNER-ONLY ═══ -->
     <div x-show="currentPage === 'colaboradores' && isPartnerPanel()" x-cloak class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="partner-colaboradores-heading" style="aspect-ratio: 5 / 1;" class="relative min-h-[210px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
-        <img src="/admin/painel/assets/colaboradores-hero-v2.webp?v=20260826-colaboradores-banner2" alt="Equipe trabalhando em conjunto no galpão" class="absolute inset-0 h-full w-full object-fill object-center">
-        <div class="absolute inset-0 z-20 flex flex-col justify-center gap-5 px-7 py-7 lg:flex-row lg:items-center lg:justify-between lg:px-10">
-          <div><h1 id="partner-colaboradores-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px]">Colaboradores</h1><p class="mt-3 max-w-lg text-sm text-gray-600">Equipe, acessos, remuneração e desempenho da unidade</p></div>
-          <div class="flex w-full max-w-xs flex-col gap-3">
-            <div class="rounded-xl border border-white/70 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm"><div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="store" class="h-5 w-5"></i></span><div class="min-w-0"><p class="text-xs text-gray-500">Unidade</p><b class="block truncate text-sm" x-text="partnerColaboradores.unitName || panelWorkplace?.unit_name || 'Unidade'"></b></div></div><p class="mt-2 flex items-center gap-2 border-t pt-2 text-xs text-emerald-800"><i data-lucide="circle-check" class="h-4 w-4"></i>Dados somente desta unidade</p></div>
-            <button @click="partnerColaboradoresOpenCreate()" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-900 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><i data-lucide="user-plus" class="h-4 w-4"></i>Novo colaborador</button>
+      <section aria-labelledby="partner-colaboradores-heading" class="relative min-h-[176px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm sm:min-h-[148px]">
+        <img src="/admin/painel/assets/colaboradores-hero-v2.webp?v=20260826-colaboradores-banner2" alt="Equipe trabalhando em conjunto no galpão" class="absolute inset-0 h-full w-full object-cover object-top">
+        <div class="absolute inset-0 z-20 flex flex-col justify-center gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+          <div><h1 id="partner-colaboradores-heading" class="text-2xl font-bold tracking-tight text-gray-950 lg:text-3xl">Colaboradores</h1><p class="mt-1.5 max-w-lg text-sm text-gray-600">Equipe, acessos, remuneração e desempenho da unidade</p></div>
+          <div class="flex w-full items-center gap-2 sm:w-auto">
+            <div class="min-w-0 flex-1 rounded-xl border border-white/70 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:w-48 sm:flex-none"><div class="flex items-center gap-2"><span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="store" class="h-4 w-4"></i></span><div class="min-w-0"><p class="text-[11px] text-gray-500">Unidade</p><b class="block truncate text-sm" x-text="partnerColaboradores.unitName || panelWorkplace?.unit_name || 'Unidade'"></b></div></div></div>
+            <button @click="partnerColaboradoresOpenCreate()" class="inline-flex min-h-10 flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-900 px-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"><i data-lucide="user-plus" class="h-4 w-4"></i><span class="hidden md:inline">Novo colaborador</span><span class="md:hidden">Novo</span></button>
           </div>
         </div>
       </section>
@@ -6338,18 +6338,18 @@
       <div x-show="partnerColaboradores.password.open" class="fixed inset-0 z-[90] flex items-end justify-center bg-gray-950/50 sm:items-center sm:p-6" @click.self="partnerColaboradores.password.open=false"><form @submit.prevent="partnerColaboradoresResetPassword()" class="w-full rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl"><h2 class="text-xl font-bold">Redefinir senha</h2><input type="password" x-model="partnerColaboradores.password.value" placeholder="Nova senha com 12+ caracteres" class="mt-4 w-full rounded-lg border p-3"><p x-show="partnerColaboradores.password.error" class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700" x-text="partnerColaboradores.password.error"></p><div class="mt-4 grid grid-cols-2 gap-2"><button type="button" @click="partnerColaboradores.password.open=false" class="rounded-lg border p-3 font-bold">Cancelar</button><button type="submit" :disabled="partnerColaboradores.saving" class="rounded-lg bg-emerald-800 p-3 font-bold text-white disabled:opacity-50">Redefinir</button></div></form></div>
     </div>
     <div x-show="currentPage === 'colaboradores' && isMatrixPanel()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="colaboradores-heading" style="aspect-ratio: 5 / 1;"
-               class="relative mb-0 min-h-[210px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+      <section aria-labelledby="colaboradores-heading"
+               class="relative mb-0 min-h-[176px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm sm:min-h-[148px]">
         <img src="/admin/painel/assets/colaboradores-hero-v2.webp?v=20260826-colaboradores-banner2"
              alt="Equipe da 2W Pneus trabalhando em conjunto no galpão"
-             class="absolute inset-0 h-full w-full object-fill object-center">
-        <div class="absolute inset-0 z-20 flex flex-col justify-center gap-5 px-8 py-7 sm:flex-row sm:items-center sm:justify-between xl:px-10">
+             class="absolute inset-0 h-full w-full object-cover object-top">
+        <div class="absolute inset-0 z-20 flex flex-col justify-center gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-10">
           <div>
             <h1 id="colaboradores-heading"
-                class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Colaboradores</h1>
-            <p class="mt-3 max-w-md text-sm text-gray-600">Equipe, acessos, remuneração e desempenho da Matriz</p>
+                class="text-2xl font-bold tracking-tight text-gray-950 lg:text-3xl lg:leading-tight">Colaboradores</h1>
+            <p class="mt-1.5 max-w-md text-sm text-gray-600">Equipe, acessos, remuneração e desempenho da Matriz</p>
           </div>
-          <div class="flex w-full max-w-xs flex-col gap-3"><div class="rounded-xl border border-white/70 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm"><div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="warehouse" class="h-5 w-5"></i></span><div><p class="text-xs text-gray-500">Unidade</p><b class="text-sm">Matriz</b></div></div><p class="mt-2 flex items-center gap-2 border-t pt-2 text-xs text-emerald-800"><i data-lucide="circle-check" class="h-4 w-4"></i>Dados da operação central</p></div><button @click="abrirNovoColaborador()" type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"><i data-lucide="user-plus" class="h-4 w-4"></i>Novo colaborador</button></div>
+          <div class="flex w-full items-center gap-2 sm:w-auto"><div class="min-w-0 flex-1 rounded-xl border border-white/70 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm sm:w-44 sm:flex-none"><div class="flex items-center gap-2"><span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="warehouse" class="h-4 w-4"></i></span><div><p class="text-[11px] text-gray-500">Unidade</p><b class="text-sm">Matriz</b></div></div></div><button @click="abrirNovoColaborador()" type="button" class="inline-flex min-h-10 flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-900 px-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"><i data-lucide="user-plus" class="h-4 w-4"></i><span class="hidden md:inline">Novo colaborador</span><span class="md:hidden">Novo</span></button></div>
         </div>
       </section>
 
