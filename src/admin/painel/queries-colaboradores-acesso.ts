@@ -220,3 +220,24 @@ export async function resetMatrizCollaboratorPassword(
     client.release();
   }
 }
+
+/** Encerra as sessões do colaborador sem mudar senha, papel ou vínculo. */
+export async function endMatrizCollaboratorSessions(
+  input: { environment?: 'prod' | 'test'; id: string },
+  dbPool: Pool = defaultPool,
+): Promise<{ ended: boolean }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const result = await dbPool.query(
+    `UPDATE network.matriz_staff_sessions s SET revoked_at=now()
+      FROM network.matriz_collaborators mc
+      WHERE mc.environment=$1 AND mc.id=$2 AND mc.person_id=s.person_id
+        AND s.environment=mc.environment AND s.revoked_at IS NULL
+      RETURNING s.person_id`,
+    [environment, input.id],
+  );
+  const collaborator = await dbPool.query(
+    `SELECT id FROM network.matriz_collaborators WHERE environment=$1 AND id=$2`,
+    [environment, input.id],
+  );
+  return { ended: (collaborator.rowCount ?? 0) === 1 || (result.rowCount ?? 0) > 0 };
+}

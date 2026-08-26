@@ -196,33 +196,6 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabSaving = false;
       }
     },
-    async colabCarregarPermissoes(c) {
-      if (!c?.id) return;
-      this.colabPermLoading = true;
-      try {
-        const payload = await this.apiGet(`/admin/api/colaboradores/${c.id}/permissoes-operacao`);
-        this.colabPermForm = {
-          vendas: !!payload.permissions?.vendas,
-          entregas: !!payload.permissions?.entregas,
-          financeiro: !!payload.permissions?.financeiro,
-        };
-        this.colabPermAvailable = payload.available_permissions || [];
-        this.colabPermLocked = !!payload.locked;
-      } catch (err) {
-        this.colabMsg = { ok: false, text: `Não consegui carregar as permissões (${err.message}).` };
-      } finally { this.colabPermLoading = false; }
-    },
-    async colabSalvarPermissoes() {
-      const c = this.colabSelected; if (!c || this.colabPermLocked) return;
-      this.colabSaving = true; this.colabMsg = null;
-      try {
-        await this.apiPut(`/admin/api/colaboradores/${c.id}/permissoes-operacao`, this.colabPermForm);
-        this.colabMsg = { ok: true, text: `Permissões de ${c.display_name} atualizadas. O login anterior foi encerrado por segurança.` };
-        this.colabCloseDrawer();
-      } catch (err) {
-        this.colabMsg = { ok: false, text: `Não consegui salvar as permissões (${err.message}).` };
-      } finally { this.colabSaving = false; }
-    },
     trocarSenhaColaborador(c) {
       this.abrirColabDialog('password', c);
     },

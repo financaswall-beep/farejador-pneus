@@ -5,13 +5,16 @@ window.PAINEL_MODULES.partnerColaboradoresFinance = function () {
   return {
     partnerColaboradoresSetTab(tab) {
       const state = this.partnerColaboradores;
-      if (!['equipe', 'remuneracao'].includes(tab)) return;
+      if (!['equipe', 'remuneracao', 'permissoes'].includes(tab)) return;
       state.tab = tab;
       state.notice = '';
       if (tab === 'equipe') state.selected = null;
       else if (!state.selected) {
         const first = state.rows.find((row) => row.active);
-        if (first) this.partnerColaboradoresOpen(first);
+        if (first) {
+          if (tab === 'permissoes') this.partnerColaboradoresOpenPermissions(first);
+          else this.partnerColaboradoresOpen(first);
+        }
       }
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },

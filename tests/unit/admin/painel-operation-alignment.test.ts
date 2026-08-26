@@ -7,7 +7,7 @@ const source = (file: string) => readFileSync(resolve(file), 'utf8');
 describe('alinhamento dos painéis administrativos com a Operação da Loja', () => {
   const matrixHtml = source('painel/public/index.html');
   const matrixUi = source('painel/public/app.colaboradores.gestao.js');
-  const matrixPermissions = source('painel/public/app.colaboradores.js');
+  const matrixPermissions = source('painel/public/app.colaboradores.permissions.js');
   const matrixRoutes = source('src/admin/painel/route-colaboradores-gestao.ts');
   const partnerHtml = source('parceiro/public/index.html');
   const partnerUi = source('parceiro/public/app.config.equipe.js');

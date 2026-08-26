@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { MatrizCollaboratorUsernameTakenError, MatrizLastOwnerError, createMatrizCollaborator, listMatrizCollaborators, reactivateMatrizCollaborator, resetMatrizCollaboratorPassword, revokeMatrizCollaborator, updateMatrizCollaboratorJob, updateMatrizCollaboratorPanelRole } from './queries.js';
+import { MatrizCollaboratorUsernameTakenError, MatrizLastOwnerError, createMatrizCollaborator, endMatrizCollaboratorSessions, listMatrizCollaborators, reactivateMatrizCollaborator, resetMatrizCollaboratorPassword, revokeMatrizCollaborator, updateMatrizCollaboratorJob, updateMatrizCollaboratorPanelRole } from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 
 export async function registerPainelColaboradores(fastify: FastifyInstance): Promise<void> {
@@ -145,6 +145,20 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel colaboradores senha failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/colaboradores/encerrar-sessoes', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = idColaboradorSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await endMatrizCollaboratorSessions(parsed.data);
+      if (!result.ended) return reply.status(404).send({ error: 'collaborator_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel colaboradores sessions revoke failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

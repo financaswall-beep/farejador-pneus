@@ -3237,6 +3237,25 @@ export async function listPartnerFuncionarios(ctx: PartnerContext): Promise<Part
   return res.rows;
 }
 
+/** Encerra todas as sessões do funcionário sem alterar senha, vínculo ou permissões. */
+export async function endPartnerFuncionarioSessions(
+  ctx: PartnerContext,
+  tokenId: string,
+): Promise<{ ended: boolean }> {
+  const target = await pool.query(
+    `SELECT id FROM network.partner_access_tokens
+      WHERE id=$1 AND environment=$2 AND partner_unit_id=$3 AND role='funcionario'`,
+    [tokenId, ctx.environment, ctx.partnerUnitId],
+  );
+  if ((target.rowCount ?? 0) !== 1) return { ended: false };
+  await pool.query(
+    `UPDATE network.partner_sessions SET revoked_at=now()
+      WHERE environment=$1 AND token_id=$2 AND revoked_at IS NULL`,
+    [ctx.environment, tokenId],
+  );
+  return { ended: true };
+}
+
 /** Revoga (desativa) um login de funcionário da própria unidade. */
 export async function revokePartnerFuncionario(
   ctx: PartnerContext,

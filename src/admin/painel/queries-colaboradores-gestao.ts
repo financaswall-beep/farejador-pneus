@@ -5,11 +5,10 @@ import { hasMatrizPayrollSchema } from './payroll-schema.js';
 import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
 import { commissionItemRulesOf, type OperationCommissionItemRules } from '../../shared/operation-team.js';
 type Queryable = Pick<Pool, 'query'>;
-type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
-type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
+type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other'; type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
 export interface CollaboratorManagementRow {
   id: string; display_name: string; username: string; job: string; job_title: string;
-  work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean;
+  work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean; last_used_at: string | null;
   allow_vendas: boolean; allow_estoque: boolean; allow_entregas: boolean; allow_financeiro: boolean;
   eligible_in_competence: boolean;
   employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
@@ -26,7 +25,6 @@ export interface CollaboratorManagementRow {
   payroll_item_id: string | null; payroll_status: 'preview' | 'pending' | 'paid';
   payroll_due_date: string | null; payroll_paid_at: string | null; source_expense_id: string | null;
 }
-
 function n(value: unknown): number { return Number(value ?? 0); }
 async function runSequential(queries: Array<() => Promise<any>>): Promise<any[]> {
   const results = []; for (const query of queries) results.push(await query());
@@ -44,7 +42,7 @@ export async function getMatrizCollaboratorManagement(
   const [people, performance, adjustments, payroll, adjustmentDetails] = await runSequential([
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
-              mc.panel_role, mc.revoked_at IS NULL AS active,
+              mc.panel_role, mc.revoked_at IS NULL AS active, sessions.last_used_at,
               CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_vendas,mc.job='vendedor' AND mc.work_area='sales') END AS allow_vendas,
               CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_estoque,mc.job='vendedor' AND mc.work_area='sales') END AS allow_estoque,
               CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_entregas,mc.job='entregador') END AS allow_entregas,
@@ -65,6 +63,9 @@ export async function getMatrizCollaboratorManagement(
          FROM network.matriz_collaborators mc
          JOIN network.partner_people pp ON pp.id = mc.person_id
          LEFT JOIN network.matriz_collaborator_operation_permissions op ON op.collaborator_id=mc.id AND op.environment=mc.environment
+         LEFT JOIN LATERAL (SELECT max(s.last_used_at) AS last_used_at
+           FROM network.matriz_staff_sessions s
+          WHERE s.environment=mc.environment AND s.person_id=mc.person_id) sessions ON true
          LEFT JOIN LATERAL (
            SELECT h.* FROM network.matriz_collaborator_compensation h
             WHERE h.collaborator_id=mc.id AND h.environment=mc.environment
@@ -235,7 +236,6 @@ export async function getMatrizCollaboratorManagement(
        HAVING a.amount-COALESCE(sum(al.amount),0)>0
         ORDER BY a.created_at,a.id`, [environment, competence]),
   ]);
-
   const perf = new Map(performance.rows.map((r: any) => [r.id, r]));
   const adj = new Map(adjustments.rows.map((r: any) => [r.collaborator_id, r]));
   const frozen = new Map(payroll.rows.map((r: any) => [r.collaborator_id, r]));

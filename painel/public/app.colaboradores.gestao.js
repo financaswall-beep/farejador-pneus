@@ -35,6 +35,9 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       if (tab === 'remuneracao' && this.colabAtivos[0]) {
         this.colabOpen(this.colabAtivos[0], 'financeiro-inline');
       }
+      if (tab === 'permissoes' && this.colabAtivos[0]) {
+        this.colabOpenPermissions(this.colabAtivos[0]);
+      }
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async colabMesMudou() {

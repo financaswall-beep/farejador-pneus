@@ -29,6 +29,7 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
       rows: [], activeCount: 0, loading: false, error: null, notice: '', request: 0,
       unitName: '', commissionTotal: 0,
       tab: 'equipe', q: '', filter: 'active', remunerationFilter: 'all',
+      permissionModel: 'custom',
       selected: null, detail: emptyDetail(),
       detailLoading: false, detailError: null, saving: false,
       create: { open: false, name: '', username: '', password: '', role: 'colaborador', error: '' },
@@ -124,7 +125,6 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
     partnerColaboradoresPermissionCount() {
       return Object.values(this.partnerColaboradores.detail.permissions).filter(Boolean).length;
     },
-
     async partnerColaboradoresOpen(row) {
       const state = this.partnerColaboradores;
       state.selected = row;

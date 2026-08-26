@@ -26,7 +26,7 @@ describe('retiradas no painel único', () => {
     expect(nav).toContain("scopes: ['matrix', 'partner'], requires: 'retiradas'");
     expect(nav).toContain("partnerLoad: ['loadPartnerRetiradas']");
     expect(html).toContain("currentPage === 'retiradas'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260825-price-compare1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260826-colab-layout1');
     expect(html).toContain('data-pickup-workspace');
     expect(html).toContain('data-pickup-detail-panel');
     expect(html).toContain('[data-pickup-detail-panel]{position:static!important');

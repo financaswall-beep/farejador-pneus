@@ -102,6 +102,7 @@ import {
   createPartnerFuncionario,
   resetPartnerFuncionarioPassword,
   listPartnerFuncionarios,
+  endPartnerFuncionarioSessions,
   revokePartnerFuncionario,
   setOwnPartnerCredentials,
   revokePartnerSession,
@@ -641,6 +642,14 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
     const result = await resetPartnerFuncionarioPassword(getPartnerContext(request), params.data.tokenId, body.data.password);
     if (!result.reset) return reply.status(404).send({ error: 'funcionario_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  fastify.post('/parceiro/:slug/api/funcionarios/:tokenId/encerrar-sessoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const params = funcionarioParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    const result = await endPartnerFuncionarioSessions(getPartnerContext(request), params.data.tokenId);
+    if (!result.ended) return reply.status(404).send({ error: 'funcionario_not_found' });
     return reply.status(200).send(result);
   });
 

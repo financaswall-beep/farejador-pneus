@@ -80,7 +80,7 @@ describe('catalogo no painel', () => {
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260825-price-compare1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260826-colab-layout1');
     expect(html).toContain('app.catalogo.js?v=20260823-fitment1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
@@ -406,7 +406,7 @@ describe('catalogo no painel', () => {
       "discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 }",
     );
     const html = readFileSync('painel/public/index.html', 'utf8');
-    expect(html).toContain('app.js?v=20260825-price-compare1');
+    expect(html).toContain('app.js?v=20260826-permissions1');
   });
 
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {

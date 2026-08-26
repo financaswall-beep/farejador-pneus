@@ -181,10 +181,12 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
     const catalog = source('painel/public/app.partner-catalogo.js');
     const team = source('painel/public/app.partner-colaboradores.js');
     const finance = source('painel/public/app.partner-colaboradores.finance.js');
+    const permissions = source('painel/public/app.partner-colaboradores.permissions.js');
     expect(catalog.split(/\r?\n/).length).toBeLessThanOrEqual(300);
     expect(team.split(/\r?\n/).length).toBeLessThanOrEqual(300);
     expect(finance.split(/\r?\n/).length).toBeLessThanOrEqual(120);
-    for (const body of [catalog, team, finance]) {
+    expect(permissions.split(/\r?\n/).length).toBeLessThanOrEqual(120);
+    for (const body of [catalog, team, finance, permissions]) {
       expect(body).not.toContain('/admin/api');
       expect(body).not.toMatch(/\bapiGet\b|\bapiPost\b|\bapiPut\b/);
     }

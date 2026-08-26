@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-26T05:18:51.374Z",
-  "total": 277,
+  "geradoEm": "2026-08-26T06:26:48.715Z",
+  "total": 280,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -95,6 +95,7 @@
     "GET /admin/painel/app.colaboradores.finance.js PUBLICA",
     "GET /admin/painel/app.colaboradores.gestao.js PUBLICA",
     "GET /admin/painel/app.colaboradores.js PUBLICA",
+    "GET /admin/painel/app.colaboradores.permissions.js PUBLICA",
     "GET /admin/painel/app.comissoes.js PUBLICA",
     "GET /admin/painel/app.compras.acoes.js PUBLICA",
     "GET /admin/painel/app.compras.historico.js PUBLICA",
@@ -132,6 +133,7 @@
     "GET /admin/painel/app.partner-catalogo.js PUBLICA",
     "GET /admin/painel/app.partner-colaboradores.finance.js PUBLICA",
     "GET /admin/painel/app.partner-colaboradores.js PUBLICA",
+    "GET /admin/painel/app.partner-colaboradores.permissions.js PUBLICA",
     "GET /admin/painel/app.partner-compras.js PUBLICA",
     "GET /admin/painel/app.partner-estoque.js PUBLICA",
     "GET /admin/painel/app.partner-financeiro.js PUBLICA",
@@ -198,6 +200,7 @@
     "POST /admin/api/colaboradores/ajustes/remover GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/comissao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/configuracao-financeira GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/colaboradores/encerrar-sessoes GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/folha/fechar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/folha/pagar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/colaboradores/funcao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
