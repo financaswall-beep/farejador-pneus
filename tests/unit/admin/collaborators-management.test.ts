@@ -37,6 +37,7 @@ describe('gestão de colaboradores da matriz', () => {
       ] };
       if (sql.includes('WITH retail AS')) return { rows: [{ id: 'c1', sales_count: 10, revenue: '12000', margin: '5000', items_without_cost: 0, commission_amount: '100', deliveries_count: 0, trips_count: 0, distance_km: 0, on_time_pct: null }] };
       if (sql.includes('matriz_payroll_adjustments')) return { rows: [{ collaborator_id: 'c1', additions: '300', deductions: '120' }] };
+      if (sql.includes('matriz_payroll_assignment_gaps')) return { rows: [{ missing_count: 0 }] };
       if (sql.includes('matriz_payroll_periods p')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql.slice(0, 40)}`);
     });

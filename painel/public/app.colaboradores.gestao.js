@@ -15,9 +15,6 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
     get colabComissaoRows() {
       return this.colabAtivos.filter((c) => c.commission_active || c.work_area === 'sales' || c.work_area === 'delivery');
     },
-    get colabFolhaRows() {
-      return this.colaboradores.filter((c) => c.payroll_item_id || (c.active && (c.employment_type || c.commission_active || c.additions || c.deductions)));
-    },
     get colabSelectedAdjustments() {
       if (!this.colabSelectedId) return [];
       return this.colabAdjustments.filter((adjustment) => adjustment.collaborator_id === this.colabSelectedId);

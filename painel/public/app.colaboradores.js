@@ -16,6 +16,7 @@ window.PAINEL_MODULES.colaboradores = function () {
           ...adjustment, review_amount: adjustment.amount ?? '',
         }));
         this.colabSummary = payload.summary || {};
+        this.colabPayrollHistory = payload.payroll_history || [];
         this.colabLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       } catch (err) {

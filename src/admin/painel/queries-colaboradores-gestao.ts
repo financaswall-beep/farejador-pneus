@@ -2,30 +2,9 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
-import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
-import { commissionItemRulesOf, type OperationCommissionItemRules } from '../../shared/operation-team.js';
+import { buildMatrizCollaboratorManagement } from './queries-colaboradores-payroll-summary.js';
 type Queryable = Pick<Pool, 'query'>;
-type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other'; type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
-export interface CollaboratorManagementRow {
-  id: string; display_name: string; username: string; job: string; job_title: string;
-  work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean; last_used_at: string | null;
-  allow_vendas: boolean; allow_estoque: boolean; allow_entregas: boolean; allow_financeiro: boolean;
-  eligible_in_competence: boolean;
-  employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
-  salary_frequency: 'weekly' | 'monthly';
-  payment_method: string | null; payment_note: string | null; compensation_starts_on: string | null;
-  benefits: OperationBenefit[]; benefits_total: number;
-  commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
-  commission_value: number; commission_starts_on: string | null; commission_active: boolean;
-  commission_itemized: boolean; commission_item_rules: OperationCommissionItemRules;
-  commission_settlement_frequency: 'weekly' | 'monthly';
-  sales_count: number; revenue: number; margin: number; items_without_cost: number; deliveries_count: number;
-  trips_count: number; distance_km: number; on_time_pct: number | null;
-  additions: number; deductions: number; commission_amount: number; total_due: number;
-  payroll_item_id: string | null; payroll_status: 'preview' | 'pending' | 'paid';
-  payroll_due_date: string | null; payroll_paid_at: string | null; source_expense_id: string | null;
-}
-function n(value: unknown): number { return Number(value ?? 0); }
+export type { CollaboratorManagementRow } from './queries-colaboradores-payroll-summary.js';
 async function runSequential(queries: Array<() => Promise<any>>): Promise<any[]> {
   const results = []; for (const query of queries) results.push(await query());
   return results;
@@ -38,8 +17,8 @@ export async function getMatrizCollaboratorManagement(
   if (!(await hasMatrizPayrollSchema(db))) throw new Error('collaborator_management_unavailable');
   // closeMatrizPayroll chama esta leitura dentro de um PoolClient transacional.
   // pg nao aceita consultas concorrentes no mesmo client (e removera o suporte
-  // acidental no pg 9), portanto estas quatro leituras sao deliberadamente sequenciais.
-  const [people, performance, adjustments, payroll, adjustmentDetails] = await runSequential([
+  // acidental no pg 9), portanto estas leituras sao deliberadamente sequenciais.
+  const [people, performance, adjustments, payroll, adjustmentDetails, assignmentGaps, payrollHistory] = await runSequential([
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
               mc.panel_role, mc.revoked_at IS NULL AS active, sessions.last_used_at,
@@ -218,6 +197,7 @@ export async function getMatrizCollaboratorManagement(
       `SELECT i.collaborator_id, i.id payroll_item_id, i.base_salary, i.commission_amount,
               i.additions, i.deductions, i.total_due, i.payment_status payroll_status,
               i.due_date payroll_due_date, i.paid_at payroll_paid_at, i.source_expense_id,
+              i.calculation payroll_calculation,
               p.id payroll_period_id, p.status payroll_period_status
          FROM finance.matriz_payroll_periods p
          JOIN finance.matriz_payroll_items i ON i.payroll_period_id=p.id
@@ -235,66 +215,27 @@ export async function getMatrizCollaboratorManagement(
         GROUP BY a.id
        HAVING a.amount-COALESCE(sum(al.amount),0)>0
         ORDER BY a.created_at,a.id`, [environment, competence]),
+    () => db.query<{ missing_count: number }>(
+      `SELECT COALESCE(sum(missing_count),0)::int AS missing_count
+         FROM finance.matriz_payroll_assignment_gaps($1,$2::date)
+        WHERE missing_count>0`, [environment, competence]),
+    () => db.query<any>(
+      `SELECT p.id,p.competence,p.status,p.closed_at,p.closed_by,
+              count(i.id)::int AS collaborator_count,
+              COALESCE(sum(i.total_due),0) AS total,
+              count(i.id) FILTER (WHERE i.payment_status='pending')::int AS pending_count,
+              COALESCE(sum(i.total_due) FILTER (WHERE i.payment_status='pending'),0) AS pending_total,
+              count(i.id) FILTER (WHERE i.payment_status='paid')::int AS paid_count,
+              COALESCE(sum(i.total_due) FILTER (WHERE i.payment_status='paid'),0) AS paid_total
+         FROM finance.matriz_payroll_periods p
+         LEFT JOIN finance.matriz_payroll_items i
+           ON i.environment=p.environment AND i.payroll_period_id=p.id
+        WHERE p.environment=$1
+        GROUP BY p.id
+        ORDER BY p.competence DESC
+        LIMIT 12`, [environment]),
   ]);
-  const perf = new Map(performance.rows.map((r: any) => [r.id, r]));
-  const adj = new Map(adjustments.rows.map((r: any) => [r.collaborator_id, r]));
-  const frozen = new Map(payroll.rows.map((r: any) => [r.collaborator_id, r]));
-  const rows: CollaboratorManagementRow[] = people.rows.map((p: any) => {
-    const q = perf.get(p.id) as any ?? {}; const a = adj.get(p.id) as any ?? {}; const f = frozen.get(p.id) as any;
-    const benefits = benefitsOf(p.benefits);
-    const row: CollaboratorManagementRow = {
-      ...p, active: Boolean(p.active),
-      allow_vendas: Boolean(p.allow_vendas), allow_estoque: Boolean(p.allow_estoque), allow_entregas: Boolean(p.allow_entregas),
-      allow_financeiro: Boolean(p.allow_financeiro),
-      eligible_in_competence: Boolean(p.eligible_in_competence ?? p.active),
-      base_salary: n(p.base_salary), monthly_base_salary: n(p.monthly_base_salary),
-      payment_day: p.payment_day === null ? null : n(p.payment_day),
-      benefits, benefits_total: benefitTotal(benefits),
-      commission_value: n(p.commission_value), commission_active: Boolean(p.commission_active),
-      commission_itemized: Boolean(p.commission_itemized),
-      commission_item_rules: commissionItemRulesOf(p.commission_item_rules),
-      sales_count: n(q.sales_count), revenue: n(q.revenue), margin: n(q.margin), items_without_cost: n(q.items_without_cost),
-      deliveries_count: n(q.deliveries_count), trips_count: n(q.trips_count), distance_km: n(q.distance_km),
-      on_time_pct: q.on_time_pct === null || q.on_time_pct === undefined ? null : n(q.on_time_pct),
-      additions: n(a.additions), deductions: n(a.deductions), commission_amount: 0, total_due: 0,
-      payroll_item_id: f?.payroll_item_id ?? null, payroll_status: f?.payroll_status ?? 'preview',
-      payroll_due_date: f?.payroll_due_date ?? null, payroll_paid_at: f?.payroll_paid_at ?? null,
-      source_expense_id: f?.source_expense_id ?? null,
-    };
-    row.commission_amount = f ? n(f.commission_amount) : n(q.commission_amount);
-    if (f) Object.assign(row, { base_salary: n(f.base_salary), additions: n(f.additions), deductions: n(f.deductions) });
-    row.total_due = f ? n(f.total_due) : Math.max(0, Math.round((row.base_salary + row.benefits_total
-      + row.commission_amount + row.additions - row.deductions) * 100) / 100);
-    return row;
+  return buildMatrizCollaboratorManagement({
+    competence, people, performance, adjustments, payroll, adjustmentDetails, assignmentGaps, payrollHistory,
   });
-  const active = rows.filter((r) => r.active);
-  const competenceEligible = rows.filter((r) => r.eligible_in_competence);
-  const payrollRows = payroll.rows.length ? rows.filter((r) => r.payroll_item_id) : competenceEligible;
-  const payable = rows.filter((r) => r.payroll_status === 'pending');
-  const paid = rows.filter((r) => r.payroll_status === 'paid');
-  const summary = {
-    active_count: active.length, role_count: new Set(active.map((r) => r.job_title)).size,
-    panel_access_count: active.filter((r) => r.panel_role).length, revoked_count: rows.length - active.length,
-    configured_count: competenceEligible.filter((r) => r.employment_type).length,
-    base_salary_total: competenceEligible.reduce((s, r) => s + r.base_salary, 0),
-    unconfigured_count: competenceEligible.filter((r) => !r.employment_type).length,
-    commission_total: competenceEligible.reduce((s, r) => s + r.commission_amount, 0),
-    sales_eligible: competenceEligible.reduce((s, r) => s + r.sales_count, 0),
-    deliveries_eligible: competenceEligible.reduce((s, r) => s + r.deliveries_count, 0),
-    without_rule: competenceEligible.filter((r) => !r.commission_active).length,
-    payroll_total: payrollRows.reduce((s, r) => s + r.total_due, 0),
-    payroll_payable: payable.reduce((s, r) => s + r.total_due, 0),
-    payroll_paid: paid.reduce((s, r) => s + r.total_due, 0), paid_count: paid.length,
-    payroll_count: payroll.rows.length
-      || competenceEligible.filter((r) => r.employment_type || r.commission_active).length,
-    payroll_period_id: payroll.rows[0]?.payroll_period_id ?? null,
-    payroll_period_status: payroll.rows[0]?.payroll_period_status ?? 'preview',
-    revenue: competenceEligible.reduce((s, r) => s + r.revenue, 0),
-    margin: competenceEligible.reduce((s, r) => s + r.margin, 0),
-    trips_count: competenceEligible.reduce((s, r) => s + r.trips_count, 0),
-  };
-  return { competence, collaborators: rows, summary,
-    adjustments: adjustmentDetails.rows.map((row: any) => ({
-      ...row, amount: row.amount === null ? null : n(row.amount),
-    })) };
 }

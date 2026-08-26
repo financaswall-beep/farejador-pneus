@@ -222,6 +222,7 @@ function painelApp() {
     // ── COLABORADORES da matriz (0124 — fatia 1): staff próprio, vendedor/entregador ──
     colaboradores: [],
     colabAdjustments: [],
+    colabPayrollHistory: [],
     colabLoaded: false, colabLoading: false, colabLoadError: null,
     colabSaving: false, colabMsg: null,
     colabDialog: { open: false, kind: null, collaborator: null, password: '', showPassword: false, error: null }, colabShowForm: false,

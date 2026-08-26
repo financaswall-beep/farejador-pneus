@@ -39,6 +39,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.logisticaComprovantes, // Etapa 7: revisão humana e idempotente
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA
     window.PAINEL_MODULES.colaboradores, // app.colaboradores.js (linhas 1531-1629 pré-obra): colaboradores da matriz (0124): criar/função/senha/revogar
+    window.PAINEL_MODULES.colaboradoresPayroll, // processo da folha: validações, histórico e ligação com contas a pagar
     window.PAINEL_MODULES.colaboradoresGestao, // 0133: remuneração, comissão, folha e desempenho
     window.PAINEL_MODULES.colaboradoresPermissions, // acesso ao painel, allowlist operacional e sessões
     window.PAINEL_MODULES.colaboradoresFinance, // remuneração e comissão unificadas, com gravação atômica
