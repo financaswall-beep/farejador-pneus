@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-26T14:25:11.204Z",
+  "geradoEm": "2026-08-26T15:21:28.541Z",
   "commitBase": "dd64a35",
-  "total": 1506,
+  "total": 1507,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -1405,6 +1405,7 @@
     "teamPerformanceRows": "function",
     "teamPerformanceSetRange": "function",
     "teamPerformanceSummary": "function",
+    "teamPerformanceSvg": "function",
     "teamPerformanceWorkAreas": "function",
     "termsForm": "value:object",
     "termsMsg": "value:null",

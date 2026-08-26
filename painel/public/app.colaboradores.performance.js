@@ -131,6 +131,24 @@ window.PAINEL_MODULES.colaboradoresPerformance = function () {
       return days.map((row, index) => ({ ...row, index }))
         .filter((row, index) => index === 0 || index === days.length - 1 || index % step === 0);
     },
+    teamPerformanceSvg() {
+      const days = this.teamPerformanceDays();
+      const grid = [40, 77.5, 115, 152.5, 190].map((y) => (
+        `<line x1="34" y1="${y}" x2="686" y2="${y}" stroke="#e5e7eb" stroke-dasharray="4 5"></line>`
+      )).join('');
+      const bars = days.map((row, index) => {
+        const x = this.teamPerformanceChartX(index) - 5;
+        const y = this.teamPerformanceChartY(row.installations_count);
+        return `<rect x="${x}" y="${y}" width="10" height="${190 - y}" rx="3" fill="#a7f3d0"><title>${this.teamPerformanceDateLabel(row.date)} · ${Number(row.installations_count || 0)} instalação(ões)</title></rect>`;
+      }).join('');
+      const points = days.map((row, index) => (
+        `<circle cx="${this.teamPerformanceChartX(index)}" cy="${this.teamPerformanceChartY(row.sales_count)}" r="4" fill="#065f46"><title>${this.teamPerformanceDateLabel(row.date)} · ${Number(row.sales_count || 0)} venda(s)</title></circle>`
+      )).join('');
+      const labels = this.teamPerformanceAxisLabels().map((row) => (
+        `<text x="${this.teamPerformanceChartX(row.index)}" y="216" text-anchor="middle" font-size="10" fill="#6b7280">${this.teamPerformanceDateLabel(row.date)}</text>`
+      )).join('');
+      return `${grid}${bars}<polyline points="${this.teamPerformanceLinePoints()}" fill="none" stroke="#065f46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${points}${labels}`;
+    },
     teamPerformanceDateLabel(value) {
       const [, month, day] = String(value || '').split('-');
       return day && month ? `${day}/${month}` : '—';

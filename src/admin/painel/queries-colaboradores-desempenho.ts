@@ -90,20 +90,22 @@ export async function getMatrizTeamPerformance(
     ),
     db.query<{ date: string; collaborator_id: string; sales_count: number; installations_count: number }>(
       `${matrizCommissionFactsSql}, ${installationsSql}, sales_daily AS (
-         SELECT (occurred_at AT TIME ZONE 'America/Sao_Paulo')::date day,collaborator_id,
+         SELECT (occurred_at AT TIME ZONE 'America/Sao_Paulo')::date occurred_on,collaborator_id,
                 count(*) FILTER (WHERE event_type='sale')::int sales_count
            FROM ruled GROUP BY 1,2
        ), pickup_daily AS (
-         SELECT occurred_on day,collaborator_id,sum(installations_count)::int installations_count
+         SELECT occurred_on,collaborator_id,sum(installations_count)::int installations_count
            FROM installations GROUP BY occurred_on,collaborator_id
        ), keys AS (
-         SELECT day,collaborator_id FROM sales_daily UNION SELECT day,collaborator_id FROM pickup_daily
+         SELECT occurred_on,collaborator_id FROM sales_daily
+         UNION SELECT occurred_on,collaborator_id FROM pickup_daily
        )
-       SELECT to_char(k.day,'YYYY-MM-DD') date,k.collaborator_id,
+       SELECT to_char(k.occurred_on,'YYYY-MM-DD') date,k.collaborator_id,
               COALESCE(s.sales_count,0)::int sales_count,
               COALESCE(p.installations_count,0)::int installations_count
-         FROM keys k LEFT JOIN sales_daily s USING(day,collaborator_id)
-         LEFT JOIN pickup_daily p USING(day,collaborator_id) ORDER BY k.day,k.collaborator_id`,
+         FROM keys k LEFT JOIN sales_daily s USING(occurred_on,collaborator_id)
+         LEFT JOIN pickup_daily p USING(occurred_on,collaborator_id)
+        ORDER BY k.occurred_on,k.collaborator_id`,
       [environment, bounds.start, bounds.end],
     ),
     db.query<{
@@ -128,7 +130,7 @@ export async function getMatrizTeamPerformance(
          (SELECT count(*)::int FROM finance.matriz_payroll_adjustments a,bounds b
            WHERE a.environment=$1 AND a.deleted_at IS NULL AND a.causal_status='needs_review'
              AND a.competence>=date_trunc('month',b.start_date)::date
-             AND a.competence<date_trunc('month',b.end_date-1)+interval '1 month')::date)
+             AND a.competence<(date_trunc('month',b.end_date-1)+interval '1 month')::date)
            commission_review_count`,
       [environment, bounds.start, bounds.end],
     ),
