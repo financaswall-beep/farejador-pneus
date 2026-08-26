@@ -52,6 +52,37 @@ describe('aba de permissões dos colaboradores', () => {
     }));
   });
 
+  it('mostra ao proprietário todas as 12 permissões efetivas do parceiro', () => {
+    const app = appWith(moduleOf(
+      'painel/public/app.partner-colaboradores.permissions.js', 'partnerColaboradoresPermissions',
+    ), {});
+    expect(Array.from(app.partnerColaboradoresVisiblePermissionKeys())).toEqual([
+      'vendas', 'estoque', 'pedidos', 'clientes', 'entregas', 'retiradas',
+      'batepapo', 'resumo', 'financeiro', 'compras', 'colaboradores', 'catalogo',
+    ]);
+  });
+
+  it('impede funcionário parceiro e administrador da Matriz de abrir abas sensíveis', () => {
+    const partner = appWith(moduleOf(
+      'painel/public/app.partner-colaboradores.finance.js', 'partnerColaboradoresFinance',
+    ), {
+      isPartnerPanel: () => true,
+      panelWorkplace: { role: 'funcionario' },
+      partnerColaboradoresOwner: () => false,
+      partnerColaboradores: { tab: 'equipe', selected: null },
+    });
+    partner.partnerColaboradoresSetTab('remuneracao');
+    expect(partner.partnerColaboradores.tab).toBe('equipe');
+
+    const matrix = appWith(moduleOf(
+      'painel/public/app.colaboradores.gestao.js', 'colaboradoresGestao',
+    ), {
+      adminUser: { role: 'admin' }, colabTab: 'equipe', colabAtivos: [],
+    });
+    matrix.colabSetTab('remuneracao');
+    expect(matrix.colabTab).toBe('equipe');
+  });
+
   it('aplica modelo da Matriz e usa endpoints protegidos para salvar e encerrar sessões', async () => {
     const put = vi.fn().mockResolvedValue({});
     const post = vi.fn().mockResolvedValue({});
@@ -85,5 +116,17 @@ describe('aba de permissões dos colaboradores', () => {
     expect(partnerRoute).toContain("'/parceiro/:slug/api/funcionarios/:tokenId/encerrar-sessoes', { preHandler: ownerOnly }");
     expect(matrixQuery).toContain('mc.environment=$1 AND mc.id=$2');
     expect(partnerQuery).toContain('partner_unit_id=$3');
+  });
+
+  it('libera só o diretório da Matriz ao administrador autorizado e mantém escritas owner-only', () => {
+    const route = source('src/admin/painel/route-colaboradores.ts');
+    const ui = source('painel/public/app.colaboradores.js');
+    const html = source('painel/public/index.html');
+    expect(route).toContain("fastify.get('/admin/api/colaboradores', { preHandler: requireAdminAuth }");
+    expect(route).toContain("fastify.post('/admin/api/colaboradores', { preHandler: requireAdminOwner }");
+    expect(route).toContain("'/admin/api/colaboradores/senha', { preHandler: requireAdminOwner }");
+    expect(ui).toContain("this.adminUser?.role === 'owner'");
+    expect(ui).toContain("await this.apiGet('/admin/api/colaboradores')");
+    expect(html).toContain("x-show=\"adminUser?.role === 'owner'\"");
   });
 });

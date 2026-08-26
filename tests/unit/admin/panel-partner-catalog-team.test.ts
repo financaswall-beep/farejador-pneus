@@ -67,21 +67,32 @@ describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
       .toEqual({ min: 89, max: 99 });
   });
 
-  it('não carrega catálogo nem equipe para funcionário', async () => {
+  it('não carrega catálogo sem autorização e limita a equipe do funcionário ao diretório', async () => {
     const catalogApi = vi.fn();
     const catalog = appWith(moduleOf(
       'painel/public/app.partner-catalogo.js', 'partnerCatalogo',
     ), { panelWorkplace: { role: 'funcionario' }, partnerApiGet: catalogApi });
-    const teamApi = vi.fn();
+    const teamApi = vi.fn().mockResolvedValue({
+      unit_name: 'Rio do Ouro', active_count: 1,
+      members: [{ id: 'u1', name: 'Ana', role: 'Vendedor', work_area: 'sales', active: true }],
+    });
     const team = appWith(moduleOf(
       'painel/public/app.partner-colaboradores.js', 'partnerColaboradores',
-    ), { panelWorkplace: { role: 'funcionario' }, partnerApiGet: teamApi });
+    ), {
+      panelWorkplace: { role: 'funcionario' }, partnerApiGet: teamApi,
+      hasPanelModule: (module: string) => module === 'colaboradores',
+    });
 
     await catalog.loadPartnerCatalogo();
     await team.loadPartnerColaboradores();
 
     expect(catalogApi).not.toHaveBeenCalled();
-    expect(teamApi).not.toHaveBeenCalled();
+    expect(teamApi).toHaveBeenCalledTimes(1);
+    expect(teamApi).toHaveBeenCalledWith('equipe');
+    expect(team.partnerColaboradores.rows[0]).toEqual({
+      id: 'u1', name: 'Ana', role: 'Vendedor', work_area: 'sales', active: true,
+    });
+    expect(team.partnerColaboradores.rows[0]).not.toHaveProperty('base_salary');
   });
 
   it('une equipe e contas da mesma unidade sem consultar folha da Matriz', async () => {

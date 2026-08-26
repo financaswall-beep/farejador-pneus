@@ -49,6 +49,7 @@ type MatrixRow = {
   allow_vendas: boolean | null;
   allow_estoque: boolean | null;
   allow_entregas: boolean | null;
+  allow_retiradas: boolean | null;
   allow_financeiro: boolean | null;
 };
 
@@ -82,7 +83,8 @@ export async function listOperationWorkplaces(
   const [matrix, partners] = await Promise.all([
     dbPool.query<MatrixRow>(
       `SELECT mc.id AS collaborator_id, mc.job, mc.work_area, mc.panel_role,
-              op.allow_vendas,op.allow_estoque,op.allow_entregas,op.allow_financeiro
+              op.allow_vendas,op.allow_estoque,op.allow_entregas,
+              op.allow_retiradas,op.allow_financeiro
          FROM network.matriz_collaborators mc
          LEFT JOIN network.matriz_collaborator_operation_permissions op
            ON op.collaborator_id=mc.id AND op.environment=mc.environment
@@ -95,6 +97,7 @@ export async function listOperationWorkplaces(
             OR COALESCE(op.allow_vendas,false)
             OR COALESCE(op.allow_estoque,false)
             OR COALESCE(op.allow_entregas,false)
+            OR COALESCE(op.allow_retiradas,false)
             OR COALESCE(op.allow_financeiro,false))
         LIMIT 1`,
       [environment, personId],
@@ -150,7 +153,7 @@ export async function listOperationWorkplaces(
       vendas: matrixRow.allow_vendas ?? canSell,
       estoque: matrixRow.allow_estoque ?? canSell,
       entregas: matrixRow.allow_entregas ?? isCourier,
-      retiradas: false,
+      retiradas: matrixRow.allow_retiradas ?? false,
       financeiro: matrixRow.allow_financeiro ?? (panelRole !== null),
     };
     if (modules.vendas || modules.estoque || modules.entregas || modules.retiradas || modules.financeiro) workplaces.push({

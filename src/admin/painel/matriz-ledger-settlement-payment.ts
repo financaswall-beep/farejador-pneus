@@ -62,7 +62,7 @@ export async function lockSettlementObligation(
 ): Promise<SettlementObligationRow> {
   const result = await client.query<SettlementObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
-            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff')
+            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff','adjustment')
               THEN p.amount ELSE -p.amount END)
               FROM finance.matriz_ledger_payments p
              WHERE p.environment=t.environment

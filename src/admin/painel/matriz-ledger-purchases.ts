@@ -177,7 +177,7 @@ export async function postWholesalePurchaseQuantityAdjustment(
       `INSERT INTO finance.matriz_ledger_payments
         (environment,obligation_transaction_id,payment_transaction_id,
          payment_kind,amount,paid_at,created_by)
-       VALUES ($1,$2,$3,'writeoff',$4,$5::timestamptz,$6)`,
+       VALUES ($1,$2,$3,'adjustment',$4,$5::timestamptz,$6)`,
       [purchase.environment, obligationId, adjustmentId, payableCents / 100,
        occurredAt, matrizLedgerActor(adjustedBy)],
     );

@@ -10,17 +10,29 @@ window.PAINEL_MODULES.colaboradores = function () {
       this.colabLoadError = null;
       this.colabLoaded = false;
       try {
-        const payload = await this.apiGet(`/admin/api/colaboradores/gestao?competencia=${encodeURIComponent(this.colabMes + '-01')}`);
-        this.colaboradores = payload.collaborators || [];
-        this.colabAdjustments = (payload.adjustments || []).map((adjustment) => ({
-          ...adjustment, review_amount: adjustment.amount ?? '',
+        const owner = this.adminUser?.role === 'owner';
+        const payload = owner
+          ? await this.apiGet(`/admin/api/colaboradores/gestao?competencia=${encodeURIComponent(this.colabMes + '-01')}`)
+          : await this.apiGet('/admin/api/colaboradores');
+        this.colaboradores = (payload.collaborators || []).map((row) => ({
+          ...row,
+          // A rota de diretório não fornece números financeiros ou resultados.
+          // Defaults locais mantêm os componentes de leitura determinísticos.
+          sales_count: Number(row.sales_count || 0),
+          deliveries_count: Number(row.deliveries_count || 0),
+          trips_count: Number(row.trips_count || 0),
         }));
-        this.colabSummary = payload.summary || {};
-        this.colabPayrollHistory = payload.payroll_history || [];
+        this.colabAdjustments = owner ? (payload.adjustments || []).map((adjustment) => ({
+          ...adjustment, review_amount: adjustment.amount ?? '',
+        })) : [];
+        this.colabSummary = owner ? (payload.summary || {}) : {};
+        this.colabPayrollHistory = owner ? (payload.payroll_history || []) : [];
         this.colabLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       } catch (err) {
-        this.colabLoadError = 'Não foi possível carregar a equipe e a folha. Tente novamente.';
+        this.colabLoadError = this.adminUser?.role === 'owner'
+          ? 'Não foi possível carregar a equipe e a folha. Tente novamente.'
+          : 'Não foi possível carregar a equipe. Tente novamente.';
         console.error('colaboradores load failed', err);
       } finally {
         this.colabLoading = false;
@@ -116,6 +128,7 @@ window.PAINEL_MODULES.colaboradores = function () {
       if (c.allow_vendas) chips.push('Vendas');
       if (c.allow_estoque) chips.push('Estoque');
       if (c.allow_entregas) chips.push('Logística');
+      if (c.allow_retiradas) chips.push('Retiradas');
       if (c.allow_financeiro) chips.push('Financeiro');
       return [...new Set(chips)].slice(0, 3);
     },

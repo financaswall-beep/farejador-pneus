@@ -107,7 +107,8 @@ describe('resolução segura do local da Operação da Loja', () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{
         collaborator_id: 'collab-override', job: 'vendedor', work_area: 'sales', panel_role: null,
-        allow_vendas: false, allow_estoque: false, allow_entregas: true, allow_financeiro: false,
+        allow_vendas: false, allow_estoque: false, allow_entregas: true,
+        allow_retiradas: true, allow_financeiro: false,
       }] })
       .mockResolvedValueOnce({ rows: [] });
     const dbPool = { query } as unknown as Pool;
@@ -115,9 +116,12 @@ describe('resolução segura do local da Operação da Loja', () => {
     const workplaces = await listOperationWorkplaces('test', 'person-override', dbPool);
 
     expect(workplaces[0]).toMatchObject({
-      modules: { vendas: false, estoque: false, entregas: true, retiradas: false, financeiro: false },
+      modules: { vendas: false, estoque: false, entregas: true, retiradas: true, financeiro: false },
     });
-    expect(String(query.mock.calls[0]?.[0])).toContain('matriz_collaborator_operation_permissions');
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('matriz_collaborator_operation_permissions');
+    expect(sql).toContain('op.allow_retiradas');
+    expect(sql).toContain('COALESCE(op.allow_retiradas,false)');
   });
 
   it('permite que o dono libere o Financeiro simples para funcionÃ¡rio parceiro', async () => {

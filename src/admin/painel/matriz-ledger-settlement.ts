@@ -162,7 +162,7 @@ async function settleMarketing(
   let pendingCents = moneyCents(requestedAmount(input.amount, balance));
   const obligations = await client.query<ObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
-            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff')
+            (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff','adjustment')
               THEN p.amount ELSE -p.amount END) FROM finance.matriz_ledger_payments p
              WHERE p.environment=t.environment
                AND p.obligation_transaction_id=t.id),0))::numeric(14,2)::text open_amount

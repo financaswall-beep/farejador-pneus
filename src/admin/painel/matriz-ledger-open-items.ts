@@ -154,7 +154,7 @@ export async function getMatrizLedgerOpenItems(
   const result = await dbPool.query<OpenRow>(
     `WITH paid AS (
        SELECT obligation_transaction_id,
-              sum(CASE WHEN payment_kind IN ('settlement','writeoff')
+              sum(CASE WHEN payment_kind IN ('settlement','writeoff','adjustment')
                 THEN amount ELSE -amount END) amount,
               sum(CASE WHEN payment_kind='settlement' THEN amount
                 WHEN payment_kind='reversal' THEN -amount ELSE 0 END) settled_amount

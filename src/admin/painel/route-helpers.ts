@@ -66,7 +66,7 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
        'unit_cost_cent_precision', 'purchase_line_total_too_large',
        'purchase_total_too_large', 'purchased_at_future', 'paid_at_future',
        'freight_amount_invalid', 'discount_amount_invalid',
-       'discount_exceeds_purchase', 'installments_total_mismatch',
+       'discount_exceeds_purchase', 'due_date_required', 'installments_total_mismatch',
        'installment_amount_invalid', 'purchase_allocation_failed',
        'purchase_received_quantity_invalid', 'purchase_receipt_items_incomplete',
        'purchase_receipt_empty', 'purchase_receipt_exceeds_order',

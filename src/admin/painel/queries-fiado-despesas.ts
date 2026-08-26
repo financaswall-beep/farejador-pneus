@@ -44,7 +44,7 @@ export async function getWholesaleFinance(
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
     `WITH settled AS (
        SELECT t.source_id purchase_id,
-              COALESCE(sum(CASE WHEN pay.payment_kind IN ('settlement','writeoff')
+              COALESCE(sum(CASE WHEN pay.payment_kind IN ('settlement','writeoff','adjustment')
                 THEN pay.amount ELSE -pay.amount END),0) paid
          FROM finance.matriz_ledger_transactions t
          LEFT JOIN finance.matriz_ledger_payments pay

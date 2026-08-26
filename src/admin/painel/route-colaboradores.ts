@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminOwner } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { MatrizCollaboratorUsernameTakenError, MatrizLastOwnerError, createMatrizCollaborator, endMatrizCollaboratorSessions, listMatrizCollaborators, reactivateMatrizCollaborator, resetMatrizCollaboratorPassword, revokeMatrizCollaborator, updateMatrizCollaboratorJob, updateMatrizCollaboratorPanelRole } from './queries.js';
@@ -39,7 +39,10 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     password: z.string().min(12).max(200),
   });
 
-  fastify.get('/admin/api/colaboradores', { preHandler: requireAdminOwner }, async (_request, reply) => {
+  // Leitura mínima da equipe: administradores com o módulo Colaboradores podem
+  // consultar o diretório. Escritas, remuneração, folha, senhas e permissões
+  // continuam owner-only nas rotas abaixo e em route-colaboradores-gestao.ts.
+  fastify.get('/admin/api/colaboradores', { preHandler: requireAdminAuth }, async (_request, reply) => {
     try {
       return reply.status(200).send({ collaborators: await listMatrizCollaborators() });
     } catch (err) {

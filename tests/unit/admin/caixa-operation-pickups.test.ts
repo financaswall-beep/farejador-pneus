@@ -42,7 +42,8 @@ describe('Retiradas dentro da Operação da Loja', () => {
   it('protege a Matriz com módulo próprio e não converte Vendas em Retiradas', () => {
     expect(caixaRoute).toContain("requireCaixaModule('retiradas')");
     expect(matrixRoute).toContain('requirePickups');
-    expect(operationAuth).toContain('retiradas: false');
+    expect(operationAuth).toContain('retiradas: matrixRow.allow_retiradas ?? false');
+    expect(operationAuth).toContain('COALESCE(op.allow_retiradas,false)');
     expect(operationAuth).toContain('retiradas: true');
     expect(operationAuth).toContain('allow_retiradas');
   });

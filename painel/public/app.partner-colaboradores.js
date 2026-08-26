@@ -1,5 +1,5 @@
-// Gestão da equipe da unidade no painel moderno. Cadeado visual owner-only; o
-// servidor repete a trava. Usa exclusivamente APIs do parceiro e nunca a Matriz.
+// Diretório da equipe no painel moderno; remuneração, acessos e alterações são
+// owner-only no cliente e no servidor. Usa APIs do parceiro e nunca a Matriz.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.partnerColaboradores = function () {
   const permissions = () => ({

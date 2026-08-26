@@ -7,6 +7,7 @@ import {
   getPartnerOperationTeam, savePartnerOperationCommissionRule,
   savePartnerOperationCompensation,
 } from './operation-team.js';
+import { getPartnerOperationTeamDirectory } from './operation-team-directory.js';
 import { createPartnerOperationMember } from './operation-team-create.js';
 import {
   getPartnerOperationPermissions,
@@ -93,7 +94,13 @@ function bad(reply: FastifyReply, error: unknown, label: string) {
 export function registerPartnerOperationTeamRoutes(fastify: FastifyInstance): void {
   fastify.get('/parceiro/:slug/api/equipe', { preHandler: teamScreen }, async (request: PartnerAuthedRequest, reply) => {
     reply.header('Cache-Control', 'no-store');
-    try { return reply.status(200).send(await getPartnerOperationTeam(getPartnerContext(request))); }
+    try {
+      const ctx = getPartnerContext(request);
+      const payload = ctx.role === 'owner'
+        ? await getPartnerOperationTeam(ctx)
+        : await getPartnerOperationTeamDirectory(ctx);
+      return reply.status(200).send(payload);
+    }
     catch (error) { return bad(reply, error, 'partner operation team unavailable'); }
   });
 

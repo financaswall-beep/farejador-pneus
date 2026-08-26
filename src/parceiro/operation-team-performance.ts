@@ -93,7 +93,9 @@ export async function getPartnerTeamPerformance(
     ));
   }
   const bounds = teamPerformanceBounds(range);
-  const params = [ctx.environment, ctx.unitId, bounds.start, bounds.end, ctx.partnerUnitId];
+  // O escopo do parceiro já está plantado por withPartnerContext; todas as
+  // consultas abaixo possuem exatamente quatro placeholders ($1..$4).
+  const params = [ctx.environment, ctx.unitId, bounds.start, bounds.end];
   const [people, days, alerts] = await Promise.all([
     db.query<PerformanceRow>(
       `${realizedSql}, totals AS (
@@ -104,23 +106,21 @@ export async function getPartnerTeamPerformance(
                 sum(missing_cost_items)::int missing_cost_items
            FROM realized WHERE collaborator_id IS NOT NULL GROUP BY collaborator_id
        )
-       SELECT pat.id,COALESCE(NULLIF(btrim(pat.label),''),pat.login_username,'Colaborador') name,
-              CASE pat.job_role WHEN 'vendedor' THEN 'Vendedor' WHEN 'estoque' THEN 'Estoque'
-                WHEN 'entregador' THEN 'Entregador' ELSE 'Colaborador' END role,
+       SELECT pat.id,pat.name,
+              pat.role_name role,
               CASE pat.job_role WHEN 'vendedor' THEN 'sales' WHEN 'estoque' THEN 'stock'
                 WHEN 'entregador' THEN 'delivery' ELSE 'other' END work_area,
-              pat.revoked_at IS NULL active,COALESCE(t.sales_count,0)::int sales_count,
+              pat.active,COALESCE(t.sales_count,0)::int sales_count,
               COALESCE(t.revenue,0)::text revenue,COALESCE(t.margin,0)::text margin,
               COALESCE(t.installations_count,0)::int installations_count,
               COALESCE(t.pickups_count,0)::int pickups_count,
               COALESCE(t.deliveries_count,0)::int deliveries_count,t.average_service_minutes::text,
               COALESCE(c.amount,0)::text commission_amount,
               COALESCE(t.missing_cost_items,0)::int missing_cost_items
-         FROM network.partner_access_tokens pat
+         FROM network.partner_staff_directory() pat
          LEFT JOIN totals t ON t.collaborator_id=pat.id
          LEFT JOIN commissions c ON c.token_id=pat.id
-        WHERE pat.environment=$1 AND pat.partner_unit_id=$5 AND pat.role='funcionario'
-          AND (pat.revoked_at IS NULL OR t.collaborator_id IS NOT NULL OR c.token_id IS NOT NULL)
+        WHERE pat.active OR t.collaborator_id IS NOT NULL OR c.token_id IS NOT NULL
         ORDER BY COALESCE(t.revenue,0) DESC,name`, params),
     db.query<{ date: string; collaborator_id: string; sales_count: number; installations_count: number }>(
       `${realizedSql}, daily AS (

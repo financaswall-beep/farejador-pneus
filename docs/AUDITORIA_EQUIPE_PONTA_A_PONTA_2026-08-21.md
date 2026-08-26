@@ -140,3 +140,43 @@ o smoke autenticado. Este veredito não declara o runtime novo já implantado.
 O comando `npm run test:integration` também foi estabilizado: ele renova o processo do
 Vitest a cada 12 arquivos, sequencialmente. Isso evita o encerramento tardio do worker por
 acúmulo de recursos sem mudar testes, banco ou rigor da bateria.
+
+## Atualização de fechamento — 26/08/2026
+
+A nova interface unificada de Colaboradores foi reavaliada contra Matriz, parceiro,
+`/operacao`, RLS, remuneração, comissão, folha e Financeiro. Foram corrigidos:
+
+- funcionário do parceiro recebe somente o diretório mínimo da própria unidade; salário,
+  benefício, comissão, usuário e permissões continuam exclusivos do proprietário;
+- administrador da Matriz com o módulo Colaboradores recebe diretório somente leitura;
+  cadastro, revogação, senha, remuneração, folha, desempenho e permissões continuam
+  `owner-only` também no servidor;
+- todas as 12 permissões efetivas do parceiro aparecem no editor, evitando acesso oculto;
+- a permissão de Retiradas da Matriz passou a valer também no `/operacao`;
+- o desempenho do parceiro deixou de consultar credenciais diretamente e passou a usar
+  um diretório escopado por RLS; também foi corrigida a quantidade de parâmetros SQL;
+- durante a regressão completa, Compras revelou uma classificação contábil incorreta:
+  recusa parcial de mercadoria reduzia contas a pagar como `writeoff`. A migration `0212`
+  criou o fato próprio `adjustment`, sem fingir perda de cliente ou movimento de caixa,
+  e bloqueia ajuste cruzado entre compras diferentes;
+- compra a prazo sem vencimento agora é recusada no serviço antes de chegar à constraint.
+
+### Provas desta atualização
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.449/1.449**, 291 arquivos |
+| Integração completa | **292/292**, 60 arquivos em 5 lotes |
+| TypeScript | aprovado |
+| Instalação limpa PostgreSQL 17 | **213/213 migrations** |
+| Manifesto de migrations | aprovado; última `0212`; gap histórico `0071` documentado |
+| Painéis e contratos | 599 propriedades do parceiro, 1.519 da Matriz e 95 contratos aprovados |
+| Arquitetura e rotas | pools/isolamento aprovados; **284/284 rotas**; fiscal de tamanho aprovado |
+
+**Veredito do código e do banco: aprovado.** Em 26/08/2026, as migrations `0211` e
+`0212` foram primeiro ensaiadas com `ROLLBACK` e depois aplicadas com `COMMIT` no banco
+novo de produção em São Paulo, usando `.env.novo`. A verificação pós-aplicação confirmou:
+função de diretório presente e `SECURITY DEFINER`, `EXECUTE` para a role restrita, nenhum
+`SELECT` direto nas credenciais, constraint de `adjustment` ativa e função de saldo
+instalada. Resta o deploy manual e o smoke autenticado com proprietário e funcionário de
+uma unidade; este documento não declara o runtime novo já implantado.

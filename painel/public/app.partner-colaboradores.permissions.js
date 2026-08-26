@@ -7,10 +7,9 @@ window.PAINEL_MODULES.partnerColaboradoresPermissions = function () {
     'retiradas', 'batepapo', 'resumo', 'financeiro',
     'compras', 'colaboradores', 'catalogo',
   ];
-  const visibleKeys = [
-    'resumo', 'vendas', 'retiradas', 'compras', 'estoque', 'entregas',
-    'financeiro', 'colaboradores', 'catalogo',
-  ];
+  // Toda permissão efetiva precisa aparecer no editor. Ocultar chaves aqui
+  // deixava pedidos, clientes e bate-papo ativos sem o proprietário enxergar.
+  const visibleKeys = [...keys];
   return {
     partnerColaboradoresVisiblePermissionKeys() { return visibleKeys; },
     partnerColaboradoresPermissionRows() { return this.partnerColaboradoresFiltered(); },

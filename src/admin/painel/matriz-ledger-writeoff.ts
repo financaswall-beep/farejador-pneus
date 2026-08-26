@@ -44,7 +44,7 @@ async function lockReceivable(
   const result = await client.query<ObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,
             (e.amount-COALESCE((SELECT sum(CASE
-              WHEN p.payment_kind IN ('settlement','writeoff') THEN p.amount
+              WHEN p.payment_kind IN ('settlement','writeoff','adjustment') THEN p.amount
               ELSE -p.amount END)
               FROM finance.matriz_ledger_payments p
              WHERE p.environment=t.environment

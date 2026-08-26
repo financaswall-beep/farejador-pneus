@@ -6,6 +6,7 @@ window.PAINEL_MODULES.partnerColaboradoresFinance = function () {
     partnerColaboradoresSetTab(tab) {
       const state = this.partnerColaboradores;
       if (!['equipe', 'remuneracao', 'permissoes', 'desempenho'].includes(tab)) return;
+      if (!this.partnerColaboradoresOwner() && tab !== 'equipe') return;
       state.tab = tab;
       state.notice = '';
       if (tab === 'equipe') state.selected = null;

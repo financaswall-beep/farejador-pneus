@@ -238,6 +238,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
     const input = {
       environment: 'test' as const, supplier_id: f.supplierId, created_by: 'etapa5-compra',
       receipt_status: 'pending' as const, payment_status: 'pending' as const,
+      due_date: '2026-09-30',
       items: [{ measure: f.measure, quantity: 2, unit_cost: 12.34 }], idempotency_key: createKey,
     };
     const pending = await registerPurchase(input, db.pool);

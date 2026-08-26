@@ -27,6 +27,7 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
     },
     colabSetTab(tab) {
       if (tab === 'comissoes') tab = 'remuneracao';
+      if (this.adminUser?.role !== 'owner' && tab !== 'equipe') return;
       this.colabTab = tab; this.colabDrawer = null; this.colabSelectedId = null;
       this.colabBusca = ''; this.colabCargoFiltro = ''; this.colabAcessoFiltro = '';
       if (tab === 'remuneracao' && this.colabAtivos[0]) {

@@ -26,6 +26,11 @@ export interface MatrizCollaborator {
   job_title: string;
   work_area: MatrizCollaboratorWorkArea;
   panel_role: MatrizPanelRole | null;
+  allow_vendas?: boolean;
+  allow_estoque?: boolean;
+  allow_entregas?: boolean;
+  allow_retiradas?: boolean;
+  allow_financeiro?: boolean;
   active: boolean;
   created_at: string;
   revoked_at: string | null;
@@ -52,12 +57,21 @@ export async function listMatrizCollaborators(
     id: string; display_name: string; username: string; job: MatrizCollaboratorJob;
     job_title: string; work_area: MatrizCollaboratorWorkArea;
     panel_role: MatrizPanelRole | null;
+    allow_vendas: boolean; allow_estoque: boolean; allow_entregas: boolean;
+    allow_retiradas: boolean; allow_financeiro: boolean;
     created_at: string; revoked_at: string | null;
   }>(
     `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
-            mc.panel_role, mc.created_at, mc.revoked_at
+            mc.panel_role, mc.created_at, mc.revoked_at,
+            CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_vendas,false) END allow_vendas,
+            CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_estoque,false) END allow_estoque,
+            CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_entregas,false) END allow_entregas,
+            CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_retiradas,false) END allow_retiradas,
+            CASE WHEN mc.panel_role='owner' THEN true ELSE COALESCE(op.allow_financeiro,false) END allow_financeiro
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp ON pp.id = mc.person_id
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.environment=mc.environment AND op.collaborator_id=mc.id
       WHERE mc.environment = $1
       ORDER BY (mc.revoked_at IS NULL) DESC, mc.created_at DESC`,
     [environment],

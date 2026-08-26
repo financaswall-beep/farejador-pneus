@@ -209,6 +209,41 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
       { valor: '8.00', due: '2026-10-20' },
     ]);
 
+    // A trava do banco também impede usar um ajuste de outra compra para
+    // reduzir artificialmente esta obrigação.
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { postMatrizLedgerTransaction } = await import(
+        '../../src/admin/painel/matriz-ledger-posting.js');
+      const forgedAdjustmentId = await postMatrizLedgerTransaction(client, {
+        environment: 'test', sourceType: 'commerce.wholesale_purchase.adjustment',
+        sourceId: randomUUID(), kind: 'purchase_quantity_adjustment', amount: 1,
+        occurredAt: '2026-08-20T15:00:00-03:00', description: 'Ajuste cruzado inválido',
+        createdBy: 'owner:audit', metadata: {}, lines: [
+          { account_code: 'accounts_payable', account_class: 'liability', side: 'debit', amount: 1 },
+          { account_code: 'inventory_in_transit', account_class: 'asset', side: 'credit', amount: 1 },
+        ],
+      });
+      const obligation = await client.query<{ id: string }>(
+        `SELECT id FROM finance.matriz_ledger_transactions
+          WHERE environment='test' AND source_type='commerce.wholesale_purchase.accrual'
+            AND source_id=$1::text`, [purchase.purchase_id],
+      );
+      await client.query(
+        `INSERT INTO finance.matriz_ledger_payments
+          (environment,obligation_transaction_id,payment_transaction_id,
+           payment_kind,amount,paid_at,created_by)
+         VALUES ('test',$1,$2,'adjustment',1,'2026-08-20T15:00:00-03:00','owner:audit')`,
+        [obligation.rows[0]!.id, forgedAdjustmentId],
+      );
+      await expect(client.query('SET CONSTRAINTS ALL IMMEDIATE'))
+        .rejects.toThrow('matriz_ledger_invalid_adjustment_transaction');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+
     // Simula uma compra antiga sem ordem e prova que o vínculo posterior é só
     // organizacional: não reposta livro nem toca no galpão.
     await db.pool.query(
@@ -231,11 +266,11 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
     expect(linked.order_code).toBe(purchase.order_code);
     const afterLink = await db.pool.query<{ ledger: number; movements: number; order_id: string }>(
       `SELECT (SELECT count(*)::int FROM finance.matriz_ledger_transactions
-                WHERE environment='test' AND source_id=$1) ledger,
+                WHERE environment='test' AND source_id=$1::text) ledger,
               (SELECT count(*)::int FROM commerce.wholesale_stock_movements
-                WHERE environment='test' AND ref=$1) movements,
+                WHERE environment='test' AND ref=$1::text) movements,
               purchase_order_id order_id
-         FROM commerce.wholesale_purchases WHERE environment='test' AND id=$1`,
+         FROM commerce.wholesale_purchases WHERE environment='test' AND id=$1::uuid`,
       [purchase.purchase_id],
     );
     expect(afterLink.rows[0]).toEqual({ ...beforeLink.rows[0], order_id: purchase.order_id });

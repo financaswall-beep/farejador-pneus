@@ -90,17 +90,38 @@ describe('Etapa 4 — verdade financeira da Matriz', () => {
   }
 
   async function purchase(total: string, payment: 'paid' | 'pending'): Promise<void> {
-    const purchase = await db.pool.query<{ id: string }>(
-      `INSERT INTO commerce.wholesale_purchases
-         (environment,supplier_id,total_amount,status,payment_status,paid_at,created_by)
-       VALUES ('test',$1,$2,'confirmed',$3,CASE WHEN $3='paid' THEN now() ELSE NULL END,'etapa4')
-       RETURNING id`, [supplierId, total, payment],
-    );
-    await db.pool.query(
-      `INSERT INTO commerce.wholesale_purchase_items
-         (environment,purchase_id,measure,quantity,unit_cost)
-       VALUES ('test',$1,'90/90-18',1,$2)`, [purchase.rows[0]!.id, total],
-    );
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const purchase = await client.query<{ id: string }>(
+        `INSERT INTO commerce.wholesale_purchases
+           (environment,supplier_id,total_amount,products_amount,freight_amount,discount_amount,
+            status,payment_status,due_date,paid_at,created_by)
+         VALUES ('test',$1,$2,$2,0,0,'confirmed',$3,
+           CASE WHEN $3='pending' THEN CURRENT_DATE ELSE NULL END,
+           CASE WHEN $3='paid' THEN now() ELSE NULL END,'etapa4')
+         RETURNING id`, [supplierId, total, payment],
+      );
+      await client.query(
+        `INSERT INTO commerce.wholesale_purchase_items
+           (environment,purchase_id,measure,quantity,unit_cost,ordered_quantity,
+            accepted_quantity,allocated_cost)
+         VALUES ('test',$1,'90/90-18',1,$2,1,1,$2)`, [purchase.rows[0]!.id, total],
+      );
+      if (payment === 'pending') {
+        await client.query(
+          `INSERT INTO commerce.wholesale_purchase_installments
+             (environment,purchase_id,installment_number,due_date,amount)
+           VALUES ('test',$1,1,CURRENT_DATE,$2)`, [purchase.rows[0]!.id, total],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   it('separa competência, custo pendente, caixa e cancelamentos centavo a centavo', async () => {

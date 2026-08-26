@@ -21,7 +21,6 @@ import {
   getPurchaseCatalogBlockers, type PurchaseCatalogBlocker,
 } from './purchase-catalog-readiness.js';
 import { resolveWholesalePurchaseOrder } from './queries-purchase-orders.js';
-
 type AllocatedPurchaseItem = PurchaseItemInput & {
   id?: string;
   ordered_quantity?: number;
@@ -182,6 +181,7 @@ export async function registerWholesalePurchase(
       client, environment, supplier.id, input.created_by, input.purchase_order_id,
     );
     const pendingPayment = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+    if (pendingPayment && !input.due_date && !input.installments?.length) throw new Error('due_date_required');
     const installments = pendingPayment
       ? (input.installments?.length ? input.installments : [{
         due_date: input.due_date!, amount: totals.totalCents / 100,

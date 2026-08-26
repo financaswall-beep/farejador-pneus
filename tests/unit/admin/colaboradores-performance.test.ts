@@ -80,8 +80,10 @@ describe('desempenho operacional comum à Matriz e ao parceiro', () => {
     for (const call of query.mock.calls) {
       expect(call[1][0]).toBe('test');
       expect(call[1][1]).toBe('unit-1');
-      expect(call[1][4]).toBe('partner-unit-1');
+      expect(call[1]).toHaveLength(4);
     }
+    expect(String(query.mock.calls[0][0])).toContain('network.partner_staff_directory()');
+    expect(String(query.mock.calls[0][0])).not.toContain('network.partner_access_tokens');
     expect(payload.summary).toMatchObject({ sales_count: 2, revenue: 180, margin: 70 });
     expect(payload.unit_name).toBe('Unidade Canário');
   });

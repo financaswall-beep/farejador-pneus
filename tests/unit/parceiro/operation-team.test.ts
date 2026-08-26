@@ -2,12 +2,14 @@ import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: vi.fn() } }));
+vi.mock('../../../src/parceiro/db.js', () => ({ withPartnerContext: vi.fn() }));
 
 import {
   getPartnerOperationCommissionRule,
   getPartnerOperationCompensation,
   getPartnerOperationTeam,
 } from '../../../src/parceiro/operation-team.js';
+import { getPartnerOperationTeamDirectory } from '../../../src/parceiro/operation-team-directory.js';
 import type { PartnerContext } from '../../../src/parceiro/auth.js';
 
 const context: PartnerContext = {
@@ -43,6 +45,37 @@ describe('equipe da Operação do parceiro', () => {
       id: 'employee-1', work_area: 'sales', base_salary: 2300,
       benefits_total: 220, commission_value: 5,
     });
+  });
+
+  it('entrega ao funcionário somente o diretório sem consultar ou expor dados financeiros', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{
+      id: 'employee-1', name: 'Wallace', active: true,
+      role_name: 'Vendedor', job_role: 'vendedor',
+    }] });
+    const db = { query } as unknown as Pool;
+
+    const result = await getPartnerOperationTeamDirectory(
+      { ...context, role: 'funcionario', tokenId: 'employee-2' }, db,
+    );
+
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(query.mock.calls[0]?.[1]).toBeUndefined();
+    expect(sql).toContain('network.partner_staff_directory()');
+    expect(sql).not.toContain('partner_access_tokens');
+    expect(sql).not.toContain('partner_collaborator_compensation');
+    expect(sql).not.toContain('partner_staff_commission');
+    expect(sql).not.toContain('partner_token_permissions');
+    expect(sql).not.toContain('login_username');
+    expect(result).toEqual({
+      unit_name: 'Borracharia Rio do Ouro', active_count: 1,
+      members: [{
+        id: 'employee-1', name: 'Wallace', role: 'Vendedor', work_area: 'sales', active: true,
+      }],
+    });
+    for (const forbidden of [
+      'username', 'base_salary', 'benefits', 'benefits_total',
+      'commission_amount', 'commission_value', 'permissions',
+    ]) expect(result.members[0]).not.toHaveProperty(forbidden);
   });
 
   it('monta a remuneração sem expor nem buscar colaborador de outra loja', async () => {
