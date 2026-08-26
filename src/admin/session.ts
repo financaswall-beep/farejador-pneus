@@ -3,6 +3,11 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { fakeVerify, hashPassword, hashSessionToken, verifyPassword } from '../parceiro/password.js';
+import {
+  matrixPanelModules,
+  type MatrixPanelModule,
+  type MatrixPanelPermissionRow,
+} from './panel-modules.js';
 
 export const ADMIN_SESSION_COOKIE = 'farejador_matriz_session';
 export const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -17,6 +22,7 @@ export interface MatrizAdminContext {
   displayName: string;
   username: string | null;
   role: MatrizAdminRole;
+  modules: MatrixPanelModule[];
 }
 
 export interface MatrizAdminLoginResult {
@@ -70,13 +76,19 @@ export async function authenticateMatrizAdmin(
     display_name: string | null;
     username: string;
     panel_role: MatrizAdminRole | null;
-  }>(
+  } & Partial<MatrixPanelPermissionRow>>(
     `SELECT pp.id AS person_id, pp.password_hash, pp.username,
-            mc.id AS collaborator_id, mc.display_name, mc.panel_role
+            mc.id AS collaborator_id, mc.display_name, mc.panel_role,
+            op.allow_resumo,op.allow_bot,op.allow_vendas,op.allow_retiradas,
+            op.allow_clientes,op.allow_compras,op.allow_estoque,op.allow_logistica,
+            op.allow_financeiro,op.allow_rede,op.allow_marketing,
+            op.allow_colaboradores,op.allow_catalogo
        FROM network.partner_people pp
        LEFT JOIN network.matriz_collaborators mc
          ON mc.person_id = pp.id AND mc.environment = pp.environment
         AND mc.revoked_at IS NULL AND mc.panel_role IS NOT NULL
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.collaborator_id=mc.id AND op.environment=mc.environment
       WHERE pp.environment = $1 AND lower(pp.username) = lower($2)
         AND pp.revoked_at IS NULL AND pp.password_hash IS NOT NULL
       LIMIT 1`,
@@ -100,6 +112,7 @@ export async function authenticateMatrizAdmin(
       displayName: row.display_name,
       username: row.username,
       role: row.panel_role,
+      modules: matrixPanelModules(row.panel_role, row),
     },
   };
 }
@@ -116,11 +129,17 @@ export async function mintMatrizAdminSessionForPerson(
     display_name: string;
     username: string;
     panel_role: MatrizAdminRole;
-  }>(
-    `SELECT mc.id AS collaborator_id, mc.display_name, pp.username, mc.panel_role
+  } & Partial<MatrixPanelPermissionRow>>(
+    `SELECT mc.id AS collaborator_id, mc.display_name, pp.username, mc.panel_role,
+            op.allow_resumo,op.allow_bot,op.allow_vendas,op.allow_retiradas,
+            op.allow_clientes,op.allow_compras,op.allow_estoque,op.allow_logistica,
+            op.allow_financeiro,op.allow_rede,op.allow_marketing,
+            op.allow_colaboradores,op.allow_catalogo
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp
          ON pp.id = mc.person_id AND pp.environment = mc.environment
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.collaborator_id=mc.id AND op.environment=mc.environment
       WHERE mc.environment = $1 AND mc.person_id = $2 AND mc.id = $3
         AND mc.revoked_at IS NULL AND mc.panel_role IS NOT NULL
         AND pp.revoked_at IS NULL
@@ -135,6 +154,7 @@ export async function mintMatrizAdminSessionForPerson(
     context: {
       authType: 'session', personId, collaboratorId: row.collaborator_id,
       displayName: row.display_name, username: row.username, role: row.panel_role,
+      modules: matrixPanelModules(row.panel_role, row),
     },
   };
 }
@@ -151,18 +171,24 @@ export async function validateMatrizAdminSession(
     display_name: string;
     username: string;
     panel_role: MatrizAdminRole;
-  }>(
+  } & Partial<MatrixPanelPermissionRow>>(
     `UPDATE network.matriz_staff_sessions s
         SET last_used_at = now()
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp ON pp.id = mc.person_id AND pp.environment = mc.environment
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.collaborator_id=mc.id AND op.environment=mc.environment
       WHERE s.session_hash = $1 AND s.environment = $2
         AND s.revoked_at IS NULL AND s.expires_at > now()
         AND mc.person_id = s.person_id AND mc.environment = s.environment
         AND mc.revoked_at IS NULL AND mc.panel_role IS NOT NULL
         AND pp.revoked_at IS NULL
       RETURNING s.person_id, mc.id AS collaborator_id, mc.display_name,
-                pp.username, mc.panel_role`,
+                pp.username, mc.panel_role,
+                op.allow_resumo,op.allow_bot,op.allow_vendas,op.allow_retiradas,
+                op.allow_clientes,op.allow_compras,op.allow_estoque,op.allow_logistica,
+                op.allow_financeiro,op.allow_rede,op.allow_marketing,
+                op.allow_colaboradores,op.allow_catalogo`,
     [hashSessionToken(sessionToken), environment],
   );
   const row = result.rows[0];
@@ -174,6 +200,7 @@ export async function validateMatrizAdminSession(
     displayName: row.display_name,
     username: row.username,
     role: row.panel_role,
+    modules: matrixPanelModules(row.panel_role, row),
   };
 }
 
@@ -244,6 +271,7 @@ export async function bootstrapMatrizOwner(
         displayName: input.displayName.trim(),
         username: person.rows[0]!.username,
         role: 'owner',
+        modules: matrixPanelModules('owner'),
       },
     };
   } catch (error) {

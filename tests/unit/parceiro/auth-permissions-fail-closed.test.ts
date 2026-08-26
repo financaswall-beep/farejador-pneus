@@ -22,6 +22,7 @@ describe('permissões do parceiro falham fechadas', () => {
     expect(await resolvePartnerPermissions(employee)).toEqual({
       vendas: false, estoque: false, pedidos: false, clientes: false,
       entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+      compras: false, colaboradores: false, catalogo: false,
     });
     expect(query).toHaveBeenCalledTimes(1);
     expect(String(query.mock.calls[0]?.[0])).toContain('partner_token_permissions');

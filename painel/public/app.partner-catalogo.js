@@ -18,9 +18,13 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
     partnerCatalogoOwner() {
       return this.isPartnerPanel() && this.panelWorkplace?.role === 'owner';
     },
+    partnerCatalogoCanView() {
+      return this.isPartnerPanel() && (this.partnerCatalogoOwner()
+        || this.hasPanelModule?.('catalogo'));
+    },
 
     async loadPartnerCatalogo(page = 1) {
-      if (!this.partnerCatalogoOwner()) return;
+      if (!this.partnerCatalogoCanView()) return;
       const state = this.partnerCatalogo;
       const requestedPage = Math.max(1, Number(page) || 1);
       const request = ++state.request;

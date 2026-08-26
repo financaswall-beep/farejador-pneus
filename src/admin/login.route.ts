@@ -34,6 +34,7 @@ import {
   type OperationWorkplace,
 } from './caixa/operation-auth.js';
 import { consumePanelLoginTicket, newPanelLoginTicket } from './panel-login-ticket.js';
+import { matrixPanelModules } from './panel-modules.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_PER_USER = 10;
@@ -79,17 +80,6 @@ function tooMany(reply: FastifyReply, key: string) {
     .status(429).send({ error: 'too_many_attempts' });
 }
 
-const MATRIX_OWNER_MODULES = [
-  'resumo', 'bot', 'vendas', 'clientes', 'compras', 'estoque', 'logistica',
-  'financeiro', 'rede', 'marketing', 'colaboradores', 'catalogo', 'retiradas',
-];
-
-function matrixPanelModules(role: 'owner' | 'admin'): string[] {
-  return role === 'owner'
-    ? [...MATRIX_OWNER_MODULES]
-    : MATRIX_OWNER_MODULES.filter((module) => !['marketing', 'colaboradores', 'retiradas'].includes(module));
-}
-
 async function issuePanelSession(
   reply: FastifyReply,
   personId: string,
@@ -105,7 +95,7 @@ async function issuePanelSession(
     return {
       mode: 'direct' as const, scope: 'matrix' as const,
       workplace: publicOperationWorkplace(workplace),
-      modules: matrixPanelModules(result.context.role), user: publicUser(result),
+       modules: result.context.modules ?? matrixPanelModules(result.context.role), user: publicUser(result),
     };
   }
   clearSessionCookie(reply);
@@ -240,7 +230,7 @@ export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise
       workplace: workplace ? publicOperationWorkplace(workplace) : {
         id: 'matrix', kind: 'matrix', name: 'Matriz', role: context.role,
       },
-      modules: matrixPanelModules(context.role),
+       modules: context.modules ?? matrixPanelModules(context.role),
     });
   });
 

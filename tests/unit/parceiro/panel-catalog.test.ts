@@ -190,12 +190,12 @@ describe('catálogo seguro do painel parceiro', () => {
     expect(mocks.query).toHaveBeenCalledTimes(1);
   });
 
-  it('publica as duas rotas para quem possui a permissão canônica de estoque', () => {
+  it('publica as duas rotas para quem possui a permissão explícita de catálogo', () => {
     const route = readFileSync(resolve('src/parceiro/route-panel-catalog.ts'), 'utf8');
-    expect(route).toContain("const stockScreen = [requirePartnerAuth, requireScreen('estoque')]");
+    expect(route).toContain("const catalogScreen = [requirePartnerAuth, requireScreen('catalogo')]");
     expect(route).toContain("'/parceiro/:slug/api/painel/catalogo'");
     expect(route).toContain("'/parceiro/:slug/api/painel/catalogo/:productId/compatibilidade'");
-    expect(route.match(/preHandler: stockScreen/g)).toHaveLength(2);
+    expect(route.match(/preHandler: catalogScreen/g)).toHaveLength(2);
     expect(route).toContain("reply.header('Cache-Control', 'no-store')");
   });
 });

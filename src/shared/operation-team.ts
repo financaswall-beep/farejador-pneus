@@ -87,7 +87,8 @@ export interface OperationCommissionHistoryItem {
 
 export type OperationPermissionKey =
   | 'vendas' | 'estoque' | 'pedidos' | 'clientes' | 'entregas'
-  | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro';
+  | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro' | 'bot'
+  | 'compras' | 'logistica' | 'rede' | 'marketing' | 'colaboradores' | 'catalogo';
 
 export interface OperationPermissionsPayload {
   unit_name: string;

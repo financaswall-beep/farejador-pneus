@@ -5,6 +5,7 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
   const permissions = () => ({
     vendas: false, estoque: false, pedidos: false, clientes: false,
     entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+    compras: false, colaboradores: false, catalogo: false,
   });
   const rules = () => ({
     tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 },
@@ -39,16 +40,21 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
     partnerColaboradoresOwner() {
       return this.isPartnerPanel() && this.panelWorkplace?.role === 'owner';
     },
+    partnerColaboradoresCanView() {
+      return this.isPartnerPanel() && (this.partnerColaboradoresOwner()
+        || this.hasPanelModule?.('colaboradores'));
+    },
 
     async loadPartnerColaboradores() {
-      if (!this.partnerColaboradoresOwner()) return;
+      if (!this.partnerColaboradoresCanView()) return;
       const state = this.partnerColaboradores;
       const request = ++state.request;
       state.loading = true;
       state.error = null;
       try {
         const [team, accounts] = await Promise.all([
-          this.partnerApiGet('equipe'), this.partnerApiGet('funcionarios'),
+          this.partnerApiGet('equipe'),
+          this.partnerColaboradoresOwner() ? this.partnerApiGet('funcionarios') : Promise.resolve({ rows: [] }),
         ]);
         if (request !== state.request) return;
         const byId = new Map((accounts.rows || []).map((row) => [row.id, row]));
@@ -111,7 +117,8 @@ window.PAINEL_MODULES.partnerColaboradores = function () {
     },
     partnerColaboradoresPermissionLabels(row) {
       const labels = { vendas: 'Vendas', estoque: 'Estoque', pedidos: 'Pedidos', clientes: 'Clientes',
-        entregas: 'Entregas', retiradas: 'Retiradas', batepapo: 'Bate-papo', resumo: 'Resumo', financeiro: 'Financeiro' };
+        entregas: 'Logística', retiradas: 'Retiradas', batepapo: 'Bate-papo', resumo: 'Resumo',
+        financeiro: 'Financeiro', compras: 'Compras', colaboradores: 'Colaboradores', catalogo: 'Catálogo' };
       return Object.entries(row.permissions || {}).filter(([, enabled]) => enabled)
         .map(([key]) => labels[key] || key).slice(0, 3);
     },

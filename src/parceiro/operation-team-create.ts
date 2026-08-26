@@ -9,6 +9,7 @@ export async function createPartnerOperationMember(ctx: PartnerContext, input: {
     vendas: input.role === 'vendedor', estoque: input.role === 'estoque',
     pedidos: false, clientes: false, entregas: input.role === 'entregador',
     retiradas: false, batepapo: false, resumo: false, financeiro: false,
+    compras: input.role === 'estoque', colaboradores: false, catalogo: input.role === 'estoque',
   };
   return createPartnerFuncionario(
     ctx, input.name, input.username, input.password, permissions, undefined, input.role,

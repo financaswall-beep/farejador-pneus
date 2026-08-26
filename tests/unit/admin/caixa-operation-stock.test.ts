@@ -223,7 +223,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(receiptUi).toContain('received_quantity');
     expect(receiptUi).not.toContain('unit_cost');
     expect(receiptUi).not.toContain('sale_price');
-    expect(receiptRoute).toContain("requireScreen('estoque')");
+    expect(receiptRoute).toContain("requireScreen('compras')");
     expect(receiptRoute).toContain('api/operacao/compras/:purchaseId/receber');
     expect(receiptBackend).toContain("receipt_status='pending'");
     expect(receiptBackend).toContain('receipt_idempotency_key');

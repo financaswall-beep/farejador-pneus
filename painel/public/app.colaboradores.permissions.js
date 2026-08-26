@@ -1,5 +1,5 @@
-// Subaba de permissões da Matriz. Só expõe permissões que têm guarda real no
-// servidor; áreas administrativas continuam subordinadas ao papel do painel.
+// Subaba de permissões da Matriz. A mesma lista alimenta o menu e as guardas
+// centrais do servidor; nenhuma chave existe apenas para efeito visual.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.colaboradoresPermissions = function () {
   return {
@@ -8,10 +8,8 @@ window.PAINEL_MODULES.colaboradoresPermissions = function () {
       this.colabPermLoading = true;
       try {
         const payload = await this.apiGet(`/admin/api/colaboradores/${c.id}/permissoes-operacao`);
-        this.colabPermForm = {
-          vendas: !!payload.permissions?.vendas, estoque: !!payload.permissions?.estoque,
-          entregas: !!payload.permissions?.entregas, financeiro: !!payload.permissions?.financeiro,
-        };
+        this.colabPermForm = Object.fromEntries((payload.available_permissions || [])
+          .map((key) => [key, Boolean(payload.permissions?.[key])]));
         this.colabPermAvailable = payload.available_permissions || [];
         this.colabPermLocked = !!payload.locked;
       } catch (err) {
@@ -30,6 +28,13 @@ window.PAINEL_MODULES.colaboradoresPermissions = function () {
       return this.colabAtivos.filter((c) => c.last_used_at
         && new Date(c.last_used_at).getTime() < limit).length;
     },
+    colabPermissionCountLabel(c) {
+      if (c?.panel_role === 'owner') return `${this.colabPermAvailable.length || 13} módulos`;
+      if (this.colabSelectedId === c?.id && Object.keys(this.colabPermForm || {}).length) {
+        return `${Object.values(this.colabPermForm).filter(Boolean).length} módulos`;
+      }
+      return c?.panel_role ? 'Personalizado' : 'Sem painel';
+    },
     colabLastAccess(c) {
       if (!c?.last_used_at) return 'Nunca acessou';
       const date = new Date(c.last_used_at);
@@ -40,20 +45,34 @@ window.PAINEL_MODULES.colaboradoresPermissions = function () {
     },
     colabPermissionMeta(key) {
       return ({
+        resumo: ['Resumo', 'Visão geral da operação', 'layout-dashboard'],
+        bot: ['Bot', 'Movimento, conversas e demanda', 'bot'],
         vendas: ['Vendas', 'Registrar e consultar vendas', 'shopping-cart'],
+        retiradas: ['Retiradas', 'Pedidos reservados e atendimento', 'package-check'],
+        clientes: ['Clientes', 'Leads, histórico e relacionamento', 'users'],
+        compras: ['Compras', 'Fornecedores e abastecimento', 'shopping-basket'],
         estoque: ['Estoque', 'Consultar e movimentar estoque', 'package'],
-        entregas: ['Logística', 'Rotas, entregas e comprovantes', 'truck'],
+        logistica: ['Logística', 'Rotas, entregas e comprovantes', 'truck'],
         financeiro: ['Financeiro', 'Caixa e consultas financeiras', 'circle-dollar-sign'],
+        rede: ['Rede', 'Unidades, parceiros e consolidação', 'network'],
+        marketing: ['Marketing', 'Campanhas, investimento e conversão', 'megaphone'],
+        colaboradores: ['Colaboradores', 'Equipe, remuneração e permissões', 'users-round'],
+        catalogo: ['Catálogo', 'Produtos, preços e compatibilidades', 'tag'],
       })[key] || [key, '', 'shield-check'];
     },
     colabApplyPermissionModel() {
       const presets = {
-        vendedor: { vendas: true, estoque: false, entregas: false, financeiro: false },
-        estoque: { vendas: false, estoque: true, entregas: false, financeiro: false },
-        entregador: { vendas: false, estoque: false, entregas: true, financeiro: false },
-        gerente: { vendas: true, estoque: true, entregas: true, financeiro: true },
+        vendedor: ['resumo', 'vendas', 'retiradas', 'clientes', 'catalogo'],
+        estoque: ['resumo', 'compras', 'estoque', 'catalogo'],
+        entregador: ['resumo', 'retiradas', 'logistica'],
+        administrativo: ['resumo', 'compras', 'financeiro', 'colaboradores', 'catalogo'],
+        gerente: this.colabPermAvailable,
       };
-      if (presets[this.colabPermissionModel]) this.colabPermForm = { ...presets[this.colabPermissionModel] };
+      const selected = presets[this.colabPermissionModel];
+      if (!selected) return;
+      const enabled = new Set(selected);
+      this.colabPermForm = Object.fromEntries(this.colabPermAvailable
+        .map((key) => [key, enabled.has(key)]));
     },
     async colabOpenPermissions(c) {
       this.colabSelectedId = c.id; this.colabDrawer = null; this.colabPermissionModel = 'custom';

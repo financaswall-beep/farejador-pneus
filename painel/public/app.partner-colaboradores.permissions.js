@@ -5,9 +5,20 @@ window.PAINEL_MODULES.partnerColaboradoresPermissions = function () {
   const keys = [
     'vendas', 'estoque', 'pedidos', 'clientes', 'entregas',
     'retiradas', 'batepapo', 'resumo', 'financeiro',
+    'compras', 'colaboradores', 'catalogo',
+  ];
+  const visibleKeys = [
+    'resumo', 'vendas', 'retiradas', 'compras', 'estoque', 'entregas',
+    'financeiro', 'colaboradores', 'catalogo',
   ];
   return {
+    partnerColaboradoresVisiblePermissionKeys() { return visibleKeys; },
     partnerColaboradoresPermissionRows() { return this.partnerColaboradoresFiltered(); },
+    partnerColaboradoresPermissionCountLabel(row) {
+      const allowed = new Set(visibleKeys);
+      return `${Object.entries(row?.permissions || {})
+        .filter(([key, enabled]) => allowed.has(key) && enabled).length} módulos`;
+    },
     partnerColaboradoresWithoutPanelAccess() {
       return this.partnerColaboradores.rows.filter((row) => !row.active).length;
     },
@@ -31,17 +42,20 @@ window.PAINEL_MODULES.partnerColaboradoresPermissions = function () {
         retiradas: ['Retiradas', 'Atender pedidos reservados pelo Bot', 'package-check'],
         clientes: ['Clientes', 'Consultar e acompanhar clientes', 'users'],
         pedidos: ['Pedidos', 'Consultar pedidos da unidade', 'clipboard-list'],
+        compras: ['Compras', 'Registrar compras e recebimentos', 'shopping-cart'],
         estoque: ['Estoque', 'Consultar e movimentar estoque', 'package'],
         entregas: ['Logística', 'Rotas e entregas locais', 'truck'],
         financeiro: ['Financeiro', 'Caixa, cobranças e despesas', 'circle-dollar-sign'],
         batepapo: ['Bate-papo', 'Conversas e atendimento da unidade', 'messages-square'],
+        colaboradores: ['Colaboradores', 'Consultar a equipe local', 'users-round'],
+        catalogo: ['Catálogo', 'Produtos e preços da unidade', 'tag'],
       })[key] || [key, '', 'shield-check'];
     },
     partnerColaboradoresApplyPermissionModel() {
       const presets = {
-        vendedor: ['resumo', 'vendas', 'retiradas', 'clientes', 'pedidos', 'batepapo'],
+        vendedor: ['resumo', 'vendas', 'retiradas', 'clientes', 'pedidos', 'batepapo', 'catalogo'],
         caixa: ['resumo', 'vendas', 'retiradas', 'clientes', 'pedidos', 'financeiro'],
-        estoque: ['resumo', 'estoque', 'pedidos', 'retiradas'],
+        estoque: ['resumo', 'compras', 'estoque', 'pedidos', 'retiradas', 'catalogo'],
         entregador: ['resumo', 'entregas', 'pedidos'], gerente: keys,
       };
       const selected = presets[this.partnerColaboradores.permissionModel];

@@ -232,6 +232,37 @@ body {
   color: #be123c;
 }
 
+/* Permissões: chave seletora real, com o azul reservado às ações de decisão. */
+.permission-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 44px;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  border-radius: 9999px;
+  background-color: #cbd5e1;
+  background-image: radial-gradient(circle at 11px 50%, #fff 0 8px, transparent 8.5px);
+  transition: background-color .18s ease, background-image .18s ease, opacity .18s ease;
+}
+
+.permission-toggle:checked {
+  border-color: #0369a1;
+  background-color: #0369a1;
+  background-image: radial-gradient(circle at 32px 50%, #fff 0 8px, transparent 8.5px);
+}
+
+.permission-toggle:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, .3);
+  outline-offset: 2px;
+}
+
+.permission-toggle:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
 .fallback-error {
   padding: 40px;
   font-family: Inter, system-ui, sans-serif;

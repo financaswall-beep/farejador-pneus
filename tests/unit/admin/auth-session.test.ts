@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 const validateSession = vi.fn();
 
-function request(method = 'GET', origin?: string): FastifyRequest {
+function request(method = 'GET', origin?: string, url = '/admin/api/dashboard/matriz-resumo'): FastifyRequest {
   return {
     headers: {
       cookie: `farejador_matriz_session=ms_${'a'.repeat(64)}`,
@@ -11,6 +11,7 @@ function request(method = 'GET', origin?: string): FastifyRequest {
       ...(origin ? { origin } : {}),
     },
     method,
+    url,
     protocol: 'https',
     ip: '203.0.113.4',
     log: { warn: vi.fn() },
@@ -27,7 +28,7 @@ function reply(): FastifyReply & { payload: unknown } {
   return value as unknown as FastifyReply & { payload: unknown };
 }
 
-async function loadAuth(role: 'owner' | 'admin' = 'owner') {
+async function loadAuth(role: 'owner' | 'admin' = 'owner', modules?: string[]) {
   vi.resetModules();
   Object.assign(process.env, {
     NODE_ENV: 'test', FAREJADOR_ENV: 'prod', DATABASE_URL: 'postgres://test',
@@ -36,7 +37,7 @@ async function loadAuth(role: 'owner' | 'admin' = 'owner') {
   });
   validateSession.mockResolvedValue({
     authType: 'session', personId: 'p1', collaboratorId: 'c1', displayName: 'Wallace',
-    username: 'wallace.matriz', role,
+    username: 'wallace.matriz', role, modules,
   });
   vi.doMock('../../../src/admin/session.js', () => ({
     ADMIN_SESSION_COOKIE: 'farejador_matriz_session',
@@ -77,5 +78,20 @@ describe('admin cookie guard', () => {
     await auth.requireAdminOwner(request(), rep);
     expect(rep.statusCode).toBe(403);
     expect(rep.payload).toEqual({ error: 'admin_owner_required' });
+  });
+
+  it('enforces the selected matrix sector in the server, not only in the menu', async () => {
+    const auth = await loadAuth('admin', ['resumo', 'vendas']);
+    const rep = reply();
+    await auth.requireAdminAuth(request('GET', undefined, '/admin/api/financeiro/visao-geral'), rep);
+    expect(rep.statusCode).toBe(403);
+    expect(rep.payload).toEqual({ error: 'admin_forbidden_module', modules: ['financeiro'] });
+  });
+
+  it('allows an admin to use a matrix sector that was selected', async () => {
+    const auth = await loadAuth('admin', ['resumo', 'financeiro']);
+    const rep = reply();
+    await auth.requireAdminAuth(request('GET', undefined, '/admin/api/financeiro/visao-geral'), rep);
+    expect(rep.statusCode).toBe(200);
   });
 });

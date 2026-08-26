@@ -25,6 +25,7 @@ const context: PartnerContext = {
 const permissions = {
   vendas: true, estoque: true, pedidos: false, clientes: true, entregas: false,
   retiradas: false, batepapo: false, resumo: false, financeiro: false,
+  compras: true, colaboradores: false, catalogo: true,
 };
 
 describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () => {
@@ -42,8 +43,9 @@ describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () =
       'prod', 'unit-partner-1', 'employee-1',
     ]);
     expect(result).toMatchObject({ unit_name: 'Borracharia Rio do Ouro', permissions, locked: false });
-    expect(result?.available_permissions).toHaveLength(9);
+    expect(result?.available_permissions).toHaveLength(12);
     expect(result?.available_permissions).toContain('batepapo');
+    expect(result?.available_permissions).toContain('catalogo');
   });
 
   it('salva e revoga somente as sessÃµes do colaborador alterado', async () => {

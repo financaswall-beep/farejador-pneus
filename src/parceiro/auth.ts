@@ -10,12 +10,13 @@ import { logger } from '../shared/logger.js';
 
 export type PartnerRole = 'owner' | 'funcionario';
 
-// As 9 telas que o dono pode ligar/desligar pro funcionário (PLANO §2.3). NÃO
+// As telas que o dono pode ligar/desligar pro funcionário (PLANO §2.3). NÃO
 // existe 'config': Configurações é cadeado duro (nunca via permissão; trava no
 // backend com requireOwner cru). Esta é a ALLOWLIST canônica — qualquer chave
 // fora daqui é ignorada na escrita (defesa em profundidade, gate §5.2).
 export const PARTNER_SCREENS = [
   'vendas', 'estoque', 'pedidos', 'clientes', 'entregas', 'retiradas', 'batepapo', 'resumo', 'financeiro',
+  'compras', 'colaboradores', 'catalogo',
 ] as const;
 export type PartnerScreen = (typeof PARTNER_SCREENS)[number];
 
@@ -32,6 +33,9 @@ const EMPLOYEE_DEFAULT_PERMISSIONS: PartnerPermissions = {
   batepapo: false,
   resumo: false,
   financeiro: false,
+  compras: false,
+  colaboradores: false,
+  catalogo: false,
 };
 
 // Dono vê tudo, sempre — resolvido no código, NUNCA lendo tabela (gate §5.3/§5.5).
@@ -45,6 +49,9 @@ const OWNER_PERMISSIONS: PartnerPermissions = {
   batepapo: true,
   resumo: true,
   financeiro: true,
+  compras: true,
+  colaboradores: true,
+  catalogo: true,
 };
 
 export interface PartnerContext {
@@ -235,6 +242,9 @@ type PermissionRow = {
   allow_batepapo: boolean;
   allow_resumo: boolean;
   allow_financeiro: boolean;
+  allow_compras: boolean;
+  allow_colaboradores: boolean;
+  allow_catalogo: boolean;
 };
 
 function permissionRowToPermissions(row: PermissionRow): PartnerPermissions {
@@ -248,6 +258,9 @@ function permissionRowToPermissions(row: PermissionRow): PartnerPermissions {
     batepapo: row.allow_batepapo,
     resumo: row.allow_resumo,
     financeiro: row.allow_financeiro,
+    compras: row.allow_compras,
+    colaboradores: row.allow_colaboradores,
+    catalogo: row.allow_catalogo,
   };
 }
 
@@ -259,7 +272,8 @@ export async function resolvePartnerPermissions(context: PartnerContext): Promis
     // (1) Perfil POR PESSOA (vínculo = token_id), 0100. Tem prioridade.
     const perToken = await pool.query<PermissionRow>(
       `SELECT allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-              allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro
+              allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro,
+              allow_compras, allow_colaboradores, allow_catalogo
          FROM network.partner_token_permissions
         WHERE token_id = $1 AND environment = $2`,
       [context.tokenId, context.environment],

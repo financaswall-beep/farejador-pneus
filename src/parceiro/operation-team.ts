@@ -33,7 +33,8 @@ type PartnerMemberRow = {
   commission_amount: string;
   permissions: Partial<Record<
     'vendas' | 'estoque' | 'pedidos' | 'clientes' | 'entregas'
-    | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro', boolean
+    | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro'
+    | 'compras' | 'colaboradores' | 'catalogo', boolean
   >>;
 };
 
@@ -86,7 +87,10 @@ async function rows(ctx: PartnerContext, db: Queryable): Promise<PartnerMemberRo
               'retiradas',COALESCE(perms.allow_retiradas,false),
               'batepapo',COALESCE(perms.allow_batepapo,false),
               'resumo',COALESCE(perms.allow_resumo,false),
-              'financeiro',COALESCE(perms.allow_financeiro,false)
+              'financeiro',COALESCE(perms.allow_financeiro,false),
+              'compras',COALESCE(perms.allow_compras,false),
+              'colaboradores',COALESCE(perms.allow_colaboradores,false),
+              'catalogo',COALESCE(perms.allow_catalogo,false)
             ) permissions
        FROM network.partner_access_tokens pat
        LEFT JOIN network.partner_token_permissions perms

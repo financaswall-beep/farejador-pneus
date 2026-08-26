@@ -50,17 +50,17 @@ function receiptError(reply: FastifyReply, error: unknown): FastifyReply | null 
 }
 
 export function registerPartnerOperationPurchaseRoutes(fastify: FastifyInstance): void {
-  const stockScreen = [requirePartnerAuth, requireScreen('estoque')];
+  const purchaseScreen = [requirePartnerAuth, requireScreen('compras')];
 
   fastify.get('/parceiro/:slug/api/operacao/compras', {
-    preHandler: stockScreen,
+    preHandler: purchaseScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     if (!validParams(request, reply)) return;
     return reply.status(200).send(await getOperationPendingPurchases(getPartnerContext(request)));
   });
 
   fastify.post('/parceiro/:slug/api/operacao/compras/:purchaseId/receber', {
-    preHandler: stockScreen,
+    preHandler: purchaseScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     const params = validParams(request, reply);
     if (!params?.purchaseId) return;

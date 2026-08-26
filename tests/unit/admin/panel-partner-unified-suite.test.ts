@@ -52,11 +52,9 @@ describe('painel único completo da unidade parceira', () => {
       expect(assembly).toContain(`PAINEL_MODULES.partner${page[0].toUpperCase()}${page.slice(1)}`);
     }
 
-    expect(api).toContain("me.permissions.financeiro === true");
-    expect(api).toContain("partnerOnlyModules.push('compras')");
     expect(api).toContain("me.permissions.entregas === true");
-    expect(api).toContain("partnerOnlyModules.push('logistica')");
-    expect(api).toContain("partnerOnlyModules.push('colaboradores', 'catalogo')");
+    expect(api).toContain("['logistica']");
+    expect(api).not.toContain("me.permissions.financeiro === true");
     expect(api).not.toMatch(/partnerOnlyModules\.push\([^\n]*(?:marketing|bot|rede)/i);
     for (const blocked of ['bot', 'marketing', 'rede']) {
       expect(nav).toMatch(new RegExp(`${blocked}: \\{ scopes: \\[\\'matrix\\'\\]`));
@@ -146,15 +144,15 @@ describe('painel único completo da unidade parceira', () => {
     }
   });
 
-  it('registra catálogo com a permissão de Estoque e limita a migration às duas leituras técnicas', () => {
+  it('registra catálogo com permissão própria e limita a migration às duas leituras técnicas', () => {
     const routeRoot = source('src/parceiro/route.ts');
     const route = source('src/parceiro/route-panel-catalog.ts');
     const migration = source('db/migrations/0206_partner_panel_catalog_read_grants.sql');
     const grants = JSON.parse(source('scripts/baseline-grants-parceiro.json'));
     expect(routeRoot).toContain("import { registerPartnerPanelCatalogRoutes } from './route-panel-catalog.js'");
     expect(routeRoot).toContain('registerPartnerPanelCatalogRoutes(fastify)');
-    expect(route).toContain("const stockScreen = [requirePartnerAuth, requireScreen('estoque')]");
-    expect(route.match(/preHandler: stockScreen/g)).toHaveLength(2);
+    expect(route).toContain("const catalogScreen = [requirePartnerAuth, requireScreen('catalogo')]");
+    expect(route.match(/preHandler: catalogScreen/g)).toHaveLength(2);
     expect(migration).toContain('ON commerce.vehicle_models, commerce.vehicle_fitments');
     expect(migration).toContain('TO farejador_partner_app');
     expect(migration).toContain("has_table_privilege('farejador_partner_app', relation_name, 'SELECT')");

@@ -77,9 +77,11 @@ const financialConfigurationSchema = z.object({
   }
 });
 const operationPermissions = z.object({
-  vendas: z.boolean(), estoque: z.boolean().default(false),
-  entregas: z.boolean(), financeiro: z.boolean(),
-});
+  resumo: z.boolean(), bot: z.boolean(), vendas: z.boolean(), retiradas: z.boolean(),
+  clientes: z.boolean(), compras: z.boolean(), estoque: z.boolean(),
+  logistica: z.boolean(), financeiro: z.boolean(), rede: z.boolean(),
+  marketing: z.boolean(), colaboradores: z.boolean(), catalogo: z.boolean(),
+}).strict();
 const adjustmentSchema = z.object({
   collaborator_id: z.string().uuid(), competence: month,
   kind: z.enum(['addition', 'deduction']), description: z.string().trim().min(2).max(120),

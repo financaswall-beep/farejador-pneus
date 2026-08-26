@@ -59,7 +59,7 @@ describe('Catálogo na Operação da Loja', () => {
     expect(scripts).not.toMatch(/\/admin\/api|average_cost|unit_cost|gross_profit|margin|wholesale_stock/i);
     expect(html).toContain('O preço e o estoque exibidos são somente desta unidade.');
     expect(partnerCatalogRoute).toContain(
-      "const stockScreen = [requirePartnerAuth, requireScreen('estoque')]",
+      "const catalogScreen = [requirePartnerAuth, requireScreen('catalogo')]",
     );
   });
 

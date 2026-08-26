@@ -20,7 +20,7 @@ describe('retiradas no painel único', () => {
     const staticRoute = source('src/admin/painel/route-static.ts');
     const partnerRoute = source('src/parceiro/route.ts');
     const matrixRoute = source('src/admin/painel/route-pedidos.ts');
-    const matrixLogin = source('src/admin/login.route.ts');
+    const matrixModules = source('src/admin/panel-modules.ts');
 
     expect(nav).toContain("{ id: 'retiradas', label: 'Retiradas'");
     expect(nav).toContain("scopes: ['matrix', 'partner'], requires: 'retiradas'");
@@ -41,7 +41,8 @@ describe('retiradas no painel único', () => {
     expect(matrixRoute).toContain("fastify.post('/admin/api/orders/:order_id/retrieve', { preHandler: requireAdminOwner }");
     expect(matrixRoute).toContain('payment_method: z.string().trim().min(1).max(80)');
     expect(partnerRoute).toContain('payment_method: z.string().trim().min(1).max(80)');
-    expect(matrixLogin).toContain("'catalogo', 'retiradas'");
+    expect(matrixModules).toContain("'retiradas', 'clientes', 'compras'");
+    expect(matrixModules).toContain("'colaboradores', 'catalogo'");
   });
 
   it('confirma pelo endpoint escopado e não antecipa cálculo financeiro no navegador', async () => {

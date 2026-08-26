@@ -111,7 +111,7 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
     expect(html).toContain('stockAdjustmentImpact()');
     expect(html).toContain('app.galpao.ajuste.js?v=20260727-stock-adjustment1');
     expect(html).toContain('app.montagem.js?v=20260823-partner-pickups1');
-    expect(html).toContain('app.js?v=20260826-permissions1');
+    expect(html).toContain('app.js?v=20260826-permissions2');
     expect(montagem).toContain('window.PAINEL_MODULES.galpaoAjuste');
     expect(staticRoutes).toContain("'app.galpao.ajuste.js'");
   });

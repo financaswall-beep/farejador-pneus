@@ -118,9 +118,9 @@ describe('Colaboradores - dialogos e carregamento confiaveis', () => {
   });
 
   it('invalida o cache dos tres scripts alterados', () => {
-    expect(html).toContain('app.colaboradores.js?v=20260826-permissions1');
-    expect(html).toContain('app.colaboradores.gestao.js?v=20260826-permissions1');
-    expect(html).toContain('app.colaboradores.permissions.js?v=20260826-permissions1');
-    expect(html).toContain('app.js?v=20260826-permissions1');
+    expect(html).toContain('app.colaboradores.js?v=20260826-permissions2');
+    expect(html).toContain('app.colaboradores.gestao.js?v=20260826-permissions2');
+    expect(html).toContain('app.colaboradores.permissions.js?v=20260826-permissions2');
+    expect(html).toContain('app.js?v=20260826-permissions2');
   });
 });

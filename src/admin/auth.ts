@@ -12,6 +12,7 @@ import {
   type MatrizAdminContext,
   validateMatrizAdminSession,
 } from './session.js';
+import { matrixPanelModules, requiredMatrixModules } from './panel-modules.js';
 
 const ADMIN_AUTH_MAX_ATTEMPTS = 10;
 const ADMIN_AUTH_WINDOW_MS = 5 * 60 * 1000;
@@ -104,6 +105,7 @@ export async function requireAdminAuth(request: FastifyRequest, reply: FastifyRe
       displayName: 'Administrador emergencial',
       username: null,
       role: 'owner',
+      modules: matrixPanelModules('owner'),
     };
     rateLimitClear(rateKey);
     return;
@@ -118,6 +120,15 @@ export async function requireAdminAuth(request: FastifyRequest, reply: FastifyRe
         return;
       }
       (request as AdminAuthedRequest).adminContext = context;
+      const required = requiredMatrixModules(request.url);
+      const contextModules = Array.isArray(context.modules)
+        ? context.modules : matrixPanelModules(context.role);
+      if (context.role !== 'owner' && required
+          && !required.some((module) => contextModules.includes(module))) {
+        await reply.status(403).send({ error: 'admin_forbidden_module', modules: required });
+        return;
+      }
+      context.modules = contextModules;
       rateLimitClear(rateKey);
       return;
     }

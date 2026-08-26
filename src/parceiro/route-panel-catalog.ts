@@ -12,7 +12,7 @@ import {
   PartnerPanelCatalogNotFoundError,
 } from './panel-catalog.js';
 
-const stockScreen = [requirePartnerAuth, requireScreen('estoque')];
+const catalogScreen = [requirePartnerAuth, requireScreen('catalogo')];
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).max(1_000_000).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(40),
@@ -23,10 +23,10 @@ const querySchema = z.object({
 });
 const productParams = z.object({ productId: z.string().uuid() });
 
-/** Catálogo da unidade: leitura segue a permissão canônica de Estoque. */
+/** Catálogo da unidade: leitura segue a permissão explícita de Catálogo. */
 export function registerPartnerPanelCatalogRoutes(fastify: FastifyInstance): void {
   fastify.get('/parceiro/:slug/api/painel/catalogo', {
-    preHandler: stockScreen,
+    preHandler: catalogScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_catalog_query' });
@@ -37,7 +37,7 @@ export function registerPartnerPanelCatalogRoutes(fastify: FastifyInstance): voi
   });
 
   fastify.get('/parceiro/:slug/api/painel/catalogo/:productId/compatibilidade', {
-    preHandler: stockScreen,
+    preHandler: catalogScreen,
   }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = productParams.safeParse(request.params ?? {});
     if (!parsed.success) return reply.status(404).send({ error: 'catalog_product_not_found' });

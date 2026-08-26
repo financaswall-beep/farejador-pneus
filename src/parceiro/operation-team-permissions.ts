@@ -11,6 +11,7 @@ import {
 const available = [
   'vendas', 'estoque', 'pedidos', 'clientes', 'entregas',
   'retiradas', 'batepapo', 'resumo', 'financeiro',
+  'compras', 'colaboradores', 'catalogo',
 ] as const;
 
 type JobRole = 'vendedor' | 'estoque' | 'entregador' | 'colaborador';

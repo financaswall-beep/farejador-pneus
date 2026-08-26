@@ -24,7 +24,8 @@ describe('aba de permissões dos colaboradores', () => {
     expect(html).toContain("colabTab === 'permissoes'");
     expect(html).toContain('Modelo de acesso');
     expect(html).toContain('Encerrar sessões');
-    expect(html).toContain('Áreas administrativas');
+    expect(html).toContain('Setores permitidos na Matriz');
+    expect(html).toContain('class="permission-toggle"');
     expect(html).toContain('Estas permissões valem somente para esta unidade');
   });
 
@@ -58,12 +59,17 @@ describe('aba de permissões dos colaboradores', () => {
       'painel/public/app.colaboradores.permissions.js', 'colaboradoresPermissions',
     ), {
       apiPut: put, apiPost: post, colabPermissionModel: 'gerente', colabPermForm: {},
+      colabPermAvailable: ['resumo', 'bot', 'vendas', 'retiradas', 'clientes', 'compras', 'estoque', 'logistica', 'financeiro', 'rede', 'marketing', 'colaboradores', 'catalogo'],
       colabPermLocked: false, colabSaving: false, colabSelectedId: 'c1',
       colabSelected: { id: 'c1', display_name: 'Ana', panel_role: 'admin' },
       colaboradores: [{ id: 'c1', display_name: 'Ana' }],
     });
     app.colabApplyPermissionModel();
-    expect(app.colabPermForm).toEqual({ vendas: true, estoque: true, entregas: true, financeiro: true });
+    expect(app.colabPermForm).toMatchObject({
+      resumo: true, bot: true, vendas: true, compras: true, estoque: true,
+      logistica: true, financeiro: true, rede: true, marketing: true,
+      colaboradores: true, catalogo: true,
+    });
     await app.colabSalvarPermissoes();
     await app.colabEndSessions();
     expect(put).toHaveBeenCalledWith('/admin/api/colaboradores/c1/permissoes-operacao', app.colabPermForm);

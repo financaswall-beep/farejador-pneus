@@ -47,12 +47,7 @@ window.PAINEL_MODULES.partnerApi = function () {
       };
       this.panelModules = Object.entries(me.permissions)
         .filter(([, allowed]) => allowed === true).map(([module]) => module);
-      const partnerOnlyModules = [];
-      if (me.permissions.financeiro === true) partnerOnlyModules.push('compras');
-      if (me.permissions.entregas === true) partnerOnlyModules.push('logistica');
-      if (me.role === 'owner') {
-        partnerOnlyModules.push('colaboradores', 'catalogo');
-      }
+      const partnerOnlyModules = me.permissions.entregas === true ? ['logistica'] : [];
       this.panelModules = [...new Set([...this.panelModules, ...partnerOnlyModules])];
       // Marketing, Bot e Rede não entram: não existem na projeção da unidade.
       this.adminUser = null;

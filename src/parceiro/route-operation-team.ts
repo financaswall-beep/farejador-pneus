@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { logger } from '../shared/logger.js';
-import { getPartnerContext, requireOwner, requirePartnerAuth, type PartnerAuthedRequest } from './auth.js';
+import { getPartnerContext, requireOwner, requirePartnerAuth, requireScreen, type PartnerAuthedRequest } from './auth.js';
 import {
   getPartnerOperationCommissionRule, getPartnerOperationCompensation,
   getPartnerOperationTeam, savePartnerOperationCommissionRule,
@@ -15,6 +15,7 @@ import {
 import { savePartnerOperationConfiguration } from './operation-team-config.js';
 
 const owner = [requirePartnerAuth, requireOwner];
+const teamScreen = [requirePartnerAuth, requireScreen('colaboradores')];
 const params = z.object({ collaboratorId: z.string().uuid() });
 const centMoney = (maximum: number) => z.number().finite().min(0).max(maximum)
   .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
@@ -61,7 +62,8 @@ const commission = z.discriminatedUnion('kind', [
 const permissions = z.object({
   vendas: z.boolean(), estoque: z.boolean(), pedidos: z.boolean(), clientes: z.boolean(),
   entregas: z.boolean(), retiradas: z.boolean(), batepapo: z.boolean().default(false),
-  resumo: z.boolean(), financeiro: z.boolean(),
+  resumo: z.boolean(), financeiro: z.boolean(), compras: z.boolean(),
+  colaboradores: z.boolean(), catalogo: z.boolean(),
 });
 const newMember = z.object({
   name: z.string().trim().min(2).max(120),
@@ -87,7 +89,7 @@ function bad(reply: FastifyReply, error: unknown, label: string) {
 }
 
 export function registerPartnerOperationTeamRoutes(fastify: FastifyInstance): void {
-  fastify.get('/parceiro/:slug/api/equipe', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/equipe', { preHandler: teamScreen }, async (request: PartnerAuthedRequest, reply) => {
     reply.header('Cache-Control', 'no-store');
     try { return reply.status(200).send(await getPartnerOperationTeam(getPartnerContext(request))); }
     catch (error) { return bad(reply, error, 'partner operation team unavailable'); }

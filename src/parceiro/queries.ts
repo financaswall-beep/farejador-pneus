@@ -3151,20 +3151,22 @@ export async function createPartnerFuncionario(
     const permissions = initialPermissions ?? {
       vendas: false, estoque: false, pedidos: false, clientes: false,
       entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+      compras: false, colaboradores: false, catalogo: false,
     };
     await client.query(
         `INSERT INTO network.partner_token_permissions
            (token_id, environment, partner_unit_id,
             allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
             allow_entregas, allow_retiradas, allow_batepapo, allow_resumo,
-            allow_financeiro, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            allow_financeiro, allow_compras, allow_colaboradores, allow_catalogo, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [res.rows[0]!.id, ctx.environment, ctx.partnerUnitId,
          permissions.vendas, permissions.estoque,
          permissions.pedidos, permissions.clientes,
          permissions.entregas, permissions.retiradas,
          permissions.batepapo, permissions.resumo,
-         permissions.financeiro, `owner:${ctx.slug}`],
+         permissions.financeiro, permissions.compras, permissions.colaboradores,
+         permissions.catalogo, `owner:${ctx.slug}`],
       );
     await client.query('COMMIT');
     const row = res.rows[0]!;
@@ -3405,6 +3407,7 @@ export async function upsertPartnerTokenPermissions(
   const resolved: PartnerPermissions = {
     vendas: false, estoque: false, pedidos: false, clientes: false,
     entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+    compras: false, colaboradores: false, catalogo: false,
   };
   for (const screen of PARTNER_SCREENS) {
     const v = input[screen];
@@ -3414,8 +3417,9 @@ export async function upsertPartnerTokenPermissions(
     `INSERT INTO network.partner_token_permissions
        (token_id, environment, partner_unit_id,
         allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-        allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro,
+        allow_compras, allow_colaboradores, allow_catalogo, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      ON CONFLICT (token_id) DO UPDATE SET
         allow_vendas     = EXCLUDED.allow_vendas,
         allow_estoque    = EXCLUDED.allow_estoque,
@@ -3426,12 +3430,16 @@ export async function upsertPartnerTokenPermissions(
         allow_batepapo   = EXCLUDED.allow_batepapo,
         allow_resumo     = EXCLUDED.allow_resumo,
         allow_financeiro = EXCLUDED.allow_financeiro,
+        allow_compras    = EXCLUDED.allow_compras,
+        allow_colaboradores = EXCLUDED.allow_colaboradores,
+        allow_catalogo   = EXCLUDED.allow_catalogo,
         updated_at       = now(),
         updated_by       = EXCLUDED.updated_by`,
     [
       tokenId, ctx.environment, ctx.partnerUnitId,
       resolved.vendas, resolved.estoque, resolved.pedidos, resolved.clientes,
       resolved.entregas, resolved.retiradas, resolved.batepapo, resolved.resumo, resolved.financeiro,
+      resolved.compras, resolved.colaboradores, resolved.catalogo,
       `owner:${ctx.slug}`,
     ],
   );
@@ -3447,16 +3455,19 @@ export async function getPartnerTokenPermissions(
 ): Promise<PartnerPermissions> {
   await assertUnitFuncionario(ctx, tokenId, db);
   const cols = `allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-                allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro`;
+                allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro,
+                allow_compras, allow_colaboradores, allow_catalogo`;
   type Row = {
     allow_vendas: boolean; allow_estoque: boolean; allow_pedidos: boolean;
     allow_clientes: boolean; allow_entregas: boolean; allow_retiradas: boolean;
     allow_batepapo: boolean; allow_resumo: boolean; allow_financeiro: boolean;
+    allow_compras: boolean; allow_colaboradores: boolean; allow_catalogo: boolean;
   };
   const mapRow = (r: Row): PartnerPermissions => ({
     vendas: r.allow_vendas, estoque: r.allow_estoque, pedidos: r.allow_pedidos,
     clientes: r.allow_clientes, entregas: r.allow_entregas, retiradas: r.allow_retiradas,
     batepapo: r.allow_batepapo, resumo: r.allow_resumo, financeiro: r.allow_financeiro,
+    compras: r.allow_compras, colaboradores: r.allow_colaboradores, catalogo: r.allow_catalogo,
   });
   const perToken = await db.query<Row>(
     `SELECT ${cols} FROM network.partner_token_permissions WHERE token_id = $1 AND environment = $2`,
@@ -3466,6 +3477,7 @@ export async function getPartnerTokenPermissions(
   return {
     vendas: false, estoque: false, pedidos: false, clientes: false,
     entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+    compras: false, colaboradores: false, catalogo: false,
   };
 }
 
@@ -4042,7 +4054,7 @@ export interface PartnerPermissionsInput {
 /**
  * Upsert 1:1 das permissões de tela do funcionário (PLANO §2.3, gate §5.2).
  *
- * 🔒 ALLOWLIST FIXA NO SERVIDOR: só as 9 telas de PARTNER_SCREENS são consideradas.
+ * 🔒 ALLOWLIST FIXA NO SERVIDOR: só as telas de PARTNER_SCREENS são consideradas.
  * Qualquer chave fora da lista (notadamente `config`) é IGNORADA — defesa em
  * profundidade. Configurações NUNCA é liberável por permissão (cadeado duro: a
  * trava real é requireOwner cru nos endpoints de Configurações).
@@ -4058,6 +4070,7 @@ export async function upsertPartnerPermissions(
   const defaults: PartnerPermissions = {
     vendas: true, estoque: true, pedidos: true, clientes: true,
     entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false,
+    compras: true, colaboradores: false, catalogo: true,
   };
 
   const resolved = { ...defaults };
@@ -4073,8 +4086,9 @@ export async function upsertPartnerPermissions(
     `INSERT INTO network.partner_unit_permissions
        (partner_unit_id, environment,
         allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-        allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro,
+        allow_compras, allow_colaboradores, allow_catalogo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      ON CONFLICT (partner_unit_id) DO UPDATE SET
         allow_vendas     = EXCLUDED.allow_vendas,
         allow_estoque    = EXCLUDED.allow_estoque,
@@ -4085,6 +4099,9 @@ export async function upsertPartnerPermissions(
         allow_batepapo   = EXCLUDED.allow_batepapo,
         allow_resumo     = EXCLUDED.allow_resumo,
         allow_financeiro = EXCLUDED.allow_financeiro,
+        allow_compras    = EXCLUDED.allow_compras,
+        allow_colaboradores = EXCLUDED.allow_colaboradores,
+        allow_catalogo   = EXCLUDED.allow_catalogo,
         updated_at       = now()`,
     [
       ctx.partnerUnitId,
@@ -4098,6 +4115,9 @@ export async function upsertPartnerPermissions(
       resolved.batepapo,
       resolved.resumo,
       resolved.financeiro,
+      resolved.compras,
+      resolved.colaboradores,
+      resolved.catalogo,
     ],
   );
 
