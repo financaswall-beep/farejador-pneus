@@ -179,6 +179,7 @@ export const REQUIRED_SCHEMA_SQL = `
          AND column_name='pickup_service_code'
     )
     AND to_regclass('ops.application_schema_state') IS NOT NULL
+    AND to_regclass('ops.applied_migrations') IS NOT NULL
     AND to_regclass('finance.partner_receivable_events') IS NOT NULL
     AND to_regclass('finance.partner_payable_events') IS NOT NULL
     AND to_regclass('finance.partner_order_refunds') IS NOT NULL
@@ -190,17 +191,23 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=200
+       AND version>=213
+       AND EXISTS (
+         SELECT 1 FROM ops.applied_migrations
+          WHERE migration_file='0213_migration_ledger.sql'
+            AND checksum_sha256='32c12dbbae7497fd0946542bd76808de8df4b28560d7d46eee198e7a9dbd7788'
+       )
+       AND (SELECT count(*) FROM ops.applied_migrations)>=214
   ) AS ready`;
 
-/** Impede o processo novo de operar sem o contrato mínimo, hoje concluído na 0204. */
+/** Impede o processo novo de operar sem o contrato mínimo e o ledger da 0213. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0204_pickup_service_workflow');
+    throw new Error('required_schema_missing:0213_migration_ledger');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0204_pickup_service_workflow');
+    throw new Error('required_schema_missing:0213_migration_ledger');
   }
 }

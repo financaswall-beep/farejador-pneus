@@ -4,7 +4,11 @@ import { inspectOperationalContinuity } from '../../../src/admin/operational-hea
 
 function row(overrides: Record<string, unknown> = {}) {
   return {
-    schema_version: 199,
+    schema_version: 213,
+    schema_migration_name: '0213_migration_ledger.sql',
+    migration_ledger_rows: 214,
+    migration_ledger_version: 213,
+    migration_ledger_latest: '0213_migration_ledger.sql',
     missing_partitions: 0,
     partition_job_active: true,
     retention_job_active: true,
@@ -34,13 +38,22 @@ describe('continuidade operacional', () => {
 
     expect(result.critical).toEqual([]);
     expect(result.warnings).toEqual([]);
-    expect(result.details).toMatchObject({ schema_version: 199, missing_partitions: 0 });
+    expect(result.details).toMatchObject({
+      schema_version: 213,
+      migration_ledger_rows: 214,
+      migration_ledger_version: 213,
+      missing_partitions: 0,
+    });
     expect(query).toHaveBeenCalledWith(expect.stringContaining('farejador-ensure-partitions'), ['prod']);
   });
 
   it('bloqueia prontidão sem schema, partição ou renovação automática', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [row({
-      schema_version: 198,
+      schema_version: 212,
+      schema_migration_name: '0212_purchase_payable_adjustment.sql',
+      migration_ledger_rows: 213,
+      migration_ledger_version: 212,
+      migration_ledger_latest: '0212_purchase_payable_adjustment.sql',
       missing_partitions: 2,
       partition_job_active: false,
     })] });
@@ -49,7 +62,8 @@ describe('continuidade operacional', () => {
     );
 
     expect(result.critical).toEqual([
-      'schema_marker_outdated', 'future_partitions_missing', 'partition_job_inactive',
+      'schema_marker_outdated', 'migration_ledger_incomplete',
+      'future_partitions_missing', 'partition_job_inactive',
     ]);
   });
 

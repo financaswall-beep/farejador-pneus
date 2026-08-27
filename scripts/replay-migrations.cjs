@@ -8,6 +8,7 @@ const {
   patchKnownMigrationIssues,
   stripEmbeddedTransactionControl,
 } = require('./migration-compat.cjs');
+const { recordApplicationMigration } = require('./migration-ledger.cjs');
 
 const root = path.resolve(__dirname, '..');
 const migrationsDir = path.join(root, 'db', 'migrations');
@@ -87,6 +88,7 @@ async function main() {
       if (patched.reason) compat.push({ file, reason: patched.reason });
       try {
         await client.query(stripEmbeddedTransactionControl(patched.sql));
+        await recordApplicationMigration(client,file,raw,'replay_migrations');
       } catch (error) {
         throw new Error(`Migration ${file}: ${error.message}`, { cause: error });
       }

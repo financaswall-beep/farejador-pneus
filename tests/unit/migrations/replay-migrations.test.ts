@@ -70,7 +70,9 @@ describe('replay imutavel das migrations historicas', () => {
   it('obriga o executor avulso a remover COMMIT interno antes do dry-run', () => {
     const runner = readFileSync('scripts/apply-migration-file.cjs', 'utf8');
     expect(runner).toContain("require('./migration-compat.cjs')");
-    expect(runner).toContain("stripEmbeddedTransactionControl(fs.readFileSync(resolved, 'utf8'))");
+    expect(runner).toContain("const rawSql = fs.readFileSync(resolved, 'utf8')");
+    expect(runner).toContain('stripEmbeddedTransactionControl(rawSql)');
+    expect(runner).toContain('recordApplicationMigration');
     expect(runner.indexOf('stripEmbeddedTransactionControl')).toBeLessThan(runner.indexOf("client.query('BEGIN')"));
   });
 });

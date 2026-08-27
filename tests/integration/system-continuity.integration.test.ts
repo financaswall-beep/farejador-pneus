@@ -14,8 +14,20 @@ describe('continuidade do schema em PostgreSQL limpo', () => {
       'SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true',
     );
     expect(state.rows[0]).toEqual({
-      version: 200,
-      migration_name: '0200_finance_credit_lifecycle.sql',
+      version: 213,
+      migration_name: '0213_migration_ledger.sql',
+    });
+
+    const ledger = await db.pool.query(`
+      SELECT count(*)::int row_count,
+             count(DISTINCT migration_file)::int file_count,
+             max(migration_order)::int latest_order
+        FROM ops.applied_migrations
+    `);
+    expect(ledger.rows[0]).toEqual({
+      row_count: 214,
+      file_count: 214,
+      latest_order: 213,
     });
 
     const constraints = await db.pool.query<{ conname: string; convalidated: boolean }>(`

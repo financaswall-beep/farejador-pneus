@@ -43,18 +43,21 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='pickup_services'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='pickup_service_code'`);
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.application_schema_state')");
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.applied_migrations')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivable_events')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payable_events')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_order_refunds')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivables_effective')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payables_effective')");
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=200');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=213');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain("migration_file='0213_migration_ledger.sql'");
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=214');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0204', async () => {
+  it('recusa iniciar antes da migration 0213', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0204_pickup_service_workflow');
+      .rejects.toThrow('required_schema_missing:0213_migration_ledger');
   });
 });

@@ -3,13 +3,21 @@ import { createRequire } from 'node:module';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(HERE, '..', '..', '..', 'db', 'migrations');
 const require = createRequire(import.meta.url);
 const { patchKnownMigrationIssues } = require('../../../scripts/migration-compat.cjs') as {
   patchKnownMigrationIssues: (file: string, sql: string) => { sql: string };
+};
+const { recordApplicationMigration } = require('../../../scripts/migration-ledger.cjs') as {
+  recordApplicationMigration: (
+    client: Pool | PoolClient,
+    file: string,
+    sql: string,
+    appliedBy: string,
+  ) => Promise<boolean>;
 };
 
 export interface IntegrationDb {
@@ -84,6 +92,7 @@ async function applyMigrations(pool: Pool, throughMigration?: string): Promise<v
       const sql = patchKnownMigrationIssues(file, raw).sql;
       try {
         await client.query(sql);
+        await recordApplicationMigration(client,file,raw,'integration_helper');
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Migration ${file}: ${message}`, { cause: error });
@@ -96,9 +105,20 @@ async function applyMigrations(pool: Pool, throughMigration?: string): Promise<v
 
 /** Aplica um unico arquivo para provar sequencias de deploy/hotfix. */
 export async function applyMigrationFile(pool: Pool, file: string): Promise<void> {
-  if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(file)) throw new Error('invalid_migration_file');
+  if (!/^\d{4}[a-z]*_[a-z0-9_]+\.sql$/.test(file)) throw new Error('invalid_migration_file');
   const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
-  await pool.query(patchKnownMigrationIssues(file, raw).sql);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(patchKnownMigrationIssues(file, raw).sql);
+    await recordApplicationMigration(client,file,raw,'integration_helper_single');
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**

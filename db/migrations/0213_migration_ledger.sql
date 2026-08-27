@@ -1,0 +1,365 @@
+-- 0213_migration_ledger.sql
+-- Registro canônico, verificável e imutável das migrations do Farejador.
+--
+-- O histórico 0001-0200 é registrado como inferência histórica porque vários
+-- executores foram usados antes de existir este ledger. As migrations 0201-0212
+-- foram verificadas por objetos/constraints no Portão 0 de 27/08/2026.
+-- applied_at permanece NULL quando a data real não pode ser provada.
+
+DO $preflight$
+DECLARE
+  v_schema_version INTEGER;
+BEGIN
+  SELECT version INTO v_schema_version
+    FROM ops.application_schema_state
+   WHERE singleton=true;
+
+  IF COALESCE(v_schema_version,0)<200 THEN
+    RAISE EXCEPTION '0213: marcador 0200 ausente';
+  END IF;
+
+  IF to_regclass('analytics.customer_journey_mv') IS NULL
+     OR to_regclass('analytics.v_clientes_pra_recuperar') IS NULL
+     OR to_regclass('commerce.fitment_discovery_promotions') IS NULL
+     OR to_regclass('ops.partner_panel_canary_events') IS NULL
+     OR to_regclass('commerce.wholesale_purchase_orders') IS NULL
+     OR to_regclass('commerce.wholesale_purchase_installments') IS NULL
+     OR to_regclass('commerce.wholesale_replenishment_policies') IS NULL
+     OR to_regprocedure('network.partner_staff_directory()') IS NULL THEN
+    RAISE EXCEPTION '0213: sentinela de migration 0201-0212 ausente';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema='network' AND table_name='partner_units'
+       AND column_name='modern_panel_enabled'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema='commerce' AND table_name='orders'
+       AND column_name='pickup_services'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema='network'
+       AND table_name='matriz_collaborator_operation_permissions'
+       AND column_name='allow_catalogo'
+  ) THEN
+    RAISE EXCEPTION '0213: coluna de migration 0203, 0204 ou 0210 ausente';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid='ops.partner_panel_canary_events'::regclass
+       AND conname='partner_panel_canary_events_page_check'
+       AND pg_get_constraintdef(oid) ILIKE '%estoque%'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid='finance.matriz_ledger_payments'::regclass
+       AND conname='matriz_ledger_payments_payment_kind_check'
+       AND pg_get_constraintdef(oid) ILIKE '%adjustment%'
+  ) THEN
+    RAISE EXCEPTION '0213: constraint de migration 0205 ou 0212 ausente';
+  END IF;
+
+  IF NOT has_table_privilege(
+    'farejador_partner_app','commerce.tire_specs','SELECT'
+  ) THEN
+    RAISE EXCEPTION '0213: grant de leitura da migration 0206 ausente';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM commerce.products p
+      JOIN commerce.tire_specs ts
+        ON ts.environment=p.environment AND ts.product_id=p.id
+     WHERE p.product_type='tire' AND p.deleted_at IS NULL
+       AND p.product_name IS DISTINCT FROM concat('Pneu ',p.brand,' ',ts.tire_size)
+  ) THEN
+    RAISE EXCEPTION '0213: normalizacao da migration 0207 divergente';
+  END IF;
+END
+$preflight$;
+
+CREATE TABLE ops.applied_migrations (
+  migration_order    INTEGER NOT NULL CHECK (migration_order>0),
+  migration_suffix   TEXT NOT NULL DEFAULT ''
+    CHECK (migration_suffix ~ '^[a-z]*$'),
+  migration_file     TEXT PRIMARY KEY
+    CHECK (migration_file ~ '^[0-9]{4}[a-z]*_[a-z0-9_]+[.]sql$'),
+  checksum_sha256    TEXT NOT NULL
+    CHECK (checksum_sha256 ~ '^[0-9a-f]{64}$'),
+  applied_at         TIMESTAMPTZ,
+  recorded_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  recorded_by        TEXT NOT NULL CHECK (length(btrim(recorded_by))>0),
+  verification_level TEXT NOT NULL CHECK (
+    verification_level IN (
+      'historical_inference','verified_existing_object','executor'
+    )
+  ),
+  CONSTRAINT applied_migrations_order_suffix_uniq
+    UNIQUE (migration_order,migration_suffix)
+);
+
+REVOKE ALL ON ops.applied_migrations FROM PUBLIC;
+
+CREATE INDEX applied_migrations_latest_idx
+  ON ops.applied_migrations(migration_order DESC,migration_suffix DESC);
+
+CREATE OR REPLACE FUNCTION ops.guard_applied_migrations_immutable()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=pg_catalog,ops
+AS $function$
+BEGIN
+  RAISE EXCEPTION 'applied_migrations_is_immutable' USING ERRCODE='55000';
+END
+$function$;
+
+REVOKE ALL ON FUNCTION ops.guard_applied_migrations_immutable() FROM PUBLIC;
+
+CREATE TRIGGER applied_migrations_immutable
+  BEFORE UPDATE OR DELETE ON ops.applied_migrations
+  FOR EACH ROW EXECUTE FUNCTION ops.guard_applied_migrations_immutable();
+
+INSERT INTO ops.applied_migrations(
+  migration_order,migration_suffix,migration_file,checksum_sha256,
+  applied_at,recorded_by,verification_level
+) VALUES
+  (1,'','0001_init_schemas.sql','68a3802fda5a4bb3434fe4f2abafeb1a565b8ef075f5a8b93660a04c6dae6efa',NULL,'portao0_2026_08_27','historical_inference'),
+  (2,'','0002_raw_layer.sql','c8f1ee4977c8af265d9e254029be705001659161eb9b740fe5ba0683aad4dbed',NULL,'portao0_2026_08_27','historical_inference'),
+  (3,'','0003_core_layer.sql','aae51f1977353fe2a6dcd5fdb58ffff257bd64a52ee132f9ee64da4297bb5fe5',NULL,'portao0_2026_08_27','historical_inference'),
+  (4,'','0004_analytics_layer.sql','5257089f7ee7d2554928a7e82d9acf34680562a6111370f2a7ac5e6c164e30ed',NULL,'portao0_2026_08_27','historical_inference'),
+  (5,'','0005_ops_layer.sql','33205741d333e3e2c4080519d5a7a5a54f213b3ae382bda905f4298353f867e0',NULL,'portao0_2026_08_27','historical_inference'),
+  (6,'','0006_concurrency_guards.sql','44b9882d899f3ae5eaa31cf3dfe7f6f5ee15a8d78a91ef4bb7feda3d31619233',NULL,'portao0_2026_08_27','historical_inference'),
+  (7,'','0007_raw_immutability_guard.sql','2af686245ba127842125212cae4b18c55d57c01bd52b01a2c3ec6db2b6cf7499',NULL,'portao0_2026_08_27','historical_inference'),
+  (8,'','0008_idempotency_constraints.sql','86cf96700ba516fc8d4572b88286b74594b77fdffc51b5169d83332cec77deba',NULL,'portao0_2026_08_27','historical_inference'),
+  (9,'','0009_orphan_stub_monitor.sql','c0b74ddbfed21a7ab2d3654404a6a634809ad5183e9e41ef0fe572867a61e772',NULL,'portao0_2026_08_27','historical_inference'),
+  (10,'','0010_analytics_ruleset_auditability.sql','237bcb00bb8e306bf31b7b3059373b121f82ac22da4347066408ccc0ef84f015',NULL,'portao0_2026_08_27','historical_inference'),
+  (11,'','0011_relax_hint_type_check.sql','9b6c1ecd7932e9312954feddbaf93a1ed52251f44b36b8be64a30f7c6f306faf',NULL,'portao0_2026_08_27','historical_inference'),
+  (12,'','0012_classification_ruleset_auditability.sql','2ca17f90aa65705268cfb1fa80bfcdbf92a9aa4645e923a33b5d8dac5dc61f08',NULL,'portao0_2026_08_27','historical_inference'),
+  (13,'','0013_commerce_layer.sql','4ba396f0e5b8df43aee1ae8f9f5dbda749fa9d20ce18e2fe5a5720671b5ca850',NULL,'portao0_2026_08_27','historical_inference'),
+  (14,'','0014_commerce_indexes.sql','4a464b14d65c48c9e8a4a5e3e9d1f7d29c6b16236c38ecbb6a0a246366166c31',NULL,'portao0_2026_08_27','historical_inference'),
+  (15,'','0015_commerce_views.sql','9605bd290cdfb6cded2985a5fc7e99515527cb3042a4512c44d29fd4c663c48d',NULL,'portao0_2026_08_27','historical_inference'),
+  (16,'','0016_agent_layer.sql','843758f4aae8937567c139697b275851b12bccfd662a813abbc5527a2df89ef6',NULL,'portao0_2026_08_27','historical_inference'),
+  (17,'','0017_agent_triggers.sql','c511471a07a22e9892ce02039db7579a3f0cad2890eaf8725eb38fbd197db538',NULL,'portao0_2026_08_27','historical_inference'),
+  (18,'','0018_analytics_evidence.sql','953c591be5d216c10f799d5fba4cdd004b2b2cab7edda8f912c2633cd47a3932',NULL,'portao0_2026_08_27','historical_inference'),
+  (19,'','0019_ops_phase3_additions.sql','9c9248f703e037d6608b97e1d570f038223feca22e35b2f888d28db79a3ab941',NULL,'portao0_2026_08_27','historical_inference'),
+  (20,'','0020_vehicle_fitment_validation.sql','efb571b3b851054b5d41b9715a72303e59dda90f3787eb6d172b87adf7962d9b',NULL,'portao0_2026_08_27','historical_inference'),
+  (21,'','0021_environment_match_guards.sql','872d9306e1bb7098fee1e9838767c98f1cfe89b464f466802941ef2e3e4c3c18',NULL,'portao0_2026_08_27','historical_inference'),
+  (22,'','0022_conversation_facts_append_ledger.sql','ddcba9cf2d433e09d32e541dadbca446be5a6e0bafebd0e80c3c514f73f2b9c7',NULL,'portao0_2026_08_27','historical_inference'),
+  (23,'','0023_analytics_marts_v1.sql','5d9516b30b9695cb522d1f054636d13af8d825c443ff784f53685953f7dd5e2c',NULL,'portao0_2026_08_27','historical_inference'),
+  (24,'','0024_atendente_v1_state_extensions.sql','d91e8bbf3ddff4a4c08a160c4e0c85b9fafe5b80bf97569b985729fcd34da186',NULL,'portao0_2026_08_27','historical_inference'),
+  (25,'','0025_planner_foundation.sql','65cc0507de9e78a043a22f3244f4e758ff5f5ce512bd42d9f8aaea12cfe3f31c',NULL,'portao0_2026_08_27','historical_inference'),
+  (26,'','0026_tool_executor_events.sql','ae8c79f9c389e2431bc48a728e0f1f1af16f384c2ef8aeedc3f86a9f52078737',NULL,'portao0_2026_08_27','historical_inference'),
+  (27,'','0027_generator_shadow_events.sql','8ccb9c98bf5f02382593f6baa3ba869413838fdb7fcddb1109ab98a0627c2fec',NULL,'portao0_2026_08_27','historical_inference'),
+  (28,'','0028_generator_blocked_turn_audit.sql','efaf251f5bfc961136afa74e98bef32560b4e5aaee52f97147bf4397a8dfe8e2',NULL,'portao0_2026_08_27','historical_inference'),
+  (29,'','0029_cart_action_events_hardening.sql','1800e67b35174b89829cf568f42b1fde994ce35909e19ed1cb903f6b2fc8b576',NULL,'portao0_2026_08_27','historical_inference'),
+  (30,'','0030_vehicle_resolver_variant_precision.sql','957126ee1b9330e5ea1a20b4e8de0fdbbffbad409d58a18561bf94e3b6f5fb64',NULL,'portao0_2026_08_27','historical_inference'),
+  (31,'','0031_human_vs_bot_comparison_view.sql','066439cd3db281c21d62727e555c568262e8f305fca0717a13fda331da007280',NULL,'portao0_2026_08_27','historical_inference'),
+  (32,'','0032_order_manual_capture.sql','67b95eace05b989fe0c2e9876adabf4279e6f22a3a79279f170a714f50aedf16',NULL,'portao0_2026_08_27','historical_inference'),
+  (33,'','0033_painel_views_and_audit.sql','7ecbfb246f8d14a4d57508cc7215826ad76b1210412c6650c44196ef7c4bcf98',NULL,'portao0_2026_08_27','historical_inference'),
+  (34,'','0034_painel_walkin_and_source.sql','edfdf7fe64a58601edd56f966463959ef67bc9a78170b7bf77ad0a89446ae1f8',NULL,'portao0_2026_08_27','historical_inference'),
+  (35,'','0035_partner_portal_foundation.sql','668ec72376447cd53f3cba354203984bbd69a639b51ba92235fb4d8946ef960f',NULL,'portao0_2026_08_27','historical_inference'),
+  (36,'','0036_partner_expense_soft_delete.sql','85763c6f4ef8fb6459e1d1b8d49006bd5dc0acc494c9ba1a948f600b88388070',NULL,'portao0_2026_08_27','historical_inference'),
+  (37,'','0037_partner_operations_management.sql','95d0df0d00e9602accfa83bad83286dc8ccfc404489bb94eb8befed0a6a6ee1c',NULL,'portao0_2026_08_27','historical_inference'),
+  (38,'','0038_partner_stock_tire_dimensions.sql','0c0ccfa324767cf82ad65fe8fad766529a4c30968177e327df53d71b9c7ffd32',NULL,'portao0_2026_08_27','historical_inference'),
+  (39,'','0039_commerce_network_stock_unified.sql','c94d60132e7a2596a0c1c058b2221bdae9dfe8339c2a4c53e421d02c9484d715',NULL,'portao0_2026_08_27','historical_inference'),
+  (40,'','0040_partner_orders_local.sql','6cc122008138a297c60e7236f16b6c74986aa5ba94e62fb6a8757477695b82b0',NULL,'portao0_2026_08_27','historical_inference'),
+  (41,'','0041_partner_summary_reads_partner_orders.sql','65d704d3a9a0879ede9043c903dbb913ff877bb7dee81202f7ebefee6f509a9f',NULL,'portao0_2026_08_27','historical_inference'),
+  (42,'','0042_partner_sale_consistency.sql','e21ef57c8ff16490843e852413a6af544fab5841908f9bfea555ac60bc036450',NULL,'portao0_2026_08_27','historical_inference'),
+  (43,'','0043_partner_hardening.sql','650471b43250d4b3248ec58c7174a0e27d8671b02143a078e1f3e5f612f6b2aa',NULL,'portao0_2026_08_27','historical_inference'),
+  (44,'','0044_partner_rls_policies.sql','9fd0f041b58ee9b3311154c824ffb6f9c44ed1dc887457b9f482fa47a1f3d22f',NULL,'portao0_2026_08_27','historical_inference'),
+  (45,'','0045_partner_finance_accounts.sql','0cca3b33ab35953f8fecdf946dc1139c0c6458a21e75ecf6ee18dcd107195b9a',NULL,'portao0_2026_08_27','historical_inference'),
+  (46,'','0046_partner_summary_sao_paulo_month.sql','9e78de143d57fe07592fbfe02f4dbbaa44679de99d48b9a017a45cfca49a2d53',NULL,'portao0_2026_08_27','historical_inference'),
+  (47,'','0047_resolve_vehicle_model_prefers_useful.sql','57c4656826b0f6d80686a4c97a313789573e399b853e578df6ec7bb545bd8347',NULL,'portao0_2026_08_27','historical_inference'),
+  (48,'','0048_resolve_neighborhood_ignora_acentos.sql','a65ec6fbd2e88e7382f88d36106b7dfd784d7e10889597f2626b3f4790944000',NULL,'portao0_2026_08_27','historical_inference'),
+  (49,'','0049_agent_turns_rationale_text.sql','d42aceee4176ef014e136c630ff8cb08be6df34e6624d83d8a7aed4111d2cac8',NULL,'portao0_2026_08_27','historical_inference'),
+  (50,'','0050_partner_finance_fixes_etapa1.sql','230e152eec15a6543172d55bf08591fedd76472aad12edc1836b42fdc70d162d',NULL,'portao0_2026_08_27','historical_inference'),
+  (51,'','0051_partner_finance_fks_etapa2.sql','4219507a19653b4bd1ef4496a61e0863ab2c1eb381e5524f0a91038e875a32cd',NULL,'portao0_2026_08_27','historical_inference'),
+  (52,'','0052_partner_purchase_payment_status_etapa3.sql','3df7fef2ff07cb0ec259e14a4b32490966601353e99f6942989451fdc73923f5',NULL,'portao0_2026_08_27','historical_inference'),
+  (53,'','0053_partner_summary_3_blocos_etapa4.sql','d3646e1f1a49d3771572ffcd2da7fb27f2b7abb5c25931d231f3f76dc7cbaa00',NULL,'portao0_2026_08_27','historical_inference'),
+  (54,'','0054_partner_cash_flow_projection_etapa5.sql','9afa4cedeeb4a2b9bd863c9f65c859a1e4d932ae8eccb5b1eae53d9bb23a3832',NULL,'portao0_2026_08_27','historical_inference'),
+  (55,'','0055_partner_receivable_installments_etapa6.sql','d796c7f7e9b19c836925388d0cef1fcf2f7910ed9cd932d1891b84ba09bf7681',NULL,'portao0_2026_08_27','historical_inference'),
+  (56,'','0056_partner_finance_view_grants.sql','f07d8749f66c1e7d7701fe9ffee07552398e75a5256053d626d0474228a846e6',NULL,'portao0_2026_08_27','historical_inference'),
+  (57,'','0057_order_number_sequential.sql','5c4fd6c0f339d4a44fabf981dc7b2258b4764ec25c83c6f38bcd4aa05e301821',NULL,'portao0_2026_08_27','historical_inference'),
+  (58,'','0058_partner_pos_checkout_metadata.sql','c075b753fe4b39232c461516cadb837e32d3e89666ebd0c65c9e8e69c440becf',NULL,'portao0_2026_08_27','historical_inference'),
+  (59,'','0059_partner_orders_customer_cpf.sql','d28726654d33d343aae15c3de2916ebe2724189616fdb89b641e521b666e2bca',NULL,'portao0_2026_08_27','historical_inference'),
+  (60,'','0060_partner_customers.sql','f068aa3cc5d92f892fce4c3dc5ad94c71d4f666212fb58ecc84599e86cbf738b',NULL,'portao0_2026_08_27','historical_inference'),
+  (61,'','0061_partner_orders_customer_id.sql','a13c02b6d9e5588a5256108c7ad7783017956ff0a20e4824ead6158b6aa53ade',NULL,'portao0_2026_08_27','historical_inference'),
+  (62,'','0062_partner_customers_address_vip.sql','5a545b5bb58909ecbdff2012b873491f351dfa890d54ab3d5f1710ab6f9b9db0',NULL,'portao0_2026_08_27','historical_inference'),
+  (63,'','0063_partner_customers_address_parts.sql','68fcdb3a1c47920c1eb9adaadf2c8c35c27ec810508acbb259d8b5315b442be5',NULL,'portao0_2026_08_27','historical_inference'),
+  (64,'','0064_partner_customers_address_number.sql','8072bce915f01d255751e24a39486deb169c7d50cc5a9834c9fbfd5324eb1723',NULL,'portao0_2026_08_27','historical_inference'),
+  (65,'','0065_partner_orders_discount_freight.sql','4069150f6b74d9f9a1a5822362faeb974b41718b5d6131b0e4d40e36e26baed5',NULL,'portao0_2026_08_27','historical_inference'),
+  (66,'','0066_partner_receivables_customer_id.sql','2e2a9fd72a0726d4605b58f54ade84c8c7dac1582b4a36d5c9bf75918facc26d',NULL,'portao0_2026_08_27','historical_inference'),
+  (67,'','0067_partner_item_type.sql','627985682ca9c109dddca23648d81b3d45d870e59e9b70cb18888c6df5d5cca3',NULL,'portao0_2026_08_27','historical_inference'),
+  (68,'','0068_partner_delivery.sql','4ed131dc87fc863643310d1996bd2ef9438ae267e6bc56ae47719e4c87e8c6a9',NULL,'portao0_2026_08_27','historical_inference'),
+  (69,'','0069_partner_delivery_cod.sql','e7ddb66c3620a30300a1ec9489c4d0248f8c5a7a5ef73d7dde0fb14146c30ab3',NULL,'portao0_2026_08_27','historical_inference'),
+  (70,'','0070_partner_chat.sql','c9951b309d904d354ce62370a23a278fa31ff91ac45468bae75c7e06dd5fbdaf',NULL,'portao0_2026_08_27','historical_inference'),
+  (72,'','0072_partner_chat_avatar.sql','b7023e386644c53950121fcd60128b99c80de217af9b9ad39be5b09bddd2234d',NULL,'portao0_2026_08_27','historical_inference'),
+  (73,'','0073_partner_stock_condition_location.sql','210b55a7de5a1dd35169c11865f046be47971deb56646faf3a5b5d8e9cd9f533',NULL,'portao0_2026_08_27','historical_inference'),
+  (74,'','0074_partner_result_cogs.sql','b37471592cc7ff8ac18f009d7f79d0e07e8ff9d8bfe1c6f0384b81b9ccec116b',NULL,'portao0_2026_08_27','historical_inference'),
+  (75,'','0075_partner_stock_position.sql','e5376ecade8f0cf78259e0f8fe549f6530557470bdcb99275de604587165bce4',NULL,'portao0_2026_08_27','historical_inference'),
+  (76,'','0076_partner_stock_reserved.sql','1c05743646f8ded1d076ff6195c07213b91b468bdec21b42f335df8eb4c242c9',NULL,'portao0_2026_08_27','historical_inference'),
+  (77,'','0077_partner_finance_realized_delivery_dates.sql','1359f9a65317bda0a8bf627d348edb73004c6b5ad37660ff00c1643791e41b35',NULL,'portao0_2026_08_27','historical_inference'),
+  (78,'','0078_partner_expenses_competence.sql','15fa3fe4259ca5db94ea75caac4f44487a6709e0bccf5eda52e9e8667ef6fa10',NULL,'portao0_2026_08_27','historical_inference'),
+  (79,'','0079_partner_conversation_customer_link.sql','82b189c50731debbb7badb16e972a5643aabbd837f5fa9fc2459aac5a9e3d4c8',NULL,'portao0_2026_08_27','historical_inference'),
+  (80,'','0080_partner_cancel_reverts_received_receivable.sql','d61cb5d4bafdafe554d2db47de3a97dde7bbc9dce154e35e9ebb062ce11e1e28',NULL,'portao0_2026_08_27','historical_inference'),
+  (81,'','0081_orders_partner_order_link.sql','5f7327b7ee55ce91b70235fc601886707121a286bcad0afb597486d57106f5f4',NULL,'portao0_2026_08_27','historical_inference'),
+  (82,'','0082_painel_orders_reflect_partner_status.sql','d0dbc656955f1caa491c1f41a1c6a02ed3218c14af403fd173b90f098e2e5cfe',NULL,'portao0_2026_08_27','historical_inference'),
+  (83,'','0083_network_unit_coverage_and_token_role.sql','2750055bcea8c3d827edc7e23d99ca0083f52fc6e2b3607ae17e9e05d3184ac2',NULL,'portao0_2026_08_27','historical_inference'),
+  (84,'','0084_network_partner_applications.sql','18ce37466fb9c935566c8a0db47ea61a36342cddd478b9fb5935dc795190a424',NULL,'portao0_2026_08_27','historical_inference'),
+  (85,'','0085_partner_token_role_in_validate.sql','b8d1f1d8630f6bc61035b3b5976549e66cb446c9a6590a1db8a9328a845d36ee',NULL,'portao0_2026_08_27','historical_inference'),
+  (86,'','0086_partner_login_credentials_and_sessions.sql','a9601a407d038fd81f67543718358e0adb41f64bf6fb5aff4bbc00c8ac82e4c6',NULL,'portao0_2026_08_27','historical_inference'),
+  (87,'','0087_partner_store_config_and_delivery_areas.sql','47e8f57417423e7945e17d64f2b7894104964e61ed9e0dfd75a5409ce5b2fd4c',NULL,'portao0_2026_08_27','historical_inference'),
+  (88,'','0088_partner_unit_location.sql','e44545105b837a49c69f7e7570de83b443bb5340f5aa59cc5eb991799b1f7684',NULL,'portao0_2026_08_27','historical_inference'),
+  (89,'','0089_partner_reserve_for_pickup.sql','d847a9abd55ba156d2ef516dbd099b91f8965211356372e0537550d3b5c2cefe',NULL,'portao0_2026_08_27','historical_inference'),
+  (90,'','0090_partner_pickup_retrieve_and_source_lock.sql','159255bd12c19fe8fe8bc63b8e42faba9267b59ca754e46cc399c41dd004a966',NULL,'portao0_2026_08_27','historical_inference'),
+  (91,'','0091_partner_screen_retiradas.sql','9da69562adfcc748c417b2b214003ba2b70eb94ab6ec7d063ee2393baa935f4d',NULL,'portao0_2026_08_27','historical_inference'),
+  (92,'','0092_partner_unit_installation_fee.sql','5559d3d56045a4420c6f27e87d117883a60ebbf463fff59890f7aa7a549298a8',NULL,'portao0_2026_08_27','historical_inference'),
+  (93,'','0093_partner_unit_delivery_radius.sql','ce4c2d1d7800f30fd6e6820594f1bd3abd7a3ff85bbcfd7ce7cdeb54ec0718a7',NULL,'portao0_2026_08_27','historical_inference'),
+  (94,'','0094_photo_requests.sql','3ff8f0a3c8991af804ac4cf4c9be070e1d1c80b779ca32009d8804a4935e9272',NULL,'portao0_2026_08_27','historical_inference'),
+  (95,'','0095_partner_people_porta_unica.sql','0beb63a4a1dfab344138a24c66c78d1f3b30212aac699c74910967ceed770555',NULL,'portao0_2026_08_27','historical_inference'),
+  (96,'','0096_partitions_autocreate.sql','c57d22394d8216360e1178457adce426990b0165b2d2f2b3018f3b33ffb686a8',NULL,'portao0_2026_08_27','historical_inference'),
+  (97,'','0097_fk_indexes_scale.sql','c0d0f6de872d23e4d058fdab7fad9603eb81be6780c251cd7091ddc81cfc209a',NULL,'portao0_2026_08_27','historical_inference'),
+  (98,'','0098_geo_cache.sql','70e4e6339736e244c8c59882d1963a50c3a3a1ab28319f8034ef880980e92544',NULL,'portao0_2026_08_27','historical_inference'),
+  (99,'','0099_partner_orders_operator.sql','1d7fd2fb6c9397d787534c3b2b652dfec688c21a7bd791717eab01e64626c2fa',NULL,'portao0_2026_08_27','historical_inference'),
+  (100,'','0100_partner_person_permissions_commission.sql','9a02ecb79bc893fb16c96e8a261950dfca9e67602d5625c5bcdb1efacbb92a30',NULL,'portao0_2026_08_27','historical_inference'),
+  (101,'','0101_drop_organizadora_dead_tables.sql','c6b0fff276fa33aa4a217f51c5a954fa4b51ca017aee445e7b9e10444f82c537',NULL,'portao0_2026_08_27','historical_inference'),
+  (102,'','0102_analytics_functions_baseline.sql','3b1a5e59521e30dd59c3de87d77da5dbd8494f989847ccc5fc2c02ce6af2bee7',NULL,'portao0_2026_08_27','historical_inference'),
+  (103,'','0103_analytics_faltou_estoque.sql','b7e720d06d500e396f6b0acb9d2c0f8e40d739162cfc7b5e34c364ab1a3f7283',NULL,'portao0_2026_08_27','historical_inference'),
+  (104,'','0104_analytics_foto_distancia_instalacao.sql','8761016ab3a9e9031215539ebc45b0d4e779279a937a7777f49bf4083d4ccb0e',NULL,'portao0_2026_08_27','historical_inference'),
+  (105,'','0105_satisfaction_surveys.sql','3ca649ffea07712ba98d55960dab3d3daf2ecd3c4a8613875e34c03939b76e3c',NULL,'portao0_2026_08_27','historical_inference'),
+  (106,'','0106_photo_request_multi.sql','b63eed8643a4dfb4c28ace34972b9f531b8c4b1ea71152f0c698952e30449f9e',NULL,'portao0_2026_08_27','historical_inference'),
+  (107,'','0107_photo_queue_customer_label.sql','0f892f30f626bd0833970b869e570959fd2513321b06f140cdf1b45819bf8012',NULL,'portao0_2026_08_27','historical_inference'),
+  (108,'','0108_partner_dismissed_items.sql','13053b2c799d61985a9775c537483c489ad9041dcbb317ab4ffaab6ab5d5964c',NULL,'portao0_2026_08_27','historical_inference'),
+  (109,'','0109_partner_push_subscriptions.sql','066b4151d04012add90c447cc5078d39ef3ae250f6ca734f820769238b5364f3',NULL,'portao0_2026_08_27','historical_inference'),
+  (109,'b','0109b_push_pk_include_unit.sql','59f5d9d901c809f4b5a6acbaab6656c74bd2fd25c977c0e21deedca5e1841a5d',NULL,'portao0_2026_08_27','historical_inference'),
+  (109,'c','0109c_grant_update_push_subscriptions.sql','9afce1aa851e48880b9b8dc69b3e88e219d668961070a1d8759a82266a6ece3d',NULL,'portao0_2026_08_27','historical_inference'),
+  (110,'','0110_wholesale_atacado_foundation.sql','253a03941a5671f50148e177254ce1f0c177bf1afc0d6315c12dfaffe83af1aa',NULL,'portao0_2026_08_27','historical_inference'),
+  (111,'','0111_wholesale_stock.sql','27092b99a4064d8e9923ab3f9927e48aa59f3bd3355d8a8e988534864d9f61a3',NULL,'portao0_2026_08_27','historical_inference'),
+  (112,'','0112_wholesale_cost_profit.sql','b78c9148beb6d3e2053ee7645e13a41085de0dcd3059a34efe01890de3980f8c',NULL,'portao0_2026_08_27','historical_inference'),
+  (113,'','0113_wholesale_stock_dimensions.sql','5b2c035a2d918411deafc76b3d7903fc69b4fbded9277288fc1a7344bce8ef81',NULL,'portao0_2026_08_27','historical_inference'),
+  (114,'','0114_wholesale_suppliers.sql','7908bb123c068bd0b6563f285100e280c6b8d3cc340712e4596841a6c1f61785',NULL,'portao0_2026_08_27','historical_inference'),
+  (115,'','0115_wholesale_finance_fiado.sql','836416f3243c3d93df49e9c5b985d9d05b10d1edb3cc7907ed301831d661e3e1',NULL,'portao0_2026_08_27','historical_inference'),
+  (116,'','0116_wholesale_cancel_trail.sql','b4deefb600d4b767223b4d83233dbe9d640c0595ad8a1bbf84f5344835a33994',NULL,'portao0_2026_08_27','historical_inference'),
+  (117,'','0117_matriz_retail_cost.sql','1cd527784390748c91b255316bce1e2af95a63cad0b831dea288f8bb5e909a7d',NULL,'portao0_2026_08_27','historical_inference'),
+  (118,'','0118_network_commission_ledger.sql','eaf0d9853a17aeb1c7a473a127977afa226fe504f823f9364bbad59e78bec7c0',NULL,'portao0_2026_08_27','historical_inference'),
+  (119,'','0119_partner_orders_2w_index_and_commission_grant_lock.sql','6b3c5f01c12d2512feea7c476b9d966bec6d128894ee53e38edc0d67ac40933f',NULL,'portao0_2026_08_27','historical_inference'),
+  (120,'','0120_matriz_expenses.sql','b3b96b0b99cfdd3a111b1b55e5e78da1510167ff9940d6afdb27275f5b9150f3',NULL,'portao0_2026_08_27','historical_inference'),
+  (121,'','0121_matriz_logistics.sql','0926fb13583c2551961e73c9b4da47164a87a3b82f5e11fb104e91c692d1c971',NULL,'portao0_2026_08_27','historical_inference'),
+  (122,'','0122_orders_trip_index.sql','540c2d8e873594bc07cb00bd46cc34265f84afc65a3507b9f77b8b5adf3636a6',NULL,'portao0_2026_08_27','historical_inference'),
+  (123,'','0123_orders_scheduled_delivery_date.sql','607b4c5dbcd63cf667234192fba7f5e8f92ba070f2efa598fbf3addf2ef9b81c',NULL,'portao0_2026_08_27','historical_inference'),
+  (124,'','0124_matriz_collaborators.sql','a8adde2e1239da65417306a6910a8b3e685130fba53edf031e0aa4e97e4bccf7',NULL,'portao0_2026_08_27','historical_inference'),
+  (125,'','0125_entregador_portal.sql','4f8e88a5c4e00f020bcbb5ed233db1272de7c7a8a5c6b374c830f03eadd8ef15',NULL,'portao0_2026_08_27','historical_inference'),
+  (126,'','0126_wholesale_stock_min_quantity.sql','ca7fbd7ca5082c1afea70848ad05b0126eb67f1db6c8cc8f2a9ac0c02d435a74',NULL,'portao0_2026_08_27','historical_inference'),
+  (127,'','0127_wholesale_purchase_cancel_trail.sql','4f09d93ee513c9132c80be607e08490461e34bf6d8c69b1f45bb11e59d4cea8f',NULL,'portao0_2026_08_27','historical_inference'),
+  (128,'','0128_wholesale_stock_movements.sql','0415fcf7045becf95e689da3cd4d5ff8a7e74d9574a03d1236f9ad3cf34f8c41',NULL,'portao0_2026_08_27','historical_inference'),
+  (129,'','0129_matriz_trip_number.sql','95ef507808a9c304368c35dbca222e1ca7bb469ae88dacd70a8e3633f8b3dd10',NULL,'portao0_2026_08_27','historical_inference'),
+  (130,'','0130_matriz_expense_categories.sql','b9a3ef8c1c351d3e467c38a3d4ef6aca66b0e9e9392fcbca192f9e967d069550',NULL,'portao0_2026_08_27','historical_inference'),
+  (131,'','0131_satisfaction_matriz_order.sql','9c225badd1e1cae69a3c1ce4e0268472e7ba4290785f28ebd178895339a8ab45',NULL,'portao0_2026_08_27','historical_inference'),
+  (132,'','0132_matriz_admin_login.sql','0562e27b2f19750d5521c64eda3899cc66f992e9d17ba0bc74e91b397d05dc80',NULL,'portao0_2026_08_27','historical_inference'),
+  (133,'','0133_matriz_collaborator_management.sql','e08c892a3eb6efba6f097807c83b2282db30ddb6cf367b3dac8a5d9b0754385f',NULL,'portao0_2026_08_27','historical_inference'),
+  (134,'','0134_audit_security_hotfix.sql','79339376d63689c58c1f1d70b18bbe3b5fd0e8346733ce7aef688a326290b4a9',NULL,'portao0_2026_08_27','historical_inference'),
+  (135,'','0135_payroll_history_and_integrity.sql','b06fcdfe90625c7d2a8a9df98fe5344675042fc8ee403fce425f010cf636a6d9',NULL,'portao0_2026_08_27','historical_inference'),
+  (136,'','0136_wholesale_purchase_integrity.sql','4617f7a665e569f35a3173e1ce9098261798d728c5ac6c1ddb620a1146559438',NULL,'portao0_2026_08_27','historical_inference'),
+  (137,'','0137_partner_historical_cost.sql','3f69ecd104542a9d8fadd7e2641d8f48794427559170cc94abe413255f6e853c',NULL,'portao0_2026_08_27','historical_inference'),
+  (138,'','0138_partner_application_atomicity.sql','ac1dcdd1ad32f5fe71bd051de98eab37bbd20dc3a8dd5b68eef16043211bac17',NULL,'portao0_2026_08_27','historical_inference'),
+  (139,'','0139_partner_commission_causal_ledger.sql','a40df0ad5ddc9524301c950fb1d5ed620c65722a93a35851c89f9f76aec6835e',NULL,'portao0_2026_08_27','historical_inference'),
+  (140,'','0140_matriz_receipt_human_approval.sql','989621d487f04de18ceaf076396f63b4322096d4b7d903a74cbeff7a23a9a622',NULL,'portao0_2026_08_27','historical_inference'),
+  (141,'','0141_bot_resilience_outbox_dlq.sql','e3316cd30795b5ec47e91954d6cb0d2e95a7615f68ea75bba974cf80dd186519',NULL,'portao0_2026_08_27','historical_inference'),
+  (142,'','0142_customer_identity_privacy.sql','82c2dc95806dfe03750fc219d23f3550f088bf513b72fafc74d3d27e134429ff',NULL,'portao0_2026_08_27','historical_inference'),
+  (143,'','0143_matriz_logistics_payroll_consistency.sql','17efddb8e36266d420f8b2b1d6cde32f0a55f0ec15589e5f3f350271fdb44c2c',NULL,'portao0_2026_08_27','historical_inference'),
+  (144,'','0144_marketing_attribution_pipeline.sql','bb6526e5472a74319cbdf529f5bed6d316858f33c391982c0159d0936c43891d',NULL,'portao0_2026_08_27','historical_inference'),
+  (145,'','0145_matriz_receipt_expense_integrity.sql','9bd2af6dbc450d800703cf2a7635460bf2cfbcc7a4bd29451e416d65c4bd19eb',NULL,'portao0_2026_08_27','historical_inference'),
+  (146,'','0146_matriz_commission_reversal_refunds.sql','ea15c399464773f95838f392874157157333130914313ecb10f0f342beecd5c5',NULL,'portao0_2026_08_27','historical_inference'),
+  (147,'','0147_matriz_inventory_financial_adjustments.sql','0d80f8c79c8494cf99ab20afbf97a7f1a7fe40b4466ce5680b4c64e0088be122',NULL,'portao0_2026_08_27','historical_inference'),
+  (148,'','0148_matriz_payroll_employment_and_assignment.sql','bf023fd426b611b310362628fa336b8b2ae8ab61bfabc7ad8ec4dce1b8e4b8a7',NULL,'portao0_2026_08_27','historical_inference'),
+  (149,'','0149_matriz_central_ledger_foundation.sql','06a77cbea29517ee2775c2596ddaa12a3de9fa2bbe4d51dc6d2b4055e9453436',NULL,'portao0_2026_08_27','historical_inference'),
+  (150,'','0150_matriz_stage3_ledger_reconciliation.sql','562814ae4af434c9aa8df0024e02f9ea9ae6377e84bc50728035aa39f2432cd3',NULL,'portao0_2026_08_27','historical_inference'),
+  (151,'','0151_matriz_partner_monthly_fees.sql','50287587d6aea25da466b3f6189bdedd6f2f2c12a2aaa65fcca2a36ff8f33601',NULL,'portao0_2026_08_27','historical_inference'),
+  (152,'','0152_matriz_retail_payment_due_on.sql','07f0e7c938343ee902604fd7ba3fbbcc75a06e2c62fa7b843047d74b3faa9205',NULL,'portao0_2026_08_27','historical_inference'),
+  (153,'','0153_matriz_catalog_prices.sql','2523f2e330ec2cb46c5ea710a0b361637238839b69e4161210a1f8cff4cf1377',NULL,'portao0_2026_08_27','historical_inference'),
+  (154,'','0154_monthly_continuity.sql','d77f5af0d164f8f36d9f50bb333c4c25a2f9dfbe6086b1b576a0feb638fca0a2',NULL,'portao0_2026_08_27','historical_inference'),
+  (155,'','0155_wholesale_stock_multi_brand.sql','9b2cf5a017b32e935bb1f8d74dfbe77b30de9bed819697068c2449999478f73c',NULL,'portao0_2026_08_27','historical_inference'),
+  (156,'','0156_tire_condition_variants.sql','cb94b0bd8f1766fadfdfd780fcf3b74b48ff37fd9a27d4bee805f3f9244a6fa6',NULL,'portao0_2026_08_27','historical_inference'),
+  (157,'','0157_partner_condition_routing_guard.sql','b5656bffc73e2bce77cc72f266394c8f1b214060d7713daf9bf21ed0057fee5e',NULL,'portao0_2026_08_27','historical_inference'),
+  (158,'','0158_catalog_fitments_measure_backfill.sql','5384f0f57f942fed961480586cb8e45d21deb2e03cf1db9cc570e6f3e3c66a27',NULL,'portao0_2026_08_27','historical_inference'),
+  (159,'','0159_marketing_campaign_scope.sql','484b7bf19019ba12f362d63eed8d7978ec432612df85968273766435d4f690c0',NULL,'portao0_2026_08_27','historical_inference'),
+  (160,'','0160_bot_analytics_outbox_repair.sql','df17fab4c07e295d297e55d6ec37d18a2e10e861f7651f9dc0342f67105db801',NULL,'portao0_2026_08_27','historical_inference'),
+  (161,'','0161_marketing_multichannel_messaging.sql','6e46fc99436ddb8dae72f96acf6b16d010c9df368d49c9ffe7c78311854ad4c3',NULL,'portao0_2026_08_27','historical_inference'),
+  (162,'','0162_matriz_ledger_ignore_zero_value_cancellations.sql','ea21428e720d749c676860d6039fbc513b0dcc2d0c971775918d6d11b6bd76b2',NULL,'portao0_2026_08_27','historical_inference'),
+  (163,'','0163_partner_receivable_customer_scope.sql','0aa8579c7d30a922ffb97fe65b9e620e0f65e0a470fe7e393439628f3d8749cd',NULL,'portao0_2026_08_27','historical_inference'),
+  (164,'','0164_matriz_stock_reservations.sql','97d1fb58e28cf0b5411f2ecde6ffc6d778f7bacd7c5e7964803ba0fc0e4b0a1d',NULL,'portao0_2026_08_27','historical_inference'),
+  (165,'','0165_partner_network_orders_eligibility.sql','52c462592cc8e359c96dbdc46327a82342db4442a9309efe04f193b7a7b7e6b9',NULL,'portao0_2026_08_27','historical_inference'),
+  (166,'','0166_partner_operation_inventory_requests.sql','22e655f78c65193855f3eadf1d19933f126b3ac275cb3ccb94b87a7cdec77c79',NULL,'portao0_2026_08_27','historical_inference'),
+  (167,'','0167_partner_operation_count_batch_evidence.sql','adedcbb4d002089ec8e816931df2c37a25f2dcc06dc344ff5bc61a170b66a698',NULL,'portao0_2026_08_27','historical_inference'),
+  (168,'','0168_partner_operation_stock_updates.sql','f3615e12668f449872ff506fc4f985d26fb652973116340b58072bf1399e419b',NULL,'portao0_2026_08_27','historical_inference'),
+  (169,'','0169_partner_purchase_receiving.sql','1774314b706256644abdcc735062ec93bb351346923b3550612530a67110710f',NULL,'portao0_2026_08_27','historical_inference'),
+  (170,'','0170_partner_payroll_commission_bridge.sql','cbea415a2e2f3774d6d2f252d7fd0afd2bf5cbb08cc9a8ad8013f967ac507fb6',NULL,'portao0_2026_08_27','historical_inference'),
+  (171,'','0171_operation_team_remuneration.sql','c59b3117edbcd4405f5573cfb3e050d1fec9b505b506e62b7307928fc8da7bc8',NULL,'portao0_2026_08_27','historical_inference'),
+  (172,'','0172_matriz_operation_permissions.sql','fc5b52a95b38974fbc117b7a6cb1ff8438c2b5d80a6ce722040d89579cb2a6d4',NULL,'portao0_2026_08_27','historical_inference'),
+  (173,'','0173_itemized_staff_commissions.sql','c2c905005b6a52687baea683fa93544a8c5723d391c14fd9006b7735f1bbd9f8',NULL,'portao0_2026_08_27','historical_inference'),
+  (174,'','0174_commission_settlement_calendar.sql','072368d00d874e9a594c5e5fbb0ebab694ffcaf01dcb1819ad062cfdb4bdab49',NULL,'portao0_2026_08_27','historical_inference'),
+  (175,'','0175_salary_payment_calendar.sql','e565592fbbcb96a88de99448887da13351a085f729866377198c53228b48c2b1',NULL,'portao0_2026_08_27','historical_inference'),
+  (176,'','0176_matriz_operation_stock_permission.sql','f4bdd44463d47ea29a2f6a9e5360353d988fccb3d045780d9965f5f02f0b4ad4',NULL,'portao0_2026_08_27','historical_inference'),
+  (177,'','0177_bot_daily_metrics_fresh_schema.sql','a66551aff62673eba9caa7b34bed79f0e6f4c8641c0d53b5a21365322ccdd116',NULL,'portao0_2026_08_27','historical_inference'),
+  (178,'','0178_matriz_sales_integrity.sql','cca48f10c9fceddafd72d2937009ff66b14316fbbd4333c25b419080af50bc8a',NULL,'portao0_2026_08_27','historical_inference'),
+  (179,'','0179_matriz_sales_final_guards.sql','196a0b37cfc3c17f71bd790fa1daf8b539c72099bea455b04c04781560746457',NULL,'portao0_2026_08_27','historical_inference'),
+  (180,'','0180_wholesale_purchase_audit_guards.sql','54e1048269660a3a89c9a74e429d34a9ca451f73d86ac5d45d5056fbf07fecca',NULL,'portao0_2026_08_27','historical_inference'),
+  (181,'','0181_matriz_sales_math_audit.sql','6d578c853c3c43f0f54121fccdff165067a546f80453843e75e191005efc6a0f',NULL,'portao0_2026_08_27','historical_inference'),
+  (182,'','0182_stock_end_to_end_integrity.sql','db78b6ca27c1690feddffc3bead1ea6d38bfe9626610b7602bda8630a14802cc',NULL,'portao0_2026_08_27','historical_inference'),
+  (183,'','0183_matrix_partner_stock_transfer.sql','5e3c46ace5c4a94c4affc04d6948ea8cb797cc06c8763195e5c299e4ae0a15f7',NULL,'portao0_2026_08_27','historical_inference'),
+  (184,'','0184_partner_arrival_item_adjustments.sql','7cf00a4ad701d4a519870e8aac885a29027024a2a0f164fa1e1b80d910640f16',NULL,'portao0_2026_08_27','historical_inference'),
+  (185,'','0185_partner_purchase_business_date.sql','bb2d3aed689e54665340a08ceac7ce3b10fcc59baf90f6510bc7528a9b9cfda2',NULL,'portao0_2026_08_27','historical_inference'),
+  (186,'','0186_system_business_fact_dates.sql','2779f3fa084e48a905bbe8e7da646624e7f5cf2e865c89a9a3ecf463b406e548',NULL,'portao0_2026_08_27','historical_inference'),
+  (187,'','0187_partner_arrival_financial_settlement.sql','4a24238ec5b518cce115495248cf84c3ffff28c7e667fb68bb5600364b7cd1d6',NULL,'portao0_2026_08_27','historical_inference'),
+  (188,'','0188_partner_receipt_confirmation_guard.sql','19dd796b43c056862dadc47e9856cb09a818108f5744faf92023172779a3327f',NULL,'portao0_2026_08_27','historical_inference'),
+  (189,'','0189_checkout_price_negotiation.sql','284fc17b0f6090135ec0a21f8c8dbabba6e7240fdb3ca7d0969a8522d6ec0bd6',NULL,'portao0_2026_08_27','historical_inference'),
+  (190,'','0190_finance_audit_consistency.sql','dbaa8bd03c27ced46b3684e58ede0aee376e29f3cfb0333d9a3c713267c7cf45',NULL,'portao0_2026_08_27','historical_inference'),
+  (191,'','0191_logistics_audit_corrections.sql','2eff8e660ae1459b5025d1dfd0442220a5093e656ab79d1d4ec030051ecaba54',NULL,'portao0_2026_08_27','historical_inference'),
+  (192,'','0192_team_employment_and_payroll_integrity.sql','318bb52fd484862f8784ed9b8ef98c88fb902c80faaf6cdff9f2495a9638bcd4',NULL,'portao0_2026_08_27','historical_inference'),
+  (193,'','0193_partner_staff_employment_rollovers.sql','c24d1be89409a57c445fb389217a3d18fa82b7f508dbd52b8759c3d33f519683',NULL,'portao0_2026_08_27','historical_inference'),
+  (194,'','0194_network_audit_corrections.sql','7de195a9d8e2d2a25536b78145355cd0efb2bfb1669838f56264a828220bcaef',NULL,'portao0_2026_08_27','historical_inference'),
+  (195,'','0195_network_municipality_catalog.sql','15974428c7587870ca578d3b1534003b7fd9cb7c543beeb400d6d41965b99d0a',NULL,'portao0_2026_08_27','historical_inference'),
+  (196,'','0196_customer_lead_board.sql','b8afcc65c2f8af6c0e5b183006102c981c762ffbbd3de04aa624204169fc994d',NULL,'portao0_2026_08_27','historical_inference'),
+  (197,'','0197_catalog_integrity.sql','299440d12d2ef37bdad6eeb7fc8b3153b5fff9c0d525bbf3d92cd2272760b158',NULL,'portao0_2026_08_27','historical_inference'),
+  (198,'','0198_marketing_integrity.sql','3a62bb51ea80d95cfc864d18196e401516814c993f87711eed8de753a7122c3b',NULL,'portao0_2026_08_27','historical_inference'),
+  (199,'','0199_system_continuity.sql','ecec1a74a189ef1149f6983e2643fa0bb616e4d86588845043700bfbe8d5aa94',NULL,'portao0_2026_08_27','historical_inference'),
+  (200,'','0200_finance_credit_lifecycle.sql','ada1e7f3219708a33f2a6820da5f8d7c6b53e98c3abaee9631cb8f9aa6d83dbd',NULL,'portao0_2026_08_27','historical_inference'),
+  (201,'','0201_analytics_greenfield_views.sql','54b014c97fc01015ceebec5fd5f40f25fd9df45505987b461fa6dfa5c5783087',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (202,'','0202_catalog_bootstrap_fitment_workflow.sql','c51cf5c880e36db45085f41c23d339e7883edab3d030c2333a3f4817bd3ce0aa',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (203,'','0203_partner_modern_panel_canary.sql','7d3d049890619b4d1c8c7b4b712f05e26e509296179207dee7e202c844c565bb',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (204,'','0204_pickup_service_workflow.sql','7e3f9cda9e4f8d6113a826bddf30e96dd001da0e63324de817eeb3f2ddf80155',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (205,'','0205_partner_stock_panel_canary.sql','a8278b43f243f527468f7bd4dc7cf4abed47771811dfb6d857b1d7668ba17ada',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (206,'','0206_partner_panel_catalog_read_grants.sql','9c925d277fd174437833120c77ab347dc4fb52e64fa73c638dc34cda2f01e2b7',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (207,'','0207_catalog_brand_identity_and_names.sql','cab5b37dff35aa19c3a55feb9a2c944b986f230efa4cf40c155c7924e0b3b184',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (208,'','0208_purchase_orders_installments_and_landed_cost.sql','43b13518d57de459d5786dd97e1ff488803c9a5c6180175b5fb4616e3c1b47dd',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (209,'','0209_wholesale_replenishment_by_measure.sql','81e0964f22cbaf74bc681fa0c8d3fbdff31127938c3cc4b7c4ff48a8a3e5ddb3',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (210,'','0210_collaborator_panel_module_permissions.sql','e279247e2ade726891893f60f83a4788d987fd81f3f6b5cb165c65a9ad722b21',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (211,'','0211_partner_staff_directory_rls.sql','8c963f035ba004d88ce73e3e10e40736bc62281dc9ab4b0f9adbc57f4a516bc7',NULL,'portao0_2026_08_27','verified_existing_object'),
+  (212,'','0212_purchase_payable_adjustment.sql','df064ea960ac2bc0728adad09288e7d41c4336d9fb23d4451110b8afb89411f3',NULL,'portao0_2026_08_27','verified_existing_object')
+ON CONFLICT DO NOTHING;
+
+DO $verify$
+DECLARE
+  v_rows INTEGER;
+  v_distinct_files INTEGER;
+BEGIN
+  SELECT count(*),count(DISTINCT migration_file)
+    INTO v_rows,v_distinct_files
+    FROM ops.applied_migrations;
+
+  IF v_rows<>213 OR v_distinct_files<>213 THEN
+    RAISE EXCEPTION '0213: backfill incompleto: % linhas, % arquivos',
+      v_rows,v_distinct_files;
+  END IF;
+END
+$verify$;
+
+INSERT INTO ops.application_schema_state(
+  singleton,version,migration_name,applied_at
+) VALUES (true,213,'0213_migration_ledger.sql',now())
+ON CONFLICT (singleton) DO UPDATE
+SET version=EXCLUDED.version,
+    migration_name=EXCLUDED.migration_name,
+    applied_at=EXCLUDED.applied_at;

@@ -14,7 +14,11 @@ const healthyOperational = {
   critical: [],
   warnings: [],
   details: {
-    schema_version: 199,
+    schema_version: 213,
+    schema_migration_name: '0213_migration_ledger.sql',
+    migration_ledger_rows: 214,
+    migration_ledger_version: 213,
+    migration_ledger_latest: '0213_migration_ledger.sql',
     missing_partitions: 0,
     latest_raw_event: '2026-08-22T00:00:00.000Z',
     latest_meta_success: '2026-08-22T00:00:00.000Z',

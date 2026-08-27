@@ -4,6 +4,10 @@ type Queryable = Pick<Pool, 'query'>;
 
 type ContinuityRow = {
   schema_version: number | string | null;
+  schema_migration_name: string | null;
+  migration_ledger_rows: number | string;
+  migration_ledger_version: number | string | null;
+  migration_ledger_latest: string | null;
   missing_partitions: number | string;
   partition_job_active: boolean;
   retention_job_active: boolean;
@@ -25,6 +29,10 @@ export type OperationalContinuity = {
   warnings: string[];
   details: {
     schema_version: number;
+    schema_migration_name: string | null;
+    migration_ledger_rows: number;
+    migration_ledger_version: number;
+    migration_ledger_latest: string | null;
     missing_partitions: number;
     latest_raw_event: string | null;
     latest_meta_success: string | null;
@@ -52,6 +60,12 @@ const CONTINUITY_SQL = `
   )
   SELECT
     (SELECT version FROM ops.application_schema_state WHERE singleton=true) schema_version,
+    (SELECT migration_name FROM ops.application_schema_state WHERE singleton=true)
+      schema_migration_name,
+    (SELECT count(*) FROM ops.applied_migrations) migration_ledger_rows,
+    (SELECT max(migration_order) FROM ops.applied_migrations) migration_ledger_version,
+    (SELECT migration_file FROM ops.applied_migrations
+      ORDER BY migration_order DESC,migration_suffix DESC LIMIT 1) migration_ledger_latest,
     (SELECT missing_partitions FROM partitions) missing_partitions,
     (SELECT partition_job_active FROM cron_state) partition_job_active,
     (SELECT retention_job_active FROM cron_state) retention_job_active,
@@ -99,9 +113,16 @@ export async function inspectOperationalContinuity(
   const critical: string[] = [];
   const warnings: string[] = [];
   const schemaVersion = count(row.schema_version);
+  const ledgerRows = count(row.migration_ledger_rows);
+  const ledgerVersion = count(row.migration_ledger_version);
   const missingPartitions = count(row.missing_partitions);
 
-  if (schemaVersion < 199) critical.push('schema_marker_outdated');
+  if (schemaVersion < 213) critical.push('schema_marker_outdated');
+  if (ledgerRows < 214) critical.push('migration_ledger_incomplete');
+  if (ledgerVersion !== schemaVersion
+      || row.migration_ledger_latest !== row.schema_migration_name) {
+    critical.push('migration_ledger_state_mismatch');
+  }
   if (missingPartitions > 0) critical.push('future_partitions_missing');
   if (!row.partition_job_active) critical.push('partition_job_inactive');
   if (!row.retention_job_active) warnings.push('retention_job_inactive');
@@ -126,6 +147,10 @@ export async function inspectOperationalContinuity(
     warnings,
     details: {
       schema_version: schemaVersion,
+      schema_migration_name: row.schema_migration_name,
+      migration_ledger_rows: ledgerRows,
+      migration_ledger_version: ledgerVersion,
+      migration_ledger_latest: row.migration_ledger_latest,
       missing_partitions: missingPartitions,
       latest_raw_event: row.latest_raw_event,
       latest_meta_success: row.latest_meta_success,

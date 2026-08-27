@@ -92,7 +92,10 @@ export async function registerHealthRoute(fastify: FastifyInstance): Promise<voi
         critical: ['operational_check_unavailable'],
         warnings: [],
         details: {
-          schema_version: 0, missing_partitions: 0, latest_raw_event: null,
+          schema_version: 0, schema_migration_name: null,
+          migration_ledger_rows: 0, migration_ledger_version: 0,
+          migration_ledger_latest: null,
+          missing_partitions: 0, latest_raw_event: null,
           latest_meta_success: null, open_dead_letters: 0, cron_history_bytes: 0,
         },
       })),
