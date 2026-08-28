@@ -130,6 +130,8 @@ describe('resumo do parceiro no painel único', () => {
     expect(html).toContain('space-y-4 lg:col-span-8');
     expect(html).toContain('space-y-4 lg:col-span-4');
     expect(html).toContain('mt-2 h-56');
+    expect(html).toContain('bg-white px-6 py-7 shadow-sm');
+    expect(html).toContain('block truncate text-3xl text-emerald-950');
     expect(staticRoute).toContain("'app.partner-api.js'");
     expect(staticRoute).toContain("'app.partner-resumo.js'");
     const meHandler = partnerRoute.slice(
