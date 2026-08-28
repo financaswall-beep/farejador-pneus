@@ -53,6 +53,11 @@ describe('painel único completo da unidade parceira', () => {
     }
 
     expect(html).toContain('app.partner-compras.receipt.js');
+    expect(html).toContain('data-partner-purchases-kpis');
+    expect(html).toContain('data-partner-purchases-workspace');
+    expect(html).toContain('data-partner-purchases-attention');
+    expect(html).toContain('[data-partner-purchases-kpis]{grid-template-columns:repeat(4');
+    expect(html).toContain('[data-partner-purchases-workspace]{grid-template-columns:');
     expect(staticRoute).toContain("'app.partner-compras.receipt.js'");
     expect(assembly).toContain('PAINEL_MODULES.partnerComprasReceipt');
 
@@ -147,6 +152,12 @@ describe('painel único completo da unidade parceira', () => {
     };
     app.partnerCompras.rows = [matrix];
     expect(app.partnerComprasCanReceive(matrix)).toBe(false);
+    matrix.total_amount = 720;
+    matrix.payment_status = 'payable';
+    expect(app.partnerComprasSummary()).toMatchObject({
+      purchases: 1, units: 8, pending: 1, pendingUnits: 8,
+      payables: 1, payablesTotal: 720, total: 720, averageUnitCost: 90,
+    });
 
     matrix.matrix_arrival_settled = true;
     matrix.items[0].confirmed_quantity = 6;

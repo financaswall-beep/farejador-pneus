@@ -27,11 +27,19 @@ window.PAINEL_MODULES.partnerComprasReceipt = function () {
 
     partnerComprasSummary() {
       const rows = this.partnerCompras.rows;
+      const pendingRows = rows.filter((row) => row.receipt_status === 'pending');
+      const payableRows = rows.filter((row) => row.payment_status === 'payable');
+      const units = rows.reduce((sum, row) => sum + this.partnerComprasUnits(row), 0);
+      const total = rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
       return {
         purchases: rows.length,
-        units: rows.reduce((sum, row) => sum + this.partnerComprasUnits(row), 0),
-        pending: rows.filter((row) => row.receipt_status === 'pending').length,
-        total: rows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
+        units,
+        pending: pendingRows.length,
+        pendingUnits: pendingRows.reduce((sum, row) => sum + this.partnerComprasUnits(row), 0),
+        payables: payableRows.length,
+        payablesTotal: payableRows.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
+        total,
+        averageUnitCost: units > 0 ? total / units : 0,
       };
     },
 
