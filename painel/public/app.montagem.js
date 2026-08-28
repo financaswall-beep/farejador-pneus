@@ -76,6 +76,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.partnerRetiradas, // baixa/cancelamento pelas rotas transacionais escopadas
     window.PAINEL_MODULES.partnerEstoque, // saldo, reservas, contagem e histórico escopados por unidade
     window.PAINEL_MODULES.partnerVendas, // vendas escopadas, mesmo motor transacional do /operacao
+    window.PAINEL_MODULES.partnerVendasDashboard, // indicadores e gráfico derivados das vendas escopadas
     window.PAINEL_MODULES.partnerCompras, // compras e compromissos da própria unidade
     window.PAINEL_MODULES.partnerLogistica, // entregas e retornos da própria unidade
     window.PAINEL_MODULES.partnerFinanceiro, // competência, caixa e títulos sem números da Matriz

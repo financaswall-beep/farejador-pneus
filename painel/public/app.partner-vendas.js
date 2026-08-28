@@ -22,7 +22,8 @@ window.PAINEL_MODULES.partnerVendas = function () {
   return {
     partnerVendas: {
       rows: [], products: [], loading: false, error: '', notice: '', request: 0,
-      busca: '', filtro: 'todos', page: 1, pageSize: 12, form: freshForm(),
+      busca: '', filtro: 'todos', period: 'month', page: 1, pageSize: 10,
+      form: freshForm(),
     },
 
     async loadPartnerVendas() {
@@ -44,16 +45,27 @@ window.PAINEL_MODULES.partnerVendas = function () {
         }
       } finally {
         if (request === this.partnerVendas.request) this.partnerVendas.loading = false;
-        this.$nextTick(() => lucide.createIcons());
+        this.$nextTick(() => {
+          lucide.createIcons();
+          this.renderPartnerVendasChart();
+        });
       }
+    },
+
+    partnerVendasIsPending(row) {
+      return Boolean(row.awaiting_pickup
+        || (row.fulfillment_mode === 'delivery' && row.delivery_status !== 'delivered'));
+    },
+
+    partnerVendasIsRealized(row) {
+      return row.status !== 'cancelled' && !this.partnerVendasIsPending(row);
     },
 
     partnerVendasFiltered() {
       const search = String(this.partnerVendas.busca || '').trim().toLocaleLowerCase('pt-BR');
-      return this.partnerVendas.rows.filter((row) => {
+      return this.partnerVendasRowsInPeriod().filter((row) => {
         const filter = this.partnerVendas.filtro;
-        const pending = row.awaiting_pickup
-          || (row.fulfillment_mode === 'delivery' && row.delivery_status !== 'delivered');
+        const pending = this.partnerVendasIsPending(row);
         if (filter === 'confirmadas' && (row.status === 'cancelled' || pending)) return false;
         if (filter === 'pendentes' && !pending) return false;
         if (filter === 'canceladas' && row.status !== 'cancelled') return false;
