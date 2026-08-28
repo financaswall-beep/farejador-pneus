@@ -124,6 +124,10 @@ describe('resumo do parceiro no painel único', () => {
     expect(html).toContain('O que precisa de atenção');
     expect(html).toContain("partnerResumoGo('vendas','partnerVendasNew')");
     expect(html).toContain('estoque-hero-warehouse.webp');
+    expect(html).toContain('viewBox="0 0 1600 240"');
+    expect(html).toContain('hidden h-full w-[68%] object-cover md:block');
+    expect(html).toContain('lg:grid-cols-[minmax(0,1.7fr)_minmax(270px,.65fr)]');
+    expect(html).toContain('h-[205px] sm:h-[220px]');
     expect(staticRoute).toContain("'app.partner-api.js'");
     expect(staticRoute).toContain("'app.partner-resumo.js'");
     const meHandler = partnerRoute.slice(
