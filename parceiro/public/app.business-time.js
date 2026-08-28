@@ -35,6 +35,11 @@
     return Number.isFinite(instant.getTime()) ? dateFormatter.format(instant) : '-';
   }
 
+  function formatCivilDate(value) {
+    const plain = pureDate(String(value || '').replace(/T00:00:00(?:\.000)?Z$/, ''));
+    return plain ? `${plain.day}/${plain.month}/${plain.year}` : formatDate(value);
+  }
+
   function formatDateTime(value) {
     if (!value) return '-';
     const instant = value instanceof Date ? value : new Date(value);
@@ -77,7 +82,7 @@
   }
 
   global.FarejadorTime = Object.freeze({
-    ZONE, dateKey, businessDate: dateKey, formatDate, formatDateTime, formatTime,
+    ZONE, dateKey, businessDate: dateKey, formatDate, formatCivilDate, formatDateTime, formatTime,
     addDays, weekBuckets, nextBoundary,
   });
 })(window);

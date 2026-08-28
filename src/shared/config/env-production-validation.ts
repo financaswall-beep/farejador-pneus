@@ -3,6 +3,7 @@ import { z, type RefinementCtx } from 'zod';
 // Piso de COMPRIMENTO dos segredos em producao. Mede tamanho, nao aleatoriedade:
 // a forca real continua dependendo de gerar os valores com fonte criptografica.
 const MIN_SECRET_BYTES = 24;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface ProductionEnvConfig {
   NODE_ENV: 'development' | 'production' | 'test';
@@ -13,7 +14,9 @@ interface ProductionEnvConfig {
   ADMIN_AUTH_TOKEN: string;
   CHATWOOT_HMAC_SECRET: string;
   AGENT_V2_WORKER_ENABLED?: boolean;
+  AGENT_V2_CONVERSATION_IDS?: string[];
   BOT_OUTBOX?: boolean;
+  MATRIZ_RECEIPT_AI?: boolean;
   OPENAI_API_KEY?: string;
   CHATWOOT_API_BASE_URL?: string;
   CHATWOOT_API_TOKEN?: string;
@@ -90,12 +93,42 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
   if (Buffer.byteLength(value.CHATWOOT_HMAC_SECRET, 'utf8') < MIN_SECRET_BYTES) {
     addIssue(ctx, 'CHATWOOT_HMAC_SECRET', `must contain at least ${MIN_SECRET_BYTES} bytes in production`);
   }
-  if (value.AGENT_V2_WORKER_ENABLED) {
+  if (value.AGENT_V2_WORKER_ENABLED || value.MATRIZ_RECEIPT_AI) {
     if (!value.OPENAI_API_KEY) {
-      addIssue(ctx, 'OPENAI_API_KEY', 'is required in production when AGENT_V2_WORKER_ENABLED=true');
+      addIssue(
+        ctx,
+        'OPENAI_API_KEY',
+        'is required in production when AGENT_V2_WORKER_ENABLED=true or MATRIZ_RECEIPT_AI=true',
+      );
     }
   }
-  if (value.AGENT_V2_WORKER_ENABLED || value.BOT_OUTBOX) {
+  if ((value.AGENT_V2_WORKER_ENABLED || value.BOT_OUTBOX)
+    && (!value.AGENT_V2_CONVERSATION_IDS || value.AGENT_V2_CONVERSATION_IDS.length === 0)) {
+    addIssue(
+      ctx,
+      'AGENT_V2_CONVERSATION_IDS',
+      'must contain an explicit conversation scope when the Agent V2 worker or bot outbox is enabled',
+    );
+  }
+  if (value.AGENT_V2_CONVERSATION_IDS?.includes('*')
+    && value.AGENT_V2_CONVERSATION_IDS.length > 1) {
+    addIssue(
+      ctx,
+      'AGENT_V2_CONVERSATION_IDS',
+      'must use "*" alone; do not mix the wildcard with explicit conversation UUIDs',
+    );
+  }
+  const invalidConversationIds = value.AGENT_V2_CONVERSATION_IDS?.filter(
+    (conversationId) => conversationId !== '*' && !UUID_PATTERN.test(conversationId),
+  ) ?? [];
+  if (invalidConversationIds.length > 0) {
+    addIssue(
+      ctx,
+      'AGENT_V2_CONVERSATION_IDS',
+      'must contain internal core.conversations UUIDs (not Chatwoot numeric ids)',
+    );
+  }
+  if (value.BOT_OUTBOX) {
     if (!value.CHATWOOT_API_BASE_URL) {
       addIssue(ctx, 'CHATWOOT_API_BASE_URL', 'is required in production when the bot sender is enabled');
     }

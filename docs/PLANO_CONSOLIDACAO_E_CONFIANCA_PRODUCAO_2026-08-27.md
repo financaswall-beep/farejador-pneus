@@ -13,7 +13,8 @@ O Farejador não é um conjunto de bancos ou servidores independentes. Hoje ele 
 O núcleo transacional está mais sólido do que a organização do repositório sugere:
 
 - build e TypeScript aprovados;
-- 1.457 testes unitários aprovados;
+- 1.471 testes unitários aprovados;
+- 60 arquivos e 292 testes de integração com banco Docker aprovados;
 - 215 migrations presentes no repositório e com checksums válidos;
 - livro financeiro central balanceado;
 - nenhuma divergência causal encontrada entre venda, recebimento, estoque, custo e ledger na amostra atual;
@@ -26,9 +27,9 @@ O sistema, entretanto, ainda **não deve receber aprovação irrestrita para pro
 
 1. segredos foram expostos e precisam ser rotacionados;
 2. o banco e o ledger canônico de migrations estão sincronizados até a versão 0214;
-3. a suíte de integração com banco limpo ainda não foi executada;
-4. a configuração da IA de comprovantes permite uma combinação inválida;
-5. o banco novo ainda não comprovou a ingestão real do Chatwoot;
+3. o ingresso externo originado pelo Chatwoot ainda precisa de prova pós-deploy;
+4. o modo sombra do Agent V2 ainda precisa gerar e avaliar respostas com a chave válida do Coolify;
+5. o canário de envio do bot ainda não foi executado;
 6. existem três interfaces concorrentes e o painel antigo do parceiro ainda está ativo;
 7. existe uma unidade de teste ativa no ambiente `prod`;
 8. não há prova recente de restauração integral de backup.
@@ -523,11 +524,12 @@ Débitos do ledger = créditos do ledger
 
 ### 3.4 Registro de execução do Portão 3 — 27/08/2026
 
-**Estado:** APROVADO ANTES DO DEPLOY, COM SMOKE PÓS-DEPLOY OBRIGATÓRIO. Foram
-encontrados e corrigidos dois defeitos reais. O primeiro impedia de forma
-intermitente a baixa de uma compra a prazo; o segundo deixava o modal da venda
-mostrar um estoque antigo até o navegador ser atualizado. Ambos possuem testes de
-regressão, mas o código ainda precisa ser publicado para a comprovação final.
+**Estado:** COMPLETO E APROVADO NA VERSÃO IMPLANTADA. Foram encontrados e
+corrigidos dois defeitos reais. O primeiro impedia de forma intermitente a baixa
+de uma compra a prazo; o segundo deixava o modal da venda mostrar um estoque
+antigo até o navegador ser atualizado. Ambos possuem testes de regressão e foram
+comprovados no smoke pós-deploy do commit
+`bcfa2aaa9b40cd5979f95f8e00c8c53143860aa4`.
 
 #### Cenários transacionais executados no banco de produção controlado
 
@@ -588,12 +590,34 @@ regressão, mas o código ainda precisa ser publicado para a comprovação final
 4. A `0214` tornou a saúde de Compras consciente dos ajustes de quantidade, sem
    mascarar diferença real. Foi aplicada após dry-run e validada no banco atual.
 
-#### Gate restante deste portão
+#### Smoke pós-deploy — 28/08/2026
 
-Publicar o commit com os reparos acima e repetir: baixa dos R$ 14,00 da compra E2E,
-abertura da venda sem recarregar a página, `/livez`, `/healthz`, login, permissões e
-reconciliação. Até esse smoke, o Portão 3 está aprovado no código, mas não encerrado
-na versão implantada.
+- Coolify publicou o commit
+  `bcfa2aaa9b40cd5979f95f8e00c8c53143860aa4` e concluiu o rolling update.
+- `/livez`: HTTP 200, com o mesmo SHA do deploy.
+- `/readyz`: HTTP 200; banco, schema, banco restrito do parceiro e continuidade
+  operacional aprovados. Schema confirmado na versão `0214`.
+- `/operational-healthz`: HTTP 200, sem alerta crítico. O estado degradado decorre
+  somente de jobs periódicos ainda não observados e da ingestão do Chatwoot
+  propositalmente inativa nesta fase.
+- Login do proprietário e carregamento de todos os módulos autorizados: aprovados.
+- Venda aberta sem atualizar o navegador: a variante E2E mostrou os 4 pneus atuais
+  do galpão, comprovando a atualização do estoque no modal.
+- A obrigação E2E de R$ 14,00, com vencimento civil exibido corretamente em
+  `30/09/2026`, foi paga por PIX no Caixa principal. O contas a pagar caiu de
+  R$ 36,00 para R$ 22,00 e o caixa caiu exatamente R$ 14,00. As duas obrigações
+  anteriores de R$ 11,00 permaneceram intactas.
+- Livro financeiro: 35 transações, zero fonte duplicada, zero órfã, zero transação
+  desbalanceada e zero data de caixa ausente.
+- Auditoria canônica somente leitura: `PASS`; integridade raw, normalizada, RLS,
+  privilégio mínimo e isolamento de sessões aprovados.
+- Reconciliação financeira: etapas 3 e 5 verdes; etapa 4 sem erro monetário e
+  amarela somente pelas 6 campanhas de marketing ainda sem classificação.
+- Painel financeiro: 9 de 9 origens reconciliadas e todas com diferença de R$ 0,00.
+
+**Veredito do Portão 3:** APROVADO. Não resta bloqueador de Matriz neste portão.
+As campanhas não classificadas são uma pendência operacional do Portão 4 e não
+alteram caixa, competência, estoque ou contas a pagar.
 
 ## Portão 4 — Chatwoot e Bot
 
@@ -639,14 +663,14 @@ Efeito prático:
 | Variável | Com `false` | O que continua funcionando |
 |---|---|---|
 | `AGENT_V2_WORKER_ENABLED` | o bot principal não gera nem responde conversas | Chatwoot humano, recebimento do webhook, raw-first e normalização estrutural |
-| `BOT_OUTBOX` | a fila durável de saída do bot fica desligada | não é uma trava geral de mensagens; fluxos auxiliares habilitados podem enviar diretamente |
+| `BOT_OUTBOX` | nenhum envio automático do bot sai para o Chatwoot após a publicação do hardening do Portão 4 | respostas propostas podem ser gravadas em sombra; mensagens humanas continuam funcionando |
 | `MATRIZ_RECEIPT_AI` | comprovantes não são interpretados pela IA | conferência e aprovação humana permanecem disponíveis |
 
 Alertas obrigatórios:
 
 - `OPENAI_API_KEY` ausente é aceitável somente enquanto nenhuma função que exige IA estiver ligada.
 - `OPENAI_API_KEY=` com valor vazio derruba a aplicação na inicialização; remover a linha vazia ou gravar um segredo válido.
-- `BOT_OUTBOX=false` não garante silêncio total. `PHOTO_REQUESTS`, `SATISFACTION_SURVEY` e outros fluxos habilitados devem ser auditados porque podem usar envio direto.
+- Antes do hardening deste portão, `PHOTO_REQUESTS` e `SATISFACTION_SURVEY` podiam contornar a outbox. O código foi corrigido; a garantia de silêncio total só vale depois do deploy desse commit.
 - Não religar o bot com `AGENT_V2_CONVERSATION_IDS=*` como primeiro teste.
 
 Procedimento obrigatório para reativação:
@@ -661,6 +685,95 @@ Procedimento obrigatório para reativação:
 8. Expandir a lista gradualmente; usar `*` somente após aprovação formal do canário.
 
 **Regra de parada:** se houver resposta para conversa fora da lista, duplicidade, erro de estoque/preço/unidade ou falha de entrega, voltar imediatamente às três flags `false` e investigar antes de nova tentativa.
+
+### 4.5 Registro de execução do Portão 4 — 28/08/2026
+
+#### Prova técnica de ingestão no banco novo
+
+Foi executado um webhook HTTP assinado contra a rota real do Fastify, usando
+`environment=test` e o banco novo. O ensaio não escreveu em `prod`.
+
+| Prova | Resultado |
+|---|---|
+| HMAC inválido | rejeitado com HTTP 401 |
+| contato, conversa e mensagem assinados | aceitos com HTTP 200 |
+| raw-first | evento observado como `pending` antes da normalização |
+| normalização | 1 contato, 1 conversa e 1 mensagem criados |
+| repetição da mesma entrega | HTTP 200 sem nova linha |
+| deduplicação | 1 `raw_event` e 1 claim para a entrega repetida |
+| isolamento | `prod` permaneceu em 1.103 eventos antes e depois |
+| automação desligada | 0 jobs do agente e 0 mensagens de saída |
+
+**Veredito técnico de 4.1:** o encanamento aplicação → raw → core está
+aprovado. Ainda falta a prova de origem externa Chatwoot → domínio público →
+aplicação. A consulta local à API do Chatwoot recebeu 401 porque a credencial
+local não é a credencial trancada do Coolify; nenhum segredo foi copiado ou
+exposto para contornar isso.
+
+#### Hardening implementado
+
+1. `AGENT_V2_CONVERSATION_IDS` passou a ser aplicado no dispatcher, no
+   reconciliador, no worker, na criação de mensagens auxiliares e na retirada
+   da outbox.
+2. Lista vazia fecha todas as conversas; `*` abre todas somente quando usado
+   sozinho e de forma explícita.
+3. Produção rejeita IDs numéricos do Chatwoot no canário e exige UUIDs internos
+   de `core.conversations`.
+4. `BOT_OUTBOX=false` grava apenas a proposta em `agent.turns`, com
+   `shadow:no_external_send`, sem chamar o Chatwoot.
+5. Envio direto de texto e anexo foi bloqueado também nas funções de baixo
+   nível; fotos e pesquisas não contornam mais a outbox.
+6. Chave OpenAI vazia é normalizada como ausente. A aplicação exige chave
+   quando Agent V2 ou leitura de comprovante por IA estiverem ligados.
+7. O modo sombra não exige credenciais de envio do Chatwoot; o modo de envio
+   exige.
+
+Validações locais após o hardening:
+
+- build/TypeScript: aprovado;
+- 297 arquivos e 1.471 testes unitários: aprovados;
+- 60 arquivos e 292 testes de integração Docker: aprovados;
+- testes focados do Portão 4: 58 aprovados;
+- migration: não necessária; o contrato atual do banco já comporta sombra,
+  escopo e outbox.
+
+#### Resultado do primeiro ensaio em sombra
+
+O ensaio foi restrito a uma única conversa de `environment=test`, com
+`BOT_OUTBOX=false`. O job foi selecionado somente dentro do UUID permitido e
+nenhuma saída foi criada. A geração parou de forma segura com
+`OPENAI_API_KEY not set`, pois a estação local não possui a chave que está
+trancada no Coolify.
+
+Isso é um **bloqueio operacional**, não um vazamento nem envio indevido:
+
+- mensagens externas: 0;
+- outbox criada: 0;
+- jobs processados fora do escopo: 0;
+- dados de produção alterados pelo ensaio: 0.
+
+#### Sequência restante para fechar o Portão 4
+
+1. Publicar o hardening mantendo as três flags `false`.
+2. Fazer smoke da Matriz e confirmar que o processo permanece saudável.
+3. Confirmar no Coolify uma `OPENAI_API_KEY` válida, sem copiá-la para logs ou
+   arquivos locais.
+4. Enviar uma mensagem controlada por um contato autorizado ao Chatwoot e
+   confirmar incremento de `raw.raw_events` no domínio público.
+5. Obter o UUID interno dessa conversa em `core.conversations`; não usar o ID
+   numérico do Chatwoot.
+6. Configurar somente esse UUID em `AGENT_V2_CONVERSATION_IDS`, ligar
+   `AGENT_V2_WORKER_ENABLED=true` e manter `BOT_OUTBOX=false`.
+7. Avaliar em sombra respostas sobre medida, estoque, unidade, preço e
+   compatibilidade. Reprovar qualquer invenção ou troca de unidade.
+8. Somente depois ligar `BOT_OUTBOX=true` para a mesma conversa, comprovar uma
+   entrega, o eco do Chatwoot, idempotência e ausência de duplicidade.
+9. Manter o canário restrito antes de qualquer expansão. `*` continua proibido
+   até aprovação formal.
+
+**Veredito atual do Portão 4:** EM ANDAMENTO. O código de segurança e a prova
+técnica de ingestão estão aprovados; o ingresso externo, a qualidade do LLM em
+sombra e o envio canário pós-deploy ainda faltam. O bot permanece desligado.
 
 ## Portão 5 — Operação e recuperação
 
@@ -996,8 +1109,8 @@ Restauração total de banco é último recurso e exige avaliação de perda de 
 |---|---|
 | Núcleo financeiro e transacional | Forte; auditorias atuais aprovadas |
 | Banco e objetos recentes | Presentes, mas sem trilha formal suficiente |
-| Matriz | Próxima de canário, ainda bloqueada pelos Portões 0–3 |
-| Bot | Desligado; exige Portão 4 |
+| Matriz | Portões 0–3 aprovados; disponível para canário operacional controlado |
+| Bot | Desligado; Portão 4 em andamento, sem autorização de envio |
 | Parceiros | Backend protegido; consolidação visual incompleta |
 | Operação mobile | Ativa, deve permanecer como superfície oficial |
 | Deploy | Funcional, mas precisa de smoke e schema gate mais rigorosos |

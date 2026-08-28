@@ -18,7 +18,6 @@ import type { PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
-import { sendMessage } from './sender.js';
 import { parseRating, surveyQuestion, thankYouText } from './satisfaction-rating.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { enqueueAccessoryText } from './outbox-accessory.js';
@@ -71,7 +70,8 @@ export async function tryCaptureSurveyReply(
         kind: 'survey_text', body: thankYouText(rating),
         idempotencyKey: `survey-thanks:${pend.rows[0]!.id}` });
     } else {
-      await sendMessage(chatwootConversationId, thankYouText(rating));
+      logger.warn({ surveyId: pend.rows[0]!.id },
+        'satisfaction: agradecimento externo bloqueado (BOT_OUTBOX=false)');
     }
   } catch (err) {
     logger.error({ err, surveyId: pend.rows[0]!.id }, 'satisfaction: agradecimento nao enviado');
@@ -127,13 +127,9 @@ async function dispatchNewSurveys(): Promise<void> {
     if (ins.rowCount !== 1) continue; // outra réplica já pegou
 
     try {
-      if (env.BOT_OUTBOX) {
-        await enqueueAccessoryText(pool, { environment: r.environment as Environment,
-          chatwootConversationId: Number(r.conv), kind: 'survey_text',
-          body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
-      } else {
-        await sendMessage(Number(r.conv), surveyQuestion(r.loja));
-      }
+      await enqueueAccessoryText(pool, { environment: r.environment as Environment,
+        chatwootConversationId: Number(r.conv), kind: 'survey_text',
+        body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
     } catch (err) {
       // Pergunta que falhou fica logada; a pesquisa permanece pending (será
       // expirada na janela). Não reabre pra não mandar 2x.
@@ -185,13 +181,9 @@ export async function dispatchMatrizDeliverySurveys(): Promise<void> {
     if (ins.rowCount !== 1) continue; // outra réplica já pegou
 
     try {
-      if (env.BOT_OUTBOX) {
-        await enqueueAccessoryText(pool, { environment: r.environment as Environment,
-          chatwootConversationId: Number(r.conv), kind: 'survey_text',
-          body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
-      } else {
-        await sendMessage(Number(r.conv), surveyQuestion(r.loja));
-      }
+      await enqueueAccessoryText(pool, { environment: r.environment as Environment,
+        chatwootConversationId: Number(r.conv), kind: 'survey_text',
+        body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
     } catch (err) {
       logger.error({ err, orderId: r.order_id }, 'satisfaction matriz: pergunta nao enviada');
     }
@@ -222,7 +214,10 @@ async function expireStaleSurveys(): Promise<void> {
  * flag SATISFACTION_SURVEY: off = não agenda nada. Retorna stop() pro shutdown.
  */
 export function startSatisfactionSurveyWorker(): () => void {
-  if (!env.SATISFACTION_SURVEY) {
+  if (!env.SATISFACTION_SURVEY || !env.BOT_OUTBOX) {
+    if (env.SATISFACTION_SURVEY && !env.BOT_OUTBOX) {
+      logger.warn('satisfaction survey: envio externo bloqueado (BOT_OUTBOX=false)');
+    }
     return () => undefined;
   }
   const timer = setInterval(() => {

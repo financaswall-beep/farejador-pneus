@@ -23,12 +23,14 @@ beforeAll(async () => {
 describe('agent_v2 outbound worker', () => {
   it('claims due rows with SKIP LOCKED and records the sending lock', async () => {
     const client = { query: vi.fn().mockResolvedValue({ rows: [row] }) };
-    await expect(worker.pickOutboundMessage(client as never, 'prod', 'worker-1'))
+    await expect(worker.pickOutboundMessage(client as never, 'prod', 'worker-1', ['conv-1']))
       .resolves.toEqual(row);
     const sql = String(client.query.mock.calls[0]?.[0]);
     expect(sql).toContain('FOR UPDATE SKIP LOCKED');
     expect(sql).toContain("status='sending'");
     expect(sql).toContain('attempts=attempts+1');
+    expect(sql).toContain('conversation_id::text = ANY');
+    expect(client.query.mock.calls[0]?.[1]).toEqual(['prod', 'worker-1', false, ['conv-1']]);
   });
 
   it('never blindly retries a sending row after a crash', async () => {

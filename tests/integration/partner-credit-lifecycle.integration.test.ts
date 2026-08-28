@@ -16,13 +16,13 @@ describe('ciclo contabil do credito do parceiro', () => {
 
   afterAll(async () => { if (db) await stopPostgres(db); });
 
-  it('marca materialmente o schema consolidado como versao 213', async () => {
+  it('marca materialmente o schema consolidado na migration mais recente', async () => {
     const state = await db.pool.query(
       `SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true`,
     );
     expect(state.rows[0]).toEqual({
-      version: 213,
-      migration_name: '0213_migration_ledger.sql',
+      version: 214,
+      migration_name: '0214_purchase_adjustment_reconciliation_health.sql',
     });
   });
 

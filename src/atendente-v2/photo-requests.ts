@@ -20,7 +20,6 @@ import type { PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
-import { sendAttachment, sendMessage } from './sender.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { enqueueAccessoryText, enqueuePhotoAttachment } from './outbox-accessory.js';
 
@@ -179,7 +178,7 @@ export async function linkPhotoRequestsToOrder(
  */
 export async function dispatchPhotoToCustomer(
   photoRequestId: string,
-  photo: { bytes: Buffer; mime: string },
+  _photo: { bytes: Buffer; mime: string },
   wasLate: boolean,
 ): Promise<void> {
   const res = await pool.query<{
@@ -214,28 +213,16 @@ export async function dispatchPhotoToCustomer(
     ? `Chegou! 📸 A foto do ${nomePneu} que você pediu — dá uma olhada no estado.`
     : `Ó ele aqui 📸 ${nomePneu} — foto real do que temos na loja. Dá uma olhada no estado!`;
 
-  if (env.BOT_OUTBOX) {
-    await enqueuePhotoAttachment(pool, {
-      environment: row.environment,
-      chatwootConversationId: Number(row.conversation_id),
-      photoRequestId,
-      caption,
-    });
+  if (!env.BOT_OUTBOX) {
+    logger.warn({ photoRequestId }, 'photo dispatch: envio externo bloqueado (BOT_OUTBOX=false)');
     return;
   }
-
-  await sendAttachment(Number(row.conversation_id), {
-    buffer: photo.bytes,
-    filename: `pneu-${photoRequestId.slice(0, 8)}.jpg`,
-    contentType: photo.mime,
-  }, caption);
-
-  await pool.query(
-    `UPDATE commerce.photo_requests
-        SET status = 'sent', sent_to_customer_at = now()
-      WHERE id = $1 AND status = 'answered'`,
-    [photoRequestId],
-  );
+  await enqueuePhotoAttachment(pool, {
+    environment: row.environment,
+    chatwootConversationId: Number(row.conversation_id),
+    photoRequestId,
+    caption,
+  });
 }
 
 // ─── Expiração + fallback honesto ────────────────────────────────────────────
@@ -261,13 +248,9 @@ async function expirePendingPhotoRequests(): Promise<void> {
   );
   for (const row of expired.rows) {
     try {
-      if (env.BOT_OUTBOX) {
-        await enqueueAccessoryText(pool, { environment: row.environment,
-          chatwootConversationId: Number(row.conversation_id), kind: 'photo_text',
-          body: FALLBACK_TEXT, idempotencyKey: `photo-fallback:${row.id}` });
-      } else {
-        await sendMessage(Number(row.conversation_id), FALLBACK_TEXT);
-      }
+      await enqueueAccessoryText(pool, { environment: row.environment,
+        chatwootConversationId: Number(row.conversation_id), kind: 'photo_text',
+        body: FALLBACK_TEXT, idempotencyKey: `photo-fallback:${row.id}` });
     } catch (err) {
       // Fallback que falhou não volta o estado: melhor card expirado sem
       // mensagem do que reprocessar e arriscar mandar 2x. Fica no log.
@@ -284,7 +267,10 @@ async function expirePendingPhotoRequests(): Promise<void> {
  * Retorna o stop() pro shutdown gracioso (padrão dos workers do server.ts).
  */
 export function startPhotoRequestExpirer(): () => void {
-  if (!env.PHOTO_REQUESTS) {
+  if (!env.PHOTO_REQUESTS || !env.BOT_OUTBOX) {
+    if (env.PHOTO_REQUESTS && !env.BOT_OUTBOX) {
+      logger.warn('photo expirer: envio externo bloqueado (BOT_OUTBOX=false)');
+    }
     return () => undefined;
   }
   const timer = setInterval(() => {

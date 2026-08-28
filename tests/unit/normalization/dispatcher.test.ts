@@ -8,6 +8,7 @@ const baseEnv = {
   CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: '300',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
   AGENT_V2_WORKER_ENABLED: 'false',
+  AGENT_V2_CONVERSATION_IDS: '',
 };
 
 function createMockClient(): {
@@ -245,6 +246,7 @@ describe('dispatcher', () => {
 
   it('enqueues atendente job for message_created when agent v2 worker is enabled', async () => {
     process.env.AGENT_V2_WORKER_ENABLED = 'true';
+    process.env.AGENT_V2_CONVERSATION_IDS = 'conversation-uuid';
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
     const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
@@ -285,6 +287,33 @@ describe('dispatcher', () => {
         atendente_job_id: 'atendente-job-uuid-1',
       },
       'normalization: atendente job enqueued',
+    );
+  });
+
+  it('does not enqueue atendente job outside the configured conversation scope', async () => {
+    process.env.AGENT_V2_WORKER_ENABLED = 'true';
+    process.env.AGENT_V2_CONVERSATION_IDS = 'different-conversation';
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 571,
+      event_type: 'message_created',
+      payload: messageCreated,
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    expect(client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_atendente_job'))).toBeUndefined();
+    expect(loggerInfo).toHaveBeenCalledWith(
+      {
+        raw_event_id: 571,
+        conversation_id: 'conversation-uuid',
+        message_id: 'uuid-1',
+      },
+      'normalization: atendente job skipped — conversation outside configured scope',
     );
   });
 

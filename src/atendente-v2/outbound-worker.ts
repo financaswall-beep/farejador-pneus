@@ -10,6 +10,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import { reconcileAckAlreadyInCore, reconcilePendingAcksFromCore } from './outbound-reconcile.js';
 import { recordOutboundEvent } from './outbound-events.js';
 import { deliverOutboundRow, markPhotoRequestSent } from './outbound-delivery.js';
+import { hasAgentV2Wildcard } from './conversation-scope.js';
 
 const WORKER_ID = `bot-outbox-${randomUUID().slice(0, 8)}`;
 const POLL_MS = 2_000;
@@ -136,12 +137,16 @@ export async function supersedeStaleAgentOutbound(
 }
 
 export async function pickOutboundMessage(
-  client: PoolClient, environment: Environment, workerId = WORKER_ID,
+  client: PoolClient,
+  environment: Environment,
+  workerId = WORKER_ID,
+  allowedConversationIds: readonly string[] = env.AGENT_V2_CONVERSATION_IDS,
 ): Promise<OutboundRow | null> {
   const picked = await client.query<OutboundRow>(
     `WITH candidate AS (
        SELECT id FROM ops.outbound_messages
         WHERE environment=$1 AND status IN ('pending','failed') AND not_before<=now()
+          AND ($3::boolean OR conversation_id::text = ANY($4::text[]))
         ORDER BY not_before,created_at LIMIT 1 FOR UPDATE SKIP LOCKED
      )
      UPDATE ops.outbound_messages o
@@ -149,7 +154,8 @@ export async function pickOutboundMessage(
        FROM candidate c WHERE o.id=c.id
      RETURNING o.id,o.environment,o.conversation_id,o.turn_id,o.chatwoot_conversation_id,
                o.echo_id,o.kind,o.body,o.attempts`,
-    [environment, workerId],
+    [environment, workerId, hasAgentV2Wildcard(allowedConversationIds),
+      allowedConversationIds.filter((id) => id !== '*')],
   );
   const row = picked.rows[0] ?? null;
   if (row) await recordOutboundEvent(client, { environment, outboundId: row.id,

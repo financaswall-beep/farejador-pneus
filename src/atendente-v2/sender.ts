@@ -14,6 +14,9 @@ export async function sendMessage(
   content: string,
   echoId?: string,
 ): Promise<SendMessageResult> {
+  if (!env.BOT_OUTBOX) {
+    throw new ChatwootApiError('Direct bot sending is disabled; use the durable outbox');
+  }
   const result = await new ChatwootApiClient().sendMessage(chatwootConversationId, content, echoId);
   logger.info(
     { chatwootConversationId, chatwoot_message_id: result.chatwootMessageId ?? null },
@@ -28,6 +31,9 @@ export async function sendMessageOnce(
   content: string,
   echoId?: string,
 ): Promise<SendMessageResult> {
+  if (!env.BOT_OUTBOX) {
+    throw new ChatwootApiError('Bot outbox delivery is disabled');
+  }
   if (!env.CHATWOOT_API_BASE_URL || !env.CHATWOOT_API_TOKEN || !env.CHATWOOT_ACCOUNT_ID) {
     throw new ChatwootApiError('Chatwoot API configuration is missing');
   }
@@ -58,6 +64,9 @@ export async function sendAttachment(
   file: { buffer: Buffer; filename: string; contentType: string },
   caption: string,
 ): Promise<SendMessageResult> {
+  if (!env.BOT_OUTBOX) {
+    throw new ChatwootApiError('Direct bot attachment sending is disabled; use the durable outbox');
+  }
   return sendAttachmentWithAttempts(chatwootConversationId, file, caption, MAX_ATTEMPTS);
 }
 
@@ -67,6 +76,9 @@ export async function sendAttachmentOnce(
   file: { buffer: Buffer; filename: string; contentType: string },
   caption: string,
 ): Promise<SendMessageResult> {
+  if (!env.BOT_OUTBOX) {
+    throw new ChatwootApiError('Bot outbox delivery is disabled');
+  }
   return sendAttachmentWithAttempts(chatwootConversationId, file, caption, 1);
 }
 

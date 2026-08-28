@@ -9,6 +9,7 @@ const baseEnv = {
   CHATWOOT_HMAC_SECRET: 'test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
   ADMIN_BEARER_FALLBACK_ENABLED: 'false',
+  AGENT_V2_CONVERSATION_IDS: '',
 };
 
 let parseEnv: typeof import('../../../src/shared/config/env.js').parseEnv;
@@ -100,8 +101,75 @@ describe('environment security validation', () => {
   it('fails closed when BOT_OUTBOX is enabled without Chatwoot sender config', () => {
     expect(() => parseEnv({
       ...baseEnv, NODE_ENV: 'production', BOT_OUTBOX: 'true',
+      AGENT_V2_CONVERSATION_IDS: 'af06c4ee-cfe9-46e2-96dd-98c8fe21f06f',
       ADMIN_AUTH_TOKEN: 'a'.repeat(24), CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
     })).toThrow(/CHATWOOT_API_BASE_URL.*bot sender[\s\S]*CHATWOOT_API_TOKEN.*bot sender/);
+  });
+
+  it('normaliza OPENAI_API_KEY vazia como ausente quando toda IA está desligada', () => {
+    const parsed = parseEnv({ ...baseEnv, OPENAI_API_KEY: '' });
+    expect(parsed.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('exige OpenAI quando a leitura de comprovante por IA está ligada', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MATRIZ_RECEIPT_AI: 'true',
+      OPENAI_API_KEY: '',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/OPENAI_API_KEY.*MATRIZ_RECEIPT_AI=true/);
+  });
+
+  it('exige escopo explícito quando o worker do Agent V2 está ligado', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      AGENT_V2_WORKER_ENABLED: 'true',
+      OPENAI_API_KEY: 'test-openai-key',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/AGENT_V2_CONVERSATION_IDS.*explicit conversation scope/);
+  });
+
+  it('permite worker em sombra sem credenciais de envio do Chatwoot', () => {
+    const parsed = parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      AGENT_V2_WORKER_ENABLED: 'true',
+      AGENT_V2_CONVERSATION_IDS: 'af06c4ee-cfe9-46e2-96dd-98c8fe21f06f',
+      BOT_OUTBOX: 'false',
+      OPENAI_API_KEY: 'test-openai-key',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    });
+    expect(parsed.AGENT_V2_WORKER_ENABLED).toBe(true);
+    expect(parsed.BOT_OUTBOX).toBe(false);
+  });
+
+  it('rejeita id numérico do Chatwoot no escopo do canário', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      AGENT_V2_WORKER_ENABLED: 'true',
+      AGENT_V2_CONVERSATION_IDS: '12345',
+      OPENAI_API_KEY: 'test-openai-key',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/core\.conversations UUIDs/);
+  });
+
+  it('rejeita curinga misturado com UUIDs explícitos', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      AGENT_V2_WORKER_ENABLED: 'true',
+      AGENT_V2_CONVERSATION_IDS: '*,af06c4ee-cfe9-46e2-96dd-98c8fe21f06f',
+      OPENAI_API_KEY: 'test-openai-key',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/must use "\*" alone/);
   });
 
   it('parses an explicit trusted proxy policy', () => {

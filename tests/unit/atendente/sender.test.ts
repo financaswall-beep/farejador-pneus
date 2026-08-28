@@ -6,6 +6,7 @@ const baseEnv = {
   DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
   CHATWOOT_HMAC_SECRET: 'test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
+  BOT_OUTBOX: 'false',
 };
 
 async function loadSender(extraEnv: Record<string, string> = {}) {
@@ -29,10 +30,17 @@ describe('agent_v2 sender', () => {
     vi.resetModules();
   });
 
-  it('does not fail open when Chatwoot API config is missing', async () => {
+  it('blocks direct sending when the durable outbox is disabled', async () => {
     const { sendMessage } = await loadSender();
 
-    await expect(sendMessage(123, 'oi')).rejects.toThrow('Chatwoot API configuration is missing');
+    await expect(sendMessage(123, 'oi')).rejects.toThrow('Direct bot sending is disabled');
+  });
+
+  it('blocks the single-attempt outbox sender when BOT_OUTBOX is disabled', async () => {
+    const { sendMessageOnce } = await loadSender();
+
+    await expect(sendMessageOnce(123, 'não deve sair'))
+      .rejects.toThrow('Bot outbox delivery is disabled');
   });
 
   it('returns the Chatwoot message id from the API response', async () => {
@@ -42,6 +50,7 @@ describe('agent_v2 sender', () => {
       CHATWOOT_API_BASE_URL: 'https://chatwoot.example.test/api/v1',
       CHATWOOT_API_TOKEN: 'secret-token-value',
       CHATWOOT_ACCOUNT_ID: '1',
+      BOT_OUTBOX: 'true',
     });
 
     const result = await sendMessage(123, 'oi', 'turn-abc');
@@ -59,6 +68,7 @@ describe('agent_v2 sender', () => {
       CHATWOOT_API_BASE_URL: 'https://chatwoot.example.test/api/v1',
       CHATWOOT_API_TOKEN: 'secret-token-value',
       CHATWOOT_ACCOUNT_ID: '1',
+      BOT_OUTBOX: 'true',
     });
 
     await expect(sendMessageOnce(123, 'oi', 'turn-abc')).rejects.toThrow('fetch failed after write');
@@ -71,6 +81,7 @@ describe('agent_v2 sender', () => {
     const { sendAttachmentOnce } = await loadSender({
       CHATWOOT_API_BASE_URL: 'https://chatwoot.example.test/api/v1',
       CHATWOOT_API_TOKEN: 'secret-token-value', CHATWOOT_ACCOUNT_ID: '1',
+      BOT_OUTBOX: 'true',
     });
 
     await expect(sendAttachmentOnce(123, {

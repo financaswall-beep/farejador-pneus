@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { env } from '../shared/config/env.js';
+import { hasAgentV2Wildcard } from './conversation-scope.js';
 
 type Queryable = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
 
@@ -18,11 +20,14 @@ export async function enqueueAccessoryText(
        environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
      )
      SELECT $1,c.id,$2,$3,$4,$5,$6,'pending'
-       FROM core.conversations c
+      FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
+        AND ($7::boolean OR c.id::text = ANY($8::text[]))
      ON CONFLICT (environment,echo_id) WHERE echo_id IS NOT NULL DO NOTHING`,
     [input.environment, input.chatwootConversationId, input.idempotencyKey,
-      input.kind, input.body, hash(input.body)],
+      input.kind, input.body, hash(input.body),
+      hasAgentV2Wildcard(env.AGENT_V2_CONVERSATION_IDS),
+      env.AGENT_V2_CONVERSATION_IDS.filter((id) => id !== '*')],
   );
   return result.rowCount === 1;
 }
@@ -38,11 +43,14 @@ export async function enqueuePhotoAttachment(
        environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
      )
      SELECT $1,c.id,$2,$3,'photo_attachment',$4,$5,'pending'
-       FROM core.conversations c
+      FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
+        AND ($6::boolean OR c.id::text = ANY($7::text[]))
      ON CONFLICT (environment,echo_id) WHERE echo_id IS NOT NULL DO NOTHING`,
     [input.environment, input.chatwootConversationId,
-      `photo:${input.photoRequestId}`, body, hash(body)],
+      `photo:${input.photoRequestId}`, body, hash(body),
+      hasAgentV2Wildcard(env.AGENT_V2_CONVERSATION_IDS),
+      env.AGENT_V2_CONVERSATION_IDS.filter((id) => id !== '*')],
   );
   return result.rowCount === 1;
 }

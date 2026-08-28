@@ -7,12 +7,14 @@ import {
   ensureAtendenteSession,
 } from '../shared/repositories/ops-atendente.repository.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { isAgentV2ConversationAllowed } from '../atendente-v2/conversation-scope.js';
 
 export interface ReconcileMissingAtendenteJobsInput {
   environment: Environment;
   since: Date;
   until: Date;
   limit: number;
+  allowedConversationIds?: readonly string[];
 }
 
 export interface ReconciledAtendenteJob {
@@ -66,6 +68,10 @@ export async function reconcileMissingAtendenteJobs(
   const jobs: ReconciledAtendenteJob[] = [];
 
   for (const message of missingMessages) {
+    if (input.allowedConversationIds
+      && !isAgentV2ConversationAllowed(input.allowedConversationIds, message.conversation_id)) {
+      continue;
+    }
     const agentSessionId = await ensureAtendenteSession(
       client,
       input.environment,
@@ -135,5 +141,6 @@ export function createDefaultAtendenteJobReconcileInput(now = new Date()): Recon
     since: new Date(now.getTime() - 24 * 60 * 60 * 1000),
     until: now,
     limit: 100,
+    allowedConversationIds: env.AGENT_V2_CONVERSATION_IDS,
   };
 }

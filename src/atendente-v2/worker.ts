@@ -33,6 +33,7 @@ import {
   reconcileMissingAtendenteJobsWithPool,
 } from '../atendente/reconcile-jobs.js';
 import { runAgentV2 } from './agent.js';
+import { hasAgentV2Wildcard, isAgentV2ConversationAllowed } from './conversation-scope.js';
 
 const WORKER_ID = `agent-v2-${randomUUID().slice(0, 8)}`;
 const RECONCILE_INTERVAL_MS = 60_000;
@@ -57,6 +58,21 @@ export async function pollAndAttend(): Promise<void> {
     const job = await pickAtendenteJob(client, env.FAREJADOR_ENV);
     if (!job) {
       await client.query('COMMIT');
+      return;
+    }
+
+    if (!isAgentV2ConversationAllowed(env.AGENT_V2_CONVERSATION_IDS, job.conversation_id)) {
+      await markAtendenteJobSuperseded(
+        client,
+        job.id,
+        'superseded:conversation_outside_configured_scope',
+        true,
+      );
+      await client.query('COMMIT');
+      logger.warn(
+        { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
+        'agent_v2: job blocked — conversation outside configured scope',
+      );
       return;
     }
 
@@ -178,6 +194,9 @@ export function startAgentV2Worker(): () => void {
     { worker_id: WORKER_ID, poll_interval_ms: env.AGENT_V2_POLL_INTERVAL_MS },
     'agent_v2 worker: starting',
   );
+  if (hasAgentV2Wildcard(env.AGENT_V2_CONVERSATION_IDS)) {
+    logger.warn('agent_v2 worker: wildcard scope enabled — all conversations are eligible');
+  }
 
   let stopped = false;
 

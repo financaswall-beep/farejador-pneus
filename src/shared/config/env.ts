@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { validateProductionEnv } from './env-production-validation.js';
 import { marketingEnvShape } from './env-marketing.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
+const optionalNonEmptyStringSchema = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().min(1).optional(),
+);
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FAREJADOR_ENV: z.enum(['prod', 'test']),
@@ -38,7 +42,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   // OpenAI (usado pelo Agent V2)
-  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: optionalNonEmptyStringSchema,
   OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
   OPENAI_TIMEOUT_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('30000'),
   SKIP_EVENT_TYPES: z
@@ -53,8 +57,9 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
-  // ETAPA 8 — Outbox resiliente do Bot/Chatwoot. Default OFF: o caminho antigo
-  // continua vivo até o dono ligar no Coolify. Com ON, a resposta do bot nasce
+  // ETAPA 8 — Outbox resiliente do Bot/Chatwoot. Default OFF: nenhuma resposta
+  // automática sai para o Chatwoot; o Agent V2 pode gerar rascunhos em sombra.
+  // Com ON, a resposta do bot nasce
   // em agent.turns como generated, passa pela ops.outbound_messages e só vira
   // sent_api_ack quando a API do Chatwoot devolve aceite. A confirmação por
   // webhook/provider id é reconciliada separadamente.
