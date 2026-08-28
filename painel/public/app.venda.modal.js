@@ -26,8 +26,18 @@ window.PAINEL_MODULES.vendaModal = function () {
       this.saleModalOpen = true;
     },
 
-    openWalkinModal() {
+    async openWalkinModal() {
       this.modalConv = null;
+      // O estoque pode ter mudado em Compras sem que o shell do painel tenha
+      // sido recarregado. A venda sempre abre sobre uma fotografia nova do
+      // catálogo para não exibir saldo/custo antigos ao operador.
+      try {
+        const payload = await this.apiGet('/admin/api/dashboard/produtos?limit=100');
+        this.applyProdutos(payload.rows);
+      } catch (_error) {
+        window.alert('Não consegui atualizar o estoque para a venda. Atualize a página e tente novamente.');
+        return;
+      }
       const firstProduct = this.produtos.find((product) => product.walkin_sellable) || null;
       this.saleForm = {
         product_id: firstProduct?.product_id || '',

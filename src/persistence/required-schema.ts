@@ -191,23 +191,23 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=213
+       AND version>=214
        AND EXISTS (
          SELECT 1 FROM ops.applied_migrations
-          WHERE migration_file='0213_migration_ledger.sql'
-            AND checksum_sha256='32c12dbbae7497fd0946542bd76808de8df4b28560d7d46eee198e7a9dbd7788'
+          WHERE migration_file='0214_purchase_adjustment_reconciliation_health.sql'
+            AND checksum_sha256='9f0352758eea351a63a83cd71955ae0a5776ea8039b82fe6e408fa21ad3bb481'
        )
-       AND (SELECT count(*) FROM ops.applied_migrations)>=214
+       AND (SELECT count(*) FROM ops.applied_migrations)>=215
   ) AS ready`;
 
-/** Impede o processo novo de operar sem o contrato mínimo e o ledger da 0213. */
+/** Impede o processo novo de operar sem o contrato mínimo e a correção da 0214. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0213_migration_ledger');
+    throw new Error('required_schema_missing:0214_purchase_adjustment_health');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0213_migration_ledger');
+    throw new Error('required_schema_missing:0214_purchase_adjustment_health');
   }
 }

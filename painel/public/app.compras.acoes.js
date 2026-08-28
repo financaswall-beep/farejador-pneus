@@ -13,7 +13,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
     },
     financeDate(value) {
       if (!value) return 'sem data';
-      const formatted = window.FarejadorTime.formatDate(value);
+      const formatted = window.FarejadorTime.formatCivilDate(value);
       return formatted === '-' ? 'sem data' : formatted;
     },
     async compraOpenDetails(purchase) {

@@ -70,8 +70,25 @@ export async function lockSettlementObligation(
        FROM finance.matriz_ledger_transactions t
        JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
       WHERE t.environment=$1 AND t.id=$2
-        AND ((e.account_class='asset' AND e.side='debit')
-          OR (e.account_class='liability' AND e.side='credit'))
+        AND (
+          (e.account_code='accounts_receivable'
+            AND e.account_class='asset' AND e.side='debit'
+            AND t.source_type=ANY(ARRAY[
+              'commerce.order.revenue',
+              'commerce.wholesale_order.revenue',
+              'commerce.wholesale_order.arrival_revenue'
+            ]::text[]))
+          OR (e.account_code='accounts_payable'
+            AND e.account_class='liability' AND e.side='credit'
+            AND t.source_type='commerce.wholesale_purchase.accrual')
+          OR (e.account_code=ANY(ARRAY[
+              'supplier_refund_receivable',
+              'expense_refund_receivable',
+              'customer_refund_payable'
+            ]::text[])
+            AND ((e.account_class='asset' AND e.side='debit')
+              OR (e.account_class='liability' AND e.side='credit')))
+        )
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
           WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
       FOR UPDATE OF t`,

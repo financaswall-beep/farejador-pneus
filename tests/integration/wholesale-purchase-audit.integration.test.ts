@@ -199,6 +199,9 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
       allocated_cost: '23.00', installments_total: '23.00',
       installments: ['15.00', '8.00'], obligation_balance: '23.00', stock_delta: 2,
     });
+    expect((await db.pool.query<{ mismatches: number }>(
+      `SELECT finance.matriz_stage3_ledger_amount_mismatches('test')::int mismatches`,
+    )).rows[0]?.mismatches).toBe(0);
 
     const { getMatrizLedgerOpenItems } = await import(
       '../../src/admin/painel/matriz-ledger-open-items.js');
@@ -208,6 +211,25 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
       { valor: '15.00', due: '2026-09-20' },
       { valor: '8.00', due: '2026-10-20' },
     ]);
+
+    // A obrigação de compra também contém uma partida de ativo
+    // (inventory_in_transit). A baixa deve selecionar especificamente a partida
+    // accounts_payable, inclusive depois do ajuste por recusa parcial.
+    const { settleMatrizLedgerOpenItem } = await import(
+      '../../src/admin/painel/matriz-ledger-settlement.js');
+    const settled = await settleMatrizLedgerOpenItem({
+      environment: 'test', obligation_id: agenda[0]!.obligation_id!, amount: 23,
+      paid_at: '2026-08-21T12:00:00-03:00', payment_method: 'pix',
+      cash_account: 'Caixa principal', actor_label: 'owner:audit',
+      idempotency_key: randomUUID(),
+    }, db.pool);
+    expect(settled).toMatchObject({ amount: '23.00', remaining_balance: '0.00' });
+    expect((await db.pool.query<{ payment_status: string }>(
+      `SELECT payment_status FROM commerce.wholesale_purchases
+        WHERE environment='test' AND id=$1`, [purchase.purchase_id],
+    )).rows[0]?.payment_status).toBe('paid');
+    expect((await getMatrizLedgerOpenItems('test', db.pool)).a_pagar.itens
+      .some((row) => row.id.startsWith(purchase.purchase_id))).toBe(false);
 
     // A trava do banco também impede usar um ajuste de outra compra para
     // reduzir artificialmente esta obrigação.
