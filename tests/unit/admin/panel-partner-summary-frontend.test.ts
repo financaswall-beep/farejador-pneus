@@ -73,15 +73,18 @@ describe('resumo do parceiro no painel único', () => {
     expect(app.adminUser).toBeNull();
   });
 
-  it('carrega somente as três fontes auditadas e preserva os totais do servidor', async () => {
+  it('carrega somente resumo e alertas escopados e preserva os totais do servidor', async () => {
     const sandbox: Record<string, any> = {
       window: {}, lucide: { createIcons() {} }, performance: { now: () => Date.now() },
     };
     runInNewContext(source('painel/public/app.partner-resumo.js'), sandbox);
     const apiGet = vi.fn(async (resource: string) => {
-      if (resource === 'resumo') return { rows: [{ sales_month: '450.00', confirmed_result_month: '210.00' }] };
-      if (resource === 'comissao/equipe') return { rows: [{ username: 'ana', gross_sales: 100 }], total_commission: 5 };
-      return { finalized_sales: 2, gross_sales: 90, commission_amount: 4.5 };
+      if (resource === 'resumo') return { rows: [{
+        sales_month: '450.00', confirmed_result_month: '210.00',
+        movement_series: [{ day: '2026-08-28', total: '450.00', orders: 2 }],
+        recent_events: [{ kind: 'sale', reference: 'abc12345' }],
+      }] };
+      return { notifications: [{ id: 'stock', kind: 'stock', title: '2 itens baixos' }] };
     });
     const app: any = {
       isPartnerPanel: () => true,
@@ -98,11 +101,14 @@ describe('resumo do parceiro no painel único', () => {
     await app.loadPartnerResumo();
 
     expect(apiGet.mock.calls.map(([resource]) => resource)).toEqual([
-      'resumo', 'comissao/equipe', 'meu-desempenho',
+      'resumo', 'operacao/notificacoes',
     ]);
     expect(app.partnerResumoData.confirmed_result_month).toBe('210.00');
-    expect(app.partnerResumoTeam.total_commission).toBe(5);
-    expect(app.partnerResumoSelf.commission_amount).toBe(4.5);
+    expect(app.partnerResumoRecentEvents).toHaveLength(1);
+    expect(app.partnerResumoAlerts).toHaveLength(1);
+
+    await app.partnerResumoSetPeriod('7d');
+    expect(apiGet).toHaveBeenCalledWith('resumo?period=7d');
   });
 
   it('publica a tela no casco sem expor tokenId no /me do parceiro', () => {
@@ -114,6 +120,10 @@ describe('resumo do parceiro no painel único', () => {
     expect(html).toContain('partnerResumoData?.confirmed_result_month');
     expect(html).toContain('partnerResumoData?.cash_net_month');
     expect(html).toContain('partnerResumoData?.open_receivables_total');
+    expect(html).toContain('partnerResumoMovementChart');
+    expect(html).toContain('O que precisa de atenção');
+    expect(html).toContain("partnerResumoGo('vendas','partnerVendasNew')");
+    expect(html).toContain('estoque-hero-warehouse.webp');
     expect(staticRoute).toContain("'app.partner-api.js'");
     expect(staticRoute).toContain("'app.partner-resumo.js'");
     const meHandler = partnerRoute.slice(

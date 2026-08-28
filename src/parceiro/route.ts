@@ -24,6 +24,7 @@ import { registerPartnerCreditRoutes } from './route-finance-credit.js';
 import { getPartnerModernPanelEnabled } from './panel-canary.js';
 import { registerPartnerPanelCanaryRoutes } from './route-panel-canary.js';
 import { registerPartnerPanelCatalogRoutes } from './route-panel-catalog.js';
+import { registerPartnerSummaryRoute } from './route-partner-summary.js';
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -77,7 +78,6 @@ import {
   searchPartnerCatalog,
   searchPartnerCustomers,
   getPartnerFluxoCaixa,
-  getPartnerResumo,
   getPartnerVendas,
   getPartnerRelatorioVendas,
   getPartnerRelatorioPneus,
@@ -480,6 +480,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   registerPartnerCreditRoutes(fastify);
   registerPartnerPanelCanaryRoutes(fastify);
   registerPartnerPanelCatalogRoutes(fastify);
+  registerPartnerSummaryRoute(fastify);
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
     if (retireLegacyMobile(request, reply)) return;
@@ -833,10 +834,6 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // de permissão, pra o dono poder liberá-los ao funcionário (PLANO §2.3). Default
   // (sem linha de permissão) = Resumo/Financeiro OFF pro funcionário = comportamento
   // de hoje. Pro owner, requireScreen ≡ passa sempre (equivalente ao requireOwner).
-  fastify.get('/parceiro/:slug/api/resumo', { preHandler: [requirePartnerAuth, requireScreen('resumo')] }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });
-  });
-
   // fluxo-caixa = projeção de caixa (tela Financeiro) → requireScreen('financeiro').
   fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: [requirePartnerAuth, requireScreen('financeiro')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerFluxoCaixa(getPartnerContext(request))].filter(Boolean) });

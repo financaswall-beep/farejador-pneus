@@ -53,6 +53,9 @@ import {
   assertStrongNewPassword, isUsernameConflict, PartnerUsernameConflictError,
   type CreatedFuncionario, type PartnerTokenRow,
 } from './partner-staff-account.js';
+import {
+  getPartnerSummaryDashboard, type PartnerSummaryPeriod,
+} from './partner-summary-dashboard.js';
 export { DeliveryAlreadyFinalizedError, DeliveryReturnNotAwaitingError, confirmPartnerDeliveryReturn } from './delivery-return.js';
 export {
   getPartnerRetiradas, markPartnerPickupRetrieved, PickupAlreadyRetrievedError,
@@ -316,38 +319,11 @@ export class StockPositiveCannotDeleteError extends Error {
 // Leituras
 // ----------------------------------------------------------------------------
 
-export async function getPartnerResumo(ctx: PartnerContext): Promise<unknown> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query(
-      `SELECT *
-       FROM network.partner_unit_summary
-       WHERE environment = $1 AND unit_id = $2`,
-      [ctx.environment, ctx.unitId],
-    );
-    const base = result.rows[0];
-    if (!base) return null;
-
-    // Pesquisa de satisfação (0105, Tijolo 4): média + nº de notas da PRÓPRIA loja
-    // (RLS isola por unidade). Vazio quando a flag está off / sem respostas — o card
-    // no Resumo só aparece com satisfaction_count > 0. FAIL-SAFE: erro aqui NUNCA
-    // derruba o Resumo do dono — degrada sem o card.
-    let satisfaction_avg: number | null = null;
-    let satisfaction_count = 0;
-    try {
-      const sat = await client.query<{ avg: string | null; n: string }>(
-        `SELECT round(avg(rating)::numeric, 1) AS avg, count(id) AS n
-           FROM commerce.satisfaction_surveys
-          WHERE environment = $1 AND unit_id = $2 AND status = 'answered'`,
-        [ctx.environment, ctx.unitId],
-      );
-      satisfaction_avg = sat.rows[0]?.avg != null ? Number(sat.rows[0].avg) : null;
-      satisfaction_count = Number(sat.rows[0]?.n ?? 0);
-    } catch (err) {
-      logger.warn({ err, unit_id: ctx.unitId }, 'resumo: resumo de satisfacao indisponivel (degrada sem o card)');
-    }
-
-    return { ...base, satisfaction_avg, satisfaction_count };
-  });
+export async function getPartnerResumo(
+  ctx: PartnerContext,
+  period: PartnerSummaryPeriod = 'month',
+): Promise<unknown> {
+  return getPartnerSummaryDashboard(ctx, period);
 }
 
 export async function getPartnerFluxoCaixa(ctx: PartnerContext): Promise<unknown> {
