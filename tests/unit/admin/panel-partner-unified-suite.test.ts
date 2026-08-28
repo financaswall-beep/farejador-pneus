@@ -52,6 +52,10 @@ describe('painel único completo da unidade parceira', () => {
       expect(assembly).toContain(`PAINEL_MODULES.partner${page[0].toUpperCase()}${page.slice(1)}`);
     }
 
+    expect(html).toContain('app.partner-compras.receipt.js');
+    expect(staticRoute).toContain("'app.partner-compras.receipt.js'");
+    expect(assembly).toContain('PAINEL_MODULES.partnerComprasReceipt');
+
     expect(api).toContain("me.permissions.entregas === true");
     expect(api).toContain("['logistica']");
     expect(api).not.toContain("me.permissions.financeiro === true");
@@ -125,6 +129,47 @@ describe('painel único completo da unidade parceira', () => {
     expect(payload).not.toHaveProperty('quantity_on_hand');
   });
 
+  it('recebe no painel pelo mesmo endpoint da operação e respeita o acerto da Matriz', async () => {
+    const write = vi.fn().mockResolvedValue({ received: true });
+    const app = appWith(factory(
+      'painel/public/app.partner-compras.js', 'partnerCompras',
+    ), { partnerApiWrite: write });
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(factory(
+      'painel/public/app.partner-compras.receipt.js', 'partnerComprasReceipt',
+    )));
+    app.loadPartnerCompras = vi.fn().mockResolvedValue(undefined);
+    const matrix = {
+      id: '30000000-0000-4000-8000-000000000003', receipt_status: 'pending',
+      source_wholesale_order_id: '40000000-0000-4000-8000-000000000004',
+      matrix_arrival_settled: false,
+      items: [{ item_id: '50000000-0000-4000-8000-000000000005', quantity: 8,
+        confirmed_quantity: null }],
+    };
+    app.partnerCompras.rows = [matrix];
+    expect(app.partnerComprasCanReceive(matrix)).toBe(false);
+
+    matrix.matrix_arrival_settled = true;
+    matrix.items[0].confirmed_quantity = 6;
+    app.partnerComprasOpenReceipt(matrix);
+    app.partnerComprasReceipt.confirmed = true;
+    await app.partnerComprasConfirmReceipt();
+
+    expect(write).toHaveBeenCalledWith(
+      `operacao/compras/${matrix.id}/receber`, 'POST', expect.objectContaining({
+        items: [{ item_id: matrix.items[0].item_id, received_quantity: 6 }],
+      }),
+    );
+    expect(app.partnerCompras.notice).toContain('estoque da unidade foi atualizado');
+  });
+
+  it('libera a leitura de compras para Compras ou Financeiro sem abrir a escrita', () => {
+    const route = source('src/parceiro/route.ts');
+    expect(route).toContain("requireAnyScreen('compras', 'financeiro')");
+    expect(route).toContain("api/compras', { preHandler: comprasReadScreen }");
+    expect(route).toContain("api/compras', { preHandler: ownerOnly }");
+    expect(route).toContain("api/compras/:purchaseId', { preHandler: ownerOnly }");
+  });
+
   it('não expõe custo nos produtos/vendas e limita todos os adaptadores ao cliente parceiro', () => {
     const query = source('src/parceiro/queries.ts');
     expect(query).toContain("item - 'unit_cost_snapshot' - 'cost_status'");
@@ -142,6 +187,9 @@ describe('painel único completo da unidade parceira', () => {
       expect(code).not.toMatch(/\bthis\.api(?:Get|Post|Put|Delete)\s*\(/);
       expect(code.split(/\r?\n/).length).toBeLessThanOrEqual(300);
     }
+    const receipt = source('painel/public/app.partner-compras.receipt.js');
+    expect(receipt).not.toContain('/admin/api');
+    expect(receipt.split(/\r?\n/).length).toBeLessThanOrEqual(300);
   });
 
   it('registra catálogo com permissão própria e limita a migration às duas leituras técnicas', () => {

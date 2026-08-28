@@ -23,7 +23,8 @@ window.PAINEL_MODULES.partnerCompras = function () {
   return {
     partnerCompras: {
       rows: [], loading: false, error: '', notice: '', request: 0,
-      busca: '', filtro: 'todas', page: 1, pageSize: 12, form: freshForm(),
+      busca: '', filtro: 'todas', page: 1, pageSize: 12, selectedId: '',
+      cancellingId: '', form: freshForm(),
     },
 
     partnerComprasOwner() {
@@ -31,7 +32,7 @@ window.PAINEL_MODULES.partnerCompras = function () {
     },
 
     async loadPartnerCompras() {
-      if (!this.isPartnerPanel() || !this.hasPanelModule('financeiro')) return;
+      if (!this.isPartnerPanel() || !this.hasPanelModule('compras')) return;
       const request = ++this.partnerCompras.request;
       this.partnerCompras.loading = true;
       this.partnerCompras.error = '';
@@ -39,6 +40,9 @@ window.PAINEL_MODULES.partnerCompras = function () {
         const payload = await this.partnerApiGet('compras');
         if (request !== this.partnerCompras.request) return;
         this.partnerCompras.rows = Array.isArray(payload.rows) ? payload.rows : [];
+        if (!this.partnerCompras.rows.some((row) => row.id === this.partnerCompras.selectedId)) {
+          this.partnerCompras.selectedId = this.partnerCompras.rows[0]?.id || '';
+        }
         this.partnerCompras.page = 1;
       } catch (_) {
         if (request === this.partnerCompras.request) {
@@ -82,7 +86,7 @@ window.PAINEL_MODULES.partnerCompras = function () {
     partnerComprasStatus(row) {
       if (row.receipt_status === 'received') return 'Recebida';
       if (row.source_wholesale_order_id && !row.matrix_arrival_settled) return 'Acerto na Matriz';
-      return 'Aguardando conferência';
+      return 'Pronta para conferir';
     },
 
     partnerComprasNew() {
@@ -190,9 +194,20 @@ window.PAINEL_MODULES.partnerCompras = function () {
         this.partnerCompras.notice = 'Somente o proprietário pode cancelar compras.';
         return;
       }
-      await this.partnerApiWrite(`compras/${encodeURIComponent(row.id)}`, 'DELETE', {});
-      this.partnerCompras.notice = 'Compra cancelada e efeitos causais revertidos.';
-      await this.loadPartnerCompras();
+      if (row.source_wholesale_order_id) {
+        this.partnerCompras.notice = 'A compra enviada pela Matriz só pode ser cancelada na origem.';
+        return;
+      }
+      this.partnerCompras.cancellingId = row.id;
+      try {
+        await this.partnerApiWrite(`compras/${encodeURIComponent(row.id)}`, 'DELETE', {});
+        this.partnerCompras.notice = 'Compra cancelada e efeitos causais revertidos.';
+        await this.loadPartnerCompras();
+      } catch (error) {
+        this.partnerCompras.error = error?.message || 'Não foi possível cancelar esta compra.';
+      } finally {
+        this.partnerCompras.cancellingId = '';
+      }
     },
   };
 };

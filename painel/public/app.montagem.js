@@ -78,6 +78,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.partnerVendas, // vendas escopadas, mesmo motor transacional do /operacao
     window.PAINEL_MODULES.partnerVendasDashboard, // indicadores e gráfico derivados das vendas escopadas
     window.PAINEL_MODULES.partnerCompras, // compras e compromissos da própria unidade
+    window.PAINEL_MODULES.partnerComprasReceipt, // conferência física e ponte segura Matriz → parceiro
     window.PAINEL_MODULES.partnerLogistica, // entregas e retornos da própria unidade
     window.PAINEL_MODULES.partnerFinanceiro, // competência, caixa e títulos sem números da Matriz
     window.PAINEL_MODULES.partnerColaboradores, // equipe owner-only da unidade

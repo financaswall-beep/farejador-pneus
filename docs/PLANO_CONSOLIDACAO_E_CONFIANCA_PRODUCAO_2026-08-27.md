@@ -775,9 +775,46 @@ Isso é um **bloqueio operacional**, não um vazamento nem envio indevido:
 técnica de ingestão estão aprovados; o ingresso externo, a qualidade do LLM em
 sombra e o envio canário pós-deploy ainda faltam. O bot permanece desligado.
 
+### 4.6 Decisão de continuidade — 28/08/2026
+
+O proprietário decidiu adiar a reativação do Bot para priorizar a entrada da
+Matriz em produção controlada. Portanto, os passos abaixo **não foram
+executados** e não devem ser tratados como aprovados:
+
+- não foi configurado um UUID interno canário em
+  `AGENT_V2_CONVERSATION_IDS`;
+- `AGENT_V2_WORKER_ENABLED` não foi ligado para o ensaio em sombra;
+- respostas do LLM não foram avaliadas em uma conversa real;
+- `BOT_OUTBOX` não foi ligado e nenhum envio canário foi autorizado;
+- `MATRIZ_RECEIPT_AI` permanece fora do ensaio do Bot e não foi reativada.
+
+Estado operacional decidido para esta pausa:
+
+```ini
+AGENT_V2_WORKER_ENABLED=false
+BOT_OUTBOX=false
+MATRIZ_RECEIPT_AI=false
+```
+
+Essa pausa não bloqueia Vendas, Compras, Estoque, Financeiro nem as demais
+funções determinísticas da Matriz. A ingestão raw-first, a normalização e os
+gatilhos analíticos continuam independentes do envio automático do Bot. O
+Portão 4 permanece **EM ANDAMENTO / ADIADO**, e deverá ser retomado no item 3 da
+sequência restante antes de qualquer resposta automática a clientes.
+
 ## Portão 5 — Operação e recuperação
 
 **Objetivo:** conseguir detectar e recuperar falhas.
+
+**Estado:** ADIADO POR DECISÃO DO PROPRIETÁRIO. Não aprovado.
+
+Em linguagem operacional, este portão deve provar quatro coisas:
+
+1. perceber rapidamente quando aplicação, banco, fila ou integração pararem;
+2. avisar o responsável sem depender de alguém descobrir o problema por acaso;
+3. possuir backup recente, identificado e protegido;
+4. restaurar esse backup em ambiente separado e demonstrar que login, banco e
+   operações essenciais voltam a funcionar.
 
 ### 5.1 Monitoramento mínimo
 
@@ -820,9 +857,51 @@ Alertar sobre:
 
 **Saída obrigatória:** relatório de restauração aprovado.
 
+### 5.4 Decisão de continuidade — 28/08/2026
+
+O proprietário decidiu não executar o Portão 5 neste momento e seguir para a
+consolidação das interfaces. A decisão não equivale à aprovação das provas de
+monitoramento, backup ou restauração.
+
+Riscos conscientemente aceitos durante o adiamento:
+
+- indisponibilidades podem continuar sendo percebidas manualmente;
+- não existe, neste portão, comprovação registrada de alerta automático;
+- possuir backup não foi tratado como prova de que ele restaura corretamente;
+- o tempo necessário para recuperar a aplicação ainda não foi medido.
+
+O Portão 5 permanece documentado para retomada futura e não impede alterações
+de interface que preservem os motores transacionais já auditados.
+
 ## Portão 6 — Consolidação das interfaces
 
 **Objetivo:** reduzir manutenção sem mexer no coração financeiro.
+
+**Estado:** EM ANDAMENTO, por decisão do proprietário.
+
+### Progresso registrado em 2026-08-28
+
+| Tela | Escopo | Estado | Evidência | Proteção da Matriz |
+|---|---|---|---|---|
+| Resumo | Parceiro | Concluída | `30add3b` até `ff00090` | Bloco próprio `isPartnerPanel()`; Resumo da Matriz permanece separado |
+| Vendas | Parceiro | Concluída | `0c7cafb` | Blocos e módulos distintos para parceiro e Matriz |
+| Retiradas | Parceiro e Matriz | Concluída | `ada6383` | Layout compartilhado, mas APIs, escopo de dados e motores transacionais continuam separados |
+| Compras | Parceiro | Implementada; deploy pendente | alteração local de 2026-08-28 | Tela própria `isPartnerPanel()`; Compras da Matriz permanece no bloco `isMatrixPanel()` |
+
+As telas concluídas preservam os motores existentes. O redesenho não cria uma
+segunda regra de estoque, caixa ou financeiro no navegador. Em Retiradas, o
+parceiro continua usando as rotas `/parceiro/:slug/api/retiradas`, enquanto a
+Matriz continua usando `/admin/api/retiradas`.
+
+Em Compras, fornecedores locais e remessas criadas pela Matriz aparecem na
+mesma fila da unidade, com a origem identificada. O parceiro não pode cancelar
+nem alterar a quantidade de uma remessa da Matriz. A conferência física reutiliza
+`/parceiro/:slug/api/operacao/compras/:purchaseId/receber`, o mesmo motor do app
+Operação; portanto, o estoque só aumenta depois da confirmação. A leitura passou
+a aceitar a permissão Compras ou Financeiro, enquanto cadastro e cancelamento
+continuam exclusivos do proprietário. Build, paridade do painel e 1.477 testes
+unitários foram aprovados; não há migration nova. O teste de integração isolado
+ficou pendente porque o Docker local não estava acessível à suíte nesta sessão.
 
 ### Estado final desejado
 
