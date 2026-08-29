@@ -44,6 +44,12 @@ describe('estoque do parceiro no painel único', () => {
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
     expect(html).toContain('Estoque físico');
     expect(html).toContain('Pneus da unidade');
+    expect(html).toContain('data-partner-stock-kpis');
+    expect(html).toContain('data-partner-stock-workspace');
+    expect(html).toContain('data-partner-stock-main');
+    expect(html).toContain('data-partner-stock-sidebar');
+    expect(html).toContain('[data-partner-stock-workspace]{display:grid;grid-template-columns:minmax(0,1fr)');
+    expect(html).toContain('[data-partner-stock-workspace]{grid-template-columns:minmax(0,2fr) minmax(340px,1fr)!important}');
     expect(html).not.toContain('O bot consulta este saldo');
     expect(staticRoute).toContain("'app.partner-estoque.js'");
   });
