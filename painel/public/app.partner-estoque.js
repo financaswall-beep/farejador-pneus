@@ -57,16 +57,44 @@ window.PAINEL_MODULES.partnerEstoque = function () {
     partnerEstoqueFiltered() {
       const query = String(this.partnerEstoque.busca || '').trim().toLocaleLowerCase('pt-BR');
       return this.partnerEstoque.rows.filter((row) => {
+        if (row.item_type === 'servico') return false;
         const low = ['low_stock', 'out_of_stock', 'reserved'].includes(row.stock_status);
         const matchesFilter = this.partnerEstoque.filtro === 'todos'
           || (this.partnerEstoque.filtro === 'criticos' && low)
           || (this.partnerEstoque.filtro === 'reservados' && Number(row.quantity_reserved || 0) > 0)
-          || (this.partnerEstoque.filtro === 'servicos' && row.item_type === 'servico');
+          || (this.partnerEstoque.filtro === 'sem_saldo' && Number(row.quantity_available || 0) <= 0);
         if (!matchesFilter) return false;
         if (!query) return true;
-        return [row.item_name, row.tire_size, row.brand, row.local_sku]
+        return [row.tire_size, row.brand]
           .filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(query);
       });
+    },
+
+    partnerEstoqueRecent(limit = 4) {
+      return this.partnerEstoque.rows
+        .filter((row) => row.item_type !== 'servico')
+        .slice()
+        .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+        .slice(0, Math.max(1, Number(limit) || 4));
+    },
+
+    partnerEstoqueOpenEntry() {
+      if (this.panelWorkplace?.role !== 'owner') {
+        this.partnerEstoque.notice = 'Somente o proprietário pode registrar uma entrada.';
+        return;
+      }
+      if (!this.hasPanelModule?.('compras') || typeof this.partnerComprasNew !== 'function') {
+        this.partnerEstoque.notice = 'Libere o módulo Compras para registrar a entrada pelo fluxo seguro.';
+        return;
+      }
+      this.currentPage = 'compras';
+      this.partnerComprasNew();
+    },
+
+    partnerEstoqueOpenCatalog() {
+      if (!this.hasPanelModule?.('catalogo')) return;
+      this.currentPage = 'catalogo';
+      if (typeof this.loadPartnerCatalogo === 'function') void this.loadPartnerCatalogo(1);
     },
 
     partnerEstoqueStatus(row) {
@@ -74,8 +102,8 @@ window.PAINEL_MODULES.partnerEstoque = function () {
       const statuses = {
         in_stock: { label: 'Disponível', cls: 'bg-emerald-50 text-emerald-700' },
         low_stock: { label: 'Estoque baixo', cls: 'bg-amber-50 text-amber-700' },
-        out_of_stock: { label: 'Sem estoque', cls: 'bg-rose-50 text-rose-700' },
-        reserved: { label: 'Saldo reservado', cls: 'bg-blue-50 text-blue-700' },
+        out_of_stock: { label: 'Sem estoque', cls: 'bg-gray-100 text-gray-700' },
+        reserved: { label: 'Todo reservado', cls: 'bg-gray-100 text-gray-700' },
         untracked: { label: 'Não controlado', cls: 'bg-gray-100 text-gray-600' },
       };
       return statuses[row.stock_status] || statuses.in_stock;

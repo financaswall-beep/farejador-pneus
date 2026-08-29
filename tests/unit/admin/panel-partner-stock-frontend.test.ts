@@ -39,7 +39,12 @@ describe('estoque do parceiro no painel único', () => {
     expect(nav).toContain("partnerLoad: ['loadPartnerEstoque']");
     expect(html).toContain("currentPage === 'estoque' && isPartnerPanel()");
     expect(html).toContain("currentPage === 'estoque' && isMatrixPanel()");
-    expect(html).toContain('app.partner-estoque.js?v=20260824-partner-stock1');
+    expect(html).toContain('app.partner-estoque.js?v=20260828-partner-stock2');
+    expect(html).toContain('Buscar medida ou marca');
+    expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
+    expect(html).toContain('Estoque físico');
+    expect(html).toContain('Pneus da unidade');
+    expect(html).not.toContain('O bot consulta este saldo');
     expect(staticRoute).toContain("'app.partner-estoque.js'");
   });
 
@@ -68,8 +73,11 @@ describe('estoque do parceiro no painel único', () => {
     });
     app.partnerEstoque.filtro = 'reservados';
     expect(app.partnerEstoqueFiltered().map((row: any) => row.stock_id)).toEqual(['a', 'b']);
-    app.partnerEstoque.filtro = 'servicos';
-    expect(app.partnerEstoqueFiltered().map((row: any) => row.stock_id)).toEqual(['c']);
+    app.partnerEstoque.filtro = 'sem_saldo';
+    expect(app.partnerEstoqueFiltered().map((row: any) => row.stock_id)).toEqual(['b']);
+    app.partnerEstoque.filtro = 'todos';
+    app.partnerEstoque.busca = 'montagem';
+    expect(app.partnerEstoqueFiltered()).toEqual([]);
   });
 
   it('abre histórico pela mesma API e nunca envia token para rota administrativa', async () => {
@@ -119,6 +127,24 @@ describe('estoque do parceiro no painel único', () => {
     expect(app.partnerEstoque.notice).toContain('aprovação');
   });
 
+  it('leva a entrada para Compras e mantém o Catálogo separado do saldo', () => {
+    const partnerComprasNew = vi.fn();
+    const loadPartnerCatalogo = vi.fn();
+    const app = appWith(stockModule(), {
+      panelWorkplace: { role: 'owner' }, currentPage: 'estoque', partnerComprasNew,
+      loadPartnerCatalogo,
+      hasPanelModule: (name: string) => ['estoque', 'compras', 'catalogo'].includes(name),
+    });
+
+    app.partnerEstoqueOpenEntry();
+    expect(app.currentPage).toBe('compras');
+    expect(partnerComprasNew).toHaveBeenCalledTimes(1);
+
+    app.partnerEstoqueOpenCatalog();
+    expect(app.currentPage).toBe('catalogo');
+    expect(loadPartnerCatalogo).toHaveBeenCalledWith(1);
+  });
+
   it('mantém consulta e mutação escopadas por unidade no servidor', () => {
     const query = source('src/parceiro/operation-stock.ts');
     const detail = source('src/parceiro/operation-stock-detail.ts');
@@ -126,6 +152,8 @@ describe('estoque do parceiro no painel único', () => {
 
     expect(query).toContain('withPartnerContext(ctx.partnerUnitId');
     expect(query).toContain('WHERE environment=$1 AND unit_id=$2');
+    expect(query).toContain('product_id, local_sku');
+    expect(query).not.toContain('sale_price');
     expect(detail).toContain('WHERE id=$1 AND environment=$2 AND unit_id=$3');
     expect(route).toContain("const stockScreen = [requirePartnerAuth, requireScreen('estoque')]");
     expect(route).toContain("fastify.post('/parceiro/:slug/api/operacao/estoque/contagens'");

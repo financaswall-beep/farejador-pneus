@@ -21,6 +21,7 @@ export interface OperationItemRegistrationInput {
 
 export interface SafeStockRow {
   stock_id: string;
+  product_id: string | null;
   local_sku: string | null;
   item_name: string;
   item_type: OperationItemType;
@@ -59,7 +60,7 @@ export async function getOperationStock(ctx: PartnerContext): Promise<{
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const [stock, pending] = await Promise.all([
       client.query<SafeStockRow>(
-        `SELECT id AS stock_id, local_sku, item_name, item_type, tire_size,
+        `SELECT id AS stock_id, product_id, local_sku, item_name, item_type, tire_size,
                 tire_width_mm, tire_aspect_ratio, tire_rim_diameter, brand,
                 quantity_on_hand, quantity_reserved,
                 CASE WHEN quantity_on_hand IS NULL THEN NULL

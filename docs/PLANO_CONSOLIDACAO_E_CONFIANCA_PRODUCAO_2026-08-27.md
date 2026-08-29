@@ -886,7 +886,8 @@ de interface que preservem os motores transacionais já auditados.
 | Resumo | Parceiro | Concluída | `30add3b` até `ff00090` | Bloco próprio `isPartnerPanel()`; Resumo da Matriz permanece separado |
 | Vendas | Parceiro | Concluída | `0c7cafb` | Blocos e módulos distintos para parceiro e Matriz |
 | Retiradas | Parceiro e Matriz | Concluída | `ada6383` | Layout compartilhado, mas APIs, escopo de dados e motores transacionais continuam separados |
-| Compras | Parceiro | Implementada; deploy pendente | alteração local de 2026-08-28 | Tela própria `isPartnerPanel()`; Compras da Matriz permanece no bloco `isMatrixPanel()` |
+| Compras | Parceiro | Concluída e validada em produção | deploy de 2026-08-28 + smoke autenticado de 2026-08-28 | Tela própria `isPartnerPanel()`; Compras da Matriz permanece no bloco `isMatrixPanel()` |
+| Estoque | Parceiro | Implementada; deploy pendente | build + 1.480 testes unitários em 2026-08-28 | Tela própria `isPartnerPanel()`; galpão da Matriz e seus custos permanecem no bloco `isMatrixPanel()` |
 
 As telas concluídas preservam os motores existentes. O redesenho não cria uma
 segunda regra de estoque, caixa ou financeiro no navegador. Em Retiradas, o
@@ -902,6 +903,57 @@ a aceitar a permissão Compras ou Financeiro, enquanto cadastro e cancelamento
 continuam exclusivos do proprietário. Build, paridade do painel e 1.477 testes
 unitários foram aprovados; não há migration nova. O teste de integração isolado
 ficou pendente porque o Docker local não estava acessível à suíte nesta sessão.
+
+Em Estoque, a interface do parceiro passou a mostrar somente o trabalho da loja:
+saldo físico, reservado, disponível, mínimo, localização, situação, contagem e
+histórico. A busca visível aceita medida ou marca; compatibilidade por moto e
+identidade técnica continuam no Catálogo. O botão `Dar entrada` abre Compras,
+preservando a regra de que o saldo só muda após a conferência física. Nenhum
+detalhe técnico do bot é exibido ao borracheiro.
+
+O Atendente V2 já usava a mesma fonte oficial da tela,
+`commerce.partner_stock_levels`, com filtros obrigatórios por `environment`,
+`unit_id` e `product_id`. Ele considera apenas estoque rastreado, não excluído e
+com `quantity_on_hand - quantity_reserved` suficiente. Portanto, não foi criado
+um segundo motor de busca. Os testes foram reforçados para provar o desconto das
+reservas, o isolamento da unidade e a recusa quando o disponível não cobre a
+quantidade. Build e 1.480 testes unitários foram aprovados; não há migration.
+A suíte de integração com Postgres permaneceu pendente porque o Testcontainers
+não encontrou um runtime Docker acessível, inclusive fora do sandbox.
+
+#### Regra de preço da Rede e do parceiro
+
+O modelo híbrido principal já está implementado e deve ser preservado:
+
+- pedido originado pelo Bot/Rede usa o preço central vigente em
+  `commerce.product_prices`;
+- venda direta no balcão da unidade pode usar o preço local ou negociado pelo
+  parceiro;
+- instalação pode ser configurada por unidade;
+- o parceiro pode deixar de receber pedidos da Rede por meio de
+  `accepts_network_orders`;
+- o frete do parceiro continua seguindo a regra padrão da Rede; ele ainda não é
+  livre por unidade.
+
+Essa separação mantém um preço comercial previsível para o cliente que chega
+pela Rede sem retirar a autonomia do parceiro nas próprias vendas. O motor atual
+não consulta o custo local antes de rotear um pedido e ainda não possui preço
+mínimo aceitável nem margem mínima garantida por unidade. Essas duas proteções
+ficam registradas como evolução futura, antes da expansão comercial da Rede, e
+não bloqueiam a operação inicial da Matriz nem esta consolidação de interface.
+
+O smoke autenticado em produção foi executado com o usuário Wallace na Unidade
+Canário Teste, sem realizar mutações. A tela exibiu a remessa da Matriz de
+R$ 45,00, um pneu aguardando conferência física, nenhuma conta em aberto e o
+detalhamento coerente do item. Vendas, Retiradas, Estoque, Logística, Financeiro
+e Catálogo também carregaram com o escopo da mesma unidade.
+
+Foram observados resíduos de console provenientes de blocos ocultos do painel
+único: gráficos históricos da Compras da Matriz são inicializados fora do seu
+escopo visível; o modal oculto de compatibilidade do Catálogo avalia um resumo
+nulo; e dois nomes de ícones não existem no pacote Lucide embarcado. Esses pontos
+ficam registrados como saneamento do shell compartilhado e não invalidam a tela
+Compras do parceiro, cuja API, dados, layout e ações de leitura foram aprovados.
 
 ### Estado final desejado
 
