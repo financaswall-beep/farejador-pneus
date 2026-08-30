@@ -39,11 +39,15 @@ describe('estoque do parceiro no painel único', () => {
     expect(nav).toContain("partnerLoad: ['loadPartnerEstoque']");
     expect(html).toContain("currentPage === 'estoque' && isPartnerPanel()");
     expect(html).toContain("currentPage === 'estoque' && isMatrixPanel()");
-    expect(html).toContain('app.partner-estoque.js?v=20260828-partner-stock2');
+    expect(html).toContain('app.partner-estoque.js?v=20260829-partner-stock3');
+    expect(html).toContain('app.partner-estoque.actions.js?v=20260829-partner-stock3');
     expect(html).toContain('Buscar medida ou marca');
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
     expect(html).toContain('Estoque físico');
     expect(html).toContain('Pneus da unidade');
+    expect(html).toContain('Novo pneu');
+    expect(html).toContain('Corrigir saldo');
+    expect(html).toContain('Alterar preço');
     expect(html).toContain('data-partner-stock-kpis');
     expect(html).toContain('data-partner-stock-workspace');
     expect(html).toContain('data-partner-stock-main');
@@ -52,6 +56,7 @@ describe('estoque do parceiro no painel único', () => {
     expect(html).toContain('[data-partner-stock-workspace]{grid-template-columns:minmax(0,2fr) minmax(340px,1fr)!important}');
     expect(html).not.toContain('O bot consulta este saldo');
     expect(staticRoute).toContain("'app.partner-estoque.js'");
+    expect(staticRoute).toContain("'app.partner-estoque.actions.js'");
   });
 
   it('carrega a fonte operacional escopada e calcula apenas indicadores visuais', async () => {

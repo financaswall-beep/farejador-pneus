@@ -75,6 +75,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.partnerResumo, // resumo read-only da unidade, sem cálculo financeiro paralelo
     window.PAINEL_MODULES.partnerRetiradas, // baixa/cancelamento pelas rotas transacionais escopadas
     window.PAINEL_MODULES.partnerEstoque, // saldo, reservas, contagem e histórico escopados por unidade
+    window.PAINEL_MODULES.partnerEstoqueActions, // ações diretas e simples exclusivas do dono da unidade
     window.PAINEL_MODULES.partnerVendas, // vendas escopadas, mesmo motor transacional do /operacao
     window.PAINEL_MODULES.partnerVendasDashboard, // indicadores e gráfico derivados das vendas escopadas
     window.PAINEL_MODULES.partnerCompras, // compras e compromissos da própria unidade

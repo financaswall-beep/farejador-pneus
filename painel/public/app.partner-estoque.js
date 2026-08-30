@@ -20,9 +20,16 @@ window.PAINEL_MODULES.partnerEstoque = function () {
       this.partnerEstoque.error = null;
       const started = performance.now();
       try {
-        const payload = await this.partnerApiGet('operacao/estoque');
+        const priceRequest = this.panelWorkplace?.role === 'owner'
+          ? this.partnerApiGet('operacao/estoque-valores').catch(() => ({ rows: [] }))
+          : Promise.resolve({ rows: [] });
+        const [payload, pricePayload] = await Promise.all([
+          this.partnerApiGet('operacao/estoque'), priceRequest,
+        ]);
         if (request !== this.partnerEstoque.request) return;
-        this.partnerEstoque.rows = Array.isArray(payload.rows) ? payload.rows : [];
+        const prices = new Map((pricePayload.rows || []).map((row) => [row.stock_id, row.sale_price]));
+        this.partnerEstoque.rows = (Array.isArray(payload.rows) ? payload.rows : [])
+          .map((row) => ({ ...row, sale_price: prices.get(row.stock_id) ?? null }));
         this.partnerEstoque.pending = payload.pending || emptyPending();
         void this.partnerPanelTelemetry({
           page: 'estoque', event_type: 'read', operation: 'load_stock', outcome: 'success',
