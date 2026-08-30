@@ -15,10 +15,12 @@ function actionModule() {
 
 function app() {
   const result: any = {
-    panelWorkplace: { role: 'owner' },
+    panelWorkplace: { role: 'funcionario' }, panelModules: ['estoque', 'compras'],
     partnerEstoque: { rows: [], notice: '', selected: null },
     partnerApiWrite: vi.fn(), loadPartnerEstoque: vi.fn(),
     partnerEstoqueClose: vi.fn(), formatCurrency: (value: number) => `R$ ${value.toFixed(2)}`,
+    isPartnerPanel: () => true,
+    hasPanelModule(module: string) { return this.panelModules.includes(module); },
     $nextTick: (callback: () => void) => callback(),
   };
   Object.defineProperties(result, Object.getOwnPropertyDescriptors(actionModule()));
@@ -69,7 +71,7 @@ describe('ações simples do estoque do parceiro', () => {
     expect(target.partnerEstoque.notice).toContain('Saldo corrigido');
   });
 
-  it('altera somente o preço local e esconde as ações de funcionário', async () => {
+  it('altera o preço local para operador com permissão de Estoque', async () => {
     const target = app();
     const row = {
       stock_id: '11111111-1111-4111-8111-111111111111', item_type: 'pneu',
@@ -86,8 +88,10 @@ describe('ações simples do estoque do parceiro', () => {
         sale_price: 139.9, reason: 'Alterado na tela simples de estoque',
       },
     );
-    target.panelWorkplace.role = 'funcionario';
-    expect(target.partnerEstoqueOwner()).toBe(false);
+    expect(target.partnerEstoqueCanManage()).toBe(true);
+    expect(target.partnerEstoqueOwner()).toBe(true);
+    target.panelModules = ['vendas'];
+    expect(target.partnerEstoqueCanManage()).toBe(false);
   });
 
   it('não usa API administrativa nem expõe custo no navegador', () => {

@@ -20,7 +20,7 @@ window.PAINEL_MODULES.partnerEstoque = function () {
       this.partnerEstoque.error = null;
       const started = performance.now();
       try {
-        const priceRequest = this.panelWorkplace?.role === 'owner'
+        const priceRequest = this.hasPanelModule('estoque')
           ? this.partnerApiGet('operacao/estoque-valores').catch(() => ({ rows: [] }))
           : Promise.resolve({ rows: [] });
         const [payload, pricePayload] = await Promise.all([
@@ -86,8 +86,8 @@ window.PAINEL_MODULES.partnerEstoque = function () {
     },
 
     partnerEstoqueOpenEntry() {
-      if (this.panelWorkplace?.role !== 'owner') {
-        this.partnerEstoque.notice = 'Somente o proprietário pode registrar uma entrada.';
+      if (!this.isPartnerPanel?.() || !this.hasPanelModule?.('estoque')) {
+        this.partnerEstoque.notice = 'Seu acesso não permite alterar o estoque.';
         return;
       }
       if (!this.hasPanelModule?.('compras') || typeof this.partnerComprasNew !== 'function') {

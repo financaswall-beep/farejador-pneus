@@ -40,8 +40,10 @@ const ownerOnly = [requirePartnerAuth, requireOwner];
 const financeiroScreen = [requirePartnerAuth, requireScreen('financeiro')];
 // Compras pertence à operação da unidade, mas também alimenta o Financeiro.
 // A leitura é compartilhada entre as duas permissões; recebimento continua
-// protegido pela permissão Compras e mutações cadastrais continuam owner-only.
+// protegido pela permissão Compras. Registrar compra também exige Compras;
+// cancelar continua owner-only porque reverte estoque e efeitos financeiros.
 const comprasReadScreen = [requirePartnerAuth, requireAnyScreen('compras', 'financeiro')];
+const comprasWriteScreen = [requirePartnerAuth, requireScreen('compras')];
 import {
   cancelPartnerSale,
   cancelPartnerPayable,
@@ -1471,7 +1473,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/compras', { preHandler: comprasWriteScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = partnerPurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];

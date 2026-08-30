@@ -173,11 +173,11 @@ describe('painel único completo da unidade parceira', () => {
     expect(app.partnerCompras.notice).toContain('estoque da unidade foi atualizado');
   });
 
-  it('libera a leitura de compras para Compras ou Financeiro sem abrir a escrita', () => {
+  it('libera leitura para Compras ou Financeiro e cadastro somente para Compras', () => {
     const route = source('src/parceiro/route.ts');
     expect(route).toContain("requireAnyScreen('compras', 'financeiro')");
     expect(route).toContain("api/compras', { preHandler: comprasReadScreen }");
-    expect(route).toContain("api/compras', { preHandler: ownerOnly }");
+    expect(route).toContain("api/compras', { preHandler: comprasWriteScreen }");
     expect(route).toContain("api/compras/:purchaseId', { preHandler: ownerOnly }");
   });
 

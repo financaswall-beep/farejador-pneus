@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   getPartnerContext,
-  requireOwner,
   requirePartnerAuth,
+  requireScreen,
   type PartnerAuthedRequest,
 } from './auth.js';
 import { getPartnerSelfIdentity } from './queries.js';
@@ -24,7 +24,7 @@ const bodySchema = z.object({
 
 export function registerPartnerOperationStockPriceRoutes(fastify: FastifyInstance): void {
   fastify.post('/parceiro/:slug/api/operacao/estoque/:stockId/preco', {
-    preHandler: [requirePartnerAuth, requireOwner],
+    preHandler: [requirePartnerAuth, requireScreen('estoque')],
   }, async (request: PartnerAuthedRequest, reply) => {
     const params = paramsSchema.safeParse(request.params);
     const body = bodySchema.safeParse(request.body ?? {});

@@ -898,9 +898,10 @@ Em Compras, fornecedores locais e remessas criadas pela Matriz aparecem na
 mesma fila da unidade, com a origem identificada. O parceiro não pode cancelar
 nem alterar a quantidade de uma remessa da Matriz. A conferência física reutiliza
 `/parceiro/:slug/api/operacao/compras/:purchaseId/receber`, o mesmo motor do app
-Operação; portanto, o estoque só aumenta depois da confirmação. A leitura passou
-a aceitar a permissão Compras ou Financeiro, enquanto cadastro e cancelamento
-continuam exclusivos do proprietário. Build, paridade do painel e 1.477 testes
+Operação; portanto, o estoque só aumenta depois da confirmação. A leitura aceita
+a permissão Compras ou Financeiro. O cadastro exige a permissão Compras e o
+cancelamento continua exclusivo do proprietário, pois reverte estoque e efeitos
+financeiros. Build, paridade do painel e 1.477 testes
 unitários foram aprovados; não há migration nova. O teste de integração isolado
 ficou pendente porque o Docker local não estava acessível à suíte nesta sessão.
 
@@ -910,6 +911,14 @@ histórico. A busca visível aceita medida ou marca; compatibilidade por moto e
 identidade técnica continuam no Catálogo. O botão `Dar entrada` abre Compras,
 preservando a regra de que o saldo só muda após a conferência física. Nenhum
 detalhe técnico do bot é exibido ao borracheiro.
+
+As ações simples `Novo pneu`, `Dar entrada`, `Corrigir saldo` e `Alterar preço`
+seguem as permissões efetivas dos módulos Estoque e Compras, em vez de depender
+somente do nome técnico `owner`. Isso permite que o operador autorizado da loja
+faça o trabalho diário sem receber poderes de proprietário. O servidor continua
+validando a permissão, isolando a unidade, preservando reservas e gravando o
+histórico; configurações, gestão de acessos e cancelamentos sensíveis permanecem
+exclusivos do proprietário.
 
 O Atendente V2 já usava a mesma fonte oficial da tela,
 `commerce.partner_stock_levels`, com filtros obrigatórios por `environment`,

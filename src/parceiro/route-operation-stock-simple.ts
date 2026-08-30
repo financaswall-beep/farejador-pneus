@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   getPartnerContext,
-  requireOwner,
   requirePartnerAuth,
+  requireScreen,
   type PartnerAuthedRequest,
 } from './auth.js';
 import {
@@ -48,7 +48,7 @@ function simpleError(error: unknown) {
 
 export function registerPartnerOperationStockSimpleRoutes(fastify: FastifyInstance): void {
   fastify.get('/parceiro/:slug/api/operacao/estoque-valores', {
-    preHandler: [requirePartnerAuth, requireOwner],
+    preHandler: [requirePartnerAuth, requireScreen('estoque')],
   }, async (request: PartnerAuthedRequest, reply) => {
     const params = slugSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'partner_not_found' });
@@ -56,7 +56,7 @@ export function registerPartnerOperationStockSimpleRoutes(fastify: FastifyInstan
   });
 
   fastify.post('/parceiro/:slug/api/operacao/estoque/itens', {
-    preHandler: [requirePartnerAuth, requireOwner],
+    preHandler: [requirePartnerAuth, requireScreen('estoque')],
   }, async (request: PartnerAuthedRequest, reply) => {
     const params = slugSchema.safeParse(request.params);
     const body = newTireSchema.safeParse(request.body ?? {});
@@ -83,7 +83,7 @@ export function registerPartnerOperationStockSimpleRoutes(fastify: FastifyInstan
   });
 
   fastify.post('/parceiro/:slug/api/operacao/estoque/:stockId/saldo', {
-    preHandler: [requirePartnerAuth, requireOwner],
+    preHandler: [requirePartnerAuth, requireScreen('estoque')],
   }, async (request: PartnerAuthedRequest, reply) => {
     const params = stockParamsSchema.safeParse(request.params);
     const body = balanceSchema.safeParse(request.body ?? {});

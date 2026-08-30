@@ -31,6 +31,10 @@ window.PAINEL_MODULES.partnerCompras = function () {
       return this.panelWorkplace?.role === 'owner';
     },
 
+    partnerComprasCanCreate() {
+      return this.isPartnerPanel?.() === true && this.hasPanelModule?.('compras') === true;
+    },
+
     async loadPartnerCompras() {
       if (!this.isPartnerPanel() || !this.hasPanelModule('compras')) return;
       const request = ++this.partnerCompras.request;
@@ -90,8 +94,8 @@ window.PAINEL_MODULES.partnerCompras = function () {
     },
 
     partnerComprasNew() {
-      if (!this.partnerComprasOwner()) {
-        this.partnerCompras.notice = 'Somente o proprietário pode registrar compras.';
+      if (!this.partnerComprasCanCreate()) {
+        this.partnerCompras.notice = 'Seu acesso não permite registrar compras.';
         return;
       }
       this.partnerCompras.form = { ...freshForm(), open: true };
@@ -128,7 +132,7 @@ window.PAINEL_MODULES.partnerCompras = function () {
 
     partnerComprasValidation() {
       const form = this.partnerCompras.form;
-      if (!this.partnerComprasOwner()) return 'Somente o proprietário pode registrar compras.';
+      if (!this.partnerComprasCanCreate()) return 'Seu acesso não permite registrar compras.';
       if (!form.items.length) return 'Adicione ao menos um item.';
       for (const item of form.items) {
         if (!String(item.item_name || '').trim()) return 'Informe o nome de todos os itens.';

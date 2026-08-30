@@ -96,11 +96,11 @@ describe('estoque simples oficial do parceiro', () => {
     expect(mocks.query.mock.calls[0]?.[1]).toEqual(['test', 'unit-a']);
   });
 
-  it('mantém todas as rotas simples exclusivas do proprietário', () => {
+  it('protege todas as rotas simples pela permissão Estoque', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'src/parceiro/route-operation-stock-simple.ts'), 'utf8',
     );
-    expect(route.match(/preHandler: \[requirePartnerAuth, requireOwner\]/g)).toHaveLength(3);
+    expect(route.match(/preHandler: \[requirePartnerAuth, requireScreen\('estoque'\)\]/g)).toHaveLength(3);
     expect(route).toContain('/operacao/estoque/itens');
     expect(route).toContain('/operacao/estoque/:stockId/saldo');
     expect(route).toContain('/operacao/estoque-valores');

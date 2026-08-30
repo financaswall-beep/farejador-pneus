@@ -208,7 +208,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(matrixRoute).toContain('requireOwner');
     expect(matrixBackend).toContain('setCatalogPrice');
     expect(matrixBackend).not.toMatch(/UPDATE\s+commerce\.wholesale_stock/);
-    expect(partnerPriceRoute).toContain('preHandler: [requirePartnerAuth, requireOwner]');
+    expect(partnerPriceRoute).toContain("preHandler: [requirePartnerAuth, requireScreen('estoque')]");
     expect(partnerPriceBackend).toContain("'partner_stock_sale_price_changed'");
     expect(partnerPriceBackend).not.toMatch(/quantity_on_hand\s*=/);
     expect(partnerPriceBackend).not.toMatch(/average_cost\s*=/);
@@ -240,7 +240,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(registerBlock).toContain("'pending'");
     expect(registerBlock).not.toContain('UPDATE commerce.partner_stock_levels');
     expect(registerBlock).not.toContain('INSERT INTO commerce.partner_stock_levels');
-    expect(legacyRoute).toContain("fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }");
+    expect(legacyRoute).toContain("fastify.post('/parceiro/:slug/api/compras', { preHandler: comprasWriteScreen }");
     expect(legacyRoute).toContain("fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: ownerOnly }");
   });
 });

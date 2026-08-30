@@ -39,8 +39,9 @@ describe('estoque do parceiro no painel único', () => {
     expect(nav).toContain("partnerLoad: ['loadPartnerEstoque']");
     expect(html).toContain("currentPage === 'estoque' && isPartnerPanel()");
     expect(html).toContain("currentPage === 'estoque' && isMatrixPanel()");
-    expect(html).toContain('app.partner-estoque.js?v=20260829-partner-stock3');
-    expect(html).toContain('app.partner-estoque.actions.js?v=20260829-partner-stock3');
+    expect(html).toContain('app.partner-estoque.js?v=20260830-partner-stock-permissions1');
+    expect(html).toContain('app.partner-estoque.actions.js?v=20260830-partner-stock-permissions1');
+    expect(html).toContain('app.partner-compras.js?v=20260830-partner-stock-permissions1');
     expect(html).toContain('app.montagem.js?v=20260829-partner-stock4');
     expect(html).toContain('Buscar medida ou marca');
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
@@ -145,6 +146,7 @@ describe('estoque do parceiro no painel único', () => {
     const app = appWith(stockModule(), {
       panelWorkplace: { role: 'owner' }, currentPage: 'estoque', partnerComprasNew,
       loadPartnerCatalogo,
+      isPartnerPanel: () => true,
       hasPanelModule: (name: string) => ['estoque', 'compras', 'catalogo'].includes(name),
     });
 

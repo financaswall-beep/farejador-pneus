@@ -68,7 +68,7 @@ describe('Catálogo na Operação da Loja', () => {
     expect(view).toContain("if (entries.length === 1)");
     expect(view).toContain("if (entries.length < 2) return");
     expect(view).toContain('Caixa.openStockPrice(helper.selectedStockRow(row, entry))');
-    expect(partnerPriceRoute).toContain('preHandler: [requirePartnerAuth, requireOwner]');
+    expect(partnerPriceRoute).toContain("preHandler: [requirePartnerAuth, requireScreen('estoque')]");
     expect(price).toContain('if (Caixa.loadOperationCatalog) await Caixa.loadOperationCatalog(1)');
   });
 

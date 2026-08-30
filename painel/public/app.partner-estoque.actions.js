@@ -13,8 +13,14 @@ window.PAINEL_MODULES.partnerEstoqueActions = function () {
     partnerEstoqueBalance: emptyBalance(),
     partnerEstoquePrice: emptyPrice(),
 
+    partnerEstoqueCanManage() {
+      return this.isPartnerPanel?.() === true && this.hasPanelModule?.('estoque') === true;
+    },
+
+    // Compatibilidade com o HTML já publicado: a ação depende da permissão do
+    // módulo, não do nome técnico do papel recebido no login.
     partnerEstoqueOwner() {
-      return this.panelWorkplace?.role === 'owner';
+      return this.partnerEstoqueCanManage();
     },
 
     partnerEstoquePriceLabel(row) {
@@ -27,7 +33,7 @@ window.PAINEL_MODULES.partnerEstoqueActions = function () {
     },
 
     partnerEstoqueOpenNew() {
-      if (!this.partnerEstoqueOwner()) return;
+      if (!this.partnerEstoqueCanManage()) return;
       this.partnerEstoqueNew = { ...emptyNew(), open: true };
       this.$nextTick(() => lucide.createIcons());
     },
@@ -70,7 +76,7 @@ window.PAINEL_MODULES.partnerEstoqueActions = function () {
     },
 
     partnerEstoqueOpenBalance(row = null) {
-      if (!this.partnerEstoqueOwner()) return;
+      if (!this.partnerEstoqueCanManage()) return;
       const selected = row || this.partnerEstoque.selected || this.partnerEstoqueActionRows()[0];
       if (!selected) {
         this.partnerEstoque.notice = 'Cadastre um pneu antes de corrigir o saldo.';
@@ -115,7 +121,7 @@ window.PAINEL_MODULES.partnerEstoqueActions = function () {
     },
 
     partnerEstoqueOpenPrice(row = null) {
-      if (!this.partnerEstoqueOwner()) return;
+      if (!this.partnerEstoqueCanManage()) return;
       const selected = row || this.partnerEstoque.selected || this.partnerEstoqueActionRows()[0];
       if (!selected) {
         this.partnerEstoque.notice = 'Cadastre um pneu antes de alterar o preço.';
