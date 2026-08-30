@@ -41,6 +41,7 @@ describe('estoque do parceiro no painel único', () => {
     expect(html).toContain("currentPage === 'estoque' && isMatrixPanel()");
     expect(html).toContain('app.partner-estoque.js?v=20260829-partner-stock3');
     expect(html).toContain('app.partner-estoque.actions.js?v=20260829-partner-stock3');
+    expect(html).toContain('app.montagem.js?v=20260829-partner-stock4');
     expect(html).toContain('Buscar medida ou marca');
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
     expect(html).toContain('Estoque físico');
