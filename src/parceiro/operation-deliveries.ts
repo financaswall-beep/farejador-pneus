@@ -26,7 +26,7 @@ export interface OperationDeliveryCard {
 
 export interface OperationDeliveriesPayload {
   rows: OperationDeliveryCard[];
-  summary: { preparing: number; dispatched: number; delivered: number };
+  summary: { preparing: number; dispatched: number; delivered: number; returns: number };
   pagination: {
     view: 'active' | 'history';
     page: number;
@@ -42,6 +42,7 @@ type DeliveryRow = Omit<OperationDeliveryCard, 'total_amount' | 'items'> & {
   total_preparing: string | number;
   total_dispatched: string | number;
   total_delivered: string | number;
+  total_returns: string | number;
   items: Array<{
     quantity?: number | string;
     item_name?: string | null;
@@ -76,12 +77,15 @@ export async function getPartnerOperationDeliveries(
               pof.total_amount::text, pof.dispatched_at, pof.delivered_at,
               pof.items, approved_photo.photo_request_id,
               count(*) OVER() AS total_count,
-              count(*) FILTER (WHERE pof.delivery_status IN ('pending','failed'))
+              count(*) FILTER (WHERE pof.delivery_status = 'pending')
                 OVER() AS total_preparing,
               count(*) FILTER (WHERE pof.delivery_status = 'dispatched')
                 OVER() AS total_dispatched,
               count(*) FILTER (WHERE pof.delivery_status = 'delivered')
-                OVER() AS total_delivered
+                OVER() AS total_delivered,
+              count(*) FILTER (WHERE pof.delivery_status = 'failed'
+                                 AND pof.status <> 'cancelled')
+                OVER() AS total_returns
          FROM commerce.partner_orders_full pof
          LEFT JOIN LATERAL (
            SELECT pr.id AS photo_request_id
@@ -121,9 +125,10 @@ export async function getPartnerOperationDeliveries(
     const preparing = Number(result.rows[0]?.total_preparing ?? 0);
     const dispatched = Number(result.rows[0]?.total_dispatched ?? 0);
     const delivered = Number(result.rows[0]?.total_delivered ?? 0);
+    const returns = Number(result.rows[0]?.total_returns ?? 0);
     const rows = result.rows.map(({ total_count: _totalCount,
       total_preparing: _totalPreparing, total_dispatched: _totalDispatched,
-      total_delivered: _totalDelivered, ...row }) => ({
+      total_delivered: _totalDelivered, total_returns: _totalReturns, ...row }) => ({
       ...row,
       total_amount: Number(row.total_amount),
       items: (row.items ?? []).map((item) => ({
@@ -134,7 +139,7 @@ export async function getPartnerOperationDeliveries(
     }));
     return {
       rows,
-      summary: { preparing, dispatched, delivered },
+      summary: { preparing, dispatched, delivered, returns },
       pagination: { view, page, limit, total, has_more: offset + rows.length < total },
     };
   });

@@ -888,6 +888,7 @@ de interface que preservem os motores transacionais já auditados.
 | Retiradas | Parceiro e Matriz | Concluída | `ada6383` | Layout compartilhado, mas APIs, escopo de dados e motores transacionais continuam separados |
 | Compras | Parceiro | Concluída e validada em produção | deploy de 2026-08-28 + smoke autenticado de 2026-08-28 | Tela própria `isPartnerPanel()`; Compras da Matriz permanece no bloco `isMatrixPanel()` |
 | Estoque | Parceiro | Implementada; deploy pendente | build + 1.480 testes unitários em 2026-08-28 | Tela própria `isPartnerPanel()`; galpão da Matriz e seus custos permanecem no bloco `isMatrixPanel()` |
+| Logística | Parceiro | Implementada; deploy pendente | build + 1.490 testes unitários em 2026-08-30 | Tela própria `isPartnerPanel()`; rotas e comprovantes da Matriz permanecem no bloco `isMatrixPanel()` |
 
 As telas concluídas preservam os motores existentes. O redesenho não cria uma
 segunda regra de estoque, caixa ou financeiro no navegador. Em Retiradas, o
@@ -919,6 +920,21 @@ faça o trabalho diário sem receber poderes de proprietário. O servidor contin
 validando a permissão, isolando a unidade, preservando reservas e gravando o
 histórico; configurações, gestão de acessos e cancelamentos sensíveis permanecem
 exclusivos do proprietário.
+
+Em Logística, a interface do parceiro passou a reunir fila, filtros, histórico,
+detalhe do pedido e ações em uma composição simples de duas colunas. A entrega
+continua nascendo de Vendas — não existe entrega solta — e Retiradas permanece
+na aba própria. O operador escolhe o entregador, marca a saída, informa a forma
+de pagamento na entrega, registra uma tentativa sem sucesso e confirma o retorno
+físico separadamente. Somente a confirmação real da entrega movimenta estoque,
+caixa e financeiro; a falha mantém a reserva protegida até o pneu voltar à loja.
+Busca, WhatsApp, comprovante, paginação e ordem simples lembrada no aparelho foram
+preservados. O resumo agora separa corretamente `Preparando` de `Retornos`.
+
+O build e os 1.490 testes unitários passaram. As duas suítes de integração
+direcionadas não iniciaram porque o Docker Desktop estava desligado; nenhum teste
+de banco falhou, pois os 36 casos foram ignorados antes da criação do PostgreSQL
+descartável. Essas provas devem ser repetidas com o Docker ligado antes do deploy.
 
 O Atendente V2 já usava a mesma fonte oficial da tela,
 `commerce.partner_stock_levels`, com filtros obrigatórios por `environment`,

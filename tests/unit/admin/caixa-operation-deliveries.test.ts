@@ -54,6 +54,8 @@ describe('Entregas na Operação da Loja', () => {
     expect(backend).toContain('pof.environment = $1 AND pof.unit_id = $2');
     expect(backend).toContain("pof.fulfillment_mode = 'delivery'");
     expect(backend).toContain("pof.status <> 'cancelled'");
+    expect(backend).toContain("pof.delivery_status = 'pending'");
+    expect(backend).toContain('AS total_returns');
     expect(backend).toContain('po.unit_id = $3');
     expect(backend).not.toContain('average_cost');
     expect(backend).not.toContain('unit_cost_snapshot');

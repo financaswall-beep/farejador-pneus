@@ -42,6 +42,18 @@ describe('contratos Financeiro e Logística do parceiro', () => {
     expect(api).toContain("['GET', 'POST', 'PUT', 'PATCH', 'DELETE']");
     expect(api).toContain("['POST', 'PUT', 'PATCH', 'DELETE']");
     expect(api).toContain("resource.includes('..')");
+    expect(logistics).not.toContain('prompt(');
+  });
+
+  it('mantém a logística em duas colunas e não cria entrega solta', () => {
+    const html = source('painel/public/index.html');
+    expect(html).toContain('data-partner-logistics-kpis');
+    expect(html).toContain('data-partner-logistics-workspace');
+    expect(html).toContain('Detalhes da entrega');
+    expect(html).toContain('Quem vai entregar?');
+    expect(html).toContain('Confirmar retorno físico');
+    expect(html).toContain("partnerResumoGo('vendas','partnerVendasNew')");
+    expect(html).not.toContain('> Nova entrega</button>');
   });
 
   it('preserva zeros e nunca recompõe lucro ou caixa no navegador', async () => {
@@ -130,7 +142,7 @@ describe('contratos Financeiro e Logística do parceiro', () => {
 
   it('adota paginação autoritativa e preserva total zero no histórico', async () => {
     const apiGet = vi.fn().mockResolvedValue({
-      rows: [], summary: { preparing: 0, dispatched: 0, delivered: 0 },
+      rows: [], summary: { preparing: 0, dispatched: 0, delivered: 0, returns: 0 },
       pagination: { view: 'history', page: 2, limit: 15, total: 0, has_more: false },
     });
     const app = appWith(moduleFrom(
@@ -140,7 +152,7 @@ describe('contratos Financeiro e Logística do parceiro', () => {
     expect(apiGet).toHaveBeenCalledWith('operacao/entregas?view=active&page=9&limit=30');
     expect(app.partnerLogistica).toMatchObject({
       view: 'history', page: 2, limit: 15, total: 0, hasMore: false,
-      summary: { preparing: 0, dispatched: 0, delivered: 0 },
+      summary: { preparing: 0, dispatched: 0, delivered: 0, returns: 0 },
     });
   });
 
@@ -171,5 +183,29 @@ describe('contratos Financeiro e Logística do parceiro', () => {
       { reason: 'pneus voltaram' },
     );
     expect(app.partnerLogistica.notice).toContain('sem entrada no caixa');
+  });
+
+  it('exige entregador ao sair e mantém a ordem simples no aparelho', async () => {
+    const apiWrite = vi.fn().mockResolvedValue({ ok: true });
+    const app = appWith(moduleFrom(
+      'painel/public/app.partner-logistica.js', 'partnerLogistica',
+    ), { partnerApiWrite: apiWrite, operatorLabel: '' });
+    app.loadPartnerLogistica = vi.fn().mockResolvedValue(undefined);
+    const pending = {
+      order_id: '55555555-5555-4555-8555-555555555555',
+      order_status: 'pending', delivery_status: 'pending', delivery_courier: null,
+    };
+    expect(await app.partnerLogisticaMove(pending, 'dispatched', {})).toBe(false);
+    expect(app.partnerLogistica.actionError).toContain('quem vai fazer a entrega');
+    await app.partnerLogisticaMove(pending, 'dispatched', { delivery_courier: 'João' });
+    expect(apiWrite).toHaveBeenCalledWith(`entregas/${pending.order_id}`, 'POST', {
+      delivery_status: 'dispatched', delivery_courier: 'João',
+      payment_method: null, reason: null,
+    });
+
+    app.partnerLogistica.rows = [pending, { ...pending, order_id: 'outro' }];
+    app.partnerLogistica.routeOrder = [pending.order_id, 'outro'];
+    app.partnerLogisticaMoveOrder(pending, 1);
+    expect(app.partnerLogistica.routeOrder).toEqual(['outro', pending.order_id]);
   });
 });
