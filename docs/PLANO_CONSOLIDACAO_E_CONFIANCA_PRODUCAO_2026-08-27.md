@@ -1106,6 +1106,14 @@ SHA-256. Backups, auditorias e os demais conceitos visuais continuam intocados.
 As pastas locais `output/` e `.codex-tmp/` foram adicionadas ao `.gitignore`
 para evitar commits acidentais, sem apagar seu conteúdo.
 
+No início do Lote 3, 23 scripts locais de uso pontual e capazes de alterar dados
+foram retirados de `scripts/`. Nenhum era rastreado ou citado por arquivo
+rastreado; todos permanecem preservados, com SHA-256, em
+`output/archive/scripts-mutation-2026-09-01/`. Restam 67 scripts locais para
+revisão. Vinte e nove possuem referência documental e foram mantidos; 14 deles
+contêm operações de gravação e exigem proteção ou oficialização antes de qualquer
+reorganização.
+
 ### Classificação obrigatória
 
 | Classe | Tratamento |

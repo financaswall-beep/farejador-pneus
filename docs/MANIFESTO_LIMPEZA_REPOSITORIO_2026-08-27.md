@@ -180,9 +180,13 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 
 ### Lote 3 — scripts
 
-- revisar os 31 scripts de mutação individualmente;
-- manter somente instaladores e auditores canônicos;
-- arquivar ferramentas pontuais e corrigir as 29 referências documentais.
+- [x] identificar os scripts locais com capacidade de gravação;
+- [x] isolar 23 utilitários pontuais sem referência rastreada, preservando hash;
+- [x] manter os 29 scripts citados por documentos em seus caminhos atuais;
+- [ ] revisar os 67 scripts locais restantes;
+- [ ] proteger ou oficializar os 14 scripts de gravação ainda citados;
+- [ ] manter somente instaladores e auditores canônicos;
+- [ ] corrigir referências documentais somente depois da escolha dos canônicos.
 
 ### Lote 4 — backups e segredos
 
