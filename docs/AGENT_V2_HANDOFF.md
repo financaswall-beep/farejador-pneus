@@ -367,4 +367,5 @@ e782c62 fix(agent-v2): resolve contradicao no exemplo de cotacao + define limiar
 - Deploy: Coolify, serviço `farejador-pneus`
 - DB: Supabase `aoqtgwzeyznycuakrdhp`
 - Auditoria de conv: ver scripts em `scripts/auditar-*.cjs`
-- Limpeza de banco: `scripts/apagar-conversas-2026-05-23.cjs` (com `COMMIT=1`)
+- Limpeza de banco: começar por `scripts/planejar-limpeza-prod-readonly.cjs`;
+  o apagador amplo antigo foi aposentado no Portão 7.

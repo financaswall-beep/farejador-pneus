@@ -79,7 +79,7 @@
   `NETWORK_COMMISSION_LEDGER` → validação ao vivo (venda fiada→Recebi · cancelar ·
   venda balcão→Custo/Lucro · Rede→comissões · editar %→rótulo muda).
 - Preview **4213 DE PÉ** (demo quitada no banco test; limpar:
-  `node scripts/seed-demo-comissao.cjs --limpar`). 4212 (outra sessão) também de pé.
+  O seed pontual foi aposentado no Portão 7. 4212 (outra sessão) também de pé.
 - Herdadas: raios REAIS · matar zz-teste · rotacionar chave Google · validar frete-pino
   (roteiro #696) · faxina de chaves.
 

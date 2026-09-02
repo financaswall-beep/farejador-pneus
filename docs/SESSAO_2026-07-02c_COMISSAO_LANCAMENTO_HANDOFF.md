@@ -30,8 +30,9 @@ matriz trouxe; venda de porta não paga), decisão de 06-01 honrada.
 
 ## 2. O que entrou (flag `NETWORK_COMMISSION_LEDGER`, default OFF)
 
-- **Migration `0118_network_commission_ledger.sql` — APLICADA** (via `scripts/aplicar-0118.cjs`,
-  untracked): `network.commission_entries` (1 linha por venda 2W realizada; UNIQUE
+- **Migration `0118_network_commission_ledger.sql` — APLICADA** (o aplicador
+  pontual foi aposentado no Portão 7; o executor atual é
+  `scripts/apply-migration-file.cjs`): `network.commission_entries` (1 linha por venda 2W realizada; UNIQUE
   env+partner_order_id = idempotência; status open|settled|reversed + trilha completa).
   **ZERO grant pro `farejador_partner_app`** (conferido no próprio aplicador — o app do
   parceiro tem SELECT em partners/partner_units, mas NÃO no livro).
@@ -105,7 +106,7 @@ matriz trouxe; venda de porta não paga), decisão de 06-01 honrada.
   `wa.me/5521999990000?text=...` (DDI 55 automático, mensagem com o valor); extrato
   fechado por padrão, abre no clique; alerta persistido (`localStorage=50`). Re-prova
   pós-retomada: typecheck ✓ · prova 18/18 ✓ · vitest 519/519 ✓. Demo SEMEADA de pé no
-  4213 pro dono ver (limpar: `node scripts/seed-demo-comissao.cjs --limpar`).
+  4213 pro dono ver. O seed pontual foi aposentado no Portão 7.
 
 ## 4. Avisos honestos
 

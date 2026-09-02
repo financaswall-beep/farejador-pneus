@@ -132,7 +132,7 @@ seguinte; a bateria COMPLETA precisa rodar em todo passo (vai pro checklist do p
   por slug); na meier ficou DESLOGADO (zero resíduo). **Preview alheio 4100**: de pé (regra).
 - **Credencial da obra**: wallace/123456 na **zz-teste-meier** (dono passou em 06-11;
   validada; loja REAL deu 401 com ela = segura). zz-teste-copacabana: senha com o dono.
-- **One-off untracked que ficam**: goldens 1–10 (TODOS verdes agora) + `obra-preview-4101.cjs`.
+- **One-offs históricos**: goldens 1–10 (TODOS verdes agora); o wrapper de preview foi aposentado no Portão 7.
   Extrator do recorte (`obra-recorte-passo10.cjs`) APAGADO (regra).
 - **Modificação alheia não-commitada**: `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`
   (migration 0078, outra frente) — fora de todos os commits desta obra.

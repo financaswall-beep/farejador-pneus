@@ -83,7 +83,7 @@ Paridade pós-limpezas = **465** (471 +2 M2 −8 F9). Contratos = 69 (intactos).
 - **Preview 4101**: de pé, logado na loja de teste, `?v=20260611-onda-b` com os 2 módulos
   novos. serverId `98b2f92f…` (muda a cada restart).
 - **Preview alheio 4100**: de pé (regra), desatualizado.
-- **One-off untracked:** goldens 1/2/3(regravado)/4/5/6/**7** + `obra-preview-4101.cjs`.
+- **One-offs históricos:** goldens 1/2/3(regravado)/4/5/6/**7**; o wrapper de preview foi aposentado no Portão 7.
 - **Modificação alheia não-commitada:** `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`
   (outra frente; ficou fora de todos os commits — stash/restaurada no merge).
 - ⚠️ Lembrete de NEGÓCIO fora da obra: **raios de entrega de TESTE nos 7 parceiros**

@@ -9,9 +9,25 @@ const { recordApplicationMigration } = require('./migration-ledger.cjs');
 
 const migrationPath = process.argv[2];
 const commit = process.argv.includes('--commit');
+const environment = process.env.FAREJADOR_ENV;
 
 if (!migrationPath) {
   console.error('Uso: node --env-file=.env scripts/apply-migration-file.cjs db/migrations/NNNN.sql [--commit]');
+  process.exit(1);
+}
+
+if (!['prod', 'test'].includes(environment)) {
+  console.error('FAREJADOR_ENV deve ser informado explicitamente como prod ou test.');
+  process.exit(1);
+}
+
+const migrationName = path.basename(migrationPath);
+if (
+  commit
+  && environment === 'prod'
+  && process.env.ALLOW_PROD_MIGRATION !== migrationName
+) {
+  console.error(`Para aplicar em produção, informe ALLOW_PROD_MIGRATION=${migrationName}.`);
   process.exit(1);
 }
 
@@ -40,7 +56,7 @@ async function main() {
   });
 
   await client.connect();
-  console.log(`Aplicando ${path.basename(migrationPath)} (${commit ? 'COMMIT' : 'DRY-RUN'})`);
+  console.log(`Aplicando ${path.basename(migrationPath)} em ${environment} (${commit ? 'COMMIT' : 'DRY-RUN'})`);
 
   await client.query('BEGIN');
   try {

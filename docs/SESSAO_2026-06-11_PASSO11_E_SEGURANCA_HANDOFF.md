@@ -33,7 +33,7 @@
 | **M4 etiqueta** | `?v=20260611-onda-b` → `?v=20260611-onda-c` nos 24 `<script>` do `index.html` (cache-bust da onda C; `style.css` tem etiqueta própria, não tocado) | AO VIVO na 4101: 24 scripts **200**, 0 etiqueta velha no HTML servido, painel **boota**, console só com o nag pré-existente do Tailwind CDN, **zero req falha** |
 | **Regra do teto 300** | CLAUDE.md §3 ganha a convenção permanente: `parceiro/public/app*.js` ≤300 linhas; fiscal `npm run checar-tamanho` + `npm run prova-painel` ao tocar o painel | — |
 | **Apaga teto temporário** | `git rm scripts/obra-painel-teto.json` (era rastreado) — some a muleta, vale o **teto universal de 300**; `app.js`=263 passa folgado | `checar-tamanho` verde sem o json |
-| **Faxina** | 10 goldens `obra-teste-passo*.cjs` (one-off, "ficam até o passo 11" pelo próprio cabeçalho) **arquivados** em `_backup-goldens-painel-onda-c-2026-06-11.tgz` e removidos. Lançador `obra-preview-4101.cjs` mantido (preview de pé) | tgz confere 10 arquivos |
+| **Faxina** | 10 goldens `obra-teste-passo*.cjs` (one-off, "ficam até o passo 11" pelo próprio cabeçalho) **arquivados** em `_backup-goldens-painel-onda-c-2026-06-11.tgz` e removidos. O lançador pontual foi aposentado no Portão 7. | tgz confere 10 arquivos |
 
 **Bateria COMPLETA verde (portão final, rodada uma última vez):**
 `prova-painel` = **paridade 465** props idênticas ao baseline + **contratos 69** idênticos +

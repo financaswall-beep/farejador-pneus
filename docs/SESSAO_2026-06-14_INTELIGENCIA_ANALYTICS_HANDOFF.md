@@ -98,6 +98,7 @@ Retirada: o bot **não dá mais endereço/link do Maps antes de fechar** (trava 
 - Funções do gerador: `db/migrations/0102_analytics_functions_baseline.sql` (a `extract_facts_from_turn` é onde se adicionam campos).
 - Mapa da limpeza Organizadora: `docs/MAPA_LIMPEZA_ORGANIZADORA_2026-06-14.md`.
 - Memória viva: `~/.claude/.../memory/project_analytics_organizadora.md` + `project_bot_maps_retirada.md`.
-- Scripts de operação (untracked, fora do git): `gerar-baseline-analytics.cjs`, `auditar-gerador-facts.cjs`, `campos-analytics.cjs`, `amostra-2-camadas.cjs`.
+- Baseline oficial: `db/migrations/0102_analytics_functions_baseline.sql`. O
+  extrator pontual foi aposentado no Portão 7; os auditores permanecem em revisão.
 
 — Orquestrador (Claude Opus 4.8), 2026-06-14

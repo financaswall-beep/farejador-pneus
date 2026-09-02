@@ -23,7 +23,7 @@
 > Validação extra no DO $check$: prova E4 (INSERT negado) + E2 (conversation_id ilegível).
 > **Provas:** dry-run ok → commit ok → smoke 16/16 (RLS dois sentidos, duplo-clique no-op, SVG
 > negado, was_late, guard re-roteamento; rodado com GRANT role transacional + ROLLBACK total)
-> → typecheck + 345/345 vitest. Smoke: `scripts/smoke-0094.cjs` (untracked).
+> → typecheck + 345/345 vitest. Smoke: `scripts/smoke-0094.cjs`, restrito a `FAREJADOR_ENV=test`.
 
 **Veredito do `banco` sobre o BYTEA (resumo):** BYTEA aprovado pro MVP, MAS **não inline** na `photo_requests` — os bytes vão em `commerce.photo_request_blobs` (1:1, PK=FK, ON DELETE CASCADE). Motivo: `photo_requests` é fila/máquina-de-estados lida o tempo todo (expirador, view, bot-pool); blob inline faz pg_dump/backup arrastar a foto, e um `SELECT *`/`RETURNING *` distraído puxa 300KB pela rede a cada tick. Tabela separada = a fila fisicamente não tem os bytes pra arrastar (erro impossível por construção). Migrar pro Storage no futuro = trocar write/read, `photo_request_blobs` vira `photo_storage_path`.
 

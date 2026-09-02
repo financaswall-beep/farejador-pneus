@@ -343,9 +343,9 @@ ORDER BY created_at;
 ### Limpar banco (testes do zero)
 ```bash
 cd "C:\Farejador agente"
-# Apaga pedidos do bot primeiro (CASCADE alarm)
-node --env-file=.env -e "..." # ver scripts/apagar-conversas-2026-05-23.cjs
-COMMIT=1 node --env-file=.env scripts/apagar-conversas-2026-05-23.cjs
+# Primeiro gere um plano somente leitura. Não execute limpeza ampla por um
+# script histórico.
+node --env-file=.env scripts/planejar-limpeza-prod-readonly.cjs
 ```
 
 ### Ver logs em produção
@@ -426,8 +426,8 @@ npx tsc --noEmit
 # Testes
 npx vitest run --reporter=dot
 
-# Limpar conversas pra teste
-COMMIT=1 node --env-file=.env scripts/apagar-conversas-2026-05-23.cjs
+# Planejar limpeza sem gravar
+node --env-file=.env scripts/planejar-limpeza-prod-readonly.cjs
 
 # Ver estado do git
 git status --short

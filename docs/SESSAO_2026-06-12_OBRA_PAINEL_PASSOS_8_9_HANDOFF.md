@@ -88,7 +88,7 @@ fechamento da onda).
 
 - **Preview 4101**: de pé, logado na loja de teste (sessão sobrevive a reload), serverId
   `98b2f92f…`. **Preview alheio 4100**: de pé (regra), desatualizado.
-- **One-off untracked que ficam:** goldens 1–9 + `obra-preview-4101.cjs`. Extratores e o
+- **One-offs históricos:** goldens 1–9; o wrapper de preview foi aposentado no Portão 7. Extratores e o
   script de limpeza do p9 APAGADOS (regra).
 - **Modificação alheia não-commitada:** `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`
   (outra frente) — fora de todos os commits.

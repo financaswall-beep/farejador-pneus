@@ -1120,6 +1120,20 @@ SHA-256 calculado. Três dumps têm zero byte e não são backups válidos. Os d
 permanecem preservados, mas não serão classificados como restauráveis antes de
 uma prova em ambiente separado.
 
+Dos 14 scripts de gravação ainda citados, 11 eram ferramentas históricas e foram
+aposentados, preservados com hash e substituídos por referências canônicas. Três
+viraram ferramentas oficiais rastreadas: token do parceiro, reset de senha e
+smoke 0094. O runner de migrations e essas três ferramentas agora recusam
+ambiente implícito; gravações exigem confirmação, e produção exige autorização
+específica para migration, unidade ou usuário. As travas têm testes unitários.
+Restam 53 scripts locais, sendo 13 ainda marcados para revisão por padrões de
+gravação.
+
+Validação: build aprovado, 4 testes dedicados das travas aprovados e suíte
+completa com 303 arquivos e 1.497 testes aprovada. O manifesto recusou uma
+alteração acidental de comentário na migration 0101; ela foi revertida byte a
+byte antes da aprovação final, preservando o checksum histórico.
+
 A auditoria do legado do parceiro confirmou que ele ainda não pode ser removido.
 `src/parceiro/route.ts` continua servindo `parceiro/public/` nas rotas visuais
 `/parceiro/:slug/`, incluindo JavaScript, CSS, assets, vendor e service worker.

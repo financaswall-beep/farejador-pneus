@@ -90,7 +90,7 @@ MESMO commit). ESTADO continua TODO na raiz (sai só no passo 10). F2 PRESERVADO
 - **Preview 4101**: de pé, logado na loja de teste, serverId `98b2f92f-…` (muda a cada
   restart — pegar via preview_list). Mexi só em estáticos → reload basta.
 - **Preview alheio 4100**: continua de pé (regra de não derrubar), DESATUALIZADO.
-- **One-off untracked que ficam:** goldens passos 1/2/3/4/5/6 + `obra-preview-4101.cjs`.
+- **One-offs históricos:** goldens passos 1/2/3/4/5/6; o wrapper de preview foi aposentado no Portão 7.
   Extratores apagados após uso (regra). Faxina geral no passo 11.
 - **Modificação alheia não-commitada:** `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`
   (doc da migration 0078, de outra frente) — NÃO misturei com a obra; decidir destino

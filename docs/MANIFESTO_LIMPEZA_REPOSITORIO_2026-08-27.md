@@ -182,11 +182,20 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 
 - [x] identificar os scripts locais com capacidade de gravação;
 - [x] isolar 23 utilitários pontuais sem referência rastreada, preservando hash;
-- [x] manter os 29 scripts citados por documentos em seus caminhos atuais;
-- [ ] revisar os 67 scripts locais restantes;
-- [ ] proteger ou oficializar os 14 scripts de gravação ainda citados;
+- [x] revisar os 14 scripts de gravação citados por documentos;
+- [x] aposentar 11 ferramentas históricas e corrigir suas referências;
+- [x] oficializar e proteger token, reset de senha e smoke 0094;
+- [x] proteger o runner canônico de migrations em produção;
+- [x] provar as travas com 4 testes dedicados e a suíte completa de 1.497 testes;
+- [ ] revisar os 53 scripts locais restantes;
+- [ ] classificar os 13 restantes que ainda casam com padrões de gravação;
 - [ ] manter somente instaladores e auditores canônicos;
-- [ ] corrigir referências documentais somente depois da escolha dos canônicos.
+- [x] remover referências rastreadas aos 11 scripts aposentados.
+
+A suíte de manifesto detectou inclusive uma mudança de comentário na migration
+0101. A alteração foi revertida, o checksum histórico voltou ao original e um
+arquivo-túmulo seguro passou a ocupar o caminho do aplicador antigo. Nenhuma
+migration histórica foi modificada neste lote.
 
 ### Lote 4 — backups e segredos
 

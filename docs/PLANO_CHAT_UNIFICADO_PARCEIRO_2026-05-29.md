@@ -54,7 +54,7 @@ Nada aqui é risco técnico ou pesquisa. É encanamento conhecido sobre infra qu
 conversas reais e faz polling 5s; verificado no preview com a conv #624.
 **Próximo passo = Fatia 1.5 (validar em prod):**
 1. Redeploy do `11c519f` no Coolify (serviço `farejador`).
-2. Gerar token do parceiro: `node scripts/gerar-token-parceiro.cjs --slug=borracharia-rio-do-ouro --env=prod`
+2. Gerar token do parceiro: `FAREJADOR_ENV=prod COMMIT=1 ALLOW_PROD_PARTNER_TOKEN=borracharia-rio-do-ouro node scripts/gerar-token-parceiro.cjs --slug=borracharia-rio-do-ouro --env=prod`
    (token aparece 1x no stdout; cola no login de `/parceiro/borracharia-rio-do-ouro/`).
 3. Abrir o portal, aba Bate-papo, e ver a conversa do WhatsApp aparecer e atualizar sozinha.
 

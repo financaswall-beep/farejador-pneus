@@ -15,7 +15,7 @@
   `apply_migration` (project_id acima) **e** salvar o `.sql` no repo. Última: `0075`.
   Esta feature é a **`0076`**.
 - Token de login do portal: gerar com
-  `node scripts/gerar-token-parceiro.cjs --slug=borracharia-rio-do-ouro --env=prod`
+  `FAREJADOR_ENV=prod COMMIT=1 ALLOW_PROD_PARTNER_TOKEN=borracharia-rio-do-ouro node scripts/gerar-token-parceiro.cjs --slug=borracharia-rio-do-ouro --env=prod`
   (o token só aparece uma vez; cola na tela `/parceiro/borracharia-rio-do-ouro/`).
   Unidade: `unit_id = 36203e18-c3fb-4201-bca1-b15c605faa37`.
 

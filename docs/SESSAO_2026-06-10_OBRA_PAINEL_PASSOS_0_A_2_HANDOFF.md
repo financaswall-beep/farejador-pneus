@@ -83,7 +83,7 @@ Depois: commit docs desta sessão (plano marcado + este handoff).
   atualizar o teto contando TUDO que o passo adiciona ao app.js.
 - **`preview_start` não adota servidor que ele não lançou**: derrubar o próprio processo e deixar
   a ferramenta ser dona (entrada `parceiro-obra-4101` no `.claude/launch.json`, wrapper
-  `scripts/obra-preview-4101.cjs` que força a porta).
+  `src/app/preview-parceiro-server.ts`; o wrapper pontual da porta 4101 foi aposentado no Portão 7).
 
 ## 6. Provas rodadas (tudo verde no fim da sessão)
 
@@ -108,7 +108,7 @@ Depois: commit docs desta sessão (plano marcado + este handoff).
   Dono autorizando, é só reiniciar aquele processo (ou esperar o merge).
 - **One-off untracked que FICAM até o fim da obra** (não commitar — regra dos scripts de operação):
   `scripts/obra-teste-passo1-format.cjs` e `scripts/obra-teste-passo2-labels.cjs` (goldens, re-úteis
-  no passo 10 quando a montagem mudar) e `scripts/obra-preview-4101.cjs` (wrapper do preview).
+  no passo 10 quando a montagem mudar). O wrapper pontual do preview foi aposentado no Portão 7.
   Extratores `obra-extrai-passo1/2.cjs` foram apagados após uso. Faxina geral no passo 11.
 - **Etiqueta `?v=20260606-gps`** mantida de propósito nos 3 script tags — troca é no fechamento
   da onda (M4), tudo junto.

@@ -71,8 +71,9 @@ Descobertas da varredura:
 **Arquitetura:** copia o DESENHO do finance.partner_* (status/vencimento/quitação) mas mora em
 `commerce.wholesale_*` (regra de ouro). SEM tocar nas tabelas do parceiro.
 
-- **Migration `0115_wholesale_finance_fiado.sql` — APLICADA** (via `scripts/aplicar-0115.cjs`,
-  untracked; banco é ÚNICO, env é coluna): `wholesale_orders` + payment_status paid|pending +
+- **Migration `0115_wholesale_finance_fiado.sql` — APLICADA** (o aplicador
+  pontual foi aposentado no Portão 7; o executor atual é
+  `scripts/apply-migration-file.cjs`): `wholesale_orders` + payment_status paid|pending +
   payment_method + due_date + paid_at; `wholesale_purchases` + due_date + paid_at; índices
   parciais nos pending; validação interna (antigas todas paid + parceiro sem acesso).
 - **Flag `WHOLESALE_FINANCE`** (default OFF): off = tudo nasce 'paid' byte a byte, endpoint
@@ -103,8 +104,9 @@ Recebi → some).
 errado (varejo tem `cancel_manual_order`; atacado nada). Com o fiado o buraco piorou: venda
 fiada errada = "a receber" fantasma imortal.
 
-- **Migration `0116_wholesale_cancel_trail.sql` — APLICADA** (via `scripts/aplicar-0116.cjs`,
-  untracked): cancelled_at/cancelled_by/cancel_reason em wholesale_orders. O status
+- **Migration `0116_wholesale_cancel_trail.sql` — APLICADA** (o aplicador
+  pontual foi aposentado no Portão 7; o executor atual é
+  `scripts/apply-migration-file.cjs`): cancelled_at/cancelled_by/cancel_reason em wholesale_orders. O status
   'cancelled' JÁ existia no CHECK da 0110 ("cancela sem apagar") — faltava a trilha.
 - **O que corrige SOZINHO** (tudo já filtrava `status='confirmed'`): ranking de recompra
   (view `wholesale_buyer_summary`), resumo faturamento/custo/lucro (`getWholesaleResumo`) e o

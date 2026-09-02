@@ -88,7 +88,7 @@ login** (`/parceiro` sem slug) — fazer DEPOIS, fora da obra. Próximo: **Onda 
   processo VELHO sem a rota nova → recarregar a página lá = 404 nos módulos = tela morta.
   Reiniciar quando o dono autorizar (ou morre sozinho quando o main dele atualizar).
 - **One-off untracked que ficam:** goldens passo 1/2/3 (`obra-teste-passo*.cjs`),
-  wrapper `obra-preview-4101.cjs`. Faxina geral no passo 11.
+  wrapper pontual posteriormente aposentado no Portão 7. Faxina geral no passo 11.
 - **Pós-deploy desta onda:** dono valida no CELULAR no site real (giro resumo/vendas/
   estoque/financeiro/PDV nos 2 temas — os gráficos são o que mudou).
 

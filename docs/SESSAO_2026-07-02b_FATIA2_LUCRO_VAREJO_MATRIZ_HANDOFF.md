@@ -17,8 +17,9 @@ Bônus da obra: os cards eram todos "desde sempre" — entrou o recorte **Tudo �
 
 ## 2. O que entrou (tudo atrás da flag `WHOLESALE_MATRIZ_RETAIL_COST`, default OFF)
 
-- **Migration `0117_matriz_retail_cost.sql` — APLICADA** (via `scripts/aplicar-0117.cjs`,
-  untracked; banco único): `commerce.order_items.matriz_unit_cost numeric NULL`, aditiva.
+- **Migration `0117_matriz_retail_cost.sql` — APLICADA** (o aplicador pontual
+  foi aposentado no Portão 7; o executor atual é
+  `scripts/apply-migration-file.cjs`): `commerce.order_items.matriz_unit_cost numeric NULL`, aditiva.
   **Sem risco de vazamento**: `commerce.orders`/`order_items` têm ZERO grant pra role de app
   além do sistema (conferido em `role_table_grants` 07-02) — custo da matriz não chega ao parceiro.
 - **Helpers na ponte** (`src/atendente-v2/wholesale-stock-read.ts`):
@@ -58,7 +59,8 @@ Bônus da obra: os cards eram todos "desde sempre" — entrou o recorte **Tudo �
   prova-geo 9/9 (toquei o caminho do bot).
 - **Visual** (preview `matriz-fatia2-4212`, launch.json — env test + flags on): cards
   R$ 400,00 / R$ 42,50 / R$ 257,50 + banner "1 item sem custo congelado" + toggle chamando
-  `?period=mes` na rede (200). Demo semeada e LIMPA (`scripts/seed-demo-fatia2.cjs`, untracked).
+  `?period=mes` na rede (200). A demo foi semeada e limpa; o seed pontual foi
+  aposentado no Portão 7.
 
 ## 4. Avisos honestos
 
