@@ -1066,6 +1066,42 @@ Também devem ser mantidas as provas existentes de paridade, colisão Alpine, ro
 
 **Objetivo:** remover dívida sem apagar provas ou ferramentas úteis.
 
+**Estado:** EM ANDAMENTO desde 01/09/2026.
+
+### Registro de início — 01/09/2026
+
+O inventário inicial encontrou 1.653 arquivos rastreados e 129 entradas locais
+não rastreadas ou ignoradas. O núcleo oficial permanece identificável: `src/`,
+`db/`, `painel/`, `parceiro/`, `tests/`, `segments/` e os arquivos de build.
+Nenhuma migration, backup, script ou asset foi removido nesta etapa.
+
+Dos 220 scripts presentes na pasta, 130 são rastreados e 90 são locais. Entre os
+rastreados há 55 provas/testes, 21 auditores de leitura, 26 ferramentas de mutação
+e 28 utilitários. Somente 17 não possuem referência textual no código, CI ou
+documentação; ausência de referência não autoriza remoção, pois ferramentas
+operacionais também podem ser executadas manualmente.
+
+O `.dockerignore` local foi validado com um build Docker completo: contexto de
+6,97 MB, compilação TypeScript/Tailwind aprovada e imagem final gerada. Sua
+versionagem é o primeiro candidato não destrutivo deste portão.
+
+Dois worktrees temporários e limpos foram confirmados dentro de `tmp/`:
+`fix-drawer` (131,00 MB) e `deploy-main` (8,16 MB). Ambos os commits continuam
+alcançáveis por `main` e por referências remotas. Após confirmação explícita,
+ambos foram removidos com `git worktree remove`, liberando 139,16 MB. O build e
+os 1.493 testes unitários, distribuídos em 302 arquivos, passaram depois da
+limpeza.
+
+Foram localizados 11 arquivos de backup `.dump`/`.tgz`, somando 33,20 MB; três
+dumps têm tamanho zero. Nenhum deles será apagado antes da identificação,
+checksum e política de retenção.
+
+Na segunda triagem, os conteúdos restantes foram separados sem remoção:
+backups em `.codex-tmp/` e `output/`; resultados JSON de auditoria em `tmp/`;
+conceitos visuais e documentos em `output/`; logs locais; e 13 mocks/previews em
+`painel/public/`. Esses 13 arquivos não têm referência rastreada, mas só poderão
+sair depois da comparação com as telas finais correspondentes.
+
 ### Classificação obrigatória
 
 | Classe | Tratamento |

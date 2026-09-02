@@ -15,11 +15,30 @@ coverage
 # Git and local tooling
 .git
 .github
+.agents
 .claude
+.codex-tmp
 .kilo
 .kilocode
 tmp
 temp
+
+# Local design previews, reports, and recovery artifacts. These are not part of
+# the production runtime and may contain database exports or operational data.
+output
+assets
+proposta-layout-2026-06
+dashboard.html
+_backup-*
+*.tgz
+*.dump
+
+# Repository-only material. The production build reads src/, styles/, painel/
+# and parceiro/; these folders are quality, operations, or historical records.
+docs
+tests
+scripts
+SECOES
 
 # Logs and OS files
 *.log
