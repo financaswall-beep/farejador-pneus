@@ -1114,6 +1114,20 @@ revisão. Vinte e nove possuem referência documental e foram mantidos; 14 deles
 contêm operações de gravação e exigem proteção ou oficialização antes de qualquer
 reorganização.
 
+O inventário de backups foi registrado em
+`docs/INVENTARIO_BACKUPS_PORTAO7_2026-09-01.md`: 11 arquivos, 33,20 MB e
+SHA-256 calculado. Três dumps têm zero byte e não são backups válidos. Os demais
+permanecem preservados, mas não serão classificados como restauráveis antes de
+uma prova em ambiente separado.
+
+A auditoria do legado do parceiro confirmou que ele ainda não pode ser removido.
+`src/parceiro/route.ts` continua servindo `parceiro/public/` nas rotas visuais
+`/parceiro/:slug/`, incluindo JavaScript, CSS, assets, vendor e service worker.
+Além disso, `src/parceiro/` contém APIs e regras operacionais ativas consumidas
+pelo painel moderno. A remoção física fica bloqueada até separar essas duas
+responsabilidades e trocar todas as rotas visuais, em publicação própria com
+rollback.
+
 ### Classificação obrigatória
 
 | Classe | Tratamento |

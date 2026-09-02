@@ -190,17 +190,26 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 
 ### Lote 4 — backups e segredos
 
-- verificar restauração;
-- mover dumps para cofre de backup;
+- [x] inventariar os 11 arquivos e gerar SHA-256;
+- [x] identificar 3 dumps vazios que não são backups válidos;
+- [ ] verificar restauração dos dumps não vazios;
+- [ ] mover dumps válidos para cofre de backup;
 - consolidar arquivos de ambiente;
 - rotacionar segredos expostos e invalidar os antigos.
 
 ### Lote 5 — legado do parceiro
 
-- só remover após todas as rotas do parceiro apontarem para o painel compartilhado;
+- [x] auditar referências e rotas atuais;
+- [x] confirmar que `parceiro/public/` ainda é servido por rotas ativas;
+- [ ] fazer todas as rotas visuais do parceiro apontarem para o painel compartilhado;
 - provar login, estoque, vendas, retiradas, financeiro e permissões em web e `/operacao`;
 - executar canário real;
 - retirar a interface antiga em uma publicação separada, com rollback disponível.
+
+**Decisão:** a remoção física está bloqueada. `src/parceiro/route.ts` ainda serve
+`index.html`, JavaScript, CSS, assets, vendor e service worker de
+`parceiro/public/`. O backend e as APIs em `src/parceiro/` também permanecem
+ativos e não devem ser confundidos com o legado visual.
 
 ## Critério para considerar a limpeza concluída
 
