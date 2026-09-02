@@ -877,9 +877,9 @@ de interface que preservem os motores transacionais já auditados.
 
 **Objetivo:** reduzir manutenção sem mexer no coração financeiro.
 
-**Estado:** EM ANDAMENTO, por decisão do proprietário.
+**Estado:** APROVADO em 01/09/2026.
 
-### Progresso registrado em 2026-08-28
+### Progresso registrado até 2026-09-01
 
 | Tela | Escopo | Estado | Evidência | Proteção da Matriz |
 |---|---|---|---|---|
@@ -887,8 +887,8 @@ de interface que preservem os motores transacionais já auditados.
 | Vendas | Parceiro | Concluída | `0c7cafb` | Blocos e módulos distintos para parceiro e Matriz |
 | Retiradas | Parceiro e Matriz | Concluída | `ada6383` | Layout compartilhado, mas APIs, escopo de dados e motores transacionais continuam separados |
 | Compras | Parceiro | Concluída e validada em produção | deploy de 2026-08-28 + smoke autenticado de 2026-08-28 | Tela própria `isPartnerPanel()`; Compras da Matriz permanece no bloco `isMatrixPanel()` |
-| Estoque | Parceiro | Implementada; deploy pendente | build + 1.480 testes unitários em 2026-08-28 | Tela própria `isPartnerPanel()`; galpão da Matriz e seus custos permanecem no bloco `isMatrixPanel()` |
-| Logística | Parceiro | Implementada; deploy pendente | build + 1.490 testes unitários em 2026-08-30 | Tela própria `isPartnerPanel()`; rotas e comprovantes da Matriz permanecem no bloco `isMatrixPanel()` |
+| Estoque | Parceiro | Concluída e validada em produção | deploy incluído no SHA `4a5dc4c` + smoke autenticado de 2026-09-01 | Tela própria `isPartnerPanel()`; galpão da Matriz e seus custos permanecem no bloco `isMatrixPanel()` |
+| Logística | Parceiro | Concluída e validada em produção | `4a5dc4c` + smoke autenticado de 2026-09-01 | Tela própria `isPartnerPanel()`; rotas e comprovantes da Matriz permanecem no bloco `isMatrixPanel()` |
 
 As telas concluídas preservam os motores existentes. O redesenho não cria uma
 segunda regra de estoque, caixa ou financeiro no navegador. Em Retiradas, o
@@ -931,10 +931,10 @@ caixa e financeiro; a falha mantém a reserva protegida até o pneu voltar à lo
 Busca, WhatsApp, comprovante, paginação e ordem simples lembrada no aparelho foram
 preservados. O resumo agora separa corretamente `Preparando` de `Retornos`.
 
-O build e os 1.490 testes unitários passaram. As duas suítes de integração
-direcionadas não iniciaram porque o Docker Desktop estava desligado; nenhum teste
-de banco falhou, pois os 36 casos foram ignorados antes da criação do PostgreSQL
-descartável. Essas provas devem ser repetidas com o Docker ligado antes do deploy.
+O build e os 1.490 testes unitários passaram. Em 01/09/2026, com o Docker
+acessível, as duas suítes de integração direcionadas foram repetidas e os 36 casos
+passaram em PostgreSQL descartável. Os 13 testes unitários direcionados de
+Logística e entregas também passaram após o deploy.
 
 O Atendente V2 já usava a mesma fonte oficial da tela,
 `commerce.partner_stock_levels`, com filtros obrigatórios por `environment`,
@@ -979,6 +979,31 @@ escopo visível; o modal oculto de compatibilidade do Catálogo avalia um resumo
 nulo; e dois nomes de ícones não existem no pacote Lucide embarcado. Esses pontos
 ficam registrados como saneamento do shell compartilhado e não invalidam a tela
 Compras do parceiro, cuja API, dados, layout e ações de leitura foram aprovados.
+
+### Fechamento do Portão 6 — 01/09/2026
+
+O smoke autenticado foi executado em produção com Wallace, na Unidade Canário
+Teste, sem realizar mutações. Vendas, Retiradas, Compras, Estoque, Logística,
+Financeiro e Catálogo carregaram com o escopo da unidade e sem mensagem visível de
+falha. A ausência de Resumo e Colaboradores nesse acesso corresponde às permissões
+efetivas do usuário e não a erro de renderização.
+
+Na Logística, os quatro indicadores ficaram na mesma linha em 1.738 px; a lista
+ocupou a coluna esquerda e o detalhe a coluna direita. Histórico e filtros foram
+exercitados sem gerar erro novo. Em 390 px, a tela empilhou os blocos sem rolagem
+horizontal (`scrollWidth = 390`) e preservou os quatro indicadores. O SHA em
+produção era `4a5dc4c`; `/livez`, bancos e schema estavam íntegros. Os avisos
+operacionais de ingestão Chatwoot e observação do job de partições pertencem a
+outros portões e não foram causados pela consolidação visual.
+
+Os 14 erros Alpine capturados na carga já eram os resíduos conhecidos de blocos
+ocultos de Compras da Matriz e do modal de compatibilidade do Catálogo. A
+navegação completa não acrescentou nenhum erro. A correção desses resíduos segue
+para o Portão 7, sem bloquear o parceiro.
+
+**Veredito do Portão 6:** APROVADO. O painel moderno é a superfície web oficial
+do parceiro; `/operacao` permanece a superfície móvel oficial. A remoção física
+dos assets legados será feita separadamente e de forma comprovada no Portão 7.
 
 ### Estado final desejado
 
@@ -1267,7 +1292,7 @@ Restauração total de banco é último recurso e exige avaliação de perda de 
 | Banco e objetos recentes | Presentes, mas sem trilha formal suficiente |
 | Matriz | Portões 0–3 aprovados; disponível para canário operacional controlado |
 | Bot | Desligado; Portão 4 em andamento, sem autorização de envio |
-| Parceiros | Backend protegido; consolidação visual incompleta |
+| Parceiros | Backend protegido; Portão 6 aprovado no canário autenticado |
 | Operação mobile | Ativa, deve permanecer como superfície oficial |
 | Deploy | Funcional, mas precisa de smoke e schema gate mais rigorosos |
 | Recuperação | Não comprovada |
