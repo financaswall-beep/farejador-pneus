@@ -35,9 +35,15 @@ A triagem do próximo lote separou claramente os materiais restantes:
   documentos, que devem ser arquivados antes de sair da pasta;
 - `tmp/imagegen/` e `tmp/pdfs/` estão vazias;
 - os 13 mocks/previews locais de `painel/public/` não possuem referência em
-  nenhum arquivo rastreado, mas ainda aguardam comparação com as telas finais.
+  nenhum arquivo rastreado. Eles foram retirados do runtime e preservados, com
+  hashes, em `output/archive/painel-public-mockups-2026-09-01/`.
 
 Nenhum item desta segunda triagem foi apagado.
+
+As pastas locais `.codex-tmp/` e `output/` passaram a ser ignoradas pelo Git.
+Elas continuam existentes no disco e excluídas do contexto Docker; a mudança
+somente impede que backups, evidências e arquivos gerados sejam adicionados por
+engano a futuros commits.
 
 ## O que forma o sistema publicado
 
@@ -166,9 +172,11 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 
 ### Lote 2 — arquivo visual e documental
 
-- mover mockups e propostas para arquivo fora do runtime;
-- manter um índice com data, finalidade e tela correspondente;
-- retirar os 13 mocks de dentro de `painel/public/` depois de confirmar a versão final equivalente.
+- [x] retirar os 13 mocks/previews sem referência de `painel/public/`;
+- [x] preservar os arquivos fora do runtime, sem exclusão definitiva;
+- [x] manter índice com data, tamanho e SHA-256;
+- [ ] comparar e classificar os demais conceitos visuais de `output/`;
+- [ ] classificar `proposta-layout-2026-06/`, `dashboard.html` e `assets/`.
 
 ### Lote 3 — scripts
 

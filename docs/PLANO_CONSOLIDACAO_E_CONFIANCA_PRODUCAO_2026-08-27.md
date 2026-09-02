@@ -1099,8 +1099,12 @@ checksum e política de retenção.
 Na segunda triagem, os conteúdos restantes foram separados sem remoção:
 backups em `.codex-tmp/` e `output/`; resultados JSON de auditoria em `tmp/`;
 conceitos visuais e documentos em `output/`; logs locais; e 13 mocks/previews em
-`painel/public/`. Esses 13 arquivos não têm referência rastreada, mas só poderão
-sair depois da comparação com as telas finais correspondentes.
+`painel/public/`. Esses 13 arquivos não tinham referência rastreada e foram
+retirados do runtime sem exclusão: estão preservados em
+`output/archive/painel-public-mockups-2026-09-01/`, com índice de tamanho e
+SHA-256. Backups, auditorias e os demais conceitos visuais continuam intocados.
+As pastas locais `output/` e `.codex-tmp/` foram adicionadas ao `.gitignore`
+para evitar commits acidentais, sem apagar seu conteúdo.
 
 ### Classificação obrigatória
 

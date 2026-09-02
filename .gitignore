@@ -62,6 +62,8 @@ pids/
 # Optional local-only dirs
 tmp/
 temp/
+.codex-tmp/
+output/
 
 # Claude/agent artifacts (session-local, not repo state)
 .claude/
