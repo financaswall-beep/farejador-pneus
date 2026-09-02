@@ -82,13 +82,28 @@ export async function getMatrizLedgerIntegrationHealth(
            WHERE t.environment=$1 AND (
              (t.source_type LIKE 'commerce.wholesale_purchase.%' AND NOT EXISTS (
                SELECT 1 FROM commerce.wholesale_purchases x
-                WHERE x.environment=t.environment AND x.id::text=t.source_id))
+                WHERE x.environment=t.environment
+                  AND x.id::text=CASE
+                    WHEN t.source_type='commerce.wholesale_purchase.partial_payment'
+                      THEN t.metadata->>'source_id'
+                    ELSE t.source_id
+                  END))
              OR (t.source_type LIKE 'commerce.wholesale_order.%' AND NOT EXISTS (
                SELECT 1 FROM commerce.wholesale_orders x
-                WHERE x.environment=t.environment AND x.id::text=t.source_id))
+                WHERE x.environment=t.environment
+                  AND x.id::text=CASE
+                    WHEN t.source_type='commerce.wholesale_order.partial_payment'
+                      THEN t.metadata->>'source_id'
+                    ELSE t.source_id
+                  END))
              OR (t.source_type LIKE 'commerce.order.%' AND NOT EXISTS (
                SELECT 1 FROM commerce.orders x
-                WHERE x.environment=t.environment AND x.id::text=t.source_id))
+                WHERE x.environment=t.environment
+                  AND x.id::text=CASE
+                    WHEN t.source_type='commerce.order.partial_payment'
+                      THEN t.metadata->>'source_id'
+                    ELSE t.source_id
+                  END))
              OR (t.source_type='finance.inventory_adjustment' AND NOT EXISTS (
                SELECT 1 FROM finance.matriz_inventory_adjustments x
                 WHERE x.environment=t.environment AND x.id::text=t.source_id))

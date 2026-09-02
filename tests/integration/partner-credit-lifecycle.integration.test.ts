@@ -21,8 +21,8 @@ describe('ciclo contabil do credito do parceiro', () => {
       `SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true`,
     );
     expect(state.rows[0]).toEqual({
-      version: 214,
-      migration_name: '0214_purchase_adjustment_reconciliation_health.sql',
+      version: 215,
+      migration_name: '0215_partial_payment_reconciliation_health.sql',
     });
   });
 

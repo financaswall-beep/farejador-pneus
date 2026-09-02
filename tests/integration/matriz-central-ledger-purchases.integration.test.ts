@@ -147,6 +147,59 @@ describe('Etapa 3 — compras formais no livro central', () => {
     expect(Number(proof.rows[0].balance)).toBe(0);
   });
 
+  it('pagamento parcial preserva a origem e nao derruba a saude do financeiro', async () => {
+    const f = await fixture();
+    const purchase = await registerPurchase({
+      environment: 'test',
+      supplier_id: f.supplierId,
+      items: [{ measure: f.measure, quantity: 2, unit_cost: 50 }],
+      purchased_at: '2026-07-06T15:00:00Z',
+      payment_status: 'pending',
+      due_date: '2026-08-10',
+      receipt_status: 'received',
+      created_by: 'owner:purchase-partial',
+      idempotency_key: randomUUID(),
+    }, db.pool);
+    const { getMatrizLedgerOpenItems } = await import(
+      '../../src/admin/painel/matriz-ledger-open-items.js');
+    const { settleMatrizLedgerOpenItem } = await import(
+      '../../src/admin/painel/matriz-ledger-settlement.js');
+    const payable = (await getMatrizLedgerOpenItems('test', db.pool)).a_pagar.itens
+      .find((item) => item.tipo === 'fornecedor' && item.id === purchase.purchase_id);
+    expect(payable).toMatchObject({ valor: '100.00', settlement_mode: 'wholesale_purchase' });
+
+    const settlement = await settleMatrizLedgerOpenItem({
+      obligation_id: payable!.obligation_id!, amount: 40,
+      payment_method: 'pix', idempotency_key: randomUUID(),
+      actor_label: 'owner:purchase-partial', environment: 'test',
+    }, db.pool);
+    expect(settlement).toMatchObject({ amount: '40.00', remaining_balance: '60.00' });
+
+    const proof = await db.pool.query<{
+      source_id: string; operational_source_id: string; orphan_count: string;
+    }>(
+      `SELECT t.source_id,t.metadata->>'source_id' operational_source_id,
+              finance.matriz_stage3_ledger_orphans('test')::text orphan_count
+         FROM finance.matriz_ledger_transactions t
+        WHERE t.environment='test'
+          AND t.source_type='commerce.wholesale_purchase.partial_payment'
+          AND t.metadata->>'source_id'=$1`,
+      [purchase.purchase_id],
+    );
+    expect(proof.rows).toHaveLength(1);
+    expect(proof.rows[0]).toMatchObject({
+      operational_source_id: purchase.purchase_id,
+      orphan_count: '0',
+    });
+    expect(proof.rows[0]!.source_id).not.toBe(purchase.purchase_id);
+
+    const { getMatrizLedgerIntegrationHealth } = await import(
+      '../../src/admin/painel/matriz-ledger-integration-health.js');
+    const health = await getMatrizLedgerIntegrationHealth('test', db.pool);
+    expect(health.global.orphan_sources).toBe(0);
+    expect(health.status).toBe('green');
+  });
+
   it('cancelamento nao pago estorna e zera a obrigacao sem apagar o original', async () => {
     const f = await fixture();
     const purchase = await registerPurchase({

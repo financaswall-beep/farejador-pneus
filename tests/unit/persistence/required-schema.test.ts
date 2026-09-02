@@ -49,20 +49,20 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_order_refunds')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_receivables_effective')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payables_effective')");
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=214');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=215');
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
-      "migration_file='0214_purchase_adjustment_reconciliation_health.sql'",
+      "migration_file='0215_partial_payment_reconciliation_health.sql'",
     );
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
-      "checksum_sha256='9f0352758eea351a63a83cd71955ae0a5776ea8039b82fe6e408fa21ad3bb481'",
+      "checksum_sha256='29129803c293f7dbf0f68c37ca7db3514859e6f6b6b47acbb38a37b4d8c0afa6'",
     );
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=215');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=216');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0214', async () => {
+  it('recusa iniciar antes da migration 0215', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0214_purchase_adjustment_health');
+      .rejects.toThrow('required_schema_missing:0215_partial_payment_health');
   });
 });
