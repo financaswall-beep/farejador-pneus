@@ -187,8 +187,9 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 - [x] oficializar e proteger token, reset de senha e smoke 0094;
 - [x] proteger o runner canônico de migrations em produção;
 - [x] provar as travas com 4 testes dedicados e a suíte completa de 1.497 testes;
-- [ ] revisar os 53 scripts locais restantes;
-- [ ] classificar os 13 restantes que ainda casam com padrões de gravação;
+- [x] classificar e arquivar os 13 restantes que casavam com padrões de gravação;
+- [ ] revisar os 40 scripts locais restantes, todos classificados como leitura,
+  laboratório ou geração de artefato;
 - [ ] manter somente instaladores e auditores canônicos;
 - [x] remover referências rastreadas aos 11 scripts aposentados.
 
@@ -196,6 +197,10 @@ A suíte de manifesto detectou inclusive uma mudança de comentário na migratio
 0101. A alteração foi revertida, o checksum histórico voltou ao original e um
 arquivo-túmulo seguro passou a ocupar o caminho do aplicador antigo. Nenhuma
 migration histórica foi modificada neste lote.
+
+Depois desta revisão, o scanner não encontra script local não rastreado com
+padrão de gravação. Restam 40 ferramentas de leitura, laboratório ou geração;
+12 ainda são citadas por documentos e serão decididas individualmente.
 
 ### Lote 4 — backups e segredos
 

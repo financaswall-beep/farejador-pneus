@@ -1134,6 +1134,12 @@ completa com 303 arquivos e 1.497 testes aprovada. O manifesto recusou uma
 alteração acidental de comentário na migration 0101; ela foi revertida byte a
 byte antes da aprovação final, preservando o checksum histórico.
 
+Os 13 scripts locais restantes marcados por padrão de gravação foram revisados e
+arquivados sem execução. Eram auditorias, provas com rollback ou utilitários
+históricos sem referência rastreada. O inventário local agora contém 40 scripts,
+todos classificados como leitura, laboratório ou geração; 12 ainda são citados
+por documentos e aguardam decisão individual.
+
 A auditoria do legado do parceiro confirmou que ele ainda não pode ser removido.
 `src/parceiro/route.ts` continua servindo `parceiro/public/` nas rotas visuais
 `/parceiro/:slug/`, incluindo JavaScript, CSS, assets, vendor e service worker.
