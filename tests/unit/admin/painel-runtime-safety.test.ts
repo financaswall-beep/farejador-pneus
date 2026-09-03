@@ -44,10 +44,71 @@ describe('seguranca de inicializacao do painel', () => {
 
   it('nao exibe alertas sem ocorrencias e usa somente icones suportados', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
+    const sandbox = { console, lucide: {} as Record<string, unknown> };
+    const vendor = readFileSync(
+      'painel/public/vendor/lucide-1.17.0.min.js',
+      'utf8',
+    );
+    vm.runInNewContext(vendor, sandbox, { filename: 'lucide-1.17.0.min.js' });
+    const iconNames = [...html.matchAll(/data-lucide="([a-z0-9-]+)"/g)]
+      .map((match) => match[1]!)
+      .filter((name, index, rows) => rows.indexOf(name) === index);
+    const missingIcons = iconNames.filter((name) => {
+      const exportName = name.split('-')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('');
+      return !(exportName in sandbox.lucide);
+    });
 
     expect(html).not.toContain('data-lucide="package-clock"');
+    expect(missingIcons).toEqual([]);
     expect(html).toContain('<span x-show="botMudas.length > 0" x-cloak');
     expect(html).toContain('<span x-show="botEscalados.length > 0" x-cloak');
+  });
+
+  it('mantem os graficos ocultos de compras seguros sem dados carregados', () => {
+    const compras = loadPainelModule('app.compras.historico.js', 'comprasHistorico');
+    const context = {
+      ...compras,
+      comprasHistory: { rows: [], summary: null, pagination: null },
+      comprasHistoryAnalytics: null,
+      comprasHistoryFilters: {
+        period: '30d', status: 'all', payment: 'all', supplierId: '',
+        search: '', page: 1, pageSize: 10,
+      },
+      comprasHistoryHoverIndex: null,
+      comprasCost: {
+        analytics: null,
+        filters: { period: '90d', supplierId: '' },
+        loading: false,
+        error: null,
+      },
+      fornecedores: [],
+    };
+
+    expect(compras.comprasHistorySummary.call(context)).toMatchObject({
+      committed: 0, paid: 0, open: 0, tires: 0,
+    });
+    expect(compras.comprasHistoryTimeline.call(context)).toEqual([]);
+    expect(compras.comprasHistoryChartArea.call(context, 'total_committed')).toBe('');
+    expect(compras.comprasHistoryChartPoints.call(context, 'total_committed')).toBe('');
+    expect(compras.comprasHistoryChartPoint.call(
+      context, null, 0, 'total_committed',
+    )).toMatchObject({ x: 500, y: 200 });
+    expect(compras.comprasHistoryHoveredRow.call(context)).toBeNull();
+    expect(compras.comprasHistoryHoverDetail.call(context, null)).toBe('');
+    expect(compras.comprasCostSummary.call(context)).toMatchObject({ average: 0 });
+    expect(compras.comprasCostTimeline.call(context)).toEqual([]);
+    expect(compras.comprasCostChartArea.call(context)).toBe('');
+  });
+
+  it('nao acessa o resumo nulo do catalogo do parceiro', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+
+    expect(html).toContain('partnerCatalogo.compatibilitySummary?.models');
+    expect(html).toContain('partnerCatalogo.compatibilitySummary?.fitments');
+    expect(html).not.toContain('partnerCatalogo.compatibilitySummary.models');
+    expect(html).not.toContain('partnerCatalogo.compatibilitySummary.fitments');
   });
 
   it('da nome acessivel aos controles sem texto visivel', () => {

@@ -1066,7 +1066,7 @@ Também devem ser mantidas as provas existentes de paridade, colisão Alpine, ro
 
 **Objetivo:** remover dívida sem apagar provas ou ferramentas úteis.
 
-**Estado:** EM ANDAMENTO desde 01/09/2026.
+**Estado:** IMPLEMENTAÇÃO CONCLUÍDA; aguarda deploy e smoke final em produção.
 
 ### Registro de início — 01/09/2026
 
@@ -1170,6 +1170,28 @@ Além disso, `src/parceiro/` contém APIs e regras operacionais ativas consumida
 pelo painel moderno. A remoção física fica bloqueada até separar essas duas
 responsabilidades e trocar todas as rotas visuais, em publicação própria com
 rollback.
+
+No saneamento final de 02/09/2026, a inicialização do painel foi protegida contra
+três falhas que apareciam mesmo em áreas ainda ocultas: dois nomes de ícones que
+não existem na versão embarcada do Lucide foram substituídos; o resumo de
+compatibilidade do Catálogo do parceiro passou a aceitar o estado inicial nulo;
+e os gráficos de Compras da Matriz foram exercitados com resposta vazia antes do
+carregamento. Um teste agora abre o pacote Lucide real e confere todos os ícones
+estáticos usados pelo HTML, evitando que o mesmo problema volte com outro nome.
+
+A suíte de integração também revelou uma asserção antiga que procurava uma conta
+a pagar pelo ID puro da compra. O contrato atual identifica cada parcela como
+`compra:numero-da-parcela`, inclusive quando existe somente uma parcela. O teste
+foi alinhado a esse contrato já coberto pela auditoria de compras; nenhum cálculo,
+lançamento, saldo ou regra financeira foi alterado. A prova isolada do pagamento
+parcial passou e a suíte completa de integração foi aprovada.
+
+Validação final antes do deploy: build aprovado; 303 arquivos e 1.504 testes
+unitários aprovados; 61 arquivos e 295 testes de integração aprovados. O controle
+automatizado do navegador não conseguiu se conectar por uma falha interna do
+ambiente Codex antes de abrir a página, portanto a conferência visual em produção
+continua sendo a última condição para encerrar formalmente este portão. Não há
+migration nesta entrega.
 
 ### Classificação obrigatória
 

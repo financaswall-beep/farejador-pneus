@@ -165,7 +165,8 @@ describe('Etapa 3 — compras formais no livro central', () => {
     const { settleMatrizLedgerOpenItem } = await import(
       '../../src/admin/painel/matriz-ledger-settlement.js');
     const payable = (await getMatrizLedgerOpenItems('test', db.pool)).a_pagar.itens
-      .find((item) => item.tipo === 'fornecedor' && item.id === purchase.purchase_id);
+      .find((item) => item.tipo === 'fornecedor'
+        && item.id.startsWith(`${purchase.purchase_id}:`));
     expect(payable).toMatchObject({ valor: '100.00', settlement_mode: 'wholesale_purchase' });
 
     const settlement = await settleMatrizLedgerOpenItem({
