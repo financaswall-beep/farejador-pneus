@@ -14,10 +14,18 @@ import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-s
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   await registerPainelFinanceiroLedger(fastify);
-  fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (_request, reply) => {
+  fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = z.object({
+      mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+    }).safeParse(request.query ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'invalid_month' });
+    }
     try {
       return reply.status(200).send({
-        ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao()),
+        ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao(
+          undefined, undefined, parsed.data.mes,
+        )),
       });
     } catch (error) {
       if (error instanceof MatrizCentralLedgerUnavailableError) {

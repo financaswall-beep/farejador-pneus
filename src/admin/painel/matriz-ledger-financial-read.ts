@@ -2,31 +2,23 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
-interface LedgerTruthRow {
-  revenue: string; known_cost: string; operating_expenses: string; inventory_gain: string; inventory_loss: string; cash_in: string;
-  cash_out: string; cash_retail: string; cash_wholesale: string; cash_network: string; cash_monthly: string;
-  cash_purchases: string; cash_expenses: string; cash_commission_refund: string;
-  pending_revenue: string; pending_items: number; pending_orders: number; receivables: string; payables: string; retail_receivable: string;
-  cancelled_retail: number; cancelled_wholesale: number; cancelled_purchases: number; reversed_commissions: number; deleted_expenses: number;
-  reversed_after_settlement: number; suspected_test_rows: number;
-  source_wholesale: string; ledger_wholesale: string; source_retail: string;
-  ledger_retail: string; source_freight: string; source_commission: string;
-  ledger_commission: string; source_monthly: string; ledger_monthly: string;
-  source_expenses: string; ledger_expenses: string;
-  source_marketing: string; ledger_marketing: string; source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
-}
+import type { LedgerTruthRow } from './matriz-ledger-financial-read.types.js';
 const cents = (value: string | number): number => Math.round(Number(value || 0) * 100); const money = (value: number): string => (value / 100).toFixed(2);
 export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool): Promise<MatrizFinancialTruth> {
+  dbPool: Pool = defaultPool, selectedMonth?: string): Promise<MatrizFinancialTruth> {
   const result = await dbPool.query<LedgerTruthRow>(
      `WITH bounds AS (
-       SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date month_start,
-              (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+       SELECT COALESCE(to_date($3,'YYYY-MM'),
+                date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date) month_start,
+              (COALESCE(to_date($3,'YYYY-MM'),
+                date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date)
                 +interval '1 month')::date month_end,
-              (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+              (COALESCE(to_date($3,'YYYY-MM'),
+                date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date)::timestamp
                 AT TIME ZONE 'America/Sao_Paulo') month_ts,
-              ((date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
-                +interval '1 month') AT TIME ZONE 'America/Sao_Paulo') month_end_ts
+              ((COALESCE(to_date($3,'YYYY-MM'),
+                date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date)
+                +interval '1 month')::timestamp AT TIME ZONE 'America/Sao_Paulo') month_end_ts
      ), ledger AS (
        SELECT t.id,t.source_type,t.source_id,t.competence_on,t.cash_on,
               e.account_code,e.account_class,e.side,e.amount
@@ -75,6 +67,9 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
          WHERE account_code='cash' AND side='debit'),0) cash_in,
        COALESCE((SELECT sum(amount) FROM cash_month
          WHERE account_code='cash' AND side='credit'),0) cash_out,
+       COALESCE((SELECT sum(CASE side WHEN 'debit' THEN amount ELSE -amount END)
+         FROM ledger,bounds b WHERE account_code='cash' AND cash_on<b.month_start),0)
+         cash_opening,
        COALESCE((SELECT sum(CASE side WHEN 'debit' THEN amount ELSE -amount END)
          FROM cash_month WHERE account_code='cash'
            AND source_type LIKE 'commerce.order.%'),0) cash_retail,
@@ -218,7 +213,7 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
          WHEN account_code IN ('inventory_loss','inventory_internal_use')
            THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
          ELSE 0 END) FROM month_ledger),0) ledger_inventory`,
-    [environment, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
+    [environment, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED, selectedMonth ?? null],
   );
   const row = result.rows[0]!;
   const originPairs: Array<[MatrizFinancialTruth['conciliacao']['origens'][number]['origem'], number, number]> = [
@@ -245,6 +240,7 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
   const competenceStatus = difference > 0 ? 'divergente'
     : pending > 0 ? 'custo_pendente' : 'confirmado';
   const cashIn = cents(row.cash_in); const cashOut = cents(row.cash_out);
+  const cashOpening = cents(row.cash_opening);
   return {
     competencia: {
       receita_total: money(revenue),
@@ -259,8 +255,10 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
       status: competenceStatus,
     },
     caixa: {
+      saldo_anterior: money(cashOpening),
       entradas_registradas: money(cashIn), saidas_registradas: money(cashOut),
       movimento_liquido: money(cashIn - cashOut),
+      saldo_atual: money(cashOpening + cashIn - cashOut),
       recebimento_pendente: money(Math.max(0, cents(row.retail_receivable))),
       recebimentos: {
         varejo: money(cents(row.cash_retail)),

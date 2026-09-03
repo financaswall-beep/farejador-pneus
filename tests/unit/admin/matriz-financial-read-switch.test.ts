@@ -10,8 +10,8 @@ const truth = (revenue: string) => ({
     lucro_confirmado: revenue, status: 'confirmado',
   },
   caixa: {
-    entradas_registradas: revenue, saidas_registradas: '0.00',
-    movimento_liquido: revenue, recebimento_pendente: '0.00',
+    saldo_anterior: '0.00', entradas_registradas: revenue, saidas_registradas: '0.00',
+    movimento_liquido: revenue, saldo_atual: revenue, recebimento_pendente: '0.00',
     recebimentos: { varejo: revenue, atacado: '0.00', comissao: '0.00' },
     pagamentos: {
       compras: '0.00', despesas: '0.00', devolucoes_comissao: '0.00',
@@ -93,7 +93,7 @@ describe('corte da leitura financeira antiga', () => {
         writer: true, reader: true, health: healthStatus,
       });
       const result = await loaded.module.getMatrizFinancialRead(
-        'test', {} as never,
+        'test', {} as never, '2026-08',
       );
       expect(result).toEqual({
         source: 'central_ledger',
@@ -101,6 +101,7 @@ describe('corte da leitura financeira antiga', () => {
         truth: truth('110.00'),
       });
       expect(loaded.central).toHaveBeenCalledOnce();
+      expect(loaded.central).toHaveBeenCalledWith('test', {}, '2026-08');
     },
   );
 

@@ -18,11 +18,13 @@ describe('verdade financeira na interface da Matriz', () => {
   it('não chama competência de realizado e lê o movimento de caixa do backend', () => {
     const indicadores = readFileSync(`${ROOT}/painel/public/app.financeiro.indicadores.js`, 'utf8');
     const compras = readFileSync(`${ROOT}/painel/public/app.compras.js`, 'utf8');
+    const financeiro = readFileSync(`${ROOT}/painel/public/app.financeiro.js`, 'utf8');
     const html = readFileSync(`${ROOT}/painel/public/index.html`, 'utf8');
 
     expect(indicadores).toContain('v.verdade.caixa.movimento_liquido');
     expect(indicadores).not.toContain('const resultado = Number(v.mes.lucro || 0)');
-    expect(html).toContain('Caixa no período');
+    expect(html).toContain('Saldo em caixa');
+    expect(html).toContain('Saldo registrado no livro financeiro central');
     expect(html).toContain('Resultado por competência');
     expect(html).toContain('Inclui vendas fiadas; não representa dinheiro no caixa.');
     expect(html).toContain('receita_custo_pendente');
@@ -41,7 +43,7 @@ describe('verdade financeira na interface da Matriz', () => {
     expect(html).toContain('despesaConfirmarRemocao()');
     expect(html).toContain('Livro financeiro central');
     expect(html).toContain('Integração conciliada');
-    expect(compras).toContain('O cálculo antigo não será usado.');
+    expect(financeiro).toContain('O cálculo antigo não será usado.');
     expect(html).not.toMatch(/<a href="#"[^>]*>[\s\S]{0,300}<span>Configurações<\/span>/);
   });
 

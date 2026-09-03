@@ -131,7 +131,11 @@ export async function deleteWholesaleStock(
 // ─── ATACADO (Fase 3): resumo de custo + lucro ───────────────────────────────
 export type SalesPeriod = 'today' | '7d' | '30d' | 'mes' | 'tudo';
 
-export function salesPeriodWhere(period: SalesPeriod, column = 'o.created_at'): string {
+export function salesPeriodWhere(
+  period: SalesPeriod,
+  column = 'o.created_at',
+  selectedMonthParam?: number,
+): string {
   if (period === 'tudo') return '';
   if (period === 'today') {
     return `AND ${column} >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
@@ -141,6 +145,10 @@ export function salesPeriodWhere(period: SalesPeriod, column = 'o.created_at'): 
     const days = period === '7d' ? 6 : 29;
     return `AND ${column} >= ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '${days} days') AT TIME ZONE 'America/Sao_Paulo')
             AND ${column} < ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') + INTERVAL '1 day') AT TIME ZONE 'America/Sao_Paulo')`;
+  }
+  if (selectedMonthParam) {
+    return `AND (${column} AT TIME ZONE 'America/Sao_Paulo') >= to_date($${selectedMonthParam},'YYYY-MM')
+            AND (${column} AT TIME ZONE 'America/Sao_Paulo') < (to_date($${selectedMonthParam},'YYYY-MM') + INTERVAL '1 month')`;
   }
   return `AND ${column} >= (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
           AND ${column} < ((date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') + INTERVAL '1 month') AT TIME ZONE 'America/Sao_Paulo')`;
@@ -161,11 +169,12 @@ export async function getWholesaleResumo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
   period: SalesPeriod = 'tudo',
+  selectedMonth?: string,
 ): Promise<WholesaleResumoRow> {
   // Carga para parceiro só vira venda quando a Matriz conclui o acerto da chegada.
   const recognizedAt = `(CASE WHEN o.partner_transfer_status IN ('settled','received') THEN
     COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)`;
-  const periodWhere = salesPeriodWhere(period, recognizedAt);
+  const periodWhere = salesPeriodWhere(period, recognizedAt, selectedMonth ? 2 : undefined);
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
        COALESCE(SUM(oi.unit_price * CASE WHEN o.partner_transfer_status IS NULL
@@ -188,7 +197,7 @@ export async function getWholesaleResumo(
        JOIN commerce.wholesale_order_items oi
          ON oi.order_id = o.id AND oi.environment = o.environment
       WHERE o.environment = $1 ${periodWhere}`,
-    [environment],
+    selectedMonth ? [environment, selectedMonth] : [environment],
   );
   return r.rows[0]!;
 }
@@ -219,10 +228,11 @@ export async function getVarejoResumo(
   period: SalesPeriod = 'tudo',
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  selectedMonth?: string,
 ): Promise<VarejoResumoRow> {
   const recognizedAt = `(CASE WHEN o.fulfillment_mode='delivery'
     THEN o.delivered_at ELSE o.created_at END)`;
-  const periodWhere = salesPeriodWhere(period, recognizedAt);
+  const periodWhere = salesPeriodWhere(period, recognizedAt, selectedMonth ? 2 : undefined);
   const r = await dbPool.query<VarejoResumoRow>(
     `SELECT
        COALESCE(SUM(x.item_total) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS faturamento,
@@ -254,7 +264,7 @@ export async function getVarejoResumo(
          WHERE o.environment=$1 ${periodWhere}
          GROUP BY o.id
       ) x`,
-    [environment],
+    selectedMonth ? [environment, selectedMonth] : [environment],
   );
   return r.rows[0]!;
 }

@@ -23,6 +23,7 @@ export class MatrizCentralLedgerUnavailableError extends Error {
 export async function getMatrizFinancialRead(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  selectedMonth?: string,
 ): Promise<MatrizFinancialRead> {
   if (!env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) {
     throw new MatrizCentralLedgerUnavailableError('disabled');
@@ -34,6 +35,6 @@ export async function getMatrizFinancialRead(
   return {
     source: 'central_ledger',
     integration_status: health.status,
-    truth: await getMatrizCentralLedgerFinancialTruth(environment, dbPool),
+    truth: await getMatrizCentralLedgerFinancialTruth(environment, dbPool, selectedMonth),
   };
 }

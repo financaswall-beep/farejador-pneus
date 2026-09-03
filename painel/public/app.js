@@ -136,12 +136,14 @@ function painelApp() {
     matrizDespesas: null,
     despesasLoaded: false,
     financeiroVisao: null, financeiroLoadError: null,
+    finMes: new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7),
+    finCaixaExtrato: null, finCaixaExtratoLoading: false, finCaixaRequestId: 0,
     finTab: 'visao', // sub-abas visao|cobrancas|pagar|despesas|extrato|indicadores
     finIndicadorTab: 'fluxo', // Indicadores: fluxo|analise|inadimplencia (sem misturar assuntos no mesmo card)
     finFluxoDias: 30, // horizonte da agenda real: 7|30|90 dias
     finQuitando: false, // a chave de cada mutacao vive no gerenciador global da API
     finExtrato: null,
-    finExtratoLoading: false,
+    finExtratoLoading: false, finExtratoRequestId: 0,
     finExtratoFiltro: { mes: '', base: 'competencia' },
     finBaixaModal: {
       open: false, item: null, direction: 'receivable', amount: '',

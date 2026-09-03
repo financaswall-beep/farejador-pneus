@@ -157,6 +157,32 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
         semDataCount: semData.length,
       };
     },
+    finCaixaHistoricoPainel() {
+      const month = this.finMes || this.finMesAtual();
+      const [year, value] = month.split('-').map(Number);
+      const days = new Date(Date.UTC(year, value, 0)).getUTCDate();
+      const grouped = new Map();
+      for (const row of (this.finCaixaExtrato?.rows || [])) {
+        const date = String(row.cash_on || '').slice(0, 10);
+        if (!date) continue;
+        const item = grouped.get(date) || { entrada: 0, saida: 0 };
+        if (row.direction === 'entrada') item.entrada += Number(row.amount || 0);
+        if (row.direction === 'saida') item.saida += Number(row.amount || 0);
+        grouped.set(date, item);
+      }
+      const rows = Array.from({ length: days }, (_, index) => {
+        const day = index + 1;
+        const key = `${month}-${String(day).padStart(2, '0')}`;
+        const item = grouped.get(key) || { entrada: 0, saida: 0 };
+        return { day, label: String(day).padStart(2, '0'), ...item };
+      });
+      const max = Math.max(1, ...rows.flatMap((row) => [row.entrada, row.saida]));
+      return rows.map((row) => ({
+        ...row,
+        entradaPct: row.entrada > 0 ? Math.max(4, Math.round(100 * row.entrada / max)) : 0,
+        saidaPct: row.saida > 0 ? Math.max(4, Math.round(100 * row.saida / max)) : 0,
+      }));
+    },
     finAtrasosPainel() {
       const itens = this.finFluxoItens().filter((item) => item.dias !== null && item.dias < 0);
       const defs = [

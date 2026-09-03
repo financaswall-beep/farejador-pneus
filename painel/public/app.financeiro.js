@@ -7,6 +7,26 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.financeiro = function () {
   return {
+    async loadFinanceiro() {
+      this.ensureCredentials();
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      this.financeiroLoadError = null;
+      const qs = new URLSearchParams();
+      if (this.finMes) qs.set('mes', this.finMes);
+      const [visao] = await Promise.all([
+        this.apiGet('/admin/api/matriz/financeiro' + (qs.toString() ? '?' + qs.toString() : '')).catch((err) => {
+          console.warn('financeiro visão falhou:', err.message);
+          this.financeiroLoadError = err.message === 'api_503'
+            ? 'O livro financeiro central está indisponível. O cálculo antigo não será usado.'
+            : 'Não foi possível atualizar o Financeiro. Tente novamente.';
+          return null;
+        }),
+        this.loadDespesas(), this.loadFinCaixaExtrato(),
+      ]);
+      this.financeiroVisao = visao ?? this.financeiroVisao;
+      if (visao?.periodo?.mes) this.finMes = visao.periodo.mes;
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
     finBarWidth(valor) {
       const v = this.financeiroVisao;
       if (!v) return '0%';

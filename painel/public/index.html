@@ -133,7 +133,7 @@
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260818-business-time1"></script>
-<script src="/admin/painel/app.compras.js?v=20260825-purchase-orders1"></script>
+<script src="/admin/painel/app.compras.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260825-price-history1"></script>
 <script src="/admin/painel/app.compras.reposicao.js?v=20260825-replenishment3"></script>
@@ -163,9 +163,9 @@
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260727-financeiro-visao1"></script>
-<script src="/admin/painel/app.financeiro.baixas.js?v=20260818-business-time1"></script>
-<script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260903-finance-carry1"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260903-finance-carry1"></script>
+<script src="/admin/painel/app.financeiro.indicadores.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
@@ -183,7 +183,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260829-partner-stock4"></script>
-<script src="/admin/painel/app.js?v=20260826-payroll2"></script>
+<script src="/admin/painel/app.js?v=20260903-finance-carry1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 
@@ -5500,7 +5500,7 @@
           <div class="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">
             <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-900/85 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
               <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
-              <span x-text="new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date())"></span>
+              <span x-text="finMesLabel()"></span>
             </span>
             <span class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm"
                   :class="financeiroVisao?.leitura?.integration_status === 'green' ? 'border-emerald-300/30 bg-emerald-800/90' : 'border-amber-300/40 bg-amber-700/90'">
@@ -5530,6 +5530,16 @@
             </template>
           </nav>
           <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
+            <div class="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white">
+              <button type="button" @click="finMoverMes(-1)" aria-label="Mês anterior"
+                      class="px-3 py-2 text-gray-600 hover:bg-gray-50"><i data-lucide="chevron-left" class="h-4 w-4"></i></button>
+              <span class="min-w-[132px] border-x border-gray-200 px-3 py-2 text-center text-xs font-semibold capitalize text-gray-700" x-text="finMesLabel()"></span>
+              <button type="button" @click="finMoverMes(1)" :disabled="!financeiroVisao?.periodo?.proximo" aria-label="Mês seguinte"
+                      class="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"><i data-lucide="chevron-right" class="h-4 w-4"></i></button>
+            </div>
+            <span class="inline-flex rounded-lg px-3 py-2 text-xs font-semibold"
+                  :class="financeiroVisao?.periodo?.status === 'em_andamento' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'"
+                  x-text="financeiroVisao?.periodo?.status === 'em_andamento' ? 'Em andamento' : 'Período anterior'"></span>
             <button type="button" @click="loadFinanceiro()"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3.5 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
               <i data-lucide="refresh-cw" class="h-4 w-4"></i> Atualizar
@@ -5570,7 +5580,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p class="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200/75">Fechamento do período</p>
-                    <h2 class="mt-1 text-xl font-semibold" x-text="new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date())"></h2>
+                    <h2 class="mt-1 text-xl font-semibold capitalize" x-text="finMesLabel()"></h2>
                   </div>
                   <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-900/70 px-3 py-1.5 text-[11px] font-medium text-emerald-50">
                     <i data-lucide="book-check" class="h-3.5 w-3.5 text-emerald-200"></i> Competência
@@ -5633,65 +5643,48 @@
             </section>
 
             <section class="flex min-h-[300px] flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm xl:col-span-4">
-              <div class="flex items-start justify-between gap-3">
-                <div><h2 class="text-lg font-semibold">Pulso do caixa</h2><p class="mt-1 text-xs text-gray-500">Movimento realizado e posição em aberto</p></div>
-                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="activity" class="h-5 w-5 text-emerald-700"></i></div>
+              <div><h2 class="text-lg font-semibold">Saldo em caixa</h2><p class="mt-1 text-xs text-gray-500">Saldo registrado no livro financeiro central</p></div>
+              <div class="mt-5 divide-y divide-gray-100">
+                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Saldo anterior</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_anterior))"></span></div>
+                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Entradas</span><span class="num font-semibold text-emerald-700" x-text="'+ ' + formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></span></div>
+                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Saídas</span><span class="num font-semibold text-rose-600" x-text="'− ' + formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></span></div>
               </div>
-              <div class="mt-6">
-                <p class="text-xs text-gray-500">Caixa no período</p>
-                <p class="num mt-1 text-3xl font-bold tracking-tight"
-                   :class="Number(financeiroVisao.verdade.caixa.movimento_liquido) >= 0 ? 'text-emerald-800' : 'text-rose-600'"
-                   x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.movimento_liquido))"></p>
+              <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+                <div class="flex items-end justify-between gap-3"><span class="text-sm font-semibold text-emerald-900">Saldo atual</span><span class="num text-2xl font-bold text-emerald-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_atual))"></span></div>
+                <p class="mt-1 text-[11px] text-emerald-700" x-text="financeiroVisao.periodo.status === 'em_andamento' ? 'Saldo acumulado até agora' : 'Este saldo passa para o mês seguinte'"></p>
               </div>
-              <div class="mt-5 divide-y divide-gray-100 border-y border-gray-100">
-                <div class="flex items-center justify-between gap-3 py-3"><span class="inline-flex items-center gap-2 text-sm text-gray-600"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>A receber</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_receber))"></span></div>
-                <div class="flex items-center justify-between gap-3 py-3"><span class="inline-flex items-center gap-2 text-sm text-gray-600"><span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>A pagar</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_pagar))"></span></div>
-              </div>
-              <div class="mt-4">
-                <div class="mb-2 flex items-center justify-between text-[11px] text-gray-500"><span>Exposição financeira</span><span>posição aberta</span></div>
-                <div class="flex h-2.5 overflow-hidden rounded-full bg-gray-100">
-                  <div class="h-full bg-emerald-500" :style="'width:' + Math.round(100 * Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) / Math.max(1, Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) + Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)))) + '%'"></div>
-                  <div class="h-full bg-amber-400" :style="'width:' + Math.round(100 * Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)) / Math.max(1, Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) + Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)))) + '%'"></div>
-                </div>
-              </div>
-              <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')"
-                      class="mt-auto inline-flex items-center gap-2 pt-5 text-left text-xs font-semibold text-emerald-700 hover:text-emerald-900">
-                Ver agenda financeira <i data-lucide="arrow-right" class="h-4 w-4"></i>
+              <button type="button" @click="finAbrirMovimentacoesCaixa()"
+                      class="mt-auto w-full rounded-lg border border-emerald-700 px-4 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
+                Ver movimentações
               </button>
             </section>
           </div>
 
-          <!-- Fluxo previsto e compromissos: usam apenas títulos abertos com vencimento. -->
+          <!-- Movimento realizado no caixa + compromissos ainda abertos. -->
           <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
             <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
               <div class="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><h2 class="text-base font-semibold">Fluxo financeiro</h2><p class="mt-1 text-xs text-gray-500">Agenda dos títulos abertos; não representa saldo bancário.</p></div>
-                <div class="flex overflow-hidden rounded-lg border border-gray-200">
-                  <template x-for="dias in [7, 30, 90]" :key="'visao-fluxo-'+dias">
-                    <button type="button" @click="finFluxoDias = dias"
-                            :class="Number(finFluxoDias) === dias ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
-                            class="px-3 py-2 text-xs font-medium" x-text="dias + ' dias'"></button>
-                  </template>
-                </div>
+                <div><h2 class="text-base font-semibold">Fluxo financeiro</h2><p class="mt-1 text-xs text-gray-500">Entradas e saídas efetivamente registradas no mês</p></div>
+                <span class="rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold capitalize text-gray-600" x-text="finMesLabel()"></span>
               </div>
               <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Entradas previstas <strong class="num text-gray-800" x-text="formatCurrency(finFluxoPainel().entradas)"></strong></span>
-                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-rose-400"></span>Saídas previstas <strong class="num text-gray-800" x-text="formatCurrency(finFluxoPainel().saidas)"></strong></span>
+                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Entradas <strong class="num text-gray-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></strong></span>
+                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-rose-400"></span>Saídas <strong class="num text-gray-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></strong></span>
               </div>
-              <div class="mt-5 flex h-[190px] items-end gap-2 border-b border-gray-200 px-1 sm:gap-4">
-                <template x-for="bucket in finFluxoPainel().buckets" :key="'visao-bucket-'+bucket.label">
+              <div class="mt-5 flex h-[190px] items-end gap-0.5 border-b border-gray-200 px-1 sm:gap-1">
+                <template x-for="bucket in finCaixaHistoricoPainel()" :key="'visao-caixa-'+bucket.day">
                   <div class="flex h-full min-w-0 flex-1 flex-col justify-end">
-                    <div class="flex h-[145px] items-end justify-center gap-1 sm:gap-2">
-                      <div class="w-3 rounded-t-sm bg-emerald-500 transition-all sm:w-5" :style="'height:' + bucket.entradaPct + '%'" :title="'Entradas: ' + formatCurrency(bucket.entrada)"></div>
-                      <div class="w-3 rounded-t-sm bg-rose-400 transition-all sm:w-5" :style="'height:' + bucket.saidaPct + '%'" :title="'Saídas: ' + formatCurrency(bucket.saida)"></div>
+                    <div class="flex h-[145px] items-end justify-center gap-px">
+                      <div class="w-1/2 max-w-2 rounded-t-sm bg-emerald-500 transition-all" :style="'height:' + bucket.entradaPct + '%'" :title="bucket.label + ': entradas ' + formatCurrency(bucket.entrada)"></div>
+                      <div class="w-1/2 max-w-2 rounded-t-sm bg-rose-400 transition-all" :style="'height:' + bucket.saidaPct + '%'" :title="bucket.label + ': saídas ' + formatCurrency(bucket.saida)"></div>
                     </div>
-                    <p class="mt-2 truncate text-center text-[10px] text-gray-500 sm:text-[11px]" x-text="bucket.label"></p>
+                    <p class="mt-2 truncate text-center text-[9px] text-gray-500" x-show="bucket.day === 1 || bucket.day % 5 === 0" x-text="bucket.label"></p>
                   </div>
                 </template>
               </div>
               <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-xs text-gray-500">Impacto previsto: <strong class="num" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().impacto)"></strong></p>
-                <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Abrir fluxo completo →</button>
+                <p class="text-xs text-gray-500">Movimento líquido: <strong class="num" :class="Number(financeiroVisao.verdade.caixa.movimento_liquido) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.movimento_liquido))"></strong></p>
+                <button type="button" @click="finAbrirMovimentacoesCaixa()" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Abrir movimentações →</button>
               </div>
             </section>
 
@@ -5729,11 +5722,11 @@
                 <table class="w-full min-w-[720px] text-sm">
                   <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500"><tr><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Origem</th><th class="px-4 py-3 font-medium">Descrição</th><th class="px-4 py-3 font-medium">Tipo</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 text-right font-medium">Valor</th></tr></thead>
                   <tbody class="divide-y divide-gray-100">
-                    <template x-for="row in (finExtrato?.rows || []).slice(0, 4)" :key="'visao-extrato-'+row.id">
-                      <tr class="hover:bg-gray-50/60"><td class="px-5 py-3 whitespace-nowrap text-gray-600" x-text="financeDate(row.competence_on)"></td><td class="px-4 py-3 font-medium text-gray-700" x-text="row.origin"></td><td class="max-w-[260px] px-4 py-3"><p class="truncate font-medium text-gray-800" x-text="row.description"></p></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs text-gray-600"><span class="h-2 w-2 rounded-full" :class="['entrada','receita'].includes(row.direction) ? 'bg-emerald-500' : ['saida','despesa'].includes(row.direction) ? 'bg-rose-400' : 'bg-gray-400'"></span><span x-text="row.direction === 'entrada' ? 'Entrada' : row.direction === 'saida' ? 'Saída' : row.direction === 'receita' ? 'Receita' : row.direction === 'despesa' ? 'Despesa' : row.direction === 'estoque' ? 'Estoque' : 'Ajuste'"></span></span></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span></td><td class="num px-5 py-3 text-right font-semibold" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td></tr>
+                    <template x-for="row in (finCaixaExtrato?.rows || []).slice(0, 4)" :key="'visao-extrato-'+row.id">
+                      <tr class="hover:bg-gray-50/60"><td class="px-5 py-3 whitespace-nowrap text-gray-600" x-text="financeDate(row.cash_on)"></td><td class="px-4 py-3 font-medium text-gray-700" x-text="row.origin"></td><td class="max-w-[260px] px-4 py-3"><p class="truncate font-medium text-gray-800" x-text="row.description"></p></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs text-gray-600"><span class="h-2 w-2 rounded-full" :class="row.direction === 'entrada' ? 'bg-emerald-500' : 'bg-rose-400'"></span><span x-text="row.direction === 'entrada' ? 'Entrada' : 'Saída'"></span></span></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span></td><td class="num px-5 py-3 text-right font-semibold" :class="row.direction === 'entrada' ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(row.amount))"></td></tr>
                     </template>
-                    <tr x-show="finExtratoLoading"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Carregando lançamentos…</td></tr>
-                    <tr x-show="!finExtratoLoading && !(finExtrato?.rows || []).length"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Nenhum lançamento no período.</td></tr>
+                    <tr x-show="finCaixaExtratoLoading"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Carregando movimentações…</td></tr>
+                    <tr x-show="!finCaixaExtratoLoading && !(finCaixaExtrato?.rows || []).length"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Nenhuma entrada ou saída no período.</td></tr>
                   </tbody>
                 </table>
               </div>

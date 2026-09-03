@@ -23,6 +23,12 @@ export type {
 } from './matriz-ledger-open-items.js';
 
 export interface FinanceiroVisao {
+  periodo: {
+    mes: string;
+    status: 'em_andamento' | 'periodo_anterior';
+    anterior: string;
+    proximo: string | null;
+  };
   leitura: Omit<MatrizFinancialRead, 'truth'>;
   fontes: { fiado: boolean; comissao: boolean; despesas: boolean };
   verdade: MatrizFinancialTruth;
@@ -61,26 +67,40 @@ export interface FinanceiroVisao {
 export async function getMatrizFinanceiroVisao(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  selectedMonth?: string,
 ): Promise<FinanceiroVisao> {
-  const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
-  const expenseMesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')::date`;
+  const currentMonth = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+  }).format(new Date()).slice(0, 7);
+  const month = selectedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)
+    && selectedMonth <= currentMonth ? selectedMonth : currentMonth;
+  const monthRange = (column: string) =>
+    `${column} >= to_date($2,'YYYY-MM') AND ${column} < (to_date($2,'YYYY-MM') + interval '1 month')`;
+  const wholesaleRecognizedLocal = `((CASE WHEN o.partner_transfer_status IN ('settled','received')
+    THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+    AT TIME ZONE 'America/Sao_Paulo')`;
+  const shiftMonth = (delta: number): string => {
+    const [year, value] = month.split('-').map(Number) as [number, number];
+    const date = new Date(Date.UTC(year, value - 1 + delta, 1));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
   const [atacado, varejo, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes, verdade] =
     await Promise.all([
-      getWholesaleResumo(environment, dbPool, 'mes'),
-      getVarejoResumo('mes', environment, dbPool),
+      getWholesaleResumo(environment, dbPool, 'mes', month),
+      getVarejoResumo('mes', environment, dbPool, month),
       env.NETWORK_COMMISSION_LEDGER
         ? dbPool.query<{ realizado: string }>(
             `SELECT
                COALESCE((SELECT SUM(commission_amount)
                  FROM network.commission_entries
                 WHERE environment=$1
-                  AND (realized_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}),0)
+                  AND ${monthRange("(realized_at AT TIME ZONE 'America/Sao_Paulo')")}),0)
                - COALESCE((SELECT SUM(amount)
                  FROM finance.matriz_commission_reversals
                 WHERE environment=$1
-                  AND (reversed_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}),0)
+                  AND ${monthRange("(reversed_at AT TIME ZONE 'America/Sao_Paulo')")}),0)
                AS realizado`,
-            [environment],
+            [environment, month],
           ).then((r) => r.rows[0]!.realizado)
         : Promise.resolve(null),
       // Fiado do mês em aberto: soma dos ITENS (line_total) das vendas confirmed pending —
@@ -98,10 +118,8 @@ export async function getMatrizFinanceiroVisao(
               WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
                 AND (o.partner_transfer_status IS NULL
                   OR o.partner_transfer_status IN ('settled','received'))
-                AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
-                       THEN COALESCE(o.partner_settled_at,o.sold_at)
-                       ELSE o.sold_at END) AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
-            [environment],
+                AND ${monthRange(wholesaleRecognizedLocal)}`,
+            [environment, month],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),
       dbPool.query<{ capital: string; pneus: number }>(
@@ -115,9 +133,9 @@ export async function getMatrizFinanceiroVisao(
             `SELECT category, SUM(amount) AS total
                FROM commerce.matriz_expenses
               WHERE environment = $1 AND deleted_at IS NULL
-                AND ops.matriz_expense_competence_month(competence_month,occurred_at) ${expenseMesWhere}
+                AND ${monthRange('ops.matriz_expense_competence_month(competence_month,occurred_at)')}
               GROUP BY category ORDER BY SUM(amount) DESC`,
-            [environment],
+            [environment, month],
           ).then((r) => r.rows)
         : Promise.resolve(null),
       // Custo do pneu vendido nos ÚLTIMOS 30 DIAS (janela móvel) — base do GIRO. Mês-calendário
@@ -159,10 +177,10 @@ export async function getMatrizFinanceiroVisao(
               WHERE oi.order_id = o.id AND oi.environment = o.environment) itens ON true
           WHERE o.environment = $1 AND o.status IN ('confirmed','paid','delivered')
             AND o.fulfillment_mode = 'delivery'
-            AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
-        [environment],
+            AND ${monthRange("(o.created_at AT TIME ZONE 'America/Sao_Paulo')")}`,
+        [environment, month],
       ).then((r) => r.rows[0]!.frete),
-      getMatrizFinancialRead(environment, dbPool),
+      getMatrizFinancialRead(environment, dbPool, month),
     ]);
   const centralAgenda = await getMatrizLedgerOpenItems(environment, dbPool);
 
@@ -173,15 +191,13 @@ export async function getMatrizFinanceiroVisao(
   const money = (value: number): string => (value / 100).toFixed(2);
   const comissaoRealizada = comissaoMes ? cents(comissaoMes) : 0;
   const freteRecebido = cents(freteMes);
-  const faturamento = cents(atacado.faturamento) + cents(varejo.faturamento)
-    + comissaoRealizada + freteRecebido;
-  const custo = cents(atacado.custo_total) + cents(varejo.custo_total);
+  const faturamento = cents(verdade.truth.competencia.receita_total);
+  const custo = cents(verdade.truth.competencia.custo_conhecido);
   const despesasMes = despCat
     ? despCat.reduce((sum, category) => sum + cents(category.total), 0)
     : null;
-  const lucroBruto = cents(atacado.lucro_total) + cents(varejo.lucro_total)
-    + comissaoRealizada + freteRecebido;
-  const lucro = lucroBruto - (despesasMes ?? 0);
+  const lucro = cents(verdade.truth.competencia.lucro_confirmado);
+  const lucroBruto = lucro + cents(verdade.truth.competencia.despesas);
   const margemPct = faturamento > 0 ? Math.round((lucro / faturamento) * 1000) / 10 : null;
 
   // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
@@ -204,6 +220,12 @@ export async function getMatrizFinanceiroVisao(
     ? Math.round((despesasMes / 100) / margemBrutaFrac) : null;
 
   return {
+    periodo: {
+      mes: month,
+      status: month === currentMonth ? 'em_andamento' : 'periodo_anterior',
+      anterior: shiftMonth(-1),
+      proximo: month < currentMonth ? shiftMonth(1) : null,
+    },
     verdade: verdade.truth,
     leitura: {
       source: verdade.source,

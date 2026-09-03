@@ -238,23 +238,6 @@ window.PAINEL_MODULES.compras = function () {
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },
-    async loadFinanceiro() {
-      this.ensureCredentials();
-      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
-      this.financeiroLoadError = null;
-      const [visao] = await Promise.all([
-        this.apiGet('/admin/api/matriz/financeiro').catch((err) => {
-          console.warn('financeiro visão falhou:', err.message);
-          this.financeiroLoadError = err.message === 'api_503'
-            ? 'O livro financeiro central está indisponível. O cálculo antigo não será usado.'
-            : 'Não foi possível atualizar o Financeiro. Tente novamente.';
-          return null;
-        }),
-        this.loadDespesas(),
-      ]);
-      this.financeiroVisao = visao ?? this.financeiroVisao;
-      this.$nextTick(() => window.lucide && window.lucide.createIcons());
-    },
     async loadDespesas() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;

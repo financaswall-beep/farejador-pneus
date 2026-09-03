@@ -34,11 +34,16 @@ describe('Visão geral redesenhada do Financeiro', () => {
 
     expect(html).toContain('financeiroVisao.verdade.competencia.lucro_confirmado');
     expect(html).toContain('financeiroVisao.verdade.caixa.movimento_liquido');
+    expect(html).toContain('financeiroVisao.verdade.caixa.saldo_anterior');
+    expect(html).toContain('financeiroVisao.verdade.caixa.saldo_atual');
+    expect(html).toContain('finMoverMes(-1)');
+    expect(html).toContain('finCaixaHistoricoPainel()');
+    expect(html).toContain('Este saldo passa para o mês seguinte');
     expect(html).toContain('Caixa do período');
     expect(html).toContain('Margem líquida confirmada');
     expect(html).toContain('financeiroVisao.verdade.competencia.receita_custo_conhecido');
     expect(html).toContain('finFluxoPainel().buckets');
-    expect(html).toContain("(finExtrato?.rows || []).slice(0, 4)");
+    expect(html).toContain("(finCaixaExtrato?.rows || []).slice(0, 4)");
     expect(html).toContain('financeiroVisao.verdade.conciliacao.origens');
     expect(html).not.toContain('Cálculo anterior × livro financeiro central');
     expect(html).not.toContain('financeiroVisao.leitura.comparison');

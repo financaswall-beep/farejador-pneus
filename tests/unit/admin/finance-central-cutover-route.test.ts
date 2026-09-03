@@ -55,6 +55,17 @@ async function buildFinanceRoute(reason: 'disabled' | 'integration_red') {
 }
 
 describe('corte central na rota do Financeiro', () => {
+  it('recusa mês inválido antes de consultar o livro', async () => {
+    const { app, getMatrizFinanceiroVisao } = await buildFinanceRoute('disabled');
+    const response = await app.inject({
+      method: 'GET', url: '/admin/api/matriz/financeiro?mes=2026-13',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid_month' });
+    expect(getMatrizFinanceiroVisao).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it.each(['disabled', 'integration_red'] as const)(
     'retorna 503 quando o livro central esta %s e nao mascara com legado',
     async (reason) => {

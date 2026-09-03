@@ -10,6 +10,33 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
     finMesAtual() {
       return this.finHoje().slice(0, 7);
     },
+    finMesLabel(month = this.finMes) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return 'Período';
+      const [year, value] = month.split('-').map(Number);
+      return new Intl.DateTimeFormat('pt-BR', {
+        month: 'long', year: 'numeric', timeZone: 'UTC',
+      }).format(new Date(Date.UTC(year, value - 1, 1)));
+    },
+    async finSelecionarMes(month) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return;
+      if (month > this.finMesAtual()) return;
+      this.finMes = month;
+      this.finExtratoFiltro.mes = month;
+      this.despesaFiltro.mes = month;
+      this.finExtrato = null;
+      this.finCaixaExtrato = null;
+      await Promise.allSettled([this.loadFinanceiro(), this.loadFinExtrato()]);
+    },
+    async finMoverMes(direction) {
+      const period = this.financeiroVisao?.periodo;
+      const target = direction < 0 ? period?.anterior : period?.proximo;
+      if (target) await this.finSelecionarMes(target);
+    },
+    async finAbrirMovimentacoesCaixa() {
+      this.finExtratoFiltro.mes = this.finMes;
+      this.finExtratoFiltro.base = 'caixa';
+      await this.finOpenTab('extrato');
+    },
     finParseValor(value) {
       let normalized = String(value ?? '').trim().replace(/\s/g, '').replace(/^R\$/i, '');
       const comma = normalized.lastIndexOf(',');
@@ -156,27 +183,55 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
     },
     async finOpenTab(tab) {
       this.finTab = tab;
+      if (tab === 'despesas') {
+        this.despesaFiltro.mes = this.finMes;
+        await this.loadDespesas();
+      }
       if (tab === 'extrato' || tab === 'visao') await this.loadFinExtrato();
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async loadFinExtrato() {
-      if (this.finExtratoLoading || !this.adminAuthenticated) return;
-      if (!this.finExtratoFiltro.mes) this.finExtratoFiltro.mes = this.finMesAtual();
+      if (!this.adminAuthenticated) return;
+      if (!this.finExtratoFiltro.mes) this.finExtratoFiltro.mes = this.finMes || this.finMesAtual();
+      const requestId = ++this.finExtratoRequestId;
+      const requestedMonth = this.finExtratoFiltro.mes;
+      const requestedBase = this.finExtratoFiltro.base;
       this.finExtratoLoading = true;
       try {
         const qs = new URLSearchParams({
-          mes: this.finExtratoFiltro.mes,
-          base: this.finExtratoFiltro.base,
+          mes: requestedMonth,
+          base: requestedBase,
           limit: '200',
         });
-        this.finExtrato = await this.apiGet(
+        const result = await this.apiGet(
           '/admin/api/matriz/financeiro/ledger/statement?' + qs.toString(),
         );
+        if (requestId === this.finExtratoRequestId) this.finExtrato = result;
       } catch (err) {
         console.warn('extrato financeiro central falhou:', err.message);
-        this.finExtrato = null;
+        if (requestId === this.finExtratoRequestId) this.finExtrato = null;
       } finally {
-        this.finExtratoLoading = false;
+        if (requestId === this.finExtratoRequestId) this.finExtratoLoading = false;
+      }
+    },
+    async loadFinCaixaExtrato() {
+      if (!this.adminAuthenticated) return;
+      const requestId = ++this.finCaixaRequestId;
+      const requestedMonth = this.finMes || this.finMesAtual();
+      this.finCaixaExtratoLoading = true;
+      try {
+        const qs = new URLSearchParams({
+          mes: requestedMonth, base: 'caixa', limit: '200',
+        });
+        const result = await this.apiGet(
+          '/admin/api/matriz/financeiro/ledger/statement?' + qs.toString(),
+        );
+        if (requestId === this.finCaixaRequestId) this.finCaixaExtrato = result;
+      } catch (err) {
+        console.warn('movimento de caixa falhou:', err.message);
+        if (requestId === this.finCaixaRequestId) this.finCaixaExtrato = null;
+      } finally {
+        if (requestId === this.finCaixaRequestId) this.finCaixaExtratoLoading = false;
       }
     },
     finExtratoStatus(row) {

@@ -18,9 +18,11 @@ export interface MatrizFinancialTruth {
     status: 'confirmado' | 'custo_pendente' | 'divergente';
   };
   caixa: {
+    saldo_anterior: string;
     entradas_registradas: string;
     saidas_registradas: string;
     movimento_liquido: string;
+    saldo_atual: string;
     recebimento_pendente: string;
     recebimentos: {
       varejo: string; atacado: string; comissao: string; mensalidades?: string;
@@ -236,8 +238,9 @@ export async function getLegacyMatrizFinancialTruth(
       ajustes_estoque: { ganhos: money(inventoryGain), perdas: money(inventoryLoss),
         efeito_liquido: money(inventoryGain - inventoryLoss) },
       lucro_confirmado: money(knownRevenue - knownCost - expenses + inventoryGain), status },
-    caixa: { entradas_registradas: money(cashIn), saidas_registradas: money(cashOut),
-      movimento_liquido: money(cashIn - cashOut), recebimento_pendente: money(cents(row.retail_payment_pending)),
+    caixa: { saldo_anterior: '0.00', entradas_registradas: money(cashIn),
+      saidas_registradas: money(cashOut), movimento_liquido: money(cashIn - cashOut),
+      saldo_atual: money(cashIn - cashOut), recebimento_pendente: money(cents(row.retail_payment_pending)),
       recebimentos: { varejo: money(cents(row.cash_retail)), atacado: money(cents(row.cash_wholesale)), comissao: money(cents(row.cash_commission)) },
       pagamentos: { compras: money(cents(row.cash_purchases)),
         despesas: money(cents(row.cash_expenses)),

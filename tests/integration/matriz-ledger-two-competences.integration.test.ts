@@ -225,6 +225,19 @@ describe('Portao final — conciliacao central em duas competencias', () => {
     expect(await getGate(
       ['2026-06-01', '2026-07-01'], 'test', db.pool,
     )).toMatchObject({ status: 'green', total_abs_difference: '0.00' });
+
+    const { getMatrizCentralLedgerFinancialTruth } = await import(
+      '../../src/admin/painel/matriz-ledger-financial-read.js'
+    );
+    const june = await getMatrizCentralLedgerFinancialTruth('test', db.pool, '2026-06');
+    const july = await getMatrizCentralLedgerFinancialTruth('test', db.pool, '2026-07');
+    expect(july.caixa.saldo_anterior).toBe(june.caixa.saldo_atual);
+    expect(Number(july.caixa.saldo_atual)).toBeCloseTo(
+      Number(july.caixa.saldo_anterior)
+        + Number(july.caixa.entradas_registradas)
+        - Number(july.caixa.saidas_registradas),
+      2,
+    );
   });
 
   it('expoe o portao somente ao dono e valida a consulta', async () => {
