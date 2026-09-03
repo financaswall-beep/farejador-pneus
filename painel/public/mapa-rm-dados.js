@@ -1,6 +1,6 @@
 // Mapa da área do bot — malha oficial IBGE (dados públicos, qualidade intermediária),
 // recorte = municípios onde o dicionário do bot resolve bairro (geo_resolutions) + região metropolitana.
-// GERADO de assets/mapa-ibge/rj-municipios.geojson (projeção equiretangular) — não editar na mão.
+// GERADO de fonte IBGE arquivada no Portão 7 (projeção equiretangular) — não editar na mão.
 // Dados puros: window.MAPA_RM = { W, H, munis: [{ n: nome IBGE, d: path SVG, cx, cy }] }.
 window.MAPA_RM = {
   W: 700,

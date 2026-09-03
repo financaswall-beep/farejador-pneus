@@ -103,11 +103,11 @@ Opcionalmente, remover e reinstalar `node_modules/`, `.kilo/node_modules/` e `.k
 
 - `output/` sem as subpastas de backup: aproximadamente 36 MB de mockups, conceitos, imagens e documentos gerados;
 - 13 HTML/SVG de mockup em `painel/public/`, sem referência em arquivos rastreados e sem carregamento pela aplicação;
-- `proposta-layout-2026-06/`;
-- `dashboard.html` antigo, citado somente em documentação;
-- `assets/` da raiz: fontes do mapa e artefatos de geração; o runtime usa os arquivos já incorporados em `painel/public/`;
-- 20 documentos não rastreados, principalmente auditorias e handoffs;
-- 90 scripts não rastreados.
+- proposta visual isolada de junho, arquivada no Lote 2;
+- dashboard estático antigo, arquivado no Lote 2;
+- assets da antiga geração do mapa e de marketing, arquivados no Lote 2; o runtime usa os arquivos já incorporados em `painel/public/`;
+- 19 documentos não rastreados, arquivados no Lote 2;
+- scripts locais, resolvidos integralmente no Lote 3.
 
 Esses itens devem ir para um arquivo histórico fora da raiz ou para uma pasta de arquivo com índice. Apagar diretamente faria perder contexto de auditoria e ferramentas que ainda são citadas por documentos.
 
@@ -176,7 +176,11 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 - [x] preservar os arquivos fora do runtime, sem exclusão definitiva;
 - [x] manter índice com data, tamanho e SHA-256;
 - [ ] comparar e classificar os demais conceitos visuais de `output/`;
-- [ ] classificar `proposta-layout-2026-06/`, `dashboard.html` e `assets/`.
+- [x] arquivar `proposta-layout-2026-06/`, `dashboard.html` e `assets/`, com SHA-256;
+- [x] arquivar os 19 documentos locais que estavam soltos em `docs/`, com SHA-256.
+
+O build foi aprovado depois da retirada desses materiais, confirmando que nenhum
+deles era dependência do runtime ou da compilação.
 
 ### Lote 3 — scripts
 

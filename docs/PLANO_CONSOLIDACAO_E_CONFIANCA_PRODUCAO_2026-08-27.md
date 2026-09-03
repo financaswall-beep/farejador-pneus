@@ -1155,6 +1155,14 @@ foi acessado e nenhuma migration foi alterada.
 Validação final da subetapa: build aprovado, 9 testes específicos das travas e
 suíte completa com 303 arquivos e 1.502 testes aprovados.
 
+Também em 02/09/2026, os 19 documentos locais não versionados foram retirados de
+`docs/` e preservados com SHA-256. O dashboard estático antigo, a proposta visual
+de junho e sete fontes/artefatos de mapa e marketing saíram da raiz para o arquivo
+local. O runtime e o mapa já incorporado em `painel/public/mapa-rm-dados.js`
+permaneceram intactos. A árvore visível do Git deixou de ter arquivos soltos; os
+backups continuam preservados e fora deste lote. O build foi repetido e aprovado
+depois da retirada, provando que não havia dependência escondida nesses materiais.
+
 A auditoria do legado do parceiro confirmou que ele ainda não pode ser removido.
 `src/parceiro/route.ts` continua servindo `parceiro/public/` nas rotas visuais
 `/parceiro/:slug/`, incluindo JavaScript, CSS, assets, vendor e service worker.

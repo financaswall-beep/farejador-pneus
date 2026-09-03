@@ -87,7 +87,7 @@
 - **Apertar Deploy** (main pushado) e conferir DE FORA: `?v=20260712-botui1` no ar.
 - Validar ao vivo: abas da tela do Bot + card 48h com movimento real.
 - Lixo local untracked da sessão GPT: `painel/public/bot-demanda-mock*.html` (8 arquivos),
-  `dashboard.html` na RAIZ, `proposta-layout-2026-06/`, `assets/` — não vão pro deploy,
+  o antigo `dashboard.html`, a proposta visual e os assets de geração — não iam para o deploy e foram arquivados no Portão 7,
   mas sujam o repo; faxina quando o dono quiser.
 - Recado dado ao dono: trabalho de outra LLM direto no main sem prova = os fiscais
   seguram, mas só se alguém RODAR. Combinado de sempre: prova antes do push.

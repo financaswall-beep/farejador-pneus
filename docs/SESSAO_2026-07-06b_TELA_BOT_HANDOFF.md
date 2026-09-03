@@ -107,7 +107,7 @@ EXISTIA no banco** (`stage_reached` + `loss_reason`, recalculados por conversa a
   (medida campeã por região, ticket médio, rota se pagou por destino, fiado por região, comissão
   por região, nota da pesquisa por loja, candidaturas no mapa).
 - Estado inteiro do RJ no mapa (asset atual = RM; expansão quando a Rede crescer).
-- O mapa "batizado" de apresentação segue em `assets/mapa-rj-wallace-batizado.svg` (uso marketing).
+- O mapa "batizado" de apresentação era material de marketing fora do runtime e foi preservado no arquivo local do Portão 7.
 
 ## Pós-deploy (checklist)
 1. Conferir de fora: `?v=20260706-bot1` no HTML do painel em prod.

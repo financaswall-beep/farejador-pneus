@@ -64,7 +64,7 @@ O painel não é só um apoio do bot. Ele passa a ser o painel central da rede d
 | Vendas reais não registradas | Botão "Registrar venda" → `commerce.orders` |
 | Operador não vê o que o bot está achando | Tela Operação ao vivo com slots e draft |
 | Shadow não tem comparação visual | Tela Shadow com pares humano × bot |
-| Métricas ficam no `dashboard.html` estático | Tela Resumo com KPIs dentro do painel |
+| Métricas ficavam em um dashboard estático antigo, arquivado no Portão 7 | Tela Resumo com KPIs dentro do painel |
 | Rede credenciada ainda sem visão central | Tela Rede com apanhado geral, gráfico consolidado, comparativo entre unidades e parceiros clicáveis; clique abre relatório da unidade em tela cheia com cadastro, vendas, compras de pneus, funcionários, despesas extras, lançamentos, saúde da unidade, resultado estimado, estoque local completo e alertas |
 
 ## 2. Decisões arquiteturais (Fase 1)
@@ -102,7 +102,7 @@ Farejador agente/
 | UI | HTML + CSS + JS vanilla — sem React, sem templating |
 | Auth | `ADMIN_AUTH_TOKEN` + `X-Operator-Label` por request |
 | Banco | Mesmo Supabase, schemas próprios pro painel |
-| Gráficos | Chart.js via CDN (igual ao `dashboard.html` atual) |
+| Gráficos | Chart.js via CDN (como no dashboard estático antigo) |
 
 ### 2.3 Regra de ouro — quem escreve onde
 

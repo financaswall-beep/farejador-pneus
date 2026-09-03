@@ -184,7 +184,7 @@ Não precisa de servidor. Todos os scripts (Tailwind, Alpine, Lucide, Chart.js) 
 | Estilo | Tailwind CSS via CDN | Sem build step |
 | Interatividade | Alpine.js via CDN | Mais leve que React/Vue para 4 telas |
 | Ícones | Lucide via CDN | Conjunto consistente, dark+light ready |
-| Gráficos | Chart.js via CDN | Já em uso no `dashboard.html` antigo |
+| Gráficos | Chart.js via CDN | Herdado do dashboard estático arquivado no Portão 7 |
 | Tipografia | Inter via Google Fonts | Padrão SaaS moderno |
 | Tema | Light mode (Estimade-style) | Decisão de design 2026-05-18 |
 | Cor brand | Laranja `#f97316` | Vibe loja de pneu / motociclismo |
