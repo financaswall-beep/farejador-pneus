@@ -417,10 +417,10 @@ Zona: 🟡 amarela meio-alto (limite vermelho = 5.500). **Restam 597 tokens de f
 | script | uso |
 |---|---|
 | `scripts/aplicar-0048.cjs` | aplica migration 0048 com smoke tests |
-| `scripts/checar-geo-frete.cjs`, `debug-fonseca.cjs` | debug do calcularFrete |
+| Ferramentas one-off de geo/frete | debug histórico do `calcularFrete`; aposentadas no Portão 7 |
 | `scripts/testar-todas-cidades.cjs` | confirmar 15/15 cidades batem após unaccent |
 | `scripts/checar-itens-conv.cjs` | inspecionar session_items/cart/draft de uma conv |
-| `scripts/checar-uso-analytics.cjs` | uso real das tabelas analytics (confirmou que 4 das 6 estão vazias) |
+| Auditoria histórica de uso do analytics | confirmou na época que 4 das 6 tabelas estavam vazias; ferramenta aposentada no Portão 7 porque o schema mudou |
 | `scripts/descrever-analytics.cjs` | listar colunas das analytics |
 | `scripts/checar-self-correction.cjs` | query nos events de self-correction |
 | `scripts/medir-prompts.cjs` | tamanho atual dos 3 prompts |
@@ -730,7 +730,7 @@ Outra regra inventada: "add_to_cart só vale com record_offer ativa ou tool no t
 
 ## Auditoria universal — 351 queries testadas
 
-Script: `scripts/auditar-resolve-todas-motos.cjs`
+Prova histórica executada com uma ferramenta one-off aposentada no Portão 7.
 
 Pra cada `model` distinto + cada alias popular, simula `resolve_vehicle_model(query, NULL)` e categoriza pelo número de resultados + comparação de fitments.
 
@@ -805,9 +805,9 @@ Guard rail do teste subiu de 20k → 21k chars com histórico documentado.
 | `scripts/fix-fan-alias.cjs` | Aplica alias Fan na CG 160 (dry-run/commit). Já rodado em prod. |
 | `scripts/debug-cg160-fitments.cjs` | Debug que descobriu o bug do `'both'`. |
 | `scripts/diag-rationale-599.cjs` | Tentativa de pegar rationale antes da Migration 0049 (descobriu que não era persistido). |
-| `scripts/audit-aliases-multigeracao.cjs` | Procura aliases genéricos cobrindo só uma geração. |
+| Auditoria one-off de aliases multigeração | Procurou aliases genéricos cobrindo só uma geração; aposentada no Portão 7. |
 | `scripts/testar-resolves-suspeitos.cjs` | Testa resolve_vehicle_model em casos típicos. |
-| `scripts/auditar-resolve-todas-motos.cjs` | **Auditoria universal de 351 queries — categoriza A/B/C/D/sem-fitment.** |
+| Auditoria universal one-off | **351 queries — categoriza A/B/C/D/sem-fitment; aposentada no Portão 7.** |
 | `scripts/planner-rationales-600.cjs` | Extrai rationale do Planner por turn de uma conv. |
 
 ## Assinatura — janela 4

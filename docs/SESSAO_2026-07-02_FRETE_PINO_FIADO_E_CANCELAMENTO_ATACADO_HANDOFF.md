@@ -146,8 +146,9 @@ WHOLESALE_STOCK_DECREMENT=true npx tsx --env-file=.env.pooler scripts/prova-vend
 npx tsx --env-file=.env.pooler scripts/prova-fornecedores-test.ts        # 10/10
 ```
 Preview do painel com fiado ligado: launch config **`matriz-fiado-4211`** (porta 4211,
-`.env.pooler` = test + `WHOLESALE_FINANCE=true`). Ler última conversa de prod:
-`node --env-file=.env.preview.pooler scripts/ver-ultima-conversa-wpp.cjs` (local, untracked).
+`.env.pooler` = test + `WHOLESALE_FINANCE=true`). A ferramenta local que imprimia a última
+conversa de produção foi aposentada no Portão 7 por minimização de dados; use auditoria por
+identificador e campos mínimos quando uma investigação semelhante for necessária.
 
 ## 6. Estado do git / o que falta (ordem)
 

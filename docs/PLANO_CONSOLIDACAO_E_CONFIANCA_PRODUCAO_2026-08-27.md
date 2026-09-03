@@ -1140,6 +1140,21 @@ históricos sem referência rastreada. O inventário local agora contém 40 scri
 todos classificados como leitura, laboratório ou geração; 12 ainda são citados
 por documentos e aguardam decisão individual.
 
+Em 02/09/2026, a subetapa de scripts foi concluída. Cinco ferramentas atuais
+foram oficializadas: auditoria da Logística, cobertura da Rede, gate de raio de
+produção, descrição do schema `analytics` e prova externa do Google Maps. As
+quatro ferramentas de banco agora exigem ambiente explícito e usam transação
+somente leitura; a prova do Google exige confirmação específica porque consome
+API externa. Sete sondas históricas citadas foram aposentadas e suas referências
+foram convertidas em registro histórico. Os outros 34 arquivos locais também
+foram arquivados com SHA-256, incluindo seis scripts sensíveis que estavam
+ocultos pelo `.gitignore` (reset de senha, criação de acesso e seed em produção).
+Ao final, não restou script solto em `scripts/`: todo arquivo dessa pasta passou
+a ser rastreado e revisado. Nenhum script aposentado foi executado, nenhum banco
+foi acessado e nenhuma migration foi alterada.
+Validação final da subetapa: build aprovado, 9 testes específicos das travas e
+suíte completa com 303 arquivos e 1.502 testes aprovados.
+
 A auditoria do legado do parceiro confirmou que ele ainda não pode ser removido.
 `src/parceiro/route.ts` continua servindo `parceiro/public/` nas rotas visuais
 `/parceiro/:slug/`, incluindo JavaScript, CSS, assets, vendor e service worker.

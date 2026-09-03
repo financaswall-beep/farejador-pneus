@@ -75,7 +75,7 @@ de função), fiscal de tamanho ok, `?v=20260710-rede1`.
 Seeds AUDIT-REDE 100% removidos (3 partner_orders + 1 commission_entry + 1 candidatura, test);
 raio da fake-rede-a restaurado (null); localStorage do preview com alarme=10 (inofensivo).
 Preview **4228** ficou DE PÉ (porta 4228, matriz-despesas-4228 — regra: não derrubo).
-One-off fora do git: `scripts/checar-rede-prod-readonly.cjs.ts` (roda o código real contra prod, read-only).
+O one-off que executava o painel contra produção era somente leitura e foi aposentado no Portão 7; os resultados desta seção permanecem como evidência histórica.
 
 ## Fila da auditoria (o dono chama a próxima)
 **Resumo · Colaboradores** (Vendas/Compras/Estoque/Logística/Financeiro/Rede fechadas).

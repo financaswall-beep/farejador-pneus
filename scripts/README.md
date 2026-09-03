@@ -41,3 +41,17 @@ informada por `PARTNER_NEW_PASSWORD` para não aparecer na linha de comando.
 
 `smoke-0094.cjs` recusa execução sem `FAREJADOR_ENV=test` e executa toda a prova
 dentro de uma transação revertida ao final.
+
+## Auditorias somente leitura
+
+As auditorias rastreadas exigem `FAREJADOR_ENV=prod|test`, `DATABASE_URL` e abrem
+uma transação `READ ONLY` quando consultam dados. Nenhuma delas presume produção.
+
+- `auditar-logistica-prod-readonly.cjs`: consistência ponta a ponta da logística;
+- `checar-cobertura-rede.cjs`: unidades, cobertura e resolução de bairros;
+- `checar-raio-prod.cjs`: gate específico dos raios ativos em produção;
+- `descrever-analytics.cjs`: estrutura atual do schema `analytics`.
+
+`testar-geocode.cjs` chama Google Geocoding e Distance Matrix e pode consumir
+cota. Além do ambiente explícito, exige
+`ALLOW_EXTERNAL_GEOCODE_PROBE=google-maps`.

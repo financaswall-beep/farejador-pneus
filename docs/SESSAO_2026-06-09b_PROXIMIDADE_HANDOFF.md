@@ -95,7 +95,7 @@ A decisão de "qual loja" é **código determinístico** (mede distância + esto
 - **Comportamento de bot se garante por CÓDIGO, não por prompt** (o nudge determinístico foi o que resolveu o pino, depois de 2 deploys de prompt falharem).
 - **Fix do pino ≠ fix do muro da cidade** — são problemas diferentes. O pino já funciona; o muro (Caxias) AINDA bloqueia.
 - Rings: retirada [5,10,15] km, entrega [10,20,30,40] km. Banda mais perto ganha; régua reveza dentro da banda.
-- Chave do Google só no Coolify (não no `.env` local) → reverse-geocode/distância de rua não roda local; testar AO VIVO ou com `scripts/testar-geocode.cjs` (pode dar REQUEST_DENIED local se a chave for restrita por IP).
+- Chave do Google só no Coolify (não no `.env` local) → reverse-geocode/distância de rua não roda local; testar AO VIVO ou, com autorização de consumo de cota, usar `FAREJADOR_ENV=test ALLOW_EXTERNAL_GEOCODE_PROBE=google-maps node --env-file=.env scripts/testar-geocode.cjs` (pode dar `REQUEST_DENIED` local se a chave for restrita por IP).
 - `checar-naoregressao` roda SEM `--env-file` (o `.env` tem FAREJADOR_ENV=test → falso "regressão").
 
 — Sessão 2026-06-09b, orquestrador (Claude Opus 4.8) + dono (Wallace).

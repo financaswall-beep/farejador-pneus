@@ -17,6 +17,37 @@ function runScript(script: string, args: string[], env: Record<string, string>) 
 }
 
 describe('travas dos scripts operacionais', () => {
+  it.each([
+    'scripts/auditar-logistica-prod-readonly.cjs',
+    'scripts/checar-cobertura-rede.cjs',
+    'scripts/descrever-analytics.cjs',
+  ])('bloqueia auditoria sem ambiente explícito: %s', (script) => {
+    const result = runScript(script, [], { FAREJADOR_ENV: '' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('FAREJADOR_ENV deve ser informado explicitamente');
+  });
+
+  it('bloqueia o gate de raio fora de produção explícita', () => {
+    const result = runScript('scripts/checar-raio-prod.cjs', [], {
+      FAREJADOR_ENV: 'test',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('este gate exige FAREJADOR_ENV=prod');
+  });
+
+  it('bloqueia teste externo do Google sem confirmação específica', () => {
+    const result = runScript('scripts/testar-geocode.cjs', [], {
+      FAREJADOR_ENV: 'test',
+      GOOGLE_MAPS_API_KEY: 'chave-nao-usada',
+      ALLOW_EXTERNAL_GEOCODE_PROBE: '',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('ALLOW_EXTERNAL_GEOCODE_PROBE=google-maps');
+  });
+
   it('bloqueia commit de migration em produção sem autorização específica', () => {
     const result = runScript(
       'scripts/apply-migration-file.cjs',

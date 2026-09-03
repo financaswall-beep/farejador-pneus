@@ -62,7 +62,7 @@ A **busca** ("tem o pneu?") e a **localização da loja** usam o MESMO motor →
 ---
 
 ## 4. O bot consulta o banco do PARCEIRO? SIM.
-O bot lê `commerce.partner_stock_levels` (a **tabela do parceiro**) ao vivo em 4 funções (`fulfillment.ts`: `mapProductToPartnerStock`, `getPartnerStockMap`, `resolveProductAvailabilityByProximity`, `getUnitMapsUrl`). Todas respeitam `deleted_at` (apagado) + reserva. Provado por `scripts/checar-estoque-9018.cjs` (coluna `bot_ve`): Madureira apagada → bot vê 0; Méier com reserva → bot vê on_hand − reservado. É **o mesmo que o painel do parceiro mostra**.
+O bot lê `commerce.partner_stock_levels` (a **tabela do parceiro**) ao vivo em 4 funções (`fulfillment.ts`: `mapProductToPartnerStock`, `getPartnerStockMap`, `resolveProductAvailabilityByProximity`, `getUnitMapsUrl`). Todas respeitam `deleted_at` (apagado) + reserva. A prova histórica do produto 90/90-18 confirmou: Madureira apagada → bot vê 0; Méier com reserva → bot vê `on_hand − reservado`. É **o mesmo que o painel do parceiro mostra**. A ferramenta específica usada nessa prova foi aposentada no Portão 7.
 
 ---
 
@@ -74,7 +74,7 @@ O bot lê `commerce.partner_stock_levels` (a **tabela do parceiro**) ao vivo em 
    - Cachambi + retirar → **Méier** (faixa mais perto), confiável (memória de produto).
    - Penha + retirar → **revezamento** Méier/Tijuca (mesma faixa); feche um pedido e veja virar pro outro.
    - Apagar o pneu da loja perto pelo painel → bot anda pra a próxima que tem (respeita `deleted_at`).
-- Conferir estado: `node --env-file=.env scripts/checar-estoque-9018.cjs`.
+- Para nova conferência, usar a suíte atual de estoque/roteamento; não reutilizar a sonda específica de 90/90-18.
 
 ---
 

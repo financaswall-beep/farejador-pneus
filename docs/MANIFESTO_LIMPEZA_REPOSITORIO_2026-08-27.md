@@ -73,7 +73,7 @@ Também pertencem ao sistema, embora não sejam copiados para a imagem final:
 | `painel/` (191 rastreados) | Interface ativa | Manter; revisar apenas 13 mockups não rastreados |
 | `parceiro/` (65 rastreados) | Legado ainda ativo | Não apagar até concluir migração e canário |
 | `tests/` (376 rastreados) | Qualidade e segurança | Manter |
-| `scripts/` (130 rastreados) | Ferramentas oficiais | Manter; consolidar depois |
+| `scripts/` (135 rastreados após o Lote 3) | Ferramentas oficiais | Manter; consolidação concluída |
 | `docs/` (198 rastreados) | Histórico e operação | Manter; arquivar handoffs antigos em uma pasta própria |
 | `segments/`, `styles/`, `SECOES/` | Configuração e referência | Manter |
 | `dist/` — 4,32 MB | Build gerado | Pode apagar localmente; `npm run build` recria |
@@ -188,9 +188,9 @@ Antes, esses itens não entravam na imagem final, mas ainda podiam viajar no con
 - [x] proteger o runner canônico de migrations em produção;
 - [x] provar as travas com 4 testes dedicados e a suíte completa de 1.497 testes;
 - [x] classificar e arquivar os 13 restantes que casavam com padrões de gravação;
-- [ ] revisar os 40 scripts locais restantes, todos classificados como leitura,
-  laboratório ou geração de artefato;
-- [ ] manter somente instaladores e auditores canônicos;
+- [x] revisar os 40 scripts locais restantes e seis arquivos sensíveis antes
+  ocultos pelo `.gitignore`;
+- [x] manter somente instaladores e auditores canônicos;
 - [x] remover referências rastreadas aos 11 scripts aposentados.
 
 A suíte de manifesto detectou inclusive uma mudança de comentário na migration
@@ -198,9 +198,14 @@ A suíte de manifesto detectou inclusive uma mudança de comentário na migratio
 arquivo-túmulo seguro passou a ocupar o caminho do aplicador antigo. Nenhuma
 migration histórica foi modificada neste lote.
 
-Depois desta revisão, o scanner não encontra script local não rastreado com
-padrão de gravação. Restam 40 ferramentas de leitura, laboratório ou geração;
-12 ainda são citadas por documentos e serão decididas individualmente.
+Em 02/09/2026, cinco ferramentas foram oficializadas com ambiente explícito,
+leitura transacional e confirmação para consumo de API externa. Sete sondas
+referenciadas e 34 arquivos locais sem função operacional foram arquivados sem
+execução, com SHA-256. Esse segundo grupo inclui seis ferramentas sensíveis que
+estavam ocultas por padrões do `.gitignore`. Ao final do lote, todos os arquivos
+presentes em `scripts/` são rastreados; não há script local solto ou executável
+perigoso fora da revisão.
+O build e os 1.502 testes da suíte completa passaram após a consolidação.
 
 ### Lote 4 — backups e segredos
 
