@@ -1066,7 +1066,7 @@ Também devem ser mantidas as provas existentes de paridade, colisão Alpine, ro
 
 **Objetivo:** remover dívida sem apagar provas ou ferramentas úteis.
 
-**Estado:** IMPLEMENTAÇÃO CONCLUÍDA; aguarda deploy e smoke final em produção.
+**Estado:** CONCLUÍDO E APROVADO.
 
 ### Registro de início — 01/09/2026
 
@@ -1192,6 +1192,16 @@ automatizado do navegador não conseguiu se conectar por uma falha interna do
 ambiente Codex antes de abrir a página, portanto a conferência visual em produção
 continua sendo a última condição para encerrar formalmente este portão. Não há
 migration nesta entrega.
+
+Fechamento em produção: o commit `360c7cc81188e45668bee476607b8211b82f4a5a`
+foi publicado com build e rolling update concluídos. `/livez`, `/healthz` e
+`/admin/painel` responderam HTTP 200; o SHA informado pelo runtime correspondeu
+ao implantado; banco principal, schema, banco do parceiro e continuidade
+operacional responderam sem estado crítico. O HTML publicado foi comparado com
+o commit e continha as três correções de inicialização. Após login, o proprietário
+confirmou manualmente o funcionamento das telas. Permanecem registrados, sem
+bloquear este portão, os avisos operacionais `partition_job_not_observed` e
+`chatwoot_ingestion_stale`, que devem ser tratados no acompanhamento de operação.
 
 ### Classificação obrigatória
 
