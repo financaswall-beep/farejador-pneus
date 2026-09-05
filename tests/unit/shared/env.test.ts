@@ -20,6 +20,14 @@ beforeAll(async () => {
 });
 
 describe('environment security validation', () => {
+  it('limita o orçamento de saída do bot sem mudar o modelo default ou ativar o worker', () => {
+    expect(parseEnv(baseEnv)).toMatchObject({ AGENT_V2_MAX_OUTPUT_TOKENS: 8192,
+      OPENAI_MODEL: 'gpt-4o-mini', AGENT_V2_WORKER_ENABLED: false });
+    expect(parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: '4096' }).AGENT_V2_MAX_OUTPUT_TOKENS).toBe(4096);
+    for (const value of ['0', 'abc', '32769', '2048.5']) {
+      expect(() => parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: value })).toThrow();
+    }
+  });
   it('rejects short production secrets', () => {
     expect(() => parseEnv({
       ...baseEnv,

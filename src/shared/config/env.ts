@@ -57,6 +57,8 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
+  // Inclui reasoning + texto/ferramentas na Responses API; exclusivo do bot.
+  AGENT_V2_MAX_OUTPUT_TOKENS: z.string().transform(Number).pipe(z.number().int().min(1024).max(32768)).default('8192'),
   // ETAPA 8 — Outbox resiliente do Bot/Chatwoot. Default OFF: nenhuma resposta
   // automática sai para o Chatwoot; o Agent V2 pode gerar rascunhos em sombra.
   // Com ON, a resposta do bot nasce

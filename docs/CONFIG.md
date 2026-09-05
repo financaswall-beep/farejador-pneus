@@ -26,9 +26,10 @@ com validacao Zod, exceto overrides explicitamente documentados como
 | `SKIP_EVENT_TYPES` | nao | Lista CSV de `event_type` a marcar como `skipped` na normalizacao. `raw.raw_events` continua gravado. | `message_updated` |
 | `SIGNAL_TIMEZONE` | nao | Timezone IANA usado por sinais deterministicos. Default `America/Sao_Paulo`. | `America/Sao_Paulo` |
 | `ORGANIZADORA_ENABLED` | nao | Liga a Organizadora LLM em background. Default `false`. | `true` |
-| `OPENAI_API_KEY` | se Organizadora ligada | Chave OpenAI usada pela Organizadora. | `sk-...` |
-| `OPENAI_MODEL` | nao | Modelo da Organizadora. Default `gpt-4o-mini`; prod pode sobrescrever. | `gpt-5.4` |
-| `OPENAI_TIMEOUT_MS` | nao | Timeout da chamada OpenAI da Organizadora. Default `30000`. | `30000` |
+| `OPENAI_API_KEY` | se Agent V2 ligado | Chave OpenAI do bot e dos consumidores existentes. Manter no gerenciador de segredos. | `<secret>` |
+| `OPENAI_MODEL` | nao | Modelo compartilhado pelo Agent V2 e leitores de comprovantes. Default `gpt-4o-mini`; prod pode sobrescrever. Agent V2 usa Responses API. | `gpt-5.6-sol` |
+| `OPENAI_TIMEOUT_MS` | nao | Timeout por tentativa OpenAI, incluindo leitura do corpo no Agent V2. Default `30000`. | `30000` |
+| `AGENT_V2_MAX_OUTPUT_TOKENS` | nao | Teto por chamada do bot (reasoning + resposta/ferramentas). Default `8192`, intervalo `1024–32768`. Não altera leitores de comprovantes. | `8192` |
 | `ORGANIZADORA_DEBOUNCE_SECONDS` | nao | Espera apos a ultima mensagem antes de organizar. Default `90`. | `90` |
 | `ORGANIZADORA_POLL_INTERVAL_MS` | nao | Intervalo de polling do worker da Organizadora. Default `5000`. | `5000` |
 | `ORGANIZADORA_MIN_CONFIDENCE` | nao | Confidence minima para salvar fato extraido pela Organizadora. Default `0.55`. | `0.55` |

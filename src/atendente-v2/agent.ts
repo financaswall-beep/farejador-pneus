@@ -13,19 +13,15 @@ import { buildLocationReplyNudge } from './location-nudge.js';
 import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
-import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
+import type { AgentV2JobInput, ChatMessage } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { loadLastAcceptedAgentText } from './turn-guards.js';
 import { isPlaceholderCustomerName } from '../shared/customer-name.js';
 import { botMayProcessTrigger } from './conversation-control.js';
+import { createOpenAIResponsesTurn } from './openai-responses.js';
 
 const MAX_TOOL_ROUNDS = 5;
-const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
-
-// Numero maximo de tentativas para a chamada OpenAI quando der AbortError
-// (timeout). 1 retry resolve ~90% dos casos de timeout esporadico do reasoning.
-const OPENAI_RETRY_ON_TIMEOUT = 1;
 
 /**
  * Le contexto do cliente (nome do Chatwoot, recorrente, total de pedidos, LTV).
@@ -213,6 +209,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     ];
 
     // 3. LLM loop with function calling
+    const modelTurn = createOpenAIResponsesTurn(messages, activeToolDefinitions());
     let inputTokens = 0;
     let outputTokens = 0;
     let cachedTokens = 0;
@@ -222,7 +219,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!await mayContinue()) return;
-      const response = await callOpenAIWithTools(messages);
+      const response = await modelTurn.next();
       if (!await mayContinue()) return;
       inputTokens += response.inputTokens;
       outputTokens += response.outputTokens;
@@ -239,7 +236,6 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         content: null,
         tool_calls: response.tool_calls,
       };
-      messages.push(assistantToolMsg);
       turnActions.push(assistantToolMsg);
 
       // Execute all tool calls in parallel (reads only) or serial (writes)
@@ -270,14 +266,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
         }
         const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: result };
-        messages.push(toolMsg);
+        modelTurn.appendToolResult(toolCall.id, result);
         turnActions.push(toolMsg);
       }
     }
 
     if (!finalText || finalText.trim().length === 0) {
-      logger.warn({ ...logCtx, rounds: MAX_TOOL_ROUNDS, finalText }, 'agent_v2: LLM retornou vazio, nao envia ao Chatwoot');
-      return;
+      throw new Error('OpenAI response validation failed: tool round limit reached without final answer');
     }
 
     // 4. Send to Chatwoot (strip quick-reply markers from sent text, keep them for reference)
@@ -356,122 +351,4 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   } finally {
     client.release();
   }
-}
-
-// ─── OpenAI Chat Completions with tools ───────────────────────────────────
-
-interface OpenAIChoice {
-  message: {
-    content: string | null;
-    tool_calls?: ToolCall[];
-  };
-  finish_reason: string;
-}
-
-interface OpenAIResponse {
-  choices: OpenAIChoice[];
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    // Tokens reaproveitados do cache automatico da OpenAI.
-    // Modelos gpt-5.5+ usam TTL 24h por padrao; modelos antigos 5-10min.
-    // Desconto: ate 90% no token cacheado ($0.50/M vs $5/M no gpt-5.5).
-    prompt_tokens_details?: { cached_tokens?: number };
-  };
-  durationMs: number;
-}
-
-async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
-  type: 'text' | 'tool_calls';
-  content?: string;
-  tool_calls?: ToolCall[];
-  inputTokens: number;
-  outputTokens: number;
-  cachedTokens: number;
-}> {
-  const apiKey = env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
-
-  const body = JSON.stringify({
-    model: env.OPENAI_MODEL,
-    messages,
-    tools: activeToolDefinitions(),
-    tool_choice: 'auto',
-    max_completion_tokens: 1000,
-    // Garante TTL de 24h no prompt caching. gpt-5.5+ ja usa 24h por
-    // default, mas explicito > implicito. Pra modelos mais antigos
-    // (gpt-4o etc) isso forca 24h em vez do default 5-10min.
-    prompt_cache_retention: '24h',
-  });
-
-  // Retry com backoff: tenta ate OPENAI_RETRY_ON_TIMEOUT + 1 vezes total
-  // quando der AbortError (timeout) ou erro 5xx transiente da OpenAI.
-  let response: Response | null = null;
-  let lastErr: unknown = null;
-  const start = Date.now();
-
-  for (let attempt = 0; attempt <= OPENAI_RETRY_ON_TIMEOUT; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), env.OPENAI_TIMEOUT_MS);
-
-    try {
-      response = await fetch(OPENAI_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      // Retry em 5xx transientes (502/503/504 da OpenAI overload)
-      if (response.status >= 500 && response.status < 600 && attempt < OPENAI_RETRY_ON_TIMEOUT) {
-        logger.warn({ status: response.status, attempt: attempt + 1 }, 'agent_v2: OpenAI 5xx, retrying');
-        const backoffMs = 1000 * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, backoffMs));
-        continue;
-      }
-      break; // sucesso (ou erro nao-retryavel)
-    } catch (err) {
-      clearTimeout(timer);
-      lastErr = err;
-      const isAbort = err instanceof Error &&
-        (err.name === 'AbortError' || err.message.includes('aborted'));
-
-      if (isAbort && attempt < OPENAI_RETRY_ON_TIMEOUT) {
-        logger.warn({ attempt: attempt + 1, timeoutMs: env.OPENAI_TIMEOUT_MS }, 'agent_v2: OpenAI timeout, retrying');
-        const backoffMs = 1000 * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, backoffMs));
-        continue;
-      }
-      throw err; // propaga erro nao-retryavel ou apos esgotar retries
-    }
-  }
-
-  if (!response) {
-    throw lastErr instanceof Error ? lastErr : new Error('OpenAI: no response after retries');
-  }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`OpenAI error ${response.status}: ${text.slice(0, 300)}`);
-  }
-
-  const json = await response.json() as OpenAIResponse;
-  json.durationMs = Date.now() - start;
-
-  const choice = json.choices[0];
-  if (!choice) throw new Error('OpenAI: empty choices');
-
-  const inputTokens = json.usage?.prompt_tokens ?? 0;
-  const outputTokens = json.usage?.completion_tokens ?? 0;
-  const cachedTokens = json.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-
-  if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls?.length) {
-    return { type: 'tool_calls', tool_calls: choice.message.tool_calls, inputTokens, outputTokens, cachedTokens };
-  }
-
-  return { type: 'text', content: choice.message.content ?? '', inputTokens, outputTokens, cachedTokens };
 }
