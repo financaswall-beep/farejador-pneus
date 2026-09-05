@@ -22,6 +22,8 @@ export async function enqueueAccessoryText(
      SELECT $1,c.id,$2,$3,$4,$5,$6,'pending'
       FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
+        AND NOT EXISTS (SELECT 1 FROM ops.conversation_bot_control bc
+          WHERE bc.environment=c.environment AND bc.conversation_id=c.id AND bc.mode='human')
         AND ($7::boolean OR c.id::text = ANY($8::text[]))
      ON CONFLICT (environment,echo_id) WHERE echo_id IS NOT NULL DO NOTHING`,
     [input.environment, input.chatwootConversationId, input.idempotencyKey,
@@ -45,6 +47,8 @@ export async function enqueuePhotoAttachment(
      SELECT $1,c.id,$2,$3,'photo_attachment',$4,$5,'pending'
       FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
+        AND NOT EXISTS (SELECT 1 FROM ops.conversation_bot_control bc
+          WHERE bc.environment=c.environment AND bc.conversation_id=c.id AND bc.mode='human')
         AND ($6::boolean OR c.id::text = ANY($7::text[]))
      ON CONFLICT (environment,echo_id) WHERE echo_id IS NOT NULL DO NOTHING`,
     [input.environment, input.chatwootConversationId,

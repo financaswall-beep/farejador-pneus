@@ -24,7 +24,7 @@ export async function deliverOutboundRow(
     buffer: photo.photo_bytes,
     filename: `pneu-${parsed.photo_request_id.slice(0, 8)}.jpg`,
     contentType: photo.photo_mime,
-  }, parsed.caption);
+  }, parsed.caption, row.echo_id ?? undefined);
 }
 
 export async function markPhotoRequestSent(

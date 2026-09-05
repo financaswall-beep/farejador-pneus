@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { recordOutboundEvent } from './outbound-events.js';
+import { botMayProcessTrigger } from './conversation-control.js';
 
 export interface AgentTextOutboxInput {
   environment: Environment;
@@ -57,6 +58,9 @@ export async function sendAgentTextWithOutbox(
   client: PoolClient,
   input: AgentTextOutboxInput,
 ): Promise<AgentTextOutboxResult> {
+  if (!await botMayProcessTrigger(client,input.environment,input.conversationId,input.triggerMessageId)) {
+    return { status:'superseded' };
+  }
   const newerMessageId = await hasNewerCustomerMessageAfterTrigger(
     client, input.environment, input.conversationId, input.triggerMessageId,
   );
@@ -128,7 +132,7 @@ export async function sendAgentTextWithOutbox(
          job_id=EXCLUDED.job_id, body=EXCLUDED.body, body_sha256=EXCLUDED.body_sha256,
          echo_id=EXCLUDED.echo_id,
          status=CASE WHEN ops.outbound_messages.status IN
-           ('sending','sent_api_ack','delivered','dead_letter')
+           ('sending','sent_api_ack','delivered','dead_letter','superseded')
            THEN ops.outbound_messages.status ELSE 'pending' END,
          updated_at=now()
        RETURNING id,status,provider_message_id`,
@@ -141,7 +145,7 @@ export async function sendAgentTextWithOutbox(
       toStatus: 'pending', reason: 'agent_draft_queued',
     });
     await client.query('COMMIT');
-    return { status: ['sent_api_ack', 'delivered'].includes(row.status)
+    return { status: row.status==='superseded' ? 'superseded' : ['sent_api_ack', 'delivered'].includes(row.status)
       ? 'already_sent' : 'queued', turnId, outboundId: row.id,
       chatwootMessageId: row.provider_message_id == null ? null : Number(row.provider_message_id) };
   } catch (error) {

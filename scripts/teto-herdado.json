@@ -15,7 +15,6 @@
     "src/admin/painel/matriz-ledger-purchases.ts": 341,
     "src/admin/painel/queries-fornecedores-registro.ts": 435,
     "src/parceiro/auth.ts": 349,
-    "src/normalization/dispatcher.ts": 327,
     "src/normalization/partner-chat.fanout.ts": 326,
     "painel/public/app.compras.acoes.js": 363,
     "painel/public/app.compras.js": 346

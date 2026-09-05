@@ -184,7 +184,10 @@ export class ChatwootApiClient {
       content_type: 'text',
       private: false,
     };
-    if (echoId) payload.echo_id = echoId;
+    if (echoId) {
+      payload.echo_id = echoId;
+      payload.content_attributes = { farejador_echo_id:echoId };
+    }
 
     const body = await this.requestPost(url, payload);
     const id = (body as { id?: unknown } | null)?.id;

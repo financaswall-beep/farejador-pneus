@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { networkMunicipalityNameSchema } from '../network/municipality-schema.js';
 import { requirePartnerAuth, requireOwner, requireScreen, requireAnyScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
+import { bearerFrom } from './request-token.js';
 import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
 import {
   centMoneySchema, partnerPurchaseSchema, sixDecimalCostSchema,
@@ -138,15 +139,6 @@ import { registerPartnerSimpleFinanceRoute } from './route-simple-finance.js';
 import { savePartnerOperationCommissionRule } from './operation-team.js';
 import { isLegacyPartnerMobile } from './legacy-mobile.js';
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
-
-// Extrai o bearer cru (Authorization: Bearer … ou x-partner-token). Usado pra
-// distinguir token de sessão (ps_) de token de acesso cru no set-credentials/logout.
-function bearerFrom(request: { headers: Record<string, unknown> }): string {
-  const auth = request.headers.authorization;
-  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim();
-  const x = request.headers['x-partner-token'];
-  return typeof x === 'string' ? x.trim() : '';
-}
 
 const paramsSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),

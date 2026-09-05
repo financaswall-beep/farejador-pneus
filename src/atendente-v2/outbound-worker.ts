@@ -11,6 +11,8 @@ import { reconcileAckAlreadyInCore, reconcilePendingAcksFromCore } from './outbo
 import { recordOutboundEvent } from './outbound-events.js';
 import { deliverOutboundRow, markPhotoRequestSent } from './outbound-delivery.js';
 import { hasAgentV2Wildcard } from './conversation-scope.js';
+import { lockBotConversation } from './conversation-control.js';
+import { prepareControlledOutbound } from './outbound-control.js';
 
 const WORKER_ID = `bot-outbox-${randomUUID().slice(0, 8)}`;
 const POLL_MS = 2_000;
@@ -191,13 +193,14 @@ export async function markOutboundFailure(
   const ambiguous = error instanceof ChatwootApiError && error.status === null;
   const retry = !ambiguous && failure.retryable && row.attempts < MAX_ATENDENTE_RETRY_ATTEMPTS;
   if (retry) {
-    await client.query(
+    const updated = await client.query(
       `UPDATE ops.outbound_messages SET status='failed',not_before=now()+($2||' seconds')::interval,
        locked_at=NULL,locked_by=NULL,last_error_code=$3,last_error_kind=$4,
-       last_error_summary=$5,updated_at=now() WHERE id=$1`,
+       last_error_summary=$5,updated_at=now() WHERE id=$1 AND status='sending'`,
       [row.id, String(retryBackoffSeconds(row.attempts + 1)), failure.code,
         failure.kind, failure.summary],
     );
+    if (updated.rowCount===0) return; // Pausa concorrente já cancelou esta tentativa.
     await recordOutboundEvent(client, { environment: row.environment, outboundId: row.id,
       attempt: row.attempts, fromStatus: 'sending', toStatus: 'failed',
       reason: 'automatic_retry', errorCode: failure.code, errorKind: failure.kind,
@@ -206,11 +209,12 @@ export async function markOutboundFailure(
   }
   const code = ambiguous ? 'delivery_unknown' : failure.code;
   const kind = ambiguous ? 'ambiguous' : failure.kind;
-  await client.query(
+  const updated = await client.query(
     `UPDATE ops.outbound_messages SET status='dead_letter',locked_at=NULL,locked_by=NULL,
-       last_error_code=$2,last_error_kind=$3,last_error_summary=$4,updated_at=now() WHERE id=$1`,
+       last_error_code=$2,last_error_kind=$3,last_error_summary=$4,updated_at=now() WHERE id=$1 AND status='sending'`,
     [row.id, code, kind, failure.summary],
   );
+  if (updated.rowCount===0) return;
   await openOutboundDeadLetter(client, row,
     ambiguous ? 'delivery_unknown_requires_human' : 'outbound_retry_exhausted',
     code, kind, failure.summary);
@@ -237,13 +241,15 @@ export async function pollBotOutbox(): Promise<void> {
     row = await pickOutboundMessage(client, env.FAREJADOR_ENV);
     await client.query('COMMIT');
     if (!row) return;
+    await client.query('BEGIN');
+    await lockBotConversation(client,row.environment,row.conversation_id);
+    if (!await prepareControlledOutbound(client,row)) { await client.query('COMMIT'); return; }
     readyToSend = true;
     if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment'].includes(row.kind)) {
       throw new Error(`unsupported outbound kind: ${row.kind}`);
     }
     const sent = await deliverOutboundRow(client, row);
     providerAccepted = true;
-    await client.query('BEGIN');
     await markPhotoRequestSent(client, row);
     await markOutboundAck(client, row, sent.chatwootMessageId);
     await client.query('COMMIT');

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 async function buildRoute() {
   vi.resetModules();
+  vi.doMock('../../../src/admin/painel/route-bot-control.js', () => ({ registerBotControlRoutes:vi.fn() }));
   const getBotMovement = vi.fn().mockResolvedValue({ cards: {}, horarios: [] });
   vi.doMock('../../../src/admin/auth.js', () => ({
     requireAdminAuth: async () => undefined,

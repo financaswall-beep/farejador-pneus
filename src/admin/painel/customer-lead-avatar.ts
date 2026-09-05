@@ -1,9 +1,10 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { readLeadChatwootReference } from './customer-lead-chatwoot-reference.js';
 
 interface AvatarConfig { baseUrl: string; apiToken: string }
-interface ContactRef { contact_id: number; account_id: number }
+interface ContactRef { contact_id: number; account_id: number; conversation_id: number }
 const avatars = new Map<string, { expires: number; value: Promise<string | null> }>();
 
 /** URL fornecida pelo Chatwoot; a imagem é carregada pelo navegador, sem expor o token. */
@@ -24,22 +25,29 @@ export async function getCustomerLeadAvatar(
   fetchFn: typeof fetch = fetch,
 ): Promise<string | null> {
   const result = await dbPool.query<ContactRef>(
-    `SELECT c.chatwoot_contact_id AS contact_id, cv.chatwoot_account_id AS account_id
+    `SELECT c.chatwoot_contact_id AS contact_id, cv.chatwoot_account_id AS account_id,
+            cv.chatwoot_conversation_id AS conversation_id
        FROM core.conversations cv JOIN core.contacts c ON c.id=cv.contact_id AND c.environment=cv.environment
       WHERE cv.id=$1 AND cv.environment=$2 AND cv.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [conversationId, environment],
   );
   const contact = result.rows[0];
   if (!contact) throw new Error('lead_conversation_not_found');
-  if (!config || !Number.isSafeInteger(Number(contact.account_id)) || Number(contact.account_id) <= 0
-    || !Number.isSafeInteger(Number(contact.contact_id)) || Number(contact.contact_id) <= 0) return null;
+  if (!config || !Number.isSafeInteger(Number(contact.contact_id)) || Number(contact.contact_id) <= 0) return null;
   const root = config.baseUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
-  const key = `${environment}:${root}:${contact.account_id}:${contact.contact_id}`;
+  const key = `${environment}:${root}:${contact.account_id}:${contact.contact_id}:${contact.conversation_id}`;
   const cached = avatars.get(key);
   if (cached && cached.expires > Date.now()) return cached.value;
   const value = (async () => {
     try {
-      const response = await fetchFn(`${root}/api/v1/accounts/${contact.account_id}/contacts/${contact.contact_id}`, {
+      const reference = Number.isSafeInteger(Number(contact.conversation_id)) && Number(contact.conversation_id)>0
+        ? await readLeadChatwootReference(dbPool,environment,Number(contact.conversation_id),
+          Number(contact.contact_id),Number(contact.account_id)) : null;
+      const webhookAvatar = safeContactAvatar(reference?.thumbnail,root);
+      if (webhookAvatar) return webhookAvatar;
+      const accountId = Number(contact.account_id)>0 ? Number(contact.account_id) : Number(reference?.account_id);
+      if (!Number.isSafeInteger(accountId) || accountId<=0) return null;
+      const response = await fetchFn(`${root}/api/v1/accounts/${accountId}/contacts/${contact.contact_id}`, {
         headers: { api_access_token: config.apiToken },
         signal: AbortSignal.timeout(4000), redirect: 'error',
       });

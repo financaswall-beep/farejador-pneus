@@ -75,11 +75,12 @@ export async function sendAttachmentOnce(
   chatwootConversationId: number,
   file: { buffer: Buffer; filename: string; contentType: string },
   caption: string,
+  echoId?: string,
 ): Promise<SendMessageResult> {
   if (!env.BOT_OUTBOX) {
     throw new ChatwootApiError('Bot outbox delivery is disabled');
   }
-  return sendAttachmentWithAttempts(chatwootConversationId, file, caption, 1);
+  return sendAttachmentWithAttempts(chatwootConversationId, file, caption, 1, echoId);
 }
 
 async function sendAttachmentWithAttempts(
@@ -87,6 +88,7 @@ async function sendAttachmentWithAttempts(
   file: { buffer: Buffer; filename: string; contentType: string },
   caption: string,
   maxAttempts: number,
+  echoId?: string,
 ): Promise<SendMessageResult> {
   if (!env.CHATWOOT_API_BASE_URL || !env.CHATWOOT_API_TOKEN || !env.CHATWOOT_ACCOUNT_ID) {
     throw new ChatwootApiError('Chatwoot API configuration is missing');
@@ -105,6 +107,10 @@ async function sendAttachmentWithAttempts(
       form.append('content', caption);
       form.append('message_type', 'outgoing');
       form.append('private', 'false');
+      if (echoId) {
+        form.append('echo_id',echoId);
+        form.append('content_attributes',JSON.stringify({ farejador_echo_id:echoId }));
+      }
       form.append(
         'attachments[]',
         new Blob([new Uint8Array(file.buffer)], { type: file.contentType }),

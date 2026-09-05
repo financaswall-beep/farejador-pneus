@@ -19,7 +19,8 @@ export async function upsertConversation(
       $17::jsonb, $18::jsonb, $19::timestamptz
     )
     ON CONFLICT (environment, chatwoot_conversation_id) DO UPDATE
-    SET chatwoot_account_id = EXCLUDED.chatwoot_account_id,
+    SET chatwoot_account_id = CASE WHEN EXCLUDED.chatwoot_account_id > 0
+          THEN EXCLUDED.chatwoot_account_id ELSE core.conversations.chatwoot_account_id END,
         chatwoot_inbox_id = EXCLUDED.chatwoot_inbox_id,
         channel_type = EXCLUDED.channel_type,
         contact_id = EXCLUDED.contact_id,

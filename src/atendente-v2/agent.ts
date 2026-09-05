@@ -18,6 +18,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { loadLastAcceptedAgentText } from './turn-guards.js';
 import { isPlaceholderCustomerName } from '../shared/customer-name.js';
+import { botMayProcessTrigger } from './conversation-control.js';
 
 const MAX_TOOL_ROUNDS = 5;
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -114,7 +115,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const logCtx = { job_id: jobId, conversation_id: conversationId, agent: 'v2' };
 
   const client = await pool.connect();
+  const mayContinue = () => botMayProcessTrigger(client,environment as Environment,conversationId,job.triggerMessageId);
   try {
+    if (!await mayContinue()) return;
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
     const [history, chatwootConvId, customerContext, customerPin] = await Promise.all([
       loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO }),
@@ -135,6 +138,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // cliente respondeu uma NOTA, grava + agradece e PULA o LLM (é resposta de
     // pesquisa, não pergunta). Dormente com a flag off (tryCaptureSurveyReply retorna
     // false na hora). NÃO toca o fluxo normal quando a mensagem não é uma nota.
+    if (!await mayContinue()) return;
     if (env.SATISFACTION_SURVEY) {
       const lastUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? null;
       const captured = await tryCaptureSurveyReply(client, environment as Environment, chatwootConvId, lastUserText);
@@ -217,7 +221,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const turnActions: ChatMessage[] = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (!await mayContinue()) return;
       const response = await callOpenAIWithTools(messages);
+      if (!await mayContinue()) return;
       inputTokens += response.inputTokens;
       outputTokens += response.outputTokens;
       cachedTokens += response.cachedTokens;
@@ -238,6 +244,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
 
       // Execute all tool calls in parallel (reads only) or serial (writes)
       for (const toolCall of response.tool_calls) {
+        if (!await mayContinue()) return;
         let toolArgs: Record<string, unknown> = {};
         try {
           toolArgs = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
@@ -312,6 +319,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       return;
     }
 
+    if (!await mayContinue()) return;
     const sendResult = await sendFinalAgentText(client, {
       jobId,
       conversationId,

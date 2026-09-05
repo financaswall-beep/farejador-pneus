@@ -16,6 +16,10 @@ function createMockClient(): {
 } {
   return {
     query: vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes('SELECT mode,version,resumed_at')) return Promise.resolve({ rows:[{
+        mode:'auto',version:0,resumed_at:null,last_human_at:null,last_human_message_id:null,
+      }] });
+      if (sql.includes('SELECT m.chatwoot_message_id,m.sent_at')) return Promise.resolve({ rows:[] });
       if (sql.includes('ops.enqueue_enrichment_job')) {
         return Promise.resolve({
           rows: [{ enqueue_enrichment_job: 'job-uuid-1' }],

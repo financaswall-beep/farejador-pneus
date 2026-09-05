@@ -185,29 +185,31 @@ export const REQUIRED_SCHEMA_SQL = `
     AND to_regclass('finance.partner_order_refunds') IS NOT NULL
     AND to_regclass('finance.partner_receivables_effective') IS NOT NULL
     AND to_regclass('finance.partner_payables_effective') IS NOT NULL
+    AND to_regclass('ops.conversation_bot_control') IS NOT NULL
+    AND to_regclass('ops.conversation_bot_control_events') IS NOT NULL
     AS ready`;
 
 export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=215
+       AND version>=216
        AND EXISTS (
          SELECT 1 FROM ops.applied_migrations
-          WHERE migration_file='0215_partial_payment_reconciliation_health.sql'
-            AND checksum_sha256='29129803c293f7dbf0f68c37ca7db3514859e6f6b6b47acbb38a37b4d8c0afa6'
+          WHERE migration_file='0216_conversation_bot_control.sql'
+            AND checksum_sha256='10c223869c6283a300b89348caae3cb062d1c55aabf39c00282890bdc34618b4'
        )
-       AND (SELECT count(*) FROM ops.applied_migrations)>=216
+       AND (SELECT count(*) FROM ops.applied_migrations)>=217
   ) AS ready`;
 
-/** Impede o processo novo de operar sem o contrato mínimo e a correção da 0215. */
+/** Impede o processo novo de operar sem a pausa por conversa da 0216. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0215_partial_payment_health');
+    throw new Error('required_schema_missing:0216_conversation_bot_control');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0215_partial_payment_health');
+    throw new Error('required_schema_missing:0216_conversation_bot_control');
   }
 }

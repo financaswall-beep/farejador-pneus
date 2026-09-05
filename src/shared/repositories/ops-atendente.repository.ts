@@ -233,7 +233,7 @@ export async function markAtendenteJobProcessed(
          locked_at     = NULL,
          locked_by     = NULL,
          error_message = NULL
-     WHERE id = $1`,
+     WHERE id = $1 AND status='processing'`,
     [jobId],
   );
 }
@@ -245,9 +245,10 @@ export async function markAtendenteJobFailed(
   resilienceEnabled = false,
 ): Promise<void> {
   const current = await client.query<{ attempts: number; environment: Environment }>(
-    `SELECT attempts, environment FROM ops.atendente_jobs WHERE id = $1 FOR UPDATE`,
+    `SELECT attempts, environment FROM ops.atendente_jobs WHERE id = $1 AND status='processing' FOR UPDATE`,
     [jobId],
   );
+  if (!current.rows[0]) return; // Uma intervenção humana pode ter cancelado o job em execução.
   const attempts = current.rows[0]?.attempts ?? MAX_ATENDENTE_RETRY_ATTEMPTS;
   const environment = current.rows[0]?.environment;
   const failure = classifyAtendenteError(error);

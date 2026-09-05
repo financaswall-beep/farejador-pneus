@@ -19,6 +19,33 @@ beforeEach(async () => {
 });
 
 describe('foto do lead pelo Chatwoot', () => {
+  it('recupera foto já recebida no webhook mesmo com conta normalizada zero', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows:[{ contact_id:1003,account_id:0,conversation_id:731 }] })
+      .mockResolvedValueOnce({ rows:[{ account_id:2,thumbnail:'https://chatwoot.example.test/known.png' }] });
+    const fetcher = vi.fn();
+    expect(await getAvatar('conversation','prod',{ query } as unknown as Pool,config,fetcher))
+      .toBe('https://chatwoot.example.test/known.png');
+    expect(fetcher).not.toHaveBeenCalled();
+    const [sql,params] = query.mock.calls[1]!;
+    expect(sql).toContain('environment=$1');
+    expect(sql).toContain('account_id=$4');
+    expect(params).toEqual(['prod',JSON.stringify({ conversation:{ id:731,meta:{ sender:{ id:1003 } } } }),
+      JSON.stringify({ id:731,meta:{ sender:{ id:1003 } } }),0]);
+  });
+  it('não adivinha conta global quando falta referência comprovada no webhook', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows:[{ contact_id:1003,account_id:0,conversation_id:731 }] })
+      .mockResolvedValueOnce({ rows:[] });
+    const fetcher = vi.fn();
+    expect(await getAvatar('conversation','prod',{ query } as unknown as Pool,config,fetcher)).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('usa a conta comprovada para consultar a API quando o webhook não trouxe imagem', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows:[{ contact_id:1003,account_id:0,conversation_id:731 }] })
+      .mockResolvedValueOnce({ rows:[{ account_id:2,thumbnail:null }] });
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ payload:{ thumbnail:'https://chatwoot.example.test/fresh.png' } })));
+    expect(await getAvatar('conversation','prod',{ query } as unknown as Pool,config,fetcher)).toContain('fresh.png');
+    expect(fetcher.mock.calls[0][0]).toContain('/accounts/2/contacts/1003');
+  });
   it('usa a conta da conversa, envia o token só ao Chatwoot e retorna apenas a foto', async () => {
     const { pool,query } = poolFor();
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ payload:{

@@ -26,6 +26,12 @@ function createConversation(): MappedConversation {
 }
 
 describe('conversations.repository', () => {
+  it('não sobrescreve uma conta válida com zero de payload incompleto', async () => {
+    const client = { query:vi.fn().mockResolvedValue({ rows:[{ id:'conversation' }] }) };
+    await upsertConversation(client as never,{ ...createConversation(),chatwootAccountId:0 });
+    expect(client.query.mock.calls[0][0]).toContain('CASE WHEN EXCLUDED.chatwoot_account_id > 0');
+    expect(client.query.mock.calls[0][0]).toContain('ELSE core.conversations.chatwoot_account_id END');
+  });
   it('returns existing conversation id when stale upsert returns no rows', async () => {
     const client = {
       query: vi

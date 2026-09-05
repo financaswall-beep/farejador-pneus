@@ -16,6 +16,7 @@ window.PAINEL_MODULES.bot = function () {
       catch (err) { this.botCampainha = null; }
       // A lista técnica completa só é consultada enquanto o dono está na tela do Bot.
       if (this.currentPage === 'bot') {
+        await this.carregarBotControles();
         try { this.botResilience = await this.apiGet('/admin/api/bot/resiliencia'); }
         catch (err) { this.botResilience = null; }
       }
@@ -105,6 +106,7 @@ window.PAINEL_MODULES.bot = function () {
     get botConversasFila() {
       const mudas = this.botMudas.map((m) => ({
         id: 'm-' + m.conversation_id,
+        conversation_id: m.conversation_id,
         chatwoot_id: m.chatwoot_conversation_id,
         nome: m.contact_name || 'Cliente',
         mensagem: m.preview || '(sem texto)',
@@ -114,13 +116,14 @@ window.PAINEL_MODULES.bot = function () {
       const agora = Date.now();
       const escalados = this.botEscalados.map((e) => ({
         id: 'e-' + e.conversation_id,
+        conversation_id: e.conversation_id,
         chatwoot_id: e.chatwoot_conversation_id,
         nome: e.contact_name || 'Cliente',
         mensagem: e.motivo || 'Sem motivo registrado',
         tipo: 'humano',
         minutos: e.quando ? Math.max(0, Math.floor((agora - new Date(e.quando).getTime()) / 60000)) : 0,
       }));
-      return [...mudas, ...escalados].sort((a, b) => a.minutos - b.minutos);
+      return this.botMesclarConversas([...mudas, ...escalados]);
     },
     get botConversasFiltradas() {
       const busca = String(this.botConversaBusca || '').trim().toLowerCase();

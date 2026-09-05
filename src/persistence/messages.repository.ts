@@ -21,7 +21,9 @@ export async function upsertMessage(
         started_at,
         last_event_at
       ) VALUES ($1, $3, $16, $17, 'open', $14, NULL)
-      ON CONFLICT (environment, chatwoot_conversation_id) DO NOTHING
+      ON CONFLICT (environment, chatwoot_conversation_id) DO UPDATE
+      SET chatwoot_account_id = EXCLUDED.chatwoot_account_id
+      WHERE core.conversations.chatwoot_account_id <= 0 AND EXCLUDED.chatwoot_account_id > 0
       RETURNING id
     ),
     conversation_ref AS (

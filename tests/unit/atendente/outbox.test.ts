@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+const mayProcess = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+vi.mock('../../../src/atendente-v2/conversation-control.js', () => ({ botMayProcessTrigger:mayProcess }));
 
 const baseEnv = {
   NODE_ENV: 'test',
@@ -9,6 +11,7 @@ const baseEnv = {
 };
 
 async function loadOutbox() {
+  mayProcess.mockResolvedValue(true);
   vi.resetModules();
   Object.assign(process.env, baseEnv);
   vi.doMock('pino', () => ({

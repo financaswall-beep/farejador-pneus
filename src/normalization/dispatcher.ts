@@ -19,10 +19,9 @@ import { insertStatusEvent } from '../persistence/status-events.repository.js';
 import { insertAssignment } from '../persistence/assignments.repository.js';
 import { insertReaction } from '../persistence/reactions.repository.js';
 import { upsertTags } from '../persistence/tags.repository.js';
-import { enqueueAtendenteJob, ensureAtendenteSession } from '../shared/repositories/ops-atendente.repository.js';
+import { handleBotMessageEvent } from './bot-message-event.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { reconcileAgentOutboundDelivery } from '../atendente-v2/outbound-reconcile.js';
-import { isAgentV2ConversationAllowed } from '../atendente-v2/conversation-scope.js';
 import { captureAdReferralAfterMessageUpsert } from '../marketing/referrals.js';
 import { reconcilePendingMetaReferralsForMessage } from '../marketing/meta-messaging-referrals.js';
 
@@ -231,71 +230,7 @@ export async function dispatch(
         await fanOutMessageToPartnerChat(client, message, payload);
       }
 
-      // Enfileira job do Agent V2 para a conversa.
-      // So para message_created; message_updated nao dispara processamento.
-      if (eventType === 'message_created') {
-        if (env.AGENT_V2_WORKER_ENABLED) {
-          // Só processa mensagens do contato (cliente real).
-          // Mensagens de bot, agente humano e sistema não disparam o Atendente
-          // para evitar que o bot responda a si mesmo quando o envio Chatwoot for habilitado.
-          if (message.senderType !== 'contact') {
-            logger.info(
-              {
-                raw_event_id: rawEventId,
-                conversation_id: upsertedMessage.conversationId,
-                message_id: upsertedMessage.messageId,
-                sender_type: message.senderType,
-              },
-              'normalization: atendente job skipped — sender_type is not contact',
-            );
-          } else if (!isAgentV2ConversationAllowed(
-            env.AGENT_V2_CONVERSATION_IDS,
-            upsertedMessage.conversationId,
-          )) {
-            logger.info(
-              {
-                raw_event_id: rawEventId,
-                conversation_id: upsertedMessage.conversationId,
-                message_id: upsertedMessage.messageId,
-              },
-              'normalization: atendente job skipped — conversation outside configured scope',
-            );
-          } else {
-            const sessionId = await ensureAtendenteSession(
-              client,
-              environment as Environment,
-              upsertedMessage.conversationId,
-              upsertedMessage.messageId,
-            );
-            const jobId = await enqueueAtendenteJob(
-              client,
-              environment as Environment,
-              upsertedMessage.conversationId,
-              upsertedMessage.messageId,
-              env.AGENT_V2_DEBOUNCE_SECONDS,
-            );
-            logger.info(
-              {
-                raw_event_id: rawEventId,
-                conversation_id: upsertedMessage.conversationId,
-                message_id: upsertedMessage.messageId,
-                agent_session_id: sessionId,
-                atendente_job_id: jobId,
-              },
-              'normalization: atendente job enqueued',
-            );
-          }
-        } else {
-          logger.info(
-            {
-              raw_event_id: rawEventId,
-              conversation_id: upsertedMessage.conversationId,
-              message_id: upsertedMessage.messageId,
-            },
-            'normalization: atendente job skipped because AGENT_V2_WORKER_ENABLED=false',
-          );
-        }
-      }
+      await handleBotMessageEvent(client,eventType,message,upsertedMessage,rawEventId);
 
       const attachments = (payload.attachments ?? []) as Array<Record<string, unknown>>;
       for (const attPayload of attachments) {

@@ -58,6 +58,7 @@ describe('agent_v2 sender', () => {
     expect(result).toEqual({ chatwootMessageId: 987 });
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.echo_id).toBe('turn-abc');
+    expect(body.content_attributes).toEqual({ farejador_echo_id:'turn-abc' });
     expect(body.private).toBe(false);
   });
 
@@ -88,5 +89,20 @@ describe('agent_v2 sender', () => {
       buffer: Buffer.from('image'), filename: 'pneu.jpg', contentType: 'image/jpeg',
     }, 'foto')).rejects.toMatchObject({ status: null });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('correlaciona anexos da outbox sem acrescentar aviso ao texto público', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id:987 })));
+    vi.stubGlobal('fetch',fetchMock);
+    const { sendAttachmentOnce } = await loadSender({
+      CHATWOOT_API_BASE_URL:'https://chatwoot.example.test/api/v1',CHATWOOT_API_TOKEN:'test-token',
+      CHATWOOT_ACCOUNT_ID:'2',BOT_OUTBOX:'true',
+    });
+    await sendAttachmentOnce(123,{ buffer:Buffer.from('image'),filename:'pneu.jpg',contentType:'image/jpeg' },
+      'Foto solicitada','photo:request-1');
+    const form = fetchMock.mock.calls[0][1].body as FormData;
+    expect(form.get('content')).toBe('Foto solicitada');
+    expect(form.get('echo_id')).toBe('photo:request-1');
+    expect(JSON.parse(String(form.get('content_attributes')))).toEqual({ farejador_echo_id:'photo:request-1' });
   });
 });
