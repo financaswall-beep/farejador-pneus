@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth } from '../auth.js';
+import { env } from '../../shared/config/env.js';
+import { getCustomerLeadAvatar } from './customer-lead-avatar.js';
 import { logger } from '../../shared/logger.js';
 import { operatorLabel } from './route-helpers.js';
 import { changeBotConversationControl, getBotConversationControl, listHumanControlledConversations } from './bot-conversation-control.js';
@@ -16,6 +18,21 @@ function statusFor(error: unknown) {
 }
 
 export async function registerBotControlRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/admin/api/bot/conversations/:id/avatar',{ preHandler:requireAdminAuth },async (request,reply) => {
+    reply.header('Cache-Control','private, no-store');
+    if (env.MATRIZ_CUSTOMER_IDENTITY && getAdminContext(request).role!=='owner') {
+      return reply.code(403).send({ error:'admin_owner_required' });
+    }
+    const parsed=paramsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.code(400).send({ error:'invalid_conversation' });
+    try { return { avatar_url:await getCustomerLeadAvatar(parsed.data.id,env.FAREJADOR_ENV) }; }
+    catch (error) {
+      if (error instanceof Error && error.message==='lead_conversation_not_found') {
+        return reply.code(404).send({ error:'lead_conversation_not_found' });
+      }
+      return reply.code(503).send({ error:'lead_avatar_unavailable' });
+    }
+  });
   app.get('/admin/api/bot/controle', { preHandler:requireAdminAuth },async (_request,reply) => {
     try { return { conversations:await listHumanControlledConversations() }; }
     catch (error) { const mapped=statusFor(error); return reply.code(mapped.status).send({ error:mapped.error }); }

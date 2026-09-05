@@ -14,6 +14,8 @@ export interface BotCampainhaPayload {
     conversation_id: string;
     chatwoot_conversation_id: string;
     contact_name: string | null;
+    channel_type: string | null;
+    bot_mode: 'auto' | 'human';
     preview: string;
     minutos: number;
   }>;
@@ -22,6 +24,8 @@ export interface BotCampainhaPayload {
     conversation_id: string;
     chatwoot_conversation_id: string;
     contact_name: string | null;
+    channel_type: string | null;
+    bot_mode: 'auto' | 'human';
     motivo: string | null;
     quando: string;
   }>;
@@ -57,11 +61,13 @@ export async function getBotCampainha(
      SELECT u.conversation_id,
             cv.chatwoot_conversation_id::text AS chatwoot_conversation_id,
             ct.name AS contact_name,
+            cv.channel_type, COALESCE(bc.mode,'auto') AS bot_mode,
             u.preview,
             floor(extract(epoch FROM (now() - u.sent_at)) / 60)::int AS minutos
      FROM ultima_msg u
-     JOIN core.conversations cv ON cv.id = u.conversation_id
-     LEFT JOIN core.contacts ct ON ct.id = cv.contact_id
+     JOIN core.conversations cv ON cv.id = u.conversation_id AND cv.environment=$1 AND cv.deleted_at IS NULL
+     LEFT JOIN core.contacts ct ON ct.id = cv.contact_id AND ct.environment=cv.environment AND ct.deleted_at IS NULL
+     LEFT JOIN ops.conversation_bot_control bc ON bc.conversation_id=cv.id AND bc.environment=cv.environment
      LEFT JOIN respondida r ON r.conversation_id = u.conversation_id
      WHERE u.sent_at <= now() - interval '5 minutes'
        AND (r.trigger_at IS NULL OR u.sent_at > r.trigger_at)
@@ -74,18 +80,20 @@ export async function getBotCampainha(
     `SELECT cf.conversation_id,
             cv.chatwoot_conversation_id::text AS chatwoot_conversation_id,
             ct.name AS contact_name,
+            cv.channel_type, COALESCE(bc.mode,'auto') AS bot_mode,
             replace(max(cf2.fact_value::text), '"', '') AS motivo,
             max(cf.created_at)::text AS quando
      FROM analytics.conversation_facts cf
-     JOIN core.conversations cv ON cv.id = cf.conversation_id
-     LEFT JOIN core.contacts ct ON ct.id = cv.contact_id
+     JOIN core.conversations cv ON cv.id = cf.conversation_id AND cv.environment=cf.environment AND cv.deleted_at IS NULL
+     LEFT JOIN core.contacts ct ON ct.id = cv.contact_id AND ct.environment=cv.environment AND ct.deleted_at IS NULL
+     LEFT JOIN ops.conversation_bot_control bc ON bc.conversation_id=cv.id AND bc.environment=cv.environment
      LEFT JOIN analytics.conversation_facts cf2
        ON cf2.environment = $1 AND cf2.conversation_id = cf.conversation_id
       AND cf2.fact_key = 'motivo_escalacao'
       AND cf2.created_at > now() - interval '48 hours'
      WHERE cf.environment = $1 AND cf.fact_key = 'escalou'
        AND cf.created_at > now() - interval '48 hours'
-     GROUP BY cf.conversation_id, cv.chatwoot_conversation_id, ct.name
+     GROUP BY cf.conversation_id, cv.chatwoot_conversation_id, ct.name, cv.channel_type, bc.mode
      ORDER BY quando DESC
      LIMIT 10`,
     [environment],

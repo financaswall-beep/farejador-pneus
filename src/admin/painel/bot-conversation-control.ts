@@ -15,7 +15,7 @@ export async function getBotConversationControl(conversationId: string, db: Pool
 
 export async function listHumanControlledConversations(db: Pool = pool) {
   const result = await db.query(`SELECT b.conversation_id,b.mode,b.version,b.updated_at,
-      c.chatwoot_conversation_id,ct.name AS contact_name
+      c.chatwoot_conversation_id,c.channel_type,ct.name AS contact_name
     FROM ops.conversation_bot_control b
     JOIN core.conversations c ON c.id=b.conversation_id AND c.environment=b.environment
     LEFT JOIN core.contacts ct ON ct.id=c.contact_id AND ct.environment=c.environment AND ct.deleted_at IS NULL

@@ -12,7 +12,12 @@ window.PAINEL_MODULES.bot = function () {
     async loadBotCampainha() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
-      try { this.botCampainha = await this.apiGet('/admin/api/bot/campainha'); }
+      try {
+        this.botCampainha = await this.apiGet('/admin/api/bot/campainha');
+        for (const row of [...this.botMudas,...this.botEscalados]) {
+          if (['auto','human'].includes(row.bot_mode)) this.botControleModos[row.conversation_id] = row.bot_mode;
+        }
+      }
       catch (err) { this.botCampainha = null; }
       // A lista técnica completa só é consultada enquanto o dono está na tela do Bot.
       if (this.currentPage === 'bot') {
@@ -107,6 +112,7 @@ window.PAINEL_MODULES.bot = function () {
       const mudas = this.botMudas.map((m) => ({
         id: 'm-' + m.conversation_id,
         conversation_id: m.conversation_id,
+        lead_conversation_id: m.conversation_id, origin: m.channel_type, bot_mode: m.bot_mode,
         chatwoot_id: m.chatwoot_conversation_id,
         nome: m.contact_name || 'Cliente',
         mensagem: m.preview || '(sem texto)',
@@ -117,6 +123,7 @@ window.PAINEL_MODULES.bot = function () {
       const escalados = this.botEscalados.map((e) => ({
         id: 'e-' + e.conversation_id,
         conversation_id: e.conversation_id,
+        lead_conversation_id: e.conversation_id, origin: e.channel_type, bot_mode: e.bot_mode,
         chatwoot_id: e.chatwoot_conversation_id,
         nome: e.contact_name || 'Cliente',
         mensagem: e.motivo || 'Sem motivo registrado',

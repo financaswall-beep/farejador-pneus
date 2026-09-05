@@ -38,18 +38,19 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     },
     clienteLeadFoto(c) { return this.clientesLeadFotos[c?.lead_conversation_id] || ''; },
     clienteLeadFotoFalhou(c) { if (c?.lead_conversation_id) this.clientesLeadFotos[c.lead_conversation_id] = ''; },
-    carregarClienteLeadFoto(c) {
+    carregarClienteLeadFoto(c, scope = 'clientes') {
       const id = c?.lead_conversation_id;
       if (!id || !this.adminAuthenticated || fotosPendentes.has(id) || Object.hasOwn(this.clientesLeadFotos, id)) return;
-      fotosPendentes.add(id); filaFotos.push(id);
+      fotosPendentes.add(id); filaFotos.push({ id,scope });
       this.processarClienteLeadFotos();
     },
     processarClienteLeadFotos() {
       while (fotosAtivas < 4 && filaFotos.length) {
-        const id = filaFotos.shift();
+        const { id,scope } = filaFotos.shift();
         if (!this.adminAuthenticated) { fotosPendentes.delete(id); continue; }
         fotosAtivas++;
-        this.apiGet(`/admin/api/clientes/leads/${encodeURIComponent(id)}/avatar`)
+        const prefix = scope==='bot' ? '/admin/api/bot/conversations/' : '/admin/api/clientes/leads/';
+        this.apiGet(`${prefix}${encodeURIComponent(id)}/avatar`)
           .then((data) => {
             const value = data.avatar_url;
             this.clientesLeadFotos[id] = typeof value === 'string' && value.startsWith('https://') ? value : '';
@@ -62,6 +63,9 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
       this.selecionarCliente(c);
       this.clienteLeadDetalheAberto = true;
       this.carregarClienteLeadFoto(c);
+      if (c?.lead_conversation_id && this.hasPanelModule?.('bot')) {
+        this.consultarBotControle(c.lead_conversation_id).catch(() => { this.botControleModos[c.lead_conversation_id] = null; });
+      }
       this.$nextTick(() => { document.getElementById('cliente-lead-fechar')?.focus(); });
     },
     fecharClienteLeadDetalhe() {

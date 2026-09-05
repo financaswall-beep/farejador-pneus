@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 const mocks=vi.hoisted(() => ({ change:vi.fn(),get:vi.fn(),list:vi.fn() }));
+vi.mock('../../../src/shared/config/env.js',() => ({ env:{ FAREJADOR_ENV:'test',MATRIZ_CUSTOMER_IDENTITY:false } }));
+vi.mock('../../../src/admin/painel/customer-lead-avatar.js',() => ({ getCustomerLeadAvatar:vi.fn() }));
 vi.mock('../../../src/admin/painel/bot-conversation-control.js',() => ({
   changeBotConversationControl:mocks.change,getBotConversationControl:mocks.get,listHumanControlledConversations:mocks.list,
 }));

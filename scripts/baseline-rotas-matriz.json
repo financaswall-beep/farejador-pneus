@@ -1,10 +1,11 @@
 {
-  "geradoEm": "2026-09-05T13:07:53.091Z",
-  "total": 293,
+  "geradoEm": "2026-09-05T14:29:33.091Z",
+  "total": 294,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/controle GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/bot/conversations/:id/avatar GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/conversations/:id/controle GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/movimento GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/resiliencia GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
