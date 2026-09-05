@@ -18,6 +18,8 @@ export interface ClientePainelRow {
   name_needs_review?: boolean; vip_min_purchases?: number;
   lead_derived_lane?: ClientePainelRow['lead_lane']; lead_archived?: boolean;
   lead_archive_reason?: string | null; lead_board_version?: number; lead_board_updated_at?: string | null;
+  lead_manual_lane?: 'novo' | 'atendimento' | 'orcamento' | 'perdido' | null;
+  chatwoot_conversation_id?: number | null; chatwoot_account_id?: number | null;
 }
 export interface ClienteParceiroRow {
   partner_id: string; name: string; phone: string | null; document_number: string | null;
@@ -45,7 +47,8 @@ export async function getClientesPainel(
        ), latest_conversation AS (
          SELECT DISTINCT ON (cv.contact_id)
                 cv.contact_id, cv.id AS conversation_id, cv.current_status,
-                cv.started_at, cv.last_activity_at, cv.updated_at
+                cv.started_at, cv.last_activity_at, cv.updated_at, cv.channel_type,
+                cv.chatwoot_conversation_id, cv.chatwoot_account_id
            FROM core.conversations cv
           WHERE cv.environment = $1 AND cv.deleted_at IS NULL AND cv.contact_id IS NOT NULL
           ORDER BY cv.contact_id, COALESCE(cv.last_activity_at, cv.updated_at, cv.started_at) DESC, cv.id DESC
@@ -62,7 +65,7 @@ export async function getClientesPainel(
        SELECT 'chatwoot:' || c.id AS id, 'chatwoot' AS source, c.id::text AS source_id,
               COALESCE(NULLIF(c.name, ''), 'Cliente sem nome') AS name,
               c.phone_e164 AS phone, c.email, ${normalizedKindSql} AS kind, false AS is_vip,
-              COALESCE(NULLIF(c.channel_type, ''), 'Chatwoot') AS origin,
+              COALESCE(NULLIF(lc.channel_type, ''), NULLIF(c.channel_type, ''), 'Chatwoot') AS origin,
               CASE WHEN COALESCE(c.last_seen_at, c.updated_at) >= now() - interval '90 days' THEN 'ativo' ELSE 'inativo' END AS status,
               COALESCE(cp.total_orders, 0)::int AS purchases,
               COALESCE(cp.total_spent, 0)::float8 AS total_spent,
@@ -79,7 +82,7 @@ export async function getClientesPainel(
                 WHEN lead_message.has_reply OR COALESCE(lf.stage, '') NOT IN ('', 'abriu_conversa') THEN 'atendimento'
                 ELSE 'novo'
               END AS lead_lane,
-              lc.conversation_id::text AS lead_conversation_id,
+              lc.conversation_id::text AS lead_conversation_id, lc.chatwoot_conversation_id, lc.chatwoot_account_id,
               lc.started_at::text AS lead_created_at,
               lead_message.sent_at::text AS lead_last_message_at,
               CASE
@@ -293,7 +296,5 @@ export async function getClientesPainel(
   const rows = applyClienteBusinessRules(
     [...chatwoot.rows, ...balcao.rows, ...parceiro.rows, ...atacado.rows], leadBoard,
   );
-  return {
-    rows,
-    partners: partners.rows };
+  return { rows, partners: partners.rows };
 }

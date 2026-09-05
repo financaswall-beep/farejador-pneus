@@ -45,6 +45,7 @@ export function applyClienteBusinessRules(
       is_vip: Number(row.purchases || 0) >= VIP_MIN_PURCHASES,
       vip_min_purchases: VIP_MIN_PURCHASES,
       lead_derived_lane: derivedLane,
+      lead_manual_lane: state?.manual_lane ?? null,
       lead_lane: derivedLane === 'convertido' ? 'convertido' : (state?.manual_lane ?? derivedLane),
       lead_archived: state?.archived_at != null,
       lead_archive_reason: state?.archive_reason ?? null,

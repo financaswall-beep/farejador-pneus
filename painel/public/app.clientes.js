@@ -11,6 +11,7 @@ window.PAINEL_MODULES.clientes = function () {
       try {
         const payload = await this.apiGet('/admin/api/clientes');
         this.clientes = Array.isArray(payload.rows) ? payload.rows : [];
+        this.chatwootBaseUrl = payload.chatwoot_base_url || this.chatwootBaseUrl;
         this.clientesParceiros = Array.isArray(payload.partners) ? payload.partners : [];
         this.customerIdentityEnabled = payload.customer_identity?.enabled === true && this.adminUser?.role === 'owner';
         this.customerPrivacyEnabled = this.customerIdentityEnabled && payload.customer_identity?.privacy_enabled === true;
@@ -60,7 +61,12 @@ window.PAINEL_MODULES.clientes = function () {
     },
     setClientesTab(tab) {
       this.clientesTab = tab;
-      if (tab === 'leads') this.clientesMostrarArquivados = false;
+      if (tab === 'leads') {
+        this.clientesMostrarArquivados = false;
+        this.clientesLeadCanal = 'todos';
+        this.clienteLeadDetalheAberto = false;
+        this.clientesLeadCancelarSelecao();
+      }
       this.limparClientesFiltros();
       this.clientesPeriodo = tab === 'leads' ? '30' : (tab === 'recompra' || tab === 'parceiros' ? 'todos' : '90');
       const first = tab === 'leads'
@@ -85,7 +91,7 @@ window.PAINEL_MODULES.clientes = function () {
     clientesFiltrados() {
       const q = this.clienteTexto(this.clientesBusca);
       return this.clientes.filter((c) => {
-        const hit = !q || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name].join(' ')).includes(q);
+        const hit = !q || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name, c.last_item].join(' ')).includes(q);
         const tipo = this.clientesTipo === 'todos' || c.kind === this.clientesTipo;
         const origem = this.clientesOrigem === 'todos' || c.source === this.clientesOrigem;
         const status = this.clientesStatus === 'todos' || c.status === this.clientesStatus;
@@ -188,6 +194,7 @@ window.PAINEL_MODULES.clientes = function () {
     clientesLeads(lane, showArchived = this.clientesMostrarArquivados) {
       return this.clientesFiltrados()
         .filter((c) => c.source === 'chatwoot' && c.lead_conversation_id)
+        .filter((c) => !this.clientesLeadCanal || this.clientesLeadCanal === 'todos' || this.clienteLeadCanal(c) === this.clientesLeadCanal)
         .filter((c) => Boolean(c.lead_archived) === Boolean(showArchived))
         .filter((c) => this.clienteLeadLane(c) === lane)
         .sort((a, b) => {

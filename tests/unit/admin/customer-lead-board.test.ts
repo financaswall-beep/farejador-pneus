@@ -3,18 +3,18 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let updateCustomerLeadBoard: typeof import('../../../src/admin/painel/customer-lead-board.js').updateCustomerLeadBoard;
 
-function fakePool(stateVersion: number | null) {
-  const query = vi.fn(async (sqlValue: unknown) => {
+function fakePool(stateVersion: number | null, archived = false) {
+  const query = vi.fn(async (sqlValue: unknown, params?: unknown[]) => {
     const sql = String(sqlValue);
     if (sql.includes('FROM audit.operation_idempotency')) return { rows: [] };
     if (sql.includes('FROM core.conversations')) return { rows: [{ id:'conv' }] };
     if (sql.includes('FROM ops.customer_lead_board_state')) {
       return { rows: stateVersion == null ? [] : [{
-        manual_lane:'novo',archived_at:null,archived_by:null,archive_reason:null,version:stateVersion,
+        manual_lane:'novo',archived_at:archived?'2026-09-05':null,archived_by:null,archive_reason:null,version:stateVersion,
       }] };
     }
     if (sql.includes('INSERT INTO ops.customer_lead_board_state')) return { rows: [{
-      manual_lane:'orcamento',archived_at:null,archived_by:null,archive_reason:null,
+      manual_lane:params?.[2] ?? null,archived_at:null,archived_by:null,archive_reason:null,
       version:(stateVersion ?? 0)+1,
     }] };
     if (sql.includes('UPDATE audit.operation_idempotency')) return { rows: [{ idempotency_key:'key' }] };
@@ -58,6 +58,29 @@ describe('serviço do quadro de leads', () => {
       action:'move',lane:'perdido',expectedVersion:1,actor:'Dono',
       idempotencyKey:'00000000-0000-4000-8000-000000000098',
     },pool)).rejects.toThrow('lead_version_conflict');
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('retoma o automático removendo apenas a escolha manual e registra auditoria', async () => {
+    const { pool,query } = fakePool(2);
+    const result = await updateCustomerLeadBoard({
+      environment:'test',conversationId:'00000000-0000-4000-8000-000000000001',
+      action:'automatic',expectedVersion:2,actor:'Dono',idempotencyKey:'resume-automatic-1',
+    }, pool);
+    expect(result).toMatchObject({ manual_lane:null,archived:false,version:3 });
+    const insert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO ops.customer_lead_board_state'));
+    expect(insert?.[1]).toEqual(['test','00000000-0000-4000-8000-000000000001',null,'Dono']);
+    const calls = JSON.stringify(query.mock.calls);
+    expect(calls).toContain('customer_lead_automatic');
+    expect(calls).not.toMatch(/UPDATE core\.|DELETE FROM/);
+  });
+
+  it('não altera a etapa de um card arquivado', async () => {
+    const { pool,query } = fakePool(2, true);
+    await expect(updateCustomerLeadBoard({
+      environment:'test',conversationId:'00000000-0000-4000-8000-000000000001',
+      action:'automatic',expectedVersion:2,actor:'Dono',idempotencyKey:'resume-archived-1',
+    }, pool)).rejects.toThrow('lead_archived');
     expect(query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 });

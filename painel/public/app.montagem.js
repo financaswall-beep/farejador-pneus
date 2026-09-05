@@ -50,6 +50,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.botMapa, // app.bot.mapa.js (2026-07-06): desenho do mapa IBGE pintado por camada
     window.PAINEL_MODULES.clientes, // CRM da matriz: clientes/leads/compradores/recompra/parceiros
     window.PAINEL_MODULES.clientesKanban, // movimento, arquivamento recuperavel e paginacao por coluna
+    window.PAINEL_MODULES.clientesLeadsUi, // fotos Chatwoot, canais e ficha lateral da Matriz
     window.PAINEL_MODULES.clientesIdentity, // Etapa 9: identidade/revisão/privacidade owner-only
     window.PAINEL_MODULES.marketing, // Marketing: visão inicial + Meta read-only + qualidade da atribuição
     window.PAINEL_MODULES.marketingChart, // Marketing: gráfico diário de investimento e conversas

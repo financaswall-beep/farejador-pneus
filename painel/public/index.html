@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260828-partner-pickups2" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260828-partner-pickups2&leads=20260905" />
 <style>
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -154,8 +154,9 @@
 <script src="/admin/painel/app.bot.js?v=20260823-shell1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.clientes.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.clientes.kanban.js?v=20260821-clientes-auditoria1"></script>
+<script src="/admin/painel/app.clientes.js?v=20260822-continuity1&leads=20260905"></script>
+<script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
+<script src="/admin/painel/app.clientes.leads.js?v=20260905-clientes-leads1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
@@ -182,7 +183,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260829-partner-stock4"></script>
+<script src="/admin/painel/app.montagem.js?v=20260829-partner-stock4&leads=20260905"></script>
 <script src="/admin/painel/app.js?v=20260903-finance-carry1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
@@ -7754,79 +7755,130 @@
           </div>
         </section>
 
-        <!-- 2. LEADS -->
-        <section x-show="clientesTab==='leads'">
+        <!-- 2. LEADS — Matriz: preserva o banner e o menu existentes -->
+        <section x-show="clientesTab==='leads'" aria-label="Quadro de leads da Matriz">
           <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Leads novos</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().novos"></p></div>
-            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Orçamentos enviados</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().orcamentos"></p></div>
-            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Sem resposta</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().semResposta"></p></div>
-            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Conversão</p><p class="text-2xl font-semibold mt-1.5 text-emerald-800" x-text="clientesLeadsResumo().conversao.toFixed(1).replace('.',',')+'%'"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3"><span class="p-2.5 bg-blue-50 text-blue-700 rounded-full"><i data-lucide="users" class="w-5 h-5"></i></span><div><p class="text-xs text-gray-500">Leads novos</p><p class="text-2xl font-semibold mt-1" x-text="clientesLeadsResumo().novos"></p></div></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3"><span class="p-2.5 bg-amber-50 text-amber-700 rounded-full"><i data-lucide="file-text" class="w-5 h-5"></i></span><div><p class="text-xs text-gray-500">Orçamentos enviados</p><p class="text-2xl font-semibold mt-1" x-text="clientesLeadsResumo().orcamentos"></p></div></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3"><span class="p-2.5 bg-rose-50 text-rose-700 rounded-full"><i data-lucide="clock-3" class="w-5 h-5"></i></span><div><p class="text-xs text-gray-500">Sem resposta · 3 dias+</p><p class="text-2xl font-semibold mt-1" x-text="clientesLeadsResumo().semResposta"></p></div></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3"><span class="p-2.5 bg-emerald-50 text-emerald-800 rounded-full"><i data-lucide="trending-up" class="w-5 h-5"></i></span><div><p class="text-xs text-gray-500">Conversão</p><p class="text-2xl font-semibold mt-1 text-emerald-800" x-text="clientesLeadsResumo().conversao.toFixed(1).replace('.',',')+'%'"></p></div></div>
           </div>
-          <div class="bg-white border rounded-lg p-3 mb-4 flex flex-wrap gap-2 items-center">
-            <label class="relative flex-[1_1_220px]"><i data-lucide="search" class="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400"></i><input x-model.debounce.200ms="clientesBusca" placeholder="Buscar lead" class="w-full h-9 border rounded-md pl-9 pr-3 text-xs"></label>
-            <select x-model="clientesOrigem" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Origem: Todas</option><option value="chatwoot">Chatwoot</option></select>
-            <select x-model="clientesTipo" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Tipo: Todos</option><option value="pessoa_fisica">Pessoa física</option><option value="borracharia">Borracharia</option><option value="nao_classificado">Não classificado</option></select>
-            <select x-model="clientesClasse" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Classe: Todas</option><option value="vip">VIP</option><option value="normal">Normal</option></select>
-            <select x-model="clientesPeriodo" class="h-9 border rounded-md px-3 text-xs"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="todos">Todo período</option></select>
-            <span class="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'"><span class="w-1.5 h-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-500':'bg-amber-500'"></span><span x-text="clientesLiveStatus==='ao_vivo'?'Ao vivo':'Reconectando'"></span></span>
-            <button @click="clienteLeadAlternarArquivados()" class="h-9 px-3 rounded-md border text-xs inline-flex items-center gap-2" :class="clientesMostrarArquivados?'border-amber-400 bg-amber-50 text-amber-800':'border-gray-200 text-gray-600'"><i data-lucide="archive" class="w-3.5 h-3.5"></i><span x-text="clientesMostrarArquivados?'Voltar aos ativos':'Arquivados ('+clientesLeadArquivadosTotal()+')'"></span></button>
-            <button @click="loadClientes()" class="h-9 px-4 rounded-md bg-emerald-700 text-white text-xs inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Atualizar</button>
-          </div>
-          <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
-            <div class="overflow-x-auto pb-2">
-              <div class="grid grid-cols-5 gap-3 min-w-[1050px]">
-                <template x-for="lane in [
-                  {id:'novo',label:'Novo',tone:'bg-blue-100 text-blue-700',panel:'bg-slate-50 border-slate-200',card:'bg-white border-slate-200 hover:border-blue-300'},
-                  {id:'atendimento',label:'Em atendimento',tone:'bg-gray-200 text-gray-700',panel:'bg-gray-50 border-gray-200',card:'bg-white border-gray-200 hover:border-gray-400'},
-                  {id:'orcamento',label:'Orçamento enviado',tone:'bg-amber-100 text-amber-700',panel:'bg-amber-50/60 border-amber-200',card:'bg-white border-amber-200 hover:border-amber-400'},
-                  {id:'perdido',label:'Perdidos',tone:'bg-rose-600 text-white',panel:'bg-rose-100 border-rose-300',card:'bg-rose-50 border-rose-300 hover:border-rose-500'},
-                  {id:'convertido',label:'Convertidos',tone:'bg-emerald-700 text-white',panel:'bg-emerald-100 border-emerald-300',card:'bg-emerald-50 border-emerald-300 hover:border-emerald-600'}
-                ]" :key="'kanban-'+lane.id">
-                  <div class="border rounded-lg p-2.5 min-h-[470px]" :class="lane.panel" @dragover.prevent @drop.prevent="clienteLeadDrop(lane.id)">
-                    <div class="flex items-center justify-between mb-2.5"><p class="text-xs font-semibold" x-text="lane.label"></p><span class="text-[10px] px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div>
-                    <div class="space-y-2">
-                      <template x-for="c in clientesLeadsVisiveis(lane.id)" :key="'lead-'+c.id">
-                        <button @click="selecionarCliente(c)" :draggable="clienteLeadPodeMover(c)" @dragstart="clienteLeadDragStart(c,$event)" @dragend="clienteLeadDragEnd()" class="w-full border rounded-md p-3 text-left shadow-sm transition-colors" :class="[lane.card,clienteLeadArrastandoId===c.id?'opacity-50':'']">
-                          <div class="flex justify-between gap-2"><p class="text-xs font-semibold truncate" x-text="c.name"></p><span x-show="c.is_vip" class="text-[9px] bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">★ VIP</span></div>
-                          <p x-show="c.name_needs_review" class="mt-1 text-[9px] font-medium text-amber-700">Nome pendente no Chatwoot</p>
-                          <p class="text-[10px] text-gray-500 mt-0.5" x-text="clienteTipoLabel(c.kind)"></p>
-                          <p class="text-[10px] mt-2 truncate" x-show="c.last_item"><span class="text-gray-400">Interesse: </span><span class="font-medium" x-text="c.last_item"></span></p>
-                          <p class="text-[10px] mt-1 truncate" x-show="c.lead_location"><span class="text-gray-400">Local: </span><span x-text="c.lead_location"></span></p>
-                          <p class="text-[11px] font-semibold mt-2" x-show="lane.id==='orcamento' && c.lead_quote_amount" x-text="formatCurrency(c.lead_quote_amount)"></p>
-                          <p class="text-[11px] font-semibold text-emerald-800 mt-2" x-show="lane.id==='convertido' && c.lead_order_amount" x-text="formatCurrency(c.lead_order_amount)"></p>
-                          <div class="flex items-center justify-between mt-3 text-[10px]"><span class="inline-flex items-center gap-1.5 text-gray-600"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5"></template><span class="truncate max-w-[85px]" x-text="c.origin"></span></span><span class="text-gray-500" x-text="clienteLeadTempo(c)"></span></div>
-                          <p class="text-[9px] mt-2 font-medium" :class="c.lead_waiting_on==='equipe'?'text-rose-700':(lane.id==='convertido'?'text-emerald-800':'text-gray-500')" x-text="clienteLeadEspera(c)"></p>
-                        </button>
-                      </template>
-                      <button x-show="clientesLeads(lane.id).length>clientesLeadsVisiveis(lane.id).length" @click="clientesLeadMostrarMais(lane.id)" class="w-full py-2 text-[10px] font-medium text-emerald-800">Mostrar mais</button>
-                      <p x-show="!clientesLeads(lane.id).length" class="text-[10px] text-gray-400 text-center py-8">Nenhum lead</p>
-                    </div>
-                  </div>
-                </template>
-              </div>
+
+          <fieldset :disabled="!!clientesLeadLote" class="bg-white border border-gray-200 rounded-xl p-3 mb-3 flex flex-wrap gap-2 items-center">
+            <label class="relative flex-[1_1_240px]"><span class="sr-only">Buscar lead</span><i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-gray-400"></i><input x-model.debounce.200ms="clientesBusca" placeholder="Nome, telefone ou interesse" class="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm"></label>
+            <div class="flex flex-wrap gap-1.5" aria-label="Filtrar canal">
+              <template x-for="canal in [{id:'todos',label:'Todos'},{id:'whatsapp',label:'WhatsApp'},{id:'instagram',label:'Instagram'},{id:'facebook',label:'Facebook'}]" :key="'lead-canal-'+canal.id">
+                <button type="button" @click="clientesLeadCanal=canal.id" :aria-pressed="clientesLeadCanal===canal.id" class="h-10 px-3 border rounded-lg text-xs font-medium flex items-center gap-2" :class="clientesLeadCanal===canal.id?'border-emerald-600 bg-emerald-50 text-emerald-900':'border-gray-200 text-gray-600 hover:bg-gray-50'"><template x-if="canal.id!=='todos'"><img :src="'/assets/brands/'+canal.id+'.svg'" alt="" class="w-4 h-4"></template><span x-text="canal.label"></span></button>
+              </template>
             </div>
-            <aside class="bg-white border rounded-lg p-4 h-fit" x-show="clienteLeadSelecionado()">
-              <div class="flex justify-between"><p class="text-sm font-semibold">Lead selecionado</p><button @click="clienteSelecionadoId=null" class="text-gray-400">×</button></div>
-              <div class="flex items-center gap-3 py-4"><div class="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-semibold" x-text="initials(clienteLeadSelecionado()?.name||'')"></div><div><p class="font-semibold text-sm" x-text="clienteLeadSelecionado()?.name"></p><p class="text-[10px] text-gray-400" x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></p></div></div>
-              <dl class="space-y-2 text-xs border-y py-3">
-                <div class="flex justify-between"><dt class="text-gray-500">Origem</dt><dd class="inline-flex items-center gap-1.5"><template x-if="clienteOrigemIcone(clienteLeadSelecionado())"><img :src="clienteOrigemIcone(clienteLeadSelecionado())" alt="" class="w-3.5 h-3.5"></template><span x-text="clienteLeadSelecionado()?.origin"></span></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">Criado em</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_created_at)"></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">Classe</dt><dd x-text="clienteClasseLabel(clienteLeadSelecionado())"></dd></div>
-                <div class="flex justify-between gap-3"><dt class="text-gray-500">Interesse</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></dd></div>
-                <div class="flex justify-between gap-3"><dt class="text-gray-500">Local</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.lead_location||'Não informado'"></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">Situação</dt><dd class="font-medium" :class="clienteLeadSelecionado()?.lead_waiting_on==='equipe'?'text-rose-700':'text-emerald-700'" x-text="clienteLeadEspera(clienteLeadSelecionado())"></dd></div>
-                <div class="flex justify-between" x-show="clienteLeadSelecionado()?.lead_quote_amount"><dt class="text-gray-500">Cotação</dt><dd class="font-semibold" x-text="formatCurrency(clienteLeadSelecionado()?.lead_quote_amount)"></dd></div>
-                <div class="flex justify-between" x-show="clienteLeadSelecionado()?.lead_order_amount"><dt class="text-gray-500">Pedido</dt><dd class="font-semibold text-emerald-800" x-text="formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></dd></div>
-              </dl>
-              <p class="text-[10px] text-gray-400 mt-4 mb-2">Próxima ação sugerida</p>
-              <label x-show="!clienteLeadSelecionado()?.lead_archived && clienteLeadLane(clienteLeadSelecionado())!=='convertido'" class="block mb-2"><span class="block text-[10px] text-gray-400 mb-1">Mover para</span><select :value="clienteLeadLane(clienteLeadSelecionado())" @change="alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 border rounded-md px-3 text-xs"><option value="novo">Novo</option><option value="atendimento">Em atendimento</option><option value="orcamento">Orçamento enviado</option><option value="perdido">Perdido</option></select></label>
-              <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado())" class="w-full h-9 bg-emerald-700 text-white rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4 bg-white rounded-full">Continuar conversa</button>
-              <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado(),clienteOfertaMensagem(clienteLeadSelecionado()))" class="w-full h-9 border border-emerald-700 text-emerald-800 rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4">Enviar oferta</button>
-              <button @click="abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full text-xs text-emerald-800 py-2">Ver histórico do lead</button>
-              <button x-show="!clienteLeadSelecionado()?.lead_archived" @click="arquivarClienteLead(clienteLeadSelecionado())" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 mt-2 border border-gray-300 text-gray-600 rounded-md text-xs inline-flex items-center justify-center gap-2"><i data-lucide="archive" class="w-3.5 h-3.5"></i>Arquivar card</button>
-              <button x-show="clienteLeadSelecionado()?.lead_archived" @click="restaurarClienteLead(clienteLeadSelecionado())" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 mt-2 bg-amber-600 text-white rounded-md text-xs inline-flex items-center justify-center gap-2"><i data-lucide="archive-restore" class="w-3.5 h-3.5"></i>Restaurar card</button>
-            </aside>
+            <label><span class="sr-only">Período dos leads</span><select x-model="clientesPeriodo" class="h-10 border border-gray-200 rounded-lg px-3 text-xs"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="todos">Todo período</option></select></label>
+            <details class="relative"><summary class="h-10 border border-gray-200 rounded-lg px-3 text-xs cursor-pointer flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4"></i>Filtros</summary><div class="absolute right-0 top-12 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-3"><label class="block text-xs text-gray-500">Tipo<select x-model="clientesTipo" class="w-full h-9 mt-1 border rounded-lg px-2 text-gray-800"><option value="todos">Todos</option><option value="pessoa_fisica">Pessoa física</option><option value="borracharia">Borracharia</option><option value="nao_classificado">Não classificado</option></select></label><label class="block text-xs text-gray-500">Classe<select x-model="clientesClasse" class="w-full h-9 mt-1 border rounded-lg px-2 text-gray-800"><option value="todos">Todas</option><option value="vip">VIP</option><option value="normal">Normal</option></select></label></div></details>
+            <button type="button" @click="loadClientes()" title="Atualizar quadro" aria-label="Atualizar quadro" class="h-10 w-10 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+          </fieldset>
+
+          <div class="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3"><span class="text-emerald-800 p-2 bg-emerald-50 rounded-lg"><i data-lucide="workflow" class="w-5 h-5"></i></span><div><p class="text-sm font-semibold text-gray-800">Kanban automático</p><p class="text-xs text-gray-500 mt-0.5">Acompanha atendimento e vendas. A equipe pode ajustar as etapas.</p></div></div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 text-xs mr-2" :class="clientesLiveStatus==='ao_vivo'?'text-emerald-700':'text-amber-700'"><span class="w-1.5 h-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-500':'bg-amber-500'"></span><span x-text="clientesLiveStatus==='ao_vivo'?'Ao vivo':'Reconectando'"></span></span>
+              <div class="relative" @click.outside="clientesLeadLimpezaAberta=false" @keydown.escape.stop="clientesLeadLimpezaAberta=false">
+                <button type="button" @click="clientesLeadLimpezaAberta=!clientesLeadLimpezaAberta" :disabled="!!clientesLeadLote || clientesMostrarArquivados" :aria-expanded="clientesLeadLimpezaAberta" class="h-10 px-3 border border-emerald-700 text-emerald-900 rounded-lg text-xs font-medium flex items-center gap-2 disabled:opacity-40"><i data-lucide="archive" class="w-4 h-4"></i>Limpar quadro<i data-lucide="chevron-down" class="w-3 h-3"></i></button>
+                <div x-show="clientesLeadLimpezaAberta" x-cloak class="absolute right-0 top-12 z-30 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-2">
+                  <p class="px-3 py-2 text-xs font-semibold text-gray-800">Organizar quadro</p>
+                  <button type="button" @click="arquivarClientesLeadLote(true)" class="w-full p-3 text-left rounded-lg hover:bg-gray-50"><span class="block text-sm font-medium">Arquivar concluídos</span><span class="block text-xs text-gray-500 mt-1">Perdidos e convertidos nos filtros atuais</span></button>
+                  <button type="button" @click="clientesLeadIniciarSelecao()" class="w-full p-3 text-left text-sm rounded-lg hover:bg-gray-50">Selecionar cards para arquivar</button>
+                  <button type="button" @click="clienteLeadAlternarArquivados()" class="w-full p-3 text-left text-sm rounded-lg hover:bg-gray-50">Ver arquivados</button>
+                  <p class="px-3 py-2 border-t text-xs text-gray-500">Histórico preservado. Você pode restaurar.</p>
+                </div>
+              </div>
+              <button type="button" @click="clienteLeadAlternarArquivados()" :disabled="!!clientesLeadLote" class="h-10 px-3 border rounded-lg text-xs flex items-center gap-2 disabled:opacity-40" :class="clientesMostrarArquivados?'border-amber-400 bg-amber-50 text-amber-800':'border-gray-200 text-gray-600'"><i data-lucide="archive-restore" class="w-4 h-4"></i><span x-text="clientesMostrarArquivados?'Voltar aos ativos':'Arquivados ('+clientesLeadArquivadosTotal()+')'"></span></button>
+            </div>
           </div>
+
+          <div x-show="clientesLeadSelecionando && !clientesMostrarArquivados" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-wrap items-center gap-3">
+            <p class="text-sm text-blue-900 flex-1"><b x-text="clientesLeadQuantidadeMarcados()"></b> card(s) selecionado(s)</p>
+            <button type="button" @click="arquivarClientesLeadLote(false)" :disabled="!clientesLeadQuantidadeMarcados() || !!clientesLeadLote" class="h-9 px-3 bg-emerald-700 text-white rounded-lg text-xs disabled:opacity-40">Arquivar selecionados</button>
+            <button type="button" @click="clientesLeadCancelarSelecao()" :disabled="!!clientesLeadLote" class="h-9 px-3 text-blue-800 text-xs">Cancelar seleção</button>
+          </div>
+          <div aria-live="polite" class="space-y-2 mb-3">
+            <p x-show="clientesLeadLote" class="p-3 rounded-lg bg-blue-50 text-blue-800 text-sm" x-text="'Arquivando '+(clientesLeadLote?.feitos||0)+' de '+(clientesLeadLote?.total||0)+' cards…'"></p>
+            <p x-show="clientesLeadAviso" class="p-3 rounded-lg bg-emerald-50 text-emerald-800 text-sm" x-text="clientesLeadAviso"></p>
+            <p x-show="clientesLeadErro" role="alert" class="p-3 rounded-lg bg-amber-50 text-amber-900 text-sm" x-text="clientesLeadErro"></p>
+          </div>
+
+          <div class="flex flex-wrap justify-between gap-2 mb-3 text-xs text-gray-500">
+            <p><b class="text-gray-800" x-text="clientesLeadCardsDoQuadro().length"></b> cards <span x-text="clientesMostrarArquivados?'arquivados':'ativos'"></span> nos filtros atuais</p>
+            <p x-show="!clientesMostrarArquivados"><span class="hidden sm:inline">Arraste os cards ou use “Mover etapa” · </span>Prioridade para quem aguarda a equipe</p>
+          </div>
+          <div class="overflow-x-auto pb-4" role="region" aria-label="Etapas do Kanban" tabindex="0">
+            <div class="grid grid-cols-5 gap-3 min-w-[1120px]">
+              <template x-for="lane in clientesLeadEtapas" :key="'kanban-'+lane.id">
+                <div class="border border-gray-200 border-t-[3px] rounded-xl bg-gray-50/80 p-2 min-h-[430px]" :class="lane.border" @dragover.prevent @drop.prevent="clienteLeadDrop(lane.id)">
+                  <div class="flex items-center gap-2 px-1 py-2.5 mb-1"><h3 class="text-xs font-semibold text-gray-800" x-text="lane.label"></h3><span class="text-xs px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div>
+                  <div class="space-y-2.5">
+                    <template x-for="c in clientesLeadsVisiveis(lane.id)" :key="'lead-'+c.id">
+                      <button type="button" :id="'lead-card-'+c.id" x-effect="if(currentPage==='clientes' && clientesTab==='leads') carregarClienteLeadFoto(c)" @click="abrirClienteLead(c)" :disabled="!!clientesLeadLote" :aria-label="(clientesLeadSelecionando?'Selecionar ':'Abrir lead ')+c.name" :aria-pressed="clientesLeadSelecionando?clientesLeadMarcados.includes(c.id):clienteSelecionadoId===c.id && clienteLeadDetalheAberto" :draggable="clienteLeadPodeMover(c)" @dragstart="clienteLeadDragStart(c,$event)" @dragend="clienteLeadDragEnd()" class="w-full border rounded-xl bg-white text-left overflow-hidden shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:opacity-60" :class="[clienteLeadArrastandoId===c.id?'opacity-50':'',clientesLeadMarcados.includes(c.id)||clienteSelecionadoId===c.id&&clienteLeadDetalheAberto?'border-emerald-600 bg-emerald-50/30':'border-gray-200 hover:border-emerald-300']">
+                        <div class="p-3">
+                          <div class="flex items-start gap-2.5">
+                            <span class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0 overflow-hidden text-xs font-semibold">
+                              <template x-if="clienteLeadFoto(c)"><img :src="clienteLeadFoto(c)" alt="" @error="clienteLeadFotoFalhou(c)" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="w-full h-full object-cover"></template>
+                              <span x-show="!clienteLeadFoto(c)" x-text="initials(c.name||'')"></span>
+                            </span>
+                            <span class="min-w-0 flex-1"><span class="block font-semibold text-sm truncate text-gray-900" x-text="c.name"></span><span class="inline-flex gap-1.5 items-center text-xs text-gray-500 mt-1"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5"></template><span x-text="clienteLeadCanalLabel(c)"></span></span></span>
+                            <span x-show="clientesLeadSelecionando" class="w-4 h-4 shrink-0 border rounded flex items-center justify-center text-[10px]" :class="clientesLeadMarcados.includes(c.id)?'bg-emerald-700 border-emerald-700 text-white':'border-gray-300'" x-text="clientesLeadMarcados.includes(c.id)?'✓':''"></span>
+                            <span x-show="!clientesLeadSelecionando && clienteLeadPodeMover(c)" aria-hidden="true" class="text-gray-400"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i></span>
+                          </div>
+                          <p x-show="c.name_needs_review" class="mt-2 text-[10px] font-medium text-amber-700">Nome pendente no Chatwoot</p>
+                          <span x-show="c.is_vip" class="inline-block text-[10px] bg-amber-50 text-amber-800 rounded px-1.5 py-0.5 mt-2">★ VIP</span>
+                          <p class="text-xs text-gray-800 mt-3 truncate" x-text="c.last_item||'Interesse não informado'"></p>
+                          <p x-show="c.lead_location" class="text-[11px] text-gray-500 mt-1.5 truncate" x-text="c.lead_location"></p>
+                          <p x-show="lane.id==='orcamento' && c.lead_quote_amount" class="text-sm font-semibold text-emerald-900 mt-2" x-text="formatCurrency(c.lead_quote_amount)"></p>
+                          <p x-show="lane.id==='convertido' && c.lead_order_amount" class="text-sm font-semibold text-emerald-900 mt-2" x-text="formatCurrency(c.lead_order_amount)"></p>
+                          <div class="flex flex-wrap items-center gap-1.5 mt-3"><span class="text-[10px] px-1.5 py-1 rounded-md font-medium" :class="c.lead_waiting_on==='equipe' && !['perdido','convertido'].includes(lane.id)?'bg-rose-50 text-rose-700':lane.tone" x-text="clienteLeadEspera(c)"></span><span class="text-[10px] text-gray-500" x-text="clienteLeadTempo(c)"></span></div>
+                          <div class="border-t border-gray-100 mt-3 pt-2"><span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded" :class="clienteLeadManual(c)?'bg-blue-50 text-blue-800':'bg-emerald-50 text-emerald-800'"><span aria-hidden="true" x-text="clienteLeadManual(c)?'↔':'↻'"></span><span x-text="clienteLeadManual(c)?'Manual':'Automático'"></span></span><p class="text-[10px] text-gray-500 mt-1" x-text="clienteLeadOrigemEtapa(c)"></p></div>
+                        </div>
+                        <div class="border-t border-gray-100 py-2 px-3 text-xs text-emerald-900 flex justify-between"><span x-text="clientesLeadSelecionando?'Selecionar card':'Ver detalhes'"></span><span aria-hidden="true">→</span></div>
+                      </button>
+                    </template>
+                    <button type="button" x-show="clientesLeads(lane.id).length>clientesLeadsVisiveis(lane.id).length" @click="clienteLeadMostrarMais(lane.id)" class="w-full py-2 text-xs font-medium text-emerald-800">Mostrar mais</button>
+                    <p x-show="!clientesLeads(lane.id).length" class="text-xs text-gray-400 text-center py-12">Nenhum lead nesta etapa</p>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak @click="fecharClienteLeadDetalhe()" class="fixed inset-0 bg-gray-900/25 z-[70]"></div>
+          <aside x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak role="dialog" aria-modal="true" aria-labelledby="cliente-lead-titulo" @keydown.escape.window="if(clienteLeadDetalheAberto) fecharClienteLeadDetalhe()" @keydown="clienteLeadFoco($event)" class="fixed inset-y-0 right-0 z-[71] w-full max-w-sm bg-white border-l border-gray-200 shadow-xl flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-gray-100"><h2 id="cliente-lead-titulo" class="text-base font-semibold">Lead selecionado</h2><button id="cliente-lead-fechar" type="button" @click="fecharClienteLeadDetalhe()" aria-label="Fechar detalhes do lead" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+            <div class="p-5 overflow-y-auto flex-1">
+              <div class="flex items-center gap-3 mb-5"><span class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center overflow-hidden shrink-0 font-semibold"><template x-if="clienteLeadFoto(clienteLeadSelecionado())"><img :src="clienteLeadFoto(clienteLeadSelecionado())" alt="" @error="clienteLeadFotoFalhou(clienteLeadSelecionado())" referrerpolicy="no-referrer" class="w-full h-full object-cover"></template><span x-show="!clienteLeadFoto(clienteLeadSelecionado())" x-text="initials(clienteLeadSelecionado()?.name||'')"></span></span><div class="min-w-0"><p class="text-base font-semibold break-words" x-text="clienteLeadSelecionado()?.name"></p><p class="text-xs text-gray-500 mt-1" x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></p><p x-show="clienteLeadFoto(clienteLeadSelecionado())" class="text-[10px] text-gray-400 mt-1">Foto via Chatwoot</p></div></div>
+              <p class="inline-block px-2 py-1 rounded-md bg-emerald-50 text-emerald-900 text-xs font-medium mb-4" x-text="clienteLeadEtapaLabel(clienteLeadSelecionado())"></p>
+              <p x-show="clienteLeadSelecionado()?.lead_archived" class="text-xs text-amber-800 bg-amber-50 p-2 rounded mb-3">Card arquivado · histórico preservado</p>
+              <dl class="text-xs divide-y divide-gray-100 border-y border-gray-100">
+                <div class="flex justify-between py-3"><dt class="text-gray-500">Canal</dt><dd x-text="clienteLeadCanalLabel(clienteLeadSelecionado())"></dd></div>
+                <div class="flex justify-between gap-4 py-3"><dt class="text-gray-500">Interesse</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></dd></div>
+                <div class="flex justify-between gap-4 py-3"><dt class="text-gray-500">Local</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.lead_location||'Não informado'"></dd></div>
+                <div x-show="clienteLeadSelecionado()?.lead_quote_amount" class="flex justify-between py-3"><dt class="text-gray-500">Cotação</dt><dd class="font-semibold text-emerald-900" x-text="formatCurrency(clienteLeadSelecionado()?.lead_quote_amount)"></dd></div>
+                <div x-show="clienteLeadSelecionado()?.lead_order_amount" class="flex justify-between py-3"><dt class="text-gray-500">Pedido confirmado</dt><dd class="font-semibold text-emerald-900" x-text="formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></dd></div>
+              </dl>
+              <div x-show="!clienteLeadSelecionado()?.lead_archived && clienteLeadLane(clienteLeadSelecionado())!=='convertido'" class="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-4">
+                <p class="text-sm font-semibold">Controle da etapa</p>
+                <p class="text-xs mt-2 font-medium" :class="clienteLeadManual(clienteLeadSelecionado())?'text-blue-800':'text-emerald-800'" x-text="clienteLeadManual(clienteLeadSelecionado())?'Manual · etapa mantida pela equipe':'Automático · acompanha a conversa'"></p>
+                <label class="block mt-3"><span class="block text-xs text-gray-500 mb-1">Mover etapa</span><select :value="clienteLeadLane(clienteLeadSelecionado())" @change="alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm"><option value="novo">Novo</option><option value="atendimento">Em atendimento</option><option value="orcamento">Orçamento enviado</option><option value="perdido">Perdido</option></select></label>
+                <button type="button" x-show="!clienteLeadManual(clienteLeadSelecionado())" @click="assumirControleClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-gray-300 bg-white rounded-lg text-xs mt-2 disabled:opacity-40">Manter esta etapa manualmente</button>
+                <button type="button" x-show="clienteLeadManual(clienteLeadSelecionado())" @click="retomarClienteLeadAutomatico(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-emerald-700 text-emerald-800 bg-white rounded-lg text-xs mt-2 disabled:opacity-40">Retomar automático</button>
+              </div>
+              <p x-show="clienteLeadLane(clienteLeadSelecionado())==='convertido'" class="text-xs text-emerald-800 bg-emerald-50 p-3 rounded-lg mt-4">Etapa confirmada pela venda. Mover cards não altera o financeiro.</p>
+              <div class="mt-4 p-3 bg-amber-50 rounded-lg text-xs text-amber-900"><p x-text="clienteLeadEspera(clienteLeadSelecionado())"></p><p class="mt-1" x-text="clienteLeadTempo(clienteLeadSelecionado())"></p></div>
+              <a x-show="clienteLeadConversaUrl(clienteLeadSelecionado())" :href="clienteLeadConversaUrl(clienteLeadSelecionado())" target="_blank" rel="noopener noreferrer" class="w-full min-h-[42px] mt-4 px-3 bg-emerald-700 text-white rounded-lg text-sm inline-flex items-center justify-center gap-2"><i data-lucide="messages-square" class="w-4 h-4"></i>Abrir conversa no Chatwoot</a>
+              <p x-show="!clienteLeadConversaUrl(clienteLeadSelecionado())" class="mt-3 text-xs text-gray-500">Link da conversa indisponível. Confira a conexão com o Chatwoot.</p>
+              <button type="button" x-show="Number(clienteLeadSelecionado()?.purchases||0)>0" @click="fecharClienteLeadDetalhe();abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full h-10 mt-2 border border-gray-200 rounded-lg text-xs">Histórico de compras</button>
+              <button type="button" x-show="!clienteLeadSelecionado()?.lead_archived" @click="arquivarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 mt-2 border border-gray-300 text-gray-600 rounded-lg text-xs disabled:opacity-40">Arquivar card</button>
+              <button type="button" x-show="clienteLeadSelecionado()?.lead_archived" @click="restaurarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 mt-2 border border-amber-500 text-amber-800 rounded-lg text-xs disabled:opacity-40">Restaurar card</button>
+              <div aria-live="polite"><p x-show="clientesLeadAviso" class="mt-3 text-xs text-emerald-800" x-text="clientesLeadAviso"></p><p x-show="clientesLeadErro" class="mt-3 text-xs text-amber-800" x-text="clientesLeadErro"></p></div>
+              <dl class="border-t border-gray-100 mt-5 pt-3 text-xs space-y-3"><div class="flex justify-between"><dt class="text-gray-500">Lead recebido</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_created_at)"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Última mensagem</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_last_message_at)"></dd></div><div x-show="clienteLeadSelecionado()?.lead_board_updated_at" class="flex justify-between"><dt class="text-gray-500">Último ajuste no quadro</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_board_updated_at)"></dd></div></dl>
+            </div>
+          </aside>
         </section>
 
         <!-- 3. COMPRADORES -->

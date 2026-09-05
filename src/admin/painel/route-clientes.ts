@@ -8,6 +8,7 @@ import { subscribeClientesKanban, type ClientesKanbanEvent } from '../../shared/
 import { registerCustomerIdentityRoutes } from './route-clientes-identity.js';
 import { registerCustomerPrivacyRoutes } from './route-clientes-privacy.js';
 import { updateCustomerLeadBoard } from './customer-lead-board.js';
+import { getCustomerLeadAvatar } from './customer-lead-avatar.js';
 
 const MAX_SSE_PER_IP = 12;
 const sseByIp = new Map<string, number>();
@@ -22,6 +23,7 @@ const leadActionSchema = z.discriminatedUnion('action', [
     lane: z.enum(['novo','atendimento','orcamento','perdido']) }),
   z.object({ ...leadBaseSchema, action: z.literal('archive') }),
   z.object({ ...leadBaseSchema, action: z.literal('restore') }),
+  z.object({ ...leadBaseSchema, action: z.literal('automatic') }),
 ]);
 
 function acquireSseSlot(ip: string): (() => void) | null {
@@ -72,11 +74,28 @@ export async function registerPainelClientes(fastify: FastifyInstance): Promise<
       if (['lead_version_conflict','idempotency_conflict','idempotency_incomplete'].includes(code)) {
         return reply.status(409).send({ error: code });
       }
-      if (['lead_lane_required','lead_version_invalid','lead_board_state_not_found'].includes(code)) {
+      if (['lead_lane_required','lead_version_invalid','lead_board_state_not_found','lead_archived'].includes(code)) {
         return reply.status(400).send({ error: code });
       }
       request.log.error({ err: error }, 'clientes: falha ao atualizar quadro');
       return reply.status(500).send({ error: 'lead_board_failed' });
+    }
+  });
+
+  fastify.get('/admin/api/clientes/leads/:conversationId/avatar', { preHandler: requireAdminAuth }, async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    if (env.MATRIZ_CUSTOMER_IDENTITY && getAdminContext(request).role !== 'owner') {
+      return reply.status(403).send({ error: 'admin_owner_required' });
+    }
+    const params = leadParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      return reply.send({ avatar_url: await getCustomerLeadAvatar(params.data.conversationId, env.FAREJADOR_ENV) });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'lead_conversation_not_found') {
+        return reply.status(404).send({ error: 'lead_conversation_not_found' });
+      }
+      return reply.status(503).send({ error: 'lead_avatar_unavailable' });
     }
   });
 

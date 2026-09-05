@@ -24,6 +24,7 @@ describe('regras unificadas de Clientes', () => {
     expect(result).toMatchObject({
       name:'Cliente sem nome',name_needs_review:true,is_vip:true,vip_min_purchases:3,
       lead_derived_lane:'novo',lead_lane:'orcamento',lead_archived:true,lead_board_version:2,
+      lead_manual_lane:'orcamento',
     });
   });
 
@@ -33,5 +34,15 @@ describe('regras unificadas de Clientes', () => {
       archived_at:null,archive_reason:null,version:1,updated_at:'2026-08-21T00:00:00Z',
     }]);
     expect(result?.lead_lane).toBe('convertido');
+  });
+
+  it('a escolha manual sobrevive ao progresso automático; voltar ao automático usa a etapa atual', () => {
+    const state = { conversation_id:'00000000-0000-4000-8000-000000000001',manual_lane:'atendimento' as const,
+      archived_at:null,archive_reason:null,version:2,updated_at:'2026-09-05T00:00:00Z' };
+    expect(applyClienteBusinessRules([row({ lead_lane:'orcamento' })],[state])[0]).toMatchObject({
+      lead_lane:'atendimento',lead_derived_lane:'orcamento',lead_manual_lane:'atendimento',
+    });
+    expect(applyClienteBusinessRules([row({ lead_lane:'orcamento' })],[{ ...state,manual_lane:null }])[0])
+      .toMatchObject({ lead_lane:'orcamento',lead_manual_lane:null });
   });
 });

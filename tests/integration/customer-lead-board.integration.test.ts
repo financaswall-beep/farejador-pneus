@@ -74,4 +74,16 @@ describe('quadro operacional de Clientes', () => {
        VALUES('prod',$1,'intruso')`,[conversationId],
     )).rejects.toThrow(/customer_lead_conversation_not_found/);
   });
+
+  it('retoma automático com idempotência, versão e preservação dos dados', async () => {
+    const key = randomUUID();
+    const input = { environment:'test' as const,conversationId,action:'automatic' as const,
+      expectedVersion:3,actor:'Dono teste',idempotencyKey:key };
+    expect(await updateBoard(input,db.pool)).toMatchObject({ manual_lane:null,archived:false,version:4 });
+    expect(await updateBoard(input,db.pool)).toMatchObject({ manual_lane:null,version:4,replayed:true });
+    const state = await db.pool.query('SELECT manual_lane,version FROM ops.customer_lead_board_state WHERE conversation_id=$1',[conversationId]);
+    expect(state.rows[0]).toMatchObject({ manual_lane:null,version:4 });
+    await expect(updateBoard({ ...input,environment:'prod',idempotencyKey:randomUUID() },db.pool))
+      .rejects.toThrow('lead_conversation_not_found');
+  });
 });

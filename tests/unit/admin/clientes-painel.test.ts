@@ -54,6 +54,7 @@ describe('painel de clientes', () => {
     const nav = readFileSync('painel/public/app.nav.js', 'utf8');
     const staticRoute = readFileSync('src/admin/painel/route-static.ts', 'utf8');
     const identityUi = readFileSync('painel/public/app.clientes.identity.js', 'utf8');
+    const leadsUi = readFileSync('painel/public/app.clientes.leads.js', 'utf8');
 
     for (const label of ['Todos', 'Leads', 'Compradores', 'Recompra', 'Parceiros']) {
       expect(html).toContain(`label:'${label}'`);
@@ -67,10 +68,10 @@ describe('painel de clientes', () => {
     expect(html).toContain('Nomes, telefones');
     expect(identityUi).toContain("confirmation:'UNIR IDENTIDADES'");
     expect(identityUi).toContain("request_type:requestType");
-    expect(html).toContain("id:'convertido',label:'Convertidos'");
-    expect(html).toContain("id:'perdido',label:'Perdidos'");
-    expect(html).toContain("panel:'bg-rose-100 border-rose-300'");
-    expect(html).toContain("panel:'bg-emerald-100 border-emerald-300'");
+    expect(leadsUi).toContain("id:'convertido',label:'Convertidos'");
+    expect(leadsUi).toContain("id:'perdido',label:'Perdidos'");
+    expect(html).toContain('Quadro de leads da Matriz');
+    expect(html).toContain('Limpar quadro');
   });
 
   it('emite a invalidação do Kanban com ambiente, conversa e motivo', async () => {

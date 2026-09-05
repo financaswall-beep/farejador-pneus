@@ -6,7 +6,7 @@ import {
   recordIntegrityEvent, type MatrizEnvironment,
 } from './stage5-integrity.js';
 
-export type CustomerLeadAction = 'move' | 'archive' | 'restore';
+export type CustomerLeadAction = 'move' | 'archive' | 'restore' | 'automatic';
 export type CustomerLeadManualLane = 'novo' | 'atendimento' | 'orcamento' | 'perdido';
 
 export interface CustomerLeadBoardInput {
@@ -41,6 +41,7 @@ function normalizedReason(input: CustomerLeadBoardInput): string {
   if (supplied) return supplied;
   if (input.action === 'archive') return 'Lead arquivado pelo quadro';
   if (input.action === 'restore') return 'Lead restaurado no quadro';
+  if (input.action === 'automatic') return 'Movimentação automática retomada pela equipe';
   return 'Lead movido no quadro';
 }
 
@@ -93,8 +94,9 @@ export async function updateCustomerLeadBoard(
     );
     const before = beforeQuery.rows[0] ?? null;
     if (Number(before?.version ?? 0) !== input.expectedVersion) throw new Error('lead_version_conflict');
+    if (before?.archived_at && ['move', 'automatic'].includes(input.action)) throw new Error('lead_archived');
     let changed;
-    if (input.action === 'move') {
+    if (input.action === 'move' || input.action === 'automatic') {
       changed = await client.query<StateRow>(
         `INSERT INTO ops.customer_lead_board_state
            (environment,conversation_id,manual_lane,updated_by)
@@ -103,7 +105,7 @@ export async function updateCustomerLeadBoard(
            manual_lane=EXCLUDED.manual_lane,version=ops.customer_lead_board_state.version+1,
            updated_by=EXCLUDED.updated_by,updated_at=now()
          RETURNING manual_lane,archived_at,archived_by,archive_reason,version`,
-        [input.environment,input.conversationId,input.lane,input.actor],
+        [input.environment,input.conversationId,input.action === 'automatic' ? null : input.lane,input.actor],
       );
     } else if (input.action === 'archive') {
       changed = await client.query<StateRow>(
