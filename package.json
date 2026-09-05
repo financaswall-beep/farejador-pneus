@@ -15,6 +15,7 @@
     "build": "npm run build:css && tsc -p tsconfig.json",
     "start": "node dist/app/server.js",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build:css",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "node scripts/run-integration-batches.cjs",

@@ -48,3 +48,5 @@ O teste com banco real identificou e permitiu corrigir perda de precisão de tim
 A referência real de avatar foi consultada somente por leitura, e a prévia de navegador usou clientes fictícios. A única alteração em produção foi a migration autorizada, descrita acima. Nenhum envio de teste ou deploy da aplicação foi executado. Não substituir testes isolados por dry-run de mutações no banco de produção.
 
 A prova geral do painel passou integralmente. A pendência anterior de tamanho foi resolvida extraindo a função de leitura do token HTTP para `src/parceiro/request-token.ts`, sem alterar seu comportamento, com sete casos de regressão. O arquivo de rotas ficou com 1.671 linhas, abaixo do teto congelado de 1.678; o limite não foi ampliado.
+
+A primeira execução no GitHub identificou uma dependência de preparação: um teste do painel lê o CSS compilado, que não é versionado. `npm test` agora executa `build:css` no `pretest`, garantindo os mesmos artefatos em checkout limpo e no desenvolvimento local, sem remover ou enfraquecer testes.
