@@ -71,6 +71,7 @@ export function mapConversation(
   const meta = readNestedObject(rawPayload, 'meta');
   const metaSender = readNestedObject(meta, 'sender');
   const contactInbox = readNestedObject(rawPayload, 'contact_inbox');
+  const account = readNestedObject(rawPayload, 'account');
 
   const createdAt = parseTimestamp(p.created_at) ?? lastEventAt;
   const updatedAt = parseTimestamp(p.updated_at);
@@ -86,7 +87,7 @@ export function mapConversation(
   return {
     environment,
     chatwootConversationId: p.id,
-    chatwootAccountId: p.account_id ?? 0,
+    chatwootAccountId: p.account_id ?? readNestedNumber(account, 'id') ?? 0,
     chatwootInboxId: p.inbox_id ?? null,
     channelType: canonicalChannelType(rawPayload.channel)
       ?? canonicalChannelType(additionalAttributes.channel_type),

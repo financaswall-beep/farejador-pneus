@@ -52,6 +52,18 @@ describe('conversation.mapper', () => {
     expect(result.chatwootContactId).toBe(301);
   });
 
+  it('reads account id from the nested account used by current Chatwoot webhooks', () => {
+    const payload = {
+      ...conversationCreated,
+      account_id: undefined,
+      account: { id: 2, name: '2W PNEUS' },
+    };
+
+    const result = mapConversation(payload, environment, lastEventAt);
+
+    expect(result.chatwootAccountId).toBe(2);
+  });
+
   it('reads contact id from meta sender when contact_id and contact_inbox are missing', () => {
     const payload = {
       ...conversationCreated,

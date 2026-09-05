@@ -3,7 +3,7 @@
   "routes": [
     {
       "environment": "prod",
-      "chatwoot_account_id": 1,
+      "chatwoot_account_id": 2,
       "chatwoot_inbox_id": null,
       "segment": "generic"
     },
