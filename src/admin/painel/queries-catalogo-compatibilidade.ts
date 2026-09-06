@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
+import { applicationsForMeasure, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
 
 export interface CatalogCompatibilityRow {
   vehicle_model_id: string;
@@ -209,6 +210,7 @@ export async function getCatalogCompatibility(
   };
   summary: { models: number; fitments: number };
   rows: CatalogCompatibilityRow[];
+  applications: VehicleTireApplication[];
 }> {
   const product = await dbPool.query<{
     product_id: string;
@@ -254,6 +256,7 @@ export async function getCatalogCompatibility(
       fitments: fitments.rows.length,
     },
     rows: fitments.rows,
+    applications: applicationsForMeasure(selected.tire_size),
   };
 }
 

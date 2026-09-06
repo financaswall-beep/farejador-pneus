@@ -29,6 +29,20 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('exibe aplicações do fabricante separadas da aprovação de produtos', async () => {
+    const module = loadCatalogModule();
+    const app = { application_id: 'reference-1', make: 'Honda', model: 'CB 300F', position: 'rear' };
+    const context = { ...module, catalogoCompatibilidade: { row: { product_id: 'p1' }, applications: [] },
+      apiGet: vi.fn().mockResolvedValue({ rows: [], applications: [app], summary: { models: 0, fitments: 0 } }),
+      $nextTick: vi.fn() };
+    await module.catalogoCompatibilityLoad.call(context, 'p1');
+    expect(context.catalogoCompatibilidade.applications).toEqual([app]);
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('Aplicações consultadas no fabricante');
+    expect(html).toContain('catalogoCompatibilidade.applications');
+    expect(html).toContain('partnerCatalogo.applications');
+    expect(html).toContain('Não é homologação automática do produto em estoque');
+  });
   it('simplifica R e ZR só na apresentação, preservando a especificação original', () => {
     const module = loadCatalogModule();
     const row = Object.freeze({ product_type: 'tire', tire_size: '140/70R17',

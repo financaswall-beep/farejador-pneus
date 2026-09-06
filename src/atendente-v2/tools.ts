@@ -33,6 +33,7 @@ import { env } from '../shared/config/env.js';
 import { getMatrizWholesaleStockQty, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
+import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
@@ -540,21 +541,15 @@ export async function executeTool(
   try {
     switch (name) {
       case 'buscar_compatibilidade': {
-        const compatInput = {
-          environment,
-          moto_modelo: args.moto_modelo as string,
-          moto_ano: args.moto_ano as number | undefined,
-          posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
-          condicao_pneu: args.condicao_pneu as 'meia_vida' | 'novo' | 'remold' | undefined,
-          limit: 10,
-        };
+        const compatInput = compatibilityInput(environment, args);
+        const application = vehicleApplicationAnswer(compatInput);
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
         const result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
-        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        if (result.length === 0) return JSON.stringify(application ?? { encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
         const withApprovedFitments = vehiclesWithApprovedFitments(result);
-        if (withApprovedFitments.length === 0) return JSON.stringify({ encontrado: false,
+        if (withApprovedFitments.length === 0) return JSON.stringify(application ?? { encontrado: false,
           motivo: 'compatibilidade_nao_cadastrada', mensagem: 'A moto foi reconhecida, mas ainda não existe compatibilidade aprovada. Peça ao cliente a medida escrita no pneu; não adivinhe a medida.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) {
           await applyMatrizPricesToCompatibility(client, environment, withApprovedFitments);

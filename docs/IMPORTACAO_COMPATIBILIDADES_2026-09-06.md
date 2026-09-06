@@ -1,5 +1,7 @@
 # Importação da pesquisa de compatibilidades — 06/09/2026
 
+Atualização posterior: a base de aplicações do fabricante foi integrada ao catálogo e à consulta do bot, e os 10 vínculos incorretos foram retirados com auditoria. Veja `docs/APLICACOES_FABRICANTE_2026-09-06.md`. O relato abaixo registra a importação inicial das candidatas, não homologação de SKU.
+
 ## Resultado aplicado e verificado
 
 Lote `catalog-fitment-research-20260906-v1`, produção atual (São Paulo):
@@ -33,7 +35,7 @@ Para cada produto, conferir modelo comercial, inscrições laterais, posição p
 
 **Atenção:** a aprovação atual do painel propaga a associação para produtos de mesma medida. Não usar aprovação em lote sem conferir cada produto envolvido. O resumo de cada candidata também contém esse aviso.
 
-Também permanecem 10 vínculos antigos divergentes da pesquisa, que não foram removidos nesta importação aditiva:
+Na importação inicial foram preservados 10 vínculos antigos divergentes da pesquisa (retirados na correção posterior documentada acima):
 
 - Seis vínculos de produtos 90/90-10 como traseiros para Burgman 125i/Lindy 125. Os manuais consultados registram essa medida na dianteira e 100/90-10 na traseira.
 - Quatro vínculos de produtos 140/70-17 para ambos os eixos da CB 300F Twister. O manual consultado de 2025–2026 registra 110/70R17 dianteiro e 150/60R17 traseiro. Não estender a conclusão automaticamente a todos os anos do cadastro antigo.

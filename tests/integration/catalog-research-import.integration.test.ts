@@ -6,6 +6,8 @@ import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postg
 const require = createRequire(import.meta.url);
 const { planResearchImport, loadCatalog, insertPendingResearch }
   = require('../../scripts/catalog-fitment-research.cjs');
+const { correctionTargets, removeIncorrectFitments }
+  = require('../../scripts/correct-catalog-fitment-errors.cjs');
 let db: IntegrationDb;
 let applications: any[];
 let getCatalogFitmentDiscoveries: Function;
@@ -108,5 +110,60 @@ describe('importação de pesquisa de compatibilidades, sem homologação autom�
       expect(await loadCatalog(client, 'prod')).toHaveLength(0);
       expect((await client.query("SELECT id FROM commerce.fitment_discoveries WHERE environment='prod'")).rows).toHaveLength(0);
     } finally { client.release(); }
+  });
+
+  it('catálogo e ferramenta do bot consultam aplicações sem aprovar SKU ou alterar estoque', async () => {
+    const { getCatalogCompatibility } = await import('../../src/admin/painel/queries-catalogo-compatibilidade.js');
+    const { executeTool } = await import('../../src/atendente-v2/tools.js');
+    const client = await db.pool.connect();
+    try {
+      const before = await untouchedState();
+      const products = await loadCatalog(client, 'test');
+      const wheel = products.find((p: any) => p.tire_size === '90/90-10');
+      const catalog = await getCatalogCompatibility(wheel.product_id, 'test', db.pool);
+      expect(catalog.applications.some(a => a.model === 'Burgman 125i' && a.position === 'front')).toBe(true);
+      expect(catalog.applications.some(a => a.model === 'Lindy 125' && a.position === 'rear')).toBe(false);
+      const result = JSON.parse(await executeTool(client, 'test', randomUUID(), 'buscar_compatibilidade', {
+        moto_modelo: 'CB 300F', moto_ano: 2026, posicao_pneu: 'rear',
+      }));
+      expect(result).toMatchObject({ encontrado: true, produto_confirmado: false, estoque_consultado: false });
+      expect(result.aplicacoes[0]).toMatchObject({ tire_size: '150/60R17', position: 'rear' });
+      expect(await untouchedState()).toEqual(before);
+    } finally { client.release(); }
+  });
+
+  it('corrige só os vínculos conhecidos, preserva auditoria e permite rollback integral', async () => {
+    const client = await db.pool.connect();
+    try {
+      const before = await untouchedState();
+      await client.query('BEGIN');
+      const products = await loadCatalog(client, 'test');
+      for (const [make, model, size, position] of [
+        ['Suzuki', 'Burgman 125i', '90/90-10', 'rear'],
+        ['Haojue', 'Lindy 125', '90/90-10', 'rear'],
+        ['Honda', 'CB 300F Twister', '140/70-17', 'both'],
+        ['Honda', 'Modelo de controle', '140/70-17', 'rear'],
+      ]) {
+        const vehicleId = randomUUID();
+        await client.query(`INSERT INTO commerce.vehicle_models(id,environment,vehicle_type,make,model)
+          VALUES ($1,'test','motorcycle',$2,$3)`, [vehicleId, make, model]);
+        const spec = products.find((p: any) => p.tire_size === size);
+        await client.query(`INSERT INTO commerce.vehicle_fitments
+          (environment,vehicle_model_id,tire_spec_id,position,is_oem,source)
+          VALUES ('test',$1,$2,$3,false,'manual')`, [vehicleId, spec.tire_spec_id, position]);
+      }
+      const targets = await correctionTargets(client, 'test');
+      expect(targets).toHaveLength(3);
+      expect(await removeIncorrectFitments(client, 'test', targets)).toBe(3);
+      expect(await correctionTargets(client, 'test')).toHaveLength(0);
+      expect((await client.query(`SELECT count(*)::int total FROM commerce.vehicle_fitments`)).rows[0].total).toBe(1);
+      const audit = await client.query(`SELECT payload_before FROM audit.events
+        WHERE event_type='catalog_incorrect_fitment_removed' AND environment='test'`);
+      expect(audit.rows).toHaveLength(3);
+      expect(audit.rows.every(r => r.payload_before.fitment.id)).toBe(true);
+      await expect(removeIncorrectFitments(client, 'prod', targets)).rejects.toThrow('invalid_correction_target');
+      await client.query('ROLLBACK');
+      expect(await untouchedState()).toEqual(before);
+    } finally { await client.query('ROLLBACK'); client.release(); }
   });
 });

@@ -5,7 +5,7 @@ import { moneyCents } from '../../shared/catalog-pricing.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
-
+import { applicationsForMeasure } from '../../shared/vehicle-tire-applications.js';
 interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
   tire_condition: TireCondition | null;
@@ -35,7 +35,6 @@ function brandKey(value: string | null | undefined): string {
     .toLowerCase().replace(/[^a-z0-9]+/g, '');
   return normalized === 'semmarca' ? '' : normalized;
 }
-
 function catalogVariantKey(
   measure: string | null | undefined,
   brand: string | null | undefined,
@@ -131,6 +130,7 @@ export async function getCatalogOverview(
     return {
       ...product,
       compatibility_count: Number(product.compatibility_count ?? 0),
+      application_count: applicationsForMeasure(product.tire_size).length,
       row_key: `product:${product.product_id}`,
       catalogued: true,
       price_amount: price,

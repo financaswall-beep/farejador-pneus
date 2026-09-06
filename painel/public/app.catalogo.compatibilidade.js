@@ -9,6 +9,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         open: true,
         row,
         rows: [],
+        applications: [],
         summary: { models: 0, fitments: 0 },
         loading: true,
         error: null,
@@ -35,10 +36,12 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         );
         if (this.catalogoCompatibilidade.row?.product_id !== productId) return;
         this.catalogoCompatibilidade.rows = Array.isArray(data.rows) ? data.rows : [];
+        this.catalogoCompatibilidade.applications = Array.isArray(data.applications) ? data.applications : [];
         this.catalogoCompatibilidade.summary = data.summary || { models: 0, fitments: 0 };
       } catch {
         if (this.catalogoCompatibilidade.row?.product_id !== productId) return;
         this.catalogoCompatibilidade.rows = [];
+        this.catalogoCompatibilidade.applications = [];
         this.catalogoCompatibilidade.summary = { models: 0, fitments: 0 };
         this.catalogoCompatibilidade.error = 'Não foi possível carregar as compatibilidades.';
       } finally {
@@ -54,6 +57,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         open: false,
         row: null,
         rows: [],
+        applications: [],
         summary: { models: 0, fitments: 0 },
         loading: false,
         error: null,

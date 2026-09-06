@@ -11,7 +11,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
         products: 0, brands: 0, with_local_stock: 0,
         without_local_price: 0, local_units_available: 0,
       },
-      selected: null, compatibility: [], compatibilitySummary: null,
+      selected: null, compatibility: [], applications: [], compatibilitySummary: null,
       compatibilityLoading: false, compatibilityError: null,
     },
 
@@ -133,6 +133,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
       const state = this.partnerCatalogo;
       state.selected = row;
       state.compatibility = [];
+      state.applications = [];
       state.compatibilitySummary = null;
       state.compatibilityError = null;
       state.compatibilityLoading = true;
@@ -142,6 +143,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
         );
         state.selected = { ...row, ...(payload.product || {}) };
         state.compatibility = Array.isArray(payload.rows) ? payload.rows : [];
+        state.applications = Array.isArray(payload.applications) ? payload.applications : [];
         state.compatibilitySummary = payload.summary || { models: 0, fitments: 0 };
       } catch (_) {
         state.compatibilityError = 'Não foi possível carregar as motos compatíveis.';
@@ -153,6 +155,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
     partnerCatalogoCloseCompatibility() {
       this.partnerCatalogo.selected = null;
       this.partnerCatalogo.compatibility = [];
+      this.partnerCatalogo.applications = [];
       this.partnerCatalogo.compatibilitySummary = null;
       this.partnerCatalogo.compatibilityError = null;
     },
@@ -160,7 +163,7 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
       return [row.make, row.model, row.variant].filter(Boolean).join(' ');
     },
     partnerCatalogoYears(row) {
-      if (!row.year_start && !row.year_end) return 'Todos os anos cadastrados';
+      if (!row.year_start && !row.year_end) return 'Anos não informados';
       if (row.year_start && row.year_end && row.year_start !== row.year_end) {
         return `${row.year_start} a ${row.year_end}`;
       }
