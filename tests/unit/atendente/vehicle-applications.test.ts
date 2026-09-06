@@ -75,6 +75,8 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     expect(answer?.aplicacoes[0]).toMatchObject({ tire_size: '150/60R17', position: 'rear', product_fitment_confirmed: false });
     expect(answer).not.toHaveProperty('veiculos');
     expect(answer).not.toHaveProperty('preco');
+    expect(answer).toMatchObject({ referencia_em_uso: true, requer_aprovacao_manual_da_referencia: false,
+      consultas_de_produto: [{ medida_pneu: '150/60-17' }] });
   });
 
   it('pede confirmação de ambiguidade e de ano não delimitado', () => {
@@ -83,6 +85,19 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Lindy 125', moto_ano: 2020 })))
       .toMatchObject({ precisa_confirmar_ano: true });
     expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Modelo inexistente' }))).toBeNull();
+  });
+
+  it('prepara busca nominal por condição sem confundir posição da aplicação com posição do SKU', () => {
+    const answer = vehicleApplicationAnswer(compatibilityInput('prod', {
+      moto_modelo: 'Fazer 250', moto_ano: 2025, posicao_pneu: 'rear', condicao_pneu: 'meia_vida',
+    }));
+    expect(answer?.consultas_de_produto).toEqual([{ medida_pneu: '140/70-17', condicao_pneu: 'meia_vida' }]);
+    expect(answer?.aplicacoes[0]?.position).toBe('rear');
+    expect(answer?.produto_confirmado).toBe(false);
+    for (const args of [{ moto_modelo: 'Fan' }, { moto_modelo: 'Fazer 250', moto_ano: 2025 },
+      { moto_modelo: 'Lindy 125', moto_ano: 2020, posicao_pneu: 'rear' }]) {
+      expect(vehicleApplicationAnswer(compatibilityInput('prod', args))?.consultas_de_produto).toEqual([]);
+    }
   });
 
   it('não deixa consumidor alterar o catálogo compartilhado', () => {

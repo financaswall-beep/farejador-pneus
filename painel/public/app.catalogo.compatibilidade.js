@@ -137,6 +137,10 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       const state = this.catalogoCompatibilidade;
       const productId = state.row?.product_id;
       if (this.adminUser?.role !== 'owner' || !productId || state.saving) return;
+      if (item.active_reference) {
+        state.message = { ok: true, text: 'Esta referência já está em uso pelo Bot. Não precisa aprovar para consultar por medida.' };
+        return;
+      }
       const action = decision === 'approve' ? 'aprovar' : 'rejeitar';
       const reason = window.prompt(`Motivo para ${action} esta pesquisa:`);
       if (!reason || reason.trim().length < 2) return;

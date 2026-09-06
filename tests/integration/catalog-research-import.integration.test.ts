@@ -85,6 +85,13 @@ describe('importação de pesquisa de compatibilidades, sem homologação autom�
       expect(radial.evidence_summary).toContain('140/70R17');
       const displayed = await getCatalogFitmentDiscoveries(products.find((p: any) => p.tire_size === '140/70-17').product_id, 'test', db.pool);
       expect(displayed.some((r: any) => r.discovery_id === radial.id)).toBe(true);
+      expect(displayed.find((r: any) => r.discovery_id === radial.id)).toMatchObject({
+        status: 'pending', active_reference: { scope: 'manufacturer_measure', product_fitment_confirmed: false },
+      });
+      for (const product of products) {
+        const historical = await getCatalogFitmentDiscoveries(product.product_id, 'test', db.pool);
+        expect(historical.every((r: any) => r.active_reference !== null)).toBe(true);
+      }
       const audit = await client.query(`SELECT count(*)::int total FROM audit.events
         WHERE event_type='catalog_fitment_candidate_created'
           AND payload_after->>'batch'=$1`, [plan.batch]);
@@ -128,6 +135,18 @@ describe('importação de pesquisa de compatibilidades, sem homologação autom�
       }));
       expect(result).toMatchObject({ encontrado: true, produto_confirmado: false, estoque_consultado: false });
       expect(result.aplicacoes[0]).toMatchObject({ tire_size: '150/60R17', position: 'rear' });
+      const noSql = { query: async () => { throw new Error('A referência não depende de aprovação no banco'); } } as any;
+      const direct = JSON.parse(await executeTool(noSql, 'test', randomUUID(), 'buscar_compatibilidade', {
+        moto_modelo: 'Fazer 250', moto_ano: 2025, posicao_pneu: 'rear', condicao_pneu: 'novo',
+      }));
+      expect(direct).toMatchObject({ encontrado: true, requer_aprovacao_manual_da_referencia: false,
+        consultas_de_produto: [{ medida_pneu: '140/70-17', condicao_pneu: 'novo' }] });
+      const lookup = JSON.parse(await executeTool(client, 'test', randomUUID(), 'buscar_produto',
+        direct.consultas_de_produto[0]));
+      expect(lookup.encontrado).toBe(true);
+      expect(lookup.produtos).toHaveLength(2);
+      expect(lookup.produtos.every((p: any) => p.tire_size === '140/70-17' && p.tire_condition === 'novo')).toBe(true);
+      expect(lookup.precisa_localizacao).toBe(true);
       expect(await untouchedState()).toEqual(before);
     } finally { client.release(); }
   });

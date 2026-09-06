@@ -42,6 +42,19 @@ describe('catalogo no painel', () => {
     expect(html).toContain('catalogoCompatibilidade.applications');
     expect(html).toContain('partnerCatalogo.applications');
     expect(html).toContain('Não é homologação automática do produto em estoque');
+    expect(html).toContain('Em uso pelo Bot — não precisa aprovar uma por uma.');
+    expect(html).toContain('catalogoCompatibilidade.discoveries.filter(item => !item.active_reference)');
+    expect(html).toContain('Ver registro original');
+  });
+
+  it('não exige clique nem envia promoção para referência já em uso', async () => {
+    const module = loadCatalogModule();
+    const context = { ...module, adminUser: { role: 'owner' },
+      catalogoCompatibilidade: { row: { product_id: 'p1' }, saving: false, message: null },
+      apiPost: vi.fn() };
+    await module.catalogoDiscoveryReview.call(context, { discovery_id: 'd1', active_reference: {} }, 'approve');
+    expect(context.apiPost).not.toHaveBeenCalled();
+    expect(context.catalogoCompatibilidade.message).toMatchObject({ ok: true });
   });
   it('simplifica R e ZR só na apresentação, preservando a especificação original', () => {
     const module = loadCatalogModule();

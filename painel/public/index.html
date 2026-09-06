@@ -176,7 +176,7 @@
 <script src="/admin/painel/app.galpao.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.catalogo.js?v=20260906-measure-display1"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260823-fitment1"></script>
-<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260906-applications1"></script>
+<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260906-active-references2"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
@@ -9797,6 +9797,7 @@
 
           <section x-show="catalogoCompatibilidade.applications?.length > 0" class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
             <h3 class="text-sm font-bold text-emerald-950">Aplicações consultadas no fabricante</h3>
+            <p class="mt-1 text-xs font-semibold text-emerald-800">Em uso pelo Bot — não precisa aprovar uma por uma.</p>
             <p class="mt-1 text-[11px] leading-4 text-gray-600">Relação moto, medida e posição. Respeite ano/versão, construção e índices. Não é homologação automática do produto em estoque.</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-2">
               <template x-for="app in (catalogoCompatibilidade.applications || [])" :key="app.application_id">
@@ -9812,9 +9813,22 @@
             </div>
           </section>
 
-          <section x-show="catalogoCompatibilidade.discoveriesLoading || catalogoCompatibilidade.discoveries.length > 0" class="mt-5">
-            <div class="flex items-center justify-between"><div><p class="text-sm font-semibold text-gray-950">Fila de pesquisa</p><p class="text-[10px] text-gray-500">Evidências preservadas, inclusive as rejeitadas.</p></div><i x-show="catalogoCompatibilidade.discoveriesLoading" data-lucide="loader-circle" class="h-4 w-4 animate-spin text-gray-400"></i></div>
-            <div class="mt-3 space-y-2"><template x-for="item in catalogoCompatibilidade.discoveries" :key="item.discovery_id"><article class="rounded-xl border border-blue-100 bg-blue-50/50 p-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-xs font-bold text-gray-950" x-text="[item.make,item.model,item.variant].filter(Boolean).join(' ')"></p><a x-show="item.source_url" :href="item.source_url" target="_blank" rel="noopener noreferrer" class="mt-1 block truncate text-[10px] text-blue-700 underline" x-text="item.source_title || item.source_url"></a></div><span :class="item.status === 'pending' ? 'bg-amber-100 text-amber-800' : item.status === 'promoted' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'" class="shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold" x-text="item.status === 'pending' ? 'Pendente' : item.status === 'promoted' ? 'Aprovada' : item.status === 'rejected' ? 'Rejeitada' : item.status"></span></div><p class="mt-2 text-[10px] leading-4 text-gray-600" x-text="item.evidence_summary || 'Sem resumo'"></p><div x-show="item.status === 'pending' && adminUser?.role === 'owner'" class="mt-3 grid grid-cols-2 gap-2"><button type="button" @click="catalogoDiscoveryReview(item,'reject')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg border border-gray-300 bg-white px-2 py-2 text-[10px] font-semibold text-gray-600">Rejeitar</button><button type="button" @click="catalogoDiscoveryReview(item,'approve')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg bg-emerald-800 px-2 py-2 text-[10px] font-semibold text-white">Aprovar</button></div></article></template></div>
+          <details x-show="catalogoCompatibilidade.discoveries.some(item => item.active_reference)" class="mt-5 rounded-xl border border-gray-200 p-4">
+            <summary class="cursor-pointer text-xs font-semibold text-gray-600" x-text="catalogoCompatibilidade.discoveries.filter(item => item.active_reference).length + ' registros da pesquisa já cobertos pelas referências em uso'"></summary>
+            <p class="mt-2 text-[11px] text-gray-500">Histórico preservado. Não há aprovação pendente para consultar estas aplicações por medida. A conferência do pneu específico continua com a equipe.</p>
+            <div class="mt-3 space-y-2"><template x-for="item in catalogoCompatibilidade.discoveries.filter(item => item.active_reference)" :key="item.discovery_id">
+              <article class="rounded-lg border border-emerald-100 bg-emerald-50/40 p-3">
+                <p class="text-xs font-semibold" x-text="[item.make,item.model,item.variant].filter(Boolean).join(' ')"></p>
+                <p class="mt-1 text-[10px] font-semibold text-emerald-800">Referência em uso · produto específico não homologado</p>
+                <a :href="item.source_url" target="_blank" rel="noopener noreferrer" class="mt-1 block text-[10px] text-blue-700 underline">Fonte da pesquisa</a>
+                <details class="mt-2 text-[10px] text-gray-500"><summary class="cursor-pointer">Ver registro original</summary><p class="mt-1" x-text="item.evidence_summary"></p></details>
+              </article>
+            </template></div>
+          </details>
+
+          <section x-show="catalogoCompatibilidade.discoveriesLoading || catalogoCompatibilidade.discoveries.some(item => !item.active_reference)" class="mt-5">
+            <div class="flex items-center justify-between"><div><p class="text-sm font-semibold text-gray-950">Outras pesquisas e revisões de produtos</p><p class="text-[10px] text-gray-500">Não bloqueiam as referências por medida já em uso. Decisões anteriores preservadas.</p></div><i x-show="catalogoCompatibilidade.discoveriesLoading" data-lucide="loader-circle" class="h-4 w-4 animate-spin text-gray-400"></i></div>
+            <div class="mt-3 space-y-2"><template x-for="item in catalogoCompatibilidade.discoveries.filter(item => !item.active_reference)" :key="item.discovery_id"><article class="rounded-xl border border-blue-100 bg-blue-50/50 p-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-xs font-bold text-gray-950" x-text="[item.make,item.model,item.variant].filter(Boolean).join(' ')"></p><a x-show="item.source_url" :href="item.source_url" target="_blank" rel="noopener noreferrer" class="mt-1 block truncate text-[10px] text-blue-700 underline" x-text="item.source_title || item.source_url"></a></div><span :class="item.status === 'pending' ? 'bg-amber-100 text-amber-800' : item.status === 'promoted' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'" class="shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold" x-text="item.status === 'pending' ? 'Pendente' : item.status === 'promoted' ? 'Aprovada' : item.status === 'rejected' ? 'Rejeitada' : item.status"></span></div><p class="mt-2 text-[10px] leading-4 text-gray-600" x-text="item.evidence_summary || 'Sem resumo'"></p><div x-show="item.status === 'pending' && adminUser?.role === 'owner'" class="mt-3 grid grid-cols-2 gap-2"><button type="button" @click="catalogoDiscoveryReview(item,'reject')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg border border-gray-300 bg-white px-2 py-2 text-[10px] font-semibold text-gray-600">Rejeitar</button><button type="button" @click="catalogoDiscoveryReview(item,'approve')" :disabled="catalogoCompatibilidade.saving" class="rounded-lg bg-emerald-800 px-2 py-2 text-[10px] font-semibold text-white">Aprovar</button></div></article></template></div>
           </section>
 
           <div x-show="catalogoCompatibilidade.loading" class="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Carregando compatibilidades...</div>

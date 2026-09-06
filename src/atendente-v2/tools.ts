@@ -271,7 +271,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_compatibilidade',
-      description: 'Dado o modelo da moto (e opcionalmente o ano), retorna os pneus compatíveis com preço e estoque.',
+      description: 'Consulta aplicações por moto, ano e posição, sem aprovação manual da referência. Pode retornar somente medidas do fabricante, com estoque_consultado=false: nesse caso use buscar_produto para preço/estoque. Quando não houver referência, consulta vínculos de produtos existentes.',
       parameters: {
         type: 'object',
         properties: {
@@ -543,13 +543,14 @@ export async function executeTool(
       case 'buscar_compatibilidade': {
         const compatInput = compatibilityInput(environment, args);
         const application = vehicleApplicationAnswer(compatInput);
+        if (application) return JSON.stringify(application);
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
         const result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
-        if (result.length === 0) return JSON.stringify(application ?? { encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
         const withApprovedFitments = vehiclesWithApprovedFitments(result);
-        if (withApprovedFitments.length === 0) return JSON.stringify(application ?? { encontrado: false,
+        if (withApprovedFitments.length === 0) return JSON.stringify({ encontrado: false,
           motivo: 'compatibilidade_nao_cadastrada', mensagem: 'A moto foi reconhecida, mas ainda não existe compatibilidade aprovada. Peça ao cliente a medida escrita no pneu; não adivinhe a medida.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) {
           await applyMatrizPricesToCompatibility(client, environment, withApprovedFitments);

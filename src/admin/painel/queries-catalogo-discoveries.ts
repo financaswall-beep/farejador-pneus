@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { activeResearchReference } from './catalog-discovery-reference.js';
 import {
   loadCatalogMeasureSpecs,
   type CatalogVehicleModelRow,
@@ -21,6 +22,7 @@ export interface CatalogFitmentDiscoveryRow extends CatalogVehicleModelRow {
   reviewed_by: string | null;
   reviewed_at: string | null;
   notes: string | null;
+  active_reference: ReturnType<typeof activeResearchReference>;
 }
 
 export async function getCatalogFitmentDiscoveries(
@@ -28,7 +30,7 @@ export async function getCatalogFitmentDiscoveries(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<CatalogFitmentDiscoveryRow[]> {
-  const result = await dbPool.query<CatalogFitmentDiscoveryRow>(
+  const result = await dbPool.query<CatalogFitmentDiscoveryRow & { discovery_measure: string }>(
     `WITH selected AS (
        SELECT regexp_replace(ts.tire_size,'[^0-9]+','','g') measure_key
          FROM commerce.products p
@@ -40,7 +42,7 @@ export async function getCatalogFitmentDiscoveries(
      SELECT d.id discovery_id,d.position,d.status,d.discovery_origin,
             d.source_url,d.source_title,d.source_checked_at,d.evidence_summary,
             d.suggested_is_oem,d.suggested_confidence_level,d.discovered_at,
-            d.reviewed_by,d.reviewed_at,d.notes,
+            d.reviewed_by,d.reviewed_at,d.notes,ts.tire_size discovery_measure,
             vm.id vehicle_model_id,vm.make,vm.model,vm.variant,
             vm.year_start,vm.year_end,vm.displacement_cc
        FROM commerce.fitment_discoveries d
@@ -63,7 +65,9 @@ export async function getCatalogFitmentDiscoveries(
     );
     if (!product.rows[0]) throw new Error('catalog_product_not_found');
   }
-  return result.rows;
+  return result.rows.map(({ discovery_measure, ...row }) => ({
+    ...row, active_reference: activeResearchReference({ ...row, discovery_measure }),
+  }));
 }
 
 export interface CreateFitmentDiscoveryInput {

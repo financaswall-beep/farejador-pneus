@@ -8,11 +8,19 @@ Essa base é um catálogo público de referência incluído no código, não uma
 
 ## Consulta do bot
 
-`buscar_compatibilidade` preserva as consultas de produtos já associados e o roteamento/estoque existentes. Se não encontrar uma moto ou vínculos de produtos aprovados, consulta a base de aplicações do fabricante. Assim, consegue responder a medida sem inventá-la nem depender de um produto já cadastrado.
+Na versão `manufacturer-applications-20260906-v2`, `buscar_compatibilidade` prioriza as aplicações verificadas por moto/ano/posição, sem depender de aprovações de produtos no banco. Quando não existe referência, preserva a consulta anterior de produtos associados. Assim, uma correspondência aproximada antiga não substitui a medida documentada.
 
 O retorno distingue explicitamente aplicação de medida de produto confirmado; não fabrica SKU, preço ou estoque. Ambiguidade de moto/versão e ano indefinido são sinalizados. A busca de preço e estoque continua sendo feita pelas ferramentas existentes. Fontes sem ano delimitado nunca significam todos os anos, e R/ZR/B/polegadas são preservados na especificação original.
 
 O deploy é necessário para disponibilizar essa consulta e as novas seções do catálogo. O deploy não executa scripts de manutenção nem promove as 62 candidatas a produtos homologados.
+
+## Uso sem aprovação individual
+
+O retorno do bot indica `referencia_em_uso=true`, `requer_aprovacao_manual_da_referencia=false` e `estoque_consultado=false`. Com modelo/ano/posição identificados na fonte, prepara `consultas_de_produto` por medida e condição. A ferramenta `buscar_produto` continua responsável pelos produtos, preços, estoque e localização; referências sozinhas não garantem disponibilidade. Não é aplicada uma posição de produto inventada ao cadastro genérico.
+
+Na tela, as cópias exatas da pesquisa já presentes na base passam para um histórico recolhido, sem solicitar o clique de aprovação. O histórico original permanece acessível, e pesquisas divergentes/rejeitadas ou revisões anteriores não são ocultadas por esse reconhecimento. A API apenas adiciona o metadado de leitura `active_reference`: nenhum status no banco é promovido ou reescrito.
+
+Conferência somente leitura no banco atual: 62 de 62 registros reconhecidos. Nesta etapa não houve escrita no banco, nova migration, alteração de variáveis ou separação por modelo comercial de pneu. A conferência do produto específico continua com a equipe antes da venda/montagem.
 
 ## Correção já aplicada no banco atual
 
@@ -33,3 +41,5 @@ Conferência pós-COMMIT: quatro vínculos não afetados permaneceram; as 62 can
 Testes cobrem Fan/Titan por ano, CB 250F/300F, Burgman/Lindy por posição, XMAX/Citycom, Mottu com alternativas expressas, medidas largas, rejeição de conflitos e manutenção das inscrições técnicas. A integração em Postgres temporário executa a ferramenta real do bot, consulta o catálogo, valida ausência de efeitos em estoque e testa a correção com auditoria/rollback. Build, TypeScript, paridade dos painéis, teto de arquivos e manifesto de migrations foram verificados.
 
 Verificação final: 1.246 testes unitários dos módulos admin/parceiro/atendente e oito testes de integração de importação/correção e catálogo operacional passaram. A carga do JavaScript compilado confirmou 147 aplicações, 73 configurações e 13 marcas. Não foi realizada validação visual em produção nem deploy nesta etapa.
+
+Verificação da versão sem cliques: 1.261 testes unitários e dez testes de integração passaram, incluindo reconhecimento do lote, preservação de rejeições, consulta sem SQL de aprovação e busca dos produtos por medida com posição do SKU não preenchida. Build, tipos, paridade e teto de arquivos passaram. Sem conversa real/LLM ou validação visual em produção nesta etapa.
