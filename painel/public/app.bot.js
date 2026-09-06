@@ -7,6 +7,7 @@ window.PAINEL_MODULES.bot = function () {
   return {
     botResilience: null,
     botResilienceMsg: null,
+    botFilaErro: false,
     // Leve de propósito: roda no boot e no refresh de 15s em QUALQUER página —
     // cliente esperando é alarme, não estatística. Badge acende na aba do menu.
     async loadBotCampainha() {
@@ -14,18 +15,19 @@ window.PAINEL_MODULES.bot = function () {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.botCampainha = await this.apiGet('/admin/api/bot/campainha');
+        this.botFilaErro = false;
         for (const row of [...this.botMudas,...this.botEscalados]) {
           if (['auto','human'].includes(row.bot_mode)) this.botControleModos[row.conversation_id] = row.bot_mode;
         }
       }
-      catch (err) { this.botCampainha = null; }
+      catch (err) { this.botFilaErro = true; } // Mantém a última fila confirmada em falha de rede.
       // A lista técnica completa só é consultada enquanto o dono está na tela do Bot.
       if (this.currentPage === 'bot') {
         await this.carregarBotControles();
         try { this.botResilience = await this.apiGet('/admin/api/bot/resiliencia'); }
         catch (err) { this.botResilience = null; }
       }
-      const n = this.botMudas.length + this.botEscalados.length;
+      const n = this.botConversasFila.length;
       this.menuBadges.bot = n > 0 ? String(n) : null;
     },
 
@@ -118,6 +120,7 @@ window.PAINEL_MODULES.bot = function () {
         mensagem: m.preview || '(sem texto)',
         tipo: 'esperando',
         minutos: Number(m.minutos || 0),
+        atividade_em: m.quando,
       }));
       const agora = Date.now();
       const escalados = this.botEscalados.map((e) => ({
@@ -129,15 +132,9 @@ window.PAINEL_MODULES.bot = function () {
         mensagem: e.motivo || 'Sem motivo registrado',
         tipo: 'humano',
         minutos: e.quando ? Math.max(0, Math.floor((agora - new Date(e.quando).getTime()) / 60000)) : 0,
+        atividade_em: this.botFilaAtividade(e.quando,e.last_customer_at),
       }));
       return this.botMesclarConversas([...mudas, ...escalados]);
-    },
-    get botConversasFiltradas() {
-      const busca = String(this.botConversaBusca || '').trim().toLowerCase();
-      return this.botConversasFila.filter((c) => {
-        if (this.botConversaFiltro !== 'todos' && c.tipo !== this.botConversaFiltro) return false;
-        return !busca || c.nome.toLowerCase().includes(busca) || c.mensagem.toLowerCase().includes(busca);
-      });
     },
     get botRespondidas48h() {
       // SÓ do servidor (régua real de 48h em queries-bot-visao) — sem conta
@@ -258,6 +255,7 @@ window.PAINEL_MODULES.bot = function () {
 
     botMinutosLabel(min) {
       if (min == null) return '';
+      if (min >= 1440) return Math.floor(min / 1440) + 'd ' + Math.floor((min % 1440) / 60) + 'h';
       if (min >= 60) return Math.floor(min / 60) + 'h' + String(min % 60).padStart(2, '0');
       return min + ' min';
     },

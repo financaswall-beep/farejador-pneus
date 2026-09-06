@@ -8,6 +8,38 @@ window.PAINEL_MODULES.botControle = function () {
     botControleErro: '',
     botControleSalvando: false,
     botControleCarregando: false,
+    botFilaPeriodo: 'todos',
+    botFilaPagina: 1,
+    botFilaPorPagina: 20,
+    botFilaAtividade(...datas) {
+      const validas = datas.map(data => new Date(data || '').getTime()).filter(Number.isFinite);
+      return validas.length ? new Date(Math.max(...validas)).toISOString() : null;
+    },
+    setBotFilaPeriodo(periodo) {
+      this.botFilaPeriodo = ['todos','7','15','30'].includes(periodo) ? periodo : 'todos';
+      this.botFilaPagina = 1;
+    },
+    botFilaDentroPeriodo(row) {
+      if (!['7','15','30'].includes(this.botFilaPeriodo)) return true;
+      const quando = new Date(row.atividade_em || '').getTime();
+      // Sem data comprovada, mantém visível em vez de esconder silenciosamente.
+      return !Number.isFinite(quando) || quando >= Date.now() - Number(this.botFilaPeriodo) * 86400000;
+    },
+    get botFilaForaPeriodo() {
+      return this.botConversasFila.filter(row => !this.botFilaDentroPeriodo(row)).length;
+    },
+    get botConversasFiltradas() {
+      const busca = String(this.botConversaBusca || '').trim().toLowerCase();
+      return this.botConversasFila.filter(c => this.botFilaDentroPeriodo(c)
+        && (this.botConversaFiltro === 'todos' || c.tipo === this.botConversaFiltro)
+        && (!busca || c.nome.toLowerCase().includes(busca) || c.mensagem.toLowerCase().includes(busca)));
+    },
+    get botFilaTotalPaginas() { return Math.max(1,Math.ceil(this.botConversasFiltradas.length / this.botFilaPorPagina)); },
+    get botFilaPaginaAtual() { return Math.max(1,Math.min(this.botFilaPagina,this.botFilaTotalPaginas)); },
+    get botConversasPaginadas() {
+      const inicio = (this.botFilaPaginaAtual - 1) * this.botFilaPorPagina;
+      return this.botConversasFiltradas.slice(inicio,inicio + this.botFilaPorPagina);
+    },
     botControleModo(id, fallback = null) {
       // Lê a chave mesmo quando ausente, para o Alpine acompanhar a resposta assíncrona.
       const mode = this.botControleModos[id];
@@ -31,7 +63,13 @@ window.PAINEL_MODULES.botControle = function () {
       } catch { /* Preserva a lista já confirmada; não inventa retomada em falha de rede. */ }
     },
     botMesclarConversas(rows) {
-      const map = new Map(rows.map((row) => [row.conversation_id,row]));
+      const map = new Map();
+      for (const row of rows) {
+        const anterior = map.get(row.conversation_id);
+        map.set(row.conversation_id,{ ...row,
+          atividade_em:this.botFilaAtividade(anterior?.atividade_em,row.atividade_em),
+        });
+      }
       for (const state of this.botControlesHumanos) {
         map.set(state.conversation_id,{
           ...map.get(state.conversation_id),
@@ -41,9 +79,10 @@ window.PAINEL_MODULES.botControle = function () {
           chatwoot_id:state.chatwoot_conversation_id,nome:state.contact_name || 'Cliente',
           mensagem:'Bot pausado — atendimento humano',tipo:'humano',
           minutos:Math.max(0,Math.floor((Date.now()-new Date(state.updated_at).getTime())/60000)),
+          atividade_em:this.botFilaAtividade(map.get(state.conversation_id)?.atividade_em,state.updated_at,state.last_customer_at),
         });
       }
-      return [...map.values()].sort((a,b) => a.minutos-b.minutos);
+      return [...map.values()].sort((a,b) => b.minutos-a.minutos || a.conversation_id.localeCompare(b.conversation_id));
     },
     async abrirControleBot(conversationId,nome) {
       if (!conversationId || !this.hasPanelModule('bot') || this.botControleSalvando) return;

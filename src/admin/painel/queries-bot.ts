@@ -8,8 +8,8 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 
 export interface BotCampainhaPayload {
-  /** Conversas com a ÚLTIMA mensagem do cliente SEM resposta entregue do bot
-   *  (janela 24h; ≥5 min de espera pra não alarmar conversa em andamento). */
+  /** Conversas com a ÚLTIMA mensagem do cliente SEM resposta do bot ou humano
+   *  (sem expiração; ≥5 min de espera pra não alarmar conversa em andamento). */
   mudas: Array<{
     conversation_id: string;
     chatwoot_conversation_id: string;
@@ -17,9 +17,10 @@ export interface BotCampainhaPayload {
     channel_type: string | null;
     bot_mode: 'auto' | 'human';
     preview: string;
+    quando: string;
     minutos: number;
   }>;
-  /** Conversas em que o bot escalou pra humano nas últimas 48h (fact 'escalou'). */
+  /** Encaminhamentos ainda abertos, sem expiração por idade (fact 'escalou'). */
   escalados: Array<{
     conversation_id: string;
     chatwoot_conversation_id: string;
@@ -28,6 +29,7 @@ export interface BotCampainhaPayload {
     bot_mode: 'auto' | 'human';
     motivo: string | null;
     quando: string;
+    last_customer_at: string | null;
   }>;
 }
 
@@ -42,37 +44,47 @@ export async function getBotCampainha(
   // sent_at (hora REAL da mensagem, chave da partição/índice) — nunca created_at,
   // que é hora de INGESTÃO (um replay atrasado inventaria "cliente esperando").
   const mudas = await dbPool.query<BotCampainhaPayload['mudas'][number]>(
-    `WITH ultima_msg AS (
-       SELECT DISTINCT ON (m.conversation_id)
-              m.conversation_id, m.sent_at,
-              left(coalesce(m.content, '(sem texto — mídia/áudio)'), 140) AS preview
-       FROM core.messages m
-       WHERE m.environment = $1 AND m.sender_type = 'contact' AND m.is_private = false
-         AND m.sent_at > now() - interval '24 hours'
-       ORDER BY m.conversation_id, m.sent_at DESC
-     ),
-     respondida AS (
+    `WITH respondida AS (
        SELECT t.conversation_id, max(tm.sent_at) AS trigger_at
        FROM agent.turns t
-       JOIN core.messages tm ON tm.id = t.trigger_message_id
+       JOIN core.messages tm ON tm.id = t.trigger_message_id AND tm.environment=t.environment
+         AND tm.conversation_id=t.conversation_id AND tm.deleted_at IS NULL
        WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status IN ('delivered', 'sent_api_ack')
        GROUP BY t.conversation_id
      )
-     SELECT u.conversation_id,
+     SELECT cv.id AS conversation_id,
             cv.chatwoot_conversation_id::text AS chatwoot_conversation_id,
             ct.name AS contact_name,
             cv.channel_type, COALESCE(bc.mode,'auto') AS bot_mode,
-            u.preview,
+            u.preview, u.sent_at::text AS quando,
             floor(extract(epoch FROM (now() - u.sent_at)) / 60)::int AS minutos
-     FROM ultima_msg u
-     JOIN core.conversations cv ON cv.id = u.conversation_id AND cv.environment=$1 AND cv.deleted_at IS NULL
+     FROM core.conversations cv
+     JOIN LATERAL (
+       SELECT m.sent_at, left(coalesce(m.content, '(sem texto — mídia/áudio)'), 140) AS preview
+       FROM core.messages m
+       WHERE m.environment=cv.environment AND m.conversation_id=cv.id
+         AND m.sender_type='contact' AND m.is_private=false AND m.deleted_at IS NULL
+       ORDER BY m.sent_at DESC, m.chatwoot_message_id DESC LIMIT 1
+     ) u ON true
      LEFT JOIN core.contacts ct ON ct.id = cv.contact_id AND ct.environment=cv.environment AND ct.deleted_at IS NULL
      LEFT JOIN ops.conversation_bot_control bc ON bc.conversation_id=cv.id AND bc.environment=cv.environment
-     LEFT JOIN respondida r ON r.conversation_id = u.conversation_id
-     WHERE u.sent_at <= now() - interval '5 minutes'
+     LEFT JOIN respondida r ON r.conversation_id = cv.id
+     WHERE cv.environment=$1 AND cv.deleted_at IS NULL AND cv.current_status <> 'resolved'
+       AND u.sent_at <= now() - interval '5 minutes'
        AND (r.trigger_at IS NULL OR u.sent_at > r.trigger_at)
-     ORDER BY u.sent_at ASC
-     LIMIT 20`,
+       AND NOT EXISTS (
+         SELECT 1 FROM core.messages h
+         WHERE h.environment=cv.environment AND h.conversation_id=cv.id AND h.sent_at>=u.sent_at
+           AND h.sender_type='user' AND h.message_type=1 AND h.is_private=false
+           AND h.deleted_at IS NULL AND h.status IS DISTINCT FROM 'failed'
+           AND NOT EXISTS (SELECT 1 FROM agent.turns t WHERE t.environment=h.environment
+             AND t.conversation_id=h.conversation_id AND t.chatwoot_message_id=h.chatwoot_message_id)
+           AND NOT EXISTS (SELECT 1 FROM ops.outbound_messages o WHERE o.environment=h.environment
+             AND o.conversation_id=h.conversation_id AND (o.provider_message_id=h.chatwoot_message_id
+               OR (o.attempts>0 AND o.echo_id IS NOT NULL
+                 AND (o.echo_id=h.echo_id OR o.echo_id=h.content_attributes->>'farejador_echo_id'))))
+       )
+     ORDER BY u.sent_at ASC, cv.id`,
     [environment],
   );
 
@@ -81,21 +93,30 @@ export async function getBotCampainha(
             cv.chatwoot_conversation_id::text AS chatwoot_conversation_id,
             ct.name AS contact_name,
             cv.channel_type, COALESCE(bc.mode,'auto') AS bot_mode,
-            replace(max(cf2.fact_value::text), '"', '') AS motivo,
-            max(cf.created_at)::text AS quando
+            cf2.motivo,
+            max(cf.created_at)::text AS quando, ultima.sent_at::text AS last_customer_at
      FROM analytics.conversation_facts cf
      JOIN core.conversations cv ON cv.id = cf.conversation_id AND cv.environment=cf.environment AND cv.deleted_at IS NULL
      LEFT JOIN core.contacts ct ON ct.id = cv.contact_id AND ct.environment=cv.environment AND ct.deleted_at IS NULL
      LEFT JOIN ops.conversation_bot_control bc ON bc.conversation_id=cv.id AND bc.environment=cv.environment
-     LEFT JOIN analytics.conversation_facts cf2
-       ON cf2.environment = $1 AND cf2.conversation_id = cf.conversation_id
-      AND cf2.fact_key = 'motivo_escalacao'
-      AND cf2.created_at > now() - interval '48 hours'
+     LEFT JOIN LATERAL (
+       SELECT max(m.sent_at) AS sent_at FROM core.messages m
+       WHERE m.environment=cv.environment AND m.conversation_id=cv.id
+         AND m.sender_type='contact' AND m.is_private=false AND m.deleted_at IS NULL
+     ) ultima ON true
+     LEFT JOIN LATERAL (
+       SELECT replace(f.fact_value::text, '"', '') AS motivo
+       FROM analytics.conversation_facts f
+       WHERE f.environment=cf.environment AND f.conversation_id=cf.conversation_id
+         AND f.fact_key='motivo_escalacao' AND f.superseded_by IS NULL
+       ORDER BY f.created_at DESC, f.id DESC LIMIT 1
+     ) cf2 ON true
      WHERE cf.environment = $1 AND cf.fact_key = 'escalou'
-       AND cf.created_at > now() - interval '48 hours'
-     GROUP BY cf.conversation_id, cv.chatwoot_conversation_id, ct.name, cv.channel_type, bc.mode
-     ORDER BY quando DESC
-     LIMIT 10`,
+       AND cf.fact_value='true'::jsonb AND cf.superseded_by IS NULL
+       AND cv.current_status <> 'resolved'
+       AND (bc.resumed_at IS NULL OR cf.created_at>bc.resumed_at)
+     GROUP BY cf.conversation_id, cv.chatwoot_conversation_id, ct.name, cv.channel_type, bc.mode, cf2.motivo, ultima.sent_at
+     ORDER BY max(cf.created_at) ASC, cf.conversation_id`,
     [environment],
   );
 

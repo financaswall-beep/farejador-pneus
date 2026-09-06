@@ -15,12 +15,15 @@ export async function getBotConversationControl(conversationId: string, db: Pool
 
 export async function listHumanControlledConversations(db: Pool = pool) {
   const result = await db.query(`SELECT b.conversation_id,b.mode,b.version,b.updated_at,
-      c.chatwoot_conversation_id,c.channel_type,ct.name AS contact_name
+      c.chatwoot_conversation_id,c.channel_type,ct.name AS contact_name,
+      (SELECT max(m.sent_at)::text FROM core.messages m
+        WHERE m.environment=c.environment AND m.conversation_id=c.id
+          AND m.sender_type='contact' AND m.is_private=false AND m.deleted_at IS NULL) AS last_customer_at
     FROM ops.conversation_bot_control b
     JOIN core.conversations c ON c.id=b.conversation_id AND c.environment=b.environment
     LEFT JOIN core.contacts ct ON ct.id=c.contact_id AND ct.environment=c.environment AND ct.deleted_at IS NULL
-    WHERE b.environment=$1 AND b.mode='human' AND c.deleted_at IS NULL
-    ORDER BY b.updated_at DESC LIMIT 200`, [env.FAREJADOR_ENV]);
+    WHERE b.environment=$1 AND b.mode='human' AND c.deleted_at IS NULL AND c.current_status <> 'resolved'
+    ORDER BY b.updated_at ASC,b.conversation_id`, [env.FAREJADOR_ENV]);
   return result.rows;
 }
 
