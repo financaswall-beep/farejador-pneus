@@ -29,6 +29,20 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('mostra só a medida no título do pneu, sem repetir nome e medida', () => {
+    const module = loadCatalogModule();
+    const row = Object.freeze({ product_type: 'tire', product_name: 'Pneu Vipal 110/90-17',
+      brand: 'Vipal', tire_size: '110/90-17' });
+    expect(module.catalogoTitle(row)).toBe('110/90-17');
+    expect(module.catalogoTitle({ ...row, tire_size: ' 140/70R17 ' })).toBe('140/70-17');
+    expect(module.catalogoTitle({ ...row, product_name: '110/90-17 · 110/90-17' })).toBe('110/90-17');
+    expect(row.product_name).toBe('Pneu Vipal 110/90-17');
+    expect(row.brand).toBe('Vipal');
+    expect(module.catalogoTitle({ product_type: 'service', product_name: 'Montagem', tire_size: '110/90-17' })).toBe('Montagem');
+    expect(module.catalogoTitle({ product_name: 'Produto sem medida', tire_size: ' ' })).toBe('Produto sem medida');
+    expect(module.catalogoTitle(null)).toBe('');
+  });
+
   it('exibe aplicações do fabricante separadas da aprovação de produtos', async () => {
     const module = loadCatalogModule();
     const app = { application_id: 'reference-1', make: 'Honda', model: 'CB 300F', position: 'rear' };
@@ -159,7 +173,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
-    expect(html).toContain('app.catalogo.js?v=20260906-measure-display1');
+    expect(html.includes('app.catalogo.js?v=20260906-measure-title2')).toBe(true);
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');

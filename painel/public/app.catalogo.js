@@ -19,8 +19,9 @@ window.PAINEL_MODULES.catalogo = function () {
       return row?.product_type === 'service' ? name : catalogoPresentationText(name);
     },
     catalogoTitle(row) {
-      return [this.catalogoProductLabel(row), row?.tire_size
-        ? this.catalogoMeasureLabel(row.tire_size) : ''].filter(Boolean).join(' · ');
+      if (row?.product_type === 'service') return this.catalogoProductLabel(row);
+      const measure = String(row?.tire_size || '').trim();
+      return measure ? this.catalogoMeasureLabel(measure) : this.catalogoProductLabel(row);
     },
     catalogoTechnicalLabel(row) {
       if (!row || row.product_type === 'service' || !row.tire_size) return '';
