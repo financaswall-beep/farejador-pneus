@@ -30,6 +30,29 @@ afterAll(async () => {
 });
 
 describe('Catálogo da Operação — integração com estoque local', () => {
+  it.each(['140/70R17', '180/55ZR17'])(
+    'encontra %s pela medida visual e preserva a construção radial', async (original) => {
+      const own = await createPartnerFixture(db.pool, { slugSuffix: randomUUID().slice(0, 8) });
+      const { createCatalogProduct } = await import('../../src/admin/painel/queries-catalogo-create.js');
+      const displayed = original.replace(/ZR|R/, '-');
+      const product = await createCatalogProduct({
+        measure: displayed, brand: 'Pirelli', tireCondition: 'novo',
+        productCode: `RAD-${randomUUID().slice(0, 8)}`, productName: `Pneu ${original}`,
+        actorLabel: 'Teste de apresentação', environment: 'test',
+      }, db.pool);
+      // Dado sintético somente no Postgres efêmero do teste.
+      await db.pool.query(`UPDATE commerce.tire_specs SET tire_size=$2,construction='radial'
+        WHERE environment='test' AND product_id=$1`, [product.product_id, original]);
+      const result = await getPartnerPanelCatalog(own.ctx, { q: displayed, type: 'tire' });
+      expect(result.rows.find(row => row.product_id === product.product_id)).toMatchObject({
+        tire_size: original, tire_construction: 'radial',
+      });
+      const stored = await db.pool.query(`SELECT tire_size,construction FROM commerce.tire_specs
+        WHERE environment='test' AND product_id=$1`, [product.product_id]);
+      expect(stored.rows[0]).toEqual({ tire_size: original, construction: 'radial' });
+    },
+  );
+
   it('casa variante sem product_id, isola a unidade e oculta detalhes do funcionário', async () => {
     const own = await createPartnerFixture(db.pool, { slugSuffix: randomUUID().slice(0, 8) });
     await createPartnerFixture(db.pool, {

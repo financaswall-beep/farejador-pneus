@@ -4,8 +4,37 @@ const CATALOGO_KNOWN_BRANDS = Object.freeze([
   'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
 ]);
 const catalogoMoneyValue = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+// Apenas apresentação. Nunca usar este texto como identidade, medida de gravação
+// ou critério de compatibilidade: R/ZR continuam presentes no dado original.
+const catalogoPresentationText = (value) => String(value || '')
+  .replace(/\b(\d{2,3})\s*\/\s*(\d{2,3})\s*(?:ZR|R)\s*(\d{2})(?!\d)/gi, '$1/$2-$3')
+  .replace(/\b(\d[.,]\d{1,2})\s*R\s*(\d{2})(?!\d)/gi, '$1-$2');
 window.PAINEL_MODULES.catalogo = function () {
   return {
+    catalogoMeasureLabel(value) {
+      return catalogoPresentationText(value).trim() || '—';
+    },
+    catalogoProductLabel(row) {
+      const name = String(row?.product_name || '');
+      return row?.product_type === 'service' ? name : catalogoPresentationText(name);
+    },
+    catalogoTitle(row) {
+      return [this.catalogoProductLabel(row), row?.tire_size
+        ? this.catalogoMeasureLabel(row.tire_size) : ''].filter(Boolean).join(' · ');
+    },
+    catalogoTechnicalLabel(row) {
+      if (!row || row.product_type === 'service' || !row.tire_size) return '';
+      const original = String(row.tire_size).trim();
+      const radialMark = /^(?:\d{2,3}\s*\/\s*\d{2,3}\s*(?:ZR|R)|\d[.,]\d{1,2}\s*R)\s*\d{2}$/i.test(original);
+      const beltedMark = /^\d{2,3}\s*\/\s*\d{2,3}\s*B\s*\d{2}$/i.test(original);
+      const construction = { radial: 'radial', bias: 'diagonal' }[row.tire_construction]
+        || (radialMark ? 'radial' : beltedMark ? 'diagonal cintada' : 'não informada');
+      if ((radialMark && row.tire_construction === 'bias')
+        || (beltedMark && row.tire_construction === 'radial')) {
+        return `Especificação original: ${original} · Construção divergente: conferir cadastro`;
+      }
+      return `Especificação original: ${original} · Construção: ${construction}`;
+    },
     async loadCatalogo() {
       if (!this.adminAuthenticated) return;
       this.catalogoLoading = true;
@@ -36,6 +65,7 @@ window.PAINEL_MODULES.catalogo = function () {
         if (this.catalogoFiltro === 'sem_preco' && Number(row.price_amount) > 0) return false;
         if (!search) return true;
         return [row.product_code, row.product_name, row.brand, row.tire_size,
+          this.catalogoMeasureLabel(row.tire_size), this.catalogoProductLabel(row),
           this.catalogoConditionLabel(row.tire_condition)]
           .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(search));
       });

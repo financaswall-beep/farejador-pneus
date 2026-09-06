@@ -28,6 +28,7 @@ type CatalogRow = {
   brand: string | null;
   tire_size: string | null;
   tire_position: string | null;
+  tire_construction?: 'radial' | 'bias' | null;
   local_stock_rows: number | string;
   local_quantity_on_hand: number | string;
   local_quantity_reserved: number | string;
@@ -151,6 +152,7 @@ export async function getPartnerPanelCatalog(
     const rowsResult = await client.query<CatalogRow>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,ts.tire_size,ts.position tire_position,
+              ts.construction tire_construction,
               COALESCE(local.stock_rows,0)::int local_stock_rows,
               COALESCE(local.quantity_on_hand,0)::int local_quantity_on_hand,
               COALESCE(local.quantity_reserved,0)::int local_quantity_reserved,
@@ -215,6 +217,7 @@ export async function getPartnerPanelCatalog(
         brand: row.brand,
         tire_size: row.tire_size,
         tire_position: row.tire_position,
+        tire_construction: row.tire_construction ?? null,
         has_local_stock: finiteNumber(row.local_stock_rows) > 0,
         local_stock_rows: finiteNumber(row.local_stock_rows),
         local_quantity_on_hand: finiteNumber(row.local_quantity_on_hand),
@@ -242,9 +245,10 @@ export async function getPartnerPanelCatalogCompatibility(
       brand: string | null;
       tire_condition: string | null;
       tire_size: string | null;
+      tire_construction: 'radial' | 'bias' | null;
     }>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.brand,
-              p.tire_condition,ts.tire_size
+              p.tire_condition,ts.tire_size,ts.construction tire_construction
          FROM commerce.products p
          LEFT JOIN commerce.tire_specs ts
            ON ts.environment=p.environment AND ts.product_id=p.id

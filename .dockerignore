@@ -26,6 +26,7 @@ temp
 # Local design previews, reports, and recovery artifacts. These are not part of
 # the production runtime and may contain database exports or operational data.
 output
+outputs
 assets
 proposta-layout-2026-06
 dashboard.html

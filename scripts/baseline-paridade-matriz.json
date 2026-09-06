@@ -1,7 +1,7 @@
 {
   "geradoEm": "2026-09-05T14:29:31.110Z",
   "commitBase": "dd64a35",
-  "total": 1665,
+  "total": 1669,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -226,6 +226,7 @@
     "catalogoMarca": "value:string",
     "catalogoMarcaCorrecao": "value:object",
     "catalogoMargem": "function",
+    "catalogoMeasureLabel": "function",
     "catalogoMessage": "value:null",
     "catalogoNovoPreco": "function",
     "catalogoOpen": "function",
@@ -236,6 +237,7 @@
     "catalogoPorPagina": "value:number",
     "catalogoPrecoMinimo": "function",
     "catalogoPriceForm": "value:object",
+    "catalogoProductLabel": "function",
     "catalogoRows": "value:array",
     "catalogoSavePrice": "function",
     "catalogoSaving": "value:boolean",
@@ -243,6 +245,8 @@
     "catalogoSetFiltro": "function",
     "catalogoSetMarca": "function",
     "catalogoSummary": "value:object",
+    "catalogoTechnicalLabel": "function",
+    "catalogoTitle": "function",
     "catalogoTotalPaginas": "function",
     "chartOptions": "function",
     "chatwootAccountId": "value:null",

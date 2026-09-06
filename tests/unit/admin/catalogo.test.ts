@@ -21,6 +21,18 @@ beforeAll(async () => {
 });
 
 describe('catalogo conciliado com estoque e precos', () => {
+  it('expõe a construção técnica sem normalizar a medida nem escrever no banco', async () => {
+    const query = vi.fn(async (sql: string) => ({ rows: sql.includes('FROM commerce.products')
+      ? [{ product_id: 'radial-1', product_code: 'PIR-R17', product_type: 'tire',
+        product_name: 'Pneu 140/70R17', brand: 'Pirelli', tire_size: '140/70R17',
+        tire_construction: 'radial', tire_condition: 'novo', price_amount: null }]
+      : [] }));
+    const result = await getCatalogOverview('test', { query } as unknown as Pool);
+    expect(result.rows[0]).toMatchObject({ tire_size: '140/70R17', tire_construction: 'radial' });
+    expect(query.mock.calls[0][0]).toContain('ts.construction tire_construction');
+    expect(query.mock.calls.every(([sql]) => /^\s*SELECT\b/.test(sql))).toBe(true);
+  });
+
   it('combina produto, preco central, custo e saldo oficial sem duplicar fonte', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('FROM commerce.products')) return {

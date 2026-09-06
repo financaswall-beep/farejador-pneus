@@ -27,6 +27,20 @@ function appWith(module: Record<string, unknown>, overrides: Record<string, unkn
 }
 
 describe('módulos isolados de catálogo e colaboradores do parceiro', () => {
+  it('usa a mesma medida visual sem alterar a busca de estoque do parceiro', () => {
+    const app = appWith(moduleOf('painel/public/app.partner-catalogo.js', 'partnerCatalogo'), {
+      ...moduleOf('painel/public/app.catalogo.js', 'catalogo'),
+      hasPanelModule: () => true, partnerEstoque: { busca: '', filtro: '' },
+    });
+    const row = Object.freeze({ tire_size: '180/55ZR17', product_name: 'Pneu 180/55ZR17',
+      product_type: 'tire', has_local_stock: true });
+    expect(app.partnerCatalogoIdentity(row)).toBe('180/55-17');
+    expect(app.catalogoTechnicalLabel(row)).toContain('Construção: radial');
+    app.partnerCatalogoOpenStock(row);
+    expect(app.partnerEstoque.busca).toBe('180/55ZR17');
+    expect(row.tire_size).toBe('180/55ZR17');
+  });
+
   it('carrega catálogo paginado apenas pela API do parceiro', async () => {
     const api = vi.fn().mockResolvedValue({
       page: 1, limit: 40, total: 1, pages: 1, brands: ['Pirelli'],

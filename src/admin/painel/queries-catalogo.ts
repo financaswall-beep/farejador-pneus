@@ -10,6 +10,7 @@ interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
   tire_condition: TireCondition | null;
   brand: string | null; tire_size: string | null; tire_position: string | null;
+  tire_construction?: 'radial' | 'bias' | null;
   price_amount: string | null; currency: string | null; price_type: string | null;
   compatibility_count: number | string;
 }
@@ -51,7 +52,7 @@ export async function getCatalogOverview(
     dbPool.query<CatalogRow>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,
-              ts.tire_size,ts.position tire_position,
+              ts.tire_size,ts.position tire_position,ts.construction tire_construction,
               cp.price_amount,cp.currency,cp.price_type,
               COALESCE((
                 SELECT count(DISTINCT vf.vehicle_model_id)::int

@@ -29,6 +29,7 @@ parceiro/public/tailwind.css
 # Test output
 coverage/
 .nyc_output/
+outputs/**/*.inspect.ndjson
 
 # Logs
 *.log

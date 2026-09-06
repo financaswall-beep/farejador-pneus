@@ -29,6 +29,57 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('simplifica R e ZR só na apresentação, preservando a especificação original', () => {
+    const module = loadCatalogModule();
+    const row = Object.freeze({ product_type: 'tire', tire_size: '140/70R17',
+      product_name: 'Pneu Rinaldi 140/70R17', tire_construction: 'radial' });
+    expect(module.catalogoMeasureLabel(row.tire_size)).toBe('140/70-17');
+    expect(module.catalogoProductLabel(row)).toBe('Pneu Rinaldi 140/70-17');
+    expect(module.catalogoTechnicalLabel(row)).toBe('Especificação original: 140/70R17 · Construção: radial');
+    expect(module.catalogoMeasureLabel(' 120 / 70 ZR 17 ')).toBe('120/70-17');
+    expect(module.catalogoMeasureLabel('2.75R17')).toBe('2.75-17');
+    expect(row.tire_size).toBe('140/70R17');
+    expect(row.product_name).toBe('Pneu Rinaldi 140/70R17');
+    expect(row.tire_construction).toBe('radial');
+  });
+
+  it('não apaga B, marcas, nomes de serviços nem inventa construção para medida simples', () => {
+    const module = loadCatalogModule();
+    expect(module.catalogoMeasureLabel('150/80B16')).toBe('150/80B16');
+    expect(module.catalogoMeasureLabel('90/90-18')).toBe('90/90-18');
+    expect(module.catalogoMeasureLabel(null)).toBe('—');
+    expect(module.catalogoProductLabel({ product_name: 'Pneu Rinaldi R15 Sport' }))
+      .toBe('Pneu Rinaldi R15 Sport');
+    expect(module.catalogoProductLabel({ product_type: 'service', product_name: 'Serviço 140/70R17' }))
+      .toBe('Serviço 140/70R17');
+    expect(module.catalogoTechnicalLabel({ tire_size: '140/70-17' })).toContain('não informada');
+    expect(module.catalogoTechnicalLabel({ tire_size: '140/70-17', tire_construction: 'radial' }))
+      .toContain('Construção: radial');
+    expect(module.catalogoTechnicalLabel({ tire_size: '140/70R17', tire_construction: 'bias' }))
+      .toContain('Construção divergente');
+  });
+
+  it('pesquisa pela medida exibida sem substituir o valor usado nas operações', () => {
+    const module = loadCatalogModule();
+    const row = Object.freeze({ product_id: 'radial-1', tire_size: '140/70R17',
+      product_name: 'Pneu 140/70R17', tire_construction: 'radial', tire_condition: 'novo' });
+    const context = { ...module, catalogoRows: [row], catalogoBusca: '140/70-17',
+      catalogoMarca: 'todas', catalogoFiltro: 'todos' };
+    expect(context.catalogoFiltrados()).toEqual([row]);
+    context.catalogoBusca = '140/70R17';
+    expect(context.catalogoFiltrados()).toEqual([row]);
+    expect(row.tire_size).toBe('140/70R17');
+  });
+
+  it('usa apresentação comum na Matriz e parceiro e mantém detalhe técnico visível', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('x-text="catalogoTitle(row)"');
+    expect(html).toContain('x-text="catalogoTechnicalLabel(catalogoCompatibilidade.row)"');
+    expect(html).toContain('x-text="catalogoTechnicalLabel(catalogoSelecionado)"');
+    expect(html).toContain('x-text="catalogoTechnicalLabel(partnerCatalogo.selected)"');
+    expect(html).not.toContain("[row.product_name,row.tire_size].filter(Boolean).join(' · ')");
+  });
+
   it('calcula preco por margem, lucro e minimo usando custo oficial', () => {
     const module = loadCatalogModule();
     const context = {
@@ -81,7 +132,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
-    expect(html).toContain('app.catalogo.js?v=20260823-fitment1');
+    expect(html).toContain('app.catalogo.js?v=20260906-measure-display1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');

@@ -25,7 +25,9 @@ export const CATALOG_WHERE = `p.environment=$1 AND p.deleted_at IS NULL
   AND ($2::text IS NULL OR p.product_code ILIKE $2 ESCAPE '\\'
     OR p.product_name ILIKE $2 ESCAPE '\\'
     OR COALESCE(p.brand,'') ILIKE $2 ESCAPE '\\'
-    OR COALESCE(ts.tire_size,'') ILIKE $2 ESCAPE '\\')
+    OR COALESCE(ts.tire_size,'') ILIKE $2 ESCAPE '\\'
+    OR regexp_replace(regexp_replace(COALESCE(ts.tire_size,''),'[[:space:]]','','g'),
+         '([0-9])Z?R([0-9])','\\1-\\2','gi') ILIKE $2 ESCAPE '\\')
   AND ($3::text IS NULL OR lower(p.brand)=lower($3))
   AND ($4::text='all' OR ($4='tire' AND p.product_type='tire')
     OR ($4='service' AND p.product_type='service'))

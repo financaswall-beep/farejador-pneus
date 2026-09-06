@@ -76,7 +76,8 @@ window.PAINEL_MODULES.partnerCatalogo = function () {
     },
 
     partnerCatalogoIdentity(row) {
-      return row.tire_size || row.product_name || row.product_code || 'Produto';
+      return row.tire_size ? this.catalogoMeasureLabel(row.tire_size)
+        : this.catalogoProductLabel(row) || row.product_code || 'Produto';
     },
     partnerCatalogoCondition(row) {
       return { novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' }[row.tire_condition] || '';
