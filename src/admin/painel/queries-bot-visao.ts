@@ -1,11 +1,6 @@
-// TELA DO BOT — VISÃO (fatia 2, 2026-07-06): agregadores SÓ-LEITURA da aba Bot.
-// Fatiado de queries-bot.ts por ASSUNTO (lá fica a campainha; aqui, o que carrega
-// ao entrar na aba). Nenhuma tabela nova — deriva das 3 camadas que o gerador de
-// analytics JÁ grava (trigger em agent.turns, baseline 0102 + 0103/0104):
-//   • facts (tool calls): município, pedido_criado, faltou_estoque, medida_consultada;
-//   • classifications: stage_reached (funil) + loss_reason (perda por motivo);
-//   • linguistic_hints: objeção de preço, concorrente, parcelamento… (regex ≈ termômetro).
-// SÓ LEITURA, admin-only (dono). Zero grant pro parceiro.
+// Visão do Bot: agregadores somente leitura, exclusivos do painel da matriz.
+// Facts, classificações e sinais vêm do analytics determinístico (0102–0104/0218).
+// O mapa também lê municípios de pinos já geocodificados; não expõe coordenadas.
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -188,17 +183,29 @@ export async function getBotVisao(
   } catch { /* bloco vazio */ }
 
   try {
-    // Município do sensor vem CANÔNICO do dicionário — mesmo nome do IBGE do desenho.
+    // Município resolvido pelo pino OU pelo frete. Retirada também gera demanda.
     const r = await dbPool.query<BotVisaoMapaRow>(
       `WITH conv AS (
          SELECT cf.conversation_id,
-                replace(max(cf.fact_value::text) FILTER (WHERE cf.fact_key = 'municipio_entrega'), '"', '') AS municipio,
                 bool_or(cf.fact_key = 'faltou_estoque') AS faltou,
                 bool_or(cf.fact_key = 'pedido_criado') AS pediu_fact
          FROM analytics.conversation_facts cf
          WHERE cf.environment = $1
            AND COALESCE(cf.observed_at, cf.created_at) >= ${sinceSql}
          GROUP BY cf.conversation_id
+       ), demand AS (
+         SELECT l.conversation_id, l.municipio,
+                COALESCE(c.faltou, false) AS faltou,
+                COALESCE(c.pediu_fact, false) AS pediu_fact
+         FROM analytics.v_bot_demand_location l
+         LEFT JOIN conv c ON c.conversation_id = l.conversation_id
+         WHERE l.environment = $1 AND l.municipio IS NOT NULL
+           AND (l.observed_at >= ${sinceSql} OR c.conversation_id IS NOT NULL OR EXISTS (
+             SELECT 1 FROM agent.turns t
+             WHERE t.environment = $1 AND t.conversation_id = l.conversation_id
+               AND t.agent_version = 'v2' AND t.status IN ('sent_api_ack', 'delivered')
+               AND t.created_at >= ${sinceSql}
+           ))
        )
        SELECT c.municipio,
               count(DISTINCT c.conversation_id)::int AS chamou,
@@ -207,12 +214,11 @@ export async function getBotVisao(
               count(DISTINCT c.conversation_id)
                 FILTER (WHERE po.delivery_status = 'delivered' OR o.delivery_status = 'delivered')::int AS efetivou,
               count(DISTINCT c.conversation_id) FILTER (WHERE c.faltou)::int AS faltou
-       FROM conv c
+       FROM demand c
        LEFT JOIN commerce.orders o
          ON o.source_conversation_id = c.conversation_id
         AND o.environment = $1 AND o.status <> 'cancelled'
-       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
-       WHERE c.municipio IS NOT NULL
+       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id AND po.environment = $1
        GROUP BY c.municipio
        ORDER BY chamou DESC`,
       [environment],
@@ -232,9 +238,9 @@ export async function getBotVisao(
        SELECT count(*)::int AS sem_regiao
        FROM handled h
        WHERE NOT EXISTS (
-         SELECT 1 FROM analytics.conversation_facts cf
-         WHERE cf.environment = $1 AND cf.conversation_id = h.conversation_id
-           AND cf.fact_key = 'municipio_entrega'
+         SELECT 1 FROM analytics.v_bot_demand_location l
+         WHERE l.environment = $1 AND l.conversation_id = h.conversation_id
+           AND l.municipio IS NOT NULL
        )`,
       [environment],
     );

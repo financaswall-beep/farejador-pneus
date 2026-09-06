@@ -4,6 +4,7 @@
 // Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.bot = function () {
+  let latestVisaoRequestId = 0;
   return {
     botResilience: null,
     botResilienceMsg: null,
@@ -31,17 +32,30 @@ window.PAINEL_MODULES.bot = function () {
       this.menuBadges.bot = n > 0 ? String(n) : null;
     },
 
-    async loadBotVisao() {
+    async loadBotVisao({ silent = false } = {}) {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
-      this.botLoading = true;
+      if (silent && this.botLoading) return;
+      const requestId = ++latestVisaoRequestId;
+      const period = this.botPeriodo;
+      let changed = false;
+      if (!silent) this.botLoading = true;
       try {
         const [visao, resilience] = await Promise.allSettled([
-          this.apiGet('/admin/api/bot/visao?period=' + encodeURIComponent(this.botPeriodo)),
-          this.apiGet('/admin/api/bot/resiliencia'),
+          this.apiGet('/admin/api/bot/visao?period=' + encodeURIComponent(period)),
+          silent ? Promise.resolve(null) : this.apiGet('/admin/api/bot/resiliencia'),
         ]);
-        this.botVisao = visao.status === 'fulfilled' ? visao.value : null;
-        this.botResilience = resilience.status === 'fulfilled' ? resilience.value : null;
+        if (requestId !== latestVisaoRequestId || period !== this.botPeriodo) return;
+        if (visao.status === 'fulfilled') {
+          changed = JSON.stringify(this.botVisao) !== JSON.stringify(visao.value);
+          if (changed) this.botVisao = visao.value;
+        } else if (!silent) this.botVisao = null;
+        if (!silent) this.botResilience = resilience.status === 'fulfilled' ? resilience.value : null;
+        if (changed && this.botMapaSel) {
+          const selected = this.botMapaRows.find(r => r.municipio === this.botMapaSel.municipio);
+          this.botMapaSel = selected ? { ...selected }
+            : { municipio: this.botMapaSel.municipio, chamou: 0, pediu: 0, efetivou: 0, faltou: 0 };
+        }
         if (!this.botMapaSel && this.botMapaRows.length) {
           const destaque = [...this.botMapaRows]
             .sort((a, b) => Number(b.chamou || 0) - Number(a.chamou || 0))[0];
@@ -54,13 +68,16 @@ window.PAINEL_MODULES.bot = function () {
           };
         }
       } catch (err) {
-        this.botVisao = null;
+        if (!silent && requestId === latestVisaoRequestId) this.botVisao = null;
+      } finally {
+        if (requestId === latestVisaoRequestId) {
+          this.botLoading = false;
+          if (!silent || changed) this.$nextTick(() => {
+            lucide.createIcons();
+            this.renderBotMapa();
+          });
+        }
       }
-      this.botLoading = false;
-      this.$nextTick(() => {
-        lucide.createIcons();
-        this.renderBotMapa();
-      });
     },
 
     setBotPeriodo(p) {

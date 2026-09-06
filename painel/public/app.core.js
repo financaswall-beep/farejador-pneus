@@ -164,6 +164,13 @@ window.PAINEL_MODULES.core = function () {
       void this.loadSino();
       // Campainha do bot idem: cliente esperando não pode depender da aba aberta.
       if (this.hasPanelModule('bot')) void this.loadBotCampainha();
+      if (this.currentPage === 'bot' && this.hasPanelModule('bot')) {
+        this.liveRefreshing = true;
+        try { await this.loadBotVisao({ silent: true }); }
+        catch (err) { /* silencioso: mantém o último dado confirmado */ }
+        finally { this.liveRefreshing = false; }
+        return;
+      }
       if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;
