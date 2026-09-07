@@ -231,9 +231,7 @@ window.PAINEL_MODULES.clientes = function () {
         .sort((a, b) => (this.clienteDias(b.last_purchase_at) ?? 0) - (this.clienteDias(a.last_purchase_at) ?? 0));
     },
     abrirHistoricoCliente(c) {
-      this.vendasBusca = c?.phone || c?.name || '';
-      this.vendasTab = 'historico';
-      this.currentPage = 'vendas';
+      this.abrirFichaCliente(c);
     },
     clienteMensagem(c) {
       const primeiro = String(c?.name || 'cliente').trim().split(/\s+/)[0];

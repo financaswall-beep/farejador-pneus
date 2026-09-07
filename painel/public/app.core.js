@@ -136,6 +136,7 @@ window.PAINEL_MODULES.core = function () {
         return;
       }
       if (pageId !== 'clientes') this.stopClientesLive();
+      if (pageId !== 'clientes' && this.clienteFichaAberta) this.fecharFichaCliente();
       const page = window.PAINEL_PAGES[pageId];
       const scopedEnter = page[`${this.panelScope}Enter`] || page.enter || [];
       const scopedLoad = page[`${this.panelScope}Load`] || page.load || [];

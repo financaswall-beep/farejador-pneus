@@ -159,8 +159,8 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('app.compras.reposicao.js?v=20260825-replenishment3');
     expect(html).toContain('app.compras.reposicao.pdf.js?v=20260825-replenishment3');
     expect(html).toContain('app.compras.acoes.js?v=20260825-purchase-orders1');
-    expect(html).toContain('app.core.js?v=20260906-sales-demand1');
-    expect(html).toContain('app.clientes.js?v=20260822-continuity1');
+    expect(html).toContain('app.core.js?v=20260907-ficha1');
+    expect(html).toContain('app.clientes.js?v=20260907-ficha1');
     expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });
 });

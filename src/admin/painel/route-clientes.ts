@@ -9,6 +9,7 @@ import { registerCustomerIdentityRoutes } from './route-clientes-identity.js';
 import { registerCustomerPrivacyRoutes } from './route-clientes-privacy.js';
 import { updateCustomerLeadBoard } from './customer-lead-board.js';
 import { getCustomerLeadAvatar } from './customer-lead-avatar.js';
+import { registerCustomerDetailRoute } from './route-customer-detail.js';
 
 const MAX_SSE_PER_IP = 12;
 const sseByIp = new Map<string, number>();
@@ -134,5 +135,6 @@ export async function registerPainelClientes(fastify: FastifyInstance): Promise<
   });
 
   await registerCustomerIdentityRoutes(fastify);
+  await registerCustomerDetailRoute(fastify);
   await registerCustomerPrivacyRoutes(fastify);
 }
