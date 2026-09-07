@@ -59,6 +59,9 @@ describe('ficha lateral de Clientes',() => {
     expect(drawer).toContain('role="dialog"'); expect(drawer).toContain('aria-modal="true"');
     expect(drawer).toContain('@keydown.escape.window="if(clienteFichaAberta) fecharFichaCliente()"');
     expect(drawer).toContain('Endereço não informado'); expect(drawer).toContain('Telefone não informado');
+    expect(drawer).toContain('Localização do lead');
+    expect(drawer).toContain('Estimado pelo pino compartilhado');
+    expect(drawer).toContain('clienteFichaLocalizacaoMapaUrl()');
     expect(drawer).not.toContain('x-html'); expect(drawer).not.toContain('Carlos Oliveira');
     expect(html).not.toContain('<dialog id="cliente-ficha-dialog"');
     expect(html).not.toContain('Cliente selecionado');

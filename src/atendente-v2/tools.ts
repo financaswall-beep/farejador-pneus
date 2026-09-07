@@ -50,6 +50,7 @@ import {
   repriceMatrizQuotedItems,
 } from './channel-pricing.js';
 import { recordGeoRoutingDecision, recordPartnerRoutingDecision } from './routing-decisions.js';
+import { resolveDeliveryAddress } from './previous-delivery-address.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
@@ -442,6 +443,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           nome_cliente: { type: 'string' },
           modalidade: { type: 'string', enum: ['delivery', 'pickup'] },
           endereco_entrega: { type: 'string', description: 'Obrigatório se modalidade=delivery' },
+          usar_endereco_anterior: { type: 'boolean', description: 'Use true SOMENTE depois de perguntar se a entrega será no mesmo endereço da última entrega e o cliente confirmar. O sistema recupera o endereço sem expô-lo no prompt. Se o cliente informou endereço novo, passe endereco_entrega e omita este campo.' },
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
@@ -1259,6 +1261,25 @@ async function criarPedido(
     return JSON.stringify({ erro: 'Contato não encontrado para esta conversa.' });
   }
 
+  const deliveryAddressResolution = modalidade === 'delivery'
+    ? await resolveDeliveryAddress(client,environment,conversationId,contactId,{
+      address:args.endereco_entrega,usePrevious:args.usar_endereco_anterior === true,
+    })
+    : null;
+  if (deliveryAddressResolution && !deliveryAddressResolution.ok) {
+    const messages = {
+      endereco_entrega_obrigatorio: 'Peça rua, número e bairro. Se houver endereço anterior, pergunte antes se a entrega será no mesmo endereço e só após a confirmação rechame com usar_endereco_anterior=true.',
+      numero_endereco_obrigatorio: 'Confirme o número do endereço com o cliente antes de criar o pedido de entrega.',
+      confirmacao_endereco_anterior_obrigatoria: 'Pergunte se a entrega será no mesmo endereço da última entrega e aguarde uma resposta afirmativa. Não marque usar_endereco_anterior sozinho.',
+      endereco_anterior_indisponivel: 'Não há uma entrega anterior concluída com endereço neste cadastro. Peça rua, número e bairro.',
+    } as const;
+    return JSON.stringify({
+      erro:deliveryAddressResolution.code,
+      endereco_confirmado:false,
+      mensagem:messages[deliveryAddressResolution.code],
+    });
+  }
+
   // Telefone efetivo do pedido: o que o BOT coletou (contato sem número — Insta/FB)
   // tem prioridade; senão usa o do contato (WhatsApp). Reusa o normalizador E164
   // compartilhado e testado (normalizeBrazilianPhone).
@@ -1281,8 +1302,9 @@ async function criarPedido(
 
   // Dados comuns aos dois caminhos.
   const customerName = (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null;
-  const deliveryAddress =
-    modalidade === 'delivery' ? ((args.endereco_entrega as string | undefined) ?? null) : null;
+  const deliveryAddress = modalidade === 'delivery' && deliveryAddressResolution?.ok
+    ? deliveryAddressResolution.address
+    : null;
   const geoResolutionId = (args.geo_resolution_id as string | undefined) ?? null;
   const formaPagamento = (args.forma_pagamento as string | undefined) ?? null;
 

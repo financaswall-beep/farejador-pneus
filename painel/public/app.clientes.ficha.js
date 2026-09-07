@@ -70,6 +70,7 @@ window.PAINEL_MODULES.clientesFicha = function () {
       const address = this.clienteFicha?.customer?.address;
       return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : '';
     },
+    clienteFichaLocalizacaoMapaUrl() { return this.clienteFicha?.customer?.shared_location?.maps_url || ''; },
     clienteFichaStatusPedido(order) {
       if (order.status === 'cancelled') return 'Cancelado';
       return order.completed ? 'Concluído' : 'Pendente';

@@ -31,6 +31,12 @@ export interface ReverseGeocodeResult {
   municipio: string | null;
   /** Bairro (sublocality_level_1 / sublocality / neighborhood), quando o Google trouxer. */
   neighborhood: string | null;
+  /** Campos de endereço retornados pelo Google. O número é estimado pelo pino e
+   *  nunca deve ser tratado como endereço de entrega confirmado. */
+  formattedAddress?: string;
+  street?: string;
+  streetNumber?: string;
+  postalCode?: string;
 }
 
 interface GeocodeResponse {
@@ -43,6 +49,7 @@ interface GeocodeResponse {
 interface ReverseGeocodeResponse {
   status: string;
   results?: Array<{
+    formatted_address?: string;
     address_components?: Array<{ long_name: string; short_name?: string; types: string[] }>;
   }>;
 }
@@ -142,7 +149,12 @@ export async function reverseGeocode(
 
   let municipio: string | null = null;
   let neighborhood: string | null = null;
+  let formattedAddress: string | null = null;
+  let street: string | null = null;
+  let streetNumber: string | null = null;
+  let postalCode: string | null = null;
   for (const result of json.results ?? []) {
+    if (!formattedAddress && result.formatted_address?.trim()) formattedAddress = result.formatted_address.trim();
     for (const comp of result.address_components ?? []) {
       const types = comp.types ?? [];
       if (!municipio && types.includes('administrative_area_level_2')) {
@@ -156,12 +168,21 @@ export async function reverseGeocode(
       ) {
         neighborhood = comp.long_name;
       }
+      if (!street && types.includes('route')) street = comp.long_name;
+      if (!streetNumber && types.includes('street_number')) streetNumber = comp.long_name;
+      if (!postalCode && types.includes('postal_code')) postalCode = comp.long_name;
     }
-    if (municipio && neighborhood) break;
+    if (municipio && neighborhood && formattedAddress && street) break;
   }
 
-  if (!municipio && !neighborhood) return null;
-  return { municipio, neighborhood };
+  if (!municipio && !neighborhood && !formattedAddress) return null;
+  return {
+    municipio,neighborhood,
+    ...(formattedAddress ? { formattedAddress } : {}),
+    ...(street ? { street } : {}),
+    ...(streetNumber ? { streetNumber } : {}),
+    ...(postalCode ? { postalCode } : {}),
+  };
 }
 
 /**

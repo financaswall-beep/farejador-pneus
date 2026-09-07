@@ -109,13 +109,15 @@ export async function cachedReverseGeocode(
   client: PoolClient,
   point: GeoPoint,
   apiKey: string | undefined,
+  options: { requireFormattedAddress?: boolean } = {},
 ): Promise<ReverseGeocodeResult | null> {
   if (!env.GEO_CACHE || !apiKey) return google.reverseGeocode(point, apiKey);
 
   const key = reverseCacheKey(point);
   try {
     const hit = (await readMany(client, [key])).get(key) as ReverseGeocodeResult | undefined;
-    if (hit && ('municipio' in hit || 'neighborhood' in hit)) return hit;
+    if (hit && ('municipio' in hit || 'neighborhood' in hit)
+      && (!options.requireFormattedAddress || typeof hit.formattedAddress === 'string')) return hit;
   } catch (err) {
     logger.warn({ err }, 'geo-cache: leitura falhou (segue pro Google)');
   }

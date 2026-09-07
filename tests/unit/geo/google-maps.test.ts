@@ -111,6 +111,22 @@ describe('reverseGeocode', () => {
     });
   });
 
+  it('extrai endereço formatado e componentes sem tratá-los como confirmação de entrega', async () => {
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(jsonResponse({ status:'OK',results:[{
+      formatted_address:'Av. Central, 3990 - Rio do Ouro, São Gonçalo - RJ, 24751-001, Brasil',
+      address_components:[
+        COMP('3990',['street_number']),COMP('Av. Central',['route']),
+        COMP('Rio do Ouro',['sublocality_level_1']),COMP('São Gonçalo',['administrative_area_level_2']),
+        COMP('24751-001',['postal_code']),
+      ],
+    }] })));
+    expect(await reverseGeocode({ lat:-22.8,lng:-43.0 },'k')).toEqual({
+      municipio:'São Gonçalo',neighborhood:'Rio do Ouro',
+      formattedAddress:'Av. Central, 3990 - Rio do Ouro, São Gonçalo - RJ, 24751-001, Brasil',
+      street:'Av. Central',streetNumber:'3990',postalCode:'24751-001',
+    });
+  });
+
   it('só bairro (sem admin_area_2) → municipio null, neighborhood preenchido', async () => {
     vi.stubGlobal(
       'fetch',

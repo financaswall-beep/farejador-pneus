@@ -1,6 +1,9 @@
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
+const { cachedReverseGeocode } = vi.hoisted(() => ({ cachedReverseGeocode:vi.fn() }));
 vi.mock('../../../src/persistence/db.js',() => ({ pool:{} }));
+vi.mock('../../../src/shared/config/env.js',() => ({ env:{ GOOGLE_MAPS_API_KEY:'test-google-key' } }));
+vi.mock('../../../src/shared/geo/geo-cache.js',() => ({ cachedReverseGeocode }));
 import { getCustomerDetail } from '../../../src/admin/painel/customer-detail.js';
 import { customerOrdersSql, customerProfileSql } from '../../../src/admin/painel/customer-detail-sql.js';
 
@@ -30,6 +33,27 @@ describe('ficha individual de cliente',() => {
     const detail = await getCustomerDetail('prod','parceiro','id',{}, { query } as unknown as Pool);
     expect(detail?.customer).toMatchObject({ is_vip:false,address:'Rua Teste, 10',address_source:'customer' });
     expect(detail?.next_offset).toBeNull();
+  });
+  it('mostra o último pino do lead como estimativa, sem transformá-lo em endereço confirmado',async () => {
+    cachedReverseGeocode.mockResolvedValueOnce({
+      municipio:'Maricá',neighborhood:'Inoã',formattedAddress:'Rodovia Amaral Peixoto, Inoã, Maricá - RJ',
+    });
+    const leadProfile={ ...profile,address:null,origin:'Instagram',unit_id:null,unit_name:null };
+    const leadHistory={ ...history,purchases:0,total_spent:0,avg_ticket:0,history_total:0,
+      orders:[],last_address:null,last_unit_name:null };
+    const query=vi.fn()
+      .mockResolvedValueOnce({ rows:[leadProfile] })
+      .mockResolvedValueOnce({ rows:[leadHistory] })
+      .mockResolvedValueOnce({ rows:[{ coordinates_lat:'-22.9301',coordinates_lng:'-42.8204',observed_at:'2026-09-07' }] });
+    const detail=await getCustomerDetail('prod','chatwoot','contact-1',{}, { query } as unknown as Pool);
+    expect(detail?.customer).toMatchObject({
+      address:null,address_source:null,
+      shared_location:{ label:'Inoã — Maricá',estimated_address:'Rodovia Amaral Peixoto, Inoã, Maricá - RJ',source:'shared_pin' },
+    });
+    expect(detail?.customer.shared_location.maps_url).toContain('-22.9301%2C-42.8204');
+    expect(cachedReverseGeocode).toHaveBeenCalledWith(expect.anything(),{ lat:-22.9301,lng:-42.8204 },
+      'test-google-key',{ requireFormattedAddress:true });
+    expect(query.mock.calls[2]?.[1]).toEqual(['prod','contact-1']);
   });
   it.each(['chatwoot','balcao','parceiro','atacado'] as const)('mantém escopo explícito em %s',source => {
     const sql = customerOrdersSql(source);

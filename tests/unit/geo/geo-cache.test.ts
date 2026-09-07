@@ -154,6 +154,18 @@ describe('cachedReverseGeocode', () => {
     expect(reverseGeocode).toHaveBeenCalledTimes(1);
     expect(inserts(client)).toHaveLength(1);
   });
+
+  it('refaz cache antigo quando o chamador precisa do endereço formatado', async () => {
+    const mod=await loadGeoCache();
+    const point={ lat:-22.88,lng:-43.09 };
+    const legacy={ municipio:'Niterói',neighborhood:'Fonseca' };
+    const enriched={ ...legacy,formattedAddress:'Alameda São Boaventura, 100, Fonseca, Niterói - RJ' };
+    reverseGeocode.mockResolvedValueOnce(enriched);
+    const client=fakeClient([{ cache_key:mod.reverseCacheKey(point),value:legacy }]);
+    expect(await mod.cachedReverseGeocode(client,point,'KEY',{ requireFormattedAddress:true })).toEqual(enriched);
+    expect(reverseGeocode).toHaveBeenCalledTimes(1);
+    expect(inserts(client)).toHaveLength(1);
+  });
 });
 
 describe('cachedRoadDistanceKm (cache POR DESTINO)', () => {

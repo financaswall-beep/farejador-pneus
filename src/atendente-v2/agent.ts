@@ -17,61 +17,12 @@ import type { AgentV2JobInput, ChatMessage } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { loadLastAcceptedAgentText } from './turn-guards.js';
-import { isPlaceholderCustomerName } from '../shared/customer-name.js';
 import { botMayProcessTrigger } from './conversation-control.js';
 import { createOpenAIResponsesTurn } from './openai-responses.js';
 import { loadCustomerMemory } from './customer-memory.js';
+import { loadCustomerContext } from './customer-context.js';
 
 const MAX_TOOL_ROUNDS = 5;
-
-/**
- * Le contexto do cliente (nome do Chatwoot, recorrente, total de pedidos, LTV).
- * Retorna string pra injetar no system prompt OU null se nao tiver info util.
- *
- * Filtra nomes invalidos do Chatwoot (numeros de telefone, placeholders,
- * strings vazias) pra evitar bot chamar cliente de "+5521..." ou "Cliente".
- */
-function isValidChatwootName(name: string | null): boolean {
-  return !isPlaceholderCustomerName(name);
-}
-
-async function loadCustomerContext(
-  client: PoolClient,
-  conversationId: string,
-): Promise<string | null> {
-  try {
-    const result = await client.query<{
-      name: string | null;
-      is_returning: boolean;
-      purchase_count: number;
-      partial_ltv_brl: string | null;
-    }>(
-      `SELECT ct.name, cj.is_returning, cj.purchase_count, cj.partial_ltv_brl
-       FROM core.conversations c
-       JOIN core.contacts ct ON ct.id = c.contact_id
-       LEFT JOIN analytics.customer_journey_mv cj ON cj.contact_id = c.contact_id
-       WHERE c.id = $1
-       LIMIT 1`,
-      [conversationId],
-    );
-    const row = result.rows[0];
-    if (!row) return null;
-
-    const hasValidName = isValidChatwootName(row.name);
-    const firstName = hasValidName ? (row.name as string).trim().split(/\s+/)[0] : null;
-
-    if (row.is_returning && firstName && row.purchase_count >= 1) {
-      return `\n[CONTEXTO CLIENTE] Este cliente já comprou aqui antes. Nome (do Chatwoot): ${firstName}. Total de pedidos anteriores: ${row.purchase_count}. LTV: R$ ${row.partial_ltv_brl ?? '0,00'}. Trate como cliente recorrente — use saudação personalizada com o nome dele, mostre que reconhece. NÃO pergunte o nome dele.`;
-    }
-    if (firstName) {
-      return `\n[CONTEXTO CLIENTE] Nome conhecido do Chatwoot: ${firstName}. Primeira conversa. USE esse nome desde o turno 1 (ex: "Bom dia, ${firstName}!") e NÃO pergunte o nome dele de novo. Se ele se identificar com nome diferente na conversa, prefira o nome novo.`;
-    }
-    return `\n[CONTEXTO CLIENTE] Nome do cliente NÃO veio do Chatwoot. Pergunte o nome dele em algum momento durante a conversa (ex: turno 2 após cotar).`;
-  } catch (err) {
-    logger.warn({ err, conversation_id: conversationId }, 'agent_v2: loadCustomerContext falhou (ignorado)');
-    return null;
-  }
-}
 
 /**
  * Distância em LINHA RETA (haversine) do cliente até a loja ATIVA mais perto, em km.
