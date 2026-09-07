@@ -330,7 +330,7 @@ describe('catalogo no painel', () => {
     expect(html).toContain('class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col');
     expect(html).not.toContain('w-[min(520px,calc(100vw-24px))] -translate-x-1/2');
     expect(html).toContain('!catalogoCompatibilidade.open && !catalogoMarcaCorrecao.open');
-    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(4);
+    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(5);
   });
 
   it('corrige Sem marca antes do cadastro e oferece continuar para o produto', async () => {

@@ -12,15 +12,12 @@ window.PAINEL_MODULES.clientesFicha = function () {
     abrirFichaCliente(c) {
       if (!c?.source_id || !['chatwoot','balcao','parceiro','atacado'].includes(c.source)) return;
       returnFocus = document.activeElement;
-      this.selecionarCliente(c);
       this.clienteFichaOrigem = { ...c };
       this.clienteFicha = null;
       this.clienteFichaErro = '';
       this.clienteFichaAberta = true;
       this.$nextTick(() => {
         if (!this.clienteFichaAberta) return;
-        const dialog = document.getElementById('cliente-ficha-dialog');
-        if (dialog && !dialog.open) dialog.showModal();
         document.getElementById('cliente-ficha-fechar')?.focus();
         lucide.createIcons();
       });
@@ -34,8 +31,6 @@ window.PAINEL_MODULES.clientesFicha = function () {
       this.clienteFicha = null;
       this.clienteFichaOrigem = null;
       this.clienteFichaErro = '';
-      const dialog = document.getElementById('cliente-ficha-dialog');
-      if (dialog?.open) dialog.close();
       const target = returnFocus;
       returnFocus = null;
       this.$nextTick(() => { if (target?.isConnected) target.focus(); });

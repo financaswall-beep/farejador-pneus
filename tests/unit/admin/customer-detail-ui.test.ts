@@ -4,30 +4,29 @@ import { describe, expect, it, vi } from 'vitest';
 
 function setup() {
   const trigger = { focus:vi.fn(),isConnected:true };
-  const dialog = { open:false,showModal:vi.fn(function(this:{ open:boolean }) { this.open=true; }),
-    close:vi.fn(function(this:{ open:boolean }) { this.open=false; }),focus:vi.fn() };
-  const context = createContext({ window:{ PAINEL_MODULES:{} },document:{ activeElement:trigger,getElementById:() => dialog },
+  const closeButton = { focus:vi.fn() };
+  const context = createContext({ window:{ PAINEL_MODULES:{} },document:{ activeElement:trigger,getElementById:(id:string) => id === 'cliente-ficha-fechar' ? closeButton : null },
     lucide:{ createIcons:vi.fn() },console,URL,setTimeout,clearTimeout });
   for (const file of ['app.clientes.js','app.clientes.ficha.js']) runInContext(readFileSync('painel/public/'+file,'utf8'),context);
   const ui = runInContext('Object.assign({},window.PAINEL_MODULES.clientes(),window.PAINEL_MODULES.clientesFicha())',context);
   Object.assign(ui,{ $nextTick:(cb:()=>void) => cb(),apiGet:vi.fn(),carregarClienteLeadFoto:vi.fn(),
     currentPage:'clientes',clientesBusca:'Ana',clientesPagina:2,clientesOrigem:'parceiro',
     clienteLeadFoto:vi.fn(() => ''),clienteLeadConversaUrl:vi.fn(() => '') });
-  return { ui,dialog,trigger };
+  return { ui,closeButton,trigger };
 }
 const customer = { id:'parceiro:a',source:'parceiro',source_id:'a',name:'Ana' };
 const payload = { customer,summary:{ purchases:1 },orders:[{ id:'p1' }],next_offset:10,history_total:11 };
 const tick = () => new Promise(resolve => setTimeout(resolve,0));
 describe('ficha lateral de Clientes',() => {
   it('histórico abre na lateral, mantém filtros/página e devolve foco ao fechar',async () => {
-    const { ui,dialog,trigger } = setup(); ui.apiGet.mockResolvedValue(payload);
+    const { ui,closeButton,trigger } = setup(); ui.apiGet.mockResolvedValue(payload);
     ui.abrirHistoricoCliente(customer); await tick();
-    expect(dialog.showModal).toHaveBeenCalledTimes(1);
+    expect(ui.clienteFichaAberta).toBe(true); expect(closeButton.focus).toHaveBeenCalledTimes(1);
     expect(ui.currentPage).toBe('clientes');
     expect(ui.clientesBusca).toBe('Ana'); expect(ui.clientesPagina).toBe(2); expect(ui.clientesOrigem).toBe('parceiro');
     expect(ui.clienteFicha.customer).toEqual(customer);
     ui.fecharFichaCliente();
-    expect(dialog.close).toHaveBeenCalled(); expect(trigger.focus).toHaveBeenCalled();
+    expect(trigger.focus).toHaveBeenCalled(); expect(ui.clienteFichaAberta).toBe(false);
     expect(ui.clienteFicha).toBeNull();
   });
   it('descarta resposta atrasada de outro cliente e de uma ficha fechada',async () => {
@@ -54,11 +53,16 @@ describe('ficha lateral de Clientes',() => {
   });
   it('preserva o modelo aprovado, escapes de texto e navegação acessível',() => {
     const html = readFileSync('painel/public/index.html','utf8');
-    const drawer = html.slice(html.indexOf('<dialog id="cliente-ficha-dialog"'),html.indexOf('<!-- ═══ TELA: MARKETING'));
+    const drawer = html.slice(html.indexOf('<!-- Ficha de leitura:'),html.indexOf('<!-- ═══ TELA: MARKETING'));
     expect(drawer).toContain('bg-emerald-900'); expect(drawer).toContain('text-white');
-    expect(drawer).toContain('@cancel.prevent="fecharFichaCliente()"');
+    expect(drawer).toContain('class="fixed inset-0"'); expect(drawer).toContain('absolute inset-y-0 right-0');
+    expect(drawer).toContain('role="dialog"'); expect(drawer).toContain('aria-modal="true"');
+    expect(drawer).toContain('@keydown.escape.window="if(clienteFichaAberta) fecharFichaCliente()"');
     expect(drawer).toContain('Endereço não informado'); expect(drawer).toContain('Telefone não informado');
     expect(drawer).not.toContain('x-html'); expect(drawer).not.toContain('Carlos Oliveira');
-    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).not.toContain('<dialog id="cliente-ficha-dialog"');
+    expect(html).not.toContain('Cliente selecionado');
+    expect(html).not.toContain('<tr @click="abrirFichaCliente(c)"');
+    expect(html.match(/@click(?:\.stop)?="abrirFichaCliente\(c\)"/g)).toHaveLength(3);
   });
 });
