@@ -43,20 +43,38 @@ const chatwootListResponseSchema = z
       .passthrough(),
   ]);
 
+const nullableHourSchema = z.number().int().min(0).max(23).nullable().default(null);
+const nullableMinuteSchema = z.number().int().min(0).max(59).nullable().default(null);
+const chatwootWorkingHourSchema = z.object({
+  day_of_week: z.number().int().min(0).max(6),
+  closed_all_day: z.boolean().default(false),
+  open_all_day: z.boolean().default(false),
+  // O Chatwoot devolve null nestes campos em dias fechados. A validação
+  // condicional abaixo continua exigindo números para dias com expediente.
+  open_hour: nullableHourSchema,
+  open_minutes: nullableMinuteSchema,
+  close_hour: nullableHourSchema,
+  close_minutes: nullableMinuteSchema,
+}).passthrough();
+
 const chatwootInboxSchema = z.object({
   id: z.number().int(),
   working_hours_enabled: z.boolean().default(false),
   timezone: z.string().min(1).default('UTC'),
-  working_hours: z.array(z.object({
-    day_of_week: z.number().int().min(0).max(6),
-    closed_all_day: z.boolean().default(false),
-    open_all_day: z.boolean().default(false),
-    open_hour: z.number().int().min(0).max(23).default(0),
-    open_minutes: z.number().int().min(0).max(59).default(0),
-    close_hour: z.number().int().min(0).max(23).default(0),
-    close_minutes: z.number().int().min(0).max(59).default(0),
-  }).passthrough()).default([]),
-}).passthrough();
+  working_hours: z.array(chatwootWorkingHourSchema).default([]),
+}).passthrough().superRefine((inbox, ctx) => {
+  if (!inbox.working_hours_enabled) return;
+  inbox.working_hours.forEach((row, index) => {
+    if (row.closed_all_day || row.open_all_day) return;
+    for (const field of ['open_hour', 'open_minutes', 'close_hour', 'close_minutes'] as const) {
+      if (row[field] === null) ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['working_hours', index, field],
+        message: 'required for an open business day',
+      });
+    }
+  });
+});
 
 export interface ChatwootApiClientConfig {
   baseUrl: string;
@@ -185,10 +203,10 @@ export class ChatwootApiClient {
         dayOfWeek: row.day_of_week,
         closedAllDay: row.closed_all_day,
         openAllDay: row.open_all_day,
-        openHour: row.open_hour,
-        openMinutes: row.open_minutes,
-        closeHour: row.close_hour,
-        closeMinutes: row.close_minutes,
+        openHour: row.open_hour ?? 0,
+        openMinutes: row.open_minutes ?? 0,
+        closeHour: row.close_hour ?? 0,
+        closeMinutes: row.close_minutes ?? 0,
       })),
     };
   }

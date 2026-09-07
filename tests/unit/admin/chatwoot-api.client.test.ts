@@ -232,8 +232,12 @@ describe('ChatwootApiClient', () => {
     const { ChatwootApiClient } = await loadClient();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
       id: 39, working_hours_enabled: true, timezone: 'America/Sao_Paulo',
-      working_hours: [{ day_of_week: 1, closed_all_day: false, open_all_day: false,
-        open_hour: 9, open_minutes: 0, close_hour: 18, close_minutes: 0 }],
+      working_hours: [
+        { day_of_week: 1, closed_all_day: false, open_all_day: false,
+          open_hour: 9, open_minutes: 0, close_hour: 18, close_minutes: 0 },
+        { day_of_week: 6, closed_all_day: true, open_all_day: false,
+          open_hour: null, open_minutes: null, close_hour: null, close_minutes: null },
+      ],
     }));
     const client = new ChatwootApiClient({
       baseUrl: 'https://chatwoot.example.test/api/v1', accountId: 2,
@@ -241,7 +245,50 @@ describe('ChatwootApiClient', () => {
     });
     await expect(client.getInbox(39)).resolves.toMatchObject({
       id: 39, workingHoursEnabled: true, timezone: 'America/Sao_Paulo',
-      workingHours: [{ dayOfWeek: 1, openHour: 9, closeHour: 18 }],
+      workingHours: [
+        { dayOfWeek: 1, openHour: 9, closeHour: 18 },
+        { dayOfWeek: 6, closedAllDay: true, openHour: 0, closeHour: 0 },
+      ],
     });
+  });
+
+  it('aceita horários nulos enviados pelo Chatwoot em dias fechados', async () => {
+    const { ChatwootApiClient } = await loadClient();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 39, working_hours_enabled: false, timezone: 'America/Sao_Paulo',
+      working_hours: [
+        { day_of_week: 0, closed_all_day: true, open_all_day: false,
+          open_hour: null, open_minutes: null, close_hour: null, close_minutes: null },
+        { day_of_week: 6, closed_all_day: true, open_all_day: false,
+          open_hour: null, open_minutes: null, close_hour: null, close_minutes: null },
+      ],
+    }));
+    const client = new ChatwootApiClient({
+      baseUrl: 'https://chatwoot.example.test/api/v1', accountId: 2,
+      apiToken: 'secret-token-value', fetchFn: fetchMock as typeof fetch,
+    });
+
+    await expect(client.getInbox(39)).resolves.toMatchObject({
+      workingHoursEnabled: false,
+      workingHours: [
+        { dayOfWeek: 0, closedAllDay: true, openHour: 0, closeHour: 0 },
+        { dayOfWeek: 6, closedAllDay: true, openHour: 0, closeHour: 0 },
+      ],
+    });
+  });
+
+  it('rejeita horário nulo em dia aberto quando a agenda está habilitada', async () => {
+    const { ChatwootApiClient } = await loadClient();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 39, working_hours_enabled: true, timezone: 'America/Sao_Paulo',
+      working_hours: [{ day_of_week: 1, closed_all_day: false, open_all_day: false,
+        open_hour: null, open_minutes: null, close_hour: null, close_minutes: null }],
+    }));
+    const client = new ChatwootApiClient({
+      baseUrl: 'https://chatwoot.example.test/api/v1', accountId: 2,
+      apiToken: 'secret-token-value', fetchFn: fetchMock as typeof fetch,
+    });
+
+    await expect(client.getInbox(39)).rejects.toThrow('required for an open business day');
   });
 });
