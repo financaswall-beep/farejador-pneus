@@ -39,7 +39,8 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('Custo médio');
     expect(stockHtml).toContain('Capital');
     expect(stockHtml).toContain('Status');
-    expect(stockHtml.match(/\/admin\/painel\/assets\/estoque-hero\.webp\?preview=tire/g)).toHaveLength(2);
+    expect(stockHtml.match(/\/admin\/painel\/assets\/catalog-tire\.webp\?v=20260729-catalogo1/g)).toHaveLength(3);
+    expect(stockHtml.match(/\/admin\/painel\/assets\/estoque-hero\.webp\?preview=tire/g)).toHaveLength(1);
     expect(stockHtml).not.toContain('Mapa | Lista');
     expect(stockHtml).not.toContain('Criar compra');
     expect(stockHtml).not.toContain('pagination');

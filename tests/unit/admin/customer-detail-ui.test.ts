@@ -62,7 +62,11 @@ describe('ficha lateral de Clientes',() => {
     expect(drawer).not.toContain('x-html'); expect(drawer).not.toContain('Carlos Oliveira');
     expect(html).not.toContain('<dialog id="cliente-ficha-dialog"');
     expect(html).not.toContain('Cliente selecionado');
-    expect(html).not.toContain('<tr @click="abrirFichaCliente(c)"');
-    expect(html.match(/@click(?:\.stop)?="abrirFichaCliente\(c\)"/g)).toHaveLength(3);
+    const allCustomers = html.slice(html.indexOf(':key="\'todos-\'+c.id"'),html.indexOf('clientesMudarPagina(-1,clientesFiltrados())'));
+    expect(allCustomers).toContain('@click="abrirFichaCliente(c)"');
+    expect(allCustomers).toContain('carregarClienteLeadFoto(c)');
+    expect(allCustomers).toContain('clienteLeadFoto(c)');
+    expect(allCustomers).toContain('clienteLeadFotoFalhou(c)');
+    expect(html.match(/@click(?:\.stop)?="abrirFichaCliente\(c\)"/g)).toHaveLength(4);
   });
 });

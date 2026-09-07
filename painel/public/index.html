@@ -3715,7 +3715,7 @@
                class="mb-5 overflow-hidden rounded-xl border border-emerald-700/60 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm">
         <div class="grid grid-cols-1 divide-y divide-emerald-700/50 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
           <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
-            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-700/45"><i data-lucide="circle-dot-dashed" class="h-6 w-6 text-emerald-100"></i></div>
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-300/30 bg-white/95 p-1"><img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1" alt="" aria-hidden="true" width="48" height="48" class="h-full w-full object-contain mix-blend-multiply"></div>
             <div><p class="text-xs text-emerald-100/80">Pneus no galpão</p><p class="mt-1 text-2xl font-semibold num" x-text="stockResumo().pneus"></p></div>
           </div>
           <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
@@ -3949,13 +3949,13 @@
                       <td class="px-5 py-3.5">
                         <div class="flex items-center gap-3">
                           <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50 p-1 shadow-sm">
-                            <img src="/admin/painel/assets/estoque-hero.webp?preview=tire"
+                            <img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1"
                                  alt=""
                                  width="48"
                                  height="48"
                                  loading="lazy"
                                  decoding="async"
-                                 class="h-full w-full object-contain drop-shadow-sm">
+                                 class="h-full w-full object-contain mix-blend-multiply">
                           </div>
                           <div>
                             <span class="font-semibold" x-text="row.measure"></span>
@@ -3992,7 +3992,7 @@
                     <div>
                       <p class="text-xs font-medium uppercase tracking-[0.14em] text-emerald-700">Painel da medida</p>
                       <div class="mt-3 flex items-center gap-3">
-                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="circle-dot-dashed" class="h-7 w-7"></i></div>
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white p-1 shadow-sm"><img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1" alt="" aria-hidden="true" width="56" height="56" class="h-full w-full object-contain mix-blend-multiply"></div>
                         <div>
                           <h3 id="painel-medida-heading" class="text-2xl font-semibold tracking-tight" x-text="selectedRow.measure"></h3>
                           <p class="mt-0.5 text-xs font-medium text-emerald-700" x-text="`${selectedRow.brand || 'Marca não informada'} · ${catalogoConditionLabel(selectedRow.tire_condition)}`"></p>
@@ -7771,7 +7771,39 @@
                 <button @click="limparClientesFiltros()" class="h-9 px-3 text-xs text-gray-500 hover:text-gray-900">Limpar filtros</button>
                 <button class="h-9 px-4 rounded-md bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-2"><i data-lucide="filter" class="w-3.5 h-3.5"></i>Filtrar</button>
               </div>
-              <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50 text-left text-gray-500"><tr><th class="px-3 py-2.5">Cliente</th><th class="px-3 py-2.5">Tipo</th><th class="px-3 py-2.5">Classe</th><th class="px-3 py-2.5">Origem</th><th class="px-3 py-2.5">Última compra</th><th class="px-3 py-2.5">Próxima ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="c in clientesPaginados(clientesFiltrados())" :key="'todos-'+c.id"><tr class="hover:bg-emerald-50/40"><td class="px-3 py-3"><button type="button" @click="abrirFichaCliente(c)" aria-haspopup="dialog" class="font-medium text-emerald-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" x-text="c.name"></button><p class="text-[10px] text-gray-400 mt-0.5" x-text="c.phone||c.email||'Sem contato'"></p></td><td class="px-3 py-3" x-text="clienteTipoLabel(c.kind)"></td><td class="px-3 py-3"><span class="px-2 py-0.5 rounded-full" :class="c.is_vip?'bg-amber-50 text-amber-700':'bg-gray-100 text-gray-600'" x-text="clienteClasseLabel(c)"></span></td><td class="px-3 py-3"><span class="inline-flex items-center gap-1.5"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5 shrink-0"></template><span x-text="c.origin"></span></span><p class="text-[10px] text-gray-400 mt-0.5" x-text="clienteOrigemLabel(c.source)"></p></td><td class="px-3 py-3" x-text="clienteData(c.last_purchase_at)"></td><td class="px-3 py-3"><button @click.stop="abrirWhatsAppCliente(c, Number(c.purchases||0)?clienteMensagem(c):'')" class="inline-flex items-center gap-1.5 text-emerald-800 hover:underline"><img src="/assets/brands/whatsapp.svg" alt="" class="w-3.5 h-3.5"><span x-text="clienteProximaAcao(c)"></span></button></td></tr></template></tbody></table><p x-show="!clientesFiltrados().length" class="p-10 text-center text-xs text-gray-400">Nenhum cliente encontrado.</p></div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead class="bg-gray-50 text-left text-gray-500"><tr><th class="px-3 py-2.5">Cliente</th><th class="px-3 py-2.5">Tipo</th><th class="px-3 py-2.5">Classe</th><th class="px-3 py-2.5">Origem</th><th class="px-3 py-2.5">Última compra</th><th class="px-3 py-2.5">Próxima ação</th></tr></thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <template x-for="c in clientesPaginados(clientesFiltrados())" :key="'todos-'+c.id">
+                      <tr x-effect="if(currentPage==='clientes' && clientesTab==='todos') carregarClienteLeadFoto(c)"
+                          @click="abrirFichaCliente(c)"
+                          class="cursor-pointer transition-colors hover:bg-emerald-50/40">
+                        <td class="px-3 py-3">
+                          <div class="flex min-w-0 items-center gap-2.5">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-[11px] font-semibold text-emerald-800">
+                              <template x-if="clienteLeadFoto(c)">
+                                <img :src="clienteLeadFoto(c)" alt="" @error="clienteLeadFotoFalhou(c)" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="h-full w-full object-cover">
+                              </template>
+                              <span x-show="!clienteLeadFoto(c)" x-text="initials(c.name||'')"></span>
+                            </span>
+                            <div class="min-w-0">
+                              <button type="button" @click.stop="abrirFichaCliente(c)" aria-haspopup="dialog" class="max-w-[220px] truncate text-left font-medium text-emerald-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" :title="c.name" x-text="c.name"></button>
+                              <p class="mt-0.5 text-[10px] text-gray-400" x-text="c.phone||c.email||'Sem contato'"></p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-3 py-3" x-text="clienteTipoLabel(c.kind)"></td>
+                        <td class="px-3 py-3"><span class="rounded-full px-2 py-0.5" :class="c.is_vip?'bg-amber-50 text-amber-700':'bg-gray-100 text-gray-600'" x-text="clienteClasseLabel(c)"></span></td>
+                        <td class="px-3 py-3"><span class="inline-flex items-center gap-1.5"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="h-3.5 w-3.5 shrink-0"></template><span x-text="c.origin"></span></span><p class="mt-0.5 text-[10px] text-gray-400" x-text="clienteOrigemLabel(c.source)"></p></td>
+                        <td class="px-3 py-3" x-text="clienteData(c.last_purchase_at)"></td>
+                        <td class="px-3 py-3"><button @click.stop="abrirWhatsAppCliente(c, Number(c.purchases||0)?clienteMensagem(c):'')" class="inline-flex items-center gap-1.5 text-emerald-800 hover:underline"><img src="/assets/brands/whatsapp.svg" alt="" class="h-3.5 w-3.5"><span x-text="clienteProximaAcao(c)"></span></button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <p x-show="!clientesFiltrados().length" class="p-10 text-center text-xs text-gray-400">Nenhum cliente encontrado.</p>
+              </div>
               <div class="px-3 py-2.5 border-t flex items-center justify-between text-[11px] text-gray-400"><span>Mostrando <b class="text-gray-600" x-text="clientesPaginados(clientesFiltrados()).length"></b> de <b class="text-gray-600" x-text="clientesFiltrados().length"></b> clientes</span><div class="flex items-center gap-2"><button @click="clientesMudarPagina(-1,clientesFiltrados())" class="w-7 h-7 border rounded disabled:opacity-30" :disabled="clientesPagina===1">‹</button><span><b x-text="clientesPagina"></b> / <span x-text="clientesTotalPaginas(clientesFiltrados())"></span></span><button @click="clientesMudarPagina(1,clientesFiltrados())" class="w-7 h-7 border rounded disabled:opacity-30" :disabled="clientesPagina===clientesTotalPaginas(clientesFiltrados())">›</button></div></div>
             </div>
           </div>
