@@ -14,8 +14,8 @@ describe('continuidade do schema em PostgreSQL limpo', () => {
       'SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true',
     );
     expect(state.rows[0]).toEqual({
-      version: 216,
-      migration_name: '0216_conversation_bot_control.sql',
+      version: 219,
+      migration_name: '0219_bot_conversation_lifecycle.sql',
     });
 
     const ledger = await db.pool.query(`
@@ -25,9 +25,9 @@ describe('continuidade do schema em PostgreSQL limpo', () => {
         FROM ops.applied_migrations
     `);
     expect(ledger.rows[0]).toEqual({
-      row_count: 217,
-      file_count: 217,
-      latest_order: 216,
+      row_count: 220,
+      file_count: 220,
+      latest_order: 219,
     });
 
     const constraints = await db.pool.query<{ conname: string; convalidated: boolean }>(`

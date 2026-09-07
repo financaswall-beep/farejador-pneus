@@ -51,20 +51,27 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('finance.partner_payables_effective')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.conversation_bot_control')");
     expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('ops.conversation_bot_control_events')");
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=216');
+    expect(REQUIRED_SCHEMA_SQL).toContain('conversation_resolution');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=219');
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "migration_file='0216_conversation_bot_control.sql'",
     );
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "checksum_sha256='10c223869c6283a300b89348caae3cb062d1c55aabf39c00282890bdc34618b4'",
     );
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=217');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
+      "migration_file='0219_bot_conversation_lifecycle.sql'",
+    );
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
+      "checksum_sha256='5b2e34392720996da7ae5de76e272421c1cb87ede6b827dcb4a102ba118c72ae'",
+    );
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=220');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0216', async () => {
+  it('recusa iniciar antes da migration 0219', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0216_conversation_bot_control');
+      .rejects.toThrow('required_schema_missing:0219_bot_conversation_lifecycle');
   });
 });

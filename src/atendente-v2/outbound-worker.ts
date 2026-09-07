@@ -49,12 +49,32 @@ async function openOutboundDeadLetter(
 export async function reclaimAmbiguousOutbound(
   client: PoolClient, environment: Environment,
 ): Promise<number> {
+  // Alterar estado para `resolved` é idempotente. Se o processo caiu no meio,
+  // esta ação pode voltar à fila sem o risco de duplicar mensagem para o cliente.
+  const safeRetry = await client.query<OutboundRow>(
+    `UPDATE ops.outbound_messages
+        SET status='failed',locked_at=NULL,locked_by=NULL,
+            not_before=now(),last_error_code='worker_interrupted',
+            last_error_kind='retryable',
+            last_error_summary='resolution_result_unknown_safe_to_retry',updated_at=now()
+      WHERE environment=$1 AND status='sending' AND kind='conversation_resolution'
+        AND locked_at < now() - ($2 || ' minutes')::interval
+      RETURNING id,environment,conversation_id,turn_id,chatwoot_conversation_id,
+                echo_id,kind,body,attempts`,
+    [environment, String(UNKNOWN_SENDING_MINUTES)],
+  );
+  for (const row of safeRetry.rows) {
+    await recordOutboundEvent(client, { environment, outboundId: row.id,
+      attempt: row.attempts, fromStatus: 'sending', toStatus: 'failed',
+      reason: 'worker_crash_safe_resolution_retry', errorCode: 'worker_interrupted',
+      errorKind: 'retryable', errorSummary: 'resolution_result_unknown_safe_to_retry' });
+  }
   const stuck = await client.query<OutboundRow>(
     `UPDATE ops.outbound_messages
         SET status='dead_letter', locked_at=NULL, locked_by=NULL,
             last_error_code='delivery_unknown', last_error_kind='ambiguous',
             last_error_summary='process_stopped_while_provider_result_unknown', updated_at=now()
-      WHERE environment=$1 AND status='sending'
+      WHERE environment=$1 AND status='sending' AND kind<>'conversation_resolution'
         AND locked_at < now() - ($2 || ' minutes')::interval
       RETURNING id,environment,conversation_id,turn_id,chatwoot_conversation_id,
                 echo_id,kind,body,attempts`,
@@ -71,7 +91,7 @@ export async function reclaimAmbiguousOutbound(
       `UPDATE agent.turns SET status='blocked',error_message='delivery_unknown'
         WHERE environment=$1 AND id=$2`, [environment, row.turn_id]);
   }
-  return stuck.rowCount ?? 0;
+  return (safeRetry.rowCount ?? 0) + (stuck.rowCount ?? 0);
 }
 
 export async function markDeliverySuspects(
@@ -184,13 +204,26 @@ async function markOutboundAck(client: PoolClient, row: OutboundRow, providerId:
   }
 }
 
+async function markResolutionDelivered(client: PoolClient, row: OutboundRow): Promise<void> {
+  await client.query(
+    `UPDATE ops.outbound_messages SET status='delivered',sent_at=now(),delivered_at=now(),
+       locked_at=NULL,locked_by=NULL,last_error_code=NULL,last_error_kind=NULL,
+       last_error_summary=NULL,updated_at=now() WHERE id=$1 AND status='sending'`,
+    [row.id],
+  );
+  await recordOutboundEvent(client, { environment: row.environment, outboundId: row.id,
+    attempt: row.attempts, fromStatus: 'sending', toStatus: 'delivered',
+    reason: 'conversation_resolved' });
+}
+
 export async function markOutboundFailure(
   client: PoolClient,
   row: OutboundRow,
   error: unknown,
 ): Promise<void> {
   const failure = classifyAtendenteError(error);
-  const ambiguous = error instanceof ChatwootApiError && error.status === null;
+  const ambiguous = error instanceof ChatwootApiError && error.status === null
+    && row.kind !== 'conversation_resolution';
   const retry = !ambiguous && failure.retryable && row.attempts < MAX_ATENDENTE_RETRY_ATTEMPTS;
   if (retry) {
     const updated = await client.query(
@@ -245,13 +278,18 @@ export async function pollBotOutbox(): Promise<void> {
     await lockBotConversation(client,row.environment,row.conversation_id);
     if (!await prepareControlledOutbound(client,row)) { await client.query('COMMIT'); return; }
     readyToSend = true;
-    if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment'].includes(row.kind)) {
+    if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment',
+      'conversation_resolution'].includes(row.kind)) {
       throw new Error(`unsupported outbound kind: ${row.kind}`);
     }
     const sent = await deliverOutboundRow(client, row);
     providerAccepted = true;
-    await markPhotoRequestSent(client, row);
-    await markOutboundAck(client, row, sent.chatwootMessageId);
+    if (row.kind === 'conversation_resolution') {
+      await markResolutionDelivered(client, row);
+    } else {
+      await markPhotoRequestSent(client, row);
+      await markOutboundAck(client, row, sent.chatwootMessageId);
+    }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

@@ -46,6 +46,22 @@ export async function sendMessageOnce(
   return client.sendMessage(chatwootConversationId, content, echoId);
 }
 
+/** Estado explícito e idempotente: repetir `resolved` não reabre a conversa. */
+export async function resolveConversationOnce(chatwootConversationId: number): Promise<void> {
+  if (!env.BOT_OUTBOX) throw new ChatwootApiError('Bot outbox delivery is disabled');
+  if (!env.CHATWOOT_API_BASE_URL || !env.CHATWOOT_API_TOKEN || !env.CHATWOOT_ACCOUNT_ID) {
+    throw new ChatwootApiError('Chatwoot API configuration is missing');
+  }
+  const client = new ChatwootApiClient({
+    baseUrl: env.CHATWOOT_API_BASE_URL,
+    apiToken: env.CHATWOOT_API_TOKEN,
+    accountId: env.CHATWOOT_ACCOUNT_ID,
+    maxPostAttempts: 1,
+  });
+  await client.setConversationStatus(chatwootConversationId, 'resolved');
+  logger.info({ chatwootConversationId }, 'agent_v2: conversation resolved');
+}
+
 /**
  * Envia uma IMAGEM (foto sob demanda, 0094) pro cliente via Chatwoot.
  *

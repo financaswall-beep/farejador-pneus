@@ -138,6 +138,11 @@ caixa ou conta a receber. `À vista` passa a significar pagamento no acerto da c
 recebimento já acertado pela Matriz, sem abrir permissão para alterar quantidade,
 valor, venda ou pagamento.
 
+`0219_bot_conversation_lifecycle.sql` amplia a outbox durável com a ação
+idempotente `conversation_resolution`. A memória comercial de 11 dias é somente
+leitura de facts estruturados e não exige tabela nova; o encerramento automático
+continua dormente até `BOT_AUTO_RESOLVE_ENABLED=true`.
+
 `0189_checkout_price_negotiation.sql` separa preço tabelado de preço negociado no
 Caixa, congela o valor efetivamente vendido e preserva permissão do dono sobre a tabela.
 

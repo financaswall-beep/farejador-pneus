@@ -19,6 +19,7 @@ import { startMarketingCapiWorker } from '../marketing/capi.js';
 import { startMetaMessagingWorker } from '../marketing/meta-messaging-worker.js';
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
 import { assertRequiredSchema } from '../persistence/required-schema.js';
+import { startConversationAutoResolveWorker } from '../atendente-v2/auto-resolve.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -39,6 +40,7 @@ let stopMarketingScheduler: (() => void) | null = null;
 let stopMarketingCapi: (() => void) | null = null;
 let stopMetaMessaging: (() => void) | null = null;
 let stopMonthlyContinuity: (() => void) | null = null;
+let stopConversationAutoResolve: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -61,6 +63,7 @@ async function start(): Promise<void> {
   stopWorker = startWorker();
   stopAgentV2 = startAgentV2Worker();
   stopBotOutbox = startBotOutboxWorker();
+  stopConversationAutoResolve = startConversationAutoResolveWorker();
   stopPartnerChatReconciler = startPartnerChatReconciler();
   // Hub de tempo real do chat (LISTEN partner_chat -> SSE). Fatia 3.
   startPartnerChatNotifyHub();
@@ -100,6 +103,7 @@ async function shutdown(signal: string): Promise<void> {
   stopWorker?.();
   stopAgentV2?.();
   stopBotOutbox?.();
+  stopConversationAutoResolve?.();
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();

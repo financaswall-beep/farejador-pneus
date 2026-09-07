@@ -35,12 +35,25 @@ describe('agent_v2 outbound worker', () => {
 
   it('never blindly retries a sending row after a crash', async () => {
     const client = { query: vi.fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({ rows: [row], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 }) };
     await expect(worker.reclaimAmbiguousOutbound(client as never, 'prod')).resolves.toBe(1);
-    expect(String(client.query.mock.calls[0]?.[0])).toContain("status='dead_letter'");
-    expect(String(client.query.mock.calls[1]?.[0])).toContain('atendente_dead_letters');
+    expect(String(client.query.mock.calls[1]?.[0])).toContain("status='dead_letter'");
+    expect(String(client.query.mock.calls[2]?.[0])).toContain('atendente_dead_letters');
+  });
+
+  it('retries an interrupted resolution because setting resolved is idempotent', async () => {
+    const resolution = { ...row, turn_id: null, kind: 'conversation_resolution' };
+    const client = { query: vi.fn()
+      .mockResolvedValueOnce({ rows: [resolution], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) };
+    await expect(worker.reclaimAmbiguousOutbound(client as never, 'prod')).resolves.toBe(1);
+    expect(String(client.query.mock.calls[0]?.[0])).toContain("status='failed'");
+    expect(String(client.query.mock.calls[0]?.[0])).toContain("kind='conversation_resolution'");
+    expect(String(client.query.mock.calls[2]?.[0])).toContain("kind<>'conversation_resolution'");
   });
 
   it('sends an unknown provider result to human DLQ instead of retrying', async () => {

@@ -214,4 +214,34 @@ describe('ChatwootApiClient', () => {
     expect(page.items).toEqual([{ id: 18, conversation_id: 8, created_at: 1777148517 }]);
     expect(page.hasMore).toBe(false);
   });
+
+  it('define resolved explicitamente sem enviar mensagem ao cliente', async () => {
+    const { ChatwootApiClient } = await loadClient();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true }));
+    const client = new ChatwootApiClient({
+      baseUrl: 'https://chatwoot.example.test/api/v1', accountId: 2,
+      apiToken: 'secret-token-value', fetchFn: fetchMock as typeof fetch, maxPostAttempts: 1,
+    });
+    await client.setConversationStatus(39, 'resolved');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/accounts/2/conversations/39/toggle_status');
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)))
+      .toEqual({ status: 'resolved' });
+  });
+
+  it('lê a agenda comercial do inbox', async () => {
+    const { ChatwootApiClient } = await loadClient();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 39, working_hours_enabled: true, timezone: 'America/Sao_Paulo',
+      working_hours: [{ day_of_week: 1, closed_all_day: false, open_all_day: false,
+        open_hour: 9, open_minutes: 0, close_hour: 18, close_minutes: 0 }],
+    }));
+    const client = new ChatwootApiClient({
+      baseUrl: 'https://chatwoot.example.test/api/v1', accountId: 2,
+      apiToken: 'secret-token-value', fetchFn: fetchMock as typeof fetch,
+    });
+    await expect(client.getInbox(39)).resolves.toMatchObject({
+      id: 39, workingHoursEnabled: true, timezone: 'America/Sao_Paulo',
+      workingHours: [{ dayOfWeek: 1, openHour: 9, closeHour: 18 }],
+    });
+  });
 });

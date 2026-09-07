@@ -20,6 +20,7 @@ import { loadLastAcceptedAgentText } from './turn-guards.js';
 import { isPlaceholderCustomerName } from '../shared/customer-name.js';
 import { botMayProcessTrigger } from './conversation-control.js';
 import { createOpenAIResponsesTurn } from './openai-responses.js';
+import { loadCustomerMemory } from './customer-memory.js';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -115,10 +116,11 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   try {
     if (!await mayContinue()) return;
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
-    const [history, chatwootConvId, customerContext, customerPin] = await Promise.all([
+    const [history, chatwootConvId, customerContext, customerMemory, customerPin] = await Promise.all([
       loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO }),
       lookupChatwootConversationId(client, conversationId),
       loadCustomerContext(client, conversationId),
+      loadCustomerMemory(client, conversationId, env.AGENT_V2_MEMORY_DAYS),
       // Determinístico: o cliente JÁ mandou o pino? Se sim, o nudge abaixo FORÇA o bot a
       // usar a tool (em vez de pedir o bairro). Pedir no prompt sozinho não bastava — o
       // LLM ignorava (não re-chamava a tool no turno do pino). Ver agent nudge abaixo.
@@ -201,7 +203,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       ? buildDeliveryQuoteFirstNudge(latestCustomerText, customerPin != null)
       : '';
     const systemPromptWithContext =
-      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge;
+      basePrompt + (customerContext ?? '') + (customerMemory ?? '')
+      + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },

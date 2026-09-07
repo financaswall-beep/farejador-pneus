@@ -43,6 +43,21 @@ const chatwootListResponseSchema = z
       .passthrough(),
   ]);
 
+const chatwootInboxSchema = z.object({
+  id: z.number().int(),
+  working_hours_enabled: z.boolean().default(false),
+  timezone: z.string().min(1).default('UTC'),
+  working_hours: z.array(z.object({
+    day_of_week: z.number().int().min(0).max(6),
+    closed_all_day: z.boolean().default(false),
+    open_all_day: z.boolean().default(false),
+    open_hour: z.number().int().min(0).max(23).default(0),
+    open_minutes: z.number().int().min(0).max(59).default(0),
+    close_hour: z.number().int().min(0).max(23).default(0),
+    close_minutes: z.number().int().min(0).max(59).default(0),
+  }).passthrough()).default([]),
+}).passthrough();
+
 export interface ChatwootApiClientConfig {
   baseUrl: string;
   accountId: number;
@@ -68,6 +83,21 @@ export interface ChatwootPage {
   items: Array<Record<string, unknown>>;
   hasMore: boolean;
   page: number;
+}
+
+export interface ChatwootInboxBusinessHours {
+  id: number;
+  workingHoursEnabled: boolean;
+  timezone: string;
+  workingHours: Array<{
+    dayOfWeek: number;
+    closedAllDay: boolean;
+    openAllDay: boolean;
+    openHour: number;
+    openMinutes: number;
+    closeHour: number;
+    closeMinutes: number;
+  }>;
 }
 
 export class ChatwootApiError extends Error {
@@ -142,6 +172,33 @@ export class ChatwootApiClient {
     url.searchParams.set('page', String(input.page));
 
     return this.requestPage(url, input.page);
+  }
+
+  async getInbox(inboxId: number): Promise<ChatwootInboxBusinessHours> {
+    const url = new URL(`${this.baseUrl}/accounts/${this.accountId}/inboxes/${inboxId}`);
+    const body = chatwootInboxSchema.parse(await this.requestJson(url));
+    return {
+      id: body.id,
+      workingHoursEnabled: body.working_hours_enabled,
+      timezone: body.timezone,
+      workingHours: body.working_hours.map((row) => ({
+        dayOfWeek: row.day_of_week,
+        closedAllDay: row.closed_all_day,
+        openAllDay: row.open_all_day,
+        openHour: row.open_hour,
+        openMinutes: row.open_minutes,
+        closeHour: row.close_hour,
+        closeMinutes: row.close_minutes,
+      })),
+    };
+  }
+
+  /** Define o estado explicitamente; ao contrário de um toggle cego, repetir `resolved` é seguro. */
+  async setConversationStatus(chatwootConversationId: number, status: 'resolved'): Promise<void> {
+    const url = new URL(
+      `${this.baseUrl}/accounts/${this.accountId}/conversations/${chatwootConversationId}/toggle_status`,
+    );
+    await this.requestPost(url, { status });
   }
 
   /**
@@ -331,5 +388,45 @@ export class ChatwootApiClient {
     throw new ChatwootApiError(
       lastError instanceof Error ? lastError.message : 'Chatwoot API request failed',
     );
+  }
+
+  private async requestJson(url: URL): Promise<unknown> {
+    const startedAt = Date.now();
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      try {
+        const response = await this.fetchFn(url, {
+          headers: { api_access_token: this.apiToken },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const bodyText = await response.text();
+        logger.debug({ status_code: response.status, duration_ms: Date.now() - startedAt, attempt },
+          'chatwoot api request completed');
+        if (!response.ok) {
+          if (shouldRetry(response.status) && attempt < MAX_ATTEMPTS) {
+            await this.sleepFn(500 * 2 ** (attempt - 1));
+            continue;
+          }
+          throw new ChatwootApiError(
+            `Chatwoot API request failed with status ${response.status}`,
+            response.status,
+            sanitizeBody(bodyText),
+          );
+        }
+        return bodyText ? JSON.parse(bodyText) : null;
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err instanceof ChatwootApiError) throw err;
+        lastError = err;
+        if (attempt < MAX_ATTEMPTS) {
+          await this.sleepFn(500 * 2 ** (attempt - 1));
+          continue;
+        }
+      }
+    }
+    throw new ChatwootApiError(lastError instanceof Error ? lastError.message : 'Chatwoot API request failed');
   }
 }

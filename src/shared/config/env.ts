@@ -57,6 +57,9 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
+  // Memória comercial entre conversas do mesmo contato. Lê apenas facts
+  // estruturados/permitidos; 0 desliga sem apagar dado algum.
+  AGENT_V2_MEMORY_DAYS: z.string().transform(Number).pipe(z.number().int().min(0).max(30)).default('11'),
   // Inclui reasoning + texto/ferramentas na Responses API; exclusivo do bot.
   AGENT_V2_MAX_OUTPUT_TOKENS: z.string().transform(Number).pipe(z.number().int().min(1024).max(32768)).default('8192'),
   // ETAPA 8 — Outbox resiliente do Bot/Chatwoot. Default OFF: nenhuma resposta
@@ -66,6 +69,10 @@ const envSchema = z.object({
   // sent_api_ack quando a API do Chatwoot devolve aceite. A confirmação por
   // webhook/provider id é reconciliada separadamente.
   BOT_OUTBOX: booleanStringSchema,
+  // Encerramento seguro no Chatwoot. Default OFF para rollout explícito.
+  BOT_AUTO_RESOLVE_ENABLED: booleanStringSchema,
+  BOT_AUTO_RESOLVE_IDLE_BUSINESS_HOURS: z.string().transform(Number)
+    .pipe(z.number().int().min(1).max(72)).default('8'),
   MATRIZ_CUSTOMER_IDENTITY: booleanStringSchema,
   MATRIZ_CUSTOMER_PRIVACY: booleanStringSchema,
   ...marketingEnvShape,

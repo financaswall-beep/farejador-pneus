@@ -16,6 +16,7 @@ interface ProductionEnvConfig {
   AGENT_V2_WORKER_ENABLED?: boolean;
   AGENT_V2_CONVERSATION_IDS?: string[];
   BOT_OUTBOX?: boolean;
+  BOT_AUTO_RESOLVE_ENABLED?: boolean;
   MATRIZ_RECEIPT_AI?: boolean;
   OPENAI_API_KEY?: string;
   CHATWOOT_API_BASE_URL?: string;
@@ -138,6 +139,9 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
     if (!value.CHATWOOT_ACCOUNT_ID) {
       addIssue(ctx, 'CHATWOOT_ACCOUNT_ID', 'is required in production when the bot sender is enabled');
     }
+  }
+  if (value.BOT_AUTO_RESOLVE_ENABLED && !value.BOT_OUTBOX) {
+    addIssue(ctx, 'BOT_OUTBOX', 'must be true when BOT_AUTO_RESOLVE_ENABLED=true');
   }
   if (value.MARKETING_META_ENABLED) {
     if (!value.META_ADS_ACCOUNT_ID) {

@@ -22,11 +22,20 @@ beforeAll(async () => {
 describe('environment security validation', () => {
   it('limita o orçamento de saída do bot sem mudar o modelo default ou ativar o worker', () => {
     expect(parseEnv(baseEnv)).toMatchObject({ AGENT_V2_MAX_OUTPUT_TOKENS: 8192,
-      OPENAI_MODEL: 'gpt-4o-mini', AGENT_V2_WORKER_ENABLED: false });
+      OPENAI_MODEL: 'gpt-4o-mini', AGENT_V2_WORKER_ENABLED: false,
+      AGENT_V2_MEMORY_DAYS: 11, BOT_AUTO_RESOLVE_ENABLED: false,
+      BOT_AUTO_RESOLVE_IDLE_BUSINESS_HOURS: 8 });
     expect(parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: '4096' }).AGENT_V2_MAX_OUTPUT_TOKENS).toBe(4096);
     for (const value of ['0', 'abc', '32769', '2048.5']) {
       expect(() => parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: value })).toThrow();
     }
+  });
+
+  it('não permite encerramento automático sem a outbox em produção', () => {
+    expect(() => parseEnv({
+      ...baseEnv, NODE_ENV: 'production', BOT_AUTO_RESOLVE_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24), CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/BOT_OUTBOX.*BOT_AUTO_RESOLVE_ENABLED=true/);
   });
   it('rejects short production secrets', () => {
     expect(() => parseEnv({

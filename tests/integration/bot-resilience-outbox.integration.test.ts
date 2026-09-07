@@ -7,6 +7,8 @@ let chatwootConversationId: number;
 let reconcileAgentOutboundDelivery: typeof import('../../src/atendente-v2/outbound-reconcile').reconcileAgentOutboundDelivery;
 let supersedeStaleAgentOutbound: typeof import('../../src/atendente-v2/outbound-worker').supersedeStaleAgentOutbound;
 let getBotVisao: typeof import('../../src/admin/painel/queries-bot-visao').getBotVisao;
+let assessResolutionGuard: typeof import('../../src/atendente-v2/auto-resolve').assessResolutionGuard;
+let loadCustomerMemory: typeof import('../../src/atendente-v2/customer-memory').loadCustomerMemory;
 
 beforeAll(async () => {
   Object.assign(process.env, {
@@ -17,6 +19,8 @@ beforeAll(async () => {
   ({ reconcileAgentOutboundDelivery } = await import('../../src/atendente-v2/outbound-reconcile'));
   ({ supersedeStaleAgentOutbound } = await import('../../src/atendente-v2/outbound-worker'));
   ({ getBotVisao } = await import('../../src/admin/painel/queries-bot-visao'));
+  ({ assessResolutionGuard } = await import('../../src/atendente-v2/auto-resolve'));
+  ({ loadCustomerMemory } = await import('../../src/atendente-v2/customer-memory'));
   db = await startPostgres();
 });
 afterAll(async () => { if (db) await stopPostgres(db); });
@@ -65,6 +69,71 @@ async function outbound(triggerId: string, turnId: string, status = 'pending', p
 }
 
 describe('Etapa 8 — outbox e DLQ no PostgreSQL real', () => {
+  it('recupera memória estruturada de outra conversa sem copiar endereço completo', async () => {
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
+       VALUES ('test',$1,'Cliente Memória') RETURNING id`,
+      [Math.floor(Math.random() * 1_000_000_000)],
+    );
+    await db.pool.query(`UPDATE core.conversations SET contact_id=$2 WHERE id=$1`,
+      [conversationId, contact.rows[0].id]);
+    const prior = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.conversations
+         (environment,chatwoot_conversation_id,chatwoot_account_id,contact_id,
+          current_status,started_at,last_activity_at)
+       VALUES ('test',$1,1,$2,'resolved',now()-interval '1 day',now()-interval '1 day')
+       RETURNING id`,
+      [Math.floor(Math.random() * 1_000_000_000), contact.rows[0].id],
+    );
+    for (const [key, value] of [
+      ['medida_pneu', '90/90-18'], ['endereco_entrega', 'Rua Privada, 10'],
+    ]) {
+      await db.pool.query(
+        `INSERT INTO analytics.conversation_facts
+           (environment,conversation_id,fact_key,fact_value,observed_at,
+            truth_type,source,extractor_version)
+         VALUES ('test',$1,$2,to_jsonb($3::text),now()-interval '1 day',
+                 'observed','integration','integration-v1')`,
+        [prior.rows[0].id, key, value],
+      );
+    }
+    const memory = await loadCustomerMemory(db.pool as never, conversationId, 11);
+    expect(memory).toContain('medida do pneu: 90/90-18');
+    expect(memory).not.toContain('Rua Privada');
+  });
+
+  it('aceita resolução idempotente e repete a guarda contra trabalho pendente', async () => {
+    const customerId = await message('contact', 20);
+    const latestId = await message('user', 10);
+    await expect(assessResolutionGuard(
+      db.pool as never, 'test', conversationId, latestId,
+    )).resolves.toEqual({ allowed: true, has_completed_order: false });
+
+    const body = JSON.stringify({ expected_last_message_id: latestId, reason: 'inactivity' });
+    const resolution = await db.pool.query<{ id: string }>(
+      `INSERT INTO ops.outbound_messages
+         (environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256)
+       VALUES ('test',$1,$2,$3,'conversation_resolution',$4,'hash') RETURNING id`,
+      [conversationId, chatwootConversationId, `resolve:${conversationId}:${latestId}`, body],
+    );
+    await expect(db.pool.query(
+      `INSERT INTO ops.outbound_messages
+         (environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256)
+       VALUES ('test',$1,$2,$3,'conversation_resolution',$4,'hash')`,
+      [conversationId, chatwootConversationId, `resolve:${conversationId}:${latestId}`, body],
+    )).rejects.toMatchObject({ code: '23505' });
+
+    await db.pool.query(
+      `INSERT INTO ops.atendente_jobs
+         (environment,conversation_id,trigger_message_id,status)
+       VALUES ('test',$1,$2,'pending')`,
+      [conversationId, customerId],
+    );
+    await expect(assessResolutionGuard(
+      db.pool as never, 'test', conversationId, latestId, resolution.rows[0].id,
+    )).resolves.toMatchObject({ allowed: false });
+  });
+
   it('blocks cross-environment references at the database boundary', async () => {
     await expect(db.pool.query(
       `INSERT INTO ops.outbound_messages

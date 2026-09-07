@@ -1,11 +1,15 @@
 import type { PoolClient } from 'pg';
-import { sendAttachmentOnce, sendMessageOnce, type SendMessageResult } from './sender.js';
+import { resolveConversationOnce, sendAttachmentOnce, sendMessageOnce, type SendMessageResult } from './sender.js';
 import type { OutboundRow } from './outbound-worker.js';
 
 export async function deliverOutboundRow(
   client: PoolClient,
   row: OutboundRow,
 ): Promise<SendMessageResult> {
+  if (row.kind === 'conversation_resolution') {
+    await resolveConversationOnce(Number(row.chatwoot_conversation_id));
+    return { chatwootMessageId: null };
+  }
   if (row.kind !== 'photo_attachment') {
     return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
   }

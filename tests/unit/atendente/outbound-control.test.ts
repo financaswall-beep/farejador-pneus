@@ -1,6 +1,8 @@
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 const syncHuman = vi.hoisted(() => vi.fn());
+const validateResolution = vi.hoisted(() => vi.fn());
 vi.mock('../../../src/atendente-v2/conversation-control.js',() => ({ syncHumanIntervention:syncHuman }));
+vi.mock('../../../src/atendente-v2/auto-resolve.js',() => ({ validateResolutionOutbound:validateResolution }));
 import { prepareControlledOutbound } from '../../../src/atendente-v2/outbound-control.js';
 const row={ id:'out',environment:'test' as const,conversation_id:'a',turn_id:null,
   chatwoot_conversation_id:12,echo_id:'echo',kind:'agent_text',body:'oi',attempts:1 };
@@ -8,7 +10,10 @@ function database(allowed=true) {
   return { query:vi.fn().mockImplementation(async (sql:string) =>
     ({ rows:sql.includes('AS allowed') ? [{ allowed }] : [] })) };
 }
-beforeEach(() => { syncHuman.mockReset().mockResolvedValue({ mode:'auto',resumed_at:null }); });
+beforeEach(() => {
+  syncHuman.mockReset().mockResolvedValue({ mode:'auto',resumed_at:null });
+  validateResolution.mockReset().mockResolvedValue(true);
+});
 describe('última trava de envio',() => {
   it.each(['agent_text','survey_text','photo_text','photo_attachment'])('barra %s durante atendimento humano',async kind => {
     syncHuman.mockResolvedValue({ mode:'human',resumed_at:null });
@@ -29,6 +34,13 @@ describe('última trava de envio',() => {
     const db=database();
     expect(await prepareControlledOutbound(db as never,row)).toBe(true);
     expect(db.query.mock.calls.some(c=>String(c[0]).startsWith('UPDATE'))).toBe(false);
+  });
+  it('repete a guarda específica antes de resolver no Chatwoot',async () => {
+    const db=database();
+    validateResolution.mockResolvedValue(false);
+    expect(await prepareControlledOutbound(db as never,{ ...row,kind:'conversation_resolution',body:'{}' }))
+      .toBe(false);
+    expect(validateResolution).toHaveBeenCalledWith(db,'test','a','out','{}');
   });
   it('interrompe o envio em erro de banco',async () => {
     syncHuman.mockRejectedValue(new Error('database_unavailable'));
