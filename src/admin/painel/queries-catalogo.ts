@@ -11,6 +11,7 @@ interface CatalogRow {
   tire_condition: TireCondition | null;
   brand: string | null; tire_size: string | null; tire_position: string | null;
   tire_construction?: 'radial' | 'bias' | null;
+  tread_pattern: string | null; load_index: string | null; speed_rating: string | null;
   price_amount: string | null; currency: string | null; price_type: string | null;
   compatibility_count: number | string;
 }
@@ -52,6 +53,7 @@ export async function getCatalogOverview(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,
               ts.tire_size,ts.position tire_position,ts.construction tire_construction,
+              ts.tread_pattern,ts.load_index,ts.speed_rating,
               cp.price_amount,cp.currency,cp.price_type,
               COALESCE((
                 SELECT count(DISTINCT vf.vehicle_model_id)::int
@@ -166,6 +168,9 @@ export async function getCatalogOverview(
         brand: row.brand,
         tire_size: row.measure,
         tire_position: null,
+        tread_pattern: null,
+        load_index: null,
+        speed_rating: null,
         price_amount: null,
         currency: null,
         price_type: null,
@@ -199,6 +204,8 @@ export async function getCatalogOverview(
       without_price: rows.filter((row) => row.price_amount === null
         || !Number.isFinite(Number(row.price_amount)) || Number(row.price_amount) <= 0).length,
       with_stock: rows.filter((row) => Number(row.total_stock_available ?? 0) > 0).length,
+      without_position: catalogRows.filter((row) => row.product_type === 'tire'
+        && row.tire_position === null).length,
     },
     brands,
     rows,

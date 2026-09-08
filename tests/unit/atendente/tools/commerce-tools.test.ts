@@ -92,10 +92,31 @@ describe('commerce tools deterministicas da Atendente', () => {
     expect(client.calls[0]!.text).toContain('total_stock_available > 0'); // estoque ainda filtra
   });
 
-  it('buscarProduto: posicao "rear" SEGUE restringindo tire_position', async () => {
+  it('buscarProduto: posicao "rear" aceita cadastro pendente, mas segue excluindo posição contrária', async () => {
     const client = clientWithRows([[]]);
     await buscarProduto(client, { environment: 'test', medida_pneu: '100/90-18', posicao_pneu: 'rear' });
     expect(client.calls[0]!.text).toContain('OR tire_position'); // filtro de posicao presente
+    expect(client.calls[0]!.text).toContain('tire_position IS NULL');
+  });
+
+  it('buscarProduto identifica SKU sem posição como pendente, sem alegar incompatibilidade', async () => {
+    const client = clientWithRows([[
+      {
+        product_id: 'p1', product_code: 'NMAX-110', product_name: 'Pneu 110/70-13',
+        product_type: 'tire', brand: 'Pirelli', tire_condition: 'novo',
+        short_description: null, tire_size: '110/70-13', tire_position: null,
+        intended_use: 'street', price_amount: '199.00', currency: 'BRL',
+        price_type: 'regular', total_stock_available: 2,
+      },
+    ]]);
+
+    const result = await buscarProduto(client, {
+      environment: 'test', medida_pneu: '110/70-13', posicao_pneu: 'front',
+    });
+
+    expect(result[0]).toMatchObject({
+      requested_tire_position: 'front', position_verification: 'unregistered',
+    });
   });
 
   it('verificarEstoque soma locais e retorna indisponivel quando total zero', async () => {

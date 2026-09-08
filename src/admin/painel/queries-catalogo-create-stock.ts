@@ -22,6 +22,10 @@ function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
 }
 
+function optionalTechnicalText(value: string | null | undefined): string | null {
+  return value?.trim().replace(/\s+/g, ' ') || null;
+}
+
 function brandKey(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -37,6 +41,10 @@ export async function createCatalogProductFromStock(
   const tireCondition = requireTireCondition(input.tireCondition ?? 'meia_vida');
   const productCode = normalizeCode(input.productCode);
   const productName = normalizeName(input.productName);
+  const treadPattern = optionalTechnicalText(input.treadPattern);
+  const loadIndex = optionalTechnicalText(input.loadIndex);
+  const speedRating = optionalTechnicalText(input.speedRating)?.toUpperCase() ?? null;
+  const position = input.position ?? null;
   if (!measure) throw new Error('catalog_measure_required');
   if (!tireSizeKey(measure)) throw new Error('catalog_measure_invalid');
   const measureKey = measure.replace(/\D/g, '');
@@ -111,12 +119,14 @@ export async function createCatalogProductFromStock(
     const productId = product.rows[0]!.id;
     const tireSpec = await client.query<{ id: string }>(
       `INSERT INTO commerce.tire_specs
-         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
-       VALUES ($1,$2,$3,$4,$5,$6)
+         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter,
+          tread_pattern,load_index,speed_rating,position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING id`,
       [
         environment, productId, variant.measure, variant.tire_width_mm,
-        variant.tire_aspect_ratio, variant.tire_rim_diameter,
+        variant.tire_aspect_ratio, variant.tire_rim_diameter, treadPattern,
+        loadIndex, speedRating, position,
       ],
     );
     const tireSpecId = tireSpec.rows[0]?.id ?? (await client.query<{ id: string }>(
@@ -153,6 +163,10 @@ export async function createCatalogProductFromStock(
           brand: variant.brand,
           tire_condition: tireCondition,
           tire_size: variant.measure,
+          tread_pattern: treadPattern,
+          load_index: loadIndex,
+          speed_rating: speedRating,
+          position,
           source: 'wholesale_stock',
           inherited_fitments: copiedFitments.rowCount ?? 0,
           supersedes_archived_product_ids: archivedProductIds,

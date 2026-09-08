@@ -13,6 +13,7 @@ import {
   searchCatalogVehicleModels,
 } from './queries-catalogo-compatibilidade.js';
 import { createCatalogProduct, createCatalogProductFromStock } from './queries-catalogo-create.js';
+import { updateCatalogTireSpec } from './queries-catalogo-spec.js';
 import { operatorLabel } from './route-helpers.js';
 
 const productParams = z.object({ product_id: z.string().uuid() });
@@ -34,6 +35,17 @@ const createProductBody = z.object({
       'catalog_price_cent_precision')
     .nullable().optional(),
   price_reason: z.string().trim().min(2).max(500).nullable().optional(),
+  tread_pattern: z.string().trim().max(120).nullable().optional(),
+  load_index: z.string().trim().max(20).nullable().optional(),
+  speed_rating: z.string().trim().max(20).nullable().optional(),
+  position: z.enum(['front', 'rear', 'both']).nullable().optional(),
+});
+const tireSpecBody = z.object({
+  tread_pattern: z.string().trim().max(120).nullable().optional(),
+  load_index: z.string().trim().max(20).nullable().optional(),
+  speed_rating: z.string().trim().max(20).nullable().optional(),
+  position: z.enum(['front', 'rear', 'both']).nullable().optional(),
+  reason: z.string().trim().min(2).max(500),
 });
 const vehicleSearchQuery = z.object({ q: z.string().trim().min(2).max(120) });
 const compatibilityBody = z.object({
@@ -84,6 +96,10 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         actorLabel: operatorLabel(request),
         priceAmount: body.data.price_amount,
         priceReason: body.data.price_reason,
+        treadPattern: body.data.tread_pattern,
+        loadIndex: body.data.load_index,
+        speedRating: body.data.speed_rating,
+        position: body.data.position,
       });
       return reply.status(201).send(product);
     } catch (error) {
@@ -93,6 +109,31 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
            'catalog_product_code_duplicate'].includes(message) ? 409
           : message.startsWith('catalog_') ? 400 : 500;
       if (status === 500) logger.error({ error }, 'painel catalog product create failed');
+      return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
+    }
+  });
+
+  fastify.post('/admin/api/catalog/:product_id/spec', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = productParams.safeParse(request.params);
+    const body = tireSpecBody.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return reply.status(400).send({ error: 'invalid_catalog_spec' });
+    }
+    try {
+      return reply.status(200).send(await updateCatalogTireSpec({
+        productId: params.data.product_id,
+        treadPattern: body.data.tread_pattern,
+        loadIndex: body.data.load_index,
+        speedRating: body.data.speed_rating,
+        position: body.data.position,
+        reason: body.data.reason,
+        actorLabel: operatorLabel(request),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'internal_server_error';
+      const status = message === 'catalog_product_not_found' ? 404
+        : message.startsWith('catalog_spec_') ? 400 : 500;
+      if (status === 500) logger.error({ error }, 'painel catalog tire spec update failed');
       return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
     }
   });

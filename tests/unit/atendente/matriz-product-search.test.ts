@@ -70,6 +70,39 @@ describe('tools do Bot usam a fonte oficial da Matriz', () => {
     expect(allSql(query)).not.toMatch(/product_name\s+ILIKE/i);
   });
 
+  it('não descarta SKU sem posição quando a medida e a aplicação foram informadas', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [
+        { ...product('p-nmax', 'NMAX-110', '110/70-13'), tire_position: null },
+      ] })
+      .mockResolvedValueOnce({ rows: [
+        { measure: '110/70-13', brand: 'Rinaldi', quantity_on_hand: 2, quantity_reserved: 0, unit_cost: 50 },
+      ] });
+
+    const result = await buscarProdutoMatriz({ query } as unknown as PoolClient, {
+      environment: 'prod', medida_pneu: '110/70-13', posicao_pneu: 'front', limit: 10,
+    });
+
+    expect(result[0]).toMatchObject({
+      product_id: 'p-nmax', requested_tire_position: 'front',
+      position_verification: 'unregistered', total_stock_available: 2,
+    });
+    expect(String(query.mock.calls[0]?.[0])).toContain('ts.position IS NULL');
+  });
+
+  it('continua descartando posição explicitamente contrária', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await buscarProdutoMatriz({ query } as unknown as PoolClient, {
+      environment: 'prod', medida_pneu: '110/70-13', posicao_pneu: 'front', limit: 10,
+    });
+
+    expect(result).toEqual([]);
+    expect(String(query.mock.calls[0]?.[0])).toContain("ts.position = 'both' OR ts.position IS NULL");
+  });
+
   it('verificar estoque responde pelo galpao e informa a origem', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [product('p1', 'P1', '90/90-18')] })

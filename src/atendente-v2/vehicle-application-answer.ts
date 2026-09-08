@@ -12,7 +12,31 @@ export function compatibilityInput(environment: 'prod' | 'test', args: Record<st
 export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput) {
   const parsed = buscarCompatibilidadeInputSchema.parse(input);
   const rows = applicationsForMotorcycle(parsed.moto_modelo, parsed.moto_ano, parsed.posicao_pneu);
-  if (!rows.length) return null;
+  if (!rows.length) {
+    const knownModelRows = parsed.moto_ano
+      ? applicationsForMotorcycle(parsed.moto_modelo, undefined, parsed.posicao_pneu)
+      : [];
+    if (!knownModelRows.length) return null;
+    return {
+      encontrado: true,
+      tipo_resultado: 'modelo_reconhecido_ano_nao_confirmado',
+      versao_catalogo: VEHICLE_APPLICATION_VERSION,
+      ano_informado: parsed.moto_ano,
+      referencias_de_ano_disponiveis: [...new Set(knownModelRows.map(row => row.year_reference))],
+      posicoes_disponiveis: [...new Set(knownModelRows.map(row => row.position))],
+      aplicacoes: [],
+      total_aplicacoes: 0,
+      precisa_confirmar_modelo_versao: false,
+      precisa_confirmar_ano: true,
+      precisa_confirmar_posicao: !parsed.posicao_pneu || parsed.posicao_pneu === 'both',
+      precisa_confirmar_medida: true,
+      produto_confirmado: false,
+      estoque_consultado: false,
+      consultas_de_produto: [],
+      mensagem: 'A moto é reconhecida, mas o catálogo oficial ainda não confirma o ano informado. Isso não significa falta de estoque.',
+      proximo_passo: 'Se a posição ainda não foi informada, pergunte dianteiro ou traseiro. Depois peça a medida escrita na lateral do pneu, foto da medida ou confirmação no manual. Quando o cliente informar a medida exata, use buscar_produto diretamente. Não use medidas de outros anos, não diga que não há estoque e não escale o atendimento somente por essa lacuna.',
+    };
+  }
   const configurations = new Set(rows.map(r => `${r.make}:${r.model}:${r.year_reference}`));
   const ambiguous = configurations.size > 1;
   const confirmedContext = !ambiguous && Boolean(parsed.moto_ano)

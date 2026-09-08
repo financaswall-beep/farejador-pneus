@@ -19,6 +19,10 @@ export interface CreateCatalogProductInput {
   environment?: 'prod' | 'test';
   priceAmount?: number | null;
   priceReason?: string | null;
+  treadPattern?: string | null;
+  loadIndex?: string | null;
+  speedRating?: string | null;
+  position?: 'front' | 'rear' | 'both' | null;
 }
 
 export interface CreatedCatalogProduct {
@@ -37,6 +41,10 @@ function normalizeCode(value: string): string {
 
 function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
+}
+
+function optionalTechnicalText(value: string | null | undefined): string | null {
+  return value?.trim().replace(/\s+/g, ' ') || null;
 }
 
 function brandKey(value: string): string {
@@ -75,6 +83,10 @@ export async function createCatalogProduct(
   const tireCondition = requireTireCondition(input.tireCondition ?? 'meia_vida');
   const productCode = normalizeCode(input.productCode);
   const initialPrice = validateInitialPrice(input);
+  const treadPattern = optionalTechnicalText(input.treadPattern);
+  const loadIndex = optionalTechnicalText(input.loadIndex);
+  const speedRating = optionalTechnicalText(input.speedRating)?.toUpperCase() ?? null;
+  const position = input.position ?? null;
   if (!brand || brand.toLowerCase() === 'sem marca') throw new Error('catalog_brand_required');
   const productName = normalizeName(`Pneu ${brand} ${parsedMeasure.canonical}`);
   if (!/^[A-Z0-9][A-Z0-9._/-]{1,79}$/.test(productCode)) {
@@ -131,11 +143,13 @@ export async function createCatalogProduct(
     const productId = product.rows[0]!.id;
     const tireSpec = await client.query<{ id: string }>(
       `INSERT INTO commerce.tire_specs
-         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
-       VALUES ($1,$2,$3,$4,$5,$6)
+         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter,
+          tread_pattern,load_index,speed_rating,position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING id`,
       [environment, productId, parsedMeasure.canonical, parsedMeasure.widthMm,
-       parsedMeasure.aspectRatio, parsedMeasure.rimDiameter],
+       parsedMeasure.aspectRatio, parsedMeasure.rimDiameter, treadPattern,
+       loadIndex, speedRating, position],
     );
     const tireSpecId = tireSpec.rows[0]!.id;
     const copiedFitments = await client.query(
@@ -185,6 +199,10 @@ export async function createCatalogProduct(
          brand,
          tire_condition: tireCondition,
          tire_size: parsedMeasure.canonical,
+         tread_pattern: treadPattern,
+         load_index: loadIndex,
+         speed_rating: speedRating,
+         position,
          source: 'catalog_manual',
          initial_price_id: priceId,
          inherited_fitments: copiedFitments.rowCount ?? 0,

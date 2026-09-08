@@ -175,8 +175,8 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260906-measure-title2"></script>
-<script src="/admin/painel/app.catalogo.bootstrap.js?v=20260823-fitment1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260907-tire-spec1"></script>
+<script src="/admin/painel/app.catalogo.bootstrap.js?v=20260907-tire-spec1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260906-active-references2"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260823-partner-canary1"></script>
@@ -9695,6 +9695,7 @@
             <button type="button" @click="catalogoSetFiltro('todos')" :class="catalogoFiltro==='todos' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Todos</button>
             <button type="button" @click="catalogoSetFiltro('estoque')" :class="catalogoFiltro==='estoque' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Com estoque</button>
             <button type="button" @click="catalogoSetFiltro('sem_preco')" :class="catalogoFiltro==='sem_preco' ? 'bg-amber-500 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Sem preço</button>
+            <button type="button" @click="catalogoSetFiltro('sem_posicao')" :class="catalogoFiltro==='sem_posicao' ? 'bg-amber-500 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Posição pendente <span x-text="'(' + Number(catalogoSummary.without_position || 0) + ')'" class="ml-1"></span></button>
           </div>
         </div>
 
@@ -9729,6 +9730,7 @@
                         </template>
                         <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="catalogoTitle(row)" :title="catalogoTechnicalLabel(row)"></p>
                         <p class="text-[10px] font-semibold text-emerald-700" x-text="row.product_type === 'service' ? 'Serviço' : catalogoConditionLabel(row.tire_condition)"></p>
+                        <p x-show="row.product_type === 'tire' && row.catalogued !== false && !row.tire_position" class="mt-0.5 text-[10px] font-semibold text-amber-700">Posição pendente de conferência</p>
                         <p class="text-[11px] text-gray-400" x-text="row.product_code || 'Ainda não cadastrado como produto'"></p>
                       </div>
                     </div>
@@ -9752,7 +9754,7 @@
                       <span x-text="row.product_type !== 'tire' ? 'Não se aplica' : (row.catalogued === false ? 'Após cadastrar' : (Number(row.application_count || 0) > 0 ? Number(row.application_count) + ' aplicação(ões)' : (Number(row.compatibility_count || 0) > 0 ? Number(row.compatibility_count) + ' moto(s)' : 'Ver motos')))"></span>
                     </button>
                   </td>
-                  <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (Number(row.price_amount) > 0 ? 'Editar preço' : 'Definir preço'))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
+                  <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.product_type === 'tire' && !row.tire_position ? 'Completar ficha' : (Number(row.price_amount) > 0 ? 'Editar produto' : 'Definir preço')))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
                 </tr>
               </template>
               <tr x-show="catalogoPaginaRows().length === 0"><td colspan="9" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
@@ -9791,6 +9793,15 @@
           </div>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Código do produto *</span><input id="catalog-product-code" x-model="catalogoCadastro.form.product_code" @input="catalogoCadastro.form.product_code = String(catalogoCadastro.form.product_code || '').toUpperCase()" type="text" maxlength="80" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Único no sistema. Aceita letras, números, ponto, barra, hífen e sublinhado.</span></label>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome padronizado</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" readonly class="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-700"><span class="mt-1 block text-[10px] leading-4 text-gray-400">Gerado automaticamente no padrão Pneu + Marca + Medida.</span></label>
+          <section class="space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+            <div><h3 class="text-xs font-semibold text-gray-800">Ficha técnica do pneu</h3><p class="mt-1 text-[10px] leading-4 text-gray-500">Preencha conforme a lateral, etiqueta ou fabricante. Se não houver certeza, deixe como “Não informado”.</p></div>
+            <label class="block"><span class="mb-1 block text-xs font-medium text-gray-700">Modelo / desenho</span><input x-model="catalogoCadastro.form.tread_pattern" type="text" maxlength="120" placeholder="Ex.: City Extra" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"></label>
+            <div class="grid grid-cols-2 gap-3">
+              <label><span class="mb-1 block text-xs font-medium text-gray-700">Índice de carga</span><input x-model="catalogoCadastro.form.load_index" type="text" maxlength="20" placeholder="Ex.: 57" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"></label>
+              <label><span class="mb-1 block text-xs font-medium text-gray-700">Índice de velocidade</span><input x-model="catalogoCadastro.form.speed_rating" type="text" maxlength="20" placeholder="Ex.: P" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm uppercase outline-none focus:border-emerald-700"></label>
+            </div>
+            <label class="block"><span class="mb-1 block text-xs font-medium text-gray-700">Posição do pneu</span><select x-model="catalogoCadastro.form.position" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"><option value="">Não informado</option><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Ambos</option></select></label>
+          </section>
           <label x-show="catalogoCadastro.mode === 'manual'" class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Preço oficial <span class="font-normal text-gray-400">(opcional)</span></span><div class="flex overflow-hidden rounded-lg border border-gray-200 focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-100"><span class="bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-500">R$</span><input x-model="catalogoCadastro.form.price_amount" inputmode="decimal" placeholder="45,00" class="min-w-0 flex-1 px-3 py-2.5 text-sm outline-none"></div></label>
           <div class="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><i data-lucide="shield-check" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><p>Após cadastrar, o produto continuará bloqueado para venda enquanto faltar preço oficial ou recebimento físico no estoque.</p></div>
           <div x-show="catalogoCadastro.message" :class="catalogoCadastro.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoCadastro.message?.text"></div>
@@ -10024,6 +10035,21 @@
             <div class="flex items-center justify-between border-t border-emerald-100 px-4 py-2.5 text-[10px] text-emerald-800">
               <span x-text="'Atualizado: ' + catalogoDate(catalogoSelecionado?.stock_updated_at)"></span>
               <span class="flex items-center gap-1 font-semibold"><i data-lucide="lock" class="h-3 w-3"></i>O custo não é editado aqui</span>
+            </div>
+          </section>
+
+          <section x-show="catalogoSelecionado?.product_type === 'tire'" class="rounded-xl border border-gray-200 p-4">
+            <div class="flex items-start justify-between gap-3"><div><h3 class="text-sm font-semibold text-gray-950">Ficha técnica</h3><p class="mt-1 text-xs leading-5 text-gray-500">A posição descreve este produto exato. A moto compatível continua registrada separadamente em “Ver motos”.</p></div><span :class="catalogoSelecionado?.tire_position ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" class="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold" x-text="catalogoPositionLabel(catalogoSelecionado?.tire_position)"></span></div>
+            <div class="mt-4 space-y-3">
+              <label class="block"><span class="mb-1 block text-xs font-medium text-gray-700">Modelo / desenho</span><input x-model="catalogoSpecForm.tread_pattern" type="text" maxlength="120" placeholder="Ex.: City Extra" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700"></label>
+              <div class="grid grid-cols-2 gap-3">
+                <label><span class="mb-1 block text-xs font-medium text-gray-700">Índice de carga</span><input x-model="catalogoSpecForm.load_index" type="text" maxlength="20" placeholder="Ex.: 57" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                <label><span class="mb-1 block text-xs font-medium text-gray-700">Índice de velocidade</span><input x-model="catalogoSpecForm.speed_rating" type="text" maxlength="20" placeholder="Ex.: P" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase outline-none focus:border-emerald-700"></label>
+              </div>
+              <label class="block"><span class="mb-1 block text-xs font-medium text-gray-700">Posição do pneu</span><select x-model="catalogoSpecForm.position" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700"><option value="">Não informado</option><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Ambos</option></select></label>
+              <label class="block"><span class="mb-1 block text-xs font-medium text-gray-700">Motivo da alteração *</span><textarea x-model="catalogoSpecForm.reason" maxlength="500" rows="2" placeholder="Ex.: conferido na lateral do pneu" class="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700"></textarea></label>
+              <div x-show="catalogoSpecMessage" :class="catalogoSpecMessage?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoSpecMessage?.text"></div>
+              <button type="button" @click="catalogoSaveSpec()" :disabled="!catalogoPodeSalvarSpec()" class="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="badge-check" class="h-4 w-4"></i><span x-text="catalogoSpecSaving ? 'Salvando ficha...' : 'Salvar ficha técnica'"></span></button>
             </div>
           </section>
 

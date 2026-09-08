@@ -48,7 +48,7 @@ window.PAINEL_MODULES.catalogo = function () {
           ...CATALOGO_KNOWN_BRANDS,
           ...actualBrands.filter((brand) => !CATALOGO_KNOWN_BRANDS.includes(brand)),
         ];
-        this.catalogoSummary = data.summary || { products: 0, stock_only: 0, brands: 0, without_price: 0, with_stock: 0 };
+        this.catalogoSummary = data.summary || { products: 0, stock_only: 0, brands: 0, without_price: 0, with_stock: 0, without_position: 0 };
         this.catalogoPagina = Math.min(this.catalogoPagina, this.catalogoTotalPaginas());
       } catch (error) {
         this.catalogoError = error instanceof Error ? error.message : String(error);
@@ -64,10 +64,13 @@ window.PAINEL_MODULES.catalogo = function () {
         if (this.catalogoMarca !== 'todas' && row.brand !== this.catalogoMarca) return false;
         if (this.catalogoFiltro === 'estoque' && Number(row.total_stock_available ?? row.official_quantity_on_hand ?? 0) <= 0) return false;
         if (this.catalogoFiltro === 'sem_preco' && Number(row.price_amount) > 0) return false;
+        if (this.catalogoFiltro === 'sem_posicao'
+          && (row.product_type !== 'tire' || row.catalogued === false || row.tire_position)) return false;
         if (!search) return true;
         return [row.product_code, row.product_name, row.brand, row.tire_size,
           this.catalogoMeasureLabel(row.tire_size), this.catalogoProductLabel(row),
-          this.catalogoConditionLabel(row.tire_condition)]
+          this.catalogoConditionLabel(row.tire_condition), row.tread_pattern,
+          row.load_index, row.speed_rating, this.catalogoPositionLabel(row.tire_position)]
           .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(search));
       });
     },
@@ -129,6 +132,11 @@ window.PAINEL_MODULES.catalogo = function () {
       return 'Condição pendente';
     },
 
+    catalogoPositionLabel(value) {
+      return { front: 'Dianteiro', rear: 'Traseiro', both: 'Ambos' }[value]
+        || 'Não informado';
+    },
+
     async catalogoOpen(row) {
       if (this.adminUser?.role !== 'owner') return;
       if (row?.product_type === 'tire' && this.catalogoIsUnknownBrand(row?.brand)) {
@@ -145,17 +153,26 @@ window.PAINEL_MODULES.catalogo = function () {
         reason: '',
         marginPreset: null,
       };
+      this.catalogoSpecForm = {
+        tread_pattern: row.tread_pattern || '',
+        load_index: row.load_index || '',
+        speed_rating: row.speed_rating || '',
+        position: row.tire_position || '',
+        reason: '',
+      };
       this.catalogoHistory = [];
       this.catalogoMessage = null;
+      this.catalogoSpecMessage = null;
       await this.catalogoLoadHistory(row.product_id);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
 
     catalogoClose() {
-      if (this.catalogoSaving) return;
+      if (this.catalogoSaving || this.catalogoSpecSaving) return;
       this.catalogoSelecionado = null;
       this.catalogoHistory = [];
       this.catalogoMessage = null;
+      this.catalogoSpecMessage = null;
     },
 
     async catalogoLoadHistory(productId) {
@@ -229,6 +246,58 @@ window.PAINEL_MODULES.catalogo = function () {
         };
       } finally {
         this.catalogoSaving = false;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
+
+    catalogoPodeSalvarSpec() {
+      return this.adminUser?.role === 'owner' && !this.catalogoSpecSaving
+        && this.catalogoSelecionado?.product_type === 'tire'
+        && String(this.catalogoSpecForm?.reason || '').trim().length >= 2;
+    },
+
+    async catalogoSaveSpec() {
+      if (!this.catalogoPodeSalvarSpec()) return;
+      const productId = this.catalogoSelecionado.product_id;
+      const form = this.catalogoSpecForm;
+      this.catalogoSpecSaving = true;
+      this.catalogoSpecMessage = null;
+      try {
+        const nullable = (value) => String(value || '').trim() || null;
+        const result = await this.apiPost(`/admin/api/catalog/${encodeURIComponent(productId)}/spec`, {
+          tread_pattern: nullable(form.tread_pattern),
+          load_index: nullable(form.load_index),
+          speed_rating: nullable(form.speed_rating),
+          position: nullable(form.position),
+          reason: String(form.reason || '').trim(),
+        });
+        await this.loadCatalogo();
+        const refreshed = this.catalogoRows.find((row) => row.product_id === productId) || null;
+        this.catalogoSelecionado = refreshed;
+        if (refreshed) {
+          this.catalogoSpecForm = {
+            tread_pattern: refreshed.tread_pattern || '',
+            load_index: refreshed.load_index || '',
+            speed_rating: refreshed.speed_rating || '',
+            position: refreshed.tire_position || '',
+            reason: '',
+          };
+        }
+        this.catalogoSpecMessage = {
+          ok: true,
+          text: result.changed ? 'Ficha técnica atualizada e registrada no histórico de auditoria.'
+            : 'A ficha técnica já estava com esses dados.',
+        };
+      } catch (error) {
+        const code = error instanceof Error ? error.message : String(error);
+        this.catalogoSpecMessage = {
+          ok: false,
+          text: code.includes('catalog_spec_reason') ? 'Informe o motivo da alteração.'
+            : code.includes('catalog_product_not_found') ? 'Produto não encontrado.'
+              : 'Não foi possível salvar a ficha técnica. Recarregue e tente novamente.',
+        };
+      } finally {
+        this.catalogoSpecSaving = false;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },

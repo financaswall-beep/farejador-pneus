@@ -10,8 +10,8 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     const { bikes, applications } = await import('../../../scripts/data/catalog-fitment-research-20260906.mjs');
     const snapshot = JSON.parse(readFileSync('src/shared/data/vehicle-tire-research-20260906.json', 'utf8'));
     expect(snapshot.slice(0, bikes.length)).toEqual(bikes);
-    expect(snapshot).toHaveLength(84);
-    expect(snapshot.filter((b: any) => b.market === 'Brasil' && b.status === 'Medida confirmada na fonte')).toHaveLength(73);
+    expect(snapshot).toHaveLength(85);
+    expect(snapshot.filter((b: any) => b.market === 'Brasil' && b.status === 'Medida confirmada na fonte')).toHaveLength(74);
     const accepted = applications.filter((a: any) => a.market === 'Brasil' && a.status === 'Medida confirmada na fonte');
     expect(accepted).toHaveLength(145);
     expect(new Set(accepted.map((a: any) => a.id)).size).toBe(72);
@@ -64,6 +64,26 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     expect(front).toMatchObject({ tire_size: '100/80-17', index_spec: '52H', mounting: 'Sem câmara' });
     expect(rear).toMatchObject({ tire_size: '140/70-17', index_spec: '66H', mounting: 'Sem câmara' });
     expect(applicationsForMotorcycle('Fazer 250', 2022)).toEqual([]);
+  });
+
+  it('confirma a NMAX 2026 na ficha brasileira e protege um ano ainda não comprovado', () => {
+    expect(applicationsForMotorcycle('NMAX', 2026, 'front')[0]).toMatchObject({
+      model: 'NMAX ABS Connected', tire_size: '110/70-13', index_spec: '48P',
+      source_checked_at: '2026-09-07',
+    });
+    const uncertainYear = vehicleApplicationAnswer(compatibilityInput('prod', {
+      moto_modelo: 'NMAX', moto_ano: 2025,
+    }));
+    expect(uncertainYear).toMatchObject({
+      encontrado: true,
+      tipo_resultado: 'modelo_reconhecido_ano_nao_confirmado',
+      ano_informado: 2025,
+      precisa_confirmar_posicao: true,
+      precisa_confirmar_medida: true,
+      estoque_consultado: false,
+      consultas_de_produto: [],
+      aplicacoes: [],
+    });
   });
 
   it('responde referência sem fabricar produto, preço ou estoque', () => {

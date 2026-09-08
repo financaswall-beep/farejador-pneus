@@ -1,7 +1,7 @@
 import research from './data/vehicle-tire-research-20260906.json' with { type: 'json' };
 
 // Catálogo público versionado, independente de estoque/SKU. Nunca homologa produto.
-export const VEHICLE_APPLICATION_VERSION = 'manufacturer-applications-20260906-v2';
+export const VEHICLE_APPLICATION_VERSION = 'manufacturer-applications-20260907-v3';
 export interface VehicleTireApplication {
   application_id: string;
   make: string;
@@ -46,7 +46,7 @@ const applications: ReadonlyArray<VehicleTireApplication> = research
           year_reference: b.ref, position, tire_size: size,
           display_measure: applicationMeasureKey(size), index_spec: index || null,
           mounting, source_url: b.url, source_type: b.type,
-          source_checked_at: '2026-09-06', notes: b.notes,
+          source_checked_at: ('checked_at' in b ? String(b.checked_at) : '2026-09-06'), notes: b.notes,
           validation_scope: 'manufacturer_measure' as const, product_fitment_confirmed: false as const,
         };
       }));

@@ -72,6 +72,12 @@ export interface ProdutoOferta {
   currency: string | null;
   price_type: string | null;
   total_stock_available: number;
+  /**
+   * Resultado da conferência da posição pedida contra o cadastro do SKU.
+   * `unregistered` é candidato pela medida, não incompatibilidade nem falta de estoque.
+   */
+  position_verification?: 'confirmed' | 'unregistered' | 'not_requested';
+  requested_tire_position?: 'front' | 'rear' | null;
 }
 
 export interface EstoqueProduto {
@@ -235,7 +241,7 @@ export async function buscarProduto(
   // da busca por MEDIDA mesmo a Matriz tendo estoque. Só filtra quando é front/rear.
   if (parsed.posicao_pneu && parsed.posicao_pneu !== 'both') {
     values.push(parsed.posicao_pneu);
-    filters.push(`(tire_position = $${values.length} OR tire_position = 'both')`);
+    filters.push(`(tire_position = $${values.length} OR tire_position = 'both' OR tire_position IS NULL)`);
   }
   if (parsed.product_code) {
     values.push(parsed.product_code);
@@ -258,7 +264,7 @@ export async function buscarProduto(
     values,
   );
 
-  return result.rows.map(mapProdutoOferta);
+  return result.rows.map((row) => mapProdutoOferta(row, parsed.posicao_pneu));
 }
 
 export async function verificarEstoque(
@@ -463,10 +469,20 @@ export async function buscarPoliticaComercial(
   });
 }
 
-function mapProdutoOferta(row: ProductFullRow): ProdutoOferta {
+function mapProdutoOferta(
+  row: ProductFullRow,
+  requestedPosition?: 'front' | 'rear' | 'both',
+): ProdutoOferta {
+  const requested = requestedPosition && requestedPosition !== 'both' ? requestedPosition : null;
   return {
     ...row,
     total_stock_available: Number(row.total_stock_available ?? 0),
+    requested_tire_position: requested,
+    position_verification: requested === null
+      ? 'not_requested'
+      : row.tire_position === null
+        ? 'unregistered'
+        : 'confirmed',
   };
 }
 

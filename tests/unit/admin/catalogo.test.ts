@@ -72,6 +72,7 @@ describe('catalogo conciliado com estoque e precos', () => {
     const result = await getCatalogOverview('test', { query } as unknown as Pool);
     expect(result.summary).toEqual({
       products: 1, stock_only: 0, brands: 1, without_price: 0, with_stock: 1,
+      without_position: 1,
     });
     expect(result.rows[0]).toMatchObject({
       product_id: 'produto-1',

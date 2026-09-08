@@ -296,7 +296,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_produto',
-      description: 'Busca pneus por medida, marca, condição ou código. Se o cliente pedir novo, meia-vida ou remold, passe condicao_pneu.',
+      description: 'Busca pneus por medida, marca, condição ou código. Se o cliente pedir novo, meia-vida ou remold, passe condicao_pneu. position_verification="unregistered" significa que o SKU tem a medida procurada, mas sua posição ainda não foi preenchida no catálogo; não trate isso como falta de estoque nem como posição contrária.',
       parameters: {
         type: 'object',
         properties: {

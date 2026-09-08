@@ -173,7 +173,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
-    expect(html.includes('app.catalogo.js?v=20260906-measure-title2')).toBe(true);
+    expect(html.includes('app.catalogo.js?v=20260907-tire-spec1')).toBe(true);
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -266,6 +266,10 @@ describe('catalogo no painel', () => {
       tire_condition: 'meia_vida',
       product_code: 'MET-909018-MV',
       product_name: 'Pneu Metzeler 90/90-18',
+      tread_pattern: null,
+      load_index: null,
+      speed_rating: null,
+      position: null,
     });
     expect(context.catalogoSelecionado).toMatchObject({
       product_id: 'produto-metzeler',
@@ -312,6 +316,7 @@ describe('catalogo no painel', () => {
       product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin 90/90-18',
       creation_mode: 'manual', price_amount: 45,
       price_reason: 'Preço inicial do cadastro',
+      tread_pattern: null, load_index: null, speed_rating: null, position: null,
     });
     expect(context.compraForm.items[0]).toMatchObject({
       measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
@@ -319,6 +324,50 @@ describe('catalogo no painel', () => {
     });
     expect(context.currentPage).toBe('compras');
     expect(context.comprasOpenTab).toHaveBeenCalledWith('nova');
+  });
+
+  it('filtra fichas pendentes e salva a posição do produto inteiro', async () => {
+    const module = loadCatalogModule();
+    const pending = { product_id: 'produto-1', product_type: 'tire', catalogued: true,
+      brand: 'Michelin',
+      tire_position: null, tread_pattern: null, load_index: null, speed_rating: null,
+      price_amount: 89 };
+    const refreshed = { ...pending, tire_position: 'rear', tread_pattern: 'City Extra',
+      load_index: '63', speed_rating: 'P' };
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      catalogoRows: [pending], catalogoBusca: '', catalogoMarca: 'todas',
+      catalogoFiltro: 'sem_posicao', catalogoPagina: 1, catalogoPorPagina: 7,
+      catalogoSelecionado: null, catalogoHistory: [], catalogoMessage: null,
+      catalogoSpecSaving: false, catalogoSpecMessage: null,
+      apiGet: vi.fn().mockResolvedValue({ rows: [] }),
+      apiPost: vi.fn().mockResolvedValue({ changed: true }),
+      loadCatalogo: vi.fn(async function (this: { catalogoRows: unknown[] }) {
+        this.catalogoRows = [refreshed];
+      }),
+      $nextTick: vi.fn(),
+    };
+    expect(module.catalogoFiltrados.call(context)).toEqual([pending]);
+    await module.catalogoOpen.call(context, pending);
+    Object.assign(context.catalogoSpecForm, {
+      tread_pattern: ' City   Extra ', load_index: '63', speed_rating: 'p',
+      position: 'rear', reason: 'Conferido na lateral do pneu',
+    });
+    await module.catalogoSaveSpec.call(context);
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/produto-1/spec', {
+      tread_pattern: 'City   Extra', load_index: '63', speed_rating: 'p',
+      position: 'rear', reason: 'Conferido na lateral do pneu',
+    });
+    expect(context.catalogoSelecionado).toEqual(refreshed);
+    expect(context.catalogoSpecMessage).toMatchObject({ ok: true });
+    context.catalogoFiltro = 'sem_posicao';
+    expect(module.catalogoFiltrados.call(context)).toEqual([]);
+
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain("catalogoSetFiltro('sem_posicao')");
+    expect(html).toContain('x-model="catalogoSpecForm.position"');
+    expect(html).toContain('@click="catalogoSaveSpec()"');
   });
 
   it('exibe o comando de cadastro e avisa que o preco ainda bloqueia a venda', () => {

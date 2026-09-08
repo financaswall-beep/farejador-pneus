@@ -68,7 +68,7 @@ export async function buscarProdutoMatriz(
   }
   if (parsed.posicao_pneu && parsed.posicao_pneu !== 'both') {
     values.push(parsed.posicao_pneu);
-    filters.push(`(ts.position = $${values.length} OR ts.position = 'both')`);
+    filters.push(`(ts.position = $${values.length} OR ts.position = 'both' OR ts.position IS NULL)`);
   }
   if (parsed.condicao_pneu) {
     values.push(parsed.condicao_pneu);
@@ -78,6 +78,9 @@ export async function buscarProdutoMatriz(
   const stock = await loadOfficialStock(client, parsed.environment);
   const index = buildMatrizStockIndex(stock);
   const requestedKey = tireSizeKey(parsed.medida_pneu);
+  const requestedPosition = parsed.posicao_pneu && parsed.posicao_pneu !== 'both'
+    ? parsed.posicao_pneu
+    : null;
 
   return catalog.rows
     .filter((row) => !requestedKey || tireSizeKey(row.tire_size) === requestedKey)
@@ -90,6 +93,12 @@ export async function buscarProdutoMatriz(
         total_stock_available: state.sellable ? state.quantity_available : 0,
         stock_source: 'commerce.wholesale_stock' as const,
         stock_block_reason: state.block_reason,
+        requested_tire_position: requestedPosition,
+        position_verification: requestedPosition === null
+          ? 'not_requested' as const
+          : row.tire_position === null
+            ? 'unregistered' as const
+            : 'confirmed' as const,
       };
     })
     .filter((row) => options.deferAvailabilityFilter || !parsed.apenas_com_estoque || row.total_stock_available > 0)

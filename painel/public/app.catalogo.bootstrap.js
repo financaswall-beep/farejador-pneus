@@ -20,6 +20,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
           product_code: `${brandCode}-${measureCode}-${conditionCode}`,
           product_name: `Pneu ${row.brand} ${row.tire_size}`,
           price_amount: '',
+          tread_pattern: '', load_index: '', speed_rating: '', position: '',
         },
         saving: false,
         message: null,
@@ -40,6 +41,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
         form: {
           measure: '', brand: '', tire_condition: 'meia_vida',
           product_code: '', product_name: '', price_amount: '',
+          tread_pattern: '', load_index: '', speed_rating: '', position: '',
         },
         saving: false,
         message: null,
@@ -112,12 +114,20 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
           price_amount: String(form.price_amount ?? '').trim()
             ? Number(String(form.price_amount).replace(',', '.')) : null,
           price_reason: 'Preço inicial do cadastro',
+          tread_pattern: String(form.tread_pattern || '').trim() || null,
+          load_index: String(form.load_index || '').trim() || null,
+          speed_rating: String(form.speed_rating || '').trim() || null,
+          position: String(form.position || '').trim() || null,
         } : {
           measure: row.tire_size,
           brand: row.brand,
           tire_condition: row.tire_condition,
           product_code: String(form.product_code).trim().toUpperCase(),
           product_name: String(form.product_name).trim(),
+          tread_pattern: String(form.tread_pattern || '').trim() || null,
+          load_index: String(form.load_index || '').trim() || null,
+          speed_rating: String(form.speed_rating || '').trim() || null,
+          position: String(form.position || '').trim() || null,
         };
         const created = await this.apiPost('/admin/api/catalog/products', payload);
         await this.loadCatalogo();
