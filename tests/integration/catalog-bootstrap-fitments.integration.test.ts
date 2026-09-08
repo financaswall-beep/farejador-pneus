@@ -5,6 +5,10 @@ import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postg
 let db: IntegrationDb;
 let createCatalogProduct:
   typeof import('../../src/admin/painel/queries-catalogo-create.js').createCatalogProduct;
+let registerWholesalePurchase:
+  typeof import('../../src/admin/painel/queries-fornecedores-registro.js').registerWholesalePurchase;
+let getCatalogOverview:
+  typeof import('../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
 let addCatalogCompatibility:
   typeof import('../../src/admin/painel/queries-catalogo-compatibilidade.js').addCatalogCompatibility;
 let createCatalogFitmentDiscovery:
@@ -19,9 +23,14 @@ beforeAll(async () => {
   Object.assign(process.env, {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
+    WHOLESALE_FINANCE: 'false',
   });
   ({ createCatalogProduct }
     = await import('../../src/admin/painel/queries-catalogo-create.js'));
+  ({ registerWholesalePurchase }
+    = await import('../../src/admin/painel/queries-fornecedores-registro.js'));
+  ({ getCatalogOverview }
+    = await import('../../src/admin/painel/queries-catalogo.js'));
   ({ addCatalogCompatibility, createCatalogFitmentDiscovery,
     reviewCatalogFitmentDiscovery, removeCatalogCompatibility }
     = await import('../../src/admin/painel/queries-catalogo-compatibilidade.js'));
@@ -37,8 +46,22 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
       measure: '90/90R18', brand: 'Levorin', tireCondition: 'meia_vida',
       productCode: 'LEV-909018-MV', productName: 'Pneu Levorin',
       priceAmount: 45, actorLabel: 'Dono', environment: 'test',
+      treadPattern: 'Matrix Sport', loadIndex: '57', speedRating: 'P',
+      position: 'rear',
     }, db.pool);
     expect(created).toMatchObject({ tire_size: '90/90-18', price_amount: 45 });
+
+    const originalSpec = await db.pool.query<{
+      tread_pattern: string; load_index: string; speed_rating: string; position: string;
+    }>(
+      `SELECT tread_pattern,load_index,speed_rating,position
+         FROM commerce.tire_specs
+        WHERE environment='test' AND product_id=$1`,
+      [created.product_id],
+    );
+    expect(originalSpec.rows[0]).toEqual({
+      tread_pattern: 'Matrix Sport', load_index: '57', speed_rating: 'P', position: 'rear',
+    });
 
     const effects = await db.pool.query<{
       stocks: string; purchases: string; orders: string; ledger: string;
@@ -54,6 +77,57 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
       `SELECT has_table_privilege('farejador_partner_app','commerce.tire_specs','SELECT') allowed`,
     );
     expect(partnerGrant.rows[0]?.allowed).toBe(true);
+
+    const purchase = await registerWholesalePurchase({
+      environment: 'test',
+      new_supplier: { name: 'Fornecedor da ficha existente' },
+      items: [{
+        measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
+        quantity: 3, unit_cost: 30,
+      }],
+      created_by: 'Dono', receipt_status: 'received', idempotency_key: randomUUID(),
+    }, db.pool);
+    expect(purchase.catalog_blockers).toEqual([]);
+
+    const reused = await db.pool.query<{
+      products: string; specs: string; tread_pattern: string; load_index: string;
+      speed_rating: string; position: string;
+    }>(
+      `SELECT
+         (SELECT count(*) FROM commerce.products p
+           JOIN commerce.tire_specs ts ON ts.product_id=p.id AND ts.environment=p.environment
+          WHERE p.environment='test' AND p.brand='Levorin'
+            AND p.tire_condition='meia_vida' AND ts.tire_size='90/90-18') products,
+         (SELECT count(*) FROM commerce.tire_specs
+          WHERE environment='test' AND product_id=$1) specs,
+         ts.tread_pattern,ts.load_index,ts.speed_rating,ts.position
+        FROM commerce.tire_specs ts
+       WHERE ts.environment='test' AND ts.product_id=$1`,
+      [created.product_id],
+    );
+    expect(reused.rows[0]).toEqual({
+      products: '1', specs: '1', tread_pattern: 'Matrix Sport', load_index: '57',
+      speed_rating: 'P', position: 'rear',
+    });
+  });
+
+  it('expõe na fila de conferência o produto criado sem posição comprovada', async () => {
+    const pending = await createCatalogProduct({
+      measure: '100/80-17', brand: 'Rinaldi', tireCondition: 'meia_vida',
+      productCode: 'RIN-1008017-MV', productName: 'Pneu Rinaldi',
+      priceAmount: 50, actorLabel: 'Dono', environment: 'test',
+      treadPattern: 'Produto ainda em conferência', position: null,
+    }, db.pool);
+
+    const catalog = await getCatalogOverview('test', db.pool);
+    expect(catalog.summary.without_position).toBeGreaterThanOrEqual(1);
+    expect(catalog.rows).toContainEqual(expect.objectContaining({
+      product_id: pending.product_id,
+      tire_size: '100/80-17',
+      tire_position: null,
+      tread_pattern: 'Produto ainda em conferência',
+      catalogued: true,
+    }));
   });
 
   it('propaga homologação e promoção pesquisada para toda a medida', async () => {

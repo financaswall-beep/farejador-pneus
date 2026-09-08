@@ -366,7 +366,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_politica',
-      description: 'Retorna políticas da loja: garantia, horário, formas de pagamento, troca, frete mínimo.',
+      description: 'Retorna políticas institucionais cadastradas da matriz: garantia, horário, endereço, link do mapa, formas de pagamento, troca, cobertura e prazos. Use para perguntas gerais sobre a matriz; nunca invente um valor ausente.',
       parameters: {
         type: 'object',
         properties: {
@@ -405,7 +405,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'localizacao_loja',
-      description: 'Retorna nome, endereço escrito, horário e link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA. SEMPRE passe o bairro do cliente — é o que acha a loja MAIS PERTO dele. Se o cliente já escolheu um pneu, SEMPRE passe product_ids (os product_id vindos de buscar_produto/buscar_compatibilidade) — assim a loja indicada é a que REALMENTE TEM o produto, não só a mais perto. encontrado:false motivo sem_localizacao_pergunte_bairro → PERGUNTE o bairro. encontrado:false motivo sem_loja_com_estoque_perto → a loja mais perto NÃO tem esse pneu: seja honesto e ofereça alternativa (entrega de uma loja que tem / medida equivalente / avisar quando chegar), NÃO indique loja. NUNCA invente um link — só mande o maps_url retornado aqui.',
+      description: 'Seleciona a loja de RETIRADA e, antes do pedido, retorna somente nome e dados opcionais de distância, duração, horário e instalação — nunca endereço nem link do mapa. Passe bairro quando digitado; se o cliente já enviou um pino, chame sem bairro porque o sistema resolve a localização. Com pneu escolhido, SEMPRE passe product_ids para selecionar uma loja que realmente tenha o item. sem_localizacao_pergunte_bairro → peça pino/endereço ou bairro; sem_loja_com_estoque_perto → ofereça alternativa sem nomear loja; retirada_so_longe → apresente apenas os dados retornados e peça confirmação. Endereço e mapa da retirada só vêm de criar_pedido após a reserva.',
       parameters: {
         type: 'object',
         properties: {
@@ -467,7 +467,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
-          bairro: { type: 'string', description: 'Bairro do cliente. Na ENTREGA, passe o MESMO usado no calcular_frete. Na RETIRADA, passe o bairro que o cliente informou — é o que permite achar a loja mais perto pra ele retirar.' },
+          bairro: { type: 'string', description: 'Passe somente quando o cliente digitou o bairro. Na entrega, reutilize o mesmo bairro de calcular_frete; se o frete foi calculado apenas pelo pino, omita. Na retirada, omita quando já houver pino — o sistema resolve a loja por ele.' },
           confirma_retirada_distante: { type: 'boolean', description: 'Use SOMENTE na RETIRADA e SOMENTE depois que o cliente, avisado de que a loja mais perto que tem o pneu fica longe, disser EXPLICITAMENTE que vai buscar mesmo assim ("não tem problema, eu passo aí", "eu vou aí pegar"). true = reserva o pneu na loja mais perto que tem, mesmo fora do raio normal de retirada. NUNCA marque sozinho: só com a confirmação do cliente.' },
           telefone_cliente: { type: 'string', description: 'Telefone/WhatsApp do cliente (com DDD). Passe SÓ quando o contato não tem número — Instagram e Facebook não trazem telefone. Sem ele, o pedido é recusado (entrega E retirada — todo pedido precisa de número). Em conversa de WhatsApp, OMITA: o número já vem do contato.' },
         },
@@ -912,15 +912,16 @@ export async function executeTool(
               // Opção 1 (decisão Wallace 2026-06-14): ANTES de fechar, o bot recebe só
               // qual loja + a que distância — SEM endereço/maps_url. Trava por CÓDIGO (§3):
               // o cliente não força o bot a entregar o endereço pra ir direto sem reservar.
-              // O cartão da loja (endereço+mapa+horário) volta no criar_pedido e entra no resumo.
+              // Endereço+mapa voltam no criar_pedido e entram no resumo; horário pode ser
+              // usado antes quando cadastrado e retornado aqui.
               return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, distancia_km: Math.round(geo.distanceKm), horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
             }
           } else if (geo.kind === 'only_far') {
             // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada.
             // sem distancia_km de proposito: o "longe" é gatilho negativo (decisão Wallace) —
-            // o bot nomeia a loja e oferece a entrega como solução positiva. Mas devolve TAMBÉM
-            // o cartão da loja (endereço/mapa): se o cliente bancar ir buscar (consentimento), o
-            // bot já tem o que passar e fecha com criar_pedido(confirma_retirada_distante=true).
+            // o bot nomeia a loja e oferece a entrega como solução positiva. Se o cliente
+            // bancar ir buscar (consentimento), o endereço/mapa só voltam depois no
+            // criar_pedido(confirma_retirada_distante=true).
             const disp = await getUnitDisplayById(client, environment, geo.unitId);
             // Opção 1: sem endereço/maps aqui também. Se o cliente bancar ir buscar longe,
             // o endereço sai no resumo do criar_pedido(confirma_retirada_distante=true).
@@ -1451,9 +1452,9 @@ async function criarPedido(
   let respSubtotal: number;
   let respFrete: number;
   let respTotal: number;
-  // Opção 1 (decisão Wallace 2026-06-14): o cartão da loja (endereço/mapa/horário) só é
-  // devolvido AGORA, no fechamento da retirada — entra no resumo do pedido. Antes de fechar
-  // o bot nunca teve esses dados (localizacao_loja só dá nome+distância).
+  // Opção 1 (decisão Wallace 2026-06-14): endereço/mapa só são devolvidos AGORA,
+  // no fechamento da retirada. Antes disso localizacao_loja pode dar nome, distância,
+  // horário e taxa de instalação, mas nunca o endereço exato nem o link.
   let retirada: { nome_loja: string; endereco: string | null; maps_url: string | null; horario: string | null } | null = null;
 
   if (partner) {

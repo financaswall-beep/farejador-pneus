@@ -37,7 +37,7 @@ export function formatCustomerContext(row: CustomerContextRow): string {
   const parts: string[] = ['\n[CONTEXTO CLIENTE]'];
 
   if (firstName) {
-    parts.push(`Nome conhecido do Chatwoot: ${firstName}. USE esse nome e NÃO pergunte novamente.`);
+    parts.push(`Nome conhecido do Chatwoot: ${firstName}. Use na saudação inicial e, no máximo, uma vez na confirmação final; não repita em perguntas intermediárias e NÃO pergunte novamente.`);
   } else {
     parts.push('Nome não confirmado no Chatwoot. Pergunte o nome durante a conversa, sem interromper a cotação.');
   }

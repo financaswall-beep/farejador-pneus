@@ -41,11 +41,21 @@ genérico daquela medida.
   mas nunca viram endereço confirmado de pedido sem validação do cliente.
 - [x] Exibir na ficha do cliente a melhor localização conhecida e sua origem.
 
-## 3. Cadastro na entrada da compra
+## 3. Cadastro na entrada da compra — concluído
 
-- [ ] Adicionar modelo/desenho, índice de carga, índice de velocidade e posição.
-- [ ] Reutilizar automaticamente os dados quando o pneu já existir.
-- [ ] Mostrar produtos sem posição numa fila de conferência.
+- [x] Adicionar modelo/desenho, índice de carga, índice de velocidade e posição.
+- [x] Reutilizar automaticamente os dados quando o pneu já existir.
+- [x] Mostrar produtos sem posição numa fila de conferência.
+
+O cadastro técnico acontece no Catálogo antes da primeira compra. Ao escolher
+“Salvar e ir para Compras”, medida, marca e condição são levadas para o item da
+compra. Nas reposições seguintes, essa identidade reutiliza a mesma ficha
+técnica, sem duplicar o produto e sem pedir os índices novamente.
+
+Modelo/desenho, carga, velocidade e posição pertencem ao produto exato. O
+sistema não copia esses campos entre marcas diferentes apenas porque a medida é
+igual. Quando a posição não estiver comprovada, o produto permanece disponível
+para conferência no filtro “Posição pendente”, sem inventar a informação.
 
 Os índices são dados de catálogo/segurança. O bot não deve interrogá-los ao
 cliente que já informou a medida; usa-os internamente quando disponíveis.
