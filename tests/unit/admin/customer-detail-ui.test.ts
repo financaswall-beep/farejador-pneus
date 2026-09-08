@@ -61,6 +61,9 @@ describe('ficha lateral de Clientes',() => {
     expect(drawer).toContain('Endereço não informado'); expect(drawer).toContain('Telefone não informado');
     expect(drawer).toContain('Localização do lead');
     expect(drawer).toContain('Estimado pelo pino compartilhado');
+    expect(drawer).toContain('localização estimada, não é endereço de entrega confirmado');
+    expect(drawer).toContain("source==='typed'");
+    expect(drawer).toContain("'Pesquisar no mapa':'Abrir pino no mapa'");
     expect(drawer).toContain('clienteFichaLocalizacaoMapaUrl()');
     expect(drawer).not.toContain('x-html'); expect(drawer).not.toContain('Carlos Oliveira');
     expect(html).not.toContain('<dialog id="cliente-ficha-dialog"');

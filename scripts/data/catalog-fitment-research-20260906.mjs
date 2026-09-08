@@ -97,6 +97,21 @@ add('Triumph','Speed 400','Geração de lançamento 2024','110/70R17|54H|ND','15
 add('Triumph','Scrambler 400 X','Geração de lançamento 2024','100/90-19|57V|ND','140/80R17|69V|ND',triumph,{...manual,notes:'Manual brasileiro, p.178. Dianteiro com hífen; não copiar R do comunicado de lançamento.'});
 add('Triumph','Scrambler 1200 X / XE',U,'90/90-21||ND','150/70R17||ND','https://www.triumphmotorcycles.com.br/motocicletas/classic/bonneville-scrambler-1200/specification');
 
+// Etapa 2 (08/09/2026): o banco legado serviu SOMENTE como índice de busca.
+// Cada linha abaixo foi reaberta em fonte oficial brasileira; nenhuma medida ou
+// faixa de anos foi herdada do legado. Cadastros conflitantes continuam fora.
+add('Yamaha','Fazer FZ25 ABS Connected','2025','100/80-17|52H|Sem câmara','140/70-17|66H|Sem câmara','https://stgmkpprd.blob.core.windows.net/yamaha-motor-site/manual_fazerfz25abs_2025.pdf',{...manual,notes:'Manual BC5-F8199-W5, seção 7-21 e 9-1/9-2 (PDF p.69 e p.92–93). Pirelli Sport Demon Front / Sport Demon. Manual ligado pela página oficial Yamaha e listado como 2025. Não estender a outras gerações ou anos.'});
+add('Yamaha','NMAX ABS Connected','2026','110/70-13|48P|Sem câmara','130/70-13|63P|Sem câmara','https://www.yamaha-motor.com.br/product/nova-nmax-abs-connected-151482',{notes:'Ficha técnica oficial brasileira do modelo 2026; pneus dianteiro e traseiro IRC. Não usar esta ficha para afirmar automaticamente a medida de uma NMAX 2025.',checked_at:'2026-09-07'});
+add('Honda','CB 500F','2023–2024','120/70ZR17|58W|Sem câmara','160/60ZR17|69W|Sem câmara','https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/MP%20CB%20500F%20%282023~2024%29%20D2203-MAN-1281_WEB.pdf',{...manual,notes:'Manual brasileiro 2023–2024. O comunicado oficial de lançamento 2023 confirma o mesmo par de medidas.'});
+add('Honda','CB 1000R / Black Edition','2022','120/70ZR17||ND','190/55ZR17||ND','https://saladeimprensa.honda.com.br/releases/honda-cb-1000r-2022-pioneira-do-estilo-neo-sports-cafe-ganha-atualizacoes-no-estilo',{...release,notes:'Comunicado brasileiro da Honda, publicado em 27/02/2022. Não estender automaticamente a gerações anteriores.'});
+add('Honda','Lead 110','2013','90/90-12|44J|ND','100/90-10|56J|ND','https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/Lead%20110%202013.pdf',{...manual,notes:'Manual brasileiro 2013, seção Especificações, PDF p.79.'});
+add('Honda','NXR 150 Bros','2005','90/90-19|52P|ND','110/90-17|60P|ND','https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/NXR%20150%20Bros%202005.PDF',{...manual,notes:'Manual brasileiro 2005. Não usar esta linha para afirmar toda a produção da Bros 150.'});
+add('Honda','XRE 190 ABS','2018','90/90-19|52P|ND','110/90-17|60P|ND','https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/MP%20XRE190%20%282018%29%20D2203%20MAN%201131%20Completo.pdf',{...manual,notes:'Manual brasileiro 2018, seção Chassi/Suspensão, PDF p.127.'});
+add('Honda','XRE 300 ABS','2019','90/90-21|54S|ND','120/80-18|62S|ND','https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/MP%20XRE%20300%20%282019%29%20D2203-MAN-1191_WEB.pdf',{...manual,notes:'Manual brasileiro 2019, seção Chassi/Suspensão, PDF p.127.'});
+add('Haojue','NK150',U,'90/90-19|52P|ND','110/90-17|60P|ND','https://haojuemotos.com.br/storage/manual-proprietario/MANUAL-DO-PROPRIETARIO-HAOJUE-NK150.pdf',{...manual,notes:'Manual brasileiro disponível no portal oficial Haojue; a fonte não delimita ano-modelo.'});
+add('Zontes','R310',U,'110/70R17|54S|Sem câmara','160/60R17|69S|Sem câmara','https://zontesmotos.com.br/storage/manual-proprietario/MANUAL-DO-PROPRIETARIO-ZONTES-R-310-rev1.pdf',{...manual,notes:'Manual brasileiro, tabela de especificações. A fonte não delimita ano-modelo.'});
+add('Zontes','V310',U,'110/70R17||Sem câmara','180/55R17||Sem câmara','https://zontesmotos.com.br/storage/manual-proprietario/MANUAL-DO-PROPRIETARIO-ZONTES-V-310-rev1.pdf',{...manual,notes:'Manual brasileiro, tabela de especificações. A fonte não delimita ano-modelo.'});
+
 export function decode(spec) {
   const [measure,index='',mount='ND']=spec.split('|');
   const metric=measure.match(/^(\d+)\/(\d+)(ZR|R|B|-)(\d+)$/);

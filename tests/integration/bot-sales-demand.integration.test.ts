@@ -45,6 +45,18 @@ function quoteActions(result: unknown = {
   ];
 }
 
+function leadLocationActions() {
+  return [
+    { role: 'assistant', tool_calls: [{ id: 'lead-location', type: 'function', function: {
+      name: 'registrar_localizacao_lead', arguments: JSON.stringify({
+        texto_informado: 'Rua 43, Itaipuaçu, Maricá', tipo: 'endereco_digitado',
+        rua: 'Rua 43', bairro: 'Itaipuaçu', municipio: 'Maricá',
+      }),
+    } }] },
+    { role: 'tool', tool_call_id: 'lead-location', content: JSON.stringify({ ok: true }) },
+  ];
+}
+
 async function turn(c: Awaited<ReturnType<typeof conversation>>, actions = quoteActions(), status = 'delivered') {
   const msg = await message(c);
   return (await db.pool.query(
@@ -102,6 +114,8 @@ beforeAll(async () => {
   expect(await stage(oldConversation.id)).toBe('abriu_conversa');
   await applyMigrationFile(db.pool, '0217_bot_order_customer_name.sql');
   await applyMigrationFile(db.pool, '0218_bot_quote_and_demand_analytics.sql');
+  await applyMigrationFile(db.pool, '0220_lead_location_memory.sql');
+  await applyMigrationFile(db.pool, '0221_bot_analytics_trigger_isolation.sql');
 }, 180_000);
 
 afterEach(() => vi.restoreAllMocks());
@@ -117,6 +131,8 @@ describe('cotação e mapa de demanda', () => {
     expect(before).toHaveLength(3);
     await applyMigrationFile(db.pool, '0217_bot_order_customer_name.sql');
     await applyMigrationFile(db.pool, '0218_bot_quote_and_demand_analytics.sql');
+    await applyMigrationFile(db.pool, '0220_lead_location_memory.sql');
+    await applyMigrationFile(db.pool, '0221_bot_analytics_trigger_isolation.sql');
     expect(await quotedFacts(oldConversation.id)).toEqual(before);
     const evidence = await db.pool.query(
       `SELECT count(*)::int n FROM analytics.fact_evidence WHERE fact_id=ANY($1::uuid[])`,
@@ -161,6 +177,43 @@ describe('cotação e mapa de demanda', () => {
       `SELECT fact_key FROM analytics.conversation_facts WHERE conversation_id=$1
        AND fact_key IN ('municipio_entrega','taxa_frete_cotada','pedido_criado')`, [oldConversation.id],
     )).rows).toHaveLength(0);
+  });
+
+  it('localização digitada vira memória estimada e mapa sem fechar pedido', async () => {
+    const c = await conversation();
+    const id = await turn(c, leadLocationActions(), 'generated');
+    expect((await db.pool.query(
+      `SELECT id FROM analytics.conversation_facts WHERE conversation_id=$1 AND fact_key='localizacao_lead'`,
+      [c.id],
+    )).rows).toHaveLength(0);
+    await db.pool.query(`UPDATE agent.turns SET status='delivered' WHERE id=$1`, [id]);
+    const replay = await db.pool.query<{ total:number }>(
+      `SELECT analytics.extract_lead_location_facts($1)::int AS total`, [id],
+    );
+    expect(replay.rows[0].total).toBe(0);
+    const facts = (await db.pool.query(
+      `SELECT id,fact_value,truth_type,source,confidence_level,extractor_version
+         FROM analytics.conversation_facts
+        WHERE conversation_id=$1 AND fact_key='localizacao_lead'`, [c.id],
+    )).rows;
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({
+      fact_value:{ texto_informado:'Rua 43, Itaipuaçu, Maricá',tipo:'endereco_digitado',
+        rua:'Rua 43',bairro:'Itaipuaçu',municipio:'Maricá' },
+      truth_type:'inferred',source:'llm_tool_call_v2',extractor_version:'llm_tool_lead_location_v1_2026-09-08',
+    });
+    expect(Number(facts[0].confidence_level)).toBe(0.9);
+    expect((await db.pool.query(
+      `SELECT municipio FROM analytics.v_bot_demand_location WHERE conversation_id=$1`, [c.id],
+    )).rows[0].municipio).toBe('Maricá');
+    expect((await db.pool.query(
+      `SELECT evidence_text,evidence_type FROM analytics.fact_evidence WHERE fact_id=$1`, [facts[0].id],
+    )).rows).toEqual([{ evidence_text:'Rua 43, Itaipuaçu, Maricá',evidence_type:'inferred' }]);
+    await db.pool.query(`SELECT analytics.extract_lead_location_facts($1)`, [id]);
+    expect((await db.pool.query(
+      `SELECT id FROM analytics.conversation_facts WHERE conversation_id=$1 AND fact_key='localizacao_lead'`,
+      [c.id],
+    )).rows).toHaveLength(1);
   });
 
   it('pino novo não resolvido não reaproveita a cidade antiga; cache tardio corrige sem replay', async () => {

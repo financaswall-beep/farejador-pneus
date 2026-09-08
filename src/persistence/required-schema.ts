@@ -187,6 +187,7 @@ export const REQUIRED_SCHEMA_SQL = `
     AND to_regclass('finance.partner_payables_effective') IS NOT NULL
     AND to_regclass('ops.conversation_bot_control') IS NOT NULL
     AND to_regclass('ops.conversation_bot_control_events') IS NOT NULL
+    AND to_regprocedure('analytics.extract_lead_location_facts(uuid)') IS NOT NULL
     AND EXISTS (
       SELECT 1 FROM pg_constraint
        WHERE conrelid='ops.outbound_messages'::regclass
@@ -199,7 +200,7 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=219
+       AND version>=221
        AND EXISTS (
          SELECT 1 FROM ops.applied_migrations
           WHERE migration_file='0216_conversation_bot_control.sql'
@@ -210,17 +211,27 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
           WHERE migration_file='0219_bot_conversation_lifecycle.sql'
             AND checksum_sha256='5b2e34392720996da7ae5de76e272421c1cb87ede6b827dcb4a102ba118c72ae'
        )
-       AND (SELECT count(*) FROM ops.applied_migrations)>=220
+       AND EXISTS (
+         SELECT 1 FROM ops.applied_migrations
+          WHERE migration_file='0220_lead_location_memory.sql'
+            AND checksum_sha256='b3d57df6dacfe9bfe89388a6749ec87755ebed0fada50eadc6f946d0a7b1c078'
+       )
+       AND EXISTS (
+         SELECT 1 FROM ops.applied_migrations
+          WHERE migration_file='0221_bot_analytics_trigger_isolation.sql'
+            AND checksum_sha256='35f27b20f46b3dfc0cea1fc89abb691c3c6982215ef7ea2486ee069720528060'
+       )
+       AND (SELECT count(*) FROM ops.applied_migrations)>=222
   ) AS ready`;
 
-/** Impede o processo novo de operar sem o ciclo de vida seguro da 0219. */
+/** Impede o processo novo de operar sem o ciclo de vida e a memória de lead. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0219_bot_conversation_lifecycle');
+    throw new Error('required_schema_missing:0221_bot_analytics_trigger_isolation');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0219_bot_conversation_lifecycle');
+    throw new Error('required_schema_missing:0221_bot_analytics_trigger_isolation');
   }
 }

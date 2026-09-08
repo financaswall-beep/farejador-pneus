@@ -2,9 +2,9 @@
 
 ## Entrega
 
-O catálogo da Matriz e da operação das unidades passa a mostrar 147 aplicações de 73 configurações brasileiras: 145 da pesquisa inicial e duas da Fazer FZ25 Connected 2025 confirmadas nesta etapa. Cada registro contém moto, referência de ano/versão, posição, medida original, índices/montagem quando informados e link do fabricante. São 13 marcas de motos, incluindo scooters, aros 15/16 e medidas largas. Os casos internacionais, conflitantes ou sem confirmação suficiente não foram liberados.
+O catálogo da Matriz e da operação das unidades passa a mostrar 167 aplicações de 83 configurações brasileiras confirmadas. Cada registro contém moto, referência de ano/versão, posição, medida original, índices/montagem quando informados e link do fabricante. São 14 marcas de motos, incluindo scooters, aros 15/16 e medidas largas. Os casos internacionais, conflitantes ou sem confirmação suficiente não foram liberados.
 
-Essa base é um catálogo público de referência incluído no código, não uma nova tabela operacional: `src/shared/data/vehicle-tire-research-20260906.json`. Um teste garante que os 83 registros originais continuam iguais à pesquisa em `scripts/data/catalog-fitment-research-20260906.mjs`; o registro adicional M084 vem do [manual oficial Yamaha 2025](https://stgmkpprd.blob.core.windows.net/yamaha-motor-site/manual_fazerfz25abs_2025.pdf), ligado pela página brasileira do modelo. Não há migration nem alteração de variáveis.
+Essa base é um catálogo público de referência incluído no código, não uma nova tabela operacional: `src/shared/data/vehicle-tire-research-20260906.json`. Um teste garante que os 94 registros permanecem iguais à pesquisa versionada em `scripts/data/catalog-fitment-research-20260906.mjs`. O histórico do aproveitamento do legado está em `APROVEITAMENTO_COMPATIBILIDADES_LEGADO_2026-09-08.md`.
 
 ## Consulta do bot
 

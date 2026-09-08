@@ -384,6 +384,26 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'registrar_localizacao_lead',
+      description: 'Registra silenciosamente a localização que o próprio cliente acabou de DIGITAR. Use na mesma resposta em que ele informar ou corrigir rua, número, bairro ou município, inclusive em retirada ou sem compra. Copie texto_informado sem inventar; campos ausentes devem ser omitidos. Isto NÃO confirma endereço de entrega e não envia mensagem ao cliente. Pino de localização é capturado automaticamente e não usa esta ferramenta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          texto_informado: { type: 'string', maxLength: 300, description: 'Trecho exato digitado pelo cliente com sua localização.' },
+          tipo: { type: 'string', enum: ['regiao_digitada', 'endereco_digitado'], description: 'endereco_digitado quando há rua/logradouro; regiao_digitada quando há apenas bairro, município ou região.' },
+          rua: { type: 'string', maxLength: 160, description: 'Rua/logradouro somente se o cliente informou.' },
+          numero: { type: 'string', maxLength: 30, description: 'Número somente se o cliente informou.' },
+          bairro: { type: 'string', maxLength: 100, description: 'Bairro somente se o cliente informou.' },
+          municipio: { type: 'string', maxLength: 100, description: 'Município somente se o cliente informou.' },
+        },
+        required: ['texto_informado', 'tipo'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'localizacao_loja',
       description: 'Retorna nome, endereço escrito, horário e link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA. SEMPRE passe o bairro do cliente — é o que acha a loja MAIS PERTO dele. Se o cliente já escolheu um pneu, SEMPRE passe product_ids (os product_id vindos de buscar_produto/buscar_compatibilidade) — assim a loja indicada é a que REALMENTE TEM o produto, não só a mais perto. encontrado:false motivo sem_localizacao_pergunte_bairro → PERGUNTE o bairro. encontrado:false motivo sem_loja_com_estoque_perto → a loja mais perto NÃO tem esse pneu: seja honesto e ofereça alternativa (entrega de uma loja que tem / medida equivalente / avisar quando chegar), NÃO indique loja. NUNCA invente um link — só mande o maps_url retornado aqui.',
       parameters: {
@@ -826,6 +846,22 @@ export async function executeTool(
           policy_keys: args.policy_keys as string[] | undefined,
         });
         return JSON.stringify({ politicas: result });
+      }
+
+      case 'registrar_localizacao_lead': {
+        const clean = (value: unknown, max: number) => typeof value === 'string'
+          ? value.trim().slice(0, max)
+          : '';
+        const textoInformado = clean(args.texto_informado, 300);
+        const tipo = args.tipo;
+        if (!textoInformado || !['regiao_digitada', 'endereco_digitado'].includes(String(tipo))) {
+          return JSON.stringify({ erro: 'localizacao_lead_invalida' });
+        }
+        return JSON.stringify({
+          ok: true,
+          registrado: 'localizacao_lead',
+          natureza: 'estimada_nao_confirmada_para_entrega',
+        });
       }
 
       case 'localizacao_loja': {

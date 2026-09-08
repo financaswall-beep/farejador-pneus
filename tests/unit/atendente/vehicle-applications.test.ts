@@ -9,12 +9,12 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
   it('mantém o snapshot público sincronizado com a pesquisa versionada', async () => {
     const { bikes, applications } = await import('../../../scripts/data/catalog-fitment-research-20260906.mjs');
     const snapshot = JSON.parse(readFileSync('src/shared/data/vehicle-tire-research-20260906.json', 'utf8'));
-    expect(snapshot.slice(0, bikes.length)).toEqual(bikes);
-    expect(snapshot).toHaveLength(85);
-    expect(snapshot.filter((b: any) => b.market === 'Brasil' && b.status === 'Medida confirmada na fonte')).toHaveLength(74);
+    expect(snapshot).toEqual(bikes);
+    expect(snapshot).toHaveLength(94);
+    expect(snapshot.filter((b: any) => b.market === 'Brasil' && b.status === 'Medida confirmada na fonte')).toHaveLength(83);
     const accepted = applications.filter((a: any) => a.market === 'Brasil' && a.status === 'Medida confirmada na fonte');
-    expect(accepted).toHaveLength(145);
-    expect(new Set(accepted.map((a: any) => a.id)).size).toBe(72);
+    expect(accepted).toHaveLength(167);
+    expect(new Set(accepted.map((a: any) => a.id)).size).toBe(83);
     for (const a of accepted) {
       expect(applicationsForMeasure(a.measure).some(r => r.model === a.model && r.tire_size === a.measure)).toBe(true);
     }
@@ -84,6 +84,19 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
       consultas_de_produto: [],
       aplicacoes: [],
     });
+  });
+
+  it('usa somente os cruzamentos antigos reconfirmados em fonte oficial', () => {
+    expect(applicationsForMotorcycle('XRE 190', 2018, 'rear')[0]).toMatchObject({
+      tire_size: '110/90-17', index_spec: '60P', year_reference: '2018',
+    });
+    expect(applicationsForMotorcycle('XRE 300', 2019, 'rear')[0]).toMatchObject({
+      tire_size: '120/80-18', index_spec: '62S', year_reference: '2019',
+    });
+    expect(applicationsForMotorcycle('Lead 110', 2013, 'front')[0]?.tire_size).toBe('90/90-12');
+    expect(applicationsForMotorcycle('CB 500F', 2024, 'front')[0]?.tire_size).toBe('120/70ZR17');
+    expect(applicationsForMotorcycle('NXR 150 Bros', 2015)).toEqual([]);
+    expect(applicationsForMotorcycle('Classic 350')).toEqual([]);
   });
 
   it('responde referência sem fabricar produto, preço ou estoque', () => {

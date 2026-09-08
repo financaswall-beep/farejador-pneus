@@ -44,7 +44,7 @@ describe('ficha individual de cliente',() => {
     const query=vi.fn()
       .mockResolvedValueOnce({ rows:[leadProfile] })
       .mockResolvedValueOnce({ rows:[leadHistory] })
-      .mockResolvedValueOnce({ rows:[{ coordinates_lat:'-22.9301',coordinates_lng:'-42.8204',observed_at:'2026-09-07' }] });
+      .mockResolvedValueOnce({ rows:[{ source:'shared_pin',coordinates_lat:'-22.9301',coordinates_lng:'-42.8204',observed_at:'2026-09-07',fact_value:null }] });
     const detail=await getCustomerDetail('prod','chatwoot','contact-1',{}, { query } as unknown as Pool);
     expect(detail?.customer).toMatchObject({
       address:null,address_source:null,
@@ -54,6 +54,25 @@ describe('ficha individual de cliente',() => {
     expect(cachedReverseGeocode).toHaveBeenCalledWith(expect.anything(),{ lat:-22.9301,lng:-42.8204 },
       'test-google-key',{ requireFormattedAddress:true });
     expect(query.mock.calls[2]?.[1]).toEqual(['prod','contact-1']);
+  });
+  it('mostra localização digitada como estimativa sem criar endereço de entrega',async () => {
+    cachedReverseGeocode.mockClear();
+    const leadProfile={ ...profile,address:null,origin:'Instagram',unit_id:null,unit_name:null };
+    const leadHistory={ ...history,purchases:0,total_spent:0,avg_ticket:0,history_total:0,
+      orders:[],last_address:null,last_unit_name:null };
+    const query=vi.fn()
+      .mockResolvedValueOnce({ rows:[leadProfile] })
+      .mockResolvedValueOnce({ rows:[leadHistory] })
+      .mockResolvedValueOnce({ rows:[{ source:'typed',coordinates_lat:null,coordinates_lng:null,
+        observed_at:'2026-09-08',fact_value:{ texto_informado:'Rua 43, Itaipuaçu, Maricá',
+          tipo:'endereco_digitado',rua:'Rua 43',bairro:'Itaipuaçu',municipio:'Maricá' } }] });
+    const detail=await getCustomerDetail('prod','chatwoot','contact-1',{}, { query } as unknown as Pool);
+    expect(detail?.customer).toMatchObject({
+      address:null,address_source:null,
+      shared_location:{ label:'Itaipuaçu — Maricá',estimated_address:'Rua 43, Itaipuaçu, Maricá',source:'typed' },
+    });
+    expect(detail?.customer.shared_location.maps_url).toContain('Rua%2043%2C%20Itaipua%C3%A7u%2C%20Maric%C3%A1');
+    expect(cachedReverseGeocode).not.toHaveBeenCalled();
   });
   it.each(['chatwoot','balcao','parceiro','atacado'] as const)('mantém escopo explícito em %s',source => {
     const sql = customerOrdersSql(source);

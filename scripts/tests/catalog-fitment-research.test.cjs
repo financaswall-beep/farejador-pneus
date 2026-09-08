@@ -38,13 +38,13 @@ test('exige destino de produção correto e não aceita flags ambíguas', () => 
 
 test('base completa preserva R/ZR/B, alternativas, fontes e bloqueios', async () => {
   const { applications, bikes } = await import('../data/catalog-fitment-research-20260906.mjs');
-  assert.equal(bikes.length, 83);
-  assert.equal(applications.length, 165);
+  assert.equal(bikes.length, 94);
+  assert.equal(applications.length, 187);
   const products = [...new Set(applications.map(row => row.measure))].map((tire_size, i) => ({
     tire_size, tire_spec_id: stableId(`spec:${i}`), product_id: stableId(`product:${i}`),
   }));
   const plan = planResearchImport(applications, products);
-  assert.equal(plan.candidates.length, 145);
+  assert.equal(plan.candidates.length, 167);
   assert.equal(plan.skipped.length, 20);
   assert.ok(plan.skipped.every(c => c.reason !== 'sem_produto_cadastrado_na_medida'));
   assert.equal(plan.candidates.filter(c => c.research.brand === 'Mottu').length, 3);

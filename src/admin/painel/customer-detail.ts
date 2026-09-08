@@ -23,24 +23,62 @@ interface History {
   history_total: number; last_address: string | null; last_unit_name: string | null; orders: Order[];
 }
 
-interface LocationPin {
-  coordinates_lat: string | number; coordinates_lng: string | number; observed_at: string;
+interface LeadLocationCandidate {
+  source: 'shared_pin' | 'typed';
+  coordinates_lat: string | number | null;
+  coordinates_lng: string | number | null;
+  observed_at: string;
+  fact_value: unknown;
 }
 
-async function loadSharedLeadLocation(
+type SharedLeadLocation = {
+  label:string;estimated_address:string|null;observed_at:string;maps_url:string;
+  source:'shared_pin'|'typed';
+};
+
+function cleanPart(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+async function loadLeadLocation(
   environment:'prod'|'test',contactId:string,dbPool:Pool,
-):Promise<{ label:string;estimated_address:string|null;observed_at:string;maps_url:string;source:'shared_pin' }|null> {
+):Promise<SharedLeadLocation|null> {
   try {
-    const pin=(await dbPool.query<LocationPin>(
-      `SELECT a.coordinates_lat,a.coordinates_lng,a.created_at::text AS observed_at
-         FROM core.message_attachments a
-         JOIN core.conversations cv ON cv.id=a.conversation_id AND cv.environment=a.environment
-        WHERE a.environment=$1 AND cv.contact_id=$2 AND cv.deleted_at IS NULL
-          AND a.file_type='location' AND a.coordinates_lat IS NOT NULL AND a.coordinates_lng IS NOT NULL
-        ORDER BY a.created_at DESC,a.id DESC LIMIT 1`,[environment,contactId],
+    const candidate=(await dbPool.query<LeadLocationCandidate>(
+      `WITH candidates AS (
+         SELECT 'shared_pin'::text AS source,a.coordinates_lat,a.coordinates_lng,
+                a.created_at AS observed_at,NULL::jsonb AS fact_value,1 AS priority,a.id
+           FROM core.message_attachments a
+           JOIN core.conversations cv ON cv.id=a.conversation_id AND cv.environment=a.environment
+          WHERE a.environment=$1 AND cv.contact_id=$2 AND cv.deleted_at IS NULL
+            AND a.file_type='location' AND a.coordinates_lat IS NOT NULL AND a.coordinates_lng IS NOT NULL
+         UNION ALL
+         SELECT 'typed',NULL::numeric,NULL::numeric,COALESCE(f.observed_at,f.created_at),
+                f.fact_value,0,f.id
+           FROM analytics.conversation_facts f
+           JOIN core.conversations cv ON cv.id=f.conversation_id AND cv.environment=f.environment
+          WHERE f.environment=$1 AND cv.contact_id=$2 AND cv.deleted_at IS NULL
+            AND f.fact_key='localizacao_lead' AND f.superseded_by IS NULL
+            AND jsonb_typeof(f.fact_value)='object'
+       )
+       SELECT source,coordinates_lat,coordinates_lng,observed_at::text,fact_value
+         FROM candidates ORDER BY observed_at DESC,priority DESC,id DESC LIMIT 1`,[environment,contactId],
     )).rows[0];
-    if(!pin)return null;
-    const lat=Number(pin.coordinates_lat);const lng=Number(pin.coordinates_lng);
+    if(!candidate)return null;
+    if(candidate.source==='typed'){
+      const value=candidate.fact_value && typeof candidate.fact_value==='object'
+        ? candidate.fact_value as Record<string,unknown>:{};
+      const text=cleanPart(value.texto_informado);
+      if(!text)return null;
+      const rua=cleanPart(value.rua);const numero=cleanPart(value.numero);
+      const bairro=cleanPart(value.bairro);const municipio=cleanPart(value.municipio);
+      const address=[rua,numero,bairro,municipio].filter(Boolean).join(', ')||text;
+      const label=[bairro,municipio].filter(Boolean).join(' — ')||text;
+      return { label,estimated_address:address,observed_at:candidate.observed_at,
+        maps_url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+        source:'typed' };
+    }
+    const lat=Number(candidate.coordinates_lat);const lng=Number(candidate.coordinates_lng);
     if(!Number.isFinite(lat)||!Number.isFinite(lng))return null;
     const reverse=await cachedReverseGeocode(dbPool as unknown as PoolClient,{lat,lng},env.GOOGLE_MAPS_API_KEY,
       { requireFormattedAddress:true });
@@ -49,11 +87,11 @@ async function loadSharedLeadLocation(
       || null;
     const label=[reverse?.neighborhood,reverse?.municipio].filter(Boolean).join(' — ')
       || estimatedAddress || 'Localização compartilhada';
-    return { label,estimated_address:estimatedAddress,observed_at:pin.observed_at,
+    return { label,estimated_address:estimatedAddress,observed_at:candidate.observed_at,
       maps_url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`,
       source:'shared_pin' };
   }catch(error){
-    logger.warn({ error,contact_id:contactId },'customer detail: localização compartilhada indisponível');
+    logger.warn({ error,contact_id:contactId },'customer detail: localização do lead indisponível');
     return null;
   }
 }
@@ -70,7 +108,7 @@ export async function getCustomerDetail(
   if (source === 'parceiro') args.push(profile.unit_id);
   const history = (await dbPool.query<History>(customerOrdersSql(source),args)).rows[0]!;
   const address = history.last_address ?? profile.address;
-  const sharedLocation=source==='chatwoot'?await loadSharedLeadLocation(environment,id,dbPool):null;
+  const sharedLocation=source==='chatwoot'?await loadLeadLocation(environment,id,dbPool):null;
   return {
     customer: {
       id: `${source}:${id}`,source,source_id:id,

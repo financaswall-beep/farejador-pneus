@@ -143,6 +143,15 @@ idempotente `conversation_resolution`. A memória comercial de 11 dias é soment
 leitura de facts estruturados e não exige tabela nova; o encerramento automático
 continua dormente até `BOT_AUTO_RESOLVE_ENABLED=true`.
 
+`0220_lead_location_memory.sql` grava como fact analítico append-only a região ou
+o endereço digitado pelo lead após a resposta ser entregue. A localização continua
+estimada e separada do endereço confirmado do pedido; também passa a alimentar o
+mapa de demanda quando o município foi informado.
+
+`0221_bot_analytics_trigger_isolation.sql` isola os extratores do gatilho do Bot V2:
+uma falha em hints ou classificação não desfaz cotação ou localização já extraída
+no mesmo turno.
+
 `0189_checkout_price_negotiation.sql` separa preço tabelado de preço negociado no
 Caixa, congela o valor efetivamente vendido e preserva permissão do dono sobre a tabela.
 
