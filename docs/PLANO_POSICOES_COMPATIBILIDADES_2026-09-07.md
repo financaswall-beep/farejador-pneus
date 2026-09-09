@@ -1,6 +1,6 @@
 # Plano de posições e compatibilidades dos pneus
 
-Atualizado em 07/09/2026 após o teste real da NMAX no Instagram.
+Atualizado em 09/09/2026 após o fechamento e a verificação em produção.
 
 ## Proteção imediata do bot — concluída
 
@@ -80,12 +80,23 @@ A aplicação foi transacional, auditada e idempotente. A conferência posterior
 encontrou zero alterações restantes. Não houve mudança em estoque, preços,
 compras, pedidos, financeiro ou estado do bot. Esta etapa não exige migration.
 
-## 5. Finalização
+## 5. Finalização — concluída em 09/09/2026
 
 - [x] Executar testes completos.
 - [x] Conferir o banco em modo somente leitura.
 - [x] Fazer commit e push do módulo 2 validado.
-- [ ] Realizar um único deploy pelo responsável da operação.
+- [x] Realizar um único deploy pelo responsável da operação.
+
+O deploy do commit `a2d75718` foi confirmado em produção. A suíte de regressão
+local terminou com 1.734 testes aprovados e o typecheck passou. O lote técnico
+foi reexecutado em modo somente leitura: os quatro produtos comprovados estavam
+inalterados e nenhuma nova escrita era necessária.
+
+Na verificação operacional, o banco e o schema estavam íntegros. Os 33 trabalhos
+recentes da Atendente foram processados, sem job pendente, falha, bloqueio,
+incidente ou mensagem em dead letter. O aviso de saúde restante era de ausência
+de webhook novo do Chatwoot por pouco mais de 24 horas; não havia evento raw
+pendente ou com falha. Esta etapa não exigiu migration.
 
 ## Fora deste plano
 
