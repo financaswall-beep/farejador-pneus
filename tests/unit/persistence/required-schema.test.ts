@@ -55,7 +55,13 @@ describe('schema mínimo exigido no boot', () => {
       "to_regprocedure('analytics.extract_lead_location_facts(uuid)')",
     );
     expect(REQUIRED_SCHEMA_SQL).toContain('conversation_resolution');
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=221');
+    expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='vehicle_fitments'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='year_start'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='year_end'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(
+      "to_regprocedure('commerce.find_compatible_tires(env_t,uuid,text,integer)')",
+    );
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=222');
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "migration_file='0216_conversation_bot_control.sql'",
     );
@@ -80,13 +86,19 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "checksum_sha256='35f27b20f46b3dfc0cea1fc89abb691c3c6982215ef7ea2486ee069720528060'",
     );
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=222');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
+      "migration_file='0222_fitment_year_validity.sql'",
+    );
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
+      "checksum_sha256='34d272e3b7ea6d544b5920836f34b09066120892b428f2ae3049bfd990df11ed'",
+    );
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=223');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0221', async () => {
+  it('recusa iniciar antes da migration 0222', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0221_bot_analytics_trigger_isolation');
+      .rejects.toThrow('required_schema_missing:0222_fitment_year_validity');
   });
 });

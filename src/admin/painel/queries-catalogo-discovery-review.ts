@@ -26,10 +26,12 @@ export async function reviewCatalogFitmentDiscovery(
       id: string; vehicle_model_id: string; tire_spec_id: string;
       position: 'front' | 'rear' | 'both'; status: string;
       suggested_is_oem: boolean; suggested_confidence_level: string | null;
+      suggested_year_start: number | null; suggested_year_end: number | null;
       discovery_measure: string;
     }>(
       `SELECT d.id,d.vehicle_model_id,d.tire_spec_id,d.position,d.status,
               d.suggested_is_oem,d.suggested_confidence_level,
+              d.suggested_year_start,d.suggested_year_end,
               ts.tire_size discovery_measure
          FROM commerce.fitment_discoveries d
          JOIN commerce.tire_specs ts
@@ -69,17 +71,21 @@ export async function reviewCatalogFitmentDiscovery(
     ]);
     const promoted = await client.query<{ id: string }>(
       `INSERT INTO commerce.vehicle_fitments
-         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level)
-       SELECT $1::env_t,$2,spec_id,$3,$4,'discovery_promoted',$5
-         FROM unnest($6::uuid[]) AS spec_id
+         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,
+          confidence_level,year_start,year_end)
+       SELECT $1::env_t,$2,spec_id,$3,$4,'discovery_promoted',$5,$6,$7
+         FROM unnest($8::uuid[]) AS spec_id
        ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position)
        DO UPDATE SET is_oem=EXCLUDED.is_oem,source=EXCLUDED.source,
-                     confidence_level=EXCLUDED.confidence_level,updated_at=now()
+                     confidence_level=EXCLUDED.confidence_level,
+                     year_start=EXCLUDED.year_start,year_end=EXCLUDED.year_end,
+                     updated_at=now()
        RETURNING id`,
       [environment, candidate.vehicle_model_id, candidate.position,
        candidate.suggested_is_oem,
        candidate.suggested_confidence_level === null
-         ? 0.8 : Number(candidate.suggested_confidence_level), tireSpecIds],
+         ? 0.8 : Number(candidate.suggested_confidence_level),
+       candidate.suggested_year_start, candidate.suggested_year_end, tireSpecIds],
     );
     const fitmentIds = promoted.rows.map((row) => row.id);
     await client.query(
@@ -102,6 +108,8 @@ export async function reviewCatalogFitmentDiscovery(
        VALUES ($1,'catalog','commerce.fitment_discoveries',$2,'catalog_fitment_candidate_promoted',$3,$4::jsonb,$5::jsonb)`,
       [environment, input.discoveryId, actor, JSON.stringify({ status: candidate.status }),
        JSON.stringify({ status: 'promoted', reason, tire_size: tireSize,
+         year_start: candidate.suggested_year_start,
+         year_end: candidate.suggested_year_end,
          fitment_ids: fitmentIds, affected_tire_specs: tireSpecIds.length })],
     );
     await client.query('COMMIT');

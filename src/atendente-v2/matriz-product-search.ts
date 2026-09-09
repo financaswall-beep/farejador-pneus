@@ -165,6 +165,8 @@ interface FitmentRow {
   brand: string | null;
   tire_condition: TireCondition;
   tire_size: string;
+  year_start: number | null;
+  year_end: number | null;
   position: 'front' | 'rear' | 'both';
   is_oem: boolean;
   source: string;
@@ -187,7 +189,8 @@ export async function buscarCompatibilidadeMatriz(
   const fitments = await client.query<FitmentRow>(
     `SELECT vf.vehicle_model_id, p.id AS product_id, p.product_name, p.brand,
             p.tire_condition,
-            ts.tire_size, vf.position, vf.is_oem, vf.source,
+            ts.tire_size, vf.year_start, vf.year_end,
+            vf.position, vf.is_oem, vf.source,
             vf.confidence_level, cp.price_amount AS current_price
        FROM commerce.vehicle_fitments vf
        JOIN commerce.tire_specs ts
@@ -198,12 +201,17 @@ export async function buscarCompatibilidadeMatriz(
          ON cp.product_id = p.id AND cp.environment = p.environment
       WHERE vf.environment = $1 AND vf.vehicle_model_id = ANY($2::uuid[])
         AND ($3::text IS NULL OR vf.position = $3 OR vf.position = 'both')
-        AND ($4::text IS NULL OR p.tire_condition = $4)`,
+        AND ($4::text IS NULL OR p.tire_condition = $4)
+        AND ($5::int IS NULL OR (
+          (vf.year_start IS NULL OR vf.year_start <= $5)
+          AND (vf.year_end IS NULL OR vf.year_end >= $5)
+        ))`,
     [
       parsed.environment,
       vehicles.rows.map((row) => row.vehicle_model_id),
       position,
       parsed.condicao_pneu ?? null,
+      parsed.moto_ano ?? null,
     ],
   );
   const stock = await loadOfficialStock(client, parsed.environment);
@@ -222,6 +230,8 @@ export async function buscarCompatibilidadeMatriz(
           brand: row.brand,
           tire_condition: row.tire_condition,
           tire_size: row.tire_size,
+          fitment_year_start: row.year_start,
+          fitment_year_end: row.year_end,
           position: row.position,
           is_oem: row.is_oem,
           source: row.source,

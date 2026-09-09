@@ -107,6 +107,8 @@ export interface CompatibilidadeResultado {
     brand: string | null;
     tire_condition: TireCondition | null;
     tire_size: string;
+    fitment_year_start?: number | null;
+    fitment_year_end?: number | null;
     position: 'front' | 'rear' | 'both';
     is_oem: boolean;
     source: string;
@@ -182,6 +184,8 @@ interface CompatibleTireRow {
   brand: string | null;
   tire_condition?: TireCondition | null;
   tire_size: string;
+  fitment_year_start?: number | null;
+  fitment_year_end?: number | null;
   position?: 'front' | 'rear' | 'both';
   fitment_position?: 'front' | 'rear' | 'both';
   is_oem: boolean;
@@ -344,9 +348,9 @@ export async function buscarCompatibilidade(
       : null;
     const tires = await client.query<CompatibleTireRow>(
       `SELECT *
-       FROM commerce.find_compatible_tires($1, $2, $3)
-       LIMIT $4`,
-      [parsed.environment, vehicleId, positionFilter, parsed.limit],
+       FROM commerce.find_compatible_tires($1, $2, $3, $4)
+       LIMIT $5`,
+      [parsed.environment, vehicleId, positionFilter, parsed.moto_ano ?? null, parsed.limit],
     );
     out.push({
       vehicle_model_id: vehicleId,
@@ -497,6 +501,8 @@ function mapCompatibleTire(row: CompatibleTireRow): CompatibilidadeResultado['pr
     brand: row.brand,
     tire_condition: row.tire_condition ?? null,
     tire_size: row.tire_size,
+    fitment_year_start: row.fitment_year_start ?? null,
+    fitment_year_end: row.fitment_year_end ?? null,
     position,
     is_oem: row.is_oem,
     source,

@@ -40,6 +40,24 @@ export interface AddCompatibilityInput extends CompatibilityMutationInput {
   isOem: boolean;
   source: 'manufacturer' | 'manual';
   confidenceLevel: number;
+  yearStart?: number | null;
+  yearEnd?: number | null;
+}
+
+export function validateFitmentYears(
+  yearStart?: number | null,
+  yearEnd?: number | null,
+): void {
+  for (const year of [yearStart, yearEnd]) {
+    if (year !== null && year !== undefined
+      && (!Number.isInteger(year) || year < 1900 || year > 2100)) {
+      throw new Error('catalog_compatibility_year_invalid');
+    }
+  }
+  if (yearStart !== null && yearStart !== undefined
+    && yearEnd !== null && yearEnd !== undefined && yearEnd < yearStart) {
+    throw new Error('catalog_compatibility_year_range_invalid');
+  }
 }
 
 export async function searchCatalogVehicleModels(
@@ -106,6 +124,7 @@ export async function addCatalogCompatibility(
   if (reason.length < 2 || reason.length > 500) throw new Error('catalog_compatibility_reason_required');
   if (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
     || input.confidenceLevel > 1) throw new Error('catalog_compatibility_confidence_invalid');
+  validateFitmentYears(input.yearStart, input.yearEnd);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -122,17 +141,22 @@ export async function addCatalogCompatibility(
     if (!vehicle.rows[0]) throw new Error('catalog_vehicle_model_not_found');
     const inserted = await client.query(
       `INSERT INTO commerce.vehicle_fitments
-         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level)
-       SELECT $1::env_t,$2,spec_id,$3,$4,$5,$6
-         FROM unnest($7::uuid[]) AS spec_id
+         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level,
+          year_start,year_end)
+       SELECT $1::env_t,$2,spec_id,$3,$4,$5,$6,$7,$8
+         FROM unnest($9::uuid[]) AS spec_id
        ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position)
        DO UPDATE SET is_oem=EXCLUDED.is_oem,source=EXCLUDED.source,
-                     confidence_level=EXCLUDED.confidence_level,updated_at=now()
+                     confidence_level=EXCLUDED.confidence_level,
+                     year_start=EXCLUDED.year_start,year_end=EXCLUDED.year_end,
+                     updated_at=now()
        WHERE commerce.vehicle_fitments.is_oem IS DISTINCT FROM EXCLUDED.is_oem
           OR commerce.vehicle_fitments.source IS DISTINCT FROM EXCLUDED.source
-          OR commerce.vehicle_fitments.confidence_level IS DISTINCT FROM EXCLUDED.confidence_level`,
+          OR commerce.vehicle_fitments.confidence_level IS DISTINCT FROM EXCLUDED.confidence_level
+          OR commerce.vehicle_fitments.year_start IS DISTINCT FROM EXCLUDED.year_start
+          OR commerce.vehicle_fitments.year_end IS DISTINCT FROM EXCLUDED.year_end`,
       [environment, input.vehicleModelId, input.position, input.isOem, input.source,
-       input.confidenceLevel, tireSpecIds],
+       input.confidenceLevel, input.yearStart ?? null, input.yearEnd ?? null, tireSpecIds],
     );
     await client.query(
       `INSERT INTO audit.events
@@ -142,6 +166,7 @@ export async function addCatalogCompatibility(
        JSON.stringify({ tire_size: tireSize, vehicle_model_id: input.vehicleModelId,
          vehicle: vehicle.rows[0], position: input.position, is_oem: input.isOem,
          source: input.source, confidence_level: input.confidenceLevel, reason,
+         year_start: input.yearStart ?? null, year_end: input.yearEnd ?? null,
          affected_tire_specs: tireSpecIds.length, changed_rows: inserted.rowCount ?? 0 })],
     );
     await client.query('COMMIT');
@@ -235,7 +260,7 @@ export async function getCatalogCompatibility(
 
   const fitments = await dbPool.query<CatalogCompatibilityRow>(
     `SELECT vm.id AS vehicle_model_id,vm.make,vm.model,vm.variant,
-            vm.year_start,vm.year_end,vf.position,vf.is_oem,vf.source,
+            vf.year_start,vf.year_end,vf.position,vf.is_oem,vf.source,
             vf.confidence_level
        FROM commerce.products p
        JOIN commerce.tire_specs ts

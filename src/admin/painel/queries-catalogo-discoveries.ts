@@ -5,6 +5,7 @@ import { activeResearchReference } from './catalog-discovery-reference.js';
 import {
   loadCatalogMeasureSpecs,
   type CatalogVehicleModelRow,
+  validateFitmentYears,
 } from './queries-catalogo-compatibilidade.js';
 
 export interface CatalogFitmentDiscoveryRow extends CatalogVehicleModelRow {
@@ -44,7 +45,8 @@ export async function getCatalogFitmentDiscoveries(
             d.suggested_is_oem,d.suggested_confidence_level,d.discovered_at,
             d.reviewed_by,d.reviewed_at,d.notes,ts.tire_size discovery_measure,
             vm.id vehicle_model_id,vm.make,vm.model,vm.variant,
-            vm.year_start,vm.year_end,vm.displacement_cc
+            d.suggested_year_start year_start,d.suggested_year_end year_end,
+            vm.displacement_cc
        FROM commerce.fitment_discoveries d
        JOIN commerce.tire_specs ts
          ON ts.id=d.tire_spec_id AND ts.environment=d.environment
@@ -79,6 +81,8 @@ export interface CreateFitmentDiscoveryInput {
   evidenceSummary: string;
   suggestedIsOem: boolean;
   confidenceLevel: number;
+  yearStart?: number | null;
+  yearEnd?: number | null;
   actorLabel: string;
   environment?: 'prod' | 'test';
 }
@@ -103,6 +107,7 @@ export async function createCatalogFitmentDiscovery(
   }
   if (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
     || input.confidenceLevel > 1) throw new Error('catalog_compatibility_confidence_invalid');
+  validateFitmentYears(input.yearStart, input.yearEnd);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -130,12 +135,14 @@ export async function createCatalogFitmentDiscovery(
       `INSERT INTO commerce.fitment_discoveries
          (environment,vehicle_model_id,tire_spec_id,position,status,discovery_origin,
           source_url,source_title,source_checked_at,evidence_summary,
-          suggested_is_oem,suggested_confidence_level,notes)
-       VALUES ($1,$2,$3,$4,'pending','web_research',$5,$6,now(),$7,$8,$9,$10)
+          suggested_is_oem,suggested_confidence_level,suggested_year_start,
+          suggested_year_end,notes)
+       VALUES ($1,$2,$3,$4,'pending','web_research',$5,$6,now(),$7,$8,$9,$10,$11,$12)
        RETURNING id`,
       [environment, input.vehicleModelId, tireSpecIds[0], input.position,
        sourceUrl.toString(), input.sourceTitle?.trim().slice(0, 300) || null,
        summary, input.suggestedIsOem, input.confidenceLevel,
+       input.yearStart ?? null, input.yearEnd ?? null,
        `Registrado por ${input.actorLabel.trim().slice(0, 120) || 'admin'}`],
     );
     const discoveryId = created.rows[0]!.id;
@@ -146,6 +153,7 @@ export async function createCatalogFitmentDiscovery(
       [environment, discoveryId, input.actorLabel.trim().slice(0, 120) || 'admin',
        JSON.stringify({ product_id: input.productId, tire_size: tireSize,
          vehicle_model_id: input.vehicleModelId, position: input.position,
+         year_start: input.yearStart ?? null, year_end: input.yearEnd ?? null,
          source_url: sourceUrl.toString(), evidence_summary: summary,
          status: 'pending', automatic_promotion: false })],
     );

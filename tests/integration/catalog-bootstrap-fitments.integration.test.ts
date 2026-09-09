@@ -153,6 +153,7 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
     const homologated = await addCatalogCompatibility({
       productId: firstProductId, vehicleModelId: vehicleOne, position: 'rear',
       isOem: true, source: 'manufacturer', confidenceLevel: 1,
+      yearStart: 2016, yearEnd: 2026,
       reason: 'Manual oficial', actorLabel: 'Dono', environment: 'test',
     }, db.pool);
     expect(homologated.fitments_created).toBe(2);
@@ -160,12 +161,29 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
       `SELECT * FROM commerce.catalog_fitment_measure_gaps WHERE environment='test'`,
     );
     expect(gapsAfterDirect.rows).toHaveLength(0);
+    const directYears = await db.pool.query(
+      `SELECT DISTINCT year_start,year_end FROM commerce.vehicle_fitments
+        WHERE environment='test' AND vehicle_model_id=$1`,
+      [vehicleOne],
+    );
+    expect(directYears.rows).toEqual([{ year_start: 2016, year_end: 2026 }]);
+    const compatibleInRange = await db.pool.query(
+      `SELECT product_id FROM commerce.find_compatible_tires('test',$1,'rear',2025)`,
+      [vehicleOne],
+    );
+    const incompatibleAfterRange = await db.pool.query(
+      `SELECT product_id FROM commerce.find_compatible_tires('test',$1,'rear',2027)`,
+      [vehicleOne],
+    );
+    expect(compatibleInRange.rows).toHaveLength(2);
+    expect(incompatibleAfterRange.rows).toHaveLength(0);
 
     const candidate = await createCatalogFitmentDiscovery({
       productId: second.product_id, vehicleModelId: vehicleTwo, position: 'front',
       sourceUrl: 'https://fabricante.example/factor-150',
       sourceTitle: 'Manual Factor 150', evidenceSummary: 'Tabela dianteira 90/90-18',
       suggestedIsOem: true, confidenceLevel: 0.9,
+      yearStart: 2020, yearEnd: 2025,
       actorLabel: 'Dono', environment: 'test',
     }, db.pool);
     const beforeReview = await db.pool.query(
@@ -181,6 +199,12 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
       environment: 'test',
     }, db.pool);
     expect(reviewed).toEqual({ status: 'promoted', fitments_promoted: 2 });
+    const promotedYears = await db.pool.query(
+      `SELECT DISTINCT year_start,year_end FROM commerce.vehicle_fitments
+        WHERE environment='test' AND vehicle_model_id=$1`,
+      [vehicleTwo],
+    );
+    expect(promotedYears.rows).toEqual([{ year_start: 2020, year_end: 2025 }]);
     const promotionFilm = await db.pool.query(
       `SELECT count(*) total FROM commerce.fitment_discovery_promotions
         WHERE environment='test' AND discovery_id=$1`,

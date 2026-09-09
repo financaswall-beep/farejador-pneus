@@ -48,20 +48,37 @@ const tireSpecBody = z.object({
   reason: z.string().trim().min(2).max(500),
 });
 const vehicleSearchQuery = z.object({ q: z.string().trim().min(2).max(120) });
-const compatibilityBody = z.object({
+const fitmentYear = z.number().int().min(1900).max(2100).nullable().optional();
+function withValidFitmentRange<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  return schema.superRefine((body, context) => {
+    const years = body as { year_start?: number | null; year_end?: number | null };
+    if (years.year_start !== null && years.year_start !== undefined
+      && years.year_end !== null && years.year_end !== undefined
+      && years.year_end < years.year_start) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['year_end'],
+        message: 'catalog_compatibility_year_range_invalid',
+      });
+    }
+  });
+}
+const compatibilityBody = withValidFitmentRange(z.object({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),
   is_oem: z.boolean().default(false),
   source: z.enum(['manufacturer', 'manual']).default('manual'),
   confidence_level: z.number().min(0).max(1).default(1),
+  year_start: fitmentYear,
+  year_end: fitmentYear,
   reason: z.string().trim().min(2).max(500),
-});
+}));
 const compatibilityDeleteParams = productParams.extend({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),
 });
 const compatibilityDeleteBody = z.object({ reason: z.string().trim().min(2).max(500) });
-const discoveryBody = z.object({
+const discoveryBody = withValidFitmentRange(z.object({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),
   source_url: z.string().trim().url().max(2000),
@@ -69,7 +86,9 @@ const discoveryBody = z.object({
   evidence_summary: z.string().trim().min(5).max(2000),
   suggested_is_oem: z.boolean().default(false),
   confidence_level: z.number().min(0).max(1).default(0.8),
-});
+  year_start: fitmentYear,
+  year_end: fitmentYear,
+}));
 const discoveryParams = productParams.extend({ discovery_id: z.string().uuid() });
 const discoveryReviewBody = z.object({
   decision: z.enum(['approve', 'reject']),
@@ -177,6 +196,8 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         isOem: body.data.is_oem,
         source: body.data.source,
         confidenceLevel: body.data.confidence_level,
+        yearStart: body.data.year_start,
+        yearEnd: body.data.year_end,
         reason: body.data.reason,
         actorLabel: operatorLabel(request),
       }));
@@ -243,6 +264,8 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         evidenceSummary: body.data.evidence_summary,
         suggestedIsOem: body.data.suggested_is_oem,
         confidenceLevel: body.data.confidence_level,
+        yearStart: body.data.year_start,
+        yearEnd: body.data.year_end,
         actorLabel: operatorLabel(request),
       }));
     } catch (error) {

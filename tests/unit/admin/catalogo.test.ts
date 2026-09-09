@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 
 let getCatalogOverview: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
 let getCatalogCompatibility: typeof import('../../../src/admin/painel/queries-catalogo-compatibilidade.js').getCatalogCompatibility;
+let validateFitmentYears: typeof import('../../../src/admin/painel/queries-catalogo-compatibilidade.js').validateFitmentYears;
 let getCatalogPriceHistory: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogPriceHistory;
 let setCatalogPrice: typeof import('../../../src/admin/painel/queries-catalogo.js').setCatalogPrice;
 
@@ -16,7 +17,7 @@ beforeAll(async () => {
   });
   ({ getCatalogOverview, getCatalogPriceHistory, setCatalogPrice }
     = await import('../../../src/admin/painel/queries-catalogo.js'));
-  ({ getCatalogCompatibility }
+  ({ getCatalogCompatibility, validateFitmentYears }
     = await import('../../../src/admin/painel/queries-catalogo-compatibilidade.js'));
 });
 
@@ -126,7 +127,20 @@ describe('catalogo conciliado com estoque e precos', () => {
     expect(result.rows[0]).toMatchObject({ make: 'Yamaha', model: 'Neo 125' });
     const fitmentSql = String(query.mock.calls[1]?.[0]);
     expect(fitmentSql).toContain('vf.tire_spec_id=ts.id');
+    expect(fitmentSql).toContain('vf.year_start,vf.year_end');
     expect(fitmentSql).toContain('p.id=$2');
+  });
+
+  it('aceita vigência aberta ou exata e recusa anos inválidos', () => {
+    expect(() => validateFitmentYears(null, null)).not.toThrow();
+    expect(() => validateFitmentYears(2016, 2026)).not.toThrow();
+    expect(() => validateFitmentYears(2025, 2025)).not.toThrow();
+    expect(() => validateFitmentYears(2016, null)).not.toThrow();
+    expect(() => validateFitmentYears(null, 2026)).not.toThrow();
+    expect(() => validateFitmentYears(2027, 2026))
+      .toThrow('catalog_compatibility_year_range_invalid');
+    expect(() => validateFitmentYears(1899, 2026))
+      .toThrow('catalog_compatibility_year_invalid');
   });
 
   it('recusa compatibilidade de produto inexistente ou arquivado', async () => {

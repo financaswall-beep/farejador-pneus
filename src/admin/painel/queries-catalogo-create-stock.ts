@@ -136,9 +136,11 @@ export async function createCatalogProductFromStock(
     )).rows[0]!.id;
     const copiedFitments = await client.query(
       `INSERT INTO commerce.vehicle_fitments
-         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level)
+         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,
+          confidence_level,year_start,year_end)
        SELECT DISTINCT ON (vf.vehicle_model_id,vf.position)
-              $1::env_t,vf.vehicle_model_id,$2,vf.position,vf.is_oem,vf.source,vf.confidence_level
+              $1::env_t,vf.vehicle_model_id,$2,vf.position,vf.is_oem,vf.source,
+              vf.confidence_level,vf.year_start,vf.year_end
          FROM commerce.vehicle_fitments vf
          JOIN commerce.tire_specs source_spec
            ON source_spec.id=vf.tire_spec_id AND source_spec.environment=vf.environment

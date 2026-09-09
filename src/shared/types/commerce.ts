@@ -96,6 +96,8 @@ export interface VehicleFitment {
   is_oem: boolean;
   source: FitmentSource;
   confidence_level: string | null; // NUMERIC
+  year_start: number | null;
+  year_end: number | null;
   created_at: Date;
   updated_at: Date;
 }

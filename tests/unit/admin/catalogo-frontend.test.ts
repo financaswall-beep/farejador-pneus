@@ -508,7 +508,8 @@ describe('catalogo no painel', () => {
       catalogoCompatibilidade: {
         row: { product_id: 'produto-1' }, saving: false, message: null,
         selectedVehicle: { vehicle_model_id: 'moto-1' }, search: 'Honda CG', searchRows: [],
-        form: { position: 'rear', is_oem: true, source: 'manufacturer', reason: 'Manual oficial' },
+        form: { position: 'rear', is_oem: true, source: 'manufacturer',
+          year_start: '2016', year_end: '2026', reason: 'Manual oficial' },
         discoveryForm: {
           source_url: 'https://fabricante.example/manual', source_title: 'Manual',
           evidence_summary: 'Medida traseira confirmada', confidence_level: 0.9,
@@ -528,6 +529,7 @@ describe('catalogo no painel', () => {
       expect.objectContaining({
         vehicle_model_id: 'moto-1', source_url: 'https://fabricante.example/manual',
         suggested_is_oem: true, confidence_level: 0.9,
+        year_start: 2016, year_end: 2026,
       }),
     );
     expect(context.catalogoCompatibilidade.message).toMatchObject({
@@ -538,6 +540,36 @@ describe('catalogo no painel', () => {
     expect(html).toContain('Pesquisa na internet para revisar');
     expect(html).toContain('o Bot não usa antes de você aprovar');
     expect(html).toContain('@click="catalogoDiscoveryReview(item,\'approve\')"');
+    expect(html).toContain('x-model="catalogoCompatibilidade.form.year_start"');
+    expect(html).toContain('x-model="catalogoCompatibilidade.form.year_end"');
+  });
+
+  it('salva a vigência da aplicação e bloqueia uma faixa invertida', async () => {
+    const module = loadCatalogModule();
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      catalogoCompatibilidade: {
+        row: { product_id: 'produto-1' }, saving: false, message: null,
+        selectedVehicle: { vehicle_model_id: 'nmax' }, search: 'NMAX', searchRows: [],
+        form: { position: 'both', is_oem: true, source: 'manufacturer',
+          year_start: '2026', year_end: '2016', reason: 'Manual Yamaha' },
+      },
+      apiPost: vi.fn().mockResolvedValue({ changed: true }),
+      catalogoCompatibilityLoad: vi.fn(),
+      loadCatalogo: vi.fn(),
+    };
+
+    expect(module.catalogoCompatibilityCanSave.call(context)).toBe(false);
+    context.catalogoCompatibilidade.form.year_start = '2016';
+    context.catalogoCompatibilidade.form.year_end = '2026';
+    expect(module.catalogoCompatibilityCanSave.call(context)).toBe(true);
+    await module.catalogoCompatibilitySave.call(context);
+
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/produto-1/compatibility', {
+      vehicle_model_id: 'nmax', position: 'both', is_oem: true, source: 'manufacturer',
+      confidence_level: 1, year_start: 2016, year_end: 2026, reason: 'Manual Yamaha',
+    });
   });
 
   it('inicializa a fila de pesquisa antes de o Alpine avaliar o drawer oculto', () => {

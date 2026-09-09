@@ -178,6 +178,17 @@ export const REQUIRED_SCHEMA_SQL = `
        WHERE table_schema='commerce' AND table_name='partner_order_items'
          AND column_name='pickup_service_code'
     )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='vehicle_fitments'
+         AND column_name='year_start'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='vehicle_fitments'
+         AND column_name='year_end'
+    )
+    AND to_regprocedure('commerce.find_compatible_tires(env_t,uuid,text,integer)') IS NOT NULL
     AND to_regclass('ops.application_schema_state') IS NOT NULL
     AND to_regclass('ops.applied_migrations') IS NOT NULL
     AND to_regclass('finance.partner_receivable_events') IS NOT NULL
@@ -200,7 +211,7 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=221
+       AND version>=222
        AND EXISTS (
          SELECT 1 FROM ops.applied_migrations
           WHERE migration_file='0216_conversation_bot_control.sql'
@@ -221,17 +232,22 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
           WHERE migration_file='0221_bot_analytics_trigger_isolation.sql'
             AND checksum_sha256='35f27b20f46b3dfc0cea1fc89abb691c3c6982215ef7ea2486ee069720528060'
        )
-       AND (SELECT count(*) FROM ops.applied_migrations)>=222
+       AND EXISTS (
+         SELECT 1 FROM ops.applied_migrations
+          WHERE migration_file='0222_fitment_year_validity.sql'
+            AND checksum_sha256='34d272e3b7ea6d544b5920836f34b09066120892b428f2ae3049bfd990df11ed'
+       )
+       AND (SELECT count(*) FROM ops.applied_migrations)>=223
   ) AS ready`;
 
 /** Impede o processo novo de operar sem o ciclo de vida e a memória de lead. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0221_bot_analytics_trigger_isolation');
+    throw new Error('required_schema_missing:0222_fitment_year_validity');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0221_bot_analytics_trigger_isolation');
+    throw new Error('required_schema_missing:0222_fitment_year_validity');
   }
 }

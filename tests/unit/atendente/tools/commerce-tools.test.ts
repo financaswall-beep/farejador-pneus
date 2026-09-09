@@ -203,6 +203,8 @@ describe('commerce tools deterministicas da Atendente', () => {
       produtos: [expect.objectContaining({ product_id: 'p1', is_oem: true })],
     });
     expect(client.calls[1]!.text).toContain('commerce.find_compatible_tires');
+    expect(client.calls[1]!.text).toContain('($1, $2, $3, $4)');
+    expect(client.calls[1]!.values).toEqual(['test', 'v1', 'rear', 2020, 10]);
   });
 
   it('calcularFrete retorna bairro nao encontrado sem consultar zona', async () => {

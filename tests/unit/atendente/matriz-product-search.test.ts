@@ -130,12 +130,15 @@ describe('tools do Bot usam a fonte oficial da Matriz', () => {
       }] })
       .mockResolvedValueOnce({ rows: [{ measure: '90/90-18', quantity_on_hand: 4, unit_cost: 20 }] });
     const result = await buscarCompatibilidadeMatriz({ query } as unknown as PoolClient, {
-      environment: 'prod', moto_modelo: 'CG', posicao_pneu: 'rear', limit: 10,
+      environment: 'prod', moto_modelo: 'CG', moto_ano: 2025,
+      posicao_pneu: 'rear', limit: 10,
     });
     expect(result[0]?.produtos[0]).toMatchObject({
       product_id: 'p1', total_stock: 4, stock_source: 'commerce.wholesale_stock',
     });
     expect(allSql(query)).not.toMatch(/find_compatible_tires|stock_levels/i);
+    expect(String(query.mock.calls[1]?.[0])).toContain('vf.year_start <= $5');
+    expect(query.mock.calls[1]?.[1]).toEqual(['prod', ['v1'], 'rear', null, 2025]);
   });
 });
 

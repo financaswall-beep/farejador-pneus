@@ -263,7 +263,7 @@ export async function getPartnerPanelCatalogCompatibility(
 
     const fitments = await client.query<CompatibilityRow>(
       `SELECT DISTINCT vm.id vehicle_model_id,vm.make,vm.model,vm.variant,
-              vm.year_start,vm.year_end,vf.position,vf.is_oem
+              vf.year_start,vf.year_end,vf.position,vf.is_oem
          FROM commerce.products p
          JOIN commerce.tire_specs ts
            ON ts.environment=p.environment AND ts.product_id=p.id

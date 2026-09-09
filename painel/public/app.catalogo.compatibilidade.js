@@ -14,7 +14,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         loading: true,
         error: null,
         search: '', searchRows: [], searching: false, selectedVehicle: null,
-        form: { position: 'both', is_oem: false, source: 'manual', reason: '' },
+        form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
         saving: false, message: null,
         discoveries: [], discoveriesLoading: false,
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
@@ -62,7 +62,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         loading: false,
         error: null,
         search: '', searchRows: [], searching: false, selectedVehicle: null,
-        form: { position: 'both', is_oem: false, source: 'manual', reason: '' },
+        form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
         saving: false, message: null,
         discoveries: [], discoveriesLoading: false,
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
@@ -96,7 +96,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       return this.adminUser?.role === 'owner' && !state.saving
         && Boolean(state.selectedVehicle?.vehicle_model_id)
         && /^https?:\/\//i.test(String(form.source_url || '').trim())
-        && String(form.evidence_summary || '').trim().length >= 5;
+        && String(form.evidence_summary || '').trim().length >= 5
+        && this.catalogoCompatibilityYearsValid();
     },
 
     async catalogoDiscoveryCreate() {
@@ -114,10 +115,14 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
           evidence_summary: String(state.discoveryForm.evidence_summary).trim(),
           suggested_is_oem: Boolean(state.form.is_oem),
           confidence_level: Number(state.discoveryForm.confidence_level || 0.8),
+          year_start: this.catalogoCompatibilityYearValue(state.form.year_start),
+          year_end: this.catalogoCompatibilityYearValue(state.form.year_end),
         });
         state.discoveryForm = { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 };
         state.search = '';
         state.selectedVehicle = null;
+        state.form.year_start = '';
+        state.form.year_end = '';
         state.message = { ok: true, text: 'Pesquisa registrada como candidata. O Bot ainda não usa esse dado até a aprovação.' };
         await this.catalogoDiscoveryLoad(productId);
       } catch (error) {
@@ -193,6 +198,25 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       this.catalogoCompatibilidade.searchRows = [];
       this.catalogoCompatibilidade.search = [vehicle.make, vehicle.model, vehicle.variant]
         .filter(Boolean).join(' ');
+      this.catalogoCompatibilidade.form.year_start = vehicle.year_start || '';
+      this.catalogoCompatibilidade.form.year_end = vehicle.year_end || '';
+    },
+
+    catalogoCompatibilityYearValue(value) {
+      if (value === '' || value === null || value === undefined) return null;
+      const year = Number(value);
+      return Number.isInteger(year) ? year : null;
+    },
+
+    catalogoCompatibilityYearsValid() {
+      const form = this.catalogoCompatibilidade.form || {};
+      const startEmpty = form.year_start === '' || form.year_start === null || form.year_start === undefined;
+      const endEmpty = form.year_end === '' || form.year_end === null || form.year_end === undefined;
+      const start = startEmpty ? null : Number(form.year_start);
+      const end = endEmpty ? null : Number(form.year_end);
+      if (start !== null && (!Number.isInteger(start) || start < 1900 || start > 2100)) return false;
+      if (end !== null && (!Number.isInteger(end) || end < 1900 || end > 2100)) return false;
+      return start === null || end === null || end >= start;
     },
 
     catalogoCompatibilityCanSave() {
@@ -200,6 +224,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       return this.adminUser?.role === 'owner' && !state.saving
         && Boolean(state.selectedVehicle?.vehicle_model_id)
         && ['front', 'rear', 'both'].includes(state.form?.position)
+        && this.catalogoCompatibilityYearsValid()
         && String(state.form?.reason || '').trim().length >= 2;
     },
 
@@ -216,12 +241,14 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
           is_oem: Boolean(state.form.is_oem),
           source: state.form.source || 'manual',
           confidence_level: 1,
+          year_start: this.catalogoCompatibilityYearValue(state.form.year_start),
+          year_end: this.catalogoCompatibilityYearValue(state.form.year_end),
           reason: String(state.form.reason).trim(),
         });
         state.search = '';
         state.searchRows = [];
         state.selectedVehicle = null;
-        state.form = { position: 'both', is_oem: false, source: 'manual', reason: '' };
+        state.form = { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' };
         state.message = { ok: true, text: 'Compatibilidade salva para todos os produtos desta medida.' };
         await this.catalogoCompatibilityLoad(productId);
         await this.loadCatalogo();
