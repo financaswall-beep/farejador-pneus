@@ -60,11 +60,25 @@ para conferência no filtro “Posição pendente”, sem inventar a informaçã
 Os índices são dados de catálogo/segurança. O bot não deve interrogá-los ao
 cliente que já informou a medida; usa-os internamente quando disponíveis.
 
-## 4. Pneus atuais
+## 4. Pneus atuais — concluída em 09/09/2026
 
-- [ ] Pesquisar os 48 produtos individualmente.
-- [ ] Preencher posição somente quando o modelo/desenho exato estiver comprovado.
-- [ ] Manter `Não informado` quando marca e medida não forem suficientes.
+- [x] Revisar individualmente os 49 produtos ativos — os 48 originais e o
+  Pirelli `180/55-17` cadastrado depois.
+- [x] Preencher posição e índices somente quando o modelo/desenho exato estiver
+  comprovado em fonte oficial.
+- [x] Manter `Não informado` quando marca e medida não forem suficientes.
+
+Quatro produtos possuíam desenho exato identificável e foram conferidos nas
+fontes oficiais: Levorin Matrix Scooter, Maggion Sportíssimo II, Michelin City
+Grip 2 e Pirelli Diablo Rosso. Seus índices de carga e velocidade foram
+registrados; as posições já informadas foram confirmadas. Os outros 45 produtos
+continuam pendentes de identificação física do desenho gravado no pneu. Um
+deles, o IRC `110/70-13`, preserva a posição dianteira que já possuía, mas não
+recebeu índices novos sem a identificação do modelo.
+
+A aplicação foi transacional, auditada e idempotente. A conferência posterior
+encontrou zero alterações restantes. Não houve mudança em estoque, preços,
+compras, pedidos, financeiro ou estado do bot. Esta etapa não exige migration.
 
 ## 5. Finalização
 
