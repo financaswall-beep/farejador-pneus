@@ -63,6 +63,23 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('.bot-demand-summary strong').first().innerText(),'193');
     assert.equal(await page.locator('.bot-demand-stock.is-zero').count(),1);
     assert.equal(await page.locator('.bot-demand-stock.is-unknown').innerText(),'Sem registro');
+    assert.equal(await page.locator('#bot-mapa text, #bot-mapa title, #bot-mapa .bot-demand-map-tooltip').count(),0,'O mapa não deve exibir nomes nem balões');
+    assert.equal(await page.locator('#bot-mapa [data-municipio]').count(),24,'A camada de contexto não amplia o conjunto de municípios interativos');
+    const checkCoast = async () => {
+      const result = await page.locator('#bot-mapa svg').evaluate(svg => {
+        const box = svg.viewBox.baseVal;
+        const land = [...svg.querySelectorAll('.bot-demand-map-land path')];
+        const onLand = (x,y) => land.some(p => p.isPointInFill(new DOMPoint(x,y)));
+        return {
+          left:onLand(box.x+box.width*.1,box.y+box.height*.05),
+          right:onLand(box.x+box.width*.9,box.y+box.height*.05),
+          ocean:onLand(box.x+box.width*.5,box.y+box.height*.95),
+          bay:onLand(306,251),
+        };
+      });
+      assert.deepEqual(result,{left:true,right:true,ocean:false,bay:false},'Terra continua acima dos municípios; oceano e baía permanecem abertos');
+    };
+    await checkCoast();
     for (const nome of ['Maricá','Cachoeiras de Macacu']) {
       await page.locator('[data-municipio="' + nome + '"]').click();
       await page.mouse.move(10,10);
@@ -71,6 +88,10 @@ const server = http.createServer((req,res) => {
       assert.equal(await page.locator('#bot-mapa .bot-demand-map-tooltip, #bot-mapa title').count(),0,'Nome e dados ficam no quadro lateral, sem balão');
     }
     await page.getByLabel('Município da demanda').selectOption('São Gonçalo');
+    await page.waitForFunction(() => {
+      const el=document.querySelector('#bot-mapa'),box=el.querySelector('svg').viewBox.baseVal;
+      return Math.abs(box.width/box.height-el.clientWidth/el.clientHeight)<0.01;
+    });
     const originalView=await page.locator('#bot-mapa svg').getAttribute('viewBox');
     await page.getByRole('button',{name:'Ampliar mapa',exact:true}).click();
     assert.notEqual(await page.locator('#bot-mapa svg').getAttribute('viewBox'),originalView);
@@ -92,6 +113,11 @@ const server = http.createServer((req,res) => {
     const output=path.join(root,'artifacts','bot-demanda');fs.mkdirSync(output,{recursive:true});
     await page.screenshot({path:path.join(output,'desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
+    await page.waitForFunction(() => {
+      const el=document.querySelector('#bot-mapa'),box=el.querySelector('svg').viewBox.baseVal;
+      return Math.abs(box.width/box.height-el.clientWidth/el.clientHeight)<0.01;
+    });
+    await checkCoast();
     await page.screenshot({path:path.join(output,'mobile.png'),fullPage:true});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Não pode haver rolagem horizontal da página');
     await page.getByRole('group',{name:'Período da demanda',exact:true}).getByRole('button',{name:'Hoje',exact:true}).click();

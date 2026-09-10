@@ -27,3 +27,9 @@ Validação local; nenhuma consulta ao banco de produção ou deploy feito nesta
 ## Ajuste visual após o primeiro deploy
 
 Reproduzido o retângulo preto ao clicar em Maricá e Cachoeiras de Macacu e tirar o mouse: o Chromium aplicava ":focus" com outline nativo de 5px, mesmo sem ":focus-visible". O outline foi removido dos polígonos, mantendo indicação de teclado pelo próprio contorno geográfico. Removidos o balão e o ponto da seleção; nome e dados permanecem no quadro lateral. Oceano azul, terra em verde claro e escalas de cores mais vivas, preservando a distinção de municípios sem registros. Assets versionados para renovar o cache. Prova de interface inclui cliques sucessivos, saída do mouse e retenção do foco de teclado.
+
+## Continuidade da terra e remoção dos nomes
+
+A malha completa do RJ, preservada no arquivo local desde o Portão 7, agora compõe uma camada de fundo sem interação. O snapshot público está em `scripts/data/rj-municipios-ibge.geojson`; `node scripts/gerar-contexto-mapa.cjs` projeta seus 92 municípios nas mesmas coordenadas dos 24 municípios originais e acrescenta o resultado ao asset existente, com SHA-256. A camada de contexto não entra nas métricas nem no seletor. O navegador carrega apenas o asset gerado, sem consultas externas.
+
+O SVG ocupa toda a superfície, ajustando o enquadramento ao redimensionamento. A terra ao redor preenche as bordas; oceano e baía continuam vazios na geometria e exibem o fundo azul. Foram retirados todos os textos e balões do desenho, preservando os nomes acessíveis e o quadro lateral. A prova de interface verifica continuidade de terra nas bordas superiores, água na baía e no oceano, ausência de rótulos e apenas 24 municípios interativos, em desktop e mobile.

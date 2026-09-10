@@ -22,14 +22,14 @@
 .bot-demand-layers { display:flex; flex-wrap:wrap; gap:5px; }
 .bot-demand-layers button { padding:10px 13px; border:1px solid var(--d-line); border-radius:6px; font-size:11px; color:#304e47; background:white; }
 .bot-demand-map-surface { position:relative; overflow:hidden; border-radius:7px; background:linear-gradient(155deg,#d9edf7 0%,#bedef1 65%,#afd4eb 100%); min-height:440px; flex:1; display:flex; align-items:center; }
-#bot-mapa { width:100%; }
-#bot-mapa svg { display:block; width:100%; height:auto; min-height:440px; max-height:610px; }
+#bot-mapa { position:absolute; inset:0; width:100%; height:100%; }
+#bot-mapa svg { display:block; width:100%; height:100%; }
 /* O Chromium também desenha outline no SVG com :focus sem :focus-visible.
    O foco de teclado usa o contorno geográfico, sem a caixa retangular nativa. */
-#bot-mapa path, #bot-mapa path:focus { outline:none; }
-#bot-mapa path { cursor:pointer; transition:fill .15s; }
-#bot-mapa path:hover { stroke:#07513e; stroke-width:2.2; filter:brightness(.97); }
-#bot-mapa path:focus-visible { stroke:#07513e; stroke-width:3; stroke-dasharray:4 2; }
+#bot-mapa [data-municipio], #bot-mapa [data-municipio]:focus { outline:none; }
+#bot-mapa [data-municipio] { cursor:pointer; transition:fill .15s; }
+#bot-mapa [data-municipio]:hover { stroke:#07513e; stroke-width:2.2; filter:brightness(.97); }
+#bot-mapa [data-municipio]:focus-visible { stroke:#07513e; stroke-width:3; stroke-dasharray:4 2; }
 .bot-demand-zoom { position:absolute; right:14px; bottom:14px; border:1px solid var(--d-line); border-radius:7px; background:white; box-shadow:0 2px 8px #15392b10; overflow:hidden; }
 .bot-demand-zoom button { width:36px; height:36px; display:flex; align-items:center; justify-content:center; }
 .bot-demand-zoom button+button { border-top:1px solid var(--d-line); }

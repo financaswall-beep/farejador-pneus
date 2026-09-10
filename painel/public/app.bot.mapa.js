@@ -1,6 +1,8 @@
 // Demanda geográfica: malha oficial IBGE; somente dados agregados do painel.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.botMapa = function () {
+  let mapObserver;
+  let mapSize = '';
   const RAMPS = {
     chamou: ['#a8d8c1', '#78bc9f', '#439c7a', '#187455', '#05543e'],
     pediu: ['#b1dcb9', '#7dc292', '#48a76b', '#237e48', '#105b32'],
@@ -75,12 +77,22 @@ window.PAINEL_MODULES.botMapa = function () {
       const camada = this.botCamada;
       const max = Math.max(1, ...this.botMapaRows.map(r => Number(r[camada] || 0)));
       const selected = dados.munis.find(m => norm(m.n) === norm(this.botMapaSel?.municipio));
-      const width = dados.W / this.botMapaZoom, height = dados.H / this.botMapaZoom;
-      const x = Math.max(0, Math.min(dados.W - width, (selected?.cx ?? dados.W / 2) - width / 2));
-      const y = Math.max(0, Math.min(dados.H - height, (selected?.cy ?? dados.H / 2) - height / 2));
+      // Preenche a superfície inteira: a faixa superior também recebe a terra
+      // vizinha, em vez de uma sobra azul causada pelo letterbox do SVG.
+      const ratio = el.clientWidth && el.clientHeight ? el.clientWidth / el.clientHeight : dados.W / dados.H;
+      const frameWidth = Math.max(dados.W + 16, (dados.H + 42) * ratio);
+      const frameHeight = frameWidth / ratio;
+      const left = (dados.W - frameWidth) / 2, top = -18;
+      const width = frameWidth / this.botMapaZoom, height = frameHeight / this.botMapaZoom;
+      const x = Math.max(left, Math.min(left + frameWidth - width, (selected?.cx ?? dados.W / 2) - width / 2));
+      const y = Math.max(top, Math.min(top + frameHeight - height, (selected?.cy ?? dados.H / 2) - height / 2));
       const svg = node('svg', { viewBox: x + ' ' + y + ' ' + width + ' ' + height, role: 'group', 'aria-label': 'Mapa da procura por município' });
-      // O fundo azul da superfície aparece entre os polígonos e fora da malha.
-      // Sem balão: nome e números ficam no quadro do município selecionado.
+      const land = node('g', { class: 'bot-demand-map-land', 'aria-hidden': 'true', 'pointer-events': 'none',
+        fill: '#e8efe9', stroke: '#d2e0d6', 'stroke-width': 0.65, 'fill-rule': 'evenodd' });
+      for (const m of dados.contexto?.municipios || []) {
+        land.appendChild(node('path', { d: m.d, 'vector-effect': 'non-scaling-stroke' }));
+      }
+      svg.appendChild(land);
       const focusName = document.activeElement?.getAttribute('data-municipio');
       for (const m of dados.munis) {
         const row = this.botMapaRowDe(m.n);
@@ -99,15 +111,16 @@ window.PAINEL_MODULES.botMapa = function () {
         });
         svg.appendChild(p);
       }
-      for (const m of dados.munis) {
-        if (!['Rio de Janeiro', 'Niterói', 'Maricá'].includes(m.n)) continue;
-        const v = Number(this.botMapaRowDe(m.n)?.[camada] || 0);
-        svg.appendChild(node('text', { x: m.cx, y: m.cy, 'text-anchor': 'middle',
-          'font-size': 10, fill: v / max >= 0.6 ? '#fff' : '#09271d', 'pointer-events': 'none' }, m.n));
-      }
       el.replaceChildren(svg);
       if (focusName) [...svg.querySelectorAll('[data-municipio]')]
         .find(p => p.getAttribute('data-municipio') === focusName)?.focus({ preventScroll: true });
+      mapSize = el.clientWidth + 'x' + el.clientHeight;
+      if (!mapObserver && typeof ResizeObserver === 'function') {
+        mapObserver = new ResizeObserver(() => {
+          if (this.currentPage === 'bot' && this.botTab === 'demanda' && mapSize !== el.clientWidth + 'x' + el.clientHeight) this.renderBotMapa();
+        });
+        mapObserver.observe(el);
+      }
     },
   };
 };
