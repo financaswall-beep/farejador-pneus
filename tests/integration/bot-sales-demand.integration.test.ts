@@ -6,6 +6,7 @@ let db: IntegrationDb;
 let tools: typeof import('../../src/atendente-v2/tools.js');
 let fulfillment: typeof import('../../src/atendente-v2/fulfillment.js');
 let getBotVisao: typeof import('../../src/admin/painel/queries-bot-visao.js').getBotVisao;
+let getBotMedidasMunicipio: typeof import('../../src/admin/painel/queries-bot-demanda.js').getBotMedidasMunicipio;
 let oldConversation: Awaited<ReturnType<typeof conversation>>;
 let serial = 981800;
 
@@ -109,6 +110,7 @@ beforeAll(async () => {
   tools = await import('../../src/atendente-v2/tools.js');
   fulfillment = await import('../../src/atendente-v2/fulfillment.js');
   ({ getBotVisao } = await import('../../src/admin/painel/queries-bot-visao.js'));
+  ({ getBotMedidasMunicipio } = await import('../../src/admin/painel/queries-bot-demanda.js'));
   oldConversation = await conversation();
   await turn(oldConversation);
   expect(await stage(oldConversation.id)).toBe('abriu_conversa');
@@ -116,6 +118,7 @@ beforeAll(async () => {
   await applyMigrationFile(db.pool, '0218_bot_quote_and_demand_analytics.sql');
   await applyMigrationFile(db.pool, '0220_lead_location_memory.sql');
   await applyMigrationFile(db.pool, '0221_bot_analytics_trigger_isolation.sql');
+  await applyMigrationFile(db.pool, '0223_matriz_delivery_settings.sql');
 }, 180_000);
 
 afterEach(() => vi.restoreAllMocks());
@@ -251,6 +254,69 @@ describe('cotação e mapa de demanda', () => {
       { municipio: 'Cidade isolada', chamou: 1, pediu: 0, efetivou: 0, faltou: 0 },
     ]);
     expect((await getBotVisao('today', 'prod', db.pool)).sem_regiao).toBe(0);
+  });
+});
+
+describe('medidas por município e saldo atual', () => {
+  it('separa municípios e ambientes, deduplica conversas e soma marcas sem confundir zero com ausência', async () => {
+    const { randomUUID } = await import('node:crypto');
+    const fact = async (c: Awaited<ReturnType<typeof conversation>>, key: string, value: unknown, days = 0, superseded: string | null = null) => {
+      return (await db.pool.query(
+        `INSERT INTO analytics.conversation_facts(environment,conversation_id,fact_key,fact_value,
+          observed_at,truth_type,source,extractor_version,superseded_by)
+         VALUES ($1,$2,$3,$4::jsonb,now()-($5::int*interval '1 day'),'observed','test',$6,$7) RETURNING id`,
+        [c.environment,c.id,key,JSON.stringify(value),days,randomUUID(),superseded],
+      )).rows[0].id as string;
+    };
+    const a = await conversation(), b = await conversation(), other = await conversation(), prod = await conversation('prod');
+    for (const c of [a,b,prod]) await fact(c, 'municipio_entrega', 'Saquarema');
+    await fact(other, 'municipio_entrega', 'Cabo Frio');
+    await fact(a, 'medida_consultada', '130/70-13');
+    await fact(a, 'medida_consultada', '130/70-13'); // Duas buscas da mesma conversa.
+    await fact(b, 'medida_consultada', '130/70-13');
+    await fact(other, 'medida_consultada', '130/70-13');
+    await fact(prod, 'medida_consultada', '130/70-13');
+    const current = await fact(a, 'medida_consultada', '180/55-17');
+    await fact(a, 'medida_consultada', '110/70-17', 0, current); // Corrigida.
+    await fact(a, 'medida_consultada', '140/70-17', 8); // Fora dos sete dias.
+    await fact(a, 'medida_consultada', '195/55-16'); // Sem saldo cadastrado.
+    await fact(a, 'medida_consultada', { invalida: true });
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock(environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+       VALUES ('test','130/70-13','Demanda A','novo',3,10),
+              ('test','130/70-13','Demanda B','novo',7,10),
+              ('test','180/55-17','Demanda A','novo',0,10),
+              ('prod','130/70-13','Demanda A','novo',99,10)`,
+    );
+    const since = "((now() AT TIME ZONE 'America/Sao_Paulo')::date - 6)";
+    const rows = await getBotMedidasMunicipio(db.pool, 'test', since);
+    expect(rows.filter(r => r.municipio === 'Saquarema')).toEqual([
+      { municipio:'Saquarema', medida:'130/70-13', consultas:2, galpao_qty:10 },
+      { municipio:'Saquarema', medida:'180/55-17', consultas:1, galpao_qty:0 },
+      { municipio:'Saquarema', medida:'195/55-16', consultas:1, galpao_qty:null },
+    ]);
+    expect(rows.filter(r => r.municipio === 'Cabo Frio')).toEqual([
+      { municipio:'Cabo Frio', medida:'130/70-13', consultas:1, galpao_qty:10 },
+    ]);
+    expect((await getBotMedidasMunicipio(db.pool, 'prod', since)).find(r => r.municipio === 'Saquarema'))
+      .toEqual({ municipio:'Saquarema', medida:'130/70-13', consultas:1, galpao_qty:99 });
+    const panel = await getBotVisao('7d', 'test', db.pool);
+    expect(panel.demanda_disponivel).toBe(true);
+    expect(panel.medidas_por_municipio).toEqual(rows);
+    await db.pool.query("UPDATE commerce.wholesale_stock SET quantity_on_hand=4 WHERE environment='test' AND measure='130/70-13' AND brand='Demanda A'");
+    expect((await getBotMedidasMunicipio(db.pool, 'test', since)).find(r => r.municipio === 'Saquarema')?.galpao_qty).toBe(11);
+  });
+
+  it('mantém o mapa e sinaliza medidas indisponíveis quando a consulta falha', async () => {
+    const query = db.pool.query.bind(db.pool);
+    vi.spyOn(db.pool, 'query').mockImplementation(((sql: string, ...args: unknown[]) => {
+      if (sql.includes('WITH procura AS')) return Promise.reject(new Error('indisponível'));
+      return (query as (...a: unknown[]) => unknown)(sql, ...args);
+    }) as typeof db.pool.query);
+    const panel = await getBotVisao('7d', 'test', db.pool);
+    expect(panel.demanda_disponivel).toBe(true);
+    expect(panel.medidas_por_municipio).toBeNull();
+    expect(panel.mapa.length).toBeGreaterThan(0);
   });
 });
 

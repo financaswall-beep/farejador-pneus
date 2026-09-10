@@ -5,22 +5,8 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { PainelRedePeriod } from './queries-pedidos.js';
-
-export interface BotVisaoMapaRow {
-  municipio: string;
-  chamou: number;
-  pediu: number;
-  efetivou: number;
-  faltou: number;
-}
-
-export interface BotVisaoRadarRow {
-  medida: string;
-  pedidos: number;
-  fora_catalogo: number;
-  sem_estoque_perto: number;
-  galpao_qty: number | null;
-}
+import { getBotMedidasMunicipio, type BotMedidaMunicipio, type BotVisaoMapaRow, type BotVisaoRadarRow } from './queries-bot-demanda.js';
+export type { BotVisaoMapaRow, BotVisaoRadarRow } from './queries-bot-demanda.js';
 
 export interface BotVisaoHorarioRow {
   hora: number;
@@ -31,6 +17,10 @@ export interface BotVisaoPayload {
   cards: Record<string, unknown> | null;
   mapa: BotVisaoMapaRow[];
   sem_regiao: number;
+  /** Distingue ausência de procura de falha ao consultar o mapa. */
+  demanda_disponivel: boolean;
+  /** null indica consulta indisponível; [] significa nenhuma medida no período. */
+  medidas_por_municipio: BotMedidaMunicipio[] | null;
   radar: BotVisaoRadarRow[];
   /** Distribuição de stage_reached (onde a conversa PAROU); o front acumula o funil. */
   funil: Array<{ etapa: string; n: number }>;
@@ -60,6 +50,7 @@ export async function getBotVisao(
 
   const out: BotVisaoPayload = {
     cards: null, mapa: [], sem_regiao: 0, radar: [],
+    demanda_disponivel: false, medidas_por_municipio: null,
     funil: [], perdas: [], boca: [], medidas_top: [], horarios: [],
   };
 
@@ -224,6 +215,7 @@ export async function getBotVisao(
       [environment],
     );
     out.mapa = r.rows;
+    out.demanda_disponivel = true;
   } catch { /* bloco vazio */ }
 
   try {
@@ -245,7 +237,11 @@ export async function getBotVisao(
       [environment],
     );
     out.sem_regiao = r.rows[0]?.sem_regiao ?? 0;
-  } catch { /* 0 */ }
+  } catch { out.demanda_disponivel = false; }
+
+  try {
+    out.medidas_por_municipio = await getBotMedidasMunicipio(dbPool, environment, sinceSql);
+  } catch { /* null: a tela avisa, sem confundir falha com ausência de procura. */ }
 
   try {
     // Radar: o que pediram e a Rede NÃO tinha, por medida — cruzado com o galpão.

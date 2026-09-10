@@ -59,6 +59,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   }
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-entrega.css', async (_request, reply) => sendStatic(reply, 'bot-entrega.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/bot-demanda.css', async (_request, reply) => sendStatic(reply, 'bot-demanda.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/tailwind.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/assets/logistica-hero.webp', async (_request, reply) =>

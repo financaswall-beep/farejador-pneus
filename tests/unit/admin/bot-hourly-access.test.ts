@@ -37,7 +37,7 @@ describe('Bot — acessos por horário', () => {
     expect(html).toContain('Movimento do Bot');
     expect(html).toContain('botMovementSubtitle');
     expect(html).toContain('Dias da semana');
-    expect(html).toContain('app.bot.js?v=20260906-sales-demand1');
+    expect(html).toMatch(/app\.bot\.js\?v=[^"\s]+/);
     expect(html).toContain('app.bot.movimento.js?v=20260822-bot-movement1');
   });
 });

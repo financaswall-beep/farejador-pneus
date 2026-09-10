@@ -151,12 +151,12 @@
 <script src="/admin/painel/app.colaboradores.finance.js?v=20260826-matriz-pay1"></script>
 <script src="/admin/painel/app.sino.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.bot.js?v=20260906-sales-demand1"></script>
+<script src="/admin/painel/app.bot.js?v=20260910-demanda1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260906-attention1"></script>
 <script src="/admin/painel/app.bot.entrega.js?v=20260910-1"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
-<script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
+<script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260907-ficha1&leads=20260905"></script>
 <script src="/admin/painel/app.clientes.ficha.js?v=20260907-ficha1"></script>
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
@@ -192,6 +192,7 @@
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
+<link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-1" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -7049,8 +7050,8 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="bot-heading" x-show="botTab !== 'entrega'" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
+    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda' }">
+      <section aria-labelledby="bot-heading" x-show="botTab !== 'entrega' && botTab !== 'demanda'" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
           <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
           <p class="mt-2 max-w-sm text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
@@ -7068,7 +7069,19 @@
         </div>
       </section>
 
-      <!-- NAVEGAÇÃO INTERNA: separa operação, vendas e demanda sem perder nenhum dado atual -->
+      <header x-show="botTab === 'demanda'" class="bot-demand-heading" aria-labelledby="bot-demand-heading" x-cloak>
+        <div><p class="bot-demand-eyebrow">Bot / Análise da procura</p>
+          <h1 id="bot-demand-heading">Demanda e estoque</h1>
+          <p>Veja de onde vem a procura e acompanhe o estoque das medidas buscadas.</p>
+        </div>
+        <div class="bot-demand-period" role="group" aria-label="Período da demanda">
+          <template x-for="p in redePeriods" :key="'demand-period-' + p.id">
+            <button type="button" @click="setBotPeriodo(p.id)" :aria-pressed="botPeriodo === p.id" x-text="p.label"></button>
+          </template>
+        </div>
+      </header>
+
+      <!-- NAVEGAÇÃO INTERNA: operação, vendas, demanda e entrega -->
       <div class="mb-5 mt-4 border-b border-gray-200 bg-transparent">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções do Bot" class="flex items-center gap-1 overflow-x-auto">
@@ -7088,7 +7101,7 @@
                     :class="botTab === 'entrega' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium">Entrega e cobertura</button>
           </nav>
-          <div x-show="botTab !== 'visao' && botTab !== 'entrega'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
+          <div x-show="botTab !== 'visao' && botTab !== 'entrega' && botTab !== 'demanda'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -7626,138 +7639,88 @@
       </div>
 
       <!-- MAPA por município -->
-      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mb-4">
-        <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm">
-          <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="map-pin" class="w-5 h-5 text-emerald-800"></i></div>
-          <div><p class="text-xl font-semibold" x-text="botMapaRows.filter(r => Number(r.chamou || 0) > 0).length"></p><p class="text-xs text-gray-500">municípios com demanda</p></div>
+      <section x-show="botTab === 'demanda'" class="bot-demand" aria-label="Demanda por município" :aria-busy="botLoading" x-cloak>
+        <div class="bot-demand-notice" role="status" x-show="botLoading">Atualizando a procura no período…</div>
+        <div class="bot-demand-notice bot-demand-error" role="alert" x-show="!botLoading && (botVisaoErro || !botDemandaDisponivel)">
+          <span x-text="botDemandaDisponivel ? 'Não foi possível atualizar. Exibindo os últimos dados recebidos.' : 'Não foi possível carregar a demanda.'"></span>
+          <button type="button" @click="loadBotVisao()" :disabled="botLoading">Tentar novamente</button>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm">
-          <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-help" class="w-5 h-5 text-emerald-800"></i></div>
-          <div><p class="text-xl font-semibold" x-text="botSemRegiao"></p><p class="text-xs text-gray-500">conversas sem região</p></div>
+        <div class="bot-demand-summary">
+          <div><i data-lucide="messages-square"></i><strong x-text="botDemandaDisponivel ? botDemandaTotal : '—'"></strong><span>conversas no período</span></div>
+          <div><i data-lucide="map-pin"></i><strong x-text="botDemandaDisponivel ? botMunicipiosComProcura : '—'"></strong><span>municípios com procura</span></div>
+          <div><i data-lucide="circle-help"></i><strong x-text="botDemandaDisponivel ? botSemRegiao : '—'"></strong><span>sem município identificado</span></div>
         </div>
-      </div>
-
-      <div x-show="botTab === 'demanda'" class="bg-white border border-gray-200 rounded-xl p-5 mb-4 shadow-sm">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
-          <div class="flex items-center gap-2">
-            <h3 class="text-xl font-semibold">Mapa da demanda</h3>
-          </div>
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <template x-for="c in botCamadas" :key="'bc-' + c.id">
-              <button @click="setBotCamada(c.id)"
-                      :class="botCamada === c.id ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-600 hover:bg-emerald-50 border-gray-200'"
-                      class="text-xs px-4 py-2 border rounded-lg font-medium transition-colors" x-text="c.label"></button>
-            </template>
-          </div>
-        </div>
-        <p class="text-xs text-gray-500 mb-4" x-text="botCamadaAtual().desc + ' — clique em um município para ver os detalhes'"></p>
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr),360px] gap-4 items-stretch">
-          <div id="bot-mapa" class="min-h-[330px] bg-sky-50/40 rounded-xl overflow-hidden border border-sky-100">
-            <div x-show="botLoading" class="text-sm text-gray-400 p-6">Carregando o mapa…</div>
-          </div>
-          <div class="border border-gray-200 rounded-xl p-5 bg-white">
-            <div x-show="botMapaSel">
-              <div class="flex items-center justify-between gap-3 mb-4"><p class="text-2xl font-semibold" x-text="botMapaSel ? botMapaSel.municipio : ''"></p><span class="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full">Município selecionado</span></div>
-              <div class="space-y-3 text-sm text-gray-600">
-                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-700"></i>Chamaram</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.chamou : ''"></span></div>
-                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="shopping-cart" class="w-4 h-4 text-emerald-700"></i>Viraram pedido</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.pediu : ''"></span></div>
-                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Entregues</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.efetivou : ''"></span></div>
-                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="circle-alert" class="w-4 h-4 text-rose-500"></i>Faltou pneu</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.faltou : ''"></span></div>
-                <div class="pt-4 mt-4 border-t border-gray-100"><p class="text-xs text-gray-500">Conversão (virou pedido)</p><p class="text-xl font-semibold mt-1" x-text="botMapaSel && Number(botMapaSel.chamou) ? String(Math.round((Number(botMapaSel.pediu) / Number(botMapaSel.chamou)) * 1000) / 10).replace('.', ',') + '%' : '0%'"></p><div class="h-2 bg-gray-100 rounded-full mt-2 overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + (botMapaSel && Number(botMapaSel.chamou) ? Math.min(100, Math.round((Number(botMapaSel.pediu) / Number(botMapaSel.chamou)) * 100)) : 0) + '%' "></div></div></div>
+        <p class="bot-demand-notice" x-show="botDemandaDisponivel && botDemandaTotal === 0">Nenhuma conversa registrada neste período.</p>
+        <div class="bot-demand-layout" x-show="botDemandaDisponivel">
+          <article class="bot-demand-card bot-demand-map-card">
+            <header class="bot-demand-map-heading">
+              <div><h2>Onde estão os clientes</h2><p>Selecione um município para explorar a procura.</p></div>
+              <div class="bot-demand-layers" role="group" aria-label="Camada do mapa">
+                <template x-for="c in botCamadas" :key="'bc-' + c.id">
+                  <button type="button" @click="setBotCamada(c.id)" :aria-pressed="botCamada === c.id" :title="c.desc" x-text="c.label"></button>
+                </template>
+              </div>
+            </header>
+            <div class="bot-demand-map-surface">
+              <div id="bot-mapa"></div>
+              <div class="bot-demand-zoom" role="group" aria-label="Zoom do mapa">
+                <button type="button" @click="botZoomMapa(0.5)" :disabled="botMapaZoom >= 2.5" aria-label="Ampliar mapa"><i data-lucide="plus"></i></button>
+                <button type="button" @click="botZoomMapa(-0.5)" :disabled="botMapaZoom <= 1" aria-label="Reduzir mapa"><i data-lucide="minus"></i></button>
+                <button type="button" @click="botZoomMapa(0)" aria-label="Restaurar mapa"><i data-lucide="locate-fixed"></i></button>
               </div>
             </div>
-            <div x-show="!botMapaSel" class="min-h-[270px] flex flex-col items-center justify-center text-center text-sm text-gray-400">
-              <i data-lucide="map-pin" class="w-8 h-8 mb-3 text-gray-300"></i><p>Selecione um município no mapa<br>para ver os números dele aqui.</p>
+            <footer class="bot-demand-map-footer">
+              <div class="bot-demand-legend"><span>Menos</span><div>
+                <template x-for="(cor, i) in botLegenda" :key="'lg-' + i"><span :style="'background:' + cor"></span></template>
+              </div><span>Mais</span><span x-text="botCamadaAtual().label.toLowerCase()"></span></div>
+              <span class="bot-demand-no-data-key"><b></b>Sem registro</span>
+              <p x-show="botSemRegiao > 0" x-text="botSemRegiao + ' conversas sem município ficam fora do mapa.'"></p>
+              <p x-show="botMunicipiosForaMapa > 0" x-text="botMunicipiosForaMapa + ' município(s) fora deste recorte. Consulte pelo seletor ao lado.'"></p>
+            </footer>
+          </article>
+          <aside class="bot-demand-card bot-demand-city" aria-label="Detalhes do município">
+            <header>
+              <div class="bot-demand-city-eyebrow"><span>MUNICÍPIO SELECIONADO</span><span x-text="botDemandaPeriodoLabel"></span></div>
+              <label class="bot-demand-city-select"><i data-lucide="map-pin"></i>
+                <select aria-label="Município da demanda" :value="botMapaSel?.municipio || ''" @change="botSelecionarMunicipio($event.target.value)">
+                  <option value="" disabled>Selecione um município</option>
+                  <template x-for="nome in botMapaMunicipios" :key="'city-' + nome"><option :value="nome" x-text="nome"></option></template>
+                </select>
+              </label>
+            </header>
+            <div x-show="botMapaSel">
+              <div class="bot-demand-city-stats">
+                <div><i data-lucide="messages-square"></i><strong x-text="botMapaSel?.chamou || 0"></strong><span>Conversas</span></div>
+                <div><i data-lucide="shopping-cart"></i><strong x-text="botMapaSel?.pediu || 0"></strong><span>Pedidos</span></div>
+                <div><i data-lucide="package-check"></i><strong x-text="botMapaSel?.efetivou || 0"></strong><span>Entregas</span></div>
+              </div>
+              <div class="bot-demand-conversion">
+                <p>Conversas que viraram pedido</p><strong x-text="String(botCidadeConversao).replace('.', ',') + '%'"></strong>
+                <div class="bot-demand-track" role="meter" aria-label="Conversas que viraram pedido" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="botCidadeConversao"><span :style="'width:' + botCidadeConversao + '%'"></span></div>
+              </div>
+              <p class="bot-demand-shortage" x-show="botCamada === 'faltou'"><i data-lucide="circle-alert"></i><span><strong x-text="botMapaSel?.faltou || 0"></strong> conversas com falta de estoque registrada</span></p>
+              <section class="bot-demand-sizes" aria-labelledby="bot-demand-sizes-title">
+                <h2 id="bot-demand-sizes-title">O que procuram aqui</h2><p>Consultas no período e estoque atual da Matriz.</p>
+                <div class="bot-demand-table-wrap" x-show="botMedidasCidadeDisponiveis && botMedidasCidade.length">
+                  <table>
+                    <thead><tr><th scope="col">Medida</th><th scope="col">Consultas</th><th scope="col">Estoque agora</th></tr></thead>
+                    <tbody><template x-for="m in botMedidasCidade" :key="'city-size-' + m.medida"><tr>
+                      <td><strong x-text="m.medida"></strong><div class="bot-demand-size-bar" aria-hidden="true"><span :style="'width:' + m.pct + '%'"></span></div></td>
+                      <td x-text="m.consultas"></td>
+                      <td><span class="bot-demand-stock" :class="m.galpao_qty == null ? 'is-unknown' : Number(m.galpao_qty) > 0 ? 'is-positive' : 'is-zero'"
+                        x-text="m.galpao_qty == null ? 'Sem registro' : Number(m.galpao_qty) > 0 ? m.galpao_qty + ' un' : 'Zerado'"></span></td>
+                    </tr></template></tbody>
+                  </table>
+                </div>
+                <p class="bot-demand-empty" x-show="botMedidasCidadeDisponiveis && !botMedidasCidade.length">Nenhuma medida consultada neste município no período.</p>
+                <div class="bot-demand-empty" role="status" x-show="!botMedidasCidadeDisponiveis">As medidas estão indisponíveis no momento. <button type="button" @click="loadBotVisao()" :disabled="botLoading">Tentar novamente</button></div>
+                <footer>Até 10 medidas. Cada conversa conta uma vez por medida. Estoque atual da Matriz somado entre as marcas.</footer>
+              </section>
             </div>
-            <div class="flex items-center gap-1 text-[11px] text-gray-400 mt-4">
-              <span>pouco</span>
-              <template x-for="(cor, i) in botLegenda" :key="'lg-' + i">
-                <span class="inline-block w-4 h-2.5 rounded-sm" :style="'background:' + cor"></span>
-              </template>
-              <span>muito</span>
-            </div>
-            <p class="text-[11px] text-gray-400 mt-2" x-show="botSemRegiao > 0"
-               x-text="botSemRegiao + ' conversa(s) sem região identificada ficam fora do mapa'"></p>
-          </div>
+            <p class="bot-demand-empty" x-show="!botMapaSel">Selecione um município no mapa ou na lista para ver seus números.</p>
+          </aside>
         </div>
-      </div>
-
-      <!-- RADAR (faltou) + MAIS PEDIDAS: as duas listas de compra -->
-      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-      <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center gap-2 mb-1">
-          <h3 class="text-xl font-semibold">Pediram e a Rede NÃO tinha</h3>
-        </div>
-        <p class="text-xs text-gray-500 mb-3">Vendas que escaparam e viraram lista de compra</p>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm" x-show="botRadar.length">
-            <thead>
-              <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
-                <th class="py-2 pr-4 font-medium">Medida</th>
-                <th class="py-2 pr-4 font-medium">Pediram</th>
-                <th class="py-2 pr-4 font-medium">Fora do catálogo</th>
-                <th class="py-2 pr-4 font-medium">Sem estoque perto</th>
-                <th class="py-2 font-medium">Galpão tem</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="r in botRadar" :key="'rad-' + r.medida">
-                <tr class="border-b border-gray-50">
-                  <td class="py-2 pr-4 font-mono font-medium text-gray-800" x-text="r.medida"></td>
-                  <td class="py-2 pr-4"><span class="font-semibold" x-text="r.pedidos"></span><span class="text-xs text-gray-400"> vez(es)</span></td>
-                  <td class="py-2 pr-4 text-gray-500" x-text="r.fora_catalogo || '—'"></td>
-                  <td class="py-2 pr-4 text-gray-500" x-text="r.sem_estoque_perto || '—'"></td>
-                  <td class="py-2">
-                    <span x-show="r.galpao_qty !== null" class="text-xs px-2 py-0.5 rounded-full"
-                          :class="Number(r.galpao_qty) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
-                          x-text="Number(r.galpao_qty) > 0 ? (r.galpao_qty + ' un') : 'zerado'"></span>
-                    <span x-show="r.galpao_qty === null" class="text-xs text-gray-400">não cadastrada</span>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div x-show="botVisao && !botRadar.length" class="text-sm text-gray-400 py-2">
-            Nada faltou no período — a Rede segurou toda a demanda. ✓
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-        <div class="flex items-center gap-2 mb-1">
-          <h3 class="text-xl font-semibold">Medidas mais pedidas</h3>
-        </div>
-        <p class="text-xs text-gray-500 mb-3">Reposição preventiva antes de faltar</p>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm" x-show="botMedidasTop.length">
-            <thead>
-              <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
-                <th class="py-2 pr-4 font-medium">Medida</th>
-                <th class="py-2 pr-4 font-medium">Pediram</th>
-                <th class="py-2 font-medium">Galpão tem</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="m in botMedidasTop" :key="'mt-' + m.medida">
-                <tr class="border-b border-gray-50">
-                  <td class="py-2 pr-4 font-mono font-medium text-gray-800" x-text="m.medida"></td>
-                  <td class="py-2 pr-4"><span class="font-semibold" x-text="m.consultas"></span><span class="text-xs text-gray-400"> vez(es)</span></td>
-                  <td class="py-2">
-                    <span x-show="m.galpao_qty !== null" class="text-xs px-2 py-0.5 rounded-full"
-                          :class="Number(m.galpao_qty) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
-                          x-text="Number(m.galpao_qty) > 0 ? (m.galpao_qty + ' un') : 'zerado'"></span>
-                    <span x-show="m.galpao_qty === null" class="text-xs text-gray-400">não cadastrada</span>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div x-show="botVisao && !botMedidasTop.length" class="text-sm text-gray-400 py-2">
-            Nenhuma medida consultada no período.
-          </div>
-        </div>
-      </div>
-      </div>
+      </section>
     </div>
 
     <!-- ═══ TELA: CLIENTES — versão fiel ao board aprovado ═══ -->

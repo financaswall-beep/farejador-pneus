@@ -9,6 +9,7 @@ window.PAINEL_MODULES.bot = function () {
     botResilience: null,
     botResilienceMsg: null,
     botFilaErro: false,
+    botVisaoErro: false,
     // Leve de propósito: roda no boot e no refresh de 15s em QUALQUER página —
     // cliente esperando é alarme, não estatística. Badge acende na aba do menu.
     async loadBotCampainha() {
@@ -47,9 +48,13 @@ window.PAINEL_MODULES.bot = function () {
         ]);
         if (requestId !== latestVisaoRequestId || period !== this.botPeriodo) return;
         if (visao.status === 'fulfilled') {
+          this.botVisaoErro = false;
           changed = JSON.stringify(this.botVisao) !== JSON.stringify(visao.value);
           if (changed) this.botVisao = visao.value;
-        } else if (!silent) this.botVisao = null;
+        } else {
+          this.botVisaoErro = true;
+          if (!silent) { this.botVisao = null; this.botMapaSel = null; }
+        }
         if (!silent) this.botResilience = resilience.status === 'fulfilled' ? resilience.value : null;
         if (changed && this.botMapaSel) {
           const selected = this.botMapaRows.find(r => r.municipio === this.botMapaSel.municipio);
@@ -68,7 +73,10 @@ window.PAINEL_MODULES.bot = function () {
           };
         }
       } catch (err) {
-        if (!silent && requestId === latestVisaoRequestId) this.botVisao = null;
+        if (requestId === latestVisaoRequestId) {
+          this.botVisaoErro = true;
+          if (!silent) { this.botVisao = null; this.botMapaSel = null; }
+        }
       } finally {
         if (requestId === latestVisaoRequestId) {
           this.botLoading = false;
@@ -83,6 +91,7 @@ window.PAINEL_MODULES.bot = function () {
     setBotPeriodo(p) {
       this.botPeriodo = p;
       this.botMapaSel = null;
+      this.botVisao = null;
       void this.loadBotVisao();
     },
 
