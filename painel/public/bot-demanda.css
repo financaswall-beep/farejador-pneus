@@ -21,12 +21,15 @@
 .bot-demand-map-heading p, .bot-demand-sizes>p { font-size:12px; color:var(--d-muted); margin-top:5px; line-height:1.5; }
 .bot-demand-layers { display:flex; flex-wrap:wrap; gap:5px; }
 .bot-demand-layers button { padding:10px 13px; border:1px solid var(--d-line); border-radius:6px; font-size:11px; color:#304e47; background:white; }
-.bot-demand-map-surface { position:relative; overflow:hidden; border-radius:7px; background:#eef6f6; min-height:440px; flex:1; display:flex; align-items:center; }
+.bot-demand-map-surface { position:relative; overflow:hidden; border-radius:7px; background:linear-gradient(155deg,#d9edf7 0%,#bedef1 65%,#afd4eb 100%); min-height:440px; flex:1; display:flex; align-items:center; }
 #bot-mapa { width:100%; }
 #bot-mapa svg { display:block; width:100%; height:auto; min-height:440px; max-height:610px; }
+/* O Chromium também desenha outline no SVG com :focus sem :focus-visible.
+   O foco de teclado usa o contorno geográfico, sem a caixa retangular nativa. */
+#bot-mapa path, #bot-mapa path:focus { outline:none; }
 #bot-mapa path { cursor:pointer; transition:fill .15s; }
-#bot-mapa path:hover, #bot-mapa path:focus-visible { stroke:#063f35; stroke-width:2.2; outline:none; filter:brightness(.97); }
-.bot-demand-map-tooltip rect { filter:drop-shadow(0 2px 3px #173c2a14); }
+#bot-mapa path:hover { stroke:#07513e; stroke-width:2.2; filter:brightness(.97); }
+#bot-mapa path:focus-visible { stroke:#07513e; stroke-width:3; stroke-dasharray:4 2; }
 .bot-demand-zoom { position:absolute; right:14px; bottom:14px; border:1px solid var(--d-line); border-radius:7px; background:white; box-shadow:0 2px 8px #15392b10; overflow:hidden; }
 .bot-demand-zoom button { width:36px; height:36px; display:flex; align-items:center; justify-content:center; }
 .bot-demand-zoom button+button { border-top:1px solid var(--d-line); }
@@ -39,7 +42,7 @@
 .bot-demand-legend>div { display:flex; width:132px; height:9px; border-radius:4px; overflow:hidden; }
 .bot-demand-legend>div>span { flex:1; }
 .bot-demand-no-data-key { display:flex; align-items:center; gap:6px; margin-left:auto; }
-.bot-demand-no-data-key b { display:block; width:12px; height:9px; border:1px solid #bed3cc; background:#f3f6f4; }
+.bot-demand-no-data-key b { display:block; width:12px; height:9px; border:1px solid #9bbdaf; background:#d9e9df; }
 .bot-demand-city-eyebrow { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; color:var(--d-muted); font-size:10px; }
 .bot-demand-city-select { display:flex; align-items:center; gap:9px; margin:16px 0 20px; }
 .bot-demand-city-select>svg { width:31px; height:31px; padding:5px; border-radius:50%; color:var(--d-green); background:#eaf4ee; flex-shrink:0; }

@@ -23,3 +23,7 @@ Não altera prompts, ferramentas de atendimento, roteamento, pedidos ou registro
 - O verificador de paridade segue com nove propriedades preexistentes de catálogo/ficha de cliente fora do baseline; nenhuma divergência nova da demanda. O fiscal de tamanho segue com violações preexistentes em outros módulos; os arquivos desta alteração ficam dentro do limite.
 
 Validação local; nenhuma consulta ao banco de produção ou deploy feito nesta etapa.
+
+## Ajuste visual após o primeiro deploy
+
+Reproduzido o retângulo preto ao clicar em Maricá e Cachoeiras de Macacu e tirar o mouse: o Chromium aplicava ":focus" com outline nativo de 5px, mesmo sem ":focus-visible". O outline foi removido dos polígonos, mantendo indicação de teclado pelo próprio contorno geográfico. Removidos o balão e o ponto da seleção; nome e dados permanecem no quadro lateral. Oceano azul, terra em verde claro e escalas de cores mais vivas, preservando a distinção de municípios sem registros. Assets versionados para renovar o cache. Prova de interface inclui cliques sucessivos, saída do mouse e retenção do foco de teclado.

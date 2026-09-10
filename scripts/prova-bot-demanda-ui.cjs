@@ -63,6 +63,14 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('.bot-demand-summary strong').first().innerText(),'193');
     assert.equal(await page.locator('.bot-demand-stock.is-zero').count(),1);
     assert.equal(await page.locator('.bot-demand-stock.is-unknown').innerText(),'Sem registro');
+    for (const nome of ['Maricá','Cachoeiras de Macacu']) {
+      await page.locator('[data-municipio="' + nome + '"]').click();
+      await page.mouse.move(10,10);
+      assert.equal(await page.locator('[data-municipio="' + nome + '"]').evaluate(el => getComputedStyle(el).outlineStyle),'none','Clique seguido de saída do mouse não pode deixar o retângulo de foco');
+      assert.equal(await page.getByLabel('Município da demanda').inputValue(),nome);
+      assert.equal(await page.locator('#bot-mapa .bot-demand-map-tooltip, #bot-mapa title').count(),0,'Nome e dados ficam no quadro lateral, sem balão');
+    }
+    await page.getByLabel('Município da demanda').selectOption('São Gonçalo');
     const originalView=await page.locator('#bot-mapa svg').getAttribute('viewBox');
     await page.getByRole('button',{name:'Ampliar mapa',exact:true}).click();
     assert.notEqual(await page.locator('#bot-mapa svg').getAttribute('viewBox'),originalView);
@@ -76,6 +84,7 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('.bot-demand-sizes tbody tr').innerText().then(t=>t.includes('18')),true);
     assert.equal(await page.locator('[data-municipio="Maricá"]').getAttribute('aria-pressed'),'true');
     await page.locator('[data-municipio="Niterói"]').focus();await page.keyboard.press('Enter');
+    assert.equal(await page.locator('[data-municipio="Niterói"]').evaluate(el => document.activeElement === el),true,'O foco de teclado permanece no município após redesenhar');
     await page.getByText('Nenhuma medida consultada neste município no período.',{exact:true}).waitFor();
     assert.equal(await page.getByLabel('Município da demanda').inputValue(),'Niterói');
     await page.getByLabel('Município da demanda').selectOption('São Gonçalo');

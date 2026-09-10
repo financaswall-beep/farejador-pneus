@@ -2,10 +2,10 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.botMapa = function () {
   const RAMPS = {
-    chamou: ['#dceee6', '#b7d8ca', '#80b6a2', '#438d76', '#075447'],
-    pediu: ['#dcf1de', '#b2d9b7', '#77b58b', '#3c865b', '#1b5836'],
-    efetivou: ['#d7f0e9', '#a5d9cc', '#69b8a3', '#318b75', '#0b5949'],
-    faltou: ['#fbe1dc', '#efb7ae', '#d98d81', '#b75c50', '#8a352f'],
+    chamou: ['#a8d8c1', '#78bc9f', '#439c7a', '#187455', '#05543e'],
+    pediu: ['#b1dcb9', '#7dc292', '#48a76b', '#237e48', '#105b32'],
+    efetivou: ['#a1decd', '#69c3a9', '#37a78c', '#158369', '#075e49'],
+    faltou: ['#fbd2c6', '#f2a58f', '#de775f', '#bb4c3d', '#892f27'],
   };
   const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
   return {
@@ -79,21 +79,20 @@ window.PAINEL_MODULES.botMapa = function () {
       const x = Math.max(0, Math.min(dados.W - width, (selected?.cx ?? dados.W / 2) - width / 2));
       const y = Math.max(0, Math.min(dados.H - height, (selected?.cy ?? dados.H / 2) - height / 2));
       const svg = node('svg', { viewBox: x + ' ' + y + ' ' + width + ' ' + height, role: 'group', 'aria-label': 'Mapa da procura por município' });
-      svg.appendChild(node('title', {}, 'Região metropolitana do Rio de Janeiro — ' + this.botCamadaAtual().desc));
-      svg.appendChild(node('rect', { width: dados.W, height: dados.H, fill: '#eef6f6' }));
+      // O fundo azul da superfície aparece entre os polígonos e fora da malha.
+      // Sem balão: nome e números ficam no quadro do município selecionado.
       const focusName = document.activeElement?.getAttribute('data-municipio');
       for (const m of dados.munis) {
         const row = this.botMapaRowDe(m.n);
         const v = row ? Number(row[camada] || 0) : 0;
         const sel = selected === m;
         const p = node('path', {
-          d: m.d, fill: v > 0 ? this.botLegenda[Math.min(4, Math.floor(v / max * 4.999))] : '#f3f6f4',
-          stroke: sel ? '#063f35' : '#bed3cc', 'stroke-width': sel ? 2.2 : 0.75,
+          d: m.d, fill: v > 0 ? this.botLegenda[Math.min(4, Math.floor(v / max * 4.999))] : '#d9e9df',
+          stroke: sel ? '#07513e' : '#9bbdaf', 'stroke-width': sel ? 2.2 : 0.75,
           'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke', tabindex: '0', role: 'button',
           'aria-label': m.n + ' — ' + v + ' ' + this.botCamadaAtual().unidade,
           'aria-pressed': String(sel), 'data-municipio': m.n,
         });
-        p.appendChild(node('title', {}, m.n + ' — ' + v + ' ' + this.botCamadaAtual().unidade));
         p.addEventListener('click', () => this.botSelecionarMunicipio(m.n));
         p.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.botSelecionarMunicipio(m.n); }
@@ -101,22 +100,10 @@ window.PAINEL_MODULES.botMapa = function () {
         svg.appendChild(p);
       }
       for (const m of dados.munis) {
-        if (m === selected || !['Rio de Janeiro', 'Niterói', 'Maricá'].includes(m.n)) continue;
+        if (!['Rio de Janeiro', 'Niterói', 'Maricá'].includes(m.n)) continue;
         const v = Number(this.botMapaRowDe(m.n)?.[camada] || 0);
         svg.appendChild(node('text', { x: m.cx, y: m.cy, 'text-anchor': 'middle',
-          'font-size': 10, fill: v / max > 0.6 ? '#fff' : '#335d50', 'pointer-events': 'none' }, m.n));
-      }
-      if (selected && this.botDemandaDisponivel) {
-        const boxW = Math.min(210, Math.max(142, selected.n.length * 7));
-        const tx = Math.max(x + 5, Math.min(x + width - boxW - 5, selected.cx + 12));
-        const ty = Math.max(y + 5, Math.min(y + height - 54, selected.cy - 62));
-        const tip = node('g', { 'pointer-events': 'none', class: 'bot-demand-map-tooltip' });
-        tip.appendChild(node('circle', { cx: selected.cx, cy: selected.cy, r: 4, fill: '#fff', stroke: '#075447', 'stroke-width': 1.5 }));
-        tip.appendChild(node('rect', { x: tx, y: ty, width: boxW, height: 48, rx: 6, fill: '#fff', stroke: '#d8e4df', 'stroke-width': 0.7 }));
-        tip.appendChild(node('text', { x: tx + 10, y: ty + 19, 'font-size': 12, 'font-weight': 600, fill: '#102a25' }, selected.n));
-        tip.appendChild(node('text', { x: tx + 10, y: ty + 36, 'font-size': 9.5, fill: '#58716a' },
-          Number(this.botMapaSel?.[camada] || 0) + ' ' + this.botCamadaAtual().unidade));
-        svg.appendChild(tip);
+          'font-size': 10, fill: v / max >= 0.6 ? '#fff' : '#09271d', 'pointer-events': 'none' }, m.n));
       }
       el.replaceChildren(svg);
       if (focusName) [...svg.querySelectorAll('[data-municipio]')]
