@@ -29,7 +29,7 @@ describe('casco derivado do painel único', () => {
       app, Object.getOwnPropertyDescriptors(sandbox.window.PAINEL_MODULES.nav()),
     );
 
-    expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['resumo', 'estoque']);
+    expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['resumo', 'estoque', 'relatorios']);
     expect(app.liveMenu[0].badge).toBe('2');
     app.panelModules = ['financeiro'];
     expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['financeiro']);

@@ -28,6 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'app.relatorios.estoque.js', 'app.relatorios.estoque.view.js', 'app.relatorios.estoque.export.js', 'app.relatorios.estoque.pdf.js',
     'app.relatorios.pdf.core.js', 'app.relatorios.compras.js', 'app.relatorios.compras.view.js',
     'app.relatorios.compras.export.js', 'app.relatorios.compras.pdf.js',
     'app.relatorios.js', 'app.relatorios.view.js', 'app.relatorios.export.js', 'app.relatorios.pdf.js',
@@ -66,6 +67,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/bot-faltas.css', async (_request, reply) => sendStatic(reply, 'bot-faltas.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios.css', async (_request, reply) => sendStatic(reply, 'relatorios.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-compras.css', async (_request, reply) => sendStatic(reply, 'relatorios-compras.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/relatorios-estoque.css', async (_request, reply) => sendStatic(reply, 'relatorios-estoque.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/tailwind.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/assets/logistica-hero.webp', async (_request, reply) =>
