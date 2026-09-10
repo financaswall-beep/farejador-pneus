@@ -25,14 +25,14 @@ const boot = `window.demandTest=()=>{
  botVisao:null,botMapaSel:null,adminUser:{role:'owner'},adminAuthenticated:true,
  redePeriods:[{id:'today',label:'Hoje'},{id:'7d',label:'7 dias'},{id:'30d',label:'30 dias'}],
  ensureCredentials(){},async apiGet(url){const response=await fetch(url);if(!response.ok)throw new Error('offline');return response.json();}};
- for(const factory of [PAINEL_MODULES.bot,PAINEL_MODULES.botMapa])Object.defineProperties(state,Object.getOwnPropertyDescriptors(factory()));
+ for(const factory of [PAINEL_MODULES.bot,PAINEL_MODULES.botMapa,PAINEL_MODULES.botFaltas])Object.defineProperties(state,Object.getOwnPropertyDescriptors(factory()));
  return state;};`;
 const pageHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/admin/painel/tailwind.css"><link rel="stylesheet" href="/admin/painel/bot-demanda.css">
 <style>body{margin:0;background:#f8faf9;font-family:Arial,sans-serif}.proof-side{position:fixed;inset:0 auto 0 0;width:190px;background:#064b40;color:white;padding:26px 22px}.proof-side b{font-size:40px}.proof-side p{margin:30px 0}.proof-main{margin-left:190px;padding:22px}.proof-tag{font-size:10px;color:#876111;margin-bottom:10px}[x-cloak]{display:none!important}@media(max-width:650px){.proof-side{display:none}.proof-main{margin:0;padding:14px}}</style>
-<script src="/admin/painel/app.bot.js"></script><script src="/admin/painel/app.bot.mapa.js"></script><script src="/admin/painel/mapa-rm-dados.js"></script><script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script>${boot}</script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head>
+<script src="/admin/painel/app.bot.faltas.js"></script><script src="/admin/painel/app.bot.js"></script><script src="/admin/painel/app.bot.mapa.js"></script><script src="/admin/painel/mapa-rm-dados.js"></script><script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script>${boot}</script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head>
 <body><aside class="proof-side"><b>2W</b><div>P N E U S</div><p>Visão geral</p><p>● Bot</p><p>Vendas</p><p>Compras</p><p>Estoque</p><p>Logística</p><p>Rede</p><p>Financeiro</p></aside><main class="proof-main bot-demand-page" x-data="demandTest()" x-init="loadBotVisao()"><div class="proof-tag">VALIDAÇÃO LOCAL · DADOS FICTÍCIOS</div>${html.slice(headerStart,headerEnd)}${section}</main></body></html>`;
-const allowed = new Set(['tailwind.css','bot-demanda.css','app.bot.js','app.bot.mapa.js','mapa-rm-dados.js','vendor/lucide-1.17.0.min.js','vendor/alpine-3.14.9.min.js','assets/bot-hero.webp']);
+const allowed = new Set(['app.bot.faltas.js','tailwind.css','bot-demanda.css','app.bot.js','app.bot.mapa.js','mapa-rm-dados.js','vendor/lucide-1.17.0.min.js','vendor/alpine-3.14.9.min.js','assets/bot-hero.webp']);
 const server = http.createServer((req,res) => {
   const url = new URL(req.url,'http://localhost');
   if(url.pathname === '/admin/painel'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(pageHtml);}
@@ -54,6 +54,16 @@ const server = http.createServer((req,res) => {
   const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL || 'msedge'});
   try{
     const page=await browser.newPage({viewport:{width:1540,height:1050}});
+    const settleMap = async () => {
+      await page.evaluate(() => { window.proofMapSize = ''; window.proofMapFrames = 0; });
+      await page.waitForFunction(() => {
+        const el=document.querySelector('#bot-mapa'),svg=el?.querySelector('svg');
+        if(!svg)return false;
+        const size=el.clientWidth+'x'+el.clientHeight+':'+svg.getAttribute('viewBox');
+        window.proofMapFrames=size===window.proofMapSize?window.proofMapFrames+1:0;window.proofMapSize=size;
+        return window.proofMapFrames>=10;
+      });
+    };
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:'+server.address().port+'/admin/painel');
     await page.locator('.bot-demand-sizes tbody tr').first().waitFor();
@@ -92,6 +102,7 @@ const server = http.createServer((req,res) => {
       const el=document.querySelector('#bot-mapa'),box=el.querySelector('svg').viewBox.baseVal;
       return Math.abs(box.width/box.height-el.clientWidth/el.clientHeight)<0.01;
     });
+    await settleMap();
     const originalView=await page.locator('#bot-mapa svg').getAttribute('viewBox');
     await page.getByRole('button',{name:'Ampliar mapa',exact:true}).click();
     assert.notEqual(await page.locator('#bot-mapa svg').getAttribute('viewBox'),originalView);
@@ -104,6 +115,7 @@ const server = http.createServer((req,res) => {
     await page.waitForFunction(()=>document.querySelectorAll('.bot-demand-sizes tbody tr').length===1);
     assert.equal(await page.locator('.bot-demand-sizes tbody tr').innerText().then(t=>t.includes('18')),true);
     assert.equal(await page.locator('[data-municipio="Maricá"]').getAttribute('aria-pressed'),'true');
+    await settleMap();
     await page.locator('[data-municipio="Niterói"]').focus();await page.keyboard.press('Enter');
     assert.equal(await page.locator('[data-municipio="Niterói"]').evaluate(el => document.activeElement === el),true,'O foco de teclado permanece no município após redesenhar');
     await page.getByText('Nenhuma medida consultada neste município no período.',{exact:true}).waitFor();

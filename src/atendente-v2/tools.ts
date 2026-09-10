@@ -50,6 +50,7 @@ import { resolveDeliveryAddress } from './previous-delivery-address.js';
 import { decideConfiguredStore as decideStoreForItemsGeo } from './configured-routing.js';
 import { readDeliverySettings,deliveryBlockResponse,applyMatrizDeliveryPolicies } from './matriz-delivery-settings.js';
 import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
+import { observeSearchProducts, observeSearchMunicipality } from './stock-search-trace.js';
 
 import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './delivery-quote-routing.js';
 
@@ -394,6 +395,10 @@ export async function executeTool(
           : await buscarCompatibilidade(client, compatInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
         const withApprovedFitments = vehiclesWithApprovedFitments(result);
+        observeSearchProducts(withApprovedFitments.flatMap(v => v.produtos.map(p => ({
+          id: p.product_id, measure: p.tire_size,
+          matrixAvailable: env.WHOLESALE_UNIFIED_STOCK ? p.total_stock : null,
+        }))));
         if (withApprovedFitments.length === 0) return JSON.stringify({ encontrado: false,
           motivo: 'compatibilidade_nao_cadastrada', mensagem: 'A moto foi reconhecida, mas ainda não existe compatibilidade aprovada. Peça ao cliente a medida escrita no pneu; não adivinhe a medida.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) {
@@ -427,6 +432,7 @@ export async function executeTool(
                 })
               : null;
           if (customerLocation && municipio) {
+            observeSearchMunicipality(municipio);
             const productIds = withApprovedFitments.flatMap((v) => v.produtos.map((p) => p.product_id));
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
               municipio,
@@ -481,6 +487,8 @@ export async function executeTool(
         let result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarProdutoMatriz(client, productInput, { deferAvailabilityFilter: true })
           : await buscarProduto(client, productInput);
+        observeSearchProducts(result.map(p => ({ id: p.product_id, measure: p.tire_size ?? '',
+          matrixAvailable: env.WHOLESALE_UNIFIED_STOCK ? p.total_stock_available : null })));
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) {
           await applyMatrizPricesToProducts(client, environment, result);
@@ -513,6 +521,7 @@ export async function executeTool(
                 })
               : null;
           if (customerLocation && municipio) {
+            observeSearchMunicipality(municipio);
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
               municipio,
               customerLocation,

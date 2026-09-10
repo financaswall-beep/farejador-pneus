@@ -47,6 +47,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.sino, // app.sino.js (2026-07-06): sino vivo — getter notificacoes derivado + lidas em localStorage
     window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
     window.PAINEL_MODULES.botControle,
+    window.PAINEL_MODULES.botFaltas,
     window.PAINEL_MODULES.botEntrega,
     window.PAINEL_MODULES.botEntregaMapa,
     window.PAINEL_MODULES.botMovimento, // recorte diário/semanal único dos movimentos do Bot

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
+import { withStockSearchTrace, observeSearchProducts } from '../../../src/atendente-v2/stock-search-trace.js';
 
 vi.mock('../../../src/shared/config/env.js', () => ({
   env: {
@@ -21,6 +22,19 @@ import {
 } from '../../../src/atendente-v2/fulfillment.js';
 
 describe('saldo do parceiro exposto ao bot', () => {
+  it('registra a loja sem oferta pelo mesmo caminho real da busca por município',async()=>{
+    let recorded:unknown;
+    const client={query:async(sql:string,values:unknown[])=>{
+      if(sql.includes('FROM network.unit_coverage'))return {rows:[{partner_unit_id:'pu',unit_id:'u',partner_id:'p',slug:'s',partner_name:'P',unit_name:'Parceiro A'}]};
+      if(sql.includes('INSERT INTO ops.bot_stock_searches'))recorded=JSON.parse(values[6] as string);
+      return {rows:[]};
+    }} as unknown as PoolClient;
+    await withStockSearchTrace(client,'test','c',{key:'k',tool:'buscar_produto',args:{}},async()=>{
+      observeSearchProducts([{id:'product',measure:'90/90-12',matrixAvailable:0}]);
+      expect((await getPartnerStockMap(client,'test','Itaboraí')).size).toBe(0);return '{}';
+    });
+    expect(recorded).toEqual([{measure:'90/90-12',stores:[{id:'u',name:'Parceiro A',kind:'partner',available:false},{id:'matriz',name:'Matriz',kind:'matrix',available:false}]}]);
+  });
   it('usa o maior disponível quando um produto possui mais de uma linha', async () => {
     const query = async (sql: string) => {
       if (sql.includes('FROM network.unit_coverage')) {

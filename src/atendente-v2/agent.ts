@@ -21,6 +21,7 @@ import { botMayProcessTrigger } from './conversation-control.js';
 import { createOpenAIResponsesTurn } from './openai-responses.js';
 import { loadCustomerMemory } from './customer-memory.js';
 import { loadCustomerContext } from './customer-context.js';
+import { withStockSearchTrace } from './stock-search-trace.js';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -195,7 +196,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       turnActions.push(assistantToolMsg);
 
       // Execute all tool calls in parallel (reads only) or serial (writes)
-      for (const toolCall of response.tool_calls) {
+      for (const [toolIndex, toolCall] of response.tool_calls.entries()) {
         if (!await mayContinue()) return;
         let toolArgs: Record<string, unknown> = {};
         try {
@@ -219,7 +220,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           }
           await notifyClientesKanban(client, environment, conversationId, 'order');
         } else {
-          result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
+          result = await withStockSearchTrace(client, environment as Environment, conversationId,
+            { key: `${jobId}:${round}:${toolIndex}`, tool: toolCall.function.name, args: toolArgs, messageId: job.triggerMessageId },
+            () => executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs));
         }
         const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: result };
         modelTurn.appendToolResult(toolCall.id, result);

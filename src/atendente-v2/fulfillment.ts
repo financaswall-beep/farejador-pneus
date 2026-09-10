@@ -28,6 +28,8 @@
  */
 
 import type { PoolClient } from 'pg';
+import { observeSearchStore, observeSearchMunicipality } from './stock-search-trace.js';
+import { readPartnerAvailableStock } from './partner-available-stock.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import type { PartnerContext } from '../parceiro/auth.js';
 import { upsertPartnerCustomerWithClient } from '../parceiro/queries.js';
@@ -648,28 +650,12 @@ export async function getPartnerStockMap(
   environment: Environment,
   municipio: string | null,
 ): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  if (!municipio) return map;
+  observeSearchMunicipality(municipio);
+  if (!municipio) return new Map();
   const partner = await resolveUnitForMunicipio(client, environment, municipio);
-  if (!partner) return map;
-  const r = await client.query<{ product_id: string; disponivel: string }>(
-    `SELECT product_id,
-            max(quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
-     FROM commerce.partner_stock_levels
-     WHERE environment = $1
-       AND unit_id = $2
-       AND product_id IS NOT NULL
-       AND tire_condition IS NOT NULL
-       AND deleted_at IS NULL
-       AND is_tracked = true
-       AND quantity_on_hand IS NOT NULL
-       AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0
-     GROUP BY product_id`,
-    [environment, partner.unitId],
-  );
-  for (const row of r.rows) {
-    map.set(row.product_id, Math.max(map.get(row.product_id) ?? 0, Number(row.disponivel)));
-  }
+  if (!partner) return new Map();
+  const map = await readPartnerAvailableStock(client, environment, partner.unitId);
+  observeSearchStore(partner.unitId, partner.unitName, map);
   return map;
 }
 
@@ -1289,6 +1275,9 @@ export async function resolveProductAvailabilityByProximity(
     // (mesma escolha do mapProductToPartnerStock: ORDER BY disponivel DESC LIMIT 1).
     m.set(r.product_id, Math.max(m.get(r.product_id) ?? 0, Number(r.disponivel)));
   }
+
+  // A consulta SQL acima observou todas estas lojas; preservar também as sem oferta disponível.
+  for (const c of inRange) observeSearchStore(c.ctx.unitId, c.ctx.unitName, byUnit.get(c.ctx.unitId) ?? new Map());
 
   // pra cada produto, a 1ª loja em alcance (mais perto) que tem ganha.
   for (const productId of input.productIds) {

@@ -28,7 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
-    'app.bot.entrega.js', 'app.bot.entrega.mapa.js',
+    'app.bot.entrega.js', 'app.bot.entrega.mapa.js', 'app.bot.faltas.js',
     'app.nav.js', 'app.rede.kpis.js', 'app.rede.operacao.js', 'app.rede.canario.js', 'app.unidade.kpis.js', 'app.venda.modal.js', 'app.api.js', 'app.partner-api.js', 'app.partner-resumo.js', 'app.partner-retiradas.js', 'app.partner-estoque.js', 'app.partner-estoque.actions.js', 'app.partner-vendas.js', 'app.partner-vendas.dashboard.js', 'app.partner-compras.js', 'app.partner-compras.receipt.js', 'app.partner-logistica.js', 'app.partner-financeiro.js', 'app.partner-colaboradores.js', 'app.partner-colaboradores.finance.js', 'app.partner-colaboradores.permissions.js', 'app.partner-catalogo.js', 'app.municipios.js',
     'business-time.js', 'app.format.js', 'app.varejo.js', 'app.vendas.marcas.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.atacado.transfer.js', 'app.compras.js', 'app.compras.relatorios.js', 'app.compras.precos.js', 'app.compras.reposicao.js', 'app.compras.reposicao.pdf.js', 'app.compras.historico.js', 'app.compras.acoes.js',
     'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
@@ -60,6 +60,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-entrega.css', async (_request, reply) => sendStatic(reply, 'bot-entrega.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-demanda.css', async (_request, reply) => sendStatic(reply, 'bot-demanda.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/bot-faltas.css', async (_request, reply) => sendStatic(reply, 'bot-faltas.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/tailwind.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/assets/logistica-hero.webp', async (_request, reply) =>
