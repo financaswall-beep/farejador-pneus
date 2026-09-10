@@ -17,11 +17,13 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
   { id: 'marketing', label: 'Marketing', icon: 'megaphone', requires: 'marketing' },
   { id: 'colaboradores', label: 'Colaboradores', icon: 'users', requires: 'colaboradores' },
   { id: 'catalogo', label: 'Catálogo', icon: 'tag', requires: 'catalogo' },
+  { id: 'relatorios', label: 'Relatórios', icon: 'chart-no-axes-combined', requires: 'vendas' },
 ]);
 
 // Registro único do ciclo de vida das páginas. As telas do parceiro acrescentam
 // seus handlers nos PRs próprios, sem criar outro watcher ou outro encanamento.
 window.PAINEL_PAGES = {
+  relatorios: { scopes: ['matrix'], requires: 'vendas', load: ['rpOpen'] },
   resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', partnerLoad: ['loadPartnerResumo'] },
   rede: { scopes: ['matrix'], requires: 'rede', load: ['loadComissoes'], render: [
     'renderRedeChart', 'renderRedeLucroChart', 'renderRedeComprasChart',

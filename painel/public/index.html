@@ -101,7 +101,7 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260823-partner-pickups1"></script>
+<script src="/admin/painel/app.nav.js?v=20260910-relatorios1"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
@@ -153,6 +153,10 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260910-continente1"></script>
 <script src="/admin/painel/app.bot.js?v=20260910-demanda1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20260910-1"></script>
+<script src="/admin/painel/app.relatorios.js?v=20260910-1"></script>
+<script src="/admin/painel/app.relatorios.view.js?v=20260910-1"></script>
+<script src="/admin/painel/app.relatorios.export.js?v=20260910-1"></script>
+<script src="/admin/painel/app.relatorios.pdf.js?v=20260910-1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260906-attention1"></script>
 <script src="/admin/painel/app.bot.entrega.js?v=20260910-1"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
@@ -188,13 +192,14 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260910-faltas1&leads=20260905&handoff=20260905"></script>
-<script src="/admin/painel/app.js?v=20260903-finance-carry1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260910-relatorios1&leads=20260905&handoff=20260905"></script>
+<script src="/admin/painel/app.js?v=20260910-relatorios1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
+<link rel="stylesheet" href="/admin/painel/relatorios.css?v=20260910-1" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -238,7 +243,7 @@
         </a>
       </template>
 
-      <div x-show="isMatrixPanel()" class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
+      <div x-show="isMatrixPanel() && futureMenu.length" class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
         Fase 2 · próximos
       </div>
       <div x-show="isMatrixPanel()" data-future-menu>
@@ -10205,8 +10210,75 @@
       </aside>
     </div>
 
+    <!-- RELATÓRIOS DA MATRIZ: análise somente leitura das vendas confirmadas -->
+    <section x-show="currentPage === 'relatorios' && isMatrixPanel()" x-cloak class="rp-page" aria-label="Central de relatórios">
+      <header class="rp-heading"><div><small>Matriz / Gestão</small><h1>Relatórios</h1><p>Da visão do período aos detalhes de cada venda.</p></div><span class="rp-badge">Dados da Matriz</span></header>
+      <select class="rp-mobile-library" aria-label="Escolher relatório" :value="rp.report" @change="rpChoose($event.target.value)"><template x-for="item in rpLibrary" :key="item.id"><option :value="item.id" x-text="item.label"></option></template></select>
+      <div class="rp-workspace">
+        <aside class="rp-library" aria-label="Biblioteca de relatórios"><h2>Biblioteca de relatórios</h2><input type="search" aria-label="Buscar relatório" placeholder="Buscar relatório" x-model="rp.librarySearch">
+          <template x-for="group in rpLibraryGroups" :key="group.name"><section class="rp-library-group"><h3 x-text="group.name"></h3><template x-for="item in group.items" :key="item.id"><button class="rp-library-row" :aria-current="rp.report===item.id" @click="rpChoose(item.id)"><i :data-lucide="item.icon"></i><span><b x-text="item.label"></b><small x-text="item.description"></small></span><em x-text="item.page?'↗':'›'"></em></button></template></section></template>
+          <p class="rp-empty" x-show="!rpLibraryGroups.length">Nenhum relatório encontrado.</p><p class="rp-library-note">Vendas e produtos têm análise nesta central. Os atalhos ↗ abrem as consultas nos módulos correspondentes.</p>
+        </aside>
+        <article class="rp-report" :aria-busy="rp.loading">
+          <header class="rp-report-heading"><div><small>RELATÓRIO DE VENDAS</small><h2 x-text="rp.report==='produtos'?'Produtos e marcas':'Vendas da Matriz'"></h2><p>Vendas confirmadas no período.</p></div><div class="rp-actions"><button class="rp-btn" :disabled="rp.loading||rpUnapplied||!rp.data" @click="rpSaveView()"><i data-lucide="bookmark"></i>Salvar visão</button><button class="rp-btn" :disabled="rp.loading||rp.exporting||rpUnapplied||!rp.data" @click="rpExport('csv')">CSV</button><button class="rp-btn rp-btn-primary" :disabled="rp.loading||rp.exporting||rpUnapplied||!rp.data" @click="rpExport('pdf')"><i data-lucide="download"></i><span x-text="rp.exporting?'Preparando…':'Exportar PDF'"></span></button></div></header>
+          <nav class="rp-tabs" aria-label="Visões do relatório" role="tablist"><button role="tab" :aria-selected="rp.tab==='overview'" @click="rp.tab='overview'">Visão geral</button><button role="tab" :aria-selected="rp.tab==='products'" @click="rp.tab='products'">Produtos</button><button role="tab" :aria-selected="rp.tab==='sales'" @click="rp.tab='sales'">Vendas</button></nav>
+          <div class="rp-filters">
+            <div class="rp-date-row"><div class="rp-segments" aria-label="Período do relatório"><button :aria-pressed="rp.mode==='week'" @click="rpPeriod('week')">Semana</button><button :aria-pressed="rp.mode==='month'" @click="rpPeriod('month')">Mês</button><button :aria-pressed="rp.mode==='custom'" @click="rpPeriod('custom')">Personalizado</button></div>
+              <div class="rp-calendar" x-show="rp.mode==='month'"><button class="rp-btn" aria-label="Mês anterior do relatório" @click="rpPeriod('month',-1)">‹</button><input type="month" aria-label="Mês do relatório" x-model="rp.month" @change="rpPeriod('month')"><button class="rp-btn" aria-label="Próximo mês do relatório" :disabled="rp.month>=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date()).slice(0,7)" @click="rpPeriod('month',1)">›</button></div>
+              <div class="rp-calendar" x-show="rp.mode==='week'"><button class="rp-btn" aria-label="Semana anterior do relatório" @click="rpPeriod('week',-1)">‹</button><span x-text="rpDate(rp.from)"></span><button class="rp-btn" aria-label="Próxima semana do relatório" :disabled="rp.to>=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date())" @click="rpPeriod('week',1)">›</button></div>
+              <label class="rp-compare"><input type="checkbox" x-model="rp.compare" @change="rpLoad()">Comparar período</label>
+            </div>
+            <div class="rp-custom" x-show="rp.mode==='custom'"><label>De<input type="date" aria-label="Início do relatório" x-model="rp.from"></label><label>Até<input type="date" aria-label="Fim do relatório" x-model="rp.to"></label><button class="rp-btn" @click="rpLoad()">Aplicar período</button></div>
+            <p class="rp-period-caption"><span x-text="rpDate(rp.from)+' a '+rpDate(rp.to)"></span><span x-show="rp.data?.comparison"> · Comparação: <span x-text="rpDate(rp.data?.comparison?.from)+' a '+rpDate(rp.data?.comparison?.to)"></span></span></p>
+            <div class="rp-filter-row"><label>Canal<span class="rp-segments"><template x-for="channel in [{id:'all',label:'Todos'},{id:'atacado',label:'Atacado'},{id:'varejo',label:'Varejo'}]" :key="channel.id"><button :aria-pressed="rp.channel===channel.id" @click="rp.channel=channel.id;rpLoad()" x-text="channel.label"></button></template></span></label>
+              <label>Marca<select aria-label="Marca do relatório" x-model="rp.brand" @change="rpLoad()"><option value="">Todas</option><template x-for="brand in [...new Set([...(rp.data?.brands||[]),...(rp.brand?[rp.brand]:[])])]" :key="brand"><option :value="brand" x-text="brand"></option></template></select></label>
+              <label>Condição<select aria-label="Condição do relatório" x-model="rp.condition" @change="rpLoad()"><option value="">Todas</option><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option><option value="unknown">Sem condição registrada</option></select></label><button class="rp-link rp-reset" @click="rpResetFilters()">Limpar filtros</button>
+            </div>
+          </div>
+          <p x-show="rpUnapplied&&!rp.loading" class="rp-notice">Aplique o período para atualizar os números e liberar a exportação.</p>
+          <div class="rp-saved" x-show="rp.saved"><span>Uma visão salva neste navegador.</span><button class="rp-link" @click="rpRestoreView()">Restaurar visão</button></div>
+          <p x-show="rp.notice" class="rp-notice rp-notice-success" role="status"><span x-text="rp.notice"></span><button class="rp-link" style="float:right" aria-label="Fechar aviso do relatório" @click="rp.notice=''">×</button></p>
+          <p x-show="rp.exportError" x-text="rp.exportError" class="rp-error" role="alert"></p>
+          <p x-show="rp.loading" class="rp-empty" role="status">Consultando as vendas do período…</p>
+          <div x-show="rp.error" class="rp-error" role="alert"><span x-text="rp.error"></span><button @click="rpLoad()">Tentar novamente</button></div>
+          <div x-show="!rp.error&&rp.data">
+            <div class="rp-kpis">
+              <div class="rp-kpi"><p>Vendas confirmadas</p><strong x-text="rpMoney(rp.data?.summary.revenue)"></strong><small :class="rp.data?.summary.revenue >= (rp.data?.previous?.revenue||0)?'rp-positive':'rp-negative'" x-text="rpDelta(rp.data?.summary.revenue,rp.data?.previous?.revenue)"></small></div>
+              <div class="rp-kpi"><p>Margem bruta</p><strong x-text="rp.data?.can_view_costs?rpMoney(rp.data?.summary.margin):'Restrita'"></strong><small x-text="!rp.data?.can_view_costs?'Acesso financeiro necessário':rp.data?.summary.pending_cost_lines?'Há itens sem custo histórico':rp.data?.summary.margin_pct==null?'Sem base no período':rpNumber(rp.data.summary.margin_pct)+'% das vendas'"></small></div>
+              <div class="rp-kpi"><p>Pneus vendidos</p><strong x-text="rpNumber(rp.data?.summary.tires)"></strong><small :class="rp.data?.summary.tires >= (rp.data?.previous?.tires||0)?'rp-positive':'rp-negative'" x-text="rpDelta(rp.data?.summary.tires,rp.data?.previous?.tires,false)"></small></div>
+              <div class="rp-kpi"><p>Ticket médio do recorte</p><strong x-text="rpMoney(rp.data?.summary.ticket)"></strong><small x-text="rpNumber(rp.data?.summary.orders)+' vendas'"></small></div>
+            </div>
+            <p class="rp-footnote">Valores dos itens após descontos, sem frete. A margem desconta o custo histórico dos itens, antes das despesas. Canceladas ficam fora.</p>
+            <p class="rp-notice" x-show="rp.data?.summary.pending_cost_lines"><b x-text="rp.data?.summary.pending_cost_lines"></b> item(ns) sem custo registrado. Receita desses itens: <b x-text="rpMoney(rp.data?.summary.pending_cost_revenue)"></b>. A margem total permanece pendente.</p>
+            <div class="rp-empty" x-show="!rp.data?.summary.orders"><strong>Nenhuma venda neste recorte</strong>Altere o período ou os filtros para consultar outras vendas confirmadas.</div>
+            <div class="rp-charts" x-show="rp.tab==='overview'&&rp.data?.summary.orders">
+              <section class="rp-card"><div class="rp-card-heading"><h3>Evolução das vendas</h3><div class="rp-legend"><span><i></i>Selecionado</span><span x-show="rp.data?.comparison"><i class="rp-gold"></i>Comparação</span></div></div><p class="rp-chart-scale" x-text="rpMoney(rpChartMax)"></p>
+                <div class="rp-bars" role="img" aria-label="Vendas por data, comparadas ao período anterior"><template x-for="bar in rpChart" :key="bar.day"><div class="rp-bar-group" :title="bar.title"><i class="rp-bar" :style="'height:'+Math.max(0,bar.revenue/rpChartMax*100)+'%'"></i><i x-show="bar.previous!==null" class="rp-bar rp-bar-previous" :style="'height:'+Math.max(0,(bar.previous||0)/rpChartMax*100)+'%'"></i></div></template></div>
+                <div class="rp-chart-labels"><template x-for="(bar,index) in rpChart" :key="bar.day"><span x-text="rpChart.length<=10||index===0||index===rpChart.length-1||index%Math.ceil(rpChart.length/7)===0?bar.label:''"></span></template></div><p class="rp-footnote" style="margin-top:7px" x-show="(rp.data?.daily.length||0)>31">Períodos longos são agrupados no gráfico. Os totais incluem todas as datas.</p>
+              </section>
+              <section class="rp-card rp-channels"><h3>De onde vieram as vendas</h3><template x-for="channel in rp.data?.channels||[]" :key="channel.channel"><div class="rp-channel"><header><span><span x-text="channel.channel==='atacado'?'Atacado':'Varejo'"></span><b x-text="rpMoney(channel.revenue)"></b></span><span x-text="rpNumber(rpShare(channel.revenue))+'%'"></span></header><span class="rp-track"><i :class="{'is-retail':channel.channel==='varejo'}" :style="'width:'+rpShare(channel.revenue)+'%'"></i></span></div></template><p class="rp-footnote">Participação no valor dos itens vendidos.</p></section>
+            </div>
+            <section class="rp-table-card">
+              <header class="rp-table-heading"><div><h3 x-text="rp.tab==='overview'?'Medidas e itens que mais venderam':rp.tab==='products'?'Produtos e marcas':'Vendas do recorte'"></h3><p x-text="rp.tab==='sales'?'Abra uma venda para conferir seus itens.':'Volume, custo e margem. Clique para detalhar.'"></p></div><div class="rp-table-actions"><input type="search" aria-label="Buscar medida no relatório" placeholder="Buscar medida ou item" x-model="rp.measure" @input.debounce.300ms="rpSearchMeasure()"><button x-show="rp.tab==='overview'" class="rp-link" @click="rp.tab='products'">Ver todas →</button></div></header>
+              <p x-show="rp.exact" class="rp-footnote" style="margin-bottom:10px">Medida selecionada: <b x-text="rp.measure"></b> · <button class="rp-link" @click="rp.measure='';rp.exact=false;rpLoad()">Remover seleção</button></p>
+              <div class="rp-table-scroll" x-show="rp.tab==='overview'"><table class="rp-table"><thead><tr><th>Medida / item</th><th>Quantidade</th><th>Vendas</th><th x-show="rp.data?.can_view_costs">Custo dos itens</th><th x-show="rp.data?.can_view_costs">Margem bruta</th></tr></thead>
+                <template x-for="row in rpMeasures" :key="row.key"><tbody><tr :class="{'rp-selected':rp.expanded===row.key}"><td><button @click="rp.expanded=rp.expanded===row.key?'':row.key" :aria-expanded="rp.expanded===row.key"><span x-text="rp.expanded===row.key?'⌄':'›'"></span> <b x-text="row.measure"></b></button><small x-show="row.kind!=='tire'">Item não contabilizado como pneu</small></td><td x-text="rpNumber(row.units)"></td><td x-text="rpMoney(row.revenue)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(row.cost)"></td><td x-show="rp.data?.can_view_costs"><b x-text="rpMoney(row.margin)"></b><small x-text="row.margin_pct==null?'':rpNumber(row.margin_pct)+'%'"></small></td></tr>
+                  <tr x-show="rp.expanded===row.key" class="rp-details"><td :colspan="rp.data?.can_view_costs?5:3"><div class="rp-variants"><template x-for="variant in row.variants" :key="variant.key"><span x-text="variant.brand+' · '+rpCondition(variant.condition)+': '+rpNumber(variant.units)+' un.'"></span></template></div><button class="rp-link" @click="rpSeeSales(row.measure)">Ver vendas desta medida →</button></td></tr>
+                </tbody></template></table></div>
+              <div class="rp-table-scroll" x-show="rp.tab==='products'"><table class="rp-table"><thead><tr><th>Medida / produto</th><th>Quantidade</th><th>Vendas</th><th x-show="rp.data?.can_view_costs">Custo</th><th x-show="rp.data?.can_view_costs">Margem bruta</th></tr></thead><tbody><template x-for="row in rpProducts" :key="row.key"><tr><td class="rp-product-label"><button @click="rpSeeSales(row.measure,row.brand,row.condition)"><b x-text="row.measure"></b></button><small x-text="row.brand+' · '+rpCondition(row.condition)"></small></td><td x-text="rpNumber(row.units)"></td><td x-text="rpMoney(row.revenue)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(row.cost)"></td><td x-show="rp.data?.can_view_costs"><b x-text="rpMoney(row.margin)"></b><small x-text="row.margin_pct==null?'':rpNumber(row.margin_pct)+'%'"></small></td></tr></template></tbody></table></div>
+              <div class="rp-pager" x-show="rp.tab==='products'&&(rp.data?.products.length||0)>25"><button class="rp-btn" :disabled="rp.productPage<=1" @click="rp.productPage--">Anterior</button><span x-text="rp.productPage+' / '+Math.ceil((rp.data?.products.length||0)/25)"></span><button class="rp-btn" :disabled="rp.productPage*25>=(rp.data?.products.length||0)" @click="rp.productPage++">Próximos</button></div>
+              <div class="rp-table-scroll" x-show="rp.tab==='sales'"><table class="rp-table"><thead><tr><th>Venda</th><th>Data</th><th>Itens do recorte</th><th x-show="rp.data?.can_view_costs">Margem bruta</th><th></th></tr></thead><tbody><template x-for="sale in rp.data?.sales.rows||[]" :key="sale.key"><tr><td><button @click="rp.selectedSale=sale"><b x-text="rpSaleLabel(sale)"></b></button><small x-text="sale.channel==='atacado'?'Atacado':'Varejo'"></small></td><td x-text="rpDate(sale.day)"></td><td x-text="rpMoney(sale.revenue)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(sale.margin)"></td><td><button class="rp-link" @click="rp.selectedSale=sale">Ver itens</button></td></tr></template></tbody></table></div>
+              <div class="rp-pager" x-show="rp.tab==='sales'&&rp.data?.sales.total"><button class="rp-btn" :disabled="rp.loading||rp.offset===0" @click="rpLoad(rp.offset-25)">Anteriores</button><span x-text="(rp.offset+1)+'–'+(rp.offset+(rp.data?.sales.rows.length||0))+' de '+(rp.data?.sales.total||0)"></span><button class="rp-btn" :disabled="rp.loading||rp.offset+25>=(rp.data?.sales.total||0)" @click="rpLoad(rp.offset+25)">Próximas</button></div>
+            </section>
+            <footer class="rp-report-footer"><p class="rp-footnote">A exportação respeita o período e os filtros selecionados.</p><button class="rp-link" @click="rp.showRules=!rp.showRules" :aria-expanded="rp.showRules">Como os números são calculados</button></footer>
+          </div>
+          <div x-show="rp.showRules" class="rp-rules"><p><b>Vendas:</b> itens de vendas confirmadas da Matriz, após descontos e sem frete. Varejo usa a data de criação; atacado usa a data da venda, conforme a tela Vendas. Transferências em trânsito ficam fora; após o acerto, só as quantidades aceitas entram.</p><p><b>Margem:</b> valor dos itens menos o custo registrado na venda, antes das despesas. Itens sem custo deixam a margem pendente. Custos e margens exigem acesso ao Financeiro ou perfil dono.</p><p><b>Produtos:</b> pneus entram na contagem de pneus; serviços e outros itens entram apenas nos valores e quantidades gerais. No varejo, marca e medida vêm do catálogo vinculado; preço, desconto, custo e condição vêm da venda.</p><p><b>Comparação:</b> no mês, compara os mesmos dias do mês anterior, até o último dia disponível. Semana e personalizado comparam com o intervalo imediatamente anterior de mesma duração. Os filtros valem para ambos.</p><p><b>Ticket médio:</b> valor dos itens selecionados dividido pelas vendas que contêm esses itens. Este relatório é comercial; recebimentos, entregas e resultado financeiro podem usar outras datas.</p></div>
+        </article>
+      </div>
+      <div x-show="rp.selectedSale" x-cloak class="rp-modal" role="dialog" aria-modal="true" aria-label="Itens da venda" @click.self="rp.selectedSale=null" @keydown.escape.window="rp.selectedSale=null"><article><header><div><small>ITENS NO RECORTE SELECIONADO</small><h2 x-text="rp.selectedSale?rpSaleLabel(rp.selectedSale):''"></h2><p x-text="rpDate(rp.selectedSale?.day)"></p></div><button class="rp-btn" @click="rp.selectedSale=null" aria-label="Fechar itens da venda">×</button></header><div class="rp-table-scroll"><table class="rp-table"><thead><tr><th>Medida / item</th><th>Quantidade</th><th>Valor</th><th x-show="rp.data?.can_view_costs">Custo histórico</th><th x-show="rp.data?.can_view_costs">Margem</th></tr></thead><tbody><template x-for="item in rp.selectedSale?.items||[]" :key="item.id"><tr><td class="rp-product-label"><b x-text="item.measure"></b><small x-text="item.brand+' · '+rpCondition(item.condition)"></small></td><td x-text="rpNumber(item.quantity)"></td><td x-text="rpMoney(item.revenue)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(item.cost)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(item.margin)"></td></tr></template></tbody></table></div><p>Somente os itens que atendem aos filtros do relatório aparecem aqui.</p></article></div>
+    </section>
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->
-    <div x-show="['relatorios','config'].includes(currentPage)"
+    <div x-show="currentPage === 'config'"
          class="flex items-center justify-center min-h-[80vh] p-8">
       <div class="text-center max-w-md">
         <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm">

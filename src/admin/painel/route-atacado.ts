@@ -9,8 +9,10 @@ import { logger } from '../../shared/logger.js';
 import { getCommissionLedger, getPainelPedidosSalesHistory, getSalesBrandRanking, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, listWholesaleSalesHistory, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, updatePartnerCommercialTerms } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
+import { registerSalesReportRoutes } from './route-sales-report.js';
 
 export async function registerPainelAtacado(fastify: FastifyInstance): Promise<void> {
+  await registerSalesReportRoutes(fastify);
   const reconcilePartnerCostSchema = z.object({
     item_id: z.string().uuid(),
     unit_cost: z.number().nonnegative(),

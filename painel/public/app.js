@@ -239,9 +239,7 @@ function painelApp() {
     // ─── MENUS ──────────────────────────────────────
     // `liveMenu` é um getter derivado dos módulos autorizados (app.nav.js).
     // Os badges vivem fora do catálogo para o getter continuar imutável.
-    futureMenu: [
-      { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
-    ],
+    futureMenu: [],
     // ─── FILTROS DE TEMPO ───────────────────────────
     timeFilters: [
       { id: 'hoje',    label: 'Hoje' },

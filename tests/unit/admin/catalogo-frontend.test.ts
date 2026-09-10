@@ -579,7 +579,7 @@ describe('catalogo no painel', () => {
       "discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 }",
     );
     const html = readFileSync('painel/public/index.html', 'utf8');
-    expect(html).toContain('app.js?v=20260903-finance-carry1');
+    expect(html).toContain('app.js?v=20260910-relatorios1');
   });
 
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {
