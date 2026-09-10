@@ -14,8 +14,6 @@ import {
   resolveMatrizUnitId,
   resolveMunicipioFromGeo,
   resolveMunicipioFromBairro,
-  decideStoreForItems,
-  decideStoreForItemsGeo,
   getPartnerStockMap,
   resolveProductAvailabilityByProximity,
   materializePartnerOrder,
@@ -24,7 +22,6 @@ import {
   normalizeRegion,
   FRETE_PADRAO_BRL,
   MATRIZ_MAPS_URL,
-  matrizFreightForKm,
   matrizDistanceKm,
   matrizRoadInfo,
   type PartnerOrderRouting,
@@ -35,9 +32,8 @@ import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matr
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
-import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
+import { resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
-import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
 import { buildOrderIdempotencyKey } from './order-idempotency.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
@@ -51,185 +47,11 @@ import {
 } from './channel-pricing.js';
 import { recordGeoRoutingDecision, recordPartnerRoutingDecision } from './routing-decisions.js';
 import { resolveDeliveryAddress } from './previous-delivery-address.js';
+import { decideConfiguredStore as decideStoreForItemsGeo } from './configured-routing.js';
+import { readDeliverySettings,deliveryBlockResponse,applyMatrizDeliveryPolicies } from './matriz-delivery-settings.js';
+import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
 
-// ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
-// FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
-// pra a cotação e o registro nunca divergirem (invariante §5.7). Com ROUTING_GEO on
-// e coordenada do cliente → motor de proximidade (anel); senão → caminho de hoje
-// (por cidade). A coordenada vem em camadas (resolveCustomerLocation, customer-location.ts):
-// pino → endereço completo (rua+número via Google) → bairro; sem nenhuma → cidade (caso F).
-
-/**
- * Pino-first (decisão Wallace 2026-06-09): quando o caminho do BAIRRO DIGITADO não
- * resolveu a CIDADE (`municipio == null`) e há um pino na conversa, reverse-geocoda o
- * pino → cidade (e bairro, se o cliente não digitou). É ADITIVO e NÃO toca a busca por
- * bairro escrito: se a cidade já veio do bairro, devolve a entrada intacta (early
- * return) — o bairro SEMPRE vence e nem chega aqui. Degrada elegante: ROUTING_GEO off /
- * sem chave / sem pino / Google falhou → devolve o que entrou (o bot volta a pedir o
- * bairro, como hoje). O bairro digitado, quando há, mantém prioridade no canônico.
- */
-async function fillCityFromPin(
-  client: PoolClient,
-  environment: Environment,
-  conversationId: string,
-  current: { municipio: string | null; neighborhoodCanonical: string | null },
-): Promise<{ municipio: string | null; neighborhoodCanonical: string | null }> {
-  if (current.municipio) return current;
-  if (!env.ROUTING_GEO || !env.GOOGLE_MAPS_API_KEY) return current;
-  const pin = await getLatestCustomerLocation(client, environment, conversationId);
-  if (!pin) return current;
-  const rev = await cachedReverseGeocode(client, pin, env.GOOGLE_MAPS_API_KEY);
-  if (!rev?.municipio) return current;
-  return {
-    municipio: rev.municipio,
-    neighborhoodCanonical:
-      current.neighborhoodCanonical ?? (rev.neighborhood ? normalizeRegion(rev.neighborhood) : null),
-  };
-}
-
-interface GeoOnlyFar {
-  unitId: string;
-  unitName: string;
-  distanceKm: number;
-}
-
-/**
- * Decide a loja (entrega) por proximidade quando ROUTING_GEO está on e há coordenada;
- * senão cai no caminho de hoje (decideStoreForItems por cidade). Retorna o routing
- * (loja escolhida ou null=matriz) e, no caso E (só tem longe), o onlyFar pra o bot
- * dar a resposta honesta (D3). Os DOIS tools chamam isto com as MESMAS entradas.
- */
-async function decideStoreGeoOrFallback(
-  client: PoolClient,
-  environment: Environment,
-  conversationId: string,
-  input: {
-    municipio: string | null;
-    items: { product_id: string; quantity: number }[];
-    bairro: string | null | undefined;
-    modality?: 'delivery' | 'quote';
-    /** Endereço completo (rua+número) digitado pelo cliente na ENTREGA — geocodifica fino. */
-    fullAddress?: string | null;
-  },
-): Promise<{
-  routing: PartnerOrderRouting | null;
-  onlyFar?: GeoOnlyFar;
-  // Frete da MATRIZ por distância (só preenchido quando a entrega cai na matriz).
-  // Garantido por CÓDIGO (não confiar no valor_frete que o LLM passa).
-  matrizFreight?: number;
-  matrizDistanceKm?: number | null;
-}> {
-  if (env.ROUTING_GEO && input.municipio) {
-    const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
-      municipio: input.municipio,
-      bairro: input.bairro,
-      fullAddress: input.fullAddress,
-      apiKey: env.GOOGLE_MAPS_API_KEY,
-    });
-    if (customerLocation) {
-      const geo = await decideStoreForItemsGeo(client, environment, {
-        municipio: input.municipio,
-        items: input.items,
-        modalidade: 'delivery', // calcular_frete e o roteamento de pedido do bot são entrega
-        customerLocation,
-        clientNeighborhoodCanonical: input.bairro ? normalizeRegion(input.bairro) : null,
-      });
-      if (geo.kind === 'partner') {
-        await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
-        return { routing: geo.routing };
-      }
-      if (geo.kind === 'only_far') {
-        await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
-        return { routing: null, onlyFar: {
-          unitId: geo.unitId,unitName: geo.unitName,distanceKm: geo.distanceKm,
-        } };
-      }
-      // matriz: mede cliente→Matriz e cobra o frete por DISTÂNCIA (decisão 06-19).
-      const km = await matrizDistanceKm(client, customerLocation);
-      await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
-      return { routing: null, matrizFreight: matrizFreightForKm(km), matrizDistanceKm: km };
-    }
-    // sem coordenada → cai no fallback por cidade (caso F)
-  }
-  const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items });
-  await recordPartnerRoutingDecision(client, environment, conversationId, {
-    unitId: routing?.unitId ?? null,kind: routing ? 'partner' : 'matrix',
-    municipio: input.municipio,modality: input.modality ?? 'delivery',
-  });
-  // matriz sem coordenada (caso F): não dá pra medir distância → frete base da rede.
-  return routing ? { routing } : { routing: null, matrizFreight: matrizFreightForKm(null), matrizDistanceKm: null };
-}
-
-/**
- * Frete de ENTREGA cotado direto do PINO (flag DELIVERY_FREIGHT_FROM_PIN): quando o cliente
- * já mandou a localização mas não digitou o bairro, cota pela coordenada em vez de exigir o
- * endereço escrito. Usa a MESMA fonte do criar_pedido (decideStoreGeoOrFallback) → a cotação
- * bate com a cobrança (invariante §5.7). Devolve a string JSON pronta pro tool result, ou
- * `null` se não deu pra cotar pelo pino (sem produto escolhido, sem pino, ou sem cidade
- * resolvida) — aí o caller degrada pro fluxo de hoje (pede o bairro/localização). Espelha os
- * mesmos formatos de retorno do enriquecimento por bairro (parceiro fixo / só-longe / matriz
- * por distância), pra o bot tratar igual.
- */
-async function quoteFreteFromPin(
-  client: PoolClient,
-  environment: Environment,
-  conversationId: string,
-  produtos: { product_id: string; quantidade?: number }[],
-): Promise<string | null> {
-  // Sem produto escolhido não dá pra decidir a loja (estoque) — logo nem o frete. getRecent
-  // já tenta preencher no caller; se ainda vazio, degrada (o bot pede o pneu antes).
-  if (produtos.length === 0) return null;
-  // Cidade a partir do PINO (fillCityFromPin já exige ROUTING_GEO + chave + pino; sem pino
-  // devolve municipio=null). Sem cidade → não cota pelo pino (deixa pedir a localização).
-  const { municipio } = await fillCityFromPin(client, environment, conversationId, {
-    municipio: null,
-    neighborhoodCanonical: null,
-  });
-  if (!municipio) return null;
-  const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
-    municipio,
-    items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
-    bairro: undefined,
-    modality: 'quote',
-  });
-  if (decision.onlyFar) {
-    return JSON.stringify({
-      encontrado: false,
-      disponivel: false,
-      apenas_longe: true,
-      distancia_km: Math.round(decision.onlyFar.distanceKm),
-      nome_loja_distante: decision.onlyFar.unitName,
-      orientacao:
-        'Esse pneu só tem numa loja mais distante. Seja honesto: avise a distância e ofereça opções (entregar mesmo assim / medida equivalente mais perto / reservar e avisar). NÃO finja que é entrega normal.',
-    });
-  }
-  if (decision.routing) {
-    // Entrega por PARCEIRO: frete fixo da rede (mesmo do criar_pedido no caminho parceiro).
-    return JSON.stringify({
-      encontrado: true,
-      disponivel: true,
-      valor: FRETE_PADRAO_BRL.toFixed(2),
-      municipio,
-      delivery_mode: 'delivery',
-      geo_resolution_id: null,
-      via_pino: true,
-    });
-  }
-  if (decision.matrizFreight != null) {
-    // Entrega pela MATRIZ: frete por DISTÂNCIA (mesma tabela por km do criar_pedido).
-    return JSON.stringify({
-      encontrado: true,
-      disponivel: true,
-      valor: decision.matrizFreight.toFixed(2),
-      municipio,
-      distancia_km: decision.matrizDistanceKm != null ? Math.round(decision.matrizDistanceKm) : undefined,
-      delivery_mode: 'delivery',
-      geo_resolution_id: null,
-      via_pino: true,
-    });
-  }
-  return null;
-}
+import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './delivery-quote-routing.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -746,6 +568,7 @@ export async function executeTool(
       }
 
       case 'calcular_frete': {
+        const configured=(await readDeliverySettings(client,environment))?.settings??null;
         // Memória do produto (furo raiz): se o LLM não passou os produtos, usa o que o
         // bot já buscou na conversa — pra a cotação rotear pelo MESMO produto do pedido.
         // Hoisted: serve aos DOIS caminhos (bairro digitado e pino).
@@ -760,7 +583,7 @@ export async function executeTool(
         // digitado segue byte a byte). Sem pino → devolve "precisa_localizacao" e NÃO chama
         // calcularFrete com bairro vazio (o zod exige bairro min(1) → daria erro).
         const bairroArg = typeof args.bairro === 'string' ? args.bairro.trim() : '';
-        if (env.DELIVERY_FREIGHT_FROM_PIN && !bairroArg) {
+        if ((env.DELIVERY_FREIGHT_FROM_PIN || configured) && !bairroArg) {
           const pinQuote = await quoteFreteFromPin(client, environment, conversationId, produtos);
           if (pinQuote) return pinQuote;
           return JSON.stringify({
@@ -780,8 +603,10 @@ export async function executeTool(
         // com o que o pedido vai cobrar. Com ROUTING_GEO, a decisão é por PROXIMIDADE
         // (anel) e pode devolver "só tem longe" (caso E) → o bot responde com honestidade
         // (D3). decideStoreGeoOrFallback é a fonte única (mesma decisão do criar_pedido).
-        if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
-          let municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
+        if(configured && produtos.length===0)return JSON.stringify({encontrado:false,disponivel:false,
+          motivo:'precisa_produto',orientacao:'Consulte quais pneus e quantidades o cliente deseja antes de confirmar a entrega.'});
+        if (((result.encontrado && result.geo_resolution_id) || configured) && produtos.length > 0) {
+          let municipio = result.geo_resolution_id?await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id):null;
           // Pino-first: geo órfão e sem cidade → reverse-geocode do pino preenche. Aditivo.
           ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
           const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
@@ -790,6 +615,7 @@ export async function executeTool(
             bairro: args.bairro as string | undefined,
             modality: 'quote',
           });
+          if(decision.blockReason)return JSON.stringify(deliveryBlockResponse(decision.blockReason));
           if (decision.routing) {
             return JSON.stringify({
               ...result,
@@ -812,8 +638,9 @@ export async function executeTool(
           // Matriz (nem parceiro nem só-longe): se a entrega está disponível, o frete da
           // Matriz é por DISTÂNCIA (decisão Wallace 06-19), garantido por CÓDIGO — não o
           // fee fixo da zona. O criar_pedido cobra o MESMO valor (mesma fonte: o wrapper).
-          if (decision.matrizFreight != null && result.disponivel) {
-            return JSON.stringify({ ...result, valor: decision.matrizFreight.toFixed(2), motivo: undefined });
+          if (decision.matrizFreight != null && (result.disponivel || configured)) {
+            return JSON.stringify({ ...result,encontrado:true,disponivel:true,valor: decision.matrizFreight.toFixed(2), motivo: undefined,
+              ...(decision.matrizPolicyText?{politica_entrega_matriz:decision.matrizPolicyText}:{}) });
           }
         }
         // Rede de segurança pelo PINO: o cliente digitou um bairro que NÃO resolveu (typo ou
@@ -845,7 +672,8 @@ export async function executeTool(
           environment,
           policy_keys: args.policy_keys as string[] | undefined,
         });
-        return JSON.stringify({ politicas: result });
+        const saved=await readDeliverySettings(client,environment);
+        return JSON.stringify({ politicas: saved?applyMatrizDeliveryPolicies(result,saved):result });
       }
 
       case 'registrar_localizacao_lead': {
@@ -865,6 +693,7 @@ export async function executeTool(
       }
 
       case 'localizacao_loja': {
+        const pickupSettings=(await readDeliverySettings(client,environment))?.settings??null;
         const bairro = args.bairro as string | undefined;
         let municipio = (args.municipio as string | undefined) ?? null;
         if (!municipio && bairro) {
@@ -897,15 +726,18 @@ export async function executeTool(
         // (decideStoreForItemsGeo pickup) — respeita estoque, deleted_at, anel de retirada
         // de 15 km E a régua de justiça. Assim a loja indicada = a loja que o pedido vai
         // reservar (nunca diverge). Fora do raio → apenas_longe (bot honesto, oferece entrega).
-        if (productIds.length > 0 && customerLocation && env.ROUTING_GEO && municipio) {
+        if(pickupSettings && !productIds.length)return JSON.stringify({encontrado:false,motivo:'precisa_produto',orientacao:'Escolha o pneu antes de indicar uma loja para retirada.'});
+        if(pickupSettings && !customerLocation)return JSON.stringify(deliveryBlockResponse('needs_location'));
+        if (productIds.length > 0 && customerLocation && ((env.ROUTING_GEO && municipio)||pickupSettings)) {
           const geo = await decideStoreForItemsGeo(client, environment, {
-            municipio,
+            municipio:municipio??'',
             items: productIds.map((id) => ({ product_id: id, quantity: 1 })),
             modalidade: 'pickup',
             customerLocation,
             clientNeighborhoodCanonical,
           });
           await recordGeoRoutingDecision(client,environment,conversationId,geo,municipio,'pickup');
+          if(geo.blockReason)return JSON.stringify(deliveryBlockResponse(geo.blockReason));
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
             if (disp) {
@@ -934,6 +766,14 @@ export async function executeTool(
               taxa_instalacao: disp?.installation_fee ?? null,
             });
           } else {
+            if(pickupSettings){
+              const matrix=await evaluateMatrizDelivery(client,environment,{settings:pickupSettings,modalidade:'pickup',customerLocation,
+                items:productIds.map(product_id=>({product_id,quantity:1}))});
+              if(matrix.block)return JSON.stringify(deliveryBlockResponse(matrix.block));
+              return JSON.stringify({encontrado:(matrix.distanceKm??Infinity)<=15,nome_loja:'Matriz',
+                ...((matrix.distanceKm??Infinity)>15?{motivo:'retirada_so_longe',nome_loja_distante:'Matriz'}:{}),
+                distancia_km:matrix.distanceKm==null?null:Math.round(matrix.distanceKm),horario:null,taxa_instalacao:null});
+            }
             // geo.kind === 'matriz': com ROUTING_MATRIZ_AS_STORE verifica se a matriz
             // tem o pneu e a que distância fica. Três casos:
             //  ≤15 km → loja de retirada normal (cliente vem aqui)
@@ -1369,6 +1209,7 @@ async function criarPedido(
       // Endereço digitado (rua+número) → geocodificação fina da casa; bairro é paraquedas.
       fullAddress: deliveryAddress,
     });
+    if (decision.blockReason) return JSON.stringify(deliveryBlockResponse(decision.blockReason));
     // Caso E (só tem longe): NÃO cria o pedido caladamente — devolve estruturado pro bot
     // confirmar a opção com o cliente antes (D3). Salvaguarda: o bot só deve chamar
     // criar_pedido depois que o cliente escolher.
@@ -1416,6 +1257,7 @@ async function criarPedido(
         });
         await recordGeoRoutingDecision(client,environment,conversationId,geo,municipio,'pickup');
         pickupRoutingDecisionRecorded = true;
+        if(geo.blockReason)return JSON.stringify(deliveryBlockResponse(geo.blockReason));
         // Caso E (só tem longe): por padrão pergunta antes de criar (igual à entrega).
         // EXCEÇÃO — consentimento (decisão Wallace 2026-06-08): se o cliente já bancou ir
         // buscar mesmo longe (o bot marcou confirma_retirada_distante), reserva o pneu na
@@ -1442,6 +1284,15 @@ async function criarPedido(
     }
   }
 
+  // Defesa final: também cobre retirada direta e flags antigas sem reordenar os parceiros.
+  const matrixSettings=!partner?(await readDeliverySettings(client,environment))?.settings??null:null;
+  if(matrixSettings){
+    const customerLocation=modalidade==='delivery'?await resolveCustomerLocation(client,environment,conversationId,{
+      municipio:null,bairro:args.bairro as string|undefined,fullAddress:deliveryAddress,apiKey:env.GOOGLE_MAPS_API_KEY}):null;
+    const eligible=await evaluateMatrizDelivery(client,environment,{settings:matrixSettings,modalidade:modalidade as 'delivery'|'pickup',
+      customerLocation,items:itens.map(i=>({product_id:i.product_id,quantity:i.quantidade}))});
+    if(eligible.block)return JSON.stringify(deliveryBlockResponse(eligible.block));
+  }
   if (modalidade === 'pickup' && !partner && !pickupRoutingDecisionRecorded) {
     await recordPartnerRoutingDecision(client, environment, conversationId, {
       unitId: null,kind: 'matrix',municipio: null,modality: 'pickup',
@@ -1608,8 +1459,8 @@ async function criarPedido(
       );
       retirada = {
         nome_loja: nameRow.rows[0]?.name ?? 'Farejador',
-        endereco: null,
-        maps_url: MATRIZ_MAPS_URL,
+        endereco: matrixSettings?.address??null,
+        maps_url: matrixSettings?`https://www.google.com/maps/search/?api=1&query=${matrixSettings.latitude},${matrixSettings.longitude}`:MATRIZ_MAPS_URL,
         horario: null,
       };
     }

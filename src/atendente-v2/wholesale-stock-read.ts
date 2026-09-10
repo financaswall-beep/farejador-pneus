@@ -80,6 +80,7 @@ export async function checkMatrizGalpaoShortfall(
   client: PoolClient,
   environment: 'prod' | 'test',
   items: Array<{ productId: string; quantity: number }>,
+  lockStock = true,
 ): Promise<GalpaoShortfall[]> {
   // 1. agrega a quantidade pedida por produto
   const qtyByProduct = new Map<string, number>();
@@ -129,7 +130,7 @@ export async function checkMatrizGalpaoShortfall(
 
   // 3. soma o disponível no galpão por chave — COM FOR UPDATE (trava a corrida até o commit)
   const stockIndex = buildMatrizStockIndex(
-    await loadMatrizOfficialStock(client, environment, true),
+    await loadMatrizOfficialStock(client, environment, lockStock),
   );
 
   // 4. compara pedido × disponível por chave → falta quando disponível < pedido

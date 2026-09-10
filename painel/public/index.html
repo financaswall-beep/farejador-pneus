@@ -153,6 +153,8 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260906-sales-demand1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260906-attention1"></script>
+<script src="/admin/painel/app.bot.entrega.js?v=20260909-1"></script>
+<script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260907-ficha1&leads=20260905"></script>
@@ -189,6 +191,7 @@
 <script src="/admin/painel/app.js?v=20260903-finance-carry1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260909-1" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -7047,7 +7050,7 @@
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="bot-heading" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
+      <section aria-labelledby="bot-heading" x-show="botTab !== 'entrega'" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
           <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
           <p class="mt-2 max-w-sm text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
@@ -7081,8 +7084,11 @@
             <button @click="botTab = 'demanda'; $nextTick(() => renderBotMapa())"
                     :class="botTab === 'demanda' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1">Demanda e estoque</button>
+            <button x-show="adminUser?.role === 'owner'" @click="botEntregaAbrir()"
+                    :class="botTab === 'entrega' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
+                    class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium">Entrega e cobertura</button>
           </nav>
-          <div x-show="botTab !== 'visao'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
+          <div x-show="botTab !== 'visao' && botTab !== 'entrega'" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -7092,6 +7098,59 @@
           </div>
         </div>
       </div>
+
+      <section x-show="botTab === 'entrega'" class="bot-delivery" aria-labelledby="bot-delivery-heading">
+        <header class="bd-heading"><div><p class="bd-eyebrow">BOT / CONFIGURAÇÕES</p><h1 id="bot-delivery-heading">Entrega da Matriz</h1><p>Sua operação definida. O bot oferece o que você pode cumprir.</p></div>
+          <div class="bd-actions"><span class="bd-badge" x-text="botEntregaDirty ? '● Rascunho' : botEntregaConfig?.configured ? '● Configuração salva' : '● Cadastro inicial'"></span><button class="bd-primary" @click="botEntregaSalvar()" :disabled="botEntregaBusy || !botEntregaConfig || (!botEntregaDirty && botEntregaConfig.configured)">✓ Salvar alterações</button></div>
+        </header>
+        <div x-show="botEntregaErro" class="bd-alert bd-error" role="alert"><span x-text="botEntregaErro"></span> <button @click="botEntregaCarregar()" :disabled="botEntregaBusy">Recarregar cadastro</button></div>
+        <p x-show="botEntregaMensagem" class="bd-alert bd-success" role="status" x-text="botEntregaMensagem"></p>
+        <p x-show="!botEntregaConfig?.configured && botEntregaConfig" class="bd-alert">As regras atuais continuam valendo até o primeiro salvamento. Preencha o limite real da Matriz.</p>
+        <p x-show="botEntregaBusy && !botEntregaConfig" role="status">Carregando configuração…</p>
+        <div class="bd-layout" x-show="botEntregaConfig">
+          <fieldset class="bd-controls" :disabled="botEntregaBusy">
+            <article class="bd-card"><h2><i data-lucide="truck"></i>Atendimento <span class="bd-badge" x-text="botEntregaForm.delivery_enabled ? 'Entrega ativa' : 'Entrega pausada'"></span></h2>
+              <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.delivery_enabled">Entregar pela Matriz</label>
+              <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.pickup_enabled">Permitir retirada na loja</label>
+              <hr><label class="bd-label" for="bd-radius">Até onde a Matriz entrega</label>
+              <div class="bd-radius"><input id="bd-radius" type="number" min="0.1" max="40" step="0.1" x-model.number="botEntregaForm.radius_km" @change="botEntregaMapaAtualizar()" placeholder="Informe"><span>km</span></div>
+              <input aria-label="Ajustar limite de entrega em quilômetros" class="bd-range" type="range" min="0.5" max="40" step="0.5" :value="botEntregaForm.radius_km || 0.5" @input="botEntregaForm.radius_km = Number($event.target.value)" @change="botEntregaMapaAtualizar()">
+              <div class="bd-scale"><span>0,5 km</span><span>40 km</span></div>
+              <p class="bd-help">Limite medido a partir da Matriz. O círculo mostra a área em linha reta; quando disponível, o bot confere a distância por trajeto.</p>
+              <div class="bd-origin"><i data-lucide="map-pin"></i><div><strong>Matriz</strong><p x-text="botEntregaForm.address"></p></div><button class="bd-link" @click="botEntregaOrigemTexto=botEntregaForm.address; botEntregaOrigemEditando=true">Ajustar</button></div>
+              <div x-show="botEntregaOrigemEditando" class="bd-origin-edit"><label class="bd-label" for="bd-origin-address">Endereço completo da Matriz</label><input id="bd-origin-address" x-model="botEntregaOrigemTexto" maxlength="350" placeholder="Rua, número, cidade e estado"><div class="bd-actions"><button class="bd-secondary" @click="botEntregaOrigemEditando=false">Cancelar</button><button class="bd-primary" @click="botEntregaLocalizar()" :disabled="botEntregaLocalizando" x-text="botEntregaLocalizando ? 'Localizando…' : 'Localizar'"></button></div></div>
+              <hr><h3>Quem o bot oferece primeiro?</h3><div class="bd-rule"><i data-lucide="route"></i><div><strong>Regra atual da rede</strong><p>Parceiros com o pedido completo e cobertura válida, no anel mais próximo. A distribuição entre eles segue a regra de justiça.</p><p x-text="botEntregaConfig?.routing.matriz_competes ? 'A Matriz participa quando está mais perto que todos os parceiros aptos desse anel.' : 'A Matriz entra quando não há parceiro apto no anel.'"></p></div></div>
+              <p class="bd-help">A cidade localiza o cliente. Com este cadastro salvo, a entrega é limitada pela distância e pelo raio de cada loja.</p>
+            </article>
+            <article class="bd-card"><h2><i data-lucide="calendar-days"></i>Regras da entrega</h2>
+              <span class="bd-label">Dias de entrega</span><div class="bd-days"><template x-for="d in botEntregaDias" :key="d.id"><button type="button" @click="botEntregaDia(d.id)" :class="botEntregaForm.days.includes(d.id) ? 'active' : ''" :aria-pressed="botEntregaForm.days.includes(d.id)" x-text="d.label"></button></template></div>
+              <div class="bd-time"><label>Das<input type="time" x-model="botEntregaForm.opens_at"></label><label>Até<input type="time" x-model="botEntregaForm.closes_at"></label></div>
+              <label class="bd-label" for="bd-prazo">Prazo da Matriz</label><select id="bd-prazo" x-model.number="botEntregaForm.delivery_days"><option :value="null">Confirmar no atendimento</option><option :value="0">Próximo dia de entrega disponível</option><option :value="1">Até 1 dia de entrega</option><option :value="2">Até 2 dias de entrega</option><option :value="3">Até 3 dias de entrega</option><option :value="5">Até 5 dias de entrega</option><option :value="7">Até 7 dias de entrega</option></select>
+              <p class="bd-help">Contado nos dias selecionados. O cliente pode fazer o pedido fora desse horário.</p>
+              <div class="bd-info-row"><span>Frete</span><strong>Tabela atual por distância</strong></div><p class="bd-help">Até 15 km: R$ 9,90 · Até 25 km: R$ 13,00 · Acima: R$ 19,00</p>
+              <div class="bd-info-row"><span>Fora da cobertura</span><strong>Consultar retirada</strong></div>
+              <p class="bd-help">Sem entrega disponível, o bot consulta uma opção de retirada. A Matriz também precisa ter todos os itens em estoque.</p>
+              <button class="bd-secondary bd-pause" @click="botEntregaForm.delivery_enabled = !botEntregaForm.delivery_enabled" x-text="botEntregaForm.delivery_enabled ? 'Ⅱ Pausar entregas da Matriz' : '▶ Retomar entregas da Matriz'"></button><p class="bd-help">A mudança entra em vigor ao salvar.</p>
+            </article>
+          </fieldset>
+          <article class="bd-card bd-simulation"><div class="bd-simulation-head"><h2>Teste a decisão do bot</h2><span class="bd-badge">Simulação</span></div>
+            <form @submit.prevent="botEntregaSimular()"><label class="bd-label" for="bd-customer-address">Endereço do cliente</label><div class="bd-search-row"><input id="bd-customer-address" x-model="botEntregaAddress" maxlength="350" placeholder="Rua, número, bairro e cidade"><button class="bd-primary" type="submit" :disabled="botEntregaBusy" x-text="botEntregaBusy ? 'Aguarde…' : 'Simular'"></button></div></form>
+            <div class="bd-order"><label class="bd-label" for="bd-products">Pneus do pedido</label><div class="bd-product-search"><input id="bd-products" x-model="botEntregaBusca" @input.debounce.300ms="botEntregaBuscar()" placeholder="Buscar por medida, nome ou código" autocomplete="off"><div x-show="botEntregaProdutos.length" class="bd-product-results"><template x-for="p in botEntregaProdutos" :key="p.id"><button @click="botEntregaAdicionar(p)"><strong x-text="p.product_name"></strong><span x-text="[p.tire_size,p.brand,p.tire_condition].filter(Boolean).join(' · ')"></span></button></template></div></div>
+              <p x-show="botEntregaBuscando" class="bd-help" role="status">Buscando produtos…</p><p x-show="botEntregaBusca.length > 1 && !botEntregaBuscando && !botEntregaProdutos.length" class="bd-help">Nenhum resultado.</p>
+              <template x-for="item in botEntregaItems" :key="item.product_id"><div class="bd-order-item"><span x-text="item.name"></span><input type="number" min="1" max="50" x-model.number="item.quantity" :aria-label="'Quantidade de ' + item.name"><button class="bd-link" @click="botEntregaItems=botEntregaItems.filter(i=>i.product_id!==item.product_id)" :aria-label="'Remover ' + item.name">×</button></div></template>
+              <p class="bd-help">Estoque real, sem criar pedido ou reservar pneus.</p>
+            </div>
+            <div class="bd-map-frame"><div id="bot-entrega-map" class="bd-map" aria-label="Mapa da cobertura da Matriz"></div><div x-show="!botEntregaMapaPronto || botEntregaMapaErro" class="bd-map-empty"><i data-lucide="map"></i><strong>Cobertura da Matriz</strong><p x-text="botEntregaMapaErro || 'Carregando Google Maps…'"></p></div><span x-show="botEntregaMapaPronto && !botEntregaMapaErro" class="bd-map-label" x-text="'Limite da Matriz · ' + botEntregaKm(botEntregaForm.radius_km)"></span></div>
+            <p x-show="botEntregaStale" class="bd-alert">Você alterou os dados. Simule novamente para atualizar o resultado.</p>
+            <div x-show="!botEntregaResult" class="bd-empty"><i data-lucide="scan-line"></i><strong>Confira antes de colocar em prática</strong><p>Informe o endereço e os pneus para ver quem atende, a distância e o frete.</p></div>
+            <template x-if="botEntregaResult"><div class="bd-result" :class="botEntregaStale ? 'bd-stale' : ''"><span class="bd-eyebrow">RESULTADO DA SIMULAÇÃO · <span x-text="botEntregaDirty ? 'RASCUNHO' : 'CONFIGURAÇÃO DA TELA'"></span></span><h3 x-text="botEntregaResult.selected ? botEntregaResult.store + ' atende esse endereço' : 'Nenhuma entrega automática disponível'"></h3><p x-text="botEntregaMotivo(botEntregaResult.reason)"></p><p x-show="botEntregaResult.approximate" class="bd-alert">Endereço aproximado. Confirme a localização exata do cliente antes de combinar a entrega.</p>
+              <div class="bd-table-wrap"><table><thead><tr><th>Opção</th><th>Distância</th><th>Situação</th></tr></thead><tbody><template x-for="row in botEntregaResult.diagnostics" :key="row.unitId"><tr :class="row.selected ? 'bd-selected' : ''"><td><strong x-text="row.name"></strong><span x-show="row.selected" class="bd-badge">Selecionada</span></td><td x-text="botEntregaKm(row.distanceKm)"></td><td x-text="botEntregaMotivo(row.reason)"></td></tr></template></tbody></table></div>
+              <div x-show="botEntregaResult.selected" class="bd-totals"><div><span>Frete</span><strong x-text="botEntregaResult.freight == null ? 'A confirmar' : Number(botEntregaResult.freight).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})"></strong></div><div><span>Prazo</span><strong x-text="botEntregaResult.delivery_days == null ? 'Confirmar no atendimento' : botEntregaResult.delivery_days === 0 ? 'Próximo dia de entrega' : 'Até ' + botEntregaResult.delivery_days + ' dia(s) de entrega'"></strong></div></div>
+              <p class="bd-help">Resultado no momento da consulta. O bot confere novamente a cobertura e o estoque ao criar o pedido.</p>
+            </div></template>
+          </article>
+        </div>
+      </section>
 
       <!-- VISÃO GERAL: cockpit leve do Bot -->
       <div x-show="botTab === 'visao'" class="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">

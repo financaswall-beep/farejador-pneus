@@ -30,6 +30,7 @@ parceiro/public/tailwind.css
 coverage/
 .nyc_output/
 outputs/**/*.inspect.ndjson
+artifacts/bot-entrega/
 
 # Logs
 *.log

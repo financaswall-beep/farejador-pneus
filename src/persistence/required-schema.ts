@@ -4,6 +4,9 @@ type Queryable = Pick<Pool, 'query'>;
 
 export const REQUIRED_SCHEMA_SQL = `
   SELECT
+    to_regclass('commerce.matriz_delivery_settings') IS NOT NULL
+    AND to_regclass('commerce.matriz_delivery_settings_events') IS NOT NULL
+    AND
     EXISTS (
       SELECT 1
         FROM information_schema.columns
@@ -211,7 +214,7 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
   SELECT EXISTS (
     SELECT 1 FROM ops.application_schema_state
      WHERE singleton=true
-       AND version>=222
+       AND version>=223
        AND EXISTS (
          SELECT 1 FROM ops.applied_migrations
           WHERE migration_file='0216_conversation_bot_control.sql'
@@ -237,17 +240,22 @@ export const REQUIRED_SCHEMA_STATE_SQL = `
           WHERE migration_file='0222_fitment_year_validity.sql'
             AND checksum_sha256='34d272e3b7ea6d544b5920836f34b09066120892b428f2ae3049bfd990df11ed'
        )
-       AND (SELECT count(*) FROM ops.applied_migrations)>=223
+       AND EXISTS (
+         SELECT 1 FROM ops.applied_migrations
+          WHERE migration_file='0223_matriz_delivery_settings.sql'
+            AND checksum_sha256='4fcf1d554d261ed00d0399134346bdbe95e12286f9e8d64bcb4609425d8420ef'
+       )
+       AND (SELECT count(*) FROM ops.applied_migrations)>=224
   ) AS ready`;
 
 /** Impede o processo novo de operar sem o ciclo de vida e a memória de lead. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0222_fitment_year_validity');
+    throw new Error('required_schema_missing:0223_matriz_delivery_settings');
   }
   const state = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_STATE_SQL);
   if (state.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0222_fitment_year_validity');
+    throw new Error('required_schema_missing:0223_matriz_delivery_settings');
   }
 }

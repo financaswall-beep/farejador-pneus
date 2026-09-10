@@ -61,7 +61,9 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(
       "to_regprocedure('commerce.find_compatible_tires(env_t,uuid,text,integer)')",
     );
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=222');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('version>=223');
+    expect(REQUIRED_SCHEMA_SQL).toContain("to_regclass('commerce.matriz_delivery_settings')");
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain("migration_file='0223_matriz_delivery_settings.sql'");
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "migration_file='0216_conversation_bot_control.sql'",
     );
@@ -92,13 +94,13 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_STATE_SQL).toContain(
       "checksum_sha256='34d272e3b7ea6d544b5920836f34b09066120892b428f2ae3049bfd990df11ed'",
     );
-    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=223');
+    expect(REQUIRED_SCHEMA_STATE_SQL).toContain('count(*) FROM ops.applied_migrations)>=224');
     expect(REQUIRED_SCHEMA_STATE_SQL).not.toContain("migration_name='0199_system_continuity.sql'");
   });
 
-  it('recusa iniciar antes da migration 0222', async () => {
+  it('recusa iniciar antes da migration 0223', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0222_fitment_year_validity');
+      .rejects.toThrow('required_schema_missing:0223_matriz_delivery_settings');
   });
 });

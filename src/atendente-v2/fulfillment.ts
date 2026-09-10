@@ -867,14 +867,11 @@ async function decideStoreForItemsMulti(
   return null; // nenhum candidato da área tem o pedido completo → matriz
 }
 
-// ─── CAMADA GEO (proximidade) ────────────────────────────────────────────────
-// Ver docs/PLANO_CAMADA_GEO_PROXIMIDADE_REDE_2026-06-06.md §5.6.
-// Versão do motor multi-parceiro com FILTRO DE ANEL (km que cresce) antes da régua
-// de justiça. ADITIVA: não altera decideStoreForItems/Multi de hoje — as tools
-// chamam esta função só quando ROUTING_GEO está ligada E há coordenada do cliente
-// (Fase 4). Sem coordenada o caminho de hoje (por cidade) continua valendo (caso F).
+// GEO: anéis por distância antes da régua. Ver docs/PLANO_CAMADA_GEO_PROXIMIDADE_REDE_2026-06-06.md §5.6.
 
 export interface GeoDecisionInput {
+  /** Restrição da Matriz já validada; ausente preserva integralmente a regra anterior. */
+  matrizPolicy?: { canFulfill:boolean; location:GeoPoint };
   municipio: string;
   items: ItemForDecision[];
   modalidade: 'delivery' | 'pickup';
@@ -893,7 +890,7 @@ export type GeoStoreDecision =
   | { kind: 'only_far'; unitId: string; unitName: string; distanceKm: number; routing: PartnerOrderRouting }
   | { kind: 'matriz'; canFulfill: boolean };
 
-function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
+export function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
   return {
     unitId: c.ctx.unitId,
     serviceMode: c.serviceMode,
@@ -917,7 +914,7 @@ function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
  * (que só alimenta o caso "só tem longe", onde a precisão de rua não muda a oferta de
  * consentimento). `capKm` undefined = mede todas (conjunto pequeno, ex.: getUnitMapsUrl).
  */
-async function resolveDistances(
+export async function resolveDistances(
   client: PoolClient,
   origin: GeoPoint,
   units: { unitId: string; location: GeoPoint }[],
@@ -1001,8 +998,11 @@ export async function decideStoreForItemsGeo(
 ): Promise<GeoStoreDecision> {
   if (input.items.length === 0) return { kind: 'matriz', canFulfill: false };
 
+  const matrizLocation = input.matrizPolicy?.location ?? MATRIZ_COORD;
   const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
   const matrizCanFulfill = async (): Promise<boolean> => {
+    if (input.matrizPolicy) return input.matrizPolicy.canFulfill
+      && haversineKm(input.customerLocation,matrizLocation)<=Math.max(...rings);
     if (!env.ROUTING_MATRIZ_AS_STORE || !env.WHOLESALE_UNIFIED_STOCK) return false;
     if (haversineKm(input.customerLocation, MATRIZ_COORD) > Math.max(...rings)) return false;
     return (await Promise.all(input.items.map((item) =>
@@ -1016,7 +1016,7 @@ export async function decideStoreForItemsGeo(
   // de cena e entra o RAIO declarado pela loja (delivery_radius_km): sem raio = fora da
   // entrega; com raio = entra só se distância ≤ raio (corte fino mais abaixo, pós-medição).
   // Sem a flag: caminho de cidade de hoje, intocado (o `municipio` só é usado por ele).
-  const useProximity = env.ROUTING_PROXIMITY_FIRST;
+  const useProximity = env.ROUTING_PROXIMITY_FIRST || input.matrizPolicy!=null;
   const candidates = useProximity
     ? await resolveUnitCandidatesByProximity(client, environment)
     : await resolveUnitCandidates(client, environment, input.municipio);
@@ -1090,8 +1090,8 @@ export async function decideStoreForItemsGeo(
     // sido medida por rua). Empate ou parceiro mais perto → parceiro fica (a régua ENTRE
     // parceiros, acima, segue intacta). Requer WHOLESALE_UNIFIED_STOCK on + galpão com todos os
     // itens. Default OFF (a matriz segue só como backstop no bloco de baixo).
-    if (env.ROUTING_MATRIZ_COMPETES && env.WHOLESALE_UNIFIED_STOCK) {
-      const matrizDist = haversineKm(input.customerLocation, MATRIZ_COORD);
+    if (env.ROUTING_MATRIZ_COMPETES && env.WHOLESALE_UNIFIED_STOCK && input.matrizPolicy?.canFulfill!==false) {
+      const matrizDist = haversineKm(input.customerLocation, matrizLocation);
       const nearestPartnerDist = Math.min(
         ...selection.pool.map((f) => haversineKm(input.customerLocation, f.cand.location!)),
       );
@@ -1138,8 +1138,8 @@ export async function decideStoreForItemsGeo(
   // está no pool. Ela NUNCA bate um parceiro no mesmo anel (fairness máxima — zero leads).
   // Vence sobre 'only_far' quando o galpão tem o pedido E a matriz está dentro do anel.
   // Requer WHOLESALE_UNIFIED_STOCK on (garante que o galpão é a fonte de estoque da matriz).
-  if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK) {
-    const matrizDist = haversineKm(input.customerLocation, MATRIZ_COORD);
+  if (input.matrizPolicy || (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK)) {
+    const matrizDist = haversineKm(input.customerLocation, matrizLocation);
     if (await matrizCanFulfill()) {
       logger.info(
         { environment, matrizDistKm: Math.round(matrizDist), modalidade: input.modalidade },

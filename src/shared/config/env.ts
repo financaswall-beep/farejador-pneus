@@ -239,6 +239,8 @@ const envSchema = z.object({
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
+  // Chave própria do navegador, restrita por referer + Maps JavaScript API; nunca reutilizar a chave do servidor.
+  GOOGLE_MAPS_BROWSER_API_KEY: z.string().min(1).optional(),
   // Cache de geocode/distância (commerce.geo_cache, 0098): read-through sobre o
   // Google — geocode de bairro/endereço e distância cliente→loja repetem muito e o
   // Google cobra por chamada. FAIL-OPEN (erro de banco → chama o Google direto) e
