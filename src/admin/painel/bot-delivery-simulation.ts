@@ -65,7 +65,7 @@ export async function simulateBotDelivery(input:{address:string;settings:Deliver
       reason:decision.blockReason??(decision.kind==='only_far'?'only_far':!selected?'unavailable':
         selected==='matriz'?(diagnostics.some(d=>d.unitId!=='matriz'&&d.reason==='apt')?'matriz_closer':'matriz_fallback'):'partner_fairness'),
       distance_km:chosen?.distanceKm??null,
-      freight:selected==='matriz'?matrizFreightForKm(matrix.distanceKm):selected?FRETE_PADRAO_BRL:null,
+      freight:selected==='matriz'?matrizFreightForKm(matrix.distanceKm,input.settings.freight):selected?FRETE_PADRAO_BRL:null,
       delivery_days:selected==='matriz'?input.settings.delivery_days:null,
       diagnostics:diagnostics.sort((a,b)=>Number(b.selected)-Number(a.selected)||(a.distanceKm??Infinity)-(b.distanceKm??Infinity)),
       approximate:location.confidence!=='ROOFTOP'&&location.confidence!=='RANGE_INTERPOLATED',

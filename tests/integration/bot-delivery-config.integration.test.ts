@@ -11,9 +11,10 @@ import { getBotDeliveryConfig,saveBotDeliveryConfig } from '../../src/admin/pain
 import { deliveryProducts,simulateBotDelivery } from '../../src/admin/painel/bot-delivery-simulation.js';
 import { assertRequiredSchema } from '../../src/persistence/required-schema.js';
 import type { DeliverySettings } from '../../src/atendente-v2/matriz-delivery-settings.js';
+import { DEFAULT_MATRIZ_FREIGHT } from '../../src/atendente-v2/matriz-freight.js';
 let db:IntegrationDb;
 const settings:DeliverySettings={delivery_enabled:true,pickup_enabled:true,radius_km:12,address:'Matriz de teste',latitude:-22.87,longitude:-42.99,
-  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1};
+  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT}};
 beforeAll(async()=>{db=await startPostgres();});
 afterAll(async()=>{if(db)await stopPostgres(db);});
 describe('cadastro de entrega em Postgres isolado',()=>{
@@ -47,5 +48,12 @@ describe('cadastro de entrega em Postgres isolado',()=>{
     expect(await getBotDeliveryConfig(db.pool)).toMatchObject({version:1,settings:{delivery_enabled:true}});
     expect((await db.pool.query("SELECT count(*) FROM commerce.orders WHERE environment='test'")).rows).toEqual(before.rows);
     expect((await db.pool.query('SELECT * FROM commerce.matriz_delivery_settings_events')).rows).toHaveLength(1);
+  });
+  it('persiste os 55 km e os três preços, preservando o histórico anterior',async()=>{
+    const updated={...settings,radius_km:55,freight:{first_limit_km:20,first_price_brl:0,second_limit_km:40,second_price_brl:17.25,above_price_brl:32.5}};
+    await saveBotDeliveryConfig(updated,1,'owner:a',db.pool);
+    expect(await getBotDeliveryConfig(db.pool)).toMatchObject({version:2,settings:updated});
+    const audit=await db.pool.query('SELECT version,settings FROM commerce.matriz_delivery_settings_events ORDER BY version');
+    expect(audit.rows).toEqual([{version:1,settings},{version:2,settings:updated}]);
   });
 });

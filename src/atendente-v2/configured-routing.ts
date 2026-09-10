@@ -12,7 +12,8 @@ export async function decideConfiguredStore(client:PoolClient,environment:Enviro
   if (!settings) return originalDecision(client,environment,input);
   const matrix=await evaluateMatrizDelivery(client,environment,{...input,settings});
   const decision=await originalDecision(client,environment,{...input,
-    matrizPolicy:{canFulfill:matrix.canFulfill&&!matrix.block,location:matrix.origin}});
+    matrizPolicy:{canFulfill:matrix.canFulfill&&!matrix.block,location:matrix.origin,
+      deliveryRadiusKm:settings.radius_km??undefined}});
   if (decision.kind!=='matriz') return decision;
   if (matrix.block) return {...decision,canFulfill:false,blockReason:matrix.block};
   if (!matrix.canFulfill) return {...decision,canFulfill:false,blockReason:'insufficient_stock'};

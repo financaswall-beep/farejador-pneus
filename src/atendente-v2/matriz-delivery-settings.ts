@@ -2,13 +2,23 @@ import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
-import { MATRIZ_COORD } from './matriz-freight.js';
+import { MATRIZ_COORD, MATRIZ_MAX_DELIVERY_KM, DEFAULT_MATRIZ_FREIGHT } from './matriz-freight.js';
 import type { PoliticaComercial } from '../atendente/tools/commerce-tools.js';
 
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const freightPrice = z.number().min(0).max(10000).multipleOf(0.01);
+const freightLimit = z.number().positive().max(MATRIZ_MAX_DELIVERY_KM);
+const freightSchema = z.object({
+  first_limit_km:freightLimit, first_price_brl:freightPrice,
+  second_limit_km:freightLimit, second_price_brl:freightPrice, above_price_brl:freightPrice,
+}).strict().refine(v=>v.second_limit_km>v.first_limit_km,{
+  path:['second_limit_km'],message:'A segunda faixa deve terminar depois da primeira.',
+});
 export const deliverySettingsSchema = z.object({
   delivery_enabled: z.boolean(), pickup_enabled: z.boolean(),
-  radius_km: z.number().positive().max(40).nullable(),
+  radius_km: z.number().positive().max(MATRIZ_MAX_DELIVERY_KM).nullable(),
+  // Configurações já salvas continuam cobrando os mesmos valores até uma edição explícita.
+  freight: freightSchema.default({...DEFAULT_MATRIZ_FREIGHT}),
   address: z.string().trim().min(3).max(350),
   latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180),
   days: z.array(z.number().int().min(0).max(6)).max(7),

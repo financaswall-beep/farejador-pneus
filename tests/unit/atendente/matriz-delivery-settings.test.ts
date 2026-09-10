@@ -1,9 +1,27 @@
 import { describe,it,expect } from 'vitest';
 import { deliverySettingsSchema,matrizCoverageBlock,matrizScheduleText,applyMatrizDeliveryPolicies,type DeliverySettings } from '../../../src/atendente-v2/matriz-delivery-settings.js';
+import { DEFAULT_MATRIZ_FREIGHT } from '../../../src/atendente-v2/matriz-freight.js';
 const settings:DeliverySettings={delivery_enabled:true,pickup_enabled:true,radius_km:12,
   address:'Matriz São Gonçalo',latitude:-22.8777701,longitude:-42.9900824,
-  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1};
+  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT}};
 describe('limites de entrega da Matriz',()=>{
+  it('lê cadastro anterior com o mesmo frete e sem ampliar o raio salvo',()=>{
+    const {freight,...previous}=settings;
+    expect(deliverySettingsSchema.parse(previous)).toEqual(settings);
+  });
+  it('aceita até 55 km e bloqueia imediatamente fora da cobertura',()=>{
+    const extended=deliverySettingsSchema.parse({...settings,radius_km:55});
+    expect(matrizCoverageBlock(extended,'delivery',55)).toBeNull();
+    expect(matrizCoverageBlock(extended,'delivery',55.01)).toBe('outside_radius');
+    expect(deliverySettingsSchema.safeParse({...settings,radius_km:55.01}).success).toBe(false);
+  });
+  it.each([{first_limit_km:0},{second_limit_km:15},{second_limit_km:14},{second_limit_km:56},
+    {first_price_brl:-1},{second_price_brl:1.999},{above_price_brl:10001},{above_price_brl:null}])('rejeita tabela inválida: %j',patch=>{
+    expect(deliverySettingsSchema.safeParse({...settings,freight:{...settings.freight,...patch}}).success).toBe(false);
+  });
+  it('permite frete grátis sem confundir zero com campo vazio',()=>{
+    expect(deliverySettingsSchema.parse({...settings,freight:{...settings.freight,first_price_brl:0}}).freight.first_price_brl).toBe(0);
+  });
   it('substitui área, endereço e prazo antigos sem alterar o horário da loja e a garantia',()=>{
     const policies=['area_entrega','endereco','prazo_entrega_descricao','rotas_hoje','horario_funcionamento','garantia_descricao']
       .map(policy_key=>({policy_key,policy_value:'antigo',policy_version:'v1',description:null}));

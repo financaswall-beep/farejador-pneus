@@ -12,7 +12,8 @@ assert(start>0&&end>start);
 const section=html.slice(start,end);
 let version=0;
 let settings={delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'Matriz · endereço de teste',latitude:-22.8777701,longitude:-42.9900824,
-  days:[],opens_at:null,closes_at:null,delivery_days:null};
+  days:[],opens_at:null,closes_at:null,delivery_days:null,
+  freight:{first_limit_km:15,first_price_brl:9.9,second_limit_km:25,second_price_brl:13,above_price_brl:19}};
 const boot=`window.deliveryTest=()=>{
  const state={botTab:'entrega',adminUser:{role:'owner'},
  apiGet:async url=>(await fetch(url)).json(),
@@ -38,8 +39,9 @@ const server=http.createServer(async(req,res)=>{
       data={configured:version>0,version,settings,updated_at:new Date().toISOString(),maps_browser_key:null,routing:{matriz_competes:true}};
     }else if(url.pathname.endsWith('/produtos'))data={products:[{id:'11111111-1111-4111-8111-111111111111',product_name:'Pneu 130/70-13',brand:'Marca teste',tire_size:'130/70-13'}]};
     else if(url.pathname.endsWith('/simular')){
-      assert.equal(body.items[0].quantity,2);assert.equal(body.settings.radius_km,12);
-      data={selected:'matriz',store:'Matriz',reason:'matriz_closer',freight:9.9,delivery_days:1,approximate:false,location:{lat:-22.9,lng:-43},
+      assert.equal(body.items[0].quantity,2);assert.equal(body.settings.radius_km,55);
+      assert.deepEqual(body.settings.freight,{first_limit_km:20,first_price_brl:0,second_limit_km:40,second_price_brl:17.25,above_price_brl:32.5});
+      data={selected:'matriz',store:'Matriz',reason:'matriz_closer',freight:0,delivery_days:1,approximate:false,location:{lat:-22.9,lng:-43},
         diagnostics:[{unitId:'matriz',name:'Matriz',distanceKm:5.2,reason:'apt',selected:true},{unitId:'parceiro',name:'Parceiro de teste',distanceKm:8.1,reason:'apt',selected:false}]};
     }
     res.setHeader('Content-Type','application/json');return res.end(JSON.stringify(data));
@@ -58,13 +60,38 @@ const server=http.createServer(async(req,res)=>{
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:'+server.address().port);
     await page.getByText('As regras atuais continuam valendo', {exact:false}).waitFor();
-    await page.locator('#bd-radius').fill('12');
+    assert.equal(await page.locator('#bd-radius').getAttribute('max'),'55');
+    assert.equal(await page.getByRole('slider').getAttribute('max'),'55');
+    await page.locator('#bd-radius').fill('56');
+    await page.getByRole('button',{name:'Salvar alterações',exact:false}).click();
+    await page.getByText('Informe um limite de entrega maior que zero e de até 55 km.',{exact:true}).waitFor();
+    assert.equal(version,0);
+    await page.locator('#bd-radius').fill('55');
+    assert.equal(await page.getByLabel('Valor da primeira faixa',{exact:true}).inputValue(),'9,90');
+    await page.getByLabel('Limite da primeira faixa em km').fill('20');
+    await page.getByLabel('Limite da segunda faixa em km').fill('15');
+    await page.getByRole('button',{name:'Salvar alterações',exact:false}).click();
+    await page.getByText('Informe faixas de distância crescentes', {exact:false}).waitFor();
+    assert.equal(version,0);
+    await page.getByLabel('Limite da segunda faixa em km').fill('40');
+    await page.getByText('Acima de 40 km',{exact:true}).waitFor();
+    await page.getByLabel('Valor da primeira faixa',{exact:true}).fill('');
+    await page.getByRole('button',{name:'Salvar alterações',exact:false}).click();
+    await page.getByText('Preencha todos os valores de frete', {exact:false}).waitFor();
+    assert.equal(version,0);
+    await page.getByLabel('Valor da primeira faixa',{exact:true}).fill('0,00');
+    await page.getByLabel('Valor da segunda faixa',{exact:true}).fill('17,25');
+    await page.getByLabel('Valor acima da segunda faixa',{exact:true}).fill('32,50');
     await page.getByRole('button',{name:'Seg',exact:true}).click();
     await page.getByRole('button',{name:'Ter',exact:true}).click();
     await page.locator('#bd-prazo').selectOption('1');
     await page.getByRole('button',{name:'Salvar alterações',exact:false}).click();
     await page.getByText('Configuração salva. O bot já usa', {exact:false}).waitFor();
-    assert.equal(version,1);assert.equal(settings.radius_km,12);
+    assert.equal(version,1);assert.equal(settings.radius_km,55);
+    assert.equal(settings.freight.first_price_brl,0);assert.equal(settings.freight.second_price_brl,17.25);assert.equal(settings.freight.above_price_brl,32.5);
+    await page.reload();
+    await page.getByText('● Configuração salva',{exact:true}).waitFor();
+    assert.equal(await page.getByLabel('Valor acima da segunda faixa',{exact:true}).inputValue(),'32,50');
     await page.getByRole('button',{name:'Pausar entregas da Matriz',exact:false}).click();
     assert.equal(await page.getByLabel('Entregar pela Matriz',{exact:true}).isChecked(),false);
     assert.equal(await page.getByLabel('Permitir retirada na loja',{exact:true}).isChecked(),true);
@@ -80,12 +107,14 @@ const server=http.createServer(async(req,res)=>{
     assert((await page.getByRole('spinbutton',{name:'Quantidade de Pneu 130/70-13'}).boundingBox()).width<80);
     await page.evaluate(()=>window.scrollTo(0,0));
     await page.screenshot({path:path.join(output,'desktop.png'),fullPage:true});
-    await page.getByRole('spinbutton',{name:'Quantidade de Pneu 130/70-13'}).fill('3');
+    const card=page.locator('.bd-card').filter({has:page.getByRole('heading',{name:'Regras da entrega',exact:true})});
+    await card.screenshot({path:path.join(output,'regras-frete-editavel.png')});
+    await page.getByLabel('Valor acima da segunda faixa',{exact:true}).fill('33,00');
     await page.getByText('Você alterou os dados.',{exact:false}).waitFor();
     await page.setViewportSize({width:390,height:844});
     await page.screenshot({path:path.join(output,'mobile.png'),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
     assert.deepEqual(errors,[]);
-    console.log('OK: cadastro, salvamento, pausa/retirada, simulação, resultado desatualizado e layout móvel. Capturas: '+output);
+    console.log('OK: raio até 55 km, faixas editáveis, valores em reais, validação, salvamento/releitura, pausa/retirada, simulação, frete alterado invalida resultado e layout móvel. Capturas: '+output);
   }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

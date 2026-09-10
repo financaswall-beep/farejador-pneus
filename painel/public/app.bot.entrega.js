@@ -1,6 +1,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.botEntrega = function () {
-  const empty = { delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'',latitude:0,longitude:0,days:[],opens_at:null,closes_at:null,delivery_days:null };
+  const empty = { delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'',latitude:0,longitude:0,days:[],opens_at:null,closes_at:null,delivery_days:null,
+    freight:{first_limit_km:null,first_price_brl:'',second_limit_km:null,second_price_brl:'',above_price_brl:''} };
   const copy = value => JSON.parse(JSON.stringify(value));
   return {
     botEntregaForm:copy(empty),botEntregaConfig:null,botEntregaOriginal:'',botEntregaBusy:false,
@@ -21,7 +22,7 @@ window.PAINEL_MODULES.botEntrega = function () {
       this.botEntregaBusy=true;this.botEntregaErro='';this.botEntregaMensagem='';
       try{
         this.botEntregaConfig=await this.apiGet('/admin/api/bot/entrega');
-        this.botEntregaForm=copy(this.botEntregaConfig.settings);
+        this.botEntregaForm=this.botEntregaEditar(this.botEntregaConfig.settings);
         this.botEntregaOriginal=JSON.stringify(this.botEntregaForm);
         this.botEntregaResult=null;
         this.$nextTick(()=>this.botEntregaMapaAtualizar());
@@ -36,9 +37,21 @@ window.PAINEL_MODULES.botEntrega = function () {
       if(text.includes('invalid_'))return 'Confira o raio, os dias, os horários e os produtos informados.';
       return 'Não foi possível concluir. Tente novamente; suas alterações continuam na tela.';
     },
+    botEntregaNumero(value){return typeof value==='number'?value:typeof value==='string'&&value.trim()?Number(value.trim().replace(',','.')):NaN;},
+    botEntregaEditar(settings){
+      const f=copy(settings);
+      for(const key of ['first_price_brl','second_price_brl','above_price_brl'])f.freight[key]=f.freight[key].toFixed(2).replace('.',',');
+      return f;
+    },
     botEntregaValidar(){
       const f=this.botEntregaForm;
-      if(f.delivery_enabled&&(!Number.isFinite(Number(f.radius_km))||Number(f.radius_km)<=0||Number(f.radius_km)>40))return 'Informe um limite de entrega entre 0 e 40 km.';
+      if(f.delivery_enabled&&(!Number.isFinite(Number(f.radius_km))||Number(f.radius_km)<=0||Number(f.radius_km)>55))return 'Informe um limite de entrega maior que zero e de até 55 km.';
+      const first=this.botEntregaNumero(f.freight.first_limit_km),second=this.botEntregaNumero(f.freight.second_limit_km);
+      if(!Number.isFinite(first)||!Number.isFinite(second)||first<=0||second<=first||second>55)return 'Informe faixas de distância crescentes, maiores que zero e de até 55 km.';
+      for(const key of ['first_price_brl','second_price_brl','above_price_brl']){
+        const price=this.botEntregaNumero(f.freight[key]);
+        if(!Number.isFinite(price)||price<0||price>10000||Math.abs(price*100-Math.round(price*100))>0.0000001)return 'Preencha todos os valores de frete, de R$ 0,00 a R$ 10.000,00, com até duas casas decimais.';
+      }
       if((f.opens_at||f.closes_at)&&(!f.opens_at||!f.closes_at||f.opens_at>=f.closes_at))return 'Preencha um horário de início e fim válido.';
       if((f.opens_at||f.delivery_days!==null)&&!f.days.length)return 'Selecione os dias em que a Matriz entrega.';
       return '';
@@ -48,6 +61,7 @@ window.PAINEL_MODULES.botEntrega = function () {
       f.radius_km=f.radius_km===''?null:f.radius_km===null?null:Number(f.radius_km);
       f.delivery_days=f.delivery_days===''?null:f.delivery_days===null?null:Number(f.delivery_days);
       f.opens_at=f.opens_at||null;f.closes_at=f.closes_at||null;
+      for(const key of Object.keys(f.freight))f.freight[key]=this.botEntregaNumero(f.freight[key]);
       return f;
     },
     async botEntregaSalvar(){
@@ -57,7 +71,7 @@ window.PAINEL_MODULES.botEntrega = function () {
       try{
         const result=await this.apiPut('/admin/api/bot/entrega',{settings:this.botEntregaPayload(),expected_version:this.botEntregaConfig.version});
         this.botEntregaConfig={...this.botEntregaConfig,...result};
-        this.botEntregaForm=copy(result.settings);this.botEntregaOriginal=JSON.stringify(this.botEntregaForm);
+        this.botEntregaForm=this.botEntregaEditar(result.settings);this.botEntregaOriginal=JSON.stringify(this.botEntregaForm);
         this.botEntregaMensagem='Configuração salva. O bot já usa estas regras nas próximas consultas e pedidos.';
       }catch(e){this.botEntregaErro=this.botEntregaError(e);}
       finally{this.botEntregaBusy=false;}

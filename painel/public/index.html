@@ -153,7 +153,7 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260906-sales-demand1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260906-attention1"></script>
-<script src="/admin/painel/app.bot.entrega.js?v=20260909-1"></script>
+<script src="/admin/painel/app.bot.entrega.js?v=20260910-1"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
@@ -191,7 +191,7 @@
 <script src="/admin/painel/app.js?v=20260903-finance-carry1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260909-1" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -7113,9 +7113,9 @@
               <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.delivery_enabled">Entregar pela Matriz</label>
               <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.pickup_enabled">Permitir retirada na loja</label>
               <hr><label class="bd-label" for="bd-radius">Até onde a Matriz entrega</label>
-              <div class="bd-radius"><input id="bd-radius" type="number" min="0.1" max="40" step="0.1" x-model.number="botEntregaForm.radius_km" @change="botEntregaMapaAtualizar()" placeholder="Informe"><span>km</span></div>
-              <input aria-label="Ajustar limite de entrega em quilômetros" class="bd-range" type="range" min="0.5" max="40" step="0.5" :value="botEntregaForm.radius_km || 0.5" @input="botEntregaForm.radius_km = Number($event.target.value)" @change="botEntregaMapaAtualizar()">
-              <div class="bd-scale"><span>0,5 km</span><span>40 km</span></div>
+              <div class="bd-radius"><input id="bd-radius" type="number" min="0.1" max="55" step="0.1" x-model.number="botEntregaForm.radius_km" @change="botEntregaMapaAtualizar()" placeholder="Informe"><span>km</span></div>
+              <input aria-label="Ajustar limite de entrega em quilômetros" class="bd-range" type="range" min="0.5" max="55" step="0.5" :value="botEntregaForm.radius_km || 0.5" @input="botEntregaForm.radius_km = Number($event.target.value)" @change="botEntregaMapaAtualizar()">
+              <div class="bd-scale"><span>0,5 km</span><span>55 km</span></div>
               <p class="bd-help">Limite medido a partir da Matriz. O círculo mostra a área em linha reta; quando disponível, o bot confere a distância por trajeto.</p>
               <div class="bd-origin"><i data-lucide="map-pin"></i><div><strong>Matriz</strong><p x-text="botEntregaForm.address"></p></div><button class="bd-link" @click="botEntregaOrigemTexto=botEntregaForm.address; botEntregaOrigemEditando=true">Ajustar</button></div>
               <div x-show="botEntregaOrigemEditando" class="bd-origin-edit"><label class="bd-label" for="bd-origin-address">Endereço completo da Matriz</label><input id="bd-origin-address" x-model="botEntregaOrigemTexto" maxlength="350" placeholder="Rua, número, cidade e estado"><div class="bd-actions"><button class="bd-secondary" @click="botEntregaOrigemEditando=false">Cancelar</button><button class="bd-primary" @click="botEntregaLocalizar()" :disabled="botEntregaLocalizando" x-text="botEntregaLocalizando ? 'Localizando…' : 'Localizar'"></button></div></div>
@@ -7127,7 +7127,19 @@
               <div class="bd-time"><label>Das<input type="time" x-model="botEntregaForm.opens_at"></label><label>Até<input type="time" x-model="botEntregaForm.closes_at"></label></div>
               <label class="bd-label" for="bd-prazo">Prazo da Matriz</label><select id="bd-prazo" x-model.number="botEntregaForm.delivery_days"><option :value="null">Confirmar no atendimento</option><option :value="0">Próximo dia de entrega disponível</option><option :value="1">Até 1 dia de entrega</option><option :value="2">Até 2 dias de entrega</option><option :value="3">Até 3 dias de entrega</option><option :value="5">Até 5 dias de entrega</option><option :value="7">Até 7 dias de entrega</option></select>
               <p class="bd-help">Contado nos dias selecionados. O cliente pode fazer o pedido fora desse horário.</p>
-              <div class="bd-info-row"><span>Frete</span><strong>Tabela atual por distância</strong></div><p class="bd-help">Até 15 km: R$ 9,90 · Até 25 km: R$ 13,00 · Acima: R$ 19,00</p>
+              <div class="bd-freight" role="group" aria-label="Frete da Matriz por distância">
+                <div class="bd-info-row"><strong>Frete</strong><span>Por distância</span></div>
+                <div class="bd-freight-grid">
+                  <span class="bd-freight-label">Distância</span><span class="bd-freight-label">Valor do frete</span>
+                  <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da primeira faixa em km" x-model.number="botEntregaForm.freight.first_limit_km"><span>km</span></span></label>
+                  <label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da primeira faixa" x-model="botEntregaForm.freight.first_price_brl"></label>
+                  <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da segunda faixa em km" x-model.number="botEntregaForm.freight.second_limit_km"><span>km</span></span></label>
+                  <label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da segunda faixa" x-model="botEntregaForm.freight.second_price_brl"></label>
+                  <span class="bd-freight-above" x-text="'Acima de ' + botEntregaKm(botEntregaForm.freight.second_limit_km)"></span>
+                  <label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor acima da segunda faixa" x-model="botEntregaForm.freight.above_price_brl"></label>
+                </div>
+                <p class="bd-help">A última faixa vale somente dentro da cobertura.</p>
+              </div>
               <div class="bd-info-row"><span>Fora da cobertura</span><strong>Consultar retirada</strong></div>
               <p class="bd-help">Sem entrega disponível, o bot consulta uma opção de retirada. A Matriz também precisa ter todos os itens em estoque.</p>
               <button class="bd-secondary bd-pause" @click="botEntregaForm.delivery_enabled = !botEntregaForm.delivery_enabled" x-text="botEntregaForm.delivery_enabled ? 'Ⅱ Pausar entregas da Matriz' : '▶ Retomar entregas da Matriz'"></button><p class="bd-help">A mudança entra em vigor ao salvar.</p>

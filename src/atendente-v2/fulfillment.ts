@@ -871,7 +871,7 @@ async function decideStoreForItemsMulti(
 
 export interface GeoDecisionInput {
   /** Restrição da Matriz já validada; ausente preserva integralmente a regra anterior. */
-  matrizPolicy?: { canFulfill:boolean; location:GeoPoint };
+  matrizPolicy?: { canFulfill:boolean; location:GeoPoint; deliveryRadiusKm?:number };
   municipio: string;
   items: ItemForDecision[];
   modalidade: 'delivery' | 'pickup';
@@ -1000,9 +1000,12 @@ export async function decideStoreForItemsGeo(
 
   const matrizLocation = input.matrizPolicy?.location ?? MATRIZ_COORD;
   const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
+  // O raio salvo governa só a entrega da Matriz; parceiros e retirada mantêm os anéis atuais.
+  const matrizLimit = input.modalidade==='delivery' && input.matrizPolicy?.deliveryRadiusKm!=null
+    ? input.matrizPolicy.deliveryRadiusKm : Math.max(...rings);
   const matrizCanFulfill = async (): Promise<boolean> => {
     if (input.matrizPolicy) return input.matrizPolicy.canFulfill
-      && haversineKm(input.customerLocation,matrizLocation)<=Math.max(...rings);
+      && haversineKm(input.customerLocation,matrizLocation)<=matrizLimit;
     if (!env.ROUTING_MATRIZ_AS_STORE || !env.WHOLESALE_UNIFIED_STOCK) return false;
     if (haversineKm(input.customerLocation, MATRIZ_COORD) > Math.max(...rings)) return false;
     return (await Promise.all(input.items.map((item) =>
@@ -1095,7 +1098,7 @@ export async function decideStoreForItemsGeo(
       const nearestPartnerDist = Math.min(
         ...selection.pool.map((f) => haversineKm(input.customerLocation, f.cand.location!)),
       );
-      if (matrizDist < nearestPartnerDist && matrizDist <= Math.max(...rings)) {
+      if (matrizDist < nearestPartnerDist && matrizDist <= matrizLimit) {
         const allInStock = (
           await Promise.all(
             input.items.map((i) =>

@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-import { MATRIZ_COORD } from '../../atendente-v2/matriz-freight.js';
+import { MATRIZ_COORD,DEFAULT_MATRIZ_FREIGHT } from '../../atendente-v2/matriz-freight.js';
 import { readDeliverySettings,deliverySettingsSchema,type DeliverySettings } from '../../atendente-v2/matriz-delivery-settings.js';
 
 export async function getBotDeliveryConfig(db:Pool=pool) {
@@ -10,7 +10,7 @@ export async function getBotDeliveryConfig(db:Pool=pool) {
     WHERE environment=$1 AND policy_key='endereco' AND is_active=true ORDER BY updated_at DESC LIMIT 1`,[env.FAREJADOR_ENV]);
   const value=address.rows[0]?.policy_value;
   return { version:saved?.version??0,updated_at:saved?.updated_at??null,configured:!!saved,
-    settings:saved?.settings??{delivery_enabled:true,pickup_enabled:true,radius_km:null,
+    settings:saved?.settings??{delivery_enabled:true,pickup_enabled:true,radius_km:null,freight:{...DEFAULT_MATRIZ_FREIGHT},
       address:typeof value==='string'?value:'Matriz · São Gonçalo',latitude:MATRIZ_COORD.lat,longitude:MATRIZ_COORD.lng,
       days:[],opens_at:null,closes_at:null,delivery_days:null},
     maps_browser_key:env.GOOGLE_MAPS_BROWSER_API_KEY??null,

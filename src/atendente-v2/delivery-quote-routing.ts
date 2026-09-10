@@ -110,7 +110,7 @@ export async function decideStoreGeoOrFallback(
       if(matrix?.block)return {routing:null,blockReason:matrix.block};
       const km = matrix?.distanceKm??await matrizDistanceKm(client, customerLocation);
       await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
-      return { routing: null, matrizFreight: matrizFreightForKm(km), matrizDistanceKm: km,
+      return { routing: null, matrizFreight: matrizFreightForKm(km,saved?.freight), matrizDistanceKm: km,
         ...(saved?{matrizPolicyText:matrizScheduleText(saved)}:{}) };
     }
     // sem coordenada → cai no fallback por cidade (caso F)
@@ -197,4 +197,3 @@ export async function quoteFreteFromPin(
   }
   return null;
 }
-

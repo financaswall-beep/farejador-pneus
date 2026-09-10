@@ -9,6 +9,14 @@ const FRETE_BASE = 9.9;
 //   ≤ 15 km → R$ 9,90 · ≤ 25 km → R$ 13,00 · acima de 25 km → R$ 19,00 (última faixa/teto).
 // km desconhecido → frete base da rede.
 describe('matrizFreightForKm — tabela por distância', () => {
+  it('aplica os limites editados e os três preços, incluindo frete grátis',()=>{
+    const freight={first_limit_km:20,first_price_brl:0,second_limit_km:40,second_price_brl:17.25,above_price_brl:32.5};
+    expect(matrizFreightForKm(20,freight)).toBe(0);
+    expect(matrizFreightForKm(20.01,freight)).toBe(17.25);
+    expect(matrizFreightForKm(40,freight)).toBe(17.25);
+    expect(matrizFreightForKm(40.01,freight)).toBe(32.5);
+    expect(matrizFreightForKm(55,freight)).toBe(32.5);
+  });
   it('faixa 1: até 15 km = R$ 9,90', () => {
     expect(matrizFreightForKm(0)).toBe(9.9);
     expect(matrizFreightForKm(1)).toBe(9.9);
