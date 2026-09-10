@@ -10,6 +10,8 @@ window.PAINEL_MODULES.relatorios = function () {
       data:null, loading:false, error:'', offset:0, productPage:1, expanded:'', selectedSale:null,
       saved:false, notice:'', exporting:false, exportError:'', showRules:false},
     rpOpen() {
+      if(!this.hasPanelModule(this.rp.report==='compras'?'compras':'vendas'))this.rp.report=this.hasPanelModule('vendas')?'vendas':'compras';
+      if(this.rp.report==='compras')return this.rcompOpen();
       try {this.rp.saved=!!localStorage.getItem(this.rpStorageKey());} catch (_) {}
       if(!this.rp.from)this.rpPeriod('month'); else void this.rpLoad();
     },
@@ -61,12 +63,12 @@ window.PAINEL_MODULES.relatorios = function () {
     rpChoose(id) {
       const item=this.rpLibrary.find(row=>row.id===id);if(!item)return;
       if(id==='vendas') {
-        this.rp.report='vendas';this.rp.tab='overview';return;
+        this.rp.report='vendas';this.rp.tab='overview';this.rpOpen();return;
       }
+      if(id==='compras'){this.rp.report='compras';this.rcompOpen();return;}
       this.currentPage=item.page;
       if(id==='faltas')this.bfOpen();
       if(id==='demanda'){this.botTab='demanda';this.$nextTick(()=>this.renderBotMapa());}
-      if(id==='compras')this.comprasTab='historico';
     },
     rpStorageKey() {return 'farejador_report_view_v1:'+String(this.panelWorkplace?.id||'matrix')+':'+String(this.adminUser?.username||this.adminUser?.display_name||'');},
     rpSaveView() {

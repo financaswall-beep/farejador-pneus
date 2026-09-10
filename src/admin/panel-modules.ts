@@ -49,6 +49,7 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   const path = value.split('?')[0] || value;
   if (/^\/admin\/api\/(auth|integrity)(\/|$)/.test(path)) return null;
   if (/^\/admin\/api\/relatorios\/vendas(\/|$)/.test(path)) return ['vendas'];
+  if (/^\/admin\/api\/relatorios\/compras(\/|$)/.test(path)) return ['compras'];
   if (/^\/admin\/api\/dashboard\/matriz-resumo/.test(path)) return ['resumo'];
   if (/^\/admin\/api\/dashboard\/(pedidos|produtos)/.test(path)) return ['resumo'];
   if (/^\/admin\/api\/dashboard\/rede/.test(path)) return ['rede'];

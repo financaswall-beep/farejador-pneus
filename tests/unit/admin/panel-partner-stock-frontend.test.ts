@@ -42,7 +42,7 @@ describe('estoque do parceiro no painel único', () => {
     expect(html).toContain('app.partner-estoque.js?v=20260830-partner-stock-permissions1');
     expect(html).toContain('app.partner-estoque.actions.js?v=20260830-partner-stock-permissions1');
     expect(html).toContain('app.partner-compras.js?v=20260830-partner-stock-permissions1');
-    expect(html).toContain('app.montagem.js?v=20260910-relatorios1');
+    expect(html).toContain('app.montagem.js?v=20260910-compras1');
     expect(html).toContain('Buscar medida ou marca');
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
     expect(html).toContain('Estoque físico');

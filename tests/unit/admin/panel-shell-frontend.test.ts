@@ -14,7 +14,6 @@ describe('casco derivado do painel único', () => {
     const state = readPanel('app.js');
 
     expect(nav).toContain('get liveMenu()');
-    expect(nav).toContain('enabled.has(item.requires)');
     expect(api).toContain('payload.modules');
     expect(api).not.toMatch(/this\.liveMenu\s*=/);
     expect(state).not.toMatch(/liveMenu:\s*\[/);
@@ -34,6 +33,12 @@ describe('casco derivado do painel único', () => {
     expect(app.liveMenu[0].badge).toBe('2');
     app.panelModules = ['financeiro'];
     expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['financeiro']);
+    app.panelModules = ['compras'];
+    expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['compras', 'relatorios']);
+    app.panelModules = ['vendas'];
+    expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['vendas', 'relatorios']);
+    app.panelScope = 'partner';
+    expect(app.panelPageEnabled('relatorios')).toBe(false);
   });
 
   it('mantém o badge fora do getter e registra o ciclo de cada página uma vez', () => {

@@ -9,6 +9,7 @@ import { logger } from '../../shared/logger.js';
 import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseAnalytics, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, linkWholesalePurchaseOrder, listWholesalePurchaseOrders, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
+import { registerPurchaseReportRoutes } from './route-purchase-report.js';
 
 const purchaseReportQuerySchema = z.object({
   period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
@@ -27,6 +28,7 @@ const priceReportQuerySchema = z.object({
 });
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
+  await registerPurchaseReportRoutes(fastify);
   fastify.get('/admin/api/wholesale/purchase-orders', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = z.object({ supplier_id: z.string().uuid().optional(),
       status: z.enum(['open', 'closed', 'cancelled']).optional() }).safeParse(request.query);

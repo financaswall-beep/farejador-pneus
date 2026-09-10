@@ -17,13 +17,13 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
   { id: 'marketing', label: 'Marketing', icon: 'megaphone', requires: 'marketing' },
   { id: 'colaboradores', label: 'Colaboradores', icon: 'users', requires: 'colaboradores' },
   { id: 'catalogo', label: 'Catálogo', icon: 'tag', requires: 'catalogo' },
-  { id: 'relatorios', label: 'Relatórios', icon: 'chart-no-axes-combined', requires: 'vendas' },
+  { id: 'relatorios', label: 'Relatórios', icon: 'chart-no-axes-combined', requires: ['vendas','compras'] },
 ]);
 
 // Registro único do ciclo de vida das páginas. As telas do parceiro acrescentam
 // seus handlers nos PRs próprios, sem criar outro watcher ou outro encanamento.
 window.PAINEL_PAGES = {
-  relatorios: { scopes: ['matrix'], requires: 'vendas', load: ['rpOpen'] },
+  relatorios: { scopes: ['matrix'], requires: ['vendas','compras'], load: ['rpOpen'] },
   resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', partnerLoad: ['loadPartnerResumo'] },
   rede: { scopes: ['matrix'], requires: 'rede', load: ['loadComissoes'], render: [
     'renderRedeChart', 'renderRedeLucroChart', 'renderRedeComprasChart',
@@ -57,7 +57,7 @@ window.PAINEL_MODULES.nav = function () {
     get liveMenu() {
       const enabled = new Set(this.panelModules || []);
       return window.PAINEL_MENU_ITEMS
-        .filter((item) => enabled.has(item.requires) && this.panelPageEnabled(item.id))
+        .filter((item) => [item.requires].flat().some(module=>enabled.has(module)) && this.panelPageEnabled(item.id))
         .map((item) => ({ ...item, badge: this.menuBadges?.[item.id] || null }));
     },
 
@@ -75,7 +75,7 @@ window.PAINEL_MODULES.nav = function () {
 
     panelPageEnabled(pageId) {
       const page = window.PAINEL_PAGES[pageId];
-      return !!page && page.scopes.includes(this.panelScope) && this.hasPanelModule(page.requires);
+      return !!page && page.scopes.includes(this.panelScope) && [page.requires].flat().some(module=>this.hasPanelModule(module));
     },
 
     firstPanelPage() {
