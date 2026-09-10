@@ -60,8 +60,8 @@ window.PAINEL_MODULES.relatorios = function () {
     },
     rpChoose(id) {
       const item=this.rpLibrary.find(row=>row.id===id);if(!item)return;
-      if(['vendas','produtos'].includes(id)) {
-        this.rp.report=id;this.rp.tab=id==='produtos'?'products':'overview';return;
+      if(id==='vendas') {
+        this.rp.report='vendas';this.rp.tab='overview';return;
       }
       this.currentPage=item.page;
       if(id==='faltas')this.bfOpen();
@@ -85,7 +85,7 @@ window.PAINEL_MODULES.relatorios = function () {
           this.rp[key]=saved.filters[key];
         }
         this.rp.compare=String(saved.filters.compare)==='true';this.rp.exact=String(saved.filters.exact)==='true';
-        this.rp.month=this.rp.from.slice(0,7);this.rp.report=saved.report==='produtos'?'produtos':'vendas';
+        this.rp.month=this.rp.from.slice(0,7);this.rp.report='vendas';
         this.rp.tab=['overview','products','sales'].includes(saved.tab)?saved.tab:'overview';
         this.rp.notice='Visão restaurada. Os números foram consultados novamente.';void this.rpLoad();
       }catch(_){this.rp.notice='A visão salva não está disponível. Escolha os filtros novamente.';}

@@ -91,7 +91,7 @@ ${scripts.map(name=>`<script src="/admin/painel/${name}"></script>`).join('')}
     await full.locator('#farejador-sidebar-nav').getByRole('link',{name:'Relatórios',exact:true}).click();
     await full.waitForFunction(()=>Alpine.$data(document.body).rp.data&&!Alpine.$data(document.body).rp.loading);
     assert.equal(await full.locator('.rp-table:visible tbody').count(),4);
-    assert.equal(await full.locator('.rp-library-row svg').count(),3);
+    assert.equal(await full.locator('.rp-library-row svg').count(),2);
     await full.evaluate(()=>{const banner=document.createElement('p');banner.textContent='VALIDAÇÃO LOCAL · dados fictícios';banner.style.cssText='padding:8px;background:#fff7dd;color:#806127';document.querySelector('.rp-heading').before(banner);});
     await full.screenshot({path:path.join(out,'painel-completo.png'),fullPage:true});
     await full.setViewportSize({width:390,height:844});await full.screenshot({path:path.join(out,'painel-celular.png'),fullPage:true});

@@ -5,7 +5,7 @@ Implementação local em 10/09/2026, seguindo o modelo aprovado. Sem migration, 
 ## O que foi entregue
 
 - Menu **Relatórios**, exclusivo da Matriz e disponível para quem tem acesso a Vendas.
-- Biblioteca com **Vendas da Matriz** e **Produtos e marcas** nesta central. Os demais itens são atalhos identificados para os módulos existentes; não são relatórios novos completos.
+- Biblioteca com **Vendas da Matriz**, incluindo produtos e marcas na aba **Produtos**. O atalho lateral duplicado foi removido a pedido do usuário. Os demais itens são atalhos identificados para os módulos existentes; não são relatórios novos completos.
 - Visão geral, produtos e lista paginada de vendas, com detalhe dos itens do recorte.
 - Semana, mês e intervalo personalizado; comparação anterior; canal, marca, condição e medida. O clique em uma medida abre suas vendas; o clique em uma variante preserva marca e condição.
 - CSV com todos os itens filtrados e PDF com resumo e todas as linhas da aba selecionada, independentemente da página visível.

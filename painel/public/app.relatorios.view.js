@@ -5,7 +5,6 @@ window.PAINEL_MODULES.relatoriosView = function () {
     get rpLibrary() {
       return [
         {id:'vendas',group:'VENDAS',label:'Vendas da Matriz',description:'Atacado e varejo',icon:'files',module:'vendas'},
-        {id:'produtos',group:'VENDAS',label:'Produtos e marcas',description:'Volume, custo e margem',icon:'package',module:'vendas'},
         {id:'compras',group:'OPERAÇÃO',label:'Compras e fornecedores',description:'Abrir histórico de Compras',icon:'chart-no-axes-combined',module:'compras',page:'compras'},
         {id:'estoque',group:'OPERAÇÃO',label:'Estoque e reposição',description:'Abrir Estoque',icon:'boxes',module:'estoque',page:'estoque'},
         {id:'logistica',group:'OPERAÇÃO',label:'Entregas e rotas',description:'Abrir Logística',icon:'truck',module:'logistica',page:'logistica'},
