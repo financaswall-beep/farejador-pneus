@@ -128,6 +128,16 @@ describe('environment security validation', () => {
     expect(parsed.OPENAI_API_KEY).toBeUndefined();
   });
 
+  it('normaliza chaves opcionais do Google Maps vazias como ausentes', () => {
+    const parsed = parseEnv({
+      ...baseEnv,
+      GOOGLE_MAPS_API_KEY: '',
+      GOOGLE_MAPS_BROWSER_API_KEY: '',
+    });
+    expect(parsed.GOOGLE_MAPS_API_KEY).toBeUndefined();
+    expect(parsed.GOOGLE_MAPS_BROWSER_API_KEY).toBeUndefined();
+  });
+
   it('exige OpenAI quando a leitura de comprovante por IA está ligada', () => {
     expect(() => parseEnv({
       ...baseEnv,

@@ -35,6 +35,9 @@ services:
       ROUTING_GEO: ${ROUTING_GEO:-false}
       ROUTING_MATRIZ_AS_STORE: ${ROUTING_MATRIZ_AS_STORE:-false}
       WHOLESALE_UNIFIED_STOCK: ${WHOLESALE_UNIFIED_STOCK:-false}
+      # Chaves distintas: servidor para geocodificacao/distancia e navegador para o mapa do painel.
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_MAPS_BROWSER_API_KEY: ${GOOGLE_MAPS_BROWSER_API_KEY:-}
       # Etapa 9: rollout em gates separados; ambos permanecem false no deploy inicial.
       MATRIZ_CUSTOMER_IDENTITY: ${MATRIZ_CUSTOMER_IDENTITY:-false}
       MATRIZ_CUSTOMER_PRIVACY: ${MATRIZ_CUSTOMER_PRIVACY:-false}
