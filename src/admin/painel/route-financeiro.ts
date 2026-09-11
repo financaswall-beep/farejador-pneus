@@ -2,6 +2,7 @@
 // VERBATIM das linhas 720-795 do route.ts pré-obra (corpo de registerPainelRoute).
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
+import { registerFinancialReportRoutes } from './route-financial-report.js';
 import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
@@ -13,6 +14,7 @@ import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
 import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
+  await registerFinancialReportRoutes(fastify);
   await registerPainelFinanceiroLedger(fastify);
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = z.object({

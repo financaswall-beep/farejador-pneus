@@ -10,7 +10,8 @@ window.PAINEL_MODULES.relatorios = function () {
       data:null, loading:false, error:'', offset:0, productPage:1, expanded:'', selectedSale:null,
       saved:false, notice:'', exporting:false, exportError:'', showRules:false},
     rpOpen() {
-      if(!this.hasPanelModule(this.rp.report))this.rp.report=['vendas','compras','estoque','logistica'].find(module=>this.hasPanelModule(module))||'vendas';
+      if(!this.hasPanelModule(this.rp.report))this.rp.report=['vendas','compras','estoque','logistica','financeiro'].find(module=>this.hasPanelModule(module))||'vendas';
+      if(this.rp.report==='financeiro')return this.rfinOpen();
       if(this.rp.report==='logistica')return this.rlogOpen();
       if(this.rp.report==='estoque')return this.rstOpen();
       if(this.rp.report==='compras')return this.rcompOpen();
@@ -68,6 +69,7 @@ window.PAINEL_MODULES.relatorios = function () {
         this.rp.report='vendas';this.rp.tab='overview';this.rpOpen();return;
       }
       if(id==='compras'){this.rp.report='compras';this.rcompOpen();return;}
+      if(id==='financeiro'){this.rp.report='financeiro';this.rfinOpen();return;}
       if(id==='logistica'){this.rp.report='logistica';this.rlogOpen();return;}
       if(id==='estoque'){this.rp.report='estoque';this.rstOpen();return;}
       this.currentPage=item.page;

@@ -48,6 +48,11 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
     window.PAINEL_MODULES.botControle,
     window.PAINEL_MODULES.botFaltas,
+    window.PAINEL_MODULES.relatoriosFinanceiro,
+    window.PAINEL_MODULES.relatoriosFinanceiroView,
+    window.PAINEL_MODULES.relatoriosFinanceiroCharts,
+    window.PAINEL_MODULES.relatoriosFinanceiroExport,
+    window.PAINEL_MODULES.relatoriosFinanceiroPdf,
     window.PAINEL_MODULES.relatoriosLogistica,
     window.PAINEL_MODULES.relatoriosLogisticaView,
     window.PAINEL_MODULES.relatoriosLogisticaExport,
