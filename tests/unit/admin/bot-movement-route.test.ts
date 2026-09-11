@@ -5,6 +5,7 @@ async function buildRoute() {
   vi.resetModules();
   vi.doMock('../../../src/admin/painel/route-bot-faltas.js', () => ({ registerBotShortageRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-shortage-report.js', () => ({ registerShortageReportRoutes:vi.fn() }));
+  vi.doMock('../../../src/admin/painel/route-demand-report.js', () => ({ registerDemandReportRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-bot-delivery.js', () => ({ registerBotDeliveryRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-bot-control.js', () => ({ registerBotControlRoutes:vi.fn() }));
   const getBotMovement = vi.fn().mockResolvedValue({ cards: {}, horarios: [] });

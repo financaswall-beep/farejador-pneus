@@ -11,6 +11,7 @@ window.PAINEL_MODULES.relatorios = function () {
       saved:false, notice:'', exporting:false, exportError:'', showRules:false},
     rpOpen() {
       if(!this.rpLibrary.some(item=>item.id===this.rp.report&&!item.page))this.rp.report=this.rpLibrary.find(item=>!item.page)?.id||'vendas';
+      if(this.rp.report==='demanda')return this.rdemOpen();
       if(this.rp.report==='faltas')return this.rfalOpen();
       if(this.rp.report==='rede')return this.rparOpen();
       if(this.rp.report==='financeiro')return this.rfinOpen();
@@ -72,12 +73,12 @@ window.PAINEL_MODULES.relatorios = function () {
       }
       if(id==='compras'){this.rp.report='compras';this.rcompOpen();return;}
       if(id==='rede'){this.rp.report='rede';this.rparOpen();return;}
+      if(id==='demanda'){this.rp.report='demanda';this.rdemOpen();return;}
       if(id==='faltas'){this.rp.report='faltas';this.rfalOpen();return;}
       if(id==='financeiro'){this.rp.report='financeiro';this.rfinOpen();return;}
       if(id==='logistica'){this.rp.report='logistica';this.rlogOpen();return;}
       if(id==='estoque'){this.rp.report='estoque';this.rstOpen();return;}
       this.currentPage=item.page;
-      if(id==='demanda'){this.botTab='demanda';this.$nextTick(()=>this.renderBotMapa());}
     },
     rpStorageKey() {return 'farejador_report_view_v1:'+String(this.panelWorkplace?.id||'matrix')+':'+String(this.adminUser?.username||this.adminUser?.display_name||'');},
     rpSaveView() {

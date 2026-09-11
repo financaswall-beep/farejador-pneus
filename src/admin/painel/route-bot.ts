@@ -13,6 +13,7 @@ import type { PainelRedePeriod } from './queries-pedidos.js';
 import { registerBotControlRoutes } from './route-bot-control.js';
 import { registerBotDeliveryRoutes } from './route-bot-delivery.js';
 import { registerBotShortageRoutes } from './route-bot-faltas.js';
+import { registerDemandReportRoutes } from './route-demand-report.js';
 import { registerShortageReportRoutes } from './route-shortage-report.js';
 
 const PERIODOS: PainelRedePeriod[] = ['today', '7d', '30d', 'month'];
@@ -32,6 +33,7 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
   await registerBotDeliveryRoutes(fastify);
   await registerBotShortageRoutes(fastify);
   await registerShortageReportRoutes(fastify);
+  await registerDemandReportRoutes(fastify);
   // Campainha: leve (roda no load e no refresh de 15s) — cliente esperando + escalados.
   fastify.get('/admin/api/bot/campainha', { preHandler: requireAdminAuth }, async (_request, reply) => {
     try {

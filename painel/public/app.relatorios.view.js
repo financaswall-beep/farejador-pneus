@@ -11,7 +11,7 @@ window.PAINEL_MODULES.relatoriosView = function () {
         {id:'financeiro',group:'FINANCEIRO',label:'Resultado, caixa e títulos',description:'Resultado, movimentos e vencimentos',icon:'wallet',module:'financeiro'},
         {id:'rede',group:'REDE E BOT',label:'Desempenho dos parceiros',description:'Vendas e comissões',icon:'users',module:'rede'},
         {id:'faltas',group:'REDE E BOT',label:'Faltas por loja',description:'Faltas e receita potencial',icon:'store',module:'bot'},
-        {id:'demanda',group:'REDE E BOT',label:'Demanda por município',description:'Origem da procura',icon:'map-pin',module:'bot',page:'bot'},
+        {id:'demanda',group:'REDE E BOT',label:'Demanda por município',description:'Municípios, medidas e evolução',icon:'map-pin',module:'bot'},
       ].filter(item=>this.hasPanelModule(item.module));
     },
     get rpLibraryGroups() {
