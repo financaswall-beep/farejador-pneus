@@ -1,6 +1,7 @@
 // Obra 300 (2026-07-05): fatia da PORTARIA da matriz — dashboard: pedidos/produtos/rede/matriz-resumo.
 // VERBATIM das linhas 395-437 do route.ts pré-obra (corpo de registerPainelRoute).
 // Registrada por ./route.js (porta de entrada) na ordem original.
+import { registerPartnerReportRoutes } from './route-partner-report.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
@@ -11,6 +12,7 @@ import { dashboardPayload } from './route-helpers.js';
 import { limitQuerySchema, redeQuerySchema, resumoQuerySchema } from './route-schemas.js';
 
 export async function registerPainelDashboard(fastify: FastifyInstance): Promise<void> {
+  await registerPartnerReportRoutes(fastify);
   fastify.get('/admin/api/dashboard/pedidos', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = limitQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });

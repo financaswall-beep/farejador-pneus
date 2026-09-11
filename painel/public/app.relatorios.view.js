@@ -9,7 +9,7 @@ window.PAINEL_MODULES.relatoriosView = function () {
         {id:'estoque',group:'OPERAÇÃO',label:'Estoque e reposição',description:'Disponibilidade, giro e reposição',icon:'boxes',module:'estoque'},
         {id:'logistica',group:'OPERAÇÃO',label:'Entregas e rotas',description:'Entregas, ocorrências e custos',icon:'truck',module:'logistica'},
         {id:'financeiro',group:'FINANCEIRO',label:'Resultado, caixa e títulos',description:'Resultado, movimentos e vencimentos',icon:'wallet',module:'financeiro'},
-        {id:'rede',group:'REDE E BOT',label:'Desempenho dos parceiros',description:'Abrir Rede',icon:'users',module:'rede',page:'rede'},
+        {id:'rede',group:'REDE E BOT',label:'Desempenho dos parceiros',description:'Vendas e comissões',icon:'users',module:'rede'},
         {id:'faltas',group:'REDE E BOT',label:'Faltas por loja',description:'Produtos sem disponibilidade',icon:'store',module:'bot',page:'bot'},
         {id:'demanda',group:'REDE E BOT',label:'Demanda por município',description:'Origem da procura',icon:'map-pin',module:'bot',page:'bot'},
       ].filter(item=>this.hasPanelModule(item.module));

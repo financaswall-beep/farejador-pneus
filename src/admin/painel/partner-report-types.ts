@@ -1,0 +1,5 @@
+export interface ReportPartnerUnit {id:string;partner_id:string;unit_id:string;name:string;partner_name:string;city:string|null;neighborhood:string|null;status:string;archived:boolean}
+export interface ReportPartnerItem {name:string;measure:string|null;brand:string|null;quantity:number;price:number;total:number}
+export interface ReportPartnerSale {id:string;unit_id:string;day:string|null;source:string|null;mode:string;total:number;freight:number;quantity:number;items:ReportPartnerItem[];commission_id:string|null}
+export interface ReportPartnerCommission {id:string;partner_id:string;unit_id:string;order_id:string;base:number;percent:number;amount:number;status:'open'|'settled'|'reversed';day:string;settled_on:string|null;reversed_on:string|null;refund_status:string|null;refund_amount:number;refunded_on:string|null}
+export interface PartnerSnapshot {as_of:string;today:string;commission_enabled:boolean;units:ReportPartnerUnit[];sales:ReportPartnerSale[];commissions:ReportPartnerCommission[]}

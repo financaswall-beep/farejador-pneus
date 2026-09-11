@@ -39,6 +39,8 @@ describe('casco derivado do painel único', () => {
     expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['vendas', 'relatorios']);
     app.panelModules = ['logistica'];
     expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['logistica', 'relatorios']);
+    app.panelModules = ['rede'];
+    expect(app.liveMenu.map((item: { id: string }) => item.id)).toEqual(['rede', 'relatorios']);
     app.panelScope = 'partner';
     expect(app.panelPageEnabled('relatorios')).toBe(false);
   });

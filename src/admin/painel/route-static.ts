@@ -28,6 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'app.relatorios.parceiros.js', 'app.relatorios.parceiros.view.js', 'app.relatorios.parceiros.charts.js', 'app.relatorios.parceiros.export.js', 'app.relatorios.parceiros.pdf.js',
     'app.relatorios.financeiro.js', 'app.relatorios.financeiro.view.js', 'app.relatorios.financeiro.charts.js', 'app.relatorios.financeiro.export.js', 'app.relatorios.financeiro.pdf.js',
     'app.relatorios.logistica.js', 'app.relatorios.logistica.view.js', 'app.relatorios.logistica.export.js', 'app.relatorios.logistica.pdf.js',
     'app.relatorios.estoque.js', 'app.relatorios.estoque.view.js', 'app.relatorios.estoque.export.js', 'app.relatorios.estoque.pdf.js',
@@ -69,6 +70,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/bot-faltas.css', async (_request, reply) => sendStatic(reply, 'bot-faltas.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios.css', async (_request, reply) => sendStatic(reply, 'relatorios.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-compras.css', async (_request, reply) => sendStatic(reply, 'relatorios-compras.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/relatorios-parceiros.css', async (_request, reply) => sendStatic(reply, 'relatorios-parceiros.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-financeiro.css', async (_request, reply) => sendStatic(reply, 'relatorios-financeiro.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-logistica.css', async (_request, reply) => sendStatic(reply, 'relatorios-logistica.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-estoque.css', async (_request, reply) => sendStatic(reply, 'relatorios-estoque.css', 'text/css; charset=utf-8'));
