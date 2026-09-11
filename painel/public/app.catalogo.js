@@ -61,6 +61,7 @@ window.PAINEL_MODULES.catalogo = function () {
     catalogoFiltrados() {
       const search = String(this.catalogoBusca || '').trim().toLocaleLowerCase('pt-BR');
       return this.catalogoRows.filter((row) => {
+        if (this.catalogoFiltro === 'incompleto' && !row.measure_draft) return false;
         if (this.catalogoMarca !== 'todas' && row.brand !== this.catalogoMarca) return false;
         if (this.catalogoFiltro === 'estoque' && Number(row.total_stock_available ?? row.official_quantity_on_hand ?? 0) <= 0) return false;
         if (this.catalogoFiltro === 'sem_preco' && Number(row.price_amount) > 0) return false;
@@ -70,7 +71,8 @@ window.PAINEL_MODULES.catalogo = function () {
         return [row.product_code, row.product_name, row.brand, row.tire_size,
           this.catalogoMeasureLabel(row.tire_size), this.catalogoProductLabel(row),
           this.catalogoConditionLabel(row.tire_condition), row.tread_pattern,
-          row.load_index, row.speed_rating, this.catalogoPositionLabel(row.tire_position)]
+          row.load_index, row.speed_rating, row.application_search,
+          this.catalogoPositionLabel(row.tire_position)]
           .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(search));
       });
     },
@@ -91,6 +93,7 @@ window.PAINEL_MODULES.catalogo = function () {
 
     catalogoSetFiltro(filter) {
       this.catalogoFiltro = filter;
+      if (filter === 'incompleto') this.catalogoMarca = 'todas';
       this.catalogoPagina = 1;
     },
 
@@ -137,8 +140,22 @@ window.PAINEL_MODULES.catalogo = function () {
         || 'Não informado';
     },
 
+    catalogoApplicationPositionLabel(row) {
+      const positions = row?.application_positions || [];
+      if (positions.length > 1) return 'Dianteiro ou traseiro, conforme a moto';
+      if (positions.length === 1) return this.catalogoPositionLabel(positions[0]) + ' nas aplicações';
+      return 'Aplicações pendentes de conferência';
+    },
+
     async catalogoOpen(row) {
       if (this.adminUser?.role !== 'owner') return;
+      if (row?.measure_draft) {
+        this.catalogoCreateNew();
+        this.catalogoCadastro.row = row;
+        this.catalogoCadastro.form.measure = row.tire_size;
+        this.catalogoCadastro.form.tire_condition = '';
+        return;
+      }
       if (row?.product_type === 'tire' && this.catalogoIsUnknownBrand(row?.brand)) {
         this.catalogoBrandCorrectionOpen(row);
         return;

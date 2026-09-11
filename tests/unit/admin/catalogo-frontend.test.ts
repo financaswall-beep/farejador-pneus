@@ -29,6 +29,35 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('completa uma medida sem inventar marca e condição nem abrir correção de estoque', async () => {
+    const module = loadCatalogModule();
+    const context = { ...module, adminUser: { role: 'owner' }, $nextTick: vi.fn(),
+      catalogoBrandCorrectionOpen: vi.fn(), catalogoCadastro: {} };
+    await context.catalogoOpen({ measure_draft: true, tire_size: '160/60-17', product_type: 'tire' });
+    expect(context.catalogoCadastro).toMatchObject({ mode: 'manual', open: true,
+      form: { measure: '160/60-17', brand: '', tire_condition: '', position: '' } });
+    expect(context.catalogoBrandCorrectionOpen).not.toHaveBeenCalled();
+    expect(context.catalogoCreateCanSave()).toBe(false);
+    context.catalogoMarca = 'Pirelli';
+    context.catalogoSetFiltro('incompleto');
+    expect(context.catalogoMarca).toBe('todas');
+    Object.assign(context.catalogoCadastro.form, { brand: 'Pirelli', tire_condition: 'novo' });
+    context.catalogoCreateSuggestCode();
+    expect(context.catalogoCreateCanSave()).toBe(true);
+  });
+
+  it('consulta motos e anos antes de haver um produto ou marca', async () => {
+    const module = loadCatalogModule();
+    const context = { ...module, $nextTick: vi.fn(), catalogoCadastro: { open: false },
+      apiGet: vi.fn().mockResolvedValue({ applications: [{ model: 'NMAX', position: 'rear',
+        year_start: 2017, year_end: 2022 }], application_reviews: [] }),
+      catalogoDiscoveryLoad: vi.fn(), catalogoCompatibilidade: {} };
+    await context.catalogoCompatibilityOpen({ tire_size: '130/70-13', measure_draft: true, product_type: 'tire' });
+    expect(context.apiGet).toHaveBeenCalledWith('/admin/api/catalog/measure-applications?measure=130%2F70-13');
+    expect(context.catalogoDiscoveryLoad).not.toHaveBeenCalled();
+    expect(context.catalogoCompatibilidade.applications[0].position).toBe('rear');
+    expect(context.catalogoCompatibilityYearLabel(context.catalogoCompatibilidade.applications[0])).toBe('2017 a 2022');
+  });
   it('mostra só a medida no título do pneu, sem repetir nome e medida', () => {
     const module = loadCatalogModule();
     const row = Object.freeze({ product_type: 'tire', product_name: 'Pneu Vipal 110/90-17',
@@ -173,7 +202,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
-    expect(html.includes('app.catalogo.js?v=20260907-tire-spec1')).toBe(true);
+    expect(html.includes('app.catalogo.js?v=20260911-measure-registration1')).toBe(true);
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -496,7 +525,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain('<th class="px-4 py-3">Compatibilidade</th>');
     expect(html).toContain('data-testid="catalog-compatibility-drawer"');
-    expect(html).toContain(":disabled=\"row.product_type !== 'tire' || row.catalogued === false || !row.product_id\"");
+    expect(html).toContain(":disabled=\"row.product_type !== 'tire' || !row.tire_size\"");
     expect(html).toContain('Nenhuma moto associada');
   });
 

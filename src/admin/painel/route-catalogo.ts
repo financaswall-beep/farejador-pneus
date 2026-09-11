@@ -8,6 +8,7 @@ import {
   createCatalogFitmentDiscovery,
   getCatalogFitmentDiscoveries,
   getCatalogCompatibility,
+  getCatalogMeasureApplications,
   removeCatalogCompatibility,
   reviewCatalogFitmentDiscovery,
   searchCatalogVehicleModels,
@@ -130,6 +131,12 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
       if (status === 500) logger.error({ error }, 'painel catalog product create failed');
       return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
     }
+  });
+
+  fastify.get('/admin/api/catalog/measure-applications', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const query = z.object({ measure: z.string().trim().min(1).max(60) }).safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: 'invalid_measure' });
+    return reply.send(await getCatalogMeasureApplications(query.data.measure));
   });
 
   fastify.post('/admin/api/catalog/:product_id/spec', { preHandler: requireAdminOwner }, async (request, reply) => {

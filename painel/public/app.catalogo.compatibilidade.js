@@ -2,7 +2,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.catalogoCompatibilidade = function () {
   return {
     async catalogoCompatibilityOpen(row) {
-      if (!row?.product_id || row.catalogued === false) return;
+      if (!row?.tire_size || row.product_type === 'service') return;
       this.catalogoSelecionado = null;
       this.catalogoCadastro.open = false;
       this.catalogoCompatibilidade = {
@@ -20,6 +20,10 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
       };
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      if (!row.product_id) {
+        await this.catalogoCompatibilityLoad();
+        return;
+      }
       await Promise.all([
         this.catalogoCompatibilityLoad(row.product_id),
         this.catalogoDiscoveryLoad(row.product_id),
@@ -27,6 +31,24 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
     },
 
     async catalogoCompatibilityLoad(productId) {
+      if (!productId && !this.catalogoCompatibilidade.row?.product_id) {
+        const state = this.catalogoCompatibilidade;
+        if (!state.row?.tire_size) return;
+        state.loading = true;
+        state.error = null;
+        try {
+          const data = await this.apiGet(`/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}`);
+          if (this.catalogoCompatibilidade !== state) return;
+          state.applications = Array.isArray(data.applications) ? data.applications : [];
+          state.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
+        } catch {
+          state.error = 'Não foi possível carregar as aplicações desta medida.';
+        } finally {
+          state.loading = false;
+          this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        }
+        return;
+      }
       if (!productId || this.catalogoCompatibilidade.row?.product_id !== productId) return;
       this.catalogoCompatibilidade.loading = true;
       this.catalogoCompatibilidade.error = null;

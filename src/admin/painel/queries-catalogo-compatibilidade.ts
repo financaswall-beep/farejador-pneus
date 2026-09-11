@@ -221,6 +221,20 @@ export async function removeCatalogCompatibility(
   }
 }
 
+export async function getCatalogMeasureApplications(
+  measure: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+) {
+  const key = applicationMeasureKey(measure);
+  const applications = await loadVehicleApplicationCatalog(dbPool, environment, key);
+  const reviews = await dbPool.query(`SELECT application_id,make,model,position,year_start,year_end,status,review_note
+    FROM commerce.vehicle_measure_applications WHERE environment=$1
+      AND display_measure=$2 AND status<>'verified' ORDER BY make,model,application_id`,
+  [environment, key]);
+  return { applications, application_reviews: reviews.rows };
+}
+
 export async function getCatalogCompatibility(
   productId: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
@@ -277,11 +291,7 @@ export async function getCatalogCompatibility(
       ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position`,
     [environment, productId],
   );
-  const applications = await loadVehicleApplicationCatalog(dbPool, environment, selected.tire_size);
-  const reviews = await dbPool.query(`SELECT application_id,make,model,position,year_start,year_end,status,review_note
-    FROM commerce.vehicle_measure_applications WHERE environment=$1
-      AND display_measure=$2 AND status<>'verified' ORDER BY make,model,application_id`,
-  [environment, applicationMeasureKey(selected.tire_size)]);
+  const measureApplications = await getCatalogMeasureApplications(selected.tire_size ?? '', environment, dbPool);
   return {
     product: selected,
     summary: {
@@ -289,8 +299,7 @@ export async function getCatalogCompatibility(
       fitments: fitments.rows.length,
     },
     rows: fitments.rows,
-    applications,
-    application_reviews: reviews.rows,
+    ...measureApplications,
   };
 }
 

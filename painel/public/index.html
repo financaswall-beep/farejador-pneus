@@ -214,9 +214,9 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260907-tire-spec1"></script>
-<script src="/admin/painel/app.catalogo.bootstrap.js?v=20260907-tire-spec1"></script>
-<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260909-fitment-years1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260911-measure-registration1"></script>
+<script src="/admin/painel/app.catalogo.bootstrap.js?v=20260911-measure-registration1"></script>
+<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260911-measure-registration1"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
@@ -9838,9 +9838,10 @@
             <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400"></i>
             <input x-model.debounce.250ms="catalogoBusca" @input="catalogoPagina=1"
                    class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-700"
-                   placeholder="Buscar por medida, marca, condição, produto ou código">
+                   placeholder="Buscar por medida, marca ou moto">
           </label>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" @click="catalogoSetFiltro('incompleto')" :class="catalogoFiltro==='incompleto' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3 py-2 text-xs font-semibold">Cadastros incompletos <span x-text="'(' + Number(catalogoSummary.incomplete_registrations || 0) + ')'"></span></button>
             <button type="button" @click="catalogoSetFiltro('todos')" :class="catalogoFiltro==='todos' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Todos</button>
             <button type="button" @click="catalogoSetFiltro('estoque')" :class="catalogoFiltro==='estoque' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Com estoque</button>
             <button type="button" @click="catalogoSetFiltro('sem_preco')" :class="catalogoFiltro==='sem_preco' ? 'bg-amber-500 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Sem preço</button>
@@ -9875,35 +9876,35 @@
                         </template>
                         <template x-if="!catalogoBrandLogo(row.brand)">
                           <span class="inline-flex rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600"
-                                x-text="row.product_type === 'service' ? 'SERVIÇO' : String(row.brand || 'SEM MARCA').toUpperCase()"></span>
+                                x-text="row.measure_draft ? 'MARCA A DEFINIR' : (row.product_type === 'service' ? 'SERVIÇO' : String(row.brand || 'SEM MARCA').toUpperCase())"></span>
                         </template>
                         <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="catalogoTitle(row)" :title="catalogoTechnicalLabel(row)"></p>
                         <p class="text-[10px] font-semibold text-emerald-700" x-text="row.product_type === 'service' ? 'Serviço' : catalogoConditionLabel(row.tire_condition)"></p>
-                        <p x-show="row.product_type === 'tire' && row.catalogued !== false && !row.tire_position" class="mt-0.5 text-[10px] font-semibold text-amber-700">Posição pendente de conferência</p>
-                        <p class="text-[11px] text-gray-400" x-text="row.product_code || 'Ainda não cadastrado como produto'"></p>
+                        <p x-show="row.product_type === 'tire'" class="mt-0.5 text-[10px] font-semibold text-emerald-700" x-text="catalogoApplicationPositionLabel(row)"></p><p x-show="row.tire_position" class="text-[10px] text-gray-500" x-text="'Ficha do produto: ' + catalogoPositionLabel(row.tire_position)"></p>
+                        <p class="text-[11px] text-gray-400" x-text="row.measure_draft ? 'Complete marca e condição quando quiser' : (row.product_code || 'Ainda não cadastrado como produto')"></p>
                       </div>
                     </div>
                   </td>
-                  <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="row.product_type === 'service' ? 'Não se aplica' : Number(row.official_quantity_on_hand || 0) + ' un.'"></p><p class="text-[10px] text-gray-400" x-text="row.product_type === 'service' ? 'Serviço' : 'Galpão central'"></p></td>
+                  <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="row.measure_draft ? '—' : (row.product_type === 'service' ? 'Não se aplica' : Number(row.official_quantity_on_hand || 0) + ' un.')"></p><p class="text-[10px] text-gray-400" x-text="row.measure_draft ? 'Sem produto comercial' : (row.product_type === 'service' ? 'Serviço' : 'Galpão central')"></p></td>
                   <td class="px-4 py-3.5"><p class="text-sm font-medium" x-text="row.product_type === 'service' ? 'Não se aplica' : (row.official_unit_cost == null ? '—' : formatCurrency(Number(row.official_unit_cost)))"></p><p class="flex items-center gap-1 text-[10px] text-gray-400"><i data-lucide="lock" class="h-2.5 w-2.5"></i>Somente leitura</p></td>
                   <td class="px-4 py-3.5"><p class="text-base font-bold text-gray-950" x-text="Number(row.price_amount) > 0 ? formatCurrency(Number(row.price_amount)) : '—'"></p><p class="text-[10px] text-gray-400" x-text="Number(row.price_amount) > 0 ? 'oficial da Matriz' : 'sem preço'"></p></td>
                   <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400" x-text="row.product_type === 'service' ? 'Custo não configurado' : 'por pneu'"></p></td>
                   <td class="px-4 py-3.5 text-sm font-medium" x-text="catalogoPercent(row.margin_percent)"></td>
                   <td class="px-4 py-3.5">
-                    <span x-show="row.catalogued === false" class="rounded-full border border-dashed border-emerald-700 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-800">Não catalogado</span>
+                    <span x-show="row.catalogued === false" class="rounded-full border border-dashed border-emerald-700 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-800" x-text="row.measure_draft ? 'Cadastro incompleto' : 'Não catalogado'"></span>
                     <span x-show="row.catalogued !== false && row.sellable" class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Ativo</span>
                     <span x-show="row.catalogued !== false && !(Number(row.price_amount) > 0)" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
                     <span x-show="row.catalogued !== false && Number(row.price_amount) > 0 && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
                   </td>
                   <td class="px-4 py-3.5">
                     <button type="button" @click="catalogoCompatibilityOpen(row)"
-                            :disabled="row.product_type !== 'tire' || row.catalogued === false || !row.product_id"
+                            :disabled="row.product_type !== 'tire' || !row.tire_size"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-gray-50 disabled:text-gray-400">
                       <i data-lucide="bike" class="h-3.5 w-3.5"></i>
-                      <span x-text="row.product_type !== 'tire' ? 'Não se aplica' : (row.catalogued === false ? 'Após cadastrar' : (Number(row.application_count || 0) > 0 ? Number(row.application_count) + ' aplicação(ões)' : (Number(row.compatibility_count || 0) > 0 ? Number(row.compatibility_count) + ' moto(s)' : 'Ver motos')))"></span>
+                      <span x-text="row.product_type !== 'tire' ? 'Não se aplica' : (Number(row.application_count || 0) > 0 ? Number(row.application_count) + ' aplicação(ões)' : 'Ver motos e anos')"></span>
                     </button>
                   </td>
-                  <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.product_type === 'tire' && !row.tire_position ? 'Completar ficha' : (Number(row.price_amount) > 0 ? 'Editar produto' : 'Definir preço')))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
+                  <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.measure_draft ? 'Completar cadastro' : (row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.product_type === 'tire' && !row.tire_position ? 'Completar ficha' : (Number(row.price_amount) > 0 ? 'Editar produto' : 'Definir preço'))))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
                 </tr>
               </template>
               <tr x-show="catalogoPaginaRows().length === 0"><td colspan="9" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
@@ -9938,7 +9939,7 @@
               <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Medida *</span><input id="catalog-product-measure" x-model="catalogoCadastro.form.measure" @blur="catalogoCreateSuggestCode()" type="text" maxlength="60" placeholder="Ex.: 90/90-18" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Aceita 90/90-18 ou 3.00-18.</span></label>
               <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Marca *</span><input x-model="catalogoCadastro.form.brand" @change="catalogoCreateSuggestCode()" list="catalog-brand-options" type="text" maxlength="60" placeholder="Selecione a marca" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"></label>
             </div>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Condição *</span><select x-model="catalogoCadastro.form.tire_condition" @change="catalogoCreateSuggestCode()" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
+            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Condição *</span><select x-model="catalogoCadastro.form.tire_condition" @change="catalogoCreateSuggestCode()" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><option value="" disabled>Selecione a condição</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
           </div>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Código do produto *</span><input id="catalog-product-code" x-model="catalogoCadastro.form.product_code" @input="catalogoCadastro.form.product_code = String(catalogoCadastro.form.product_code || '').toUpperCase()" type="text" maxlength="80" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Único no sistema. Aceita letras, números, ponto, barra, hífen e sublinhado.</span></label>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome padronizado</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" readonly class="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-700"><span class="mt-1 block text-[10px] leading-4 text-gray-400">Gerado automaticamente no padrão Pneu + Marca + Medida.</span></label>
@@ -10048,7 +10049,7 @@
             <div class="p-4"><p class="text-[10px] text-gray-500">Aplicações por medida</p><p class="mt-1 font-bold text-emerald-900" x-text="catalogoCompatibilidade.applications?.length || 0"></p></div>
           </section>
 
-          <section x-show="adminUser?.role === 'owner'" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <section x-show="adminUser?.role === 'owner' && catalogoCompatibilidade.row?.product_id" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div class="flex items-start gap-2"><i data-lucide="badge-plus" class="mt-0.5 h-4 w-4 text-emerald-700"></i><div><p class="text-sm font-semibold text-gray-950">Associar uma moto à medida</p><p class="mt-0.5 text-[11px] leading-4 text-gray-500">Pesquise na base normalizada. A associação será aplicada a todas as marcas e condições desta mesma medida.</p></div></div>
             <div class="relative mt-4">
               <div class="flex gap-2"><input x-model="catalogoCompatibilidade.search" @input.debounce.350ms="catalogoCompatibilitySearch()" type="search" placeholder="Ex.: Honda CG 160 2024" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><span x-show="catalogoCompatibilidade.searching" class="flex items-center px-2 text-gray-400"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i></span></div>
@@ -10076,15 +10077,16 @@
 
           <div x-show="catalogoCompatibilidade.message" :class="catalogoCompatibilidade.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="mt-4 rounded-lg border p-3 text-xs" x-text="catalogoCompatibilidade.message?.text"></div>
 
+          <p x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && !catalogoCompatibilidade.applications?.length" class="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Esta medida ainda não tem aplicação confirmada. Anos e posição permanecem pendentes de conferência.</p>
           <section x-show="catalogoCompatibilidade.applications?.length > 0" class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-            <h3 class="text-sm font-bold text-emerald-950">Aplicações consultadas no fabricante</h3>
+            <h3 class="text-sm font-bold text-emerald-950">Motos, anos e posição confirmados</h3>
             <p class="mt-1 text-xs font-semibold text-emerald-800">Em uso pelo Bot — não precisa aprovar uma por uma.</p>
             <p class="mt-1 text-[11px] leading-4 text-gray-600">Relação moto, medida e posição. Respeite ano/versão, construção e índices. Não é homologação automática do produto em estoque.</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-2">
               <template x-for="app in (catalogoCompatibilidade.applications || [])" :key="app.application_id">
                 <article class="rounded-lg border border-emerald-100 bg-white p-3">
                   <p class="text-xs font-bold text-gray-950" x-text="app.make + ' ' + app.model"></p>
-                  <p class="mt-1 text-[11px] text-gray-600" x-text="app.year_reference"></p>
+                  <p class="mt-1 text-[11px] text-gray-600" x-text="catalogoCompatibilityYearLabel(app)"></p>
                   <p class="mt-2 text-xs font-semibold text-emerald-800" x-text="(app.position === 'front' ? 'Dianteiro' : 'Traseiro') + ' · ' + app.display_measure"></p>
                   <p class="mt-1 text-[10px] text-gray-500" x-text="'Original: ' + app.tire_size + ' · Índice: ' + (app.index_spec || 'não informado') + ' · ' + app.mounting"></p>
                   <p x-show="app.notes" class="mt-1 text-[10px] text-gray-500" x-text="app.notes"></p>

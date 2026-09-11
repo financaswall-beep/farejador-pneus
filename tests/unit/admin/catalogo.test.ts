@@ -67,13 +67,13 @@ describe('catalogo conciliado com estoque e precos', () => {
           purchased_at: '2026-07-28T10:00:00.000Z',
         }],
       };
-      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications') || sql.includes('commerce.catalog_measure_registrations')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
     const result = await getCatalogOverview('test', { query } as unknown as Pool);
     expect(result.summary).toEqual({
-      products: 1, stock_only: 0, brands: 1, without_price: 0, with_stock: 1,
+      products: 1, stock_only: 0, brands: 1, without_price: 0, with_stock: 1, incomplete_registrations: 0,
       without_position: 1,
     });
     expect(result.rows[0]).toMatchObject({
@@ -114,7 +114,7 @@ describe('catalogo conciliado com estoque e precos', () => {
           },
         ],
       };
-      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications') || sql.includes('commerce.catalog_measure_registrations')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
@@ -184,7 +184,7 @@ describe('catalogo conciliado com estoque e precos', () => {
         ],
       };
       if (sql.includes('FROM commerce.wholesale_purchase_items')) return { rows: [] };
-      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications') || sql.includes('commerce.catalog_measure_registrations')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
@@ -215,7 +215,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       if (sql.includes('UPDATE commerce.matriz_product_prices')) return { rows: [] };
       if (sql.includes('INSERT INTO commerce.matriz_product_prices')) return { rows: [{ id: 'preco-novo' }] };
       if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
-      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications') || sql.includes('commerce.catalog_measure_registrations')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
     const release = vi.fn();
@@ -289,7 +289,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       }] };
       if (sql.includes('FROM commerce.wholesale_stock')) return { rows: [] };
       if (sql.includes('FROM commerce.wholesale_purchase_items')) return { rows: [] };
-      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications') || sql.includes('commerce.catalog_measure_registrations')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
     const result = await getCatalogOverview('test', { query } as unknown as Pool);

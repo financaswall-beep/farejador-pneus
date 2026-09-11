@@ -55,6 +55,8 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
     catalogoCreateSuggestCode() {
       if (this.catalogoCadastro.mode !== 'manual') return;
       const form = this.catalogoCadastro.form;
+      if (this.catalogoCadastro.row?.measure_draft
+        && (!String(form.brand || '').trim() || !form.tire_condition)) return;
       const brandCode = String(form.brand || '').normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '')
         .slice(0, 3).toUpperCase() || 'PNE';

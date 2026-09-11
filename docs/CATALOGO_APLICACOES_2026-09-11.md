@@ -146,3 +146,27 @@ Evidências locais, fora do Git:
 Essas provas não são uma conversa com o bot já implantado, nem uma homologação
 física dos pneus disponíveis. As 161 propostas pendentes continuam exigindo
 conferência técnica antes de liberar toda a abrangência pedida na lista.
+
+## Pré-cadastros e classificação no Catálogo — complemento de 11/09
+
+- O documento completo contém 83 medidas distintas: 24 já presentes e 59
+  adicionais. A contagem foi feita pelo conteúdo, incluindo o complemento da lista.
+- Migration `0226_catalog_measure_registrations.sql` aplicada em produção.
+  Grava as medidas sem criar SKU, marca, condição, preço ou estoque fictícios.
+- O Catálogo passa a mostrar 59 linhas como **Cadastro incompleto**. Completar
+  marca e condição cria o produto pelo fluxo existente; a linha genérica deixa
+  de aparecer quando já há produto daquela medida.
+- Aplicações verificadas são compartilhadas por medida, inclusive com os pneus
+  existentes. Moto, ano inicial/final e posição ficam na relação de aplicação;
+  não foi atribuída uma posição universal à ficha de cada marca/modelo de pneu.
+- 63 medidas têm pelo menos uma aplicação verificada: 23 existentes e 40 novas.
+  Isso cobre 48 dos 50 produtos de pneu existentes. As outras 20 medidas seguem
+  sem aplicação confirmada; propostas pendentes/rejeitadas não orientam o bot.
+- Produtos (53 incluindo serviços), linhas de estoque (19), fitments (4) e
+  aplicações (350) permaneceram com as mesmas contagens após a migration.
+- Snapshot anterior: `.codex-tmp/backups/catalog-registrations-2026-09-11T23-18-01-575Z-before.json`.
+  Consulta local contra os dados reais: `tmp/catalog-review/registration-verification.json`.
+- Validação desta entrega: 109 testes unitários, 4 de integração com Postgres,
+  build, typecheck e manifesto das 227 migrations. O teste de integração cobre
+  completar um pré-cadastro e conservar anos/posição sem movimentar estoque.
+- A migration está aplicada. A interface depende do deploy desta alteração.

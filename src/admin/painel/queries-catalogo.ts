@@ -5,8 +5,8 @@ import { moneyCents } from '../../shared/catalog-pricing.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
-import { applicationMeasureKey } from '../../shared/vehicle-tire-applications.js';
 import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
+import { catalogApplicationSummary, pendingCatalogMeasures } from './catalog-measure-registration.js';
 interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
   tire_condition: TireCondition | null;
@@ -49,7 +49,7 @@ export async function getCatalogOverview(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<{ summary: Record<string, number>; brands: string[]; rows: unknown[] }> {
-  const [catalog, stock, purchases] = await Promise.all([
+  const [catalog, stock, purchases, measures] = await Promise.all([
     dbPool.query<CatalogRow>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,
@@ -83,6 +83,10 @@ export async function getCatalogOverview(
            ON p.id=i.purchase_id AND p.environment=i.environment
         WHERE i.environment=$1 AND p.status='confirmed'
         ORDER BY p.purchased_at DESC,i.created_at DESC`,
+      [environment],
+    ),
+    dbPool.query<{ measure: string }>(
+      `SELECT measure FROM commerce.catalog_measure_registrations WHERE environment=$1 ORDER BY measure`,
       [environment],
     ),
   ]);
@@ -134,7 +138,7 @@ export async function getCatalogOverview(
     return {
       ...product,
       compatibility_count: Number(product.compatibility_count ?? 0),
-      application_count: applications.filter(a => a.display_measure === applicationMeasureKey(product.tire_size)).length,
+      ...catalogApplicationSummary(applications, product.tire_size),
       row_key: `product:${product.product_id}`,
       catalogued: true,
       price_amount: price,
@@ -177,6 +181,7 @@ export async function getCatalogOverview(
         currency: null,
         price_type: null,
         compatibility_count: null,
+        ...catalogApplicationSummary(applications, row.measure),
         row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
         catalogued: false,
         official_quantity_on_hand: Number(row.quantity_on_hand),
@@ -193,7 +198,8 @@ export async function getCatalogOverview(
         block_reason: 'catalog_product_missing',
       };
     });
-  const rows = [...catalogRows, ...stockOnlyRows].sort((a, b) =>
+  const measureRows = pendingCatalogMeasures(measures.rows, [...catalogRows, ...stockOnlyRows], applications);
+  const rows = [...catalogRows, ...stockOnlyRows, ...measureRows].sort((a, b) =>
     String(a.brand ?? '').localeCompare(String(b.brand ?? ''), 'pt-BR')
     || String(a.tire_size ?? '').localeCompare(String(b.tire_size ?? ''), 'pt-BR')
     || String(a.product_name).localeCompare(String(b.product_name), 'pt-BR'));
@@ -201,9 +207,10 @@ export async function getCatalogOverview(
   return {
     summary: {
       products: catalogRows.length,
+      incomplete_registrations: measureRows.length,
       stock_only: stockOnlyRows.length,
       brands: brands.length,
-      without_price: rows.filter((row) => row.price_amount === null
+      without_price: [...catalogRows, ...stockOnlyRows].filter((row) => row.price_amount === null
         || !Number.isFinite(Number(row.price_amount)) || Number(row.price_amount) <= 0).length,
       with_stock: rows.filter((row) => Number(row.total_stock_available ?? 0) > 0).length,
       without_position: catalogRows.filter((row) => row.product_type === 'tire'

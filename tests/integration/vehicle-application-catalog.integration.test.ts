@@ -8,6 +8,38 @@ let db: IntegrationDb;
 beforeAll(async()=>{db=await startPostgres();},180_000);
 afterAll(async()=>{if(db)await stopPostgres(db);},30_000);
 describe('importação real do catálogo técnico',()=>{
+  it('pré-cadastro aparece sem SKU e mantém as aplicações ao completar marca e condição', async () => {
+    Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test',
+      DATABASE_URL: db.connectionString, CHATWOOT_HMAC_SECRET: 'integration-secret',
+      ADMIN_AUTH_TOKEN: 'integration-token' });
+    const { getCatalogOverview } = await import('../../src/admin/painel/queries-catalogo.js');
+    const { createCatalogProduct } = await import('../../src/admin/painel/queries-catalogo-create.js');
+    const { getCatalogCompatibility } = await import('../../src/admin/painel/queries-catalogo-compatibilidade.js');
+    expect((await db.pool.query("SELECT count(*)::int n FROM commerce.catalog_measure_registrations WHERE environment='prod'")).rows[0].n).toBe(83);
+    expect((await db.pool.query("SELECT count(*)::int n FROM commerce.catalog_measure_registrations WHERE environment='test'")).rows[0].n).toBe(0);
+    await db.pool.query("INSERT INTO commerce.catalog_measure_registrations(environment,measure,source) VALUES ('test','160/60-17','test')");
+    await db.pool.query(`INSERT INTO commerce.vehicle_measure_applications(environment,application_id,make,model,
+      position,tire_size,display_measure,year_start,year_end,status,application_kind,reference,import_batch)
+      VALUES ('test','registration-test','Teste','Moto teste','rear','160/60R17','160/60-17',2020,2022,
+      'verified','original','{"source_url":"https://example.com/manual"}','test')`);
+    const stockBefore = (await db.pool.query('SELECT * FROM commerce.wholesale_stock')).rows;
+    const overview = await getCatalogOverview('test', db.pool);
+    const draft = overview.rows.find((r: any) => r.tire_size === '160/60-17');
+    expect(draft).toMatchObject({ measure_draft: true, product_id: null, tire_condition: null,
+      application_count: 1, application_positions: ['rear'], sellable: false });
+    const product = await createCatalogProduct({ environment: 'test', measure: '160/60-17', brand: 'Pirelli',
+      tireCondition: 'novo', productCode: 'REG-1606017-NOV', productName: 'Pneu Pirelli 160/60-17',
+      actorLabel: 'integration' }, db.pool);
+    const after = await getCatalogOverview('test', db.pool);
+    const matches = after.rows.filter((r: any) => r.tire_size === '160/60-17');
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ product_id: product.product_id, brand: 'Pirelli', tire_condition: 'novo',
+      application_count: 1, application_positions: ['rear'], tire_position: null, sellable: false });
+    expect((await getCatalogCompatibility(product.product_id, 'test', db.pool)).applications[0]).toMatchObject({
+      year_start: 2020, year_end: 2022, position: 'rear' });
+    expect((await db.pool.query('SELECT * FROM commerce.wholesale_stock')).rows).toEqual(stockBefore);
+    await db.pool.query("DELETE FROM commerce.vehicle_measure_applications WHERE environment='test' AND application_id='registration-test'");
+  }, 30_000);
   it('importa de forma idempotente, isolada e sem escrever produtos/estoque/fitments',async()=>{
     const client=await db.pool.connect();
     try {
