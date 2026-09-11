@@ -45,7 +45,14 @@ const shell=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta
   await card.getByLabel('Buscar município na demanda').filter({visible:true}).fill('');await page.waitForTimeout(500);await settled();await page.screenshot({path:path.join(out,'municipios.png'),fullPage:true});
   await card.getByRole('tab',{name:'Medidas',exact:true}).click();await settled();assert.equal(await card.locator('.rdem-measure-table tbody tr').count(),4);
   await card.locator('.rdem-measure-table').getByRole('button',{name:'90/90-12',exact:true}).click();await settled();assert.match(await card.locator('.rdem-stock-box strong').innerText(),/Zerado/);
+  assert.equal(await card.locator('.rdem-selected-total strong').innerText(),'24');assert.equal(await card.locator('.rdem-selected-share strong').innerText(),'29,3%');
+  assert.equal(await card.locator('.rdem-measure-table th').allTextContents().then(h=>h.includes('Participação')),true);
+  await page.setViewportSize({width:1500,height:1050});const tableBox=await card.locator('.rdem-measures-list').boundingBox(),chartBox=await card.locator('.rdem-measure-chart').boundingBox(),detailBox=await card.locator('.rdem-measure-detail').boundingBox();
+  assert.ok(Math.abs(tableBox.x-chartBox.x)<2);assert.ok(Math.abs(tableBox.width-chartBox.width)<2);assert.ok(chartBox.y>=tableBox.y+tableBox.height);assert.ok(detailBox.x>=chartBox.x+chartBox.width);assert.ok(Math.abs(detailBox.y-tableBox.y)<2);
+  assert.ok(await card.locator('.rdem-city-comparison .rdem-meter i').count()>0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.screenshot({path:path.join(out,'medidas.png'),fullPage:true});await card.getByRole('button',{name:'Salvar visão',exact:true}).click();
+  await card.locator('.rdem-city-comparison').filter({hasText:'Niterói'}).click();await settled();assert.equal(await card.locator('.rdem-selected-heading h3').innerText(),'90/90-12');assert.equal(await card.getByLabel('Município da demanda').inputValue(),'niteroi');
+  await card.getByRole('button',{name:'Restaurar visão',exact:true}).click();await settled();await page.setViewportSize({width:1720,height:1200});
   await card.getByLabel('Município da demanda').selectOption('niteroi');await settled();await card.getByRole('button',{name:'Restaurar visão',exact:true}).click();await settled();assert.equal(await card.getByLabel('Município da demanda').inputValue(),'sao goncalo');
   await card.getByLabel('Buscar medida na demanda').fill('180 55');await page.waitForTimeout(500);await settled();assert.equal(await card.locator('.rdem-measure-table tbody tr').count(),1);
   await card.getByLabel('Buscar medida na demanda').fill('');await page.waitForTimeout(500);await settled();

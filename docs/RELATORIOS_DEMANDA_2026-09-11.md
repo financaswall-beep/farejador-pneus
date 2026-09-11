@@ -53,3 +53,9 @@ Nenhuma migration, variável, API externa ou dependência nova. Nenhuma alteraç
 - CSVs e PDFs salvos em `artifacts/relatorios-demanda/` para inspeção local. Artefatos de teste não são versionados.
 
 As verificações gerais de paridade e tamanho ainda apontam as mesmas nove divergências anteriores em cada categoria. Nenhuma função ou rota existente foi removida ou teve seu tipo/guarda alterado; o baseline recebeu apenas 31 propriedades e nove rotas desta entrega. O painel completo também mantém o erro anterior `row is not defined` no gráfico de Compras; nenhuma nova falha de JavaScript foi encontrada no relatório.
+
+## Ajuste visual da aba Medidas
+
+A composição foi corrigida para seguir a imagem aprovada: tabela e gráfico na coluna esquerda; card da medida na direita com total de conversas, participação, estado do estoque e barras de comparação entre municípios. Cabeçalho, biblioteca, filtros e indicadores foram compactados apenas nesta aba. A lista de municípios admite rolagem e mantém todas as cidades acessíveis; clicar nela preserva a medida selecionada.
+
+A miniatura do gráfico de medidas destaca o período selecionado. A comparação continua disponível nos dados exportados e no relatório de evolução do município. Nenhuma regra de cálculo, consulta SQL, migration ou variável foi alterada. O teste no navegador verifica também a geometria das duas colunas, o percentual da medida, a troca de cidade preservando a medida e a navegação nas quatro abas.
