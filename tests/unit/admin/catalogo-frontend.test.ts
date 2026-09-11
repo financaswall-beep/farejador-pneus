@@ -29,6 +29,54 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('sugere medidas de produtos e pré-cadastros sem repetir por marca', () => {
+    const context = { ...loadCatalogModule(), catalogoCadastro: { form: { measure: '130 70' } },
+      catalogoRows: [
+        { product_type: 'tire', tire_size: '130/70-13', brand: 'Pirelli' },
+        { product_type: 'tire', tire_size: '130/70-13', brand: 'Michelin' },
+        { product_type: 'tire', tire_size: '130/70-16', measure_draft: true },
+        { product_type: 'service', tire_size: '130/70-10' },
+      ] };
+    expect(context.catalogoCreateMeasureChoices()).toEqual([
+      { measure: '130/70-13', isNew: false }, { measure: '130/70-16', isNew: false },
+    ]);
+    context.catalogoCadastro.form.measure = '130/70R13';
+    expect(context.catalogoCreateMeasureChoices()).toEqual([{ measure: '130/70-13', isNew: false }]);
+  });
+
+  it('oferece uma medida nova válida e só preenche a medida, sem criar nada ao selecionar', () => {
+    const context = { ...loadCatalogModule(), catalogoRows: [], adminUser: { role: 'owner' },
+      $nextTick: vi.fn(), apiPost: vi.fn(), catalogoCadastro: {} };
+    context.catalogoCreateNew();
+    context.catalogoCadastro.form.measure = '205/55-16';
+    const choices = context.catalogoCreateMeasureChoices();
+    expect(choices).toEqual([{ measure: '205/55-16', isNew: true }]);
+    const before = { ...context.catalogoCadastro.form };
+    context.catalogoCreateMeasurePick(choices[0]);
+    expect(context.catalogoCadastro.form).toMatchObject({ measure: '205/55-16',
+      brand: before.brand, tire_condition: before.tire_condition, price_amount: before.price_amount,
+      position: before.position });
+    expect(context.apiPost).not.toHaveBeenCalled();
+    Object.assign(context.catalogoCadastro.form, { brand: 'Pirelli', tire_condition: 'novo' });
+    context.catalogoCreateSuggestCode();
+    expect(context.catalogoCreateCanSave()).toBe(true);
+  });
+
+  it('não oferece criação com medida parcial, fora dos limites ou catálogo indisponível', () => {
+    const context = { ...loadCatalogModule(), catalogoRows: [], catalogoCadastro: { form: { measure: '' } },
+      catalogoLoading: false, catalogoError: null };
+    for (const measure of ['', '130', '130 70', '999/90-17', '90/10-17', '90/90-99', 'texto']) {
+      context.catalogoCadastro.form.measure = measure;
+      expect(context.catalogoCreateMeasureChoices()).toEqual([]);
+    }
+    context.catalogoCadastro.form.measure = '3,5-10';
+    expect(context.catalogoCreateMeasureChoices()).toEqual([{ measure: '3.50-10', isNew: true }]);
+    context.catalogoError = 'load_failed';
+    expect(context.catalogoCreateMeasureChoices()).toEqual([]);
+    context.catalogoError = null;
+    context.catalogoLoading = true;
+    expect(context.catalogoCreateMeasureChoices()).toEqual([]);
+  });
   it('completa uma medida sem inventar marca e condição nem abrir correção de estoque', async () => {
     const module = loadCatalogModule();
     const context = { ...module, adminUser: { role: 'owner' }, $nextTick: vi.fn(),

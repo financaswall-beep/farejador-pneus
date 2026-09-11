@@ -68,6 +68,44 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
         .trim().replace(/\s+/g, ' ');
     },
 
+    // A medida nominal segue o parser do cadastro; não preenche a ficha do pneu.
+    catalogoCreateMeasureValue(value) {
+      const text = String(value || '').trim().replace(/\s+/g, '').replace(',', '.');
+      const metric = text.match(/^(\d{2,3})\/(\d{2,3})(?:-|R)(\d{2})$/i);
+      if (metric) {
+        const [, width, aspect, rim] = metric.map(Number);
+        return width >= 50 && width <= 400 && aspect >= 20 && aspect <= 100 && rim >= 8 && rim <= 30
+          ? `${width}/${aspect}-${metric[3]}` : '';
+      }
+      const inch = text.match(/^(\d\.\d{1,2})(?:-|R)(\d{2})$/i);
+      return inch && Number(inch[1]) >= 1.5 && Number(inch[1]) <= 8 && Number(inch[2]) >= 8 && Number(inch[2]) <= 30
+        ? `${Number(inch[1]).toFixed(2)}-${inch[2]}` : '';
+    },
+
+    catalogoCreateMeasureChoices() {
+      const raw = String(this.catalogoCadastro.form.measure || '').trim().toUpperCase();
+      if (!raw) return [];
+      const digits = raw.replace(/\D/g, '');
+      const exact = this.catalogoCreateMeasureValue(raw);
+      const measures = [...new Set((this.catalogoRows || [])
+        .filter(row => row.product_type === 'tire')
+        .map(row => this.catalogoCreateMeasureValue(row.tire_size)).filter(Boolean))];
+      const choices = measures.filter(measure => measure.includes(raw)
+        || (digits && measure.replace(/\D/g, '').includes(digits)) || measure === exact)
+        .sort((a, b) => Number(b === exact) - Number(a === exact) || a.localeCompare(b, 'pt-BR', { numeric: true }))
+        .slice(0, 8).map(measure => ({ measure, isNew: false }));
+      if (exact && !measures.includes(exact) && !this.catalogoLoading && !this.catalogoError) {
+        choices.push({ measure: exact, isNew: true });
+      }
+      return choices;
+    },
+
+    catalogoCreateMeasurePick(choice) {
+      if (!choice?.measure || this.catalogoCadastro.mode !== 'manual') return;
+      this.catalogoCadastro.form.measure = choice.measure;
+      this.catalogoCreateSuggestCode();
+    },
+
     catalogoCreateClose() {
       if (this.catalogoCadastro.saving) return;
       this.catalogoCadastro.open = false;
@@ -77,8 +115,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
     catalogoCreateCanSave() {
       const form = this.catalogoCadastro.form;
       const manualReady = this.catalogoCadastro.mode !== 'manual'
-        || (/^(?:\d{2,3}\s*\/\s*\d{2,3}|\d(?:[.,]\d{1,2}))\s*(?:-|R)\s*\d{2}$/i
-          .test(String(form.measure || '').trim())
+        || (Boolean(this.catalogoCreateMeasureValue(form.measure))
           && String(form.brand || '').trim().length >= 2
           && ['meia_vida', 'novo', 'remold'].includes(form.tire_condition));
       const price = String(form.price_amount ?? '').trim().replace(',', '.');
