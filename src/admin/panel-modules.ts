@@ -51,6 +51,7 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   if (/^\/admin\/api\/relatorios\/vendas(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/relatorios\/compras(\/|$)/.test(path)) return ['compras'];
   if (/^\/admin\/api\/relatorios\/estoque(\/|$)/.test(path)) return ['estoque'];
+  if (/^\/admin\/api\/relatorios\/logistica(\/|$)/.test(path)) return ['logistica'];
   if (/^\/admin\/api\/dashboard\/matriz-resumo/.test(path)) return ['resumo'];
   if (/^\/admin\/api\/dashboard\/(pedidos|produtos)/.test(path)) return ['resumo'];
   if (/^\/admin\/api\/dashboard\/rede/.test(path)) return ['rede'];

@@ -7,7 +7,7 @@ window.PAINEL_MODULES.relatoriosView = function () {
         {id:'vendas',group:'VENDAS',label:'Vendas da Matriz',description:'Atacado e varejo',icon:'files',module:'vendas'},
         {id:'compras',group:'OPERAÇÃO',label:'Compras e fornecedores',description:'Valores, produtos e fornecedores',icon:'shopping-cart',module:'compras'},
         {id:'estoque',group:'OPERAÇÃO',label:'Estoque e reposição',description:'Disponibilidade, giro e reposição',icon:'boxes',module:'estoque'},
-        {id:'logistica',group:'OPERAÇÃO',label:'Entregas e rotas',description:'Abrir Logística',icon:'truck',module:'logistica',page:'logistica'},
+        {id:'logistica',group:'OPERAÇÃO',label:'Entregas e rotas',description:'Entregas, ocorrências e custos',icon:'truck',module:'logistica'},
         {id:'financeiro',group:'FINANCEIRO',label:'Resultado, caixa e títulos',description:'Abrir Financeiro',icon:'wallet',module:'financeiro',page:'financeiro'},
         {id:'rede',group:'REDE E BOT',label:'Desempenho dos parceiros',description:'Abrir Rede',icon:'users',module:'rede',page:'rede'},
         {id:'faltas',group:'REDE E BOT',label:'Faltas por loja',description:'Produtos sem disponibilidade',icon:'store',module:'bot',page:'bot'},

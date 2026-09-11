@@ -11,6 +11,7 @@ import { logger } from '../../shared/logger.js';
 import { failMatrizDelivery, getMatrizLogistica, listMatrizExpenseCategories,
   requeueMatrizDelivery, rescheduleMatrizDelivery, setMatrizDeliveryStatus } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
+import { registerLogisticsReportRoutes } from './route-logistics-report.js';
 
 export const logisticaStatusSchema = z.object({
   order_id: z.string().uuid(),
@@ -80,6 +81,7 @@ export const repararDespesaComprovanteSchema = z.object({
 });
 
 export async function registerPainelLogistica(fastify: FastifyInstance): Promise<void> {
+  await registerLogisticsReportRoutes(fastify);
   // ── MATRIZ — LOGÍSTICA (0121, flag MATRIZ_LOGISTICS) ─────────────────────────
   // Entregas da 'main' nos moldes do parceiro + diário de rota do entregador
   // (km inicial/final, gasolina, comprovantes). "Não entregue" CANCELA no caminho
