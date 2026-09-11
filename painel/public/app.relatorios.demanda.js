@@ -4,7 +4,7 @@ window.PAINEL_MODULES.relatoriosDemanda=function(){
   const parse=d=>new Date(d+'T12:00:00Z'),date=d=>d.toISOString().slice(0,10);
   return{
     rdem:{tab:'overview',mode:'month',month:today().slice(0,7),from:'',to:'',compare:true,city:'',citySearch:'',measure:'',search:'',
-      metric:'conversations',grain:'day',sort:'conversations',data:null,loading:false,error:'',page:1,saved:false,notice:'',showRules:false,showChartTable:false,exporting:false,exportError:''},
+      metric:'conversations',grain:'day',sort:'conversations',data:null,loading:false,error:'',page:1,saved:false,notice:'',showRules:false,showChartTable:false,allEvolutionCities:false,exporting:false,exportError:''},
     rdemOpen(){try{this.rdem.saved=!!localStorage.getItem(this.rdemStorageKey());}catch(_){}if(!this.rdem.from)this.rdemPeriod('month');else void this.rdemLoad();},
     rdemPeriod(mode,step=0){const old=this.rdem.mode;this.rdem.mode=mode;if(mode==='custom')return;let from,to;
       if(mode==='month'){from=parse((this.rdem.month||today().slice(0,7))+'-01');from.setUTCMonth(from.getUTCMonth()+step);if(date(from)>today())from=parse(today().slice(0,7)+'-01');to=new Date(from);to.setUTCMonth(to.getUTCMonth()+1,0);this.rdem.month=date(from).slice(0,7);}
@@ -14,6 +14,7 @@ window.PAINEL_MODULES.relatoriosDemanda=function(){
     rdemQuery(filters=null){const f=filters||this.rdem;return new URLSearchParams({from:f.from,to:f.to,mode:f.mode,compare:String(f.compare),city:f.city,citySearch:f.citySearch,
       measure:f.measure,search:f.search,view:f.view||f.tab,metric:f.metric,grain:f.grain,sort:f.sort}).toString();},
     async rdemLoad(){const id=++request;Object.assign(this.rdem,{loading:true,error:'',exportError:'',page:1});const from=parse(this.rdem.from),to=parse(this.rdem.to);
+      if(this.rdem.tab==='evolution'&&this.rdem.citySearch)this.rdem.allEvolutionCities=true;
       if(!Number.isFinite(+from)||!Number.isFinite(+to)||date(from)!==this.rdem.from||date(to)!==this.rdem.to||from>to||this.rdem.to>today()||to-from>365*86400000){
         this.rdem.data=null;this.rdem.error='Escolha um período válido de até 366 dias, encerrado até hoje.';this.rdem.loading=false;return;}
       try{const data=await this.apiGet('/admin/api/relatorios/demanda?'+this.rdemQuery());if(id!==request)return;this.rdem.data=data;this.rdem.city=data.filters.city;}

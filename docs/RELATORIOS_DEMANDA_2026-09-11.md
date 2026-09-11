@@ -59,3 +59,11 @@ As verificações gerais de paridade e tamanho ainda apontam as mesmas nove dive
 A composição foi corrigida para seguir a imagem aprovada: tabela e gráfico na coluna esquerda; card da medida na direita com total de conversas, participação, estado do estoque e barras de comparação entre municípios. Cabeçalho, biblioteca, filtros e indicadores foram compactados apenas nesta aba. A lista de municípios admite rolagem e mantém todas as cidades acessíveis; clicar nela preserva a medida selecionada.
 
 A miniatura do gráfico de medidas destaca o período selecionado. A comparação continua disponível nos dados exportados e no relatório de evolução do município. Nenhuma regra de cálculo, consulta SQL, migration ou variável foi alterada. O teste no navegador verifica também a geometria das duas colunas, o percentual da medida, a troca de cidade preservando a medida e a navegação nas quatro abas.
+
+## Ajuste visual da aba Evolução
+
+A aba segue a referência aprovada: filtros de município, indicador e agrupamento no topo; faixa verde com conversas, pedidos, conversão e faltas; gráfico amplo com pontos, área verde e comparação tracejada em laranja. Abaixo ficam a comparação entre municípios e as diferenças de conversas, pedidos e conversão da cidade selecionada. A tabela mostra quatro cidades inicialmente e permite expandir, buscar e paginar a lista completa.
+
+Datas, variações e resumos usam a consulta existente. A média considera todos os dias do intervalo, mesmo no agrupamento semanal; o pico semanal informa o intervalo completo. Sem comparação não há curva anterior nem diferenças calculadas. Base anterior zero não gera percentual artificial. Os estilos compactos do cabeçalho e da biblioteca são compartilhados com Medidas.
+
+Validação: build, quatro abas no navegador e no celular, geometria dos cards, totais e diferenças, média diária no agrupamento semanal, expansão/paginação das cidades, oito exportações CSV/PDF e painel completo com permissão somente Bot. A prova de paridade mantém apenas as nove divergências anteriores; o baseline recebeu cinco auxiliares desta interface. Nenhuma migration, variável, consulta SQL ou regra do Bot mudou.
