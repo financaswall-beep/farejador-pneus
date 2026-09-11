@@ -52,7 +52,7 @@ function idFromSearchResult(name: string, content: string | null): string[] {
   } catch {
     return [];
   }
-  if (name === 'buscar_produto' && Array.isArray(r.produtos)) {
+  if (SEARCH_TOOLS.has(name) && Array.isArray(r.produtos)) {
     const ids = (r.produtos as Array<{ product_id?: unknown }>).map((p) => p?.product_id).filter((x): x is string => typeof x === 'string');
     return ids.length ? [ids[0]!] : [];
   }

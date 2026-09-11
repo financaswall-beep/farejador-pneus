@@ -1,5 +1,6 @@
 import type { PartnerContext } from './auth.js';
-import { applicationsForMeasure } from '../shared/vehicle-tire-applications.js';
+import { applicationMeasureKey } from '../shared/vehicle-tire-applications.js';
+import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { withPartnerContext } from './db.js';
 import { safeLocalStockEntries } from './panel-catalog-stock.js';
 import {
@@ -191,6 +192,7 @@ export async function getPartnerPanelCatalog(
         LIMIT $7 OFFSET $8`,
       [...filters, limit, (page - 1) * limit],
     );
+    const applications = await loadVehicleApplicationCatalog(client, ctx.environment);
     const total = finiteNumber(totalResult.rows[0]?.total);
     const summary = summaryResult.rows[0];
     return {
@@ -219,7 +221,7 @@ export async function getPartnerPanelCatalog(
         tire_size: row.tire_size,
         tire_position: row.tire_position,
         tire_construction: row.tire_construction ?? null,
-        application_count: row.product_type === 'tire' ? applicationsForMeasure(row.tire_size).length : 0,
+        application_count: row.product_type === 'tire' ? applications.filter(a => a.display_measure === applicationMeasureKey(row.tire_size)).length : 0,
         has_local_stock: finiteNumber(row.local_stock_rows) > 0,
         local_stock_rows: finiteNumber(row.local_stock_rows),
         local_quantity_on_hand: finiteNumber(row.local_quantity_on_hand),
@@ -283,7 +285,7 @@ export async function getPartnerPanelCatalogCompatibility(
         fitments: fitments.rows.length,
       },
       rows: fitments.rows,
-      applications: applicationsForMeasure(product.tire_size),
+      applications: await loadVehicleApplicationCatalog(client, ctx.environment, product.tire_size),
     };
   });
 }

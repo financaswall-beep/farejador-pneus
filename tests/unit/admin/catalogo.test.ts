@@ -67,6 +67,7 @@ describe('catalogo conciliado com estoque e precos', () => {
           purchased_at: '2026-07-28T10:00:00.000Z',
         }],
       };
+      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
@@ -113,6 +114,7 @@ describe('catalogo conciliado com estoque e precos', () => {
           },
         ],
       };
+      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
@@ -182,6 +184,7 @@ describe('catalogo conciliado com estoque e precos', () => {
         ],
       };
       if (sql.includes('FROM commerce.wholesale_purchase_items')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
 
@@ -212,6 +215,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       if (sql.includes('UPDATE commerce.matriz_product_prices')) return { rows: [] };
       if (sql.includes('INSERT INTO commerce.matriz_product_prices')) return { rows: [{ id: 'preco-novo' }] };
       if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
     const release = vi.fn();
@@ -285,6 +289,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       }] };
       if (sql.includes('FROM commerce.wholesale_stock')) return { rows: [] };
       if (sql.includes('FROM commerce.wholesale_purchase_items')) return { rows: [] };
+      if (sql.includes('commerce.vehicle_measure_applications')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
     const result = await getCatalogOverview('test', { query } as unknown as Pool);

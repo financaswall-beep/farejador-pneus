@@ -31,6 +31,7 @@ import { getMatrizWholesaleStockQty, applyMatrizGalpaoReturn, applyMatrizRetailC
 import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
+import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
@@ -95,7 +96,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_compatibilidade',
-      description: 'Consulta primeiro as compatibilidades cadastradas no banco por moto, ano e posição, respeitando a faixa de anos inclusive. Sem vínculo aprovado, consulta a referência do fabricante. Se retornar somente medidas, com estoque_consultado=false, use buscar_produto para preço/estoque.',
+      description: 'Consulta compatibilidades cadastradas e aplicações verificadas por medida no banco, respeitando modelo, posição e faixa de anos inclusive. Ao resolver a medida, consulta também preço/estoque. Use consultas_estoque quando presente; pergunte somente o contexto indicado nas flags precisa_confirmar_*. Falha ou lacuna de aplicação não significa falta de estoque.',
       parameters: {
         type: 'object',
         properties: {
@@ -395,8 +396,33 @@ export async function executeTool(
         // A edição de um manual não limita a vigência cadastrada. A referência
         // só é consultada DEPOIS dos vínculos aprovados para o modelo/ano/posição.
         if (withApprovedFitments.length === 0) {
-          const application = vehicleApplicationAnswer(compatInput);
-          if (application) return JSON.stringify(application);
+          const catalog = await loadVehicleApplicationCatalog(client, environment);
+          const application = vehicleApplicationAnswer(compatInput, catalog);
+          if (application) {
+            if (!application.consultas_de_produto.length) return JSON.stringify(application);
+            // Mesma busca comercial, localização e rastreamento usados para medida digitada.
+            // Não depender de outra rodada do LLM para consultar o estoque da aplicação.
+            const searches: Array<{ medida_pneu: string; resultado: Record<string, unknown> }> = [];
+            for (const query of application.consultas_de_produto) {
+              const positions = [...new Set(application.aplicacoes
+                .filter(a => a.display_measure === query.medida_pneu).map(a => a.position))];
+              const resultado = JSON.parse(await executeTool(client, environment, conversationId,
+                'buscar_produto', { ...query,
+                  // A busca aceita posição não cadastrada, mas exclui a oposta explícita.
+                  posicao_pneu: positions.length === 1 ? positions[0] : 'both',
+                  bairro: args.bairro, municipio: args.municipio })) as Record<string, unknown>;
+              searches.push({ medida_pneu: query.medida_pneu, resultado });
+            }
+            return JSON.stringify({ ...application,
+              estoque_consultado: searches.every(s => !s.resultado.erro),
+              consultas_estoque: searches,
+              produtos: searches.flatMap(s => Array.isArray(s.resultado.produtos) ? s.resultado.produtos : []),
+              ...(searches.some(s => s.resultado.precisa_localizacao) ? { precisa_localizacao: true } : {}),
+              ...(searches.some(s => s.resultado.sem_estoque_loja_perto) ? { sem_estoque_loja_perto: true } : {}),
+              ...(searches.some(s => s.resultado.erro) ? { falha_consulta_estoque: true } : {}),
+              proximo_passo: 'A medida já foi identificada e consultas_estoque contém a busca comercial feita agora. Não repita pergunta de ano/foto quando as flags forem falsas. Use somente os produtos, preços e disponibilidade retornados, respeitando precisa_localizacao e sem_estoque_loja_perto. Uma consulta com erro não significa falta de estoque. Sem produto cadastrado nessa medida, informe que não encontrou opção no catálogo consultado. A aplicação é por medida; a construção, os índices e a montagem do SKU ainda precisam corresponder à referência. Não troque radial por diagonal.',
+            });
+          }
           return JSON.stringify(result.length === 0
             ? { encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo e ano.' }
             : { encontrado: false, motivo: 'compatibilidade_nao_cadastrada',

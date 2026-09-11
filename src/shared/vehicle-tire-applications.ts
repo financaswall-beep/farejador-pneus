@@ -1,7 +1,12 @@
 import research from './data/vehicle-tire-research-20260906.json' with { type: 'json' };
 
 // Catálogo público versionado, independente de estoque/SKU. Nunca homologa produto.
-export const VEHICLE_APPLICATION_VERSION = 'manufacturer-applications-20260911-v5';
+export const VEHICLE_APPLICATION_VERSION = 'measure-catalog-20260911-v6';
+
+// Fonte inicial para instalação/migração. Bot e painel leem o catálogo no banco.
+export function manufacturerApplicationSeed(): VehicleTireApplication[] {
+  return applications.map(copyApplication);
+}
 export interface VehicleTireApplication {
   application_id: string;
   make: string;

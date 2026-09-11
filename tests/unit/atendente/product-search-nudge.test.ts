@@ -10,6 +10,10 @@ describe('orientação de localização antes da busca de pneu', () => {
     'tem pneus pra nmax?',
     '90/90-12',
     '130/70R13',
+    '130 70 13',
+    '90 90 12',
+    'quero pneu 130 - 70 - 13',
+    '140/70 ZR17',
     '3.00-10',
   ])('alcança o pedido %s sem exigir busca antes da localização', (message) => {
     const nudge = buildProductSearchNudge(message, false);
@@ -18,7 +22,8 @@ describe('orientação de localização antes da busca de pneu', () => {
     expect(nudge).not.toContain('OBRIGATÓRIO: chame buscar_produto');
   });
 
-  it.each(['Olá, bom dia', 'Rua das Flores, 50, Alcântara', 'Quero falar com um atendente', '', null])(
+  it.each(['Olá, bom dia', 'Rua das Flores, 50, Alcântara', 'Quero falar com um atendente',
+    '11/09/2026', '11 09 26', '+55 21 99999-9999', '130 70', '', null])(
     'não força busca nem abertura na mensagem %s', (message) => {
       expect(buildProductSearchNudge(message, false)).toBe('');
     },
@@ -35,5 +40,13 @@ describe('orientação de localização antes da busca de pneu', () => {
     const nudge = buildProductSearchNudge('quero 90/90-12, sou de Alcântara', false);
     expect(nudge).toContain('Confira a mensagem atual e o histórico');
     expect(nudge).toContain('Se o endereço/bairro/região JÁ foi informado, aproveite-o');
+  });
+
+  it('medida com espaços segue a busca direta mesmo com nome de moto na mensagem', () => {
+    const nudge = buildProductSearchNudge('quero 130 70 13 pra NMAX', true);
+    expect(nudge).toContain('use buscar_produto com essa medida');
+    expect(nudge).toContain('não pergunte modelo da moto, ano, dianteiro/traseiro nem peça foto');
+    expect(nudge).not.toContain('quando houver somente o modelo da moto');
+    expect(nudge).not.toContain(CUSTOMER_LOCATION_REQUEST);
   });
 });

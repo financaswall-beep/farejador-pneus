@@ -13,8 +13,11 @@ vi.mock('../../../src/atendente-v2/delivery-quote-routing.js', () => ({
 }));
 vi.mock('../../../src/atendente-v2/channel-pricing.js', () => ({
   applyMatrizPricesToCompatibility: async () => {},
+  applyMatrizPricesToProducts: async () => {},
 }));
 
+import { manufacturerApplicationSeed } from '../../../src/shared/vehicle-tire-applications.js';
+import { buildApplicationImport } from '../../../scripts/vehicle-application-import.js';
 import { executeTool } from '../../../src/atendente-v2/tools.js';
 
 const vehicle = {
@@ -34,6 +37,8 @@ function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitmen
   const query = vi.fn(async (sql: string, _values?: unknown[]) => {
     if (sql.includes('resolve_vehicle_model')) return { rows: vehicles };
     if (sql.includes('vehicle_fitments') || sql.includes('find_compatible_tires')) return { rows: products };
+    if (sql.includes('vehicle_measure_applications')) return { rows: manufacturerApplicationSeed().map(a => ({ ...a, reference:a })) };
+    if (sql.includes('FROM commerce.products') || sql.includes('search_products') || sql.includes('commerce.product_full')) return { rows: [] };
     if (sql.includes('wholesale_stock')) return { rows: [] };
     throw new Error(`Consulta inesperada: ${sql}`);
   });
@@ -76,7 +81,7 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
     const answer = JSON.parse(await executeTool(client, 'test', 'conv', 'buscar_compatibilidade', args));
     expect(query).toHaveBeenCalled();
     expect(answer).toMatchObject({ tipo_resultado: 'aplicacao_de_medida_do_fabricante',
-      precisa_confirmar_ano: false, estoque_consultado: false, produto_confirmado: false,
+      precisa_confirmar_ano: false, estoque_consultado: true, produto_confirmado: false,
       consultas_de_produto: [{ medida_pneu: '140/70-17' }] });
     expect(answer).not.toHaveProperty('veiculos');
   });
@@ -137,5 +142,29 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
     expect(answer.erro).toBeDefined();
     expect(answer).not.toHaveProperty('aplicacoes');
     expect(answer).not.toHaveProperty('veiculos');
+  });
+  it('resolve NMAX sem SKU vinculado, consulta o estoque e preserva a exigência de localização', async () => {
+    const query = vi.fn(async (sql:string) => {
+      if(sql.includes('resolve_vehicle_model'))return {rows:[]};
+      if(sql.includes('vehicle_measure_applications'))return {rows:buildApplicationImport()
+        .filter(r=>r.status==='verified').map(({application:a})=>({...a,reference:a}))};
+      if(sql.includes('FROM commerce.products')||sql.includes('commerce.product_full'))return {rows:[{
+        product_id:'nmax-pneu',product_name:'Pneu Michelin',product_type:'tire',brand:'Michelin',
+        tire_condition:'meia_vida',tire_size:'130/70-13',price_amount:'150.00',total_stock_available:0,
+      }]};
+      if(sql.includes('wholesale_stock'))return {rows:[]};
+      throw Error('unexpected');
+    });
+    // O teste do caminho legado usa a mesma precificação sem alterar valores.
+    const answer=JSON.parse(await executeTool({query} as unknown as PoolClient,'test','conv','buscar_compatibilidade',{
+      moto_modelo:'NMAX',moto_ano:2018,posicao_pneu:'rear',
+    }));
+    expect(answer).toMatchObject({estoque_consultado:true,precisa_confirmar_ano:false,
+      precisa_confirmar_modelo_versao:false,precisa_localizacao:true,produto_confirmado:false});
+    expect(answer.produtos[0]).toMatchObject({product_id:'nmax-pneu',total_stock_available:0});
+    expect(answer.consultas_estoque[0].medida_pneu).toBe('130/70-13');
+    const productQuery = query.mock.calls.find(([sql]) => sql.includes('FROM commerce.products')
+      || sql.includes('commerce.product_full'));
+    expect(productQuery?.[0]).toContain(unified ? 'ts.position IS NULL' : 'tire_position IS NULL');
   });
 });

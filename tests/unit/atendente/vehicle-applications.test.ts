@@ -147,11 +147,11 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
       consultas_de_produto: [{ medida_pneu: '150/60-17' }] });
   });
 
-  it('pede confirmação de ambiguidade e de ano não delimitado', () => {
+  it('não confunde edições da mesma medida com ambiguidade; preserva ano não delimitado', () => {
     expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'fan' })))
-      .toMatchObject({ precisa_confirmar_modelo_versao: true, precisa_confirmar_ano: true });
+      .toMatchObject({ precisa_confirmar_modelo_versao: false, precisa_confirmar_ano: true, precisa_confirmar_posicao: true });
     expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Lindy 125', moto_ano: 2020 })))
-      .toMatchObject({ precisa_confirmar_ano: true });
+      .toMatchObject({ precisa_confirmar_ano: false, precisa_confirmar_medida: true });
     expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Modelo inexistente' }))).toBeNull();
   });
 

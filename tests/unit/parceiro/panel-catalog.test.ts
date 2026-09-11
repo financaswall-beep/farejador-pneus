@@ -30,6 +30,7 @@ const context: PartnerContext = {
 describe('catálogo seguro do painel parceiro', () => {
   beforeEach(() => {
     mocks.query.mockReset();
+    mocks.query.mockResolvedValue({ rows: [] });
     mocks.withPartnerContext.mockReset();
     mocks.withPartnerContext.mockImplementation(async (_id: string, work: Function) => (
       work({ query: mocks.query })

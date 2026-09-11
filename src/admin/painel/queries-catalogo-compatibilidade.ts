@@ -2,7 +2,8 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
-import { applicationsForMeasure, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
+import { applicationMeasureKey, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
+import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
 
 export interface CatalogCompatibilityRow {
   vehicle_model_id: string;
@@ -236,6 +237,8 @@ export async function getCatalogCompatibility(
   summary: { models: number; fitments: number };
   rows: CatalogCompatibilityRow[];
   applications: VehicleTireApplication[];
+  application_reviews: Array<{ application_id: string; make: string; model: string;
+    position: string; year_start: number | null; year_end: number | null; status: string; review_note: string }>;
 }> {
   const product = await dbPool.query<{
     product_id: string;
@@ -274,6 +277,11 @@ export async function getCatalogCompatibility(
       ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position`,
     [environment, productId],
   );
+  const applications = await loadVehicleApplicationCatalog(dbPool, environment, selected.tire_size);
+  const reviews = await dbPool.query(`SELECT application_id,make,model,position,year_start,year_end,status,review_note
+    FROM commerce.vehicle_measure_applications WHERE environment=$1
+      AND display_measure=$2 AND status<>'verified' ORDER BY make,model,application_id`,
+  [environment, applicationMeasureKey(selected.tire_size)]);
   return {
     product: selected,
     summary: {
@@ -281,7 +289,8 @@ export async function getCatalogCompatibility(
       fitments: fitments.rows.length,
     },
     rows: fitments.rows,
-    applications: applicationsForMeasure(selected.tire_size),
+    applications,
+    application_reviews: reviews.rows,
   };
 }
 

@@ -70,6 +70,19 @@ describe('tools do Bot usam a fonte oficial da Matriz', () => {
     expect(allSql(query)).not.toMatch(/product_name\s+ILIKE/i);
   });
 
+  it('busca 130 70 13 sem exigir moto, ano ou posição e sem consultar compatibilidades', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [product('nmax', 'NMAX', '130/70-13'), product('outro', 'OUTRO', '110/70-13')] })
+      .mockResolvedValueOnce({ rows: [{ measure: '130/70-13', brand: 'Rinaldi', quantity_on_hand: 3, unit_cost: 50 }] });
+    const result = await buscarProdutoMatriz({ query } as unknown as PoolClient, {
+      environment: 'test', medida_pneu: '130 70 13', limit: 10,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ product_id: 'nmax', tire_size: '130/70-13',
+      total_stock_available: 3, requested_tire_position: null });
+    expect(allSql(query)).not.toMatch(/vehicle_models|vehicle_fitments|vehicle_measure_applications/);
+  });
+
   it('não descarta SKU sem posição quando a medida e a aplicação foram informadas', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [

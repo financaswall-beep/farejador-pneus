@@ -5,7 +5,8 @@ import { moneyCents } from '../../shared/catalog-pricing.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
-import { applicationsForMeasure } from '../../shared/vehicle-tire-applications.js';
+import { applicationMeasureKey } from '../../shared/vehicle-tire-applications.js';
+import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
 interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
   tire_condition: TireCondition | null;
@@ -85,6 +86,7 @@ export async function getCatalogOverview(
       [environment],
     ),
   ]);
+  const applications = await loadVehicleApplicationCatalog(dbPool, environment);
   const stockIndex = buildMatrizStockIndex(stock.rows);
   const stockByKey = new Map(stock.rows.map((row) => [
     catalogVariantKey(row.measure, row.brand, row.tire_condition), row,
@@ -132,7 +134,7 @@ export async function getCatalogOverview(
     return {
       ...product,
       compatibility_count: Number(product.compatibility_count ?? 0),
-      application_count: applicationsForMeasure(product.tire_size).length,
+      application_count: applications.filter(a => a.display_measure === applicationMeasureKey(product.tire_size)).length,
       row_key: `product:${product.product_id}`,
       catalogued: true,
       price_amount: price,

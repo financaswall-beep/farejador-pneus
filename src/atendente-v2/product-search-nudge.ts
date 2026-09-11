@@ -1,7 +1,8 @@
 export const CUSTOMER_LOCATION_REQUEST =
   'Me manda sua localização fixa 📍 ou seu endereço, amigo, que eu vejo onde encontro esse pneu mais perto de você.';
 
-const TIRE_SIZE_RE = /(?:\d{2,3}\/\d{2,3}|\d{1,2}\.\d{2})[-/rR]\d{2}/;
+// Aceita a escrita de balcão ("130 70 13"), sem confundir datas/telefones usuais.
+const TIRE_SIZE_RE = /\b(?:(?:[6-9]\d|[1-3]\d{2})(?:\s*[/\-]\s*|\s+)(?:[2-9]\d|100)(?:\s*(?:ZR|R|B|[-/])\s*|\s+)(?:1\d|2\d)|\d{1,2}\.\d{2}\s*[-/]\s*\d{2})\b/i;
 const TIRE_REQUEST_RE = /\bpneu(?:s|zinho|zinhos)?\b|\b(?:dianteiro|traseiro)\b/i;
 
 /** Alinha a instrução de busca à etapa de localização. O histórico continua
@@ -9,7 +10,7 @@ const TIRE_REQUEST_RE = /\bpneu(?:s|zinho|zinhos)?\b|\b(?:dianteiro|traseiro)\b/
 export function buildProductSearchNudge(latestCustomerText: string | null | undefined, hasPin: boolean): string {
   if (!latestCustomerText || (!TIRE_SIZE_RE.test(latestCustomerText) && !TIRE_REQUEST_RE.test(latestCustomerText))) return '';
   const search = TIRE_SIZE_RE.test(latestCustomerText)
-    ? 'O cliente informou uma medida: use buscar_produto com essa medida, sem perguntar o modelo da moto.'
+    ? 'O cliente informou uma medida: use buscar_produto com essa medida. Escrita com espaços, como 130 70 13, significa 130/70-13. Preserve R/ZR/B quando informados. Para buscar e cotar, não pergunte modelo da moto, ano, dianteiro/traseiro nem peça foto ou confirmação da medida já completa. Não use buscar_compatibilidade apenas para repetir essa identificação. Só investigue aplicação se o cliente perguntar se serve na moto ou houver um conflito concreto.'
     : 'Use buscar_produto se houver medida ou marca; use buscar_compatibilidade quando houver somente o modelo da moto.';
   return `\n\n[LOCALIZAÇÃO ANTES DA DISPONIBILIDADE DO PNEU]
 Este lembrete vale para busca/cotação de pneu. Se o assunto for pedido existente, cancelamento, entrega em andamento ou política da loja, siga o fluxo correspondente; mencionar pneu não exige uma nova busca.

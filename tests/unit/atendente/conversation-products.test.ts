@@ -16,6 +16,11 @@ function calcularFrete(...ids: string[]): ChatMessage[] {
 }
 
 describe('extractRecentProductIds', () => {
+  it('mantém o produto da busca automática após aplicação por medida', () => {
+    const actions = buscarProduto('NMAX-SKU');
+    actions[0]!.tool_calls![0]!.function.name = 'buscar_compatibilidade';
+    expect(extractRecentProductIds([actions])).toEqual(['NMAX-SKU']);
+  });
   it('pega o product_id do último buscar_produto', () => {
     expect(extractRecentProductIds([buscarProduto('803a')])).toEqual(['803a']);
   });
