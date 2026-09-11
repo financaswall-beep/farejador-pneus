@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CUSTOMER_LOCATION_REQUEST } from '../../../src/atendente-v2/product-search-nudge.js';
 import {
   botAskedForLocation,
   buildLocationReplyNudge,
@@ -26,6 +27,12 @@ describe('botAskedForLocation', () => {
 });
 
 describe('buildLocationReplyNudge', () => {
+  it('reconhece a nova abertura e orienta cotar após o endereço, sem pular para a modalidade', () => {
+    const nudge = buildLocationReplyNudge(CUSTOMER_LOCATION_REQUEST, false);
+    expect(nudge).toContain('Se AINDA NÃO houve cotação, apresente as opções e preços retornados antes de perguntar entrega/retirada');
+    expect(buildLocationReplyNudge(CUSTOMER_LOCATION_REQUEST, true)).toBe('');
+  });
+
   it('anexa o empurrão quando o bot pediu localização e NÃO há pino', () => {
     expect(buildLocationReplyNudge('me manda tua localização 📍', false)).toBe(LOCATION_REPLY_NUDGE);
   });

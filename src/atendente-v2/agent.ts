@@ -7,9 +7,10 @@ import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendFinalAgentText } from './final-send.js';
-import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
+import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
+import { buildProductSearchNudge } from './product-search-nudge.js';
 import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
@@ -61,7 +62,7 @@ async function nearestStoreKm(
 export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const start = Date.now();
   const { conversationId, environment, jobId } = job;
-  const logCtx = { job_id: jobId, conversation_id: conversationId, agent: 'v2' };
+  const logCtx = { job_id: jobId, conversation_id: conversationId, agent: 'v2', extractor_version: PROMPT_EXTRACTOR_VERSION };
 
   const client = await pool.connect();
   const mayContinue = () => botMayProcessTrigger(client,environment as Environment,conversationId,job.triggerMessageId);
@@ -138,16 +139,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // recita o pneu de novo em vez de reconhecer a loja e avançar (conversa 668, 06-16).
     // Permissivo: se o cliente mudou de assunto, manda seguir o cliente (não engessa).
     const locationNudge = buildLocationReplyNudge(lastAssistantText, customerPin != null);
-    // Empurrão de MEDIDA DE PNEU: quando o cliente nomeia uma medida (ex: 90/90-12), o
-    // LLM às vezes responde "Tenho sim" de cabeça sem chamar buscar_produto — prometendo
-    // estoque que não conferiu. Detecta o padrão numérico na última mensagem e injeta
-    // ordem forte pro modelo chamar a ferramenta PRIMEIRO. Regex cobre os formatos reais:
-    // 90/90-12, 130/70-17, 90/90R18, 3.00-10. NUNCA dispara em mensagens sem medida.
-    const TIRE_SIZE_RE = /\d{2,3}[\/\.]\d{2,3}[-\/rR]\d{2}/;
-    const productNudge =
-      latestCustomerText && TIRE_SIZE_RE.test(latestCustomerText)
-        ? '\n\n[MEDIDA DE PNEU DETECTADA] O cliente informou uma medida de pneu na última mensagem. OBRIGATÓRIO: chame buscar_produto com essa medida ANTES de responder. Nunca diga "tenho"/"temos" nem confirme estoque sem o resultado da ferramenta neste turno — responder de memória é PROIBIDO.'
-        : '';
+    // A busca respeita a localização primeiro, inclusive em pedidos sem medida
+    // ("pneuzinho traseiro da Twister"). Não exige busca antes de saber a região.
+    const productNudge = buildProductSearchNudge(latestCustomerText, customerPin != null);
     // Empurrão de ENTREGA-PELO-PINO (furo da conversa #696): quando o cliente escolhe entrega
     // e já mandou o pino, o bot travava pedindo o endereço escrito só pra COTAR o frete. Com a
     // flag on (calcular_frete já cota pelo pino), garante o comportamento: cotar primeiro,

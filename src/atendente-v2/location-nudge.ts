@@ -31,7 +31,7 @@ export function botAskedForLocation(lastAssistantText: string | null | undefined
 export const LOCATION_REPLY_NUDGE = `
 
 [VOCÊ JÁ PEDIU A LOCALIZAÇÃO NESTA CONVERSA] Sua mensagem anterior pediu a localização/endereço do cliente e ele acabou de responder. Então:
-- SE a resposta tem um bairro ou endereço (ex.: "Irajá", "Madureira", "rua tal, 100"): você JÁ TEM a localização — NÃO peça de novo e NÃO repita a medida/preço do pneu que você já falou. Extraia o bairro, use as ferramentas passando "bairro" pra confirmar a loja mais perto, RECONHEÇA essa loja e AVANCE (ex.: "achei a loja pertinho de [bairro] — quer entrega ou retirada?").
+- SE a resposta tem um bairro ou endereço (ex.: "Irajá", "Madureira", "rua tal, 100"): você JÁ TEM a localização — NÃO peça de novo. Extraia o bairro e use a ferramenta de busca com o pneu/modelo já informado e "bairro" para consultar uma loja que possa atender. Se AINDA NÃO houve cotação, apresente as opções e preços retornados antes de perguntar entrega/retirada. Se JÁ houve cotação, não repita a medida/preço sem necessidade: confirme a disponibilidade pela busca atual e avance na etapa que falta. Só reconheça uma loja com estoque quando o resultado confirmar; se não tiver, diga isso sem inventar disponibilidade.
 - SE o cliente mudou de assunto (trocou de pneu/moto, perguntou preço ou outra coisa): siga o cliente normalmente. Isto NÃO é um roteiro fixo — atenda o que ele pediu.`;
 
 /**
