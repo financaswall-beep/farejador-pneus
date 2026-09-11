@@ -5,7 +5,7 @@ import { applicationsForMotorcycle } from '../../../src/shared/vehicle-tire-appl
 const app = applicationsForMotorcycle('CB250F', 2019, 'rear')[0]!;
 const candidate = {
   status: 'pending', discovery_origin: 'web_research', discovery_measure: '140/70-17',
-  make: app.make, model: app.model, variant: null, year_start: 2019, year_end: 2019,
+  make: app.make, model: 'CB 250F Twister ABS / CBS', variant: null, year_start: 2019, year_end: 2019,
   position: 'rear', source_url: app.source_url,
   notes: 'catalog-fitment-research-20260906-v1; M007:Traseiro:140/70R17; sem aprovação automática',
 };

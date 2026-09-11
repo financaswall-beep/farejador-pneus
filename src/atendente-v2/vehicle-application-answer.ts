@@ -27,14 +27,14 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput) {
       aplicacoes: [],
       total_aplicacoes: 0,
       precisa_confirmar_modelo_versao: false,
-      precisa_confirmar_ano: true,
+      precisa_confirmar_ano: false,
       precisa_confirmar_posicao: !parsed.posicao_pneu || parsed.posicao_pneu === 'both',
       precisa_confirmar_medida: true,
       produto_confirmado: false,
       estoque_consultado: false,
       consultas_de_produto: [],
-      mensagem: 'A moto é reconhecida, mas o catálogo oficial ainda não confirma o ano informado. Isso não significa falta de estoque.',
-      proximo_passo: 'Se a posição ainda não foi informada, pergunte dianteiro ou traseiro. Depois peça a medida escrita na lateral do pneu, foto da medida ou confirmação no manual. Quando o cliente informar a medida exata, use buscar_produto diretamente. Não use medidas de outros anos, não diga que não há estoque e não escale o atendimento somente por essa lacuna.',
+      mensagem: 'A moto é reconhecida, mas não foi encontrada aplicação confirmada para o ano e a posição informados. Isso não significa falta de estoque.',
+      proximo_passo: 'Não pergunte novamente o ano já informado. Se a posição ainda não foi informada, pergunte dianteiro ou traseiro. Depois peça a medida escrita na lateral do pneu, foto da medida ou confirmação no manual. Quando o cliente informar a medida exata, use buscar_produto diretamente. Não use medidas de outros anos, não diga que não há estoque e não escale o atendimento somente por essa lacuna.',
     };
   }
   const configurations = new Set(rows.map(r => `${r.make}:${r.model}:${r.year_reference}`));
@@ -45,6 +45,7 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput) {
   return {
     encontrado: true,
     tipo_resultado: 'aplicacao_de_medida_do_fabricante',
+    ano_informado: parsed.moto_ano ?? null,
     versao_catalogo: VEHICLE_APPLICATION_VERSION,
     referencia_em_uso: true,
     requer_aprovacao_manual_da_referencia: false,
@@ -62,7 +63,7 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput) {
       })) : [],
     mensagem: ambiguous
       ? 'Existem versões/anos diferentes. Apresente as opções e confirme a moto antes de escolher uma medida.'
-      : 'Aplicação encontrada na fonte do fabricante. Responda a medida e a posição no contexto de ano/versão indicado. Ano não delimitado não significa todos os anos.',
+      : 'Aplicação encontrada na fonte do fabricante. A faixa inclui o primeiro e o último ano. Se o ano informado está dentro dela, ele já está confirmado: responda a medida e a posição sem pedir o mesmo ano ou foto para reconfirmá-lo. Ano não delimitado não significa todos os anos.',
     proximo_passo: 'Esta referência já está em uso; não peça aprovação ao dono nem ao cliente para consultá-la. Depois de identificar ano/versão e posição, use consultas_de_produto em buscar_produto e mantenha bairro/município conhecidos para consultar preço/estoque. A busca nominal do catálogo agrupado não deve filtrar por posição não cadastrada; a posição da aplicação continua sendo a indicada acima. estoque_consultado=false NÃO significa falta de estoque. Não prometa disponibilidade antes da busca. A equipe confere o pneu específico antes da venda/montagem: não diga que um SKU serve sem conferir construção, índices e montagem. Não troque radial por diagonal nem converta polegadas automaticamente.',
   };
 }

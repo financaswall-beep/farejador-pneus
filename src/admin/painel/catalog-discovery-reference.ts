@@ -23,8 +23,8 @@ export function activeResearchReference(row: ResearchDiscovery) {
     const researchId = app.application_id.split(':')[0];
     const sourceKey = `${researchId}:${app.position === 'front' ? 'Dianteiro' : 'Traseiro'}:${app.tire_size}`;
     return row.notes?.startsWith(`catalog-fitment-research-20260906-v1; ${sourceKey};`)
-      && row.make === app.make && row.model === app.model && row.position === app.position
-      && row.year_start === app.year_start && row.year_end === app.year_end
+      && row.make === app.make && row.model === app.reference_model && row.position === app.position
+      && row.year_start === app.reference_year_start && row.year_end === app.reference_year_end
       && row.source_url === app.source_url;
   });
   return reference ? {

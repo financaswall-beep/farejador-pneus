@@ -16,7 +16,7 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     expect(accepted).toHaveLength(167);
     expect(new Set(accepted.map((a: any) => a.id)).size).toBe(83);
     for (const a of accepted) {
-      expect(applicationsForMeasure(a.measure).some(r => r.model === a.model && r.tire_size === a.measure)).toBe(true);
+      expect(applicationsForMeasure(a.measure).some(r => r.reference_model === a.model && r.tire_size === a.measure)).toBe(true);
     }
   });
 
@@ -31,6 +31,41 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     expect(applicationsForMotorcycle('CB250F', 2019, 'rear')[0]?.tire_size).toBe('140/70R17');
     expect(applicationsForMotorcycle('CB300F', 2026, 'rear')[0]?.tire_size).toBe('150/60R17');
     expect(applicationsForMeasure('140/70-17').some(a => a.model.includes('CB 300F'))).toBe(false);
+  });
+
+  it.each([2016, 2017, 2018, 2019, 2020, 2021, 2022])('reconhece Twister %i dentro da vigência, sem repetir o ano', year => {
+    const answer = vehicleApplicationAnswer(compatibilityInput('prod', {
+      moto_modelo: 'Twister', moto_ano: year, posicao_pneu: 'rear',
+    }));
+    expect(answer).toMatchObject({
+      tipo_resultado: 'aplicacao_de_medida_do_fabricante', ano_informado: year,
+      precisa_confirmar_ano: false, precisa_confirmar_modelo_versao: false,
+      precisa_confirmar_posicao: false, estoque_consultado: false, produto_confirmado: false,
+      consultas_de_produto: [{ medida_pneu: '140/70-17' }],
+    });
+    expect(answer?.aplicacoes).toHaveLength(1);
+    expect(answer?.aplicacoes[0]).toMatchObject({
+      model: 'CB 250F Twister', year_start: 2016, year_end: 2022, year_reference: '2016–2022',
+      reference_year_start: 2019, reference_year_end: 2019,
+      tire_size: '140/70R17', index_spec: '66H', mounting: 'Sem câmara',
+    });
+  });
+
+  it.each([2015, 2023, 2026])('não estende a CB 250F ao ano %i', year => {
+    expect(applicationsForMotorcycle('CB250F', year, 'rear')).toEqual([]);
+    const answer = vehicleApplicationAnswer(compatibilityInput('prod', {
+      moto_modelo: 'CB250F', moto_ano: year, posicao_pneu: 'rear',
+    }));
+    expect(answer).toMatchObject({ precisa_confirmar_medida: true, precisa_confirmar_ano: false,
+      consultas_de_produto: [], aplicacoes: [], estoque_consultado: false });
+  });
+
+  it('preserva posição, opções sem ano e a variante ABS / CBS da referência original', () => {
+    expect(applicationsForMotorcycle('CB250F ABS', 2019, 'front')[0]?.tire_size).toBe('110/70R17');
+    expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Twister', posicao_pneu: 'rear' })))
+      .toMatchObject({ precisa_confirmar_modelo_versao: true, precisa_confirmar_ano: true, consultas_de_produto: [] });
+    expect(vehicleApplicationAnswer(compatibilityInput('prod', { moto_modelo: 'Twister', moto_ano: 2021 })))
+      .toMatchObject({ precisa_confirmar_modelo_versao: false, precisa_confirmar_ano: false, precisa_confirmar_posicao: true });
   });
 
   it('distingue dianteira e traseira de Burgman e Lindy', () => {
@@ -137,5 +172,8 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     const first = applicationsForMotorcycle('CB300F', 2026, 'rear');
     first[0]!.tire_size = '140/70-17';
     expect(applicationsForMotorcycle('CB300F', 2026, 'rear')[0]?.tire_size).toBe('150/60R17');
+    const twister = applicationsForMotorcycle('CB250F', 2021, 'rear');
+    twister[0]!.range_source_urls.length = 0;
+    expect(applicationsForMotorcycle('CB250F', 2021, 'rear')[0]!.range_source_urls.length).toBeGreaterThan(0);
   });
 });

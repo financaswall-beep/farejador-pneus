@@ -18,7 +18,24 @@ const cg16='https://www.honda.com.br/pos-venda/sites/customer_service_motos/file
 add('Honda','CG 160 Fan','2019–2020','80/100-18|47P|ND','90/90-18|57P|ND',cg16,{...manual,notes:'Traseiro REINF. Manual, seção Especificações; PDF p.128.'});
 add('Honda','CG 160 Titan','2019–2020','80/100-18|47P|ND','100/80-18|59P|ND',cg16,{...manual,notes:'Traseiro REINF. Diferente da Fan da mesma edição.'});
 add('Honda','CG 160 Start','2026','80/100-18|47S|ND','90/90-18|59S|ND','https://www.honda.com.br/motos/street/city/cg-160-start');
-add('Honda','CB 250F Twister ABS / CBS','2019','110/70R17|54H|Sem câmara','140/70R17|66H|Sem câmara','https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/MP%20CB250F%20Twister%20%282019%29%20D2203-MAN-1188_WEB.pdf',{...manual,notes:'Pirelli Diablo Rosso II; PDF p.98. Manter o R da construção radial.'});
+add('Honda','CB 250F Twister ABS / CBS','2019','110/70R17|54H|Sem câmara','140/70R17|66H|Sem câmara','https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/MP%20CB250F%20Twister%20%282019%29%20D2203-MAN-1188_WEB.pdf',{
+  ...manual,notes:'Pirelli Diablo Rosso II; PDF p.98. Manter o R da construção radial.',
+  // A edição original permanece intacta para rastrear as candidatas importadas.
+  // Vigência da geração CB 250F reconferida em manuais/comunicados de cada ano;
+  // não estender à CBX 250 nem à CB 300F, nem homologar SKU por dimensão nominal.
+  applicability: {
+    model:'CB 250F Twister',year_start:2016,year_end:2022,checked_at:'2026-09-11',
+    sources:[
+      'https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/CB%20250F%20Twister%202016_0.pdf',
+      'https://pt.slideshare.net/slideshow/cb-250f-twister-2016_0-manual-de-utilizacao/281681513',
+      'https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/MP%20CB250F%20TWISTER%20%282017%29%201083_WEB.pdf',
+      'https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/MP%20CB250F%20Twister%20%282018%29%20D2203-MAN-1121_WEB.pdf',
+      'https://www.honda.com.br/pos-venda/sites/customer_service_motos/files/manuais/MP%20CB250F%20Twister%20%282019~2020%29%20D2203-MAN-1188_WEB.pdf',
+      'https://saladeimprensa.honda.com.br/releases/honda-cb-250f-twister-2021-cores-e-grafismos-ineditos-marcam-o-modelo-com-melhor-relacao',
+      'https://saladeimprensa.honda.com.br/releases/honda-cb-twister-2022-lider-da-categoria',
+    ],
+  },
+});
 add('Honda','CB 300F Twister ABS / CBS','2025–2026','110/70R17|54H|ND','150/60R17|66H|ND','https://www.honda.com.br/pos-venda/motos/sites/customer_service_motos/files/manuais/MP%20CB%20300F%20Twister%20ABS-CBS%20%282025~2026%29%20D2203-MAN-1368_WEB.pdf',{...manual,notes:'Não herdar 140/70R17 da CB 250F. Aplicação traseira é 150/60R17.'});
 add('Honda','NXR 160 Bros ABS / CBS','2026','90/90-19|52P|ND','110/90-17|60P|ND','https://www.honda.com.br/motos/adventure/trail/nxr-160-bros');
 add('Honda','Sahara 300','2024','90/90-21||ND','120/80-18||ND','https://saladeimprensa.honda.com.br/releases/honda-xre-300-sahara-2024-design-moderno-com-estilo-aventureiro-em-uma-proposta-totalmente',release);
