@@ -19,6 +19,14 @@ const data:DemandSnapshot={as_of:'2026-09-11T17:00:00Z',current:[event('a','acti
   event('b','measure','2026-09-04','SAO GONCALO','90/90-12'),event('b','delivery','2026-09-07','SAO GONCALO'),event('c','activity','2026-09-03',null),event('d','activity','2026-09-11','Volta Redonda'),event('outside','activity','2026-09-12')],
   previous:[event('a','activity','2026-08-01'),event('a','order','2026-08-05')],stock:[{measure:'90/90-12',quantity:4},{measure:'90 90 12',quantity:2}]};
 describe('demanda por município sem mapas',()=>{
+  it('conta as duas medidas 130/70-13 e 110/70-13 em uma conversa sem inflar as reconsultas',()=>{
+    const current=[event('nmax','activity','2026-09-01','Niterói'),event('nmax','measure','2026-09-01','Niterói','130/70-13'),
+      event('nmax','measure','2026-09-02','Niterói','130 70 13'),event('nmax','measure','2026-09-02','Niterói','110/70-13')];
+    const r=buildDemandReport({...data,current,previous:[]},{...f,city:'Niterói'});
+    expect(r.scope.conversations).toBe(1);expect(r.measures_summary.consultations).toBe(2);
+    expect(r.measures.map(m=>({key:m.key,consultations:m.consultations}))).toEqual([
+      {key:'110-70-13',consultations:1},{key:'130-70-13',consultations:1}]);
+  });
   it('deduplica atividade e medidas sem confundir conversas, pessoas e retornos',()=>{
     const r=buildDemandReport(data,f);expect(r.summary).toEqual({conversations:4,orders:1,deliveries:1,shortages:1,conversion:25,municipalities:2,unidentified:1});
     expect(r.cities.find(c=>c.key==='sao goncalo')).toMatchObject({name:'São Gonçalo',conversations:2,orders:1,conversion:50});

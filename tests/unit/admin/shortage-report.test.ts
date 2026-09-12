@@ -23,14 +23,34 @@ const data:ShortageSnapshot={as_of:'2026-09-11T14:00:00Z',tracking_since:'2026-0
   products:[p,{...p,id:'p2',brand:'Outra',matrix_price:1,partner_price:1},{...p,id:'p3',condition:'meia_vida',partner_price:2}],
   stock:[{store_id:partner,measure:'90/90-12',available:4,unknown:false},{store_id:partner,measure:'90 90 12',available:2,unknown:false},{store_id:'matriz',measure:'90/90-12',available:0,unknown:false}]};
 describe('relatório de faltas e receita potencial',()=>{
-  it('separa consultas, faltas por loja e medidas; agrupa repetições sem duplicar a estimativa',()=>{
+  it('conta conversas e faltas por medida/loja sem somar as reconsultas do histórico',()=>{
     const r=buildShortageReport(data,f);
-    expect(r.summary).toEqual({consultations:3,shortages:7,stores:2,measures:2});
+    expect(r.summary).toEqual({consultations:2,shortages:5,stores:2,measures:2});
     expect(r.store?.potential).toMatchObject({amount:360.7,opportunities:3,priced:2,unpriced:1,repeated:1});
-    expect(r.measures[0]).toMatchObject({shortages:3,stock:6,potential:{amount:360.7,opportunities:2,repeated:1}});
+    expect(r.measures[0]).toMatchObject({shortages:2,stock:6,potential:{amount:360.7,opportunities:2,repeated:1}});
+    expect(r.store).toMatchObject({shortages:3,consultations:2});
+    expect(r.consultations.map(c=>c.searches)).toEqual([2,2,1]);
     expect(r.consultations).toHaveLength(3);expect(r.consultations[0]).not.toHaveProperty('conversation_id');
     expect(r.consultations[0]).not.toHaveProperty('search_key');expect(r.consultations[0]!.stores).toHaveLength(2);
     expect(r.store?.city).toBe('São Gonçalo');expect(r.legacy_records).toBe(2);
+  });
+  it('preserva 130/70-13 e 110/70-13 na mesma conversa, mesmo repetindo a primeira em outra marca',()=>{
+    const traces=[{...t,measure:'130/70-13'},
+      {...t,id:'repeat',search_key:'again',measure:'130 / 70 - 13',filters:{marca:'Pirelli'}},
+      {...t,id:'repeat2',search_key:'again2',measure:'130 70 13'},
+      {...t,id:'second-size',search_key:'front',measure:'110/70-13'}];
+    const before=structuredClone(traces),r=buildShortageReport({...data,traces},{...f,view:'consultations'});
+    expect(r.summary).toEqual({consultations:1,shortages:4,stores:2,measures:2});
+    expect(r.stores.every(s=>s.shortages===2&&s.consultations===1)).toBe(true);
+    expect(r.measures.map(m=>({key:m.key,shortages:m.shortages}))).toEqual([
+      {key:'110-70-13',shortages:1},{key:'130-70-13',shortages:1}]);
+    expect(r.consultations).toHaveLength(4);
+    expect(r.consultations.filter(c=>c.measure_key==='130-70-13').every(c=>c.searches===3)).toBe(true);
+    expect(r.store?.potential).toMatchObject({opportunities:2,repeated:2});
+    expect(traces).toEqual(before);
+    const csv=shortageReportCsv(buildShortageReport({...data,traces},f));
+    expect(csv).toContain('"130/70-13";"1"');expect(csv).toContain('"110/70-13";"1"');
+    expect(csv).toContain('Uma falta por conversa, medida e loja');
   });
   it('usa preço da Matriz ou da Rede e não produz total monetário da rede',()=>{
     const r=buildShortageReport(data,{...f,store:'matriz'});
@@ -72,7 +92,7 @@ describe('relatório de faltas e receita potencial',()=>{
       const url='/admin/api/relatorios/faltas'+suffix+'?from=2026-09-01&to=2026-09-10';
       expect(requiredMatrixModules(url)).toEqual(['bot']);state.allow=false;expect((await app.inject({url})).statusCode).toBe(401);
       state.allow=true;const response=await app.inject({url});expect(response.statusCode).toBe(200);expect(response.headers['cache-control']).toBe('no-store');
-      if(suffix==='/exportar')expect(response.headers['content-type']).toContain('text/csv');else expect(response.json().summary.shortages).toBe(7);
+      if(suffix==='/exportar')expect(response.headers['content-type']).toContain('text/csv');else expect(response.json().summary.shortages).toBe(5);
     }
     for(const args of ['environment=prod','from=2026-02-30','to=2026-08-01','store=invalid']){
       const qs=new URLSearchParams({from:f.from,to:f.to});const [key,value]=args.split('=');qs.set(key!,value!);

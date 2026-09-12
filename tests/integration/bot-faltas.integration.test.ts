@@ -21,27 +21,36 @@ beforeAll(async()=>{
      VALUES('test',$1,$2,'buscar_produto',$3,$4::jsonb,$5,'São Gonçalo')`,[conversationId,key,measure,JSON.stringify(stores),at]);
   const no=(id:string,name:string)=>({id,name,available:false});
   await insert('same-search','90/90-12',[no(partner.unitId,'Parceiro Alcântara'),no('matriz','Matriz')]);
-  await insert('same-search','180/55-17',[no('matriz','Matriz')]);
+  await insert('same-search','110/70-13',[no('matriz','Matriz')]);
   await insert('other-search','130/70-13',[no('matriz','Matriz'),{id:partner.unitId,name:'Parceiro Alcântara',available:true}]);
+  await insert('repeat-size','130 70 13',[no('matriz','Matriz')]);
+  await insert('repeat-size-again','130/70-13',[no('matriz','Matriz')]);
+  await insert('repeat-partner','90 / 90 - 12',[no(partner.unitId,'Parceiro Alcântara'),no('matriz','Matriz')]);
   await insert('outside','90/90-12',[no('matriz','Matriz')],'2026-09-11T03:00:00Z');
   await insert('before','90/90-12',[no('matriz','Matriz')],'2026-09-01T02:59:59Z');
 },120000);
 afterAll(async()=>{vi.unstubAllEnvs();if(db)await stopPostgres(db);});
 describe('relatório de faltas real no Postgres',()=>{
-  it('conta consultas uma vez, faltas por loja/medida e respeita São Paulo e ambiente',async()=>{
+  it('conta uma conversa, mantém duas medidas diferentes e desconta as reconsultas por loja',async()=>{
     const report=await queries.getBotShortages(period,'test',db.pool);
-    expect(report).toMatchObject({consultations:2,shortages:4,store_count:2,measure_count:3});
+    expect(report).toMatchObject({consultations:1,shortages:4,store_count:2,measure_count:3});
+    expect(report.counts.filter((r:{store_id:string})=>r.store_id==='matriz')).toHaveLength(3);
+    expect(report.counts.every((r:{shortages:number})=>r.shortages===1)).toBe(true);
+    const detail=await queries.getBotShortageConsultations({...period,store:'matriz',measure:'130/70-13'},'test',db.pool);
+    expect(detail.total).toBe(3);expect(detail.rows.every(r=>r.searches===3)).toBe(true);
     expect((await queries.getBotShortages(period,'prod',db.pool)).shortages).toBe(0);
   });
   it('filtra pela loja sem perder a sequência completa; estoque atual não reescreve a falta',async()=>{
     const filter={...period,store:partner.unitId,measure:'90/90-12'};
     const detail=await queries.getBotShortageConsultations(filter,'test',db.pool);
-    expect(detail.total).toBe(1);expect(detail.rows[0].stores).toHaveLength(2);
+    expect(detail.total).toBe(2);expect(detail.rows.every(r=>r.searches===2)).toBe(true);expect(detail.rows[0].stores).toHaveLength(2);
     expect(detail.rows[0].stores.every((s:{available:boolean})=>!s.available)).toBe(true);
     expect(detail.stock.find(s=>s.store_id===partner.unitId).quantity).toBe(6);
     expect((await queries.getBotShortageConsultations({...filter,measure:'130/70-13'},'test',db.pool)).rows).toEqual([]);
     const exported=await queries.exportBotShortages({...period,store:partner.unitId},'test',db.pool);
-    expect(exported).toHaveLength(1);expect(exported[0].measure).toBe('90/90-12');
+    expect(exported).toHaveLength(1);expect(exported[0].searches).toBe(2);
+    const all=await queries.exportBotShortages(period,'test',db.pool);
+    expect(all).toHaveLength(4);expect(all.find(r=>r.measure==='130/70-13'||r.measure==='130 70 13').searches).toBe(3);
   });
   it('persiste de forma idempotente e impede alteração do histórico',async()=>{
     const client=await db.pool.connect(),key=randomUUID();

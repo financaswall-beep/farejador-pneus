@@ -11,16 +11,16 @@ window.PAINEL_MODULES.relatoriosFaltasPdf=function(){return{
     const scopes=['overview','measures'].includes(tab)?r.measures.map(m=>m.potential):r.opportunities.map(o=>({amount:o.reference?.amount??null,opportunities:1,priced:o.reference?1:0,unpriced:o.reference?0:1,repeated:o.searches-1}));
     const p=scopes.reduce((sum,item)=>({amount:sum.amount==null&&item.amount==null?null:((Math.round((sum.amount||0)*100)+Math.round((item.amount||0)*100))/100),
       opportunities:sum.opportunities+item.opportunities,priced:sum.priced+item.priced,unpriced:sum.unpriced+item.unpriced,repeated:sum.repeated+item.repeated}),{amount:null,opportunities:0,priced:0,unpriced:0,repeated:0});
-    let cover=header(1);const kpis=[['Consultas com falta (rede)',r.summary.consultations],['Faltas registradas (rede)',r.summary.shortages],['Faltas na loja (total)',r.store?.shortages||0],['Potencial do recorte',this.rfalMoney(p.amount)]];
+    let cover=header(1);const kpis=[['Conversas com falta (rede)',r.summary.consultations],['Faltas registradas (rede)',r.summary.shortages],['Faltas na loja (total)',r.store?.shortages||0],['Potencial do recorte',this.rfalMoney(p.amount)]];
     kpis.forEach(([label,value],i)=>{const x=30+i*198;cover+=rect(x,350,188,77,'0.94 0.98 0.96')+text(label,x+10,403,9,false,muted)+text(value,x+10,370,i===3?17:23,true,green);});
     const notes=[p?p.priced+' de '+p.opportunities+' conversas por medida com preço. '+p.unpriced+' sem referência. '+p.repeated+' repetições removidas.':'Sem consultas por loja neste recorte.',
       'Estimativa: uma unidade por conversa e medida nesta loja, multiplicada pelo menor preço atual elegível.',
       'Filtros de marca, condição e posição registrados na busca são respeitados. Preços da Matriz e da Rede são separados.',
-      'Buscas repetidas usam a menor referência disponível do grupo. O preço e a quantidade desejada não foram registrados na busca.',
+      'Uma falta por conversa, medida e loja no período. Medidas diferentes contam separadamente; reconsultas não aumentam o total.',
       'Não confirma intenção de compra nem venda posterior. Não somar valores de lojas: a mesma procura pode aparecer em várias.',
       'Estoque atual soma marcas e condições da medida e desconta reservas. Não substitui a disponibilidade histórica.',
       'Trilha por loja desde '+this.rfalTime(r.tracking_since)+'. Registros antigos sem trilha no período: '+r.legacy_records+'.',
-      'A exportação inclui todas as páginas da aba e respeita a loja, a medida e a busca selecionadas.'];
+      'A exportação respeita os filtros. A aba Consultas mantém todas as buscas, inclusive repetições; suas linhas não são o total de faltas.'];
     let y=325;for(const note of notes){for(const line of wrap(note,125)){cover+=text(line,30,y,9,false,muted);y-=13;}y-=10;}
     const pages=[cover];
     for(let start=0;start<Math.max(1,rows.length);start+=8){let out=header(pages.length+1)+rect(30,414,782,23,'0.94 0.96 0.96');
@@ -30,7 +30,7 @@ window.PAINEL_MODULES.relatoriosFaltasPdf=function(){return{
       headers.forEach(([label,x])=>out+=text(label,x,422,9,true,muted));
       rows.slice(start,start+8).forEach((row,i)=>{const top=393-i*42;
         if(tab==='consultations'){
-          out+=text(this.rfalTime(row.occurred_at),38,top,8)+text(row.measure,38,top-12,9,true)+text(fit(row.municipality||'Sem município',32),191,top,8)
+          out+=text(this.rfalTime(row.occurred_at),38,top,8)+text(row.measure+(row.searches>1?' / '+row.searches+' buscas':''),38,top-12,9,true)+text(fit(row.municipality||'Sem município',32),191,top,8)
             +text(fit(this.rfalScope(row),38),191,top-12,7,false,muted)+text(this.rfalOutcome(row),413,top,8);
           // The complete store trace is in CSV; the PDF states when it needs abbreviation.
           out+=text(fit(row.stores.map(s=>s.name+': '+(s.available?'tinha':'não tinha')).join(' / '),74),413,top-12,7,false,muted);

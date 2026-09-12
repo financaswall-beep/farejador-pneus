@@ -22,7 +22,7 @@ const server=http.createServer((req,res)=>{
   if(url.pathname.endsWith('consultas')){
    const measure=url.searchParams.get('measure'),offset=Number(url.searchParams.get('offset')||0),store=url.searchParams.get('store');
    const total=store===a?8:25;
-   const rows=Array.from({length:Math.min(20,total-offset)},(_,i)=>({id:measure+'-'+(i+offset),measure,occurred_at:'2026-09-10T13:'+String(42-i).padStart(2,'0')+':00Z',municipality:'São Gonçalo',filters:{},stores:[{id:a,name:'Parceiro Alcântara',available:false},{id:'matriz',name:'Matriz',available:false}]}));
+   const rows=Array.from({length:Math.min(20,total-offset)},(_,i)=>({id:measure+'-'+(i+offset),measure,searches:i+offset<3?3:1,occurred_at:'2026-09-10T13:'+String(42-i).padStart(2,'0')+':00Z',municipality:'São Gonçalo',filters:{},stores:[{id:a,name:'Parceiro Alcântara',available:false},{id:'matriz',name:'Matriz',available:false}]}));
    const send=()=>res.end(JSON.stringify({rows,total,stock:[{store_id:'matriz',quantity:0},{store_id:a,quantity:6}]}));
    if(store===b)return setTimeout(send,250);return send();
   }
@@ -32,7 +32,7 @@ const server=http.createServer((req,res)=>{
  if(!['tailwind.css','bot-faltas.css','app.bot.faltas.js','vendor/alpine-3.14.9.min.js'].includes(name)){res.statusCode=404;return res.end();}
  res.setHeader('Content-Type',name.endsWith('.css')?'text/css':'application/javascript');res.end(fs.readFileSync(path.join(pub,name)));
 });
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,channel:'msedge'});
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
 try{
  const page=await browser.newPage({viewport:{width:1540,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/admin/painel');await page.locator('.bf-measures .bf-row').first().waitFor();
@@ -41,8 +41,10 @@ try{
  await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===1&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
  assert.match(await page.locator('.bf-measures .bf-row').innerText(),/8 faltas/);assert.equal(await page.locator('.bf-step').count(),2);
  assert.match(await page.locator('.bf-current').innerText(),/6 un/);assert.equal(await page.locator('.bf-consultation').count(),3);
+ assert.match(await page.locator('.bf-summary').innerText(),/conversas/);
+ assert.match(await page.locator('.bf-consultation').first().innerText(),/3 buscas nesta conversa/);
  const out=path.resolve(__dirname,'../artifacts/bot-faltas');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
- await page.getByRole('button',{name:'Ver todas as consultas →'}).click();assert.equal(await page.locator('.bf-consultation').count(),8);
+ await page.getByRole('button',{name:'Ver histórico completo →'}).click();assert.equal(await page.locator('.bf-consultation').count(),8);
  await page.getByLabel('Buscar medida nas faltas').fill('180/55-17');await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===0);
  await page.getByLabel('Remover filtro de loja').click();await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===1);
  assert.match(await page.locator('.bf-detail-title').innerText(),/180\/55-17/);

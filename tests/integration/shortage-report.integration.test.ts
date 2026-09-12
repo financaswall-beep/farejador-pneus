@@ -30,7 +30,11 @@ afterAll(async()=>{if(db){const {pool}=await import('../../src/persistence/db.js
 describe('relatório central de faltas no Postgres real',()=>{
   it('consulta o schema atual, mantém isolamento e considera reservas e preços próprios de cada canal',async()=>{
     const data=await read(filter,'test',db.pool),matrix=build(data,{...filter,store:'matriz'}),store=build(data,{...filter,store:partner.unitId});
-    expect(data.traces).toHaveLength(3);expect(matrix.summary).toEqual({consultations:3,shortages:6,stores:2,measures:2});
+    expect(data.traces).toHaveLength(3);expect(matrix.summary).toEqual({consultations:1,shortages:4,stores:2,measures:2});
+    expect(matrix.measures.every(m=>m.shortages===1)).toBe(true);
+    const {getBotShortages}=await import('../../src/admin/painel/queries-bot-faltas.js');
+    const bot=await getBotShortages(filter,'test',db.pool);
+    expect(bot).toMatchObject({consultations:matrix.summary.consultations,shortages:matrix.summary.shortages,measure_count:matrix.summary.measures});
     expect(matrix.store?.potential).toMatchObject({amount:200,opportunities:2,priced:1,unpriced:1,repeated:1});
     expect(store.store?.potential.amount).toBe(180);expect(store.measures.find(m=>m.measure==='90/90-12')?.stock).toBe(4);
     expect(matrix.measures.find(m=>m.measure==='90/90-12')?.stock).toBe(7);

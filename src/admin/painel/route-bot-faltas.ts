@@ -32,9 +32,9 @@ export async function registerBotShortageRoutes(fastify: FastifyInstance): Promi
         if (operation.endsWith('exportar')) {
           const rows=await exportBotShortages(parsed.data);
           if(rows.length>10000) return reply.code(422).send({error:'export_limit_reduce_period'});
-          const lines=[['Consulta','Data e hora (São Paulo)','Medida','Município','Loja sem disponibilidade','Filtros da busca','Resultado'],
+          const lines=[['Última busca do grupo','Data e hora (São Paulo)','Medida','Município','Loja sem disponibilidade','Filtros da última busca','Resultado da última busca','Buscas agrupadas (uma falta por conversa, medida e loja)'],
             ...rows.map(r=>[r.id,new Date(r.occurred_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
-              r.measure,r.municipality,r.store_name,JSON.stringify(r.filters),r.result])];
+              r.measure,r.municipality,r.store_name,JSON.stringify(r.filters),r.result,r.searches])];
           return reply.header('Content-Disposition',`attachment; filename="faltas-${parsed.data.from}-${parsed.data.to}.csv"`)
             .type('text/csv; charset=utf-8').send('\uFEFF'+lines.map(row=>row.map(shortageCsvCell).join(';')).join('\r\n'));
         }

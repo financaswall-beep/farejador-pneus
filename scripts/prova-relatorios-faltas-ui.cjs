@@ -45,7 +45,7 @@ const shell=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta
   if(!file.startsWith(pub+path.sep)||!['.js','.css','.svg','.webp','.png','.json'].includes(ext)||!fs.existsSync(file)){res.statusCode=404;return res.end();}
   res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.json':'application/json'})[ext]);res.end(fs.readFileSync(file));
  });
- await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const browser=await chromium.launch({headless:true,channel:'msedge'});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
  try{
   const page=await browser.newPage({viewport:{width:1720,height:1250}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   const card=page.locator('.rfal-report'),settled=()=>page.waitForFunction(()=>window.Alpine&&Alpine.$data(document.querySelector('main')).rfal.data&&!Alpine.$data(document.querySelector('main')).rfal.loading);
@@ -53,6 +53,11 @@ const shell=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta
   await card.locator('.rfal-store').filter({hasText:'Parceiro Alcântara'}).click();await settled();assert.equal(await card.locator('.rfal-store[aria-pressed=true] b').innerText(),'Parceiro Alcântara');
   await card.getByRole('button',{name:'90/90-12',exact:true}).click();await settled();assert.match(await card.getByLabel('Detalhes da consulta selecionada').innerText(),/90\/90-12/);
   assert.equal(await page.evaluate(()=>Alpine.$data(document.querySelector('main')).rfal.data.store.potential.repeated),1);
+  const measure=await page.evaluate(()=>Alpine.$data(document.querySelector('main')).rfal.data.selected_measure);
+  assert.equal(measure.shortages,measure.potential.opportunities);
+  assert.equal(await card.locator('.rfal-measures tr.rp-selected td').nth(1).innerText(),String(measure.shortages));
+  assert.match(await card.locator('.rfal-kpis').innerText(),/Conversas com falta/);
+  assert.match(await card.locator('.rfal-queries').innerText(),/2 buscas nesta conversa e medida/);
   assert.match(await card.locator('.rfal-measure-potential').innerText(),/repetições removidas/);await page.screenshot({path:path.join(out,'visao-geral.png'),fullPage:true});
   await card.getByRole('button',{name:/Ver todas \(/}).click();await card.getByLabel('Buscar loja nas faltas').fill('Mutuá');assert.equal(await card.locator('.rfal-store:visible').count(),1);
   await card.locator('.rfal-store:visible').click();await settled();assert.equal(await card.locator('.rfal-store[aria-pressed=true] b').innerText(),'Parceiro Mutuá');
@@ -67,7 +72,7 @@ const shell=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta
    await page.screenshot({path:path.join(out,tab+'.png'),fullPage:true});
    if(['consultations','potential'].includes(tab)){await card.getByRole('button',{name:'Próxima',exact:true}).click();assert.match(await card.locator('.rfal-pagination:visible').innerText(),/21–/);}
   }
-  const exported=fs.readFileSync(path.join(out,'potential.csv'),'utf8');assert.equal(exported.split('\r\n').length,46);assert.match(exported,/Sem referência/);assert.match(exported,/não lucro nem perda confirmada/);
+  const exported=fs.readFileSync(path.join(out,'potential.csv'),'utf8');assert.equal(exported.split('\r\n').length,47);assert.match(exported,/Sem referência/);assert.match(exported,/não lucro nem perda confirmada/);assert.match(exported,/Uma falta por conversa, medida e loja/);
   await card.getByLabel('Filtrar medida das consultas').selectOption('180/55-17');await settled();assert.match(await card.locator('.rfal-potential-table .rp-card-heading>strong').innerText(),/Sem referência/);
   const filteredPdf=page.waitForEvent('download');await card.getByRole('button',{name:'Exportar PDF',exact:true}).click();await(await filteredPdf).saveAs(path.join(out,'potential-filtered.pdf'));
   await card.getByRole('button',{name:'Salvar visão',exact:true}).click();await card.getByLabel('Filtrar medida das consultas').selectOption('');await settled();await card.getByRole('button',{name:'Restaurar visão',exact:true}).click();await settled();assert.equal(await card.getByLabel('Filtrar medida das consultas').inputValue(),'180/55-17');
