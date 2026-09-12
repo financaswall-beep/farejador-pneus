@@ -15,6 +15,13 @@ import { SYSTEM_PROMPT, PHOTO_PROMPT_BLOCK } from '../../../src/atendente-v2/pro
 import { activeToolDefinitions } from '../../../src/atendente-v2/tools.js';
 
 describe('consistência das regras centrais do prompt', () => {
+  it('usa a mesma regra de oferta nas buscas por medida e por moto', () => {
+    for (const name of ['buscar_produto', 'buscar_compatibilidade']) {
+      const definition = activeToolDefinitions().find(tool => tool.function.name === name);
+      expect(definition?.function.description).toContain('SINGLE TIRE OFFER');
+    }
+  });
+
   it('separa pergunta institucional de retirada com produto', () => {
     expect(SYSTEM_PROMPT).toContain('A general institutional question such as "onde fica a matriz?"');
     expect(SYSTEM_PROMPT).toContain('PICKUP OF A CHOSEN TIRE');

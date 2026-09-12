@@ -98,7 +98,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_compatibilidade',
-      description: 'Consulta compatibilidades cadastradas e aplicações verificadas por medida no banco, respeitando modelo, posição e faixa de anos inclusive. Ao resolver a medida, consulta também preço/estoque. Use consultas_estoque quando presente; pergunte somente o contexto indicado nas flags precisa_confirmar_*. Falha ou lacuna de aplicação não significa falta de estoque.',
+      description: 'Consulta compatibilidades cadastradas e aplicações verificadas por medida no banco, respeitando modelo, posição e faixa de anos inclusive. Ao resolver a medida, consulta também preço/estoque. Use consultas_estoque quando presente e apresente a oferta seguindo SINGLE TIRE OFFER; pergunte somente o contexto indicado nas flags precisa_confirmar_*. Falha ou lacuna de aplicação não significa falta de estoque.',
       parameters: {
         type: 'object',
         properties: {
@@ -122,7 +122,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_produto',
-      description: 'Busca pneus por medida, marca, condição ou código. Se o cliente pedir novo, meia-vida ou remold, passe condicao_pneu. position_verification="unregistered" significa que o SKU tem a medida procurada, mas sua posição ainda não foi preenchida no catálogo; não trate isso como falta de estoque nem como posição contrária.',
+      description: 'Busca pneus por medida, marca, condição ou código. Se o cliente pedir novo, meia-vida ou remold, passe condicao_pneu. Passe marca quando o cliente pedir uma específica. O retorno contém alternativas internas: apresente a oferta seguindo SINGLE TIRE OFFER. position_verification="unregistered" significa que o SKU tem a medida procurada, mas sua posição ainda não foi preenchida no catálogo; não trate isso como falta de estoque nem como posição contrária.',
       parameters: {
         type: 'object',
         properties: {
@@ -503,9 +503,10 @@ export async function executeTool(
             lojaResolvidaCompat = true;
           }
         }
-        if (env.WHOLESALE_UNIFIED_STOCK) {
-          for (const vehicle of withApprovedFitments) {
-            vehicle.produtos.sort((a, b) => b.total_stock - a.total_stock);
+        for (const vehicle of withApprovedFitments) {
+          // Mesma prioridade da busca por medida, após aplicar o estoque da loja.
+          vehicle.produtos.sort((a, b) => b.total_stock - a.total_stock);
+          if (env.WHOLESALE_UNIFIED_STOCK) {
             vehicle.produtos = vehicle.produtos.slice(0, compatInput.limit);
           }
         }

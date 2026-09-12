@@ -29,6 +29,18 @@ describe('extractRecentProductIds', () => {
     expect(extractRecentProductIds([buscarProduto('TOP', 'B', 'C')])).toEqual(['TOP']);
   });
 
+  it('foto de uma alternativa mantém essa marca nas próximas consultas de frete/retirada', () => {
+    const photo: ChatMessage[] = [{ role: 'assistant', content: null, tool_calls: [{
+      id: 'foto', type: 'function', function: {
+        name: 'pedir_foto', arguments: JSON.stringify({ product_id: 'B' }),
+      },
+    }] }];
+    // A opção fotografada pode não ser a primeira da busca original.
+    expect(extractRecentProductIds([photo, buscarProduto('TOP', 'B', 'C')])).toEqual(['B']);
+    // Uma escolha posterior do cliente ainda vence a foto anterior.
+    expect(extractRecentProductIds([calcularFrete('C'), photo, buscarProduto('TOP', 'B', 'C')])).toEqual(['C']);
+  });
+
   it('produto ESCOLHIDO (calcular_frete) — multi item preservado', () => {
     expect(extractRecentProductIds([calcularFrete('A', 'B')])).toEqual(['A', 'B']);
   });

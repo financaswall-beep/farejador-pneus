@@ -184,11 +184,9 @@ export async function dispatchPhotoToCustomer(
   const res = await pool.query<{
     environment: Environment;
     conversation_id: string;
-    tire_size: string;
-    brand: string | null;
     status: string;
   }>(
-    `SELECT environment, conversation_id, tire_size, brand, status
+    `SELECT environment, conversation_id, status
        FROM commerce.photo_requests
       WHERE id = $1`,
     [photoRequestId],
@@ -206,12 +204,13 @@ export async function dispatchPhotoToCustomer(
     return;
   }
 
-  const nomePneu = row.brand ? `${row.tire_size} ${row.brand}` : row.tire_size;
   // Legenda OBRIGATÓRIA (vira o content do eco → o LLM "lembra" que mandou).
+  // A marca continua no pedido da foto para a loja; não é anunciada ao cliente.
+  // tire_size de pedidos antigos pode conter o nome comercial inteiro, com marca.
   // Diz "do que temos" — NUNCA promete unicidade que o estoque não garante.
   const caption = wasLate
-    ? `Chegou! 📸 A foto do ${nomePneu} que você pediu — dá uma olhada no estado.`
-    : `Ó ele aqui 📸 ${nomePneu} — foto real do que temos na loja. Dá uma olhada no estado!`;
+    ? 'Chegou! 📸 A foto do pneu que você pediu — dá uma olhada no estado.'
+    : 'Ó ele aqui 📸 Foto real do que temos na loja. Dá uma olhada no estado!';
 
   if (!env.BOT_OUTBOX) {
     logger.warn({ photoRequestId }, 'photo dispatch: envio externo bloqueado (BOT_OUTBOX=false)');

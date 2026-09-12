@@ -33,13 +33,13 @@ const fitment = {
 };
 const args = { moto_modelo: 'Twister', moto_ano: 2021, posicao_pneu: 'rear', municipio: 'Niterói' };
 
-function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitment]) {
+function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitment], stock: unknown[] = []) {
   const query = vi.fn(async (sql: string, _values?: unknown[]) => {
     if (sql.includes('resolve_vehicle_model')) return { rows: vehicles };
     if (sql.includes('vehicle_fitments') || sql.includes('find_compatible_tires')) return { rows: products };
     if (sql.includes('vehicle_measure_applications')) return { rows: manufacturerApplicationSeed().map(a => ({ ...a, reference:a })) };
     if (sql.includes('FROM commerce.products') || sql.includes('search_products') || sql.includes('commerce.product_full')) return { rows: [] };
-    if (sql.includes('wholesale_stock')) return { rows: [] };
+    if (sql.includes('wholesale_stock')) return { rows: stock };
     throw new Error(`Consulta inesperada: ${sql}`);
   });
   return { client: { query } as unknown as PoolClient, query };
@@ -47,6 +47,21 @@ function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitmen
 
 describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', unified => {
   beforeEach(() => { config.WHOLESALE_UNIFIED_STOCK = unified; });
+
+  it('ordena as opções pelo disponível após reservas, sem transformar a busca em estoque local confirmado', async () => {
+    const { client } = database([vehicle], [
+      { ...fitment, product_id: 'p-pirelli', brand: 'Pirelli', total_stock: 1 },
+      { ...fitment, product_id: 'p-technic', brand: 'Technic', total_stock: 5 },
+    ], [
+      { measure: '140/70R17', brand: 'Pirelli', tire_condition: 'novo', quantity_on_hand: 20, quantity_reserved: 19, unit_cost: 100 },
+      { measure: '140/70R17', brand: 'Technic', tire_condition: 'novo', quantity_on_hand: 5, quantity_reserved: 0, unit_cost: 100 },
+    ]);
+    const answer = JSON.parse(await executeTool(client, 'test', 'conv', 'buscar_compatibilidade', args));
+    expect(answer.veiculos[0].produtos.map((p: { product_id: string }) => p.product_id))
+      .toEqual(['p-technic', 'p-pirelli']);
+    expect(answer.veiculos[0].produtos[0]).toMatchObject({ brand: 'Technic', current_price: '399.00', total_stock: 5 });
+    expect(answer.precisa_localizacao).toBe(true);
+  });
 
   it('retorna o vínculo vigente do banco antes da referência do fabricante, inclusive com estoque zerado', async () => {
     const { client, query } = database();

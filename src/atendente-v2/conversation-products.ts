@@ -40,6 +40,9 @@ function idsFromToolArgs(name: string, argsJson: string): string[] {
   if (name === 'localizacao_loja') {
     return asStringArray(args.product_ids);
   }
+  if (name === 'pedir_foto' && typeof args.product_id === 'string' && args.product_id) {
+    return [args.product_id];
+  }
   return [];
 }
 
