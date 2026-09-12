@@ -15,6 +15,20 @@ async function loadQuery() {
 }
 
 describe('painel de clientes', () => {
+  it('publica a localização estruturada no card e no detalhe usando a mesma fonte da ficha',async () => {
+    const getClientesPainel=await loadQuery();
+    const query=vi.fn()
+      .mockResolvedValueOnce({ rows:[{ id:'chatwoot:1',source:'chatwoot',source_id:'1',lead_location:null }] })
+      .mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({rows:[]})
+      .mockResolvedValueOnce({ rows:[{ contact_id:'1',source:'typed',observed_at:'2026-09-12',
+        fact_value:{ texto_informado:'Sou de Icaraí, Niterói.',bairro:'Icaraí',municipio:'Niterói' } }] });
+    const result=await getClientesPainel('prod',{query} as unknown as Pool);
+    expect(result.rows[0]).toMatchObject({ lead_location:'Icaraí — Niterói',
+      shared_location:{source:'typed',label:'Icaraí — Niterói'} });
+    expect(query).toHaveBeenCalledTimes(7);
+    expect(query.mock.calls[6][1]).toEqual(['prod',['1']]);
+  });
   it('consolida as fontes existentes sem criar uma nova ficha de cliente', async () => {
     const getClientesPainel = await loadQuery();
     const query = vi.fn()

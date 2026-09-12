@@ -18,6 +18,17 @@ const customer = { id:'parceiro:a',source:'parceiro',source_id:'a',name:'Ana' };
 const payload = { customer,summary:{ purchases:1 },orders:[{ id:'p1' }],next_offset:10,history_total:11 };
 const tick = () => new Promise(resolve => setTimeout(resolve,0));
 describe('ficha lateral de Clientes',() => {
+  it('atualiza o local do card ao abrir a ficha, sem sobrescrever uma localização mais recente',async () => {
+    const {ui}=setup(); const shared={label:'Icaraí — Niterói',source:'typed',observed_at:'2026-09-12T12:00:00Z'};
+    const leadCustomer={id:'chatwoot:a',source:'chatwoot',source_id:'a'};
+    ui.clientes=[{...leadCustomer,lead_location:null,shared_location:null}];
+    ui.apiGet.mockResolvedValue({...payload,customer:{...leadCustomer,shared_location:shared}});
+    ui.abrirFichaCliente(leadCustomer); await tick();
+    expect(ui.clientes[0].lead_location).toBe('Icaraí — Niterói');
+    ui.clientes[0].shared_location={...shared,label:'Centro — Maricá',observed_at:'2026-09-12T13:00:00Z'};
+    ui.clientes[0].lead_location='Centro — Maricá';
+    await ui.carregarFichaCliente(); expect(ui.clientes[0].lead_location).toBe('Centro — Maricá');
+  });
   it('histórico abre na lateral, mantém filtros/página e devolve foco ao fechar',async () => {
     const { ui,closeButton,trigger } = setup(); ui.apiGet.mockResolvedValue(payload);
     ui.abrirHistoricoCliente(customer); await tick();
@@ -63,7 +74,7 @@ describe('ficha lateral de Clientes',() => {
     expect(drawer).toContain('Estimado pelo pino compartilhado');
     expect(drawer).toContain('localização estimada, não é endereço de entrega confirmado');
     expect(drawer).toContain("source==='typed'");
-    expect(drawer).toContain("'Pesquisar no mapa':'Abrir pino no mapa'");
+    expect(drawer.includes("source==='shared_pin'?'Abrir pino no mapa':'Pesquisar no mapa'")).toBe(true);
     expect(drawer).toContain('clienteFichaLocalizacaoMapaUrl()');
     expect(drawer).not.toContain('x-html'); expect(drawer).not.toContain('Carlos Oliveira');
     expect(html).not.toContain('<dialog id="cliente-ficha-dialog"');

@@ -22,6 +22,38 @@ const lead = (id:string,lane='novo',extras={}) => ({ id,name:id,source:'chatwoot
   lead_lane:lane,lead_derived_lane:lane,lead_board_version:0,lead_archived:false,origin:'whatsapp',...extras });
 
 describe('Leads da Matriz — comportamento', () => {
+  it('abre a ficha do mesmo lead e encerra o drawer sem perder a seleção do Kanban',() => {
+    const {ui}=setup(); const c=lead('a','orcamento'); ui.clientes=[c];
+    ui.clienteSelecionadoId='a'; ui.clienteLeadDetalheAberto=true; ui.abrirFichaCliente=vi.fn();
+    ui.abrirFichaClienteDoLead();
+    expect(ui.abrirFichaCliente).toHaveBeenCalledWith(c);
+    expect(ui.clienteLeadDetalheAberto).toBe(false); expect(ui.clienteSelecionadoId).toBe('a');
+  });
+  it('prioriza o local da ficha e só abre links de localização do Google',() => {
+    const {ui}=setup(); const c=lead('a','novo',{lead_location:'Local antigo',
+      shared_location:{label:'Icaraí — Niterói',source:'typed',maps_url:'https://www.google.com/maps/search/?api=1&query=Icarai'} });
+    expect(ui.clienteLeadLocal(c)).toBe('Icaraí — Niterói');
+    expect(ui.clienteLeadLocalOrigem(c)).toBe('Informada na conversa');
+    expect(ui.clienteLeadMapaUrl(c)).toContain('https://www.google.com/maps/search/');
+    for(const url of ['javascript:alert(1)','https://www.google.com.evil.test/maps/search/','https://user:pass@www.google.com/maps/search/']) {
+      c.shared_location.maps_url=url; expect(ui.clienteLeadMapaUrl(c)).toBe('');
+    }
+    expect(ui.clienteLeadMapaUrl(lead('b'))).toBe('');
+  });
+  it('distingue bot liberado, atendimento humano e status desconhecido',() => {
+    const {ui}=setup(), c=lead('a'); ui.botControleModo=vi.fn(() => null);
+    expect(ui.clienteLeadBotStatus(c)).toEqual({label:'Status indisponível',state:'unknown'});
+    ui.clienteLeadControleCarregando='a'; expect(ui.clienteLeadBotStatus(c).label).toBe('Consultando…');
+    ui.clienteLeadControleCarregando=null; ui.botControleModo.mockReturnValue('auto');
+    expect(ui.clienteLeadBotStatus(c).state).toBe('auto');
+    ui.botControleModo.mockReturnValue('human'); expect(ui.clienteLeadBotStatus(c)).toEqual({label:'Atendimento humano',state:'human'});
+  });
+  it('não apresenta Agora nem aguardando cliente quando faltam dados',() => {
+    const {ui}=setup(); expect(ui.clienteLeadUltimaMensagem(lead('a'))).toBe('Sem mensagem');
+    expect(ui.clienteLeadUltimaMensagem(lead('a','novo',{lead_last_message_at:'inválido'}))).toBe('Sem mensagem');
+    expect(ui.clienteLeadAguardando(lead('a'))).toBe('Não informado');
+    expect(ui.clienteLeadAguardando(lead('a','novo',{lead_waiting_on:'cliente'}))).toBe('Cliente');
+  });
   it('filtra os canais sem retirar pessoas que só existem no Facebook ou Instagram', () => {
     const { ui } = setup();
     ui.clientes = [lead('a','novo',{ origin:'Channel::Instagram',phone:null }),lead('b','novo',{ origin:'facebook' }),lead('c')];

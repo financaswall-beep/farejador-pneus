@@ -195,9 +195,9 @@
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda3"></script>
 <script src="/admin/painel/app.clientes.js?v=20260907-ficha1&leads=20260905"></script>
-<script src="/admin/painel/app.clientes.ficha.js?v=20260907-ficha1"></script>
+<script src="/admin/painel/app.clientes.ficha.js?v=20260912-lead-drawer1"></script>
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
-<script src="/admin/painel/app.clientes.leads.js?v=20260905-clientes-leads2"></script>
+<script src="/admin/painel/app.clientes.leads.js?v=20260912-lead-drawer1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
@@ -237,6 +237,7 @@
 <link rel="stylesheet" href="/admin/painel/relatorios-parceiros.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-financeiro.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-logistica.css?v=20260910-1">
+<link rel="stylesheet" href="/admin/painel/clientes-lead.css?v=20260912-1">
 <link rel="stylesheet" href="/admin/painel/relatorios-estoque.css?v=20260910-1">
 <link rel="stylesheet" href="/admin/painel/relatorios.css?v=20260910-1" />
 
@@ -8050,38 +8051,61 @@
             </div>
           </div>
 
-          <div x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak @click="fecharClienteLeadDetalhe()" class="fixed inset-0 bg-gray-900/25 z-[70]"></div>
-          <aside x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak role="dialog" aria-modal="true" aria-labelledby="cliente-lead-titulo" @keydown.escape.window="if(clienteLeadDetalheAberto) fecharClienteLeadDetalhe()" @keydown="clienteLeadFoco($event)" class="fixed inset-y-0 right-0 z-[71] w-full max-w-sm bg-white border-l border-gray-200 shadow-xl flex flex-col">
-            <div class="flex items-center justify-between p-5 border-b border-gray-100"><h2 id="cliente-lead-titulo" class="text-base font-semibold">Lead selecionado</h2><button id="cliente-lead-fechar" type="button" @click="fecharClienteLeadDetalhe()" aria-label="Fechar detalhes do lead" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100"><i data-lucide="x" class="w-5 h-5"></i></button></div>
-            <div class="p-5 overflow-y-auto flex-1">
-              <div class="flex items-center gap-3 mb-5"><span class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center overflow-hidden shrink-0 font-semibold"><template x-if="clienteLeadFoto(clienteLeadSelecionado())"><img :src="clienteLeadFoto(clienteLeadSelecionado())" alt="" @error="clienteLeadFotoFalhou(clienteLeadSelecionado())" referrerpolicy="no-referrer" class="w-full h-full object-cover"></template><span x-show="!clienteLeadFoto(clienteLeadSelecionado())" x-text="initials(clienteLeadSelecionado()?.name||'')"></span></span><div class="min-w-0"><p class="text-base font-semibold break-words" x-text="clienteLeadSelecionado()?.name"></p><p class="text-xs text-gray-500 mt-1" x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></p><p x-show="clienteLeadFoto(clienteLeadSelecionado())" class="text-[10px] text-gray-400 mt-1">Foto via Chatwoot</p></div></div>
-              <p class="inline-block px-2 py-1 rounded-md bg-emerald-50 text-emerald-900 text-xs font-medium mb-4" x-text="clienteLeadEtapaLabel(clienteLeadSelecionado())"></p>
-              <p x-show="clienteLeadSelecionado()?.lead_archived" class="text-xs text-amber-800 bg-amber-50 p-2 rounded mb-3">Card arquivado · histórico preservado</p>
-              <dl class="text-xs divide-y divide-gray-100 border-y border-gray-100">
-                <div class="flex justify-between py-3"><dt class="text-gray-500">Canal</dt><dd x-text="clienteLeadCanalLabel(clienteLeadSelecionado())"></dd></div>
-                <div class="flex justify-between gap-4 py-3"><dt class="text-gray-500">Interesse</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></dd></div>
-                <div class="flex justify-between gap-4 py-3"><dt class="text-gray-500">Local</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.lead_location||'Não informado'"></dd></div>
-                <div x-show="clienteLeadSelecionado()?.lead_quote_amount" class="flex justify-between py-3"><dt class="text-gray-500">Cotação</dt><dd class="font-semibold text-emerald-900" x-text="formatCurrency(clienteLeadSelecionado()?.lead_quote_amount)"></dd></div>
-                <div x-show="clienteLeadSelecionado()?.lead_order_amount" class="flex justify-between py-3"><dt class="text-gray-500">Pedido confirmado</dt><dd class="font-semibold text-emerald-900" x-text="formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></dd></div>
-              </dl>
-              <div x-show="!clienteLeadSelecionado()?.lead_archived && clienteLeadLane(clienteLeadSelecionado())!=='convertido'" class="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-4">
-                <p class="text-sm font-semibold">Controle da etapa</p>
-                <p class="text-xs mt-2 font-medium" :class="clienteLeadManual(clienteLeadSelecionado())?'text-blue-800':'text-emerald-800'" x-text="clienteLeadManual(clienteLeadSelecionado())?'Manual · etapa mantida pela equipe':'Automático · acompanha a conversa'"></p>
-                <label class="block mt-3"><span class="block text-xs text-gray-500 mb-1">Mover etapa</span><select :value="clienteLeadLane(clienteLeadSelecionado())" @change="alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm"><option value="novo">Novo</option><option value="atendimento">Em atendimento</option><option value="orcamento">Orçamento enviado</option><option value="perdido">Perdido</option></select></label>
-                <button type="button" x-show="!clienteLeadManual(clienteLeadSelecionado())" @click="assumirControleClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-gray-300 bg-white rounded-lg text-xs mt-2 disabled:opacity-40">Manter esta etapa manualmente</button>
-                <button type="button" x-show="clienteLeadManual(clienteLeadSelecionado())" @click="retomarClienteLeadAutomatico(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 border border-emerald-700 text-emerald-800 bg-white rounded-lg text-xs mt-2 disabled:opacity-40">Retomar automático</button>
+          <div x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak @click="fecharClienteLeadDetalhe()" class="lead-drawer-backdrop"></div>
+          <aside x-show="clienteLeadDetalheAberto && clienteLeadSelecionado()" x-cloak role="dialog" aria-modal="true" aria-labelledby="cliente-lead-titulo" @keydown.escape.window="if(clienteLeadDetalheAberto && !botControleDialog && !clienteFichaAberta) fecharClienteLeadDetalhe()" @keydown="clienteLeadFoco($event)" class="lead-drawer">
+            <header class="lead-drawer-header">
+              <div><p>CLIENTES / KANBAN</p><h2 id="cliente-lead-titulo">Lead selecionado</h2></div>
+              <button id="cliente-lead-fechar" type="button" @click="fecharClienteLeadDetalhe()" aria-label="Fechar detalhes do lead" class="lead-drawer-close"><i data-lucide="x"></i></button>
+            </header>
+            <div class="lead-drawer-body">
+              <div class="lead-drawer-identity">
+                <span class="lead-drawer-avatar"><template x-if="clienteLeadFoto(clienteLeadSelecionado())"><img :src="clienteLeadFoto(clienteLeadSelecionado())" alt="" @error="clienteLeadFotoFalhou(clienteLeadSelecionado())" referrerpolicy="no-referrer"></template><span x-show="!clienteLeadFoto(clienteLeadSelecionado())" x-text="clienteLeadIniciais(clienteLeadSelecionado())"></span></span>
+                <div><h3 class="lead-drawer-name" x-text="clienteLeadSelecionado()?.name"></h3>
+                  <span class="lead-drawer-stage" :data-lane="clienteLeadLane(clienteLeadSelecionado())" :class="clienteLeadEtapaClasse(clienteLeadSelecionado())" x-text="clienteLeadEtapaLabel(clienteLeadSelecionado())"></span>
+                  <div class="lead-drawer-channel"><template x-if="clienteOrigemIcone(clienteLeadSelecionado())"><img :src="clienteOrigemIcone(clienteLeadSelecionado())" alt=""></template><i x-show="!clienteOrigemIcone(clienteLeadSelecionado())" data-lucide="message-circle"></i><span x-text="clienteLeadCanalLabel(clienteLeadSelecionado())"></span><strong x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></strong></div>
+                </div>
               </div>
-              <p x-show="clienteLeadLane(clienteLeadSelecionado())==='convertido'" class="text-xs text-emerald-800 bg-emerald-50 p-3 rounded-lg mt-4">Etapa confirmada pela venda. Mover cards não altera o financeiro.</p>
-              <div class="mt-4 p-3 bg-amber-50 rounded-lg text-xs text-amber-900"><p x-text="clienteLeadEspera(clienteLeadSelecionado())"></p><p class="mt-1" x-text="clienteLeadTempo(clienteLeadSelecionado())"></p></div>
-              <a x-show="clienteLeadConversaUrl(clienteLeadSelecionado())" :href="clienteLeadConversaUrl(clienteLeadSelecionado())" target="_blank" rel="noopener noreferrer" class="w-full min-h-[42px] mt-4 px-3 bg-emerald-700 text-white rounded-lg text-sm inline-flex items-center justify-center gap-2"><i data-lucide="messages-square" class="w-4 h-4"></i>Abrir conversa no Chatwoot</a>
-              <p x-show="!clienteLeadConversaUrl(clienteLeadSelecionado())" class="mt-3 text-xs text-gray-500">Link da conversa indisponível. Confira a conexão com o Chatwoot.</p>
-              <button type="button" x-show="hasPanelModule('bot') && clienteLeadSelecionado()?.lead_conversation_id" @click="abrirControleBot(clienteLeadSelecionado()?.lead_conversation_id,clienteLeadSelecionado()?.name)" :class="botControleClasse(botControleModo(clienteLeadSelecionado()?.lead_conversation_id))" class="w-full h-10 mt-3 border rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-300">Controle do bot nesta conversa</button>
-              <button type="button" x-show="Number(clienteLeadSelecionado()?.purchases||0)>0" @click="fecharClienteLeadDetalhe();abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full h-10 mt-2 border border-gray-200 rounded-lg text-xs">Histórico de compras</button>
-              <button type="button" x-show="!clienteLeadSelecionado()?.lead_archived" @click="arquivarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 mt-2 border border-gray-300 text-gray-600 rounded-lg text-xs disabled:opacity-40">Arquivar card</button>
-              <button type="button" x-show="clienteLeadSelecionado()?.lead_archived" @click="restaurarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="w-full h-10 mt-2 border border-amber-500 text-amber-800 rounded-lg text-xs disabled:opacity-40">Restaurar card</button>
-              <div aria-live="polite"><p x-show="clientesLeadAviso" class="mt-3 text-xs text-emerald-800" x-text="clientesLeadAviso"></p><p x-show="clientesLeadErro" class="mt-3 text-xs text-amber-800" x-text="clientesLeadErro"></p></div>
-              <dl class="border-t border-gray-100 mt-5 pt-3 text-xs space-y-3"><div class="flex justify-between"><dt class="text-gray-500">Lead recebido</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_created_at)"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Última mensagem</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_last_message_at)"></dd></div><div x-show="clienteLeadSelecionado()?.lead_board_updated_at" class="flex justify-between"><dt class="text-gray-500">Último ajuste no quadro</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_board_updated_at)"></dd></div></dl>
+              <p x-show="clienteLeadSelecionado()?.lead_archived" class="lead-drawer-alert lead-drawer-alert-warning">Lead arquivado · histórico preservado</p>
+              <section class="lead-drawer-card lead-drawer-interest" aria-label="Interesse e cotação">
+                <span class="lead-drawer-tire"><img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1" alt="" aria-hidden="true" width="56" height="62"></span>
+                <div><p class="lead-drawer-caption">Interesse</p><h3 x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></h3></div>
+                <div class="lead-drawer-quote"><p class="lead-drawer-caption">Cotação</p><strong x-text="clienteLeadSelecionado()?.lead_quote_amount != null ? formatCurrency(clienteLeadSelecionado().lead_quote_amount) : 'Sem cotação'"></strong></div>
+              </section>
+              <section class="lead-drawer-card lead-drawer-location" aria-label="Localização do lead">
+                <div class="lead-drawer-location-main">
+                  <span class="lead-drawer-location-icon"><i data-lucide="map-pin"></i></span>
+                  <div><p class="lead-drawer-caption">Localização do lead</p><h3 x-text="clienteLeadLocal(clienteLeadSelecionado())||'Não informada'"></h3><p class="lead-drawer-caption" x-text="clienteLeadLocalOrigem(clienteLeadSelecionado())"></p></div>
+                  <a x-show="clienteLeadMapaUrl(clienteLeadSelecionado())" :href="clienteLeadMapaUrl(clienteLeadSelecionado())" target="_blank" rel="noopener noreferrer" class="lead-drawer-location-link"><i data-lucide="external-link"></i>Ver no mapa</a>
+                </div>
+                <p class="lead-drawer-note">Confirme rua e número para entrega.</p>
+              </section>
+              <div class="lead-drawer-metrics">
+                <section class="lead-drawer-card lead-drawer-metric"><i data-lucide="messages-square"></i><div><p class="lead-drawer-caption">Aguardando</p><strong x-text="clienteLeadAguardando(clienteLeadSelecionado())"></strong></div></section>
+                <section class="lead-drawer-card lead-drawer-metric" :title="clienteData(clienteLeadSelecionado()?.lead_last_message_at)"><i data-lucide="clock-3"></i><div><p class="lead-drawer-caption">Última mensagem</p><strong x-text="clienteLeadUltimaMensagem(clienteLeadSelecionado())"></strong></div></section>
+              </div>
+              <section x-show="!clienteLeadSelecionado()?.lead_archived && clienteLeadLane(clienteLeadSelecionado())!=='convertido'" class="lead-drawer-card">
+                <h3 class="lead-drawer-section-title"><i data-lucide="sliders-horizontal"></i>Etapa do lead</h3>
+                <div class="lead-drawer-segments" role="group" aria-label="Modo da etapa do lead">
+                  <button type="button" :aria-pressed="!clienteLeadManual(clienteLeadSelecionado())" @click="retomarClienteLeadAutomatico(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote">Automático</button>
+                  <button type="button" :aria-pressed="clienteLeadManual(clienteLeadSelecionado())" @click="if(!clienteLeadManual(clienteLeadSelecionado())) assumirControleClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote">Manual</button>
+                </div>
+                <select aria-label="Etapa do lead" :value="clienteLeadLane(clienteLeadSelecionado())" @change="alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="lead-drawer-select"><option value="novo">Novo</option><option value="atendimento">Em atendimento</option><option value="orcamento">Orçamento enviado</option><option value="perdido">Perdido</option></select>
+                <p class="lead-drawer-note" x-text="clienteLeadManual(clienteLeadSelecionado())?'Etapa mantida pela equipe.':'Atualizada conforme o atendimento.'"></p>
+              </section>
+              <p x-show="clienteLeadLane(clienteLeadSelecionado())==='convertido'" class="lead-drawer-alert">Etapa confirmada pela venda. Mover cards não altera o financeiro.<span x-show="clienteLeadSelecionado()?.lead_order_amount != null" class="block mt-1 font-semibold" x-text="'Pedido confirmado · '+formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></span></p>
+              <section x-show="hasPanelModule('bot') && clienteLeadSelecionado()?.lead_conversation_id" class="lead-drawer-card lead-drawer-bot">
+                <i data-lucide="bot"></i><div class="lead-drawer-bot-info"><h3>Controle do bot</h3><p class="lead-drawer-bot-status" :data-state="clienteLeadBotStatus(clienteLeadSelecionado()).state" x-text="clienteLeadBotStatus(clienteLeadSelecionado()).label"></p></div>
+                <button type="button" @click="abrirControleBot(clienteLeadSelecionado()?.lead_conversation_id,clienteLeadSelecionado()?.name)" class="lead-drawer-manage" aria-label="Gerenciar controle do bot nesta conversa">Gerenciar<i data-lucide="chevron-right"></i></button>
+              </section>
+              <div aria-live="polite"><p x-show="clientesLeadAviso" class="lead-drawer-alert" x-text="clientesLeadAviso"></p><p x-show="clientesLeadErro" class="lead-drawer-alert lead-drawer-alert-warning" x-text="clientesLeadErro"></p></div>
             </div>
+            <footer class="lead-drawer-footer">
+              <a x-show="clienteLeadConversaUrl(clienteLeadSelecionado())" :href="clienteLeadConversaUrl(clienteLeadSelecionado())" target="_blank" rel="noopener noreferrer" class="lead-drawer-action lead-drawer-primary"><i data-lucide="message-circle"></i>Abrir conversa no Chatwoot</a>
+              <p x-show="!clienteLeadConversaUrl(clienteLeadSelecionado())" class="lead-drawer-caption text-center">Link da conversa indisponível. Confira a conexão com o Chatwoot.</p>
+              <button type="button" @click="abrirFichaClienteDoLead()" class="lead-drawer-action lead-drawer-secondary"><i data-lucide="contact-round"></i>Ver ficha completa</button>
+              <button type="button" x-show="!clienteLeadSelecionado()?.lead_archived" @click="arquivarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="lead-drawer-archive"><i data-lucide="archive"></i>Arquivar lead</button>
+              <button type="button" x-show="clienteLeadSelecionado()?.lead_archived" @click="restaurarClienteLead(clienteLeadSelecionado())" :disabled="!!clienteLeadSalvandoId || !!clientesLeadLote" class="lead-drawer-archive"><i data-lucide="archive-restore"></i>Restaurar lead</button>
+            </footer>
           </aside>
         </section>
 
@@ -8166,7 +8190,7 @@
                 <section x-show="clienteFicha.customer.shared_location" class="mt-5 border-t border-gray-200 pt-4">
                   <h4 class="text-sm font-semibold">Localização do lead</h4>
                   <div class="mt-3 flex items-start gap-3 text-sm"><i data-lucide="map-pinned" class="h-5 w-5 shrink-0 text-emerald-700"></i><div class="min-w-0"><p class="break-words font-medium" x-text="clienteFicha.customer.shared_location?.label"></p><p x-show="clienteFicha.customer.shared_location?.estimated_address" class="mt-1 break-words text-xs text-gray-500" x-text="clienteFicha.customer.shared_location?.estimated_address"></p></div></div>
-                  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><p class="text-gray-500" x-text="clienteFicha.customer.shared_location?.source==='typed'?'Informado na conversa · localização estimada, não é endereço de entrega confirmado':'Estimado pelo pino compartilhado · confirme rua e número para entrega'"></p><a :href="clienteFichaLocalizacaoMapaUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-emerald-800 underline" x-text="clienteFicha.customer.shared_location?.source==='typed'?'Pesquisar no mapa':'Abrir pino no mapa'"></a></div>
+                  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><p class="text-gray-500" x-text="clienteFicha.customer.shared_location?.source==='legacy'?'Registrada no atendimento · confirme o endereço para entrega':clienteFicha.customer.shared_location?.source==='typed'?'Informado na conversa · localização estimada, não é endereço de entrega confirmado':'Estimado pelo pino compartilhado · confirme rua e número para entrega'"></p><a :href="clienteFichaLocalizacaoMapaUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-emerald-800 underline" x-text="clienteFicha.customer.shared_location?.source==='shared_pin'?'Abrir pino no mapa':'Pesquisar no mapa'"></a></div>
                 </section>
                 <section class="mt-5 border-t border-gray-200 pt-4">
                   <div class="flex items-center justify-between gap-2"><h4 class="text-sm font-semibold">Histórico de compras</h4><span class="text-xs text-gray-500" x-text="clienteFicha.history_total+' pedidos'"></span></div>

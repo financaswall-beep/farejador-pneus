@@ -48,6 +48,13 @@ window.PAINEL_MODULES.clientesFicha = function () {
         const data = await this.apiGet(`/admin/api/clientes/${encodeURIComponent(c.source)}/${encodeURIComponent(c.source_id)}/ficha?limit=10&offset=${offset}`);
         if (version !== requestVersion || !this.clienteFichaAberta) return;
         this.clienteFicha = { ...data, orders:more ? [...this.clienteFicha.orders,...data.orders] : data.orders };
+        const row = this.clientes?.find(row => row.id === data.customer.id);
+        const location = data.customer.shared_location;
+        if (row && location && (!row.shared_location
+          || new Date(location.observed_at) >= new Date(row.shared_location.observed_at))) {
+          row.shared_location = location;
+          row.lead_location = location.label;
+        }
         this.carregarClienteLeadFoto(data.customer);
       } catch {
         if (version === requestVersion && this.clienteFichaAberta) {

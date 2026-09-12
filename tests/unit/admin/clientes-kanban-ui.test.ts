@@ -12,8 +12,8 @@ describe('Clientes - Kanban operacional', () => {
     expect(html).toContain('@drop.prevent="clienteLeadDrop(lane.id)"');
     expect(html).toContain('alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)');
     expect(html).toContain('★ VIP');
-    expect(html).toContain('Arquivar card');
-    expect(html).toContain('Restaurar card');
+    expect(html.includes('Arquivar lead')).toBe(true);
+    expect(html.includes('Restaurar lead')).toBe(true);
     expect(ui).toContain("alert('Convertido é automático");
     expect(ui).toContain('clientesLeadsVisiveis');
     expect(ui).toContain("method: 'PATCH'");

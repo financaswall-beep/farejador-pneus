@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { applyClienteBusinessRules, getClienteLeadBoardStates } from './queries-clientes-board.js';
+import { loadCustomerLeadLocations, type SharedLeadLocation } from './customer-lead-location.js';
 export interface ClientePainelRow {
   id: string; source: 'chatwoot' | 'balcao' | 'parceiro' | 'atacado'; source_id: string;
   name: string; phone: string | null; email: string | null;
@@ -13,6 +14,7 @@ export interface ClientePainelRow {
   lead_lane: 'novo' | 'atendimento' | 'orcamento' | 'perdido' | 'convertido' | null;
   lead_conversation_id: string | null; lead_created_at: string | null; lead_last_message_at: string | null;
   lead_waiting_on: 'equipe' | 'cliente' | 'nenhum' | null;
+  shared_location?: SharedLeadLocation | null;
   lead_location: string | null; lead_quote_amount: number | null;
   lead_order_amount: number | null; partner_id: string | null; partner_name: string | null;
   name_needs_review?: boolean; vip_min_purchases?: number;
@@ -91,7 +93,7 @@ export async function getClientesPainel(
                 WHEN lead_message.sender_type IS NOT NULL THEN 'cliente'
                 ELSE 'equipe'
               END AS lead_waiting_on,
-              lead_location.value AS lead_location,
+              NULL::text AS lead_location,
               lead_quote.amount::float8 AS lead_quote_amount,
               lead_order.total_amount::float8 AS lead_order_amount,
               NULL::text AS partner_id, NULL::text AS partner_name
@@ -126,13 +128,6 @@ export async function getClientesPainel(
               AND cf.fact_key IN ('medida_consultada', 'medida_pneu', 'produto_cotado', 'moto_modelo_consultado')
             ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1
          ) lead_interest ON true
-         LEFT JOIN LATERAL (
-           SELECT cf.fact_value #>> '{}' AS value
-             FROM analytics.conversation_facts cf
-            WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
-              AND cf.fact_key IN ('bairro_canonico', 'bairro_consultado', 'municipio_entrega')
-            ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1
-         ) lead_location ON true
          LEFT JOIN LATERAL (
            SELECT CASE WHEN raw_value ~ '^[0-9]+([.,][0-9]+)?$' THEN replace(raw_value, ',', '.')::numeric END AS amount
              FROM (SELECT cf.fact_value #>> '{}' AS raw_value
@@ -293,6 +288,11 @@ export async function getClientesPainel(
     ),
     getClienteLeadBoardStates(environment, dbPool),
   ]);
+  const locations = await loadCustomerLeadLocations(environment, chatwoot.rows.map(c => c.source_id), dbPool);
+  for (const row of chatwoot.rows) {
+    row.shared_location = locations.get(row.source_id) ?? null;
+    row.lead_location = row.shared_location?.label ?? null;
+  }
   const rows = applyClienteBusinessRules(
     [...chatwoot.rows, ...balcao.rows, ...parceiro.rows, ...atacado.rows], leadBoard,
   );

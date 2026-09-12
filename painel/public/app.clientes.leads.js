@@ -7,6 +7,7 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     clientesLeadCanal: 'todos',
     clientesLeadFotos: {},
     clienteLeadDetalheAberto: false,
+    clienteLeadControleCarregando: null,
     clientesLeadEtapas: [
       { id:'novo',label:'Novos',tone:'bg-blue-50 text-blue-700',border:'border-t-blue-500' },
       { id:'atendimento',label:'Em atendimento',tone:'bg-teal-50 text-teal-800',border:'border-t-teal-600' },
@@ -29,6 +30,47 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     },
     clienteLeadEtapaLabel(c) {
       return this.clientesLeadEtapas.find((lane) => lane.id === this.clienteLeadLane(c))?.label || 'Novo';
+    },
+    clienteLeadEtapaClasse(c) {
+      return this.clientesLeadEtapas.find(lane => lane.id === this.clienteLeadLane(c))?.tone || 'bg-gray-100 text-gray-700';
+    },
+    clienteLeadIniciais(c) {
+      const names = String(c?.name || '').trim().split(/\s+/).filter(Boolean);
+      return names.length > 1 ? (names[0][0] + names.at(-1)[0]).toUpperCase() : (names[0]?.[0] || '?').toUpperCase();
+    },
+    clienteLeadLocal(c) { return c?.shared_location?.label || c?.lead_location || ''; },
+    clienteLeadLocalOrigem(c) {
+      return ({ typed:'Informada na conversa',shared_pin:'Pino compartilhado pelo cliente',
+        legacy:'Registrada no atendimento' })[c?.shared_location?.source] || 'Localização ainda não informada';
+    },
+    clienteLeadMapaUrl(c) {
+      try {
+        const url = new URL(c?.shared_location?.maps_url || '');
+        return url.protocol === 'https:' && url.hostname === 'www.google.com' && url.pathname === '/maps/search/'
+          && !url.username && !url.password ? url.href : '';
+      } catch { return ''; }
+    },
+    clienteLeadUltimaMensagem(c) {
+      const timestamp = c?.lead_last_message_at;
+      if (!timestamp || !Number.isFinite(new Date(timestamp).getTime())) return 'Sem mensagem';
+      return this.clienteLeadTempo(c);
+    },
+    clienteLeadAguardando(c) {
+      return ({ equipe:'Equipe',cliente:'Cliente',nenhum:'Ninguém' })[c?.lead_waiting_on] || 'Não informado';
+    },
+    clienteLeadBotStatus(c) {
+      if (this.clienteLeadControleCarregando === c?.lead_conversation_id) return { label:'Consultando…',state:'unknown' };
+      const mode = this.botControleModo?.(c?.lead_conversation_id);
+      if (mode === 'auto') return { label:'Liberado nesta conversa',state:'auto' };
+      if (mode === 'human') return { label:'Atendimento humano',state:'human' };
+      return { label:'Status indisponível',state:'unknown' };
+    },
+    abrirFichaClienteDoLead() {
+      const c = this.clienteLeadSelecionado();
+      if (!c) return;
+      this.clienteLeadDetalheAberto = false;
+      document.getElementById(`lead-card-${c.id}`)?.focus();
+      this.abrirFichaCliente(c);
     },
     clienteLeadOrigemEtapa(c) {
       if (this.clienteLeadLane(c) === 'convertido') return 'Venda confirmada';
@@ -64,9 +106,12 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
       this.clienteLeadDetalheAberto = true;
       this.carregarClienteLeadFoto(c);
       if (c?.lead_conversation_id && this.hasPanelModule?.('bot')) {
-        this.consultarBotControle(c.lead_conversation_id).catch(() => { this.botControleModos[c.lead_conversation_id] = null; });
+        this.clienteLeadControleCarregando = c.lead_conversation_id;
+        this.consultarBotControle(c.lead_conversation_id)
+          .catch(() => { this.botControleModos[c.lead_conversation_id] = null; })
+          .finally(() => { if (this.clienteLeadControleCarregando === c.lead_conversation_id) this.clienteLeadControleCarregando = null; });
       }
-      this.$nextTick(() => { document.getElementById('cliente-lead-fechar')?.focus(); });
+      this.$nextTick(() => { document.getElementById('cliente-lead-fechar')?.focus(); lucide.createIcons(); });
     },
     fecharClienteLeadDetalhe() {
       this.clienteLeadDetalheAberto = false;
