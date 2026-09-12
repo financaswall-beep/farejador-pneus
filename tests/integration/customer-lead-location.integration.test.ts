@@ -82,4 +82,40 @@ describe('localização do lead — seleção real no PostgreSQL isolado',() => 
     expect(result.get(contact)).toMatchObject({source:'shared_pin',label:'Icaraí — Niterói'});
     expect(result.get(contact)?.maps_url).toContain('-22.9%2C-43.1');
   });
+  it('publica as duas medidas com preços vinculados e ignora turnos não enviados e outros ambientes',async()=>{
+    const ct=await id(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name) VALUES('test',991300,'Duas medidas') RETURNING id`);
+    const cv=await id(`INSERT INTO core.conversations(environment,chatwoot_conversation_id,chatwoot_account_id,contact_id,current_status,started_at)
+      VALUES('test',991300,2,$1,'open','2026-09-12') RETURNING id`,[ct]);
+    const message=await id(`INSERT INTO core.messages(environment,conversation_id,chatwoot_message_id,sender_type,message_type,sent_at,chatwoot_conversation_id)
+      VALUES('test',$1,991301,'contact',0,'2026-09-12',991300) RETURNING id`,[cv]);
+    const actions=[{role:'assistant',tool_calls:[
+      {id:'a',function:{name:'buscar_produto',arguments:JSON.stringify({medida_pneu:'130/70-13'})}},
+      {id:'b',function:{name:'buscar_produto',arguments:JSON.stringify({medida_pneu:'110/70-13'})}},
+    ]},{role:'tool',tool_call_id:'a',content:JSON.stringify({encontrado:false,mensagem:'Nenhum produto com estoque encontrado.'})},
+    {role:'tool',tool_call_id:'b',content:JSON.stringify({encontrado:true,produtos:[{
+      product_id:'p110',product_name:'Pneu 110/70-13',tire_size:'110/70-13',tire_condition:'meia_vida',brand:'IRC',
+      price_amount:'89',currency:'BRL',total_stock_available:7,
+    }]})}];
+    await db.pool.query(`INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
+      VALUES('test',$1,$2,'v2','test','sent_api_ack',$3::jsonb)`,[cv,message,JSON.stringify(actions)]);
+    await db.pool.query(`INSERT INTO ops.bot_stock_searches(environment,conversation_id,search_key,tool_name,measure,filters,stores,trigger_message_id)
+      VALUES('test',$1,'lead-multi-test','buscar_produto','130/70-13','{}',$2::jsonb,$3)`,
+      [cv,JSON.stringify([{id:'matriz',kind:'matrix',name:'Matriz',available:false}]),message]);
+    await fact(cv,'medida_consultada','130/70-13','2026-09-12');
+    await fact(cv,'medida_consultada','130 70 13','2026-09-12');
+    await fact(cv,'preco_cotado',999,'2026-09-12');
+    const valid=await fact(cv,'medida_consultada','110/70-13','2026-09-12');
+    const corrected=await fact(cv,'medida_consultada','180/55-17','2026-09-12');
+    await db.pool.query('UPDATE analytics.conversation_facts SET superseded_by=$1 WHERE id=$2',[valid,corrected]);
+    const unsent=await id(`INSERT INTO core.messages(environment,conversation_id,chatwoot_message_id,sender_type,message_type,sent_at,chatwoot_conversation_id)
+      VALUES('test',$1,991302,'contact',0,'2026-09-12',991300) RETURNING id`,[cv]);
+    await db.pool.query(`INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
+      VALUES('test',$1,$2,'v2','test','generated',$3::jsonb)`,[cv,unsent,JSON.stringify(actions).replaceAll('110/70-13','180/55-17')]);
+    const data=await board('test',db.pool), row=data.rows.find(c=>c.source_id===ct)!;
+    expect(row.lead_interests).toHaveLength(2);
+    expect(row.lead_interests?.find(i=>i.measure==='130/70-13')?.variants[0]).toMatchObject({quotes:[],availability:'unavailable'});
+    expect(row.lead_interests?.find(i=>i.measure==='110/70-13')?.variants[0]).toMatchObject({condition:'meia_vida',quotes:[{product_id:'p110',amount:89}]});
+    const {loadCustomerLeadInterests}=await import('../../src/admin/painel/customer-lead-interests.js');
+    expect((await loadCustomerLeadInterests('prod',[cv],db.pool)).get(cv)).toEqual([]);
+  });
 });

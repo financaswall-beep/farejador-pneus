@@ -194,10 +194,10 @@
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda3"></script>
-<script src="/admin/painel/app.clientes.js?v=20260907-ficha1&leads=20260905"></script>
+<script src="/admin/painel/app.clientes.js?v=20260912-lead-items1"></script>
 <script src="/admin/painel/app.clientes.ficha.js?v=20260912-lead-drawer1"></script>
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
-<script src="/admin/painel/app.clientes.leads.js?v=20260912-lead-drawer1"></script>
+<script src="/admin/painel/app.clientes.leads.js?v=20260912-lead-items1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
@@ -237,7 +237,7 @@
 <link rel="stylesheet" href="/admin/painel/relatorios-parceiros.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-financeiro.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-logistica.css?v=20260910-1">
-<link rel="stylesheet" href="/admin/painel/clientes-lead.css?v=20260912-2">
+<link rel="stylesheet" href="/admin/painel/clientes-lead.css?v=20260912-lead-items1">
 <link rel="stylesheet" href="/admin/painel/relatorios-estoque.css?v=20260910-1">
 <link rel="stylesheet" href="/admin/painel/relatorios.css?v=20260910-1" />
 
@@ -8033,9 +8033,18 @@
                           </div>
                           <p x-show="c.name_needs_review" class="mt-2 text-[10px] font-medium text-amber-700">Nome pendente no Chatwoot</p>
                           <span x-show="c.is_vip" class="inline-block text-[10px] bg-amber-50 text-amber-800 rounded px-1.5 py-0.5 mt-2">★ VIP</span>
-                          <p class="text-xs text-gray-800 mt-3 truncate" x-text="c.last_item||'Interesse não informado'"></p>
+                          <div class="lead-card-interests" x-show="clienteLeadInteresses(c).length">
+                            <p class="lead-card-interest-count" x-text="clienteLeadInteresses(c).length+' '+(clienteLeadInteresses(c).length===1?'medida de interesse':'medidas de interesse')"></p>
+                            <template x-for="item in clienteLeadInteressesCard(c)" :key="item.key">
+                              <div class="lead-card-interest" :data-tone="clienteLeadResumoInteresse(item).tone">
+                                <span class="lead-card-interest-main"><strong x-text="item.measure"></strong><span x-text="clienteLeadResumoInteresse(item).label"></span></span>
+                                <strong class="lead-card-interest-price" x-show="clienteLeadResumoInteresse(item).value" x-text="clienteLeadResumoInteresse(item).value"></strong>
+                              </div>
+                            </template>
+                            <p class="lead-card-interest-more" x-show="clienteLeadInteresses(c).length>2" x-text="'+'+(clienteLeadInteresses(c).length-2)+' no detalhe'"></p>
+                          </div>
+                          <p x-show="!clienteLeadInteresses(c).length" class="text-xs text-gray-800 mt-3" x-text="c.last_item||'Interesse não informado'"></p>
                           <p x-show="c.lead_location" class="text-[11px] text-gray-500 mt-1.5 truncate" x-text="c.lead_location"></p>
-                          <p x-show="lane.id==='orcamento' && c.lead_quote_amount" class="text-sm font-semibold text-emerald-900 mt-2" x-text="formatCurrency(c.lead_quote_amount)"></p>
                           <p x-show="lane.id==='convertido' && c.lead_order_amount" class="text-sm font-semibold text-emerald-900 mt-2" x-text="formatCurrency(c.lead_order_amount)"></p>
                           <div class="flex flex-wrap items-center gap-1.5 mt-3"><span class="text-[10px] px-1.5 py-1 rounded-md font-medium" :class="c.lead_waiting_on==='equipe' && !['perdido','convertido'].includes(lane.id)?'bg-rose-50 text-rose-700':lane.tone" x-text="clienteLeadEspera(c)"></span><span class="text-[10px] text-gray-500" x-text="clienteLeadTempo(c)"></span></div>
                           <div class="border-t border-gray-100 mt-3 pt-2"><span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded" :class="clienteLeadManual(c)?'bg-blue-50 text-blue-800':'bg-emerald-50 text-emerald-800'"><span aria-hidden="true" x-text="clienteLeadManual(c)?'↔':'↻'"></span><span x-text="clienteLeadManual(c)?'Manual':'Automático'"></span></span><p class="text-[10px] text-gray-500 mt-1" x-text="clienteLeadOrigemEtapa(c)"></p></div>
@@ -8066,10 +8075,25 @@
                 </div>
               </div>
               <p x-show="clienteLeadSelecionado()?.lead_archived" class="lead-drawer-alert lead-drawer-alert-warning">Lead arquivado · histórico preservado</p>
-              <section class="lead-drawer-card lead-drawer-interest" aria-label="Interesse e cotação">
-                <span class="lead-drawer-tire"><img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1" alt="" aria-hidden="true" width="56" height="62"></span>
-                <div><p class="lead-drawer-caption">Interesse</p><h3 x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></h3></div>
-                <div class="lead-drawer-quote"><p class="lead-drawer-caption">Cotação</p><strong x-text="clienteLeadSelecionado()?.lead_quote_amount != null ? formatCurrency(clienteLeadSelecionado().lead_quote_amount) : 'Sem cotação'"></strong></div>
+              <section class="lead-drawer-card lead-drawer-interests" aria-label="Interesses e cotações">
+                <div class="lead-drawer-interests-heading"><h3>Interesses e cotações</h3><span x-show="clienteLeadInteresses(clienteLeadSelecionado()).length" x-text="clienteLeadInteresses(clienteLeadSelecionado()).length+' '+(clienteLeadInteresses(clienteLeadSelecionado()).length===1?'medida':'medidas')"></span></div>
+                <template x-for="item in clienteLeadInteresses(clienteLeadSelecionado())" :key="item.key">
+                  <div class="lead-drawer-interest-item">
+                    <span class="lead-drawer-tire"><img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1" alt="" aria-hidden="true" width="40" height="48"></span>
+                    <div class="lead-drawer-interest-content">
+                      <h4 x-text="item.measure"></h4>
+                      <template x-for="variant in item.variants" :key="variant.key">
+                        <div class="lead-drawer-interest-variant" :data-state="variant.availability">
+                          <div class="lead-drawer-interest-price-row"><span class="lead-drawer-caption" x-text="clienteLeadCondicao(variant)||'Condição não informada'"></span><span class="lead-drawer-item-quote" :data-priced="variant.quotes.length>0" x-text="clienteLeadCotacao(variant)"></span></div>
+                          <div class="lead-drawer-interest-status-row"><span class="lead-drawer-item-status" x-text="clienteLeadDisponibilidade(variant)"></span><span class="lead-drawer-item-unit" x-show="variant.quotes.length">por pneu</span></div>
+                        </div>
+                      </template>
+                      <p class="lead-drawer-caption" x-show="!item.variants.length">Sem cotação</p>
+                    </div>
+                  </div>
+                </template>
+                <div x-show="!clienteLeadInteresses(clienteLeadSelecionado()).length" class="lead-drawer-interest-empty"><strong x-text="clienteLeadSelecionado()?.last_item||'Interesse não informado'"></strong><p class="lead-drawer-caption">Sem cotação vinculada ao produto.</p></div>
+                <p class="lead-drawer-interest-note">Preços e disponibilidade registrados nas consultas. Cada valor pertence ao respectivo pneu.</p>
               </section>
               <section class="lead-drawer-card lead-drawer-location" aria-label="Localização do lead">
                 <div class="lead-drawer-location-main">

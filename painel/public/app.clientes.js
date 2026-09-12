@@ -91,7 +91,8 @@ window.PAINEL_MODULES.clientes = function () {
     clientesFiltrados() {
       const q = this.clienteTexto(this.clientesBusca);
       return this.clientes.filter((c) => {
-        const hit = !q || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name, c.last_item].join(' ')).includes(q);
+        const hit = !q || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name, c.last_item,
+          ...(c.lead_interests || []).map(item => item.measure)].join(' ')).includes(q);
         const tipo = this.clientesTipo === 'todos' || c.kind === this.clientesTipo;
         const origem = this.clientesOrigem === 'todos' || c.source === this.clientesOrigem;
         const status = this.clientesStatus === 'todos' || c.status === this.clientesStatus;

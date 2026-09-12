@@ -22,6 +22,20 @@ const lead = (id:string,lane='novo',extras={}) => ({ id,name:id,source:'chatwoot
   lead_lane:lane,lead_derived_lane:lane,lead_board_version:0,lead_archived:false,origin:'whatsapp',...extras });
 
 describe('Leads da Matriz — comportamento', () => {
+  it('resume duas medidas sem preço global e preserva as demais no painel lateral', () => {
+    const {ui}=setup(); ui.formatCurrency=(n:number)=>`R$ ${n}`;
+    const items=[{key:'130',measure:'130/70-13',variants:[{quotes:[],availability:'unavailable',stores:[{name:'Matriz'}]}]},
+      {key:'110',measure:'110/70-13',variants:[{condition:'meia_vida',quotes:[{amount:89}],availability:'available'}]},
+      {key:'90',measure:'90/90-12',variants:[]}];
+    const c=lead('a','orcamento',{lead_interests:items,lead_quote_amount:999});
+    expect(ui.clienteLeadInteressesCard(c)).toHaveLength(2);
+    expect(ui.clienteLeadInteresses(c)).toHaveLength(3);
+    expect(ui.clienteLeadResumoInteresse(items[0])).toEqual({label:'Sem estoque · Matriz',value:'',tone:'missing'});
+    expect(ui.clienteLeadResumoInteresse(items[1])).toEqual({label:'Meia-vida',value:'R$ 89',tone:'quoted'});
+    expect(ui.clienteLeadCotacao({quotes:[]})).toBe('Sem cotação');
+    expect(ui.clienteLeadCotacao({quotes:[{amount:89},{amount:110}]})).toBe('A partir de R$ 89');
+    expect(ui.clienteLeadInteresses(lead('legado','orcamento',{lead_quote_amount:89}))).toEqual([]);
+  });
   it('abre a ficha do mesmo lead e encerra o drawer sem perder a seleção do Kanban',() => {
     const {ui}=setup(); const c=lead('a','orcamento'); ui.clientes=[c];
     ui.clienteSelecionadoId='a'; ui.clienteLeadDetalheAberto=true; ui.abrirFichaCliente=vi.fn();

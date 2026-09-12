@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { applyClienteBusinessRules, getClienteLeadBoardStates } from './queries-clientes-board.js';
 import { loadCustomerLeadLocations, type SharedLeadLocation } from './customer-lead-location.js';
+import { loadCustomerLeadInterests, type LeadInterest } from './customer-lead-interests.js';
 export interface ClientePainelRow {
   id: string; source: 'chatwoot' | 'balcao' | 'parceiro' | 'atacado'; source_id: string;
   name: string; phone: string | null; email: string | null;
@@ -16,6 +17,7 @@ export interface ClientePainelRow {
   lead_waiting_on: 'equipe' | 'cliente' | 'nenhum' | null;
   shared_location?: SharedLeadLocation | null;
   lead_location: string | null; lead_quote_amount: number | null;
+  lead_interests?: LeadInterest[];
   lead_order_amount: number | null; partner_id: string | null; partner_name: string | null;
   name_needs_review?: boolean; vip_min_purchases?: number;
   lead_derived_lane?: ClientePainelRow['lead_lane']; lead_archived?: boolean;
@@ -126,15 +128,16 @@ export async function getClientesPainel(
              FROM analytics.conversation_facts cf
             WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
               AND cf.fact_key IN ('medida_consultada', 'medida_pneu', 'produto_cotado', 'moto_modelo_consultado')
-            ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1
+              AND cf.superseded_by IS NULL
+            ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC, cf.id DESC LIMIT 1
          ) lead_interest ON true
          LEFT JOIN LATERAL (
            SELECT CASE WHEN raw_value ~ '^[0-9]+([.,][0-9]+)?$' THEN replace(raw_value, ',', '.')::numeric END AS amount
              FROM (SELECT cf.fact_value #>> '{}' AS raw_value
                      FROM analytics.conversation_facts cf
                     WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
-                      AND cf.fact_key = 'preco_cotado'
-                    ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1) q
+                      AND cf.fact_key = 'preco_cotado' AND cf.superseded_by IS NULL
+                    ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC, cf.id DESC LIMIT 1) q
          ) lead_quote ON true
          LEFT JOIN LATERAL (
            SELECT o.id AS order_id, o.total_amount
@@ -288,10 +291,14 @@ export async function getClientesPainel(
     ),
     getClienteLeadBoardStates(environment, dbPool),
   ]);
-  const locations = await loadCustomerLeadLocations(environment, chatwoot.rows.map(c => c.source_id), dbPool);
+  const [locations, interests] = await Promise.all([
+    loadCustomerLeadLocations(environment, chatwoot.rows.map(c => c.source_id), dbPool),
+    loadCustomerLeadInterests(environment, chatwoot.rows.map(c => c.lead_conversation_id!).filter(Boolean), dbPool),
+  ]);
   for (const row of chatwoot.rows) {
     row.shared_location = locations.get(row.source_id) ?? null;
     row.lead_location = row.shared_location?.label ?? null;
+    row.lead_interests = interests.get(row.lead_conversation_id!) ?? [];
   }
   const rows = applyClienteBusinessRules(
     [...chatwoot.rows, ...balcao.rows, ...parceiro.rows, ...atacado.rows], leadBoard,

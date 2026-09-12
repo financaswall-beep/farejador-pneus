@@ -39,6 +39,40 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
       return names.length > 1 ? (names[0][0] + names.at(-1)[0]).toUpperCase() : (names[0]?.[0] || '?').toUpperCase();
     },
     clienteLeadLocal(c) { return c?.shared_location?.label || c?.lead_location || ''; },
+    clienteLeadInteresses(c) {
+      return Array.isArray(c?.lead_interests) ? c.lead_interests : [];
+    },
+    clienteLeadInteressesCard(c) { return this.clienteLeadInteresses(c).slice(0, 2); },
+    clienteLeadCondicao(v) {
+      return [({ novo:'Novo',meia_vida:'Meia-vida',remold:'Remold' })[v?.condition],v?.brand,
+        ({ front:'Dianteiro',rear:'Traseiro',both:'Dianteiro / traseiro' })[v?.position]].filter(Boolean).join(' · ');
+    },
+    clienteLeadCotacao(v) {
+      const prices = (v?.quotes || []).map(q => q.amount).filter(n => typeof n === 'number' && Number.isFinite(n));
+      if (!prices.length) return 'Sem cotação';
+      const min = Math.min(...prices), max = Math.max(...prices);
+      return (min === max ? '' : 'A partir de ') + this.formatCurrency(min);
+    },
+    clienteLeadDisponibilidade(v) {
+      const stores = v?.stores || [];
+      if (v?.availability === 'unavailable') {
+        return stores.length === 1 ? `Sem estoque · ${stores[0].name}` : 'Sem estoque nas lojas consultadas';
+      }
+      if (v?.availability === 'not_found') return 'Não encontrado no catálogo';
+      if (v?.availability === 'available') return 'Disponível na consulta';
+      return 'Disponibilidade não confirmada';
+    },
+    clienteLeadResumoInteresse(item) {
+      const variants = item?.variants || [];
+      const quoted = variants.filter(v => v.quotes?.length);
+      if (quoted.length) {
+        const label = quoted.length === 1 ? this.clienteLeadCondicao(quoted[0]) : 'Opções consultadas';
+        return { label, value:this.clienteLeadCotacao({quotes:quoted.flatMap(v => v.quotes)}), tone:'quoted' };
+      }
+      const latest = variants.at(-1);
+      return { label:latest ? [this.clienteLeadCondicao(latest),this.clienteLeadDisponibilidade(latest)].filter(Boolean).join(' · ') : 'Sem cotação',
+        value:'',tone:latest?.availability === 'unavailable' || latest?.availability === 'not_found' ? 'missing' : 'unknown' };
+    },
     clienteLeadLocalOrigem(c) {
       return ({ typed:'Informada na conversa',shared_pin:'Pino compartilhado pelo cliente',
         legacy:'Registrada no atendimento' })[c?.shared_location?.source] || 'Localização ainda não informada';
