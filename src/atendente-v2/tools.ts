@@ -249,7 +249,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: 'pedir_foto',
       description:
-        'Pede pra LOJA tirar uma foto AO VIVO do pneu USADO em estoque e mandar pro cliente. Use SÓ quando o cliente PEDIR pra ver foto/estado/conservação do pneu — NUNCA ofereça foto por conta própria. Exige pneu já buscado (product_id de buscar_produto/buscar_compatibilidade) e localização do cliente (bairro ou pino) pra achar a loja certa. Retorno foto_solicitada → avise "vou pedir pra loja te mandar a foto, 1 minutinho 📸" e SIGA a conversa normalmente (a foto chega sozinha depois, você não precisa esperar nem confirmar). Retorno precisa_produto → pergunte qual pneu. Retorno sem_loja → peça o bairro/localização (sem isso não dá pra achar a loja que tem o pneu). Retorno limite_fotos → já tem foto a caminho, avise que chega já.',
+        'Solicita à loja uma foto real do pneu quando o cliente pede para vê-lo. Exige produto consultado e localização (bairro ou pino). foto_solicitada: confirme o pedido da foto; prazo_min é a estimativa, product_id identifica o pneu. Preserve a escolha seguindo PURCHASE CONTINUITY. precisa_produto: falta identificar o pneu. sem_loja: a loja não foi resolvida; confira localização/disponibilidade antes de prometer foto. limite_fotos: já há solicitação em andamento. Solicitar foto não confirma envio nem reserva.',
       parameters: {
         type: 'object',
         properties: {
@@ -1008,6 +1008,7 @@ export async function executeTool(
         }
         return JSON.stringify({
           status: 'foto_solicitada',
+          product_id: productId,
           prazo_min: created.prazoMin,
           nome_pneu: nomePneu,
           ja_pedida: created.status === 'dedup',

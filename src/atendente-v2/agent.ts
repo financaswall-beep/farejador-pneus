@@ -12,6 +12,7 @@ import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
 import { buildProductSearchNudge } from './product-search-nudge.js';
 import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
+import { buildPurchaseContext } from './purchase-context.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage } from './types.js';
@@ -153,7 +154,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       : '';
     const systemPromptWithContext =
       basePrompt + (customerContext ?? '') + (customerMemory ?? '')
-      + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge + cityClarificationNudge;
+      + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge
+      + buildPurchaseContext(history) + cityClarificationNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },

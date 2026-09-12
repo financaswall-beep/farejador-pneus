@@ -11,7 +11,7 @@ const config = vi.hoisted(() => ({
 
 vi.mock('../../../src/shared/config/env.js', () => ({ env: config }));
 
-import { SYSTEM_PROMPT } from '../../../src/atendente-v2/prompt.js';
+import { SYSTEM_PROMPT, PHOTO_PROMPT_BLOCK } from '../../../src/atendente-v2/prompt.js';
 import { activeToolDefinitions } from '../../../src/atendente-v2/tools.js';
 
 describe('consistência das regras centrais do prompt', () => {
@@ -47,5 +47,25 @@ describe('consistência das regras centrais do prompt', () => {
     expect(definition?.function.description).toContain('se o cliente já enviou um pino, chame sem bairro');
     expect(definition?.function.description).toContain('Endereço e mapa da retirada só vêm de criar_pedido');
     expect(definition?.function.description).not.toContain('Retorna nome, endereço escrito');
+  });
+
+  it('remove a orientação de preencher a espera da foto com outra oferta', () => {
+    config.PHOTO_REQUESTS = true;
+    try {
+      const photo = activeToolDefinitions().find(tool => tool.function.name === 'pedir_foto');
+      expect(photo?.function.description).toContain('Preserve a escolha seguindo PURCHASE CONTINUITY');
+      expect(photo?.function.description).not.toContain('SIGA a conversa normalmente');
+      expect(photo?.function.description).not.toContain('1 minutinho');
+      expect(PHOTO_PROMPT_BLOCK).not.toContain('do NOT wait');
+      expect(PHOTO_PROMPT_BLOCK).toContain('use prazo_min');
+      expect(PHOTO_PROMPT_BLOCK).toContain('This reply may end there');
+    } finally { config.PHOTO_REQUESTS = false; }
+  });
+
+  it('distingue gostar do pneu de aceitar a retirada e mantém a mudança de escolha autorizada', () => {
+    expect(SYSTEM_PROMPT).toContain('"gostei"/"goste1" approves interest in the tire, not the trip');
+    expect(SYSTEM_PROMPT).toContain('If the customer asks for another option, search normally');
+    expect(SYSTEM_PROMPT).toContain('After pickup is confirmed, advance to only missing closing details');
+    expect(SYSTEM_PROMPT).not.toContain('Rotate between:');
   });
 });

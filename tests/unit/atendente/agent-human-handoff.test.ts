@@ -62,6 +62,46 @@ describe('contexto de localização enviado ao modelo', () => {
   });
 });
 
+describe('continuidade enviada ao modelo depois de pedir foto', () => {
+  it.each([
+    ['retirada ainda pendente', 'vc pode me enviar uma foto', 'goste1'],
+    ['retirada confirmada', 'vou buscar mesmo assim, manda a foto', 'gostei'],
+    ['cliente mudou de ideia', 'vou buscar mesmo assim, manda a foto', 'vê se tem outro mais perto'],
+    ['cliente quer esperar', 'vc pode me enviar uma foto', 'quero ver a foto antes de decidir'],
+  ])('preserva as decisões e resultados na requisição: %s', async (_scenario, photoRequest, latestReply) => {
+    mocks.history.mockResolvedValue([
+      { role:'user',content:'entregar' },
+      { role:'assistant',content:null,tool_calls:[{id:'store',type:'function',function:{
+        name:'localizacao_loja',arguments:'{"product_ids":["irc"]}',
+      }}] },
+      { role:'tool',tool_call_id:'store',content:'{"encontrado":false,"motivo":"retirada_so_longe","nome_loja":"Matriz","distancia_km":47}' },
+      { role:'assistant',content:'Pra entregar não atende. Na Matriz fica a uns 47 km. Vai buscar?' },
+      { role:'user',content:photoRequest },
+      { role:'assistant',content:null,tool_calls:[{id:'photo',type:'function',function:{
+        name:'pedir_foto',arguments:'{"product_id":"irc"}',
+      }}] },
+      { role:'tool',tool_call_id:'photo',content:'{"status":"foto_solicitada","prazo_min":10}' },
+      { role:'assistant',content:'Pedi a foto desse pneu pra loja.' },
+      { role:'user',content:latestReply },
+    ]);
+    const fetcher=vi.fn().mockResolvedValue(jsonResponse(responseBody()));
+    vi.stubGlobal('fetch',fetcher);
+    const { runAgentV2 }=await import('../../../src/atendente-v2/agent.js');
+    await runAgentV2(job);
+    const request=JSON.parse(fetcher.mock.calls[0]?.[1].body);
+    const system=request.input.find((message:{role:string})=>message.role==='system').content;
+    expect(request.model).toBe('gpt-5.6-sol');
+    expect(system).toContain('[CONTINUIDADE DA COMPRA — DADOS DAS FERRAMENTAS]');
+    expect(system).toContain('"foto_solicitada":{"product_id":"irc"}');
+    expect(system).toContain('"loja":"Matriz","distante":true');
+    expect(system).toContain('não são confirmação de retirada pelo cliente');
+    expect(request.input).toContainEqual({role:'user',content:photoRequest});
+    expect(request.input.at(-1)).toEqual({role:'user',content:latestReply});
+    expect(mocks.tool).not.toHaveBeenCalled(); // O destaque não executa ações por conta própria.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('intervenção enquanto o bot prepara resposta',() => {
   it('não chama LLM nem ferramentas se a conversa já está pausada',async () => {
     mocks.may.mockResolvedValue(false);
