@@ -34,10 +34,12 @@ export async function registerBotControlRoutes(app: FastifyInstance): Promise<vo
     }
   });
   app.get('/admin/api/bot/controle', { preHandler:requireAdminAuth },async (_request,reply) => {
+    reply.header('Cache-Control','private, no-store');
     try { return { conversations:await listHumanControlledConversations() }; }
     catch (error) { const mapped=statusFor(error); return reply.code(mapped.status).send({ error:mapped.error }); }
   });
   app.get('/admin/api/bot/conversations/:id/controle',{ preHandler:requireAdminAuth },async (request,reply) => {
+    reply.header('Cache-Control','private, no-store');
     const parsed=paramsSchema.safeParse(request.params);
     if (!parsed.success) return reply.code(400).send({ error:'invalid_conversation' });
     try { return await getBotConversationControl(parsed.data.id); }

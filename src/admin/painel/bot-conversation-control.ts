@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { notifyClientesKanban } from '../../shared/clientes-kanban.notify.js';
 import { cancelConversationBotQueue, lockBotConversation, syncHumanIntervention } from '../../atendente-v2/conversation-control.js';
 
 export async function getBotConversationControl(conversationId: string, db: Pool = pool) {
@@ -38,6 +39,7 @@ export async function changeBotConversationControl(input: {
     if (state.version!==input.expectedVersion) {
       // Preserva eventual intervenção recém-observada mesmo quando a tela está desatualizada.
       await client.query('COMMIT');
+      await notifyClientesKanban(client,env.FAREJADOR_ENV,input.conversationId,'crm');
       throw new Error('bot_control_conflict');
     }
     const mode = input.action==='takeover' ? 'human' : 'auto';
@@ -53,6 +55,7 @@ export async function changeBotConversationControl(input: {
       (environment,conversation_id,version,action,actor) VALUES ($1,$2,$3,$4,$5)`,
     [env.FAREJADOR_ENV,input.conversationId,changed.rows[0].version,input.action,input.actor]);
     await client.query('COMMIT');
+    await notifyClientesKanban(client,env.FAREJADOR_ENV,input.conversationId,'crm');
     return changed.rows[0];
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }

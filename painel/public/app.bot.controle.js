@@ -4,6 +4,7 @@ window.PAINEL_MODULES.botControle = function () {
   return {
     botControlesHumanos: [],
     botControleModos: {},
+    botControleVersoes: {},
     botControleDialog: null,
     botControleErro: '',
     botControleSalvando: false,
@@ -45,6 +46,13 @@ window.PAINEL_MODULES.botControle = function () {
       const mode = this.botControleModos[id];
       return mode === undefined ? fallback : mode;
     },
+    registrarBotControle(id, state) {
+      if (!id || !['auto','human'].includes(state?.mode) || !Number.isSafeInteger(state.version) || state.version < 0) return;
+      // Uma leitura do quadro iniciada antes do clique não pode desfazer a confirmação mais recente.
+      if (state.version < (this.botControleVersoes[id] ?? -1)) return;
+      this.botControleVersoes[id] = state.version;
+      this.botControleModos[id] = state.mode;
+    },
     botControleClasse(mode) {
       if (mode==='auto') return 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700';
       if (mode==='human') return 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100';
@@ -52,14 +60,18 @@ window.PAINEL_MODULES.botControle = function () {
     },
     async consultarBotControle(id) {
       const state = await this.apiGet('/admin/api/bot/conversations/'+encodeURIComponent(id)+'/controle');
-      this.botControleModos[id] = ['auto','human'].includes(state.mode) ? state.mode : null;
+      if (!['auto','human'].includes(state?.mode) || !Number.isSafeInteger(state.version) || state.version < 0) {
+        this.botControleModos[id] = null;
+        throw new Error('invalid_bot_control');
+      }
+      this.registrarBotControle(id,state);
       return state;
     },
     async carregarBotControles() {
       try {
         const data = await this.apiGet('/admin/api/bot/controle');
         this.botControlesHumanos = data.conversations || [];
-        for (const state of this.botControlesHumanos) this.botControleModos[state.conversation_id] = 'human';
+        for (const state of this.botControlesHumanos) this.registrarBotControle(state.conversation_id,state);
       } catch { /* Preserva a lista já confirmada; não inventa retomada em falha de rede. */ }
     },
     botMesclarConversas(rows) {
@@ -108,7 +120,7 @@ window.PAINEL_MODULES.botControle = function () {
         dialog.state = await this.apiPost('/admin/api/bot/conversations/'+encodeURIComponent(dialog.conversationId)+'/controle',{
           action,expected_version:dialog.state.version,
         });
-        this.botControleModos[dialog.conversationId] = dialog.state.mode;
+        this.registrarBotControle(dialog.conversationId,dialog.state);
         await this.carregarBotControles();
       } catch {
         this.botControleModos[dialog.conversationId] = null;

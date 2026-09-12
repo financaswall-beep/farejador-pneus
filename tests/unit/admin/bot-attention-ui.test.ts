@@ -71,13 +71,14 @@ describe('fila de atenção e controle azul',() => {
     ui.apiPost.mockRejectedValue(new Error('offline'));await ui.alterarControleBot('resume');
     expect(ui.botControleModo('a')).toBeNull();expect(ui.botControleDialog.state).toBeNull();
   });
-  it('usa o mesmo estilo nos dois atalhos e no modal, com foto e coluna Origem na fila',() => {
+  it('mantém os atalhos de controle da fila e do modal, com foto e coluna Origem',() => {
     const html=readFileSync('painel/public/index.html','utf8');
     const table=html.slice(html.indexOf('id="bot-fila-atencao"'),html.indexOf('</table>',html.indexOf('id="bot-fila-atencao"')));
     expect(table).toContain('>Origem</th>');expect(table).toContain('clienteOrigemIcone(c)');
     expect(table).toContain("carregarClienteLeadFoto(c,'bot')");expect(table).toContain('clienteLeadFotoFalhou(c)');
     expect(table).toContain(':key="c.conversation_id"');
-    expect((html.match(/:class="botControleClasse\(/g)||[])).toHaveLength(3);
+    expect(table).toContain(':class="botControleClasse(');
+    expect(html).toContain('id="bot-controle-fechar"');
   });
   it('abre com todas as pendências e ordena as mais antigas primeiro, inclusive acima de 30 dias',() => {
     const ui=fixtureFila();
@@ -154,6 +155,76 @@ describe('fila de atenção e controle azul',() => {
     for(const periodo of ['Todas as pendentes','Últimos 7 dias','Últimos 15 dias','Últimos 30 dias']) expect(html).toContain(periodo);
     expect(html).toContain('aria-label="Período da fila de atenção"');
     expect(html).toContain('botFilaForaPeriodo > 0');expect(html).toContain('c in botConversasPaginadas');
-    expect(html).toContain('app.bot.controle.js?v=20260906-attention1');
+    expect(html).toContain('app.bot.controle.js?v=20260912-kanban-controls1');
+  });
+});
+
+describe('ícones de atendente nos cards do Kanban',() => {
+  const lead={ id:'lead-a',name:'Ana',lead_conversation_id:'a',lead_bot_mode:'auto',lead_bot_version:0,lead_manual_lane:'orcamento' };
+  it('assume e retoma a mesma conversa usando a versão atual, sem abrir detalhe nem mudar etapa',async () => {
+    const ui=setup();ui.abrirClienteLead=vi.fn();
+    ui.apiGet.mockResolvedValueOnce({mode:'auto',version:3});
+    ui.apiPost.mockResolvedValueOnce({mode:'human',version:4});
+    await ui.definirClienteLeadAtendente(lead,'human');
+    expect(ui.apiPost).toHaveBeenLastCalledWith('/admin/api/bot/conversations/a/controle',{action:'takeover',expected_version:3});
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('human');
+    ui.apiGet.mockResolvedValueOnce({mode:'human',version:4});
+    ui.apiPost.mockResolvedValueOnce({mode:'auto',version:5});
+    await ui.definirClienteLeadAtendente(lead,'auto');
+    expect(ui.apiPost).toHaveBeenLastCalledWith('/admin/api/bot/conversations/a/controle',{action:'resume',expected_version:4});
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('auto');
+    expect(ui.abrirClienteLead).not.toHaveBeenCalled();expect(lead.lead_manual_lane).toBe('orcamento');
+  });
+  it('confere o servidor até quando o card já mostra o modo desejado e bloqueia clique duplo',async () => {
+    const ui=setup();ui.registrarBotControle('a',{mode:'auto',version:0});
+    let resolve!: (value:unknown)=>void;
+    ui.apiGet.mockReturnValueOnce(new Promise(r=>{resolve=r;}));
+    ui.apiPost.mockResolvedValueOnce({mode:'auto',version:2});
+    const pending=ui.definirClienteLeadAtendente(lead,'auto');
+    await ui.definirClienteLeadAtendente(lead,'human');
+    expect(ui.apiGet).toHaveBeenCalledTimes(1);expect(ui.apiPost).not.toHaveBeenCalled();
+    expect(ui.clienteLeadControleDesabilitado(lead)).toBe(true);
+    resolve({mode:'human',version:1});await pending;
+    expect(ui.apiPost).toHaveBeenCalledWith('/admin/api/bot/conversations/a/controle',{action:'resume',expected_version:1});
+    expect(ui.clienteLeadControleDesabilitado(lead)).toBe(false);
+  });
+  it('não repete conflitos automaticamente e não mostra sucesso em resposta incerta',async () => {
+    const ui=setup();ui.registrarBotControle('a',{mode:'human',version:7});
+    ui.apiGet.mockResolvedValue({mode:'human',version:7});ui.apiPost.mockRejectedValue(new Error('409'));
+    await ui.definirClienteLeadAtendente(lead,'auto');
+    expect(ui.apiPost).toHaveBeenCalledTimes(1);expect(ui.clienteLeadBotStatus(lead).state).toBe('unknown');
+    expect(ui.clienteLeadControlesErros.a).toContain('Não foi possível confirmar');
+    expect(ui.clienteLeadControlesSalvando.a).toBe(false);
+  });
+  it('uma atualização antiga do quadro ou do modal não desfaz um clique confirmado',async () => {
+    const ui=setup();ui.registrarBotControle('a',{mode:'human',version:4});
+    ui.registrarBotControle('a',{mode:'auto',version:3});
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('human');
+    ui.apiGet.mockResolvedValue({mode:'auto',version:2});await ui.consultarBotControle('a');
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('human');
+    ui.registrarBotControle('a',{mode:'auto',version:5});
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('auto');
+    ui.registrarBotControle('a',{mode:'human',version:6});
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('human');
+  });
+  it('leitura inicial não inventa bot ativo e clique no modo já vigente não grava novamente',async () => {
+    const ui=setup();expect(ui.clienteLeadBotStatus({lead_conversation_id:'b'}).state).toBe('unknown');
+    expect(ui.clienteLeadBotStatus(lead).state).toBe('auto');
+    ui.apiGet.mockResolvedValue({mode:'human',version:1});
+    await ui.definirClienteLeadAtendente(lead,'human');
+    expect(ui.apiPost).not.toHaveBeenCalled();expect(ui.clienteLeadBotStatus(lead).state).toBe('human');
+  });
+  it('não altera atendimento sem permissão, durante seleção ou arquivamento em lote',async () => {
+    const ui=setup();ui.hasPanelModule=()=>false;await ui.definirClienteLeadAtendente(lead,'human');
+    ui.hasPanelModule=()=>true;ui.clientesLeadSelecionando=true;await ui.definirClienteLeadAtendente(lead,'human');
+    ui.clientesLeadSelecionando=false;ui.clientesLeadLote={};await ui.definirClienteLeadAtendente(lead,'auto');
+    expect(ui.apiGet).not.toHaveBeenCalled();expect(ui.apiPost).not.toHaveBeenCalled();
+  });
+  it('não usa uma resposta incompleta para liberar atendimento nem manter o robô aceso',async () => {
+    const ui=setup();ui.registrarBotControle('a',{mode:'auto',version:0});
+    ui.apiGet.mockResolvedValue({mode:'auto'});
+    await ui.definirClienteLeadAtendente(lead,'human');
+    expect(ui.apiPost).not.toHaveBeenCalled();expect(ui.clienteLeadBotStatus(lead).state).toBe('unknown');
+    expect(ui.clienteLeadControlesErros.a).toContain('Não foi possível confirmar');
   });
 });

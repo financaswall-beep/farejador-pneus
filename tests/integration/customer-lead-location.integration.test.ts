@@ -42,6 +42,18 @@ describe('localização do lead — seleção real no PostgreSQL isolado',() => 
     expect(ficha?.customer.address).toBeNull();
     expect(await locations('prod',[contact],db.pool)).toEqual(new Map());
   });
+  it('publica o controle da conversa atual sem confundir etapa manual ou outra conversa do contato',async()=>{
+    const {changeBotConversationControl}=await import('../../src/admin/painel/bot-conversation-control.js');
+    const current=async()=>(await board('test',db.pool)).rows.find(c=>c.source_id===contact)!;
+    expect(await current()).toMatchObject({lead_conversation_id:secondConversation,lead_bot_mode:'auto',lead_bot_version:0});
+    await changeBotConversationControl({conversationId:conversation,action:'takeover',expectedVersion:0,actor:'test'},db.pool);
+    expect((await current()).lead_bot_mode).toBe('auto');
+    await changeBotConversationControl({conversationId:secondConversation,action:'takeover',expectedVersion:0,actor:'test'},db.pool);
+    expect(await current()).toMatchObject({lead_bot_mode:'human',lead_bot_version:1});
+    await changeBotConversationControl({conversationId:secondConversation,action:'resume',expectedVersion:1,actor:'test'},db.pool);
+    expect(await current()).toMatchObject({lead_bot_mode:'auto',lead_bot_version:2});
+    expect((await board('prod',db.pool)).rows).toEqual([]);
+  });
   it('usa a correção vigente e ignora fatos vazios e conversas excluídas',async()=>{
     const corrected=await fact(secondConversation,'localizacao_lead',typed('Centro','Maricá'),'2026-04-04');
     const superseded=await fact(conversation,'localizacao_lead',typed('Centro','Rio de Janeiro'),'2026-04-06');

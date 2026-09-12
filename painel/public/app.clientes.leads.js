@@ -8,6 +8,8 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     clientesLeadFotos: {},
     clienteLeadDetalheAberto: false,
     clienteLeadControleCarregando: null,
+    clienteLeadControlesSalvando: {},
+    clienteLeadControlesErros: {},
     clientesLeadEtapas: [
       { id:'novo',label:'Novos',tone:'bg-blue-50 text-blue-700',border:'border-t-blue-500' },
       { id:'atendimento',label:'Em atendimento',tone:'bg-teal-50 text-teal-800',border:'border-t-teal-600' },
@@ -93,11 +95,47 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
       return ({ equipe:'Equipe',cliente:'Cliente',nenhum:'Ninguém' })[c?.lead_waiting_on] || 'Não informado';
     },
     clienteLeadBotStatus(c) {
-      if (this.clienteLeadControleCarregando === c?.lead_conversation_id) return { label:'Consultando…',state:'unknown' };
-      const mode = this.botControleModo?.(c?.lead_conversation_id);
+      const id = c?.lead_conversation_id;
+      if (this.clienteLeadControleCarregando === id || this.clienteLeadControlesSalvando[id]) return { label:'Consultando…',state:'unknown' };
+      const mode = this.botControleModo?.(id,c?.lead_bot_mode ?? null);
       if (mode === 'auto') return { label:'Liberado nesta conversa',state:'auto' };
       if (mode === 'human') return { label:'Atendimento humano',state:'human' };
       return { label:'Status indisponível',state:'unknown' };
+    },
+    clienteLeadControleDesabilitado(c) {
+      return !c?.lead_conversation_id || !this.hasPanelModule?.('bot') || this.clientesLeadSelecionando
+        || !!this.clientesLeadLote || this.botControleSalvando || !!this.clienteLeadControlesSalvando[c.lead_conversation_id];
+    },
+    async definirClienteLeadAtendente(c, mode) {
+      if (!['human','auto'].includes(mode) || this.clienteLeadControleDesabilitado(c)) return;
+      const id = c.lead_conversation_id;
+      this.clienteLeadControlesSalvando[id] = true;
+      this.clienteLeadControlesErros[id] = '';
+      try {
+        // Confirma a versão no servidor antes de alterar. Conflitos nunca são repetidos automaticamente.
+        const current = await this.consultarBotControle(id);
+        if (!['human','auto'].includes(current?.mode) || !Number.isSafeInteger(current.version)) throw new Error('invalid_control');
+        if (current.mode !== mode) {
+          const state = await this.apiPost('/admin/api/bot/conversations/'+encodeURIComponent(id)+'/controle',{
+            action:mode === 'human' ? 'takeover' : 'resume',expected_version:current.version,
+          });
+          if (state?.mode !== mode || !Number.isSafeInteger(state.version)) throw new Error('invalid_control');
+          this.registrarBotControle(id,state);
+        }
+      } catch {
+        this.botControleModos[id] = null;
+        this.clienteLeadControlesErros[id] = 'Não foi possível confirmar a mudança. Clique no atendente desejado para consultar e tentar novamente.';
+      } finally {
+        this.clienteLeadControlesSalvando[id] = false;
+      }
+    },
+    clienteLeadStatusCard(c) {
+      const lane = this.clienteLeadLane(c);
+      if (lane === 'convertido') return {label:'Pedido confirmado',tone:'confirmed'};
+      if (lane === 'perdido') return {label:'Conversa encerrada',tone:'closed'};
+      if (c?.lead_waiting_on === 'cliente') return {label:'Aguardando cliente',tone:'waiting'};
+      if (c?.lead_waiting_on === 'equipe') return {label:'Aguardando equipe',tone:'team'};
+      return {label:'Sem status de espera',tone:'unknown'};
     },
     abrirFichaClienteDoLead() {
       const c = this.clienteLeadSelecionado();
@@ -110,7 +148,7 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
       if (this.clienteLeadLane(c) === 'convertido') return 'Venda confirmada';
       if (this.clienteLeadManual(c)) return 'Etapa definida pela equipe';
       return ({ novo: 'Conversa recebida', atendimento: 'Atendimento em andamento',
-        orcamento: 'Orçamento identificado', perdido: 'Conversa encerrada' })[this.clienteLeadLane(c)] || '';
+        orcamento: 'Orçamento identificado', perdido: 'Encerramento identificado' })[this.clienteLeadLane(c)] || '';
     },
     clienteLeadFoto(c) { return this.clientesLeadFotos[c?.lead_conversation_id] || ''; },
     clienteLeadFotoFalhou(c) { if (c?.lead_conversation_id) this.clientesLeadFotos[c.lead_conversation_id] = ''; },

@@ -15,6 +15,7 @@ export interface ClientePainelRow {
   lead_lane: 'novo' | 'atendimento' | 'orcamento' | 'perdido' | 'convertido' | null;
   lead_conversation_id: string | null; lead_created_at: string | null; lead_last_message_at: string | null;
   lead_waiting_on: 'equipe' | 'cliente' | 'nenhum' | null;
+  lead_bot_mode?: 'auto' | 'human' | null; lead_bot_version?: number | null;
   shared_location?: SharedLeadLocation | null;
   lead_location: string | null; lead_quote_amount: number | null;
   lead_interests?: LeadInterest[];
@@ -87,6 +88,8 @@ export async function getClientesPainel(
                 ELSE 'novo'
               END AS lead_lane,
               lc.conversation_id::text AS lead_conversation_id, lc.chatwoot_conversation_id, lc.chatwoot_account_id,
+              CASE WHEN lc.conversation_id IS NOT NULL THEN COALESCE(bc.mode,'auto') END AS lead_bot_mode,
+              CASE WHEN lc.conversation_id IS NOT NULL THEN COALESCE(bc.version,0) END AS lead_bot_version,
               lc.started_at::text AS lead_created_at,
               lead_message.sent_at::text AS lead_last_message_at,
               CASE
@@ -112,6 +115,7 @@ export async function getClientesPainel(
          ) cp ON true
          LEFT JOIN latest_type lt ON lt.contact_id = c.id
          LEFT JOIN latest_conversation lc ON lc.contact_id = c.id
+         LEFT JOIN ops.conversation_bot_control bc ON bc.environment=c.environment AND bc.conversation_id=lc.conversation_id
          LEFT JOIN latest_funnel lf ON lf.contact_id = c.id
          LEFT JOIN LATERAL (
            SELECT m.sender_type, m.sent_at,

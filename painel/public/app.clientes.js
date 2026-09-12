@@ -11,6 +11,7 @@ window.PAINEL_MODULES.clientes = function () {
       try {
         const payload = await this.apiGet('/admin/api/clientes');
         this.clientes = Array.isArray(payload.rows) ? payload.rows : [];
+        for (const c of this.clientes) this.registrarBotControle?.(c.lead_conversation_id,{mode:c.lead_bot_mode,version:c.lead_bot_version});
         this.chatwootBaseUrl = payload.chatwoot_base_url || this.chatwootBaseUrl;
         this.clientesParceiros = Array.isArray(payload.partners) ? payload.partners : [];
         this.customerIdentityEnabled = payload.customer_identity?.enabled === true && this.adminUser?.role === 'owner';

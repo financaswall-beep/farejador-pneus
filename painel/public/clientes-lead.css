@@ -1,3 +1,70 @@
+/* Quadro compacto: a etapa comercial e o atendente da conversa são controles distintos. */
+.lead-kanban-grid { display:grid;grid-template-columns:repeat(5,minmax(310px,1fr));gap:14px; }
+.lead-kanban-lane { --lane-color:#0877c6;border:1px solid #dfe8f0;border-radius:12px;min-height:430px;background:#f9fbfd;overflow:hidden; }
+.lead-kanban-lane[data-lane="atendimento"] { --lane-color:#007f83; }
+.lead-kanban-lane[data-lane="orcamento"] { --lane-color:#ef5b05; }
+.lead-kanban-lane[data-lane="perdido"] { --lane-color:#e52530; }
+.lead-kanban-lane[data-lane="convertido"] { --lane-color:#008c62; }
+.lead-kanban-heading { display:flex;align-items:center;gap:9px;padding:17px 15px;background:var(--lane-color);color:#fff; }
+.lead-kanban-heading h3 { font-size:17px;font-weight:650;line-height:1.3;letter-spacing:-.025em; }
+.lead-kanban-dot { width:9px;height:9px;flex-shrink:0;background:#fff;border-radius:50%; }
+.lead-kanban-count { padding:1px 10px;border:1px solid #ffffff4d;border-radius:30px;background:#ffffff26;font-size:16px;font-weight:700;line-height:1.5; }
+.lead-kanban-cards { padding:10px;display:flex;flex-direction:column;gap:12px; }
+.lead-kanban-card { border:1px solid #e2e8f0;border-radius:11px;background:#fff;color:#111e39;box-shadow:0 2px 3px #17305305;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s; }
+.lead-kanban-card:hover { border-color:#9acfc2;box-shadow:0 3px 10px #1730530a; }
+.lead-kanban-card[data-selected="true"] { border-color:#00836b;box-shadow:0 0 0 1px #00836b; }
+.lead-kanban-card[data-dragging="true"] { opacity:.5; }
+.lead-kanban-card-body { padding:14px 13px 0; }
+.lead-kanban-card :is(button,a):focus-visible { outline:2px solid #007a66;outline-offset:3px; }
+.lead-kanban-card button:disabled { cursor:not-allowed;opacity:.5; }
+.lead-kanban-card :where([data-lucide],svg) { width:17px;height:17px;flex-shrink:0;stroke-width:1.8; }
+.lead-card-identity { display:flex;gap:9px;align-items:flex-start; }
+.lead-card-avatar { width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#dff7f2;color:#142047;font-size:17px;font-weight:700; }
+.lead-card-person { min-width:0;flex:1;padding-top:2px; }
+.lead-card-person h4 { font-size:15px;line-height:1.35;font-weight:700;letter-spacing:-.025em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lead-card-channel { display:flex;align-items:center;gap:6px;font-size:12px;color:#687999;margin-top:6px; }
+.lead-card-channel img,.lead-card-channel svg { width:16px;height:16px;object-fit:contain; }
+.lead-card-channel svg { color:#6393df; }
+.lead-card-tools { display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0; }
+.lead-card-grip { color:#94a3bd;height:16px;cursor:grab; }
+.lead-card-grip svg { width:16px;height:16px; }
+.lead-card-attendants { display:flex;gap:5px; }
+.lead-card-attendant { display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:#f0f3f8;color:#69768f;border:1px solid transparent; }
+.lead-card-attendant svg { width:20px;height:20px;stroke-width:2; }
+.lead-card-attendant:hover:not(:disabled) { border-color:#a8bbb9;background:#e7eeef; }
+.lead-card-attendant[data-mode="auto"][aria-pressed="true"] { color:#00665c;background:#dcf6ee;border-color:#bce8d9; }
+.lead-card-attendant[data-mode="human"][aria-pressed="true"] { color:#945300;background:#fff0d9;border-color:#edc77f; }
+.lead-card-check { width:18px;height:18px;border:1px solid #c8d3dd;border-radius:4px;font-size:12px;display:grid;place-items:center; }
+.lead-card-check[data-checked="true"] { background:#007963;color:#fff;border-color:#007963; }
+.lead-card-control-feedback,.lead-card-control-error { font-size:11px;line-height:1.5;margin-top:8px; }
+.lead-card-control-feedback { color:#577389; }
+.lead-card-control-error { background:#fff2dd;color:#815009;border-radius:6px;padding:7px;cursor:default; }
+.lead-kanban-card .lead-card-interests { margin-top:12px; }
+.lead-kanban-card .lead-card-interest-main>strong { font-size:16px;line-height:1.3;font-weight:700;color:#101c3b; }
+.lead-kanban-card .lead-card-interest-main>span { font-size:10px; }
+.lead-kanban-card .lead-card-interest-price { font-size:15px;line-height:1.4;color:#006471; }
+.lead-kanban-card .lead-card-interest-price[data-priced="false"] { color:#76849e; }
+.lead-card-interest-fallback { font-size:16px;font-weight:700;margin-top:16px; }
+.lead-card-location { display:flex;align-items:center;gap:6px;font-size:12px;line-height:1.5;color:#71809c;margin-top:8px; }
+.lead-card-location span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lead-card-location svg { width:16px;height:16px; }
+.lead-card-order { display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#677991;margin-top:10px; }
+.lead-card-order strong { color:#006b5b;font-weight:650; }
+.lead-card-progress { display:flex;justify-content:space-between;align-items:center;gap:7px;margin:14px 0; }
+.lead-card-status { display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:#f1f4f8;color:#63718b;font-size:11px;line-height:1.35; }
+.lead-card-status>span:first-child { width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0; }
+.lead-card-status[data-tone="waiting"] { background:#fff2df;color:#aa500b; }
+.lead-card-status[data-tone="team"] { background:#e9f2ff;color:#35659a; }
+.lead-card-status[data-tone="closed"] { background:#ffebef;color:#d32853; }
+.lead-card-status[data-tone="confirmed"] { background:#e0f7ef;color:#008266; }
+.lead-card-time { display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#71809d;white-space:nowrap; }
+.lead-card-time svg { width:16px;height:16px; }
+.lead-card-footer { display:flex;justify-content:space-between;align-items:center;gap:7px;border-top:1px solid #e9eef4;min-height:46px; }
+.lead-card-stage-reason { display:flex;align-items:center;gap:7px;font-size:10px;color:#71809a;min-width:0; }
+.lead-card-stage-reason>span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lead-card-stage-reason svg { color:#006c83; }
+.lead-card-footer button { display:flex;align-items:center;gap:6px;flex-shrink:0;min-height:36px;color:#00667c;font-size:12px;font-weight:600;border-radius:5px; }
+.lead-card-footer button svg { width:15px;height:15px; }
 /* Painel de leitura do lead. Controles da etapa continuam no módulo do Kanban. */
 .lead-drawer-backdrop { position:fixed;inset:0;z-index:70;background:#10233266; }
 .lead-drawer { position:fixed;inset:0 0 0 auto;z-index:71;width:min(440px,calc(100vw - 24px));background:#fff;color:#111b30;display:flex;flex-direction:column;border-left:1px solid #dce6e6;box-shadow:-12px 0 48px #102b3826; }

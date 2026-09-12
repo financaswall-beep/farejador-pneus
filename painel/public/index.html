@@ -189,15 +189,15 @@
 <script src="/admin/painel/app.relatorios.view.js?v=20260911-demanda1"></script>
 <script src="/admin/painel/app.relatorios.export.js?v=20260910-1"></script>
 <script src="/admin/painel/app.relatorios.pdf.js?v=20260910-compras1"></script>
-<script src="/admin/painel/app.bot.controle.js?v=20260906-attention1"></script>
+<script src="/admin/painel/app.bot.controle.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.bot.entrega.js?v=20260910-1"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda3"></script>
-<script src="/admin/painel/app.clientes.js?v=20260912-lead-items1"></script>
+<script src="/admin/painel/app.clientes.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.ficha.js?v=20260912-lead-drawer1"></script>
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
-<script src="/admin/painel/app.clientes.leads.js?v=20260912-lead-items1"></script>
+<script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
@@ -237,7 +237,7 @@
 <link rel="stylesheet" href="/admin/painel/relatorios-parceiros.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-financeiro.css?v=20260911-parceiros1">
 <link rel="stylesheet" href="/admin/painel/relatorios-logistica.css?v=20260910-1">
-<link rel="stylesheet" href="/admin/painel/clientes-lead.css?v=20260912-lead-items1">
+<link rel="stylesheet" href="/admin/painel/clientes-lead.css?v=20260912-kanban-controls1">
 <link rel="stylesheet" href="/admin/painel/relatorios-estoque.css?v=20260910-1">
 <link rel="stylesheet" href="/admin/painel/relatorios.css?v=20260910-1" />
 
@@ -8014,48 +8014,55 @@
             <p x-show="!clientesMostrarArquivados"><span class="hidden sm:inline">Arraste os cards ou use “Mover etapa” · </span>Prioridade para quem aguarda a equipe</p>
           </div>
           <div class="overflow-x-auto pb-4" role="region" aria-label="Etapas do Kanban" tabindex="0">
-            <div class="grid grid-cols-5 gap-3 min-w-[1120px]">
+            <div class="lead-kanban-grid">
               <template x-for="lane in clientesLeadEtapas" :key="'kanban-'+lane.id">
-                <div class="border border-gray-200 border-t-[3px] rounded-xl bg-gray-50/80 p-2 min-h-[430px]" :class="lane.border" @dragover.prevent @drop.prevent="clienteLeadDrop(lane.id)">
-                  <div class="flex items-center gap-2 px-1 py-2.5 mb-1"><h3 class="text-xs font-semibold text-gray-800" x-text="lane.label"></h3><span class="text-xs px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div>
-                  <div class="space-y-2.5">
+                <section class="lead-kanban-lane" :data-lane="lane.id" :aria-label="lane.label" @dragover.prevent @drop.prevent="clienteLeadDrop(lane.id)">
+                  <header class="lead-kanban-heading"><span class="lead-kanban-dot" aria-hidden="true"></span><h3 x-text="lane.label"></h3><span class="lead-kanban-count" x-text="clientesLeads(lane.id).length"></span></header>
+                  <div class="lead-kanban-cards">
                     <template x-for="c in clientesLeadsVisiveis(lane.id)" :key="'lead-'+c.id">
-                      <button type="button" :id="'lead-card-'+c.id" x-effect="if(currentPage==='clientes' && clientesTab==='leads') carregarClienteLeadFoto(c)" @click="abrirClienteLead(c)" :disabled="!!clientesLeadLote" :aria-label="(clientesLeadSelecionando?'Selecionar ':'Abrir lead ')+c.name" :aria-pressed="clientesLeadSelecionando?clientesLeadMarcados.includes(c.id):clienteSelecionadoId===c.id && clienteLeadDetalheAberto" :draggable="clienteLeadPodeMover(c)" @dragstart="clienteLeadDragStart(c,$event)" @dragend="clienteLeadDragEnd()" class="w-full border rounded-xl bg-white text-left overflow-hidden shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:opacity-60" :class="[clienteLeadArrastandoId===c.id?'opacity-50':'',clientesLeadMarcados.includes(c.id)||clienteSelecionadoId===c.id&&clienteLeadDetalheAberto?'border-emerald-600 bg-emerald-50/30':'border-gray-200 hover:border-emerald-300']">
-                        <div class="p-3">
-                          <div class="flex items-start gap-2.5">
-                            <span class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0 overflow-hidden text-xs font-semibold">
+                      <article class="lead-kanban-card" :aria-label="'Lead de '+c.name" x-effect="if(currentPage==='clientes' && clientesTab==='leads') carregarClienteLeadFoto(c)" @click="if(!clientesLeadLote) abrirClienteLead(c)" :draggable="clienteLeadPodeMover(c)" @dragstart="clienteLeadDragStart(c,$event)" @dragend="clienteLeadDragEnd()" :data-dragging="clienteLeadArrastandoId===c.id" :data-selected="clientesLeadMarcados.includes(c.id)||clienteSelecionadoId===c.id&&clienteLeadDetalheAberto">
+                        <div class="lead-kanban-card-body">
+                          <div class="lead-card-identity">
+                            <span class="lead-card-avatar">
                               <template x-if="clienteLeadFoto(c)"><img :src="clienteLeadFoto(c)" alt="" @error="clienteLeadFotoFalhou(c)" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="w-full h-full object-cover"></template>
-                              <span x-show="!clienteLeadFoto(c)" x-text="initials(c.name||'')"></span>
+                              <span x-show="!clienteLeadFoto(c)" x-text="clienteLeadIniciais(c)"></span>
                             </span>
-                            <span class="min-w-0 flex-1"><span class="block font-semibold text-sm truncate text-gray-900" x-text="c.name"></span><span class="inline-flex gap-1.5 items-center text-xs text-gray-500 mt-1"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5"></template><span x-text="clienteLeadCanalLabel(c)"></span></span></span>
-                            <span x-show="clientesLeadSelecionando" class="w-4 h-4 shrink-0 border rounded flex items-center justify-center text-[10px]" :class="clientesLeadMarcados.includes(c.id)?'bg-emerald-700 border-emerald-700 text-white':'border-gray-300'" x-text="clientesLeadMarcados.includes(c.id)?'✓':''"></span>
-                            <span x-show="!clientesLeadSelecionando && clienteLeadPodeMover(c)" aria-hidden="true" class="text-gray-400"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i></span>
+                            <div class="lead-card-person"><h4 :title="c.name" x-text="c.name"></h4><span class="lead-card-channel"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt=""></template><i x-show="!clienteOrigemIcone(c)" data-lucide="message-circle" aria-hidden="true"></i><span x-text="clienteLeadCanalLabel(c)"></span></span></div>
+                            <div class="lead-card-tools">
+                              <span x-show="clientesLeadSelecionando" class="lead-card-check" :data-checked="clientesLeadMarcados.includes(c.id)" x-text="clientesLeadMarcados.includes(c.id)?'✓':''" aria-hidden="true"></span>
+                              <span x-show="!clientesLeadSelecionando" class="lead-card-grip" aria-hidden="true"><i x-show="clienteLeadPodeMover(c)" data-lucide="grip-vertical"></i></span>
+                              <div class="lead-card-attendants" role="group" :aria-label="'Atendente de '+c.name" :aria-busy="!!clienteLeadControlesSalvando[c.lead_conversation_id]" x-show="!clientesLeadSelecionando && hasPanelModule('bot')" @click.stop @pointerdown.stop @dragstart.prevent.stop>
+                                <button type="button" class="lead-card-attendant" data-mode="human" :aria-label="'Ativar atendimento humano para '+c.name" :aria-pressed="clienteLeadBotStatus(c).state==='human'" :title="clienteLeadBotStatus(c).state==='human'?'Humano ativo · bot pausado':'Assumir atendimento e pausar o bot'" :disabled="clienteLeadControleDesabilitado(c)" @click.stop="definirClienteLeadAtendente(c,'human')"><i data-lucide="user-round" aria-hidden="true"></i></button>
+                                <button type="button" class="lead-card-attendant" data-mode="auto" :aria-label="'Ativar robô para '+c.name" :aria-pressed="clienteLeadBotStatus(c).state==='auto'" :title="clienteLeadBotStatus(c).state==='auto'?'Bot liberado para novas mensagens':'Retomar bot para novas mensagens do cliente'" :disabled="clienteLeadControleDesabilitado(c)" @click.stop="definirClienteLeadAtendente(c,'auto')"><i data-lucide="bot" aria-hidden="true"></i></button>
+                              </div>
+                            </div>
                           </div>
+                          <p class="lead-card-control-feedback" role="status" x-show="clienteLeadControlesSalvando[c.lead_conversation_id]">Atualizando atendimento…</p>
+                          <p class="lead-card-control-error" role="alert" x-show="clienteLeadControlesErros[c.lead_conversation_id]" x-text="clienteLeadControlesErros[c.lead_conversation_id]"></p>
                           <p x-show="c.name_needs_review" class="mt-2 text-[10px] font-medium text-amber-700">Nome pendente no Chatwoot</p>
                           <span x-show="c.is_vip" class="inline-block text-[10px] bg-amber-50 text-amber-800 rounded px-1.5 py-0.5 mt-2">★ VIP</span>
                           <div class="lead-card-interests" x-show="clienteLeadInteresses(c).length">
-                            <p class="lead-card-interest-count" x-text="clienteLeadInteresses(c).length+' '+(clienteLeadInteresses(c).length===1?'medida de interesse':'medidas de interesse')"></p>
+                            <p class="lead-card-interest-count" x-show="clienteLeadInteresses(c).length>1" x-text="clienteLeadInteresses(c).length+' medidas de interesse'"></p>
                             <template x-for="item in clienteLeadInteressesCard(c)" :key="item.key">
                               <div class="lead-card-interest" :data-tone="clienteLeadResumoInteresse(item).tone">
                                 <span class="lead-card-interest-main"><strong x-text="item.measure"></strong><span x-text="clienteLeadResumoInteresse(item).label"></span></span>
-                                <strong class="lead-card-interest-price" x-show="clienteLeadResumoInteresse(item).value" x-text="clienteLeadResumoInteresse(item).value"></strong>
+                                <strong class="lead-card-interest-price" :data-priced="!!clienteLeadResumoInteresse(item).value" :title="clienteLeadResumoInteresse(item).value?'Cotação por pneu':'Sem cotação para esta medida'" x-text="clienteLeadResumoInteresse(item).value||'—'"></strong>
                               </div>
                             </template>
                             <p class="lead-card-interest-more" x-show="clienteLeadInteresses(c).length>2" x-text="'+'+(clienteLeadInteresses(c).length-2)+' no detalhe'"></p>
                           </div>
-                          <p x-show="!clienteLeadInteresses(c).length" class="text-xs text-gray-800 mt-3" x-text="c.last_item||'Interesse não informado'"></p>
-                          <p x-show="c.lead_location" class="text-[11px] text-gray-500 mt-1.5 truncate" x-text="c.lead_location"></p>
-                          <p x-show="lane.id==='convertido' && c.lead_order_amount" class="text-sm font-semibold text-emerald-900 mt-2" x-text="formatCurrency(c.lead_order_amount)"></p>
-                          <div class="flex flex-wrap items-center gap-1.5 mt-3"><span class="text-[10px] px-1.5 py-1 rounded-md font-medium" :class="c.lead_waiting_on==='equipe' && !['perdido','convertido'].includes(lane.id)?'bg-rose-50 text-rose-700':lane.tone" x-text="clienteLeadEspera(c)"></span><span class="text-[10px] text-gray-500" x-text="clienteLeadTempo(c)"></span></div>
-                          <div class="border-t border-gray-100 mt-3 pt-2"><span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded" :class="clienteLeadManual(c)?'bg-blue-50 text-blue-800':'bg-emerald-50 text-emerald-800'"><span aria-hidden="true" x-text="clienteLeadManual(c)?'↔':'↻'"></span><span x-text="clienteLeadManual(c)?'Manual':'Automático'"></span></span><p class="text-[10px] text-gray-500 mt-1" x-text="clienteLeadOrigemEtapa(c)"></p></div>
+                          <p x-show="!clienteLeadInteresses(c).length" class="lead-card-interest-fallback" x-text="c.last_item||'Interesse não informado'"></p>
+                          <p class="lead-card-location" :title="clienteLeadLocal(c)||'Localização não informada'"><i data-lucide="map-pin" aria-hidden="true"></i><span x-text="clienteLeadLocal(c)||'Localização não informada'"></span></p>
+                          <p x-show="lane.id==='convertido' && c.lead_order_amount" class="lead-card-order"><span>Total do pedido</span><strong x-text="formatCurrency(c.lead_order_amount)"></strong></p>
+                          <div class="lead-card-progress"><span class="lead-card-status" :data-tone="clienteLeadStatusCard(c).tone"><span aria-hidden="true"></span><span x-text="clienteLeadStatusCard(c).label"></span></span><span class="lead-card-time" title="Tempo desde a última mensagem"><i data-lucide="clock-3" aria-hidden="true"></i><span x-text="clienteLeadUltimaMensagem(c)"></span></span></div>
+                          <footer class="lead-card-footer"><span class="lead-card-stage-reason" :title="clienteLeadOrigemEtapa(c)"><i data-lucide="workflow" aria-hidden="true"></i><span x-text="clienteLeadOrigemEtapa(c)"></span></span><button type="button" :id="'lead-card-'+c.id" @click.stop="abrirClienteLead(c)" :disabled="!!clientesLeadLote" :aria-label="(clientesLeadSelecionando?'Selecionar ':'Abrir lead ')+c.name" :aria-pressed="clientesLeadSelecionando?clientesLeadMarcados.includes(c.id):clienteSelecionadoId===c.id && clienteLeadDetalheAberto"><span x-text="clientesLeadSelecionando?'Selecionar':'Detalhes'"></span><i data-lucide="arrow-right" aria-hidden="true"></i></button></footer>
                         </div>
-                        <div class="border-t border-gray-100 py-2 px-3 text-xs text-emerald-900 flex justify-between"><span x-text="clientesLeadSelecionando?'Selecionar card':'Ver detalhes'"></span><span aria-hidden="true">→</span></div>
-                      </button>
+                      </article>
                     </template>
                     <button type="button" x-show="clientesLeads(lane.id).length>clientesLeadsVisiveis(lane.id).length" @click="clienteLeadMostrarMais(lane.id)" class="w-full py-2 text-xs font-medium text-emerald-800">Mostrar mais</button>
                     <p x-show="!clientesLeads(lane.id).length" class="text-xs text-gray-400 text-center py-12">Nenhum lead nesta etapa</p>
                   </div>
-                </div>
+                </section>
               </template>
             </div>
           </div>
