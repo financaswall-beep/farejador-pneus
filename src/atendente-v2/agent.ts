@@ -123,6 +123,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         ? `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Você TEM a localização — NÃO peça o bairro, NÃO pergunte "qual bairro aparece na localização" e NÃO peça pra mandar de novo. Para QUALQUER pergunta sobre estoque, preço na loja, frete, retirada ou "qual a loja/borracharia mais perto", CHAME a ferramenta correspondente AGORA (buscar_produto / buscar_compatibilidade / calcular_frete / localizacao_loja), SEM passar "bairro" — o sistema resolve a cidade e a loja mais perto pela localização. Só volte a pedir o bairro se a ferramenta retornar precisa_localizacao=true.${proximidadeHook}`
         : `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Para estoque, preço na loja, retirada ou loja mais perto, CHAME buscar_produto / buscar_compatibilidade / localizacao_loja AGORA, SEM bairro. Para frete, siga o schema ativo de calcular_frete; se ele exigir bairro, peça-o apenas como fallback. Não peça o pino de novo.${proximidadeHook}`
       : '';
+    const cityClarificationNudge = '\nSe qualquer ferramenta retornar precisa_municipio=true, pergunte somente a cidade do bairro. Essa confirmação pontual é permitida mesmo com pino já recebido quando ele não resolveu o município; não peça novamente o pino nem invente a cidade.';
     // Empurrão determinístico da FOTO (gêmeo do pino): quando o cliente PEDE pra
     // ver o pneu, o bot às vezes confabula ("já pedi pro pessoal") sem chamar a
     // tool pedir_foto — aí nenhum photo_request nasce. Detecta por código e injeta
@@ -152,7 +153,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       : '';
     const systemPromptWithContext =
       basePrompt + (customerContext ?? '') + (customerMemory ?? '')
-      + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge;
+      + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge + cityClarificationNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },

@@ -18,5 +18,6 @@ ${hasPin
     ? 'O cliente JÁ enviou o pino de localização. Use-o e consulte as ferramentas sem bairro. NÃO peça a localização novamente.'
     : `Confira a mensagem atual e o histórico: se o cliente ainda NÃO informou localização, endereço ou região, peça somente a localização fixa ou o endereço e AGUARDE. Use: "${CUSTOMER_LOCATION_REQUEST}". Não comece com "tenho sim", "temos" ou outra confirmação; não antecipe preço, modelo/ano ou busca de estoque nessa etapa. Se o endereço/bairro/região JÁ foi informado, aproveite-o, registre a localização conforme a regra existente e siga para a consulta, sem pedir novamente.`}
 Depois da localização: ${search}
+Se a ferramenta retornar precisa_municipio=true, pergunte somente a cidade do bairro, usando municipios_possiveis quando forem duas opções. Não invente municipio para evitar essa pergunta. Após a resposta, repita a busca com a cidade confirmada e o mesmo pneu/bairro; não peça novamente endereço ou pino.
 Só confirme disponibilidade com resultado DESTE TURNO para uma loja que possa atender. Aplicação/medida ou estoque_consultado=false não confirma estoque. Não invente bairro nem use disponibilidade de outra região.`;
 }

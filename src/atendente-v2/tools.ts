@@ -54,6 +54,8 @@ import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
 import { observeSearchProducts, observeSearchMunicipality } from './stock-search-trace.js';
 
 import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './delivery-quote-routing.js';
+import { prepareToolLocation } from './tool-location.js';
+import { AmbiguousNeighborhoodError } from './neighborhood-resolution.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -291,6 +293,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
+          municipio: { type: 'string', description: 'Cidade já informada pelo cliente ou resolvida pela localização. Reutilize a cidade confirmada na busca/cotação, especialmente para bairros que existem em mais de um município.' },
           bairro: { type: 'string', description: 'Passe somente quando o cliente digitou o bairro. Na entrega, reutilize o mesmo bairro de calcular_frete; se o frete foi calculado apenas pelo pino, omita. Na retirada, omita quando já houver pino — o sistema resolve a loja por ele.' },
           confirma_retirada_distante: { type: 'boolean', description: 'Use SOMENTE na RETIRADA e SOMENTE depois que o cliente, avisado de que a loja mais perto que tem o pneu fica longe, disser EXPLICITAMENTE que vai buscar mesmo assim ("não tem problema, eu passo aí", "eu vou aí pegar"). true = reserva o pneu na loja mais perto que tem, mesmo fora do raio normal de retirada. NUNCA marque sozinho: só com a confirmação do cliente.' },
           telefone_cliente: { type: 'string', description: 'Telefone/WhatsApp do cliente (com DDD). Passe SÓ quando o contato não tem número — Instagram e Facebook não trazem telefone. Sem ele, o pedido é recusado (entrega E retirada — todo pedido precisa de número). Em conversa de WhatsApp, OMITA: o número já vem do contato.' },
@@ -385,6 +388,7 @@ export async function executeTool(
   args: Record<string, unknown>,
 ): Promise<string> {
   try {
+    args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
       case 'buscar_compatibilidade': {
         const compatInput = compatibilityInput(environment, args);
@@ -1038,6 +1042,7 @@ export async function executeTool(
         return JSON.stringify({ erro: `Tool desconhecida: ${name}` });
     }
   } catch (err) {
+    if (err instanceof AmbiguousNeighborhoodError) return JSON.stringify(err.response());
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({ environment, conversation_id: conversationId, tool: name, err: message }, 'agent_v2: tool error');
     return JSON.stringify({ erro: message });
@@ -1255,9 +1260,9 @@ async function criarPedido(
     // Município do geo (se cotou frete) OU do bairro. Sem este OR, entrega SEM
     // geo_resolution_id caía 100% na matriz mesmo havendo parceiro com estoque na cidade
     // (furo #3 da auditoria) → parceiro perdia a venda e a régua não contava o lead.
-    let municipio = geoResolutionId
+    let municipio = (args.municipio as string | undefined) ?? (geoResolutionId
       ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
-      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
+      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null));
     // Pino-first: sem geo e sem bairro → reverse-geocode do pino preenche a cidade. Aditivo.
     ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
     const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
@@ -1294,9 +1299,9 @@ async function criarPedido(
     // RETIRADA pelos MESMOS critérios da entrega: proximidade (anel de retirada) + régua
     // de justiça. Município vem do geo (se houver) ou do bairro; coordenada vem do pino
     // ou do geocode do bairro. Sem município/coordenada → cai na matriz (como hoje).
-    let municipio = geoResolutionId
+    let municipio = (args.municipio as string | undefined) ?? (geoResolutionId
       ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
-      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
+      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null));
     // Pino-first: sem geo e sem bairro → reverse-geocode do pino preenche a cidade. Aditivo.
     ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
     if (env.ROUTING_GEO && municipio) {

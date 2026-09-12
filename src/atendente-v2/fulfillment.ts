@@ -28,6 +28,7 @@
  */
 
 import type { PoolClient } from 'pg';
+import { resolveNeighborhoodCity } from './neighborhood-resolution.js';
 import { observeSearchStore, observeSearchMunicipality } from './stock-search-trace.js';
 import { readPartnerAvailableStock } from './partner-available-stock.js';
 import type { Environment } from '../shared/types/chatwoot.js';
@@ -492,11 +493,7 @@ export async function resolveMunicipioFromBairro(
   bairro: string,
   municipio?: string | null,
 ): Promise<string | null> {
-  const r = await client.query<{ city_name: string | null }>(
-    `SELECT city_name FROM commerce.resolve_neighborhood($1, $2, $3) LIMIT 1`,
-    [environment, bairro, municipio ?? null],
-  );
-  return r.rows[0]?.city_name ?? null;
+  return resolveNeighborhoodCity(client, environment, bairro, municipio);
 }
 
 /**
