@@ -1,54 +1,54 @@
 /* Painel de leitura do lead. Controles da etapa continuam no módulo do Kanban. */
 .lead-drawer-backdrop { position:fixed;inset:0;z-index:70;background:#10233266; }
-.lead-drawer { position:fixed;inset:0 0 0 auto;z-index:71;width:min(580px,100vw);background:#fff;color:#111b30;display:flex;flex-direction:column;border-left:1px solid #dce6e6;box-shadow:-12px 0 48px #102b3826; }
+.lead-drawer { position:fixed;inset:0 0 0 auto;z-index:71;width:min(440px,calc(100vw - 24px));background:#fff;color:#111b30;display:flex;flex-direction:column;border-left:1px solid #dce6e6;box-shadow:-12px 0 48px #102b3826; }
 .lead-drawer * { min-width:0; }
 .lead-drawer button,.lead-drawer a,.lead-drawer select { -webkit-tap-highlight-color:transparent; }
 .lead-drawer :is(button,a,select):focus-visible { outline:2px solid #00856a;outline-offset:3px; }
 .lead-drawer button:disabled { opacity:.45;cursor:not-allowed; }
 .lead-drawer :where([data-lucide],svg) { width:22px;height:22px;flex-shrink:0;stroke-width:1.7; }
-.lead-drawer-header { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:25px 28px 15px;flex-shrink:0; }
+.lead-drawer-header { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 24px 12px;flex-shrink:0; }
 .lead-drawer-header p { font-size:11px;font-weight:600;color:#788395;letter-spacing:.04em;margin-bottom:4px; }
-.lead-drawer-header h2 { font-size:30px;font-weight:750;line-height:1.2;letter-spacing:-.035em; }
+.lead-drawer-header h2 { font-size:24px;font-weight:750;line-height:1.2;letter-spacing:-.035em; }
 .lead-drawer-close { display:grid;place-items:center;width:36px;height:36px;border-radius:8px; }
 .lead-drawer-close:hover { background:#f0f6f5; }
-.lead-drawer-body { flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 28px 20px;scrollbar-gutter:stable; }
-.lead-drawer-identity { display:flex;align-items:center;gap:19px;margin:6px 0 24px; }
-.lead-drawer-avatar { flex-shrink:0;display:grid;place-items:center;width:86px;height:86px;overflow:hidden;border-radius:50%;background:#dcefe9;color:#005b4f;font-size:31px;font-weight:700; }
+.lead-drawer-body { flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 24px 16px;scrollbar-gutter:stable; }
+.lead-drawer-identity { display:flex;align-items:center;gap:16px;margin:6px 0 18px; }
+.lead-drawer-avatar { flex-shrink:0;display:grid;place-items:center;width:64px;height:64px;overflow:hidden;border-radius:50%;background:#dcefe9;color:#005b4f;font-size:24px;font-weight:700; }
 .lead-drawer-avatar img { width:100%;height:100%;object-fit:cover; }
-.lead-drawer-name { font-size:29px;line-height:1.2;font-weight:750;letter-spacing:-.035em;overflow-wrap:anywhere; }
+.lead-drawer-name { font-size:20px;line-height:1.2;font-weight:750;letter-spacing:-.035em;overflow-wrap:anywhere; }
 .lead-drawer-stage { display:inline-block;padding:3px 11px;border-radius:30px;font-size:12px;font-weight:600;margin:8px 0; }
 .lead-drawer-stage[data-lane="orcamento"] { background:#ffd277;color:#482d00; }
 .lead-drawer-channel { display:flex;align-items:center;flex-wrap:wrap;gap:7px;font-size:13px;color:#475569; }
 .lead-drawer-channel svg { width:18px;height:18px;color:#006756; }
 .lead-drawer-channel img { width:20px;height:20px;object-fit:contain; }
 .lead-drawer-channel strong { font-weight:600;color:#253047; }
-.lead-drawer-card { border:1px solid #dce4eb;border-radius:10px;background:#fff;padding:18px;margin-top:16px; }
-.lead-drawer-interest { display:grid;grid-template-columns:70px minmax(0,1fr) minmax(130px,.9fr);align-items:center;gap:16px; }
-.lead-drawer-tire { display:flex;align-items:center;justify-content:center;background:#e4f3ee;border-radius:9px;height:76px;padding:7px;overflow:hidden; }
+.lead-drawer-card { border:1px solid #dce4eb;border-radius:10px;background:#fff;padding:14px;margin-top:12px; }
+.lead-drawer-interest { display:grid;grid-template-columns:52px minmax(0,1fr) minmax(108px,.9fr);align-items:center;gap:12px; }
+.lead-drawer-tire { display:flex;align-items:center;justify-content:center;background:#e4f3ee;border-radius:9px;height:62px;padding:5px;overflow:hidden; }
 .lead-drawer-tire img { display:block;width:56px;height:62px;max-width:100%;max-height:100%;min-height:0;object-fit:contain;mix-blend-mode:multiply; }
 .lead-drawer-caption { font-size:12px;color:#647084;line-height:1.5; }
-.lead-drawer-interest h3 { font-size:20px;line-height:1.3;font-weight:700;overflow-wrap:anywhere;margin-top:2px; }
-.lead-drawer-quote { padding-left:20px;border-left:1px solid #dce4eb; }
-.lead-drawer-quote strong { display:block;font-size:22px;line-height:1.35;letter-spacing:-.035em;font-weight:750;font-variant-numeric:tabular-nums; }
+.lead-drawer-interest h3 { font-size:18px;line-height:1.3;font-weight:700;overflow-wrap:anywhere;margin-top:2px; }
+.lead-drawer-quote { padding-left:12px;border-left:1px solid #dce4eb; }
+.lead-drawer-quote strong { display:block;font-size:18px;line-height:1.35;letter-spacing:-.035em;font-weight:750;font-variant-numeric:tabular-nums; }
 .lead-drawer-location { background:#edf7f3; }
-.lead-drawer-location-main { display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center; }
-.lead-drawer-location-icon { display:grid;place-items:center;width:56px;height:62px;border-radius:9px;background:#d8eee5;color:#005a4e; }
-.lead-drawer-location-icon svg { width:31px;height:31px; }
-.lead-drawer-location h3 { font-size:18px;font-weight:700;line-height:1.3;margin:3px 0;overflow-wrap:anywhere; }
-.lead-drawer-location-link { display:flex;align-items:center;justify-content:center;gap:7px;align-self:stretch;border-left:1px solid #cddfd8;padding-left:16px;font-size:12px;font-weight:600;color:#005b4e;white-space:nowrap; }
+.lead-drawer-location-main { display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center; }
+.lead-drawer-location-icon { display:grid;place-items:center;width:44px;height:52px;border-radius:9px;background:#d8eee5;color:#005a4e; }
+.lead-drawer-location-icon svg { width:27px;height:27px; }
+.lead-drawer-location h3 { font-size:16px;font-weight:700;line-height:1.3;margin:3px 0;overflow-wrap:anywhere; }
+.lead-drawer-location-link { display:flex;align-items:center;justify-content:center;gap:6px;align-self:stretch;border-left:1px solid #cddfd8;padding-left:10px;font-size:11px;font-weight:600;color:#005b4e;white-space:nowrap; }
 .lead-drawer-location-link svg { width:17px;height:17px; }
 .lead-drawer-note { font-size:11px;line-height:1.5;color:#7b8798;margin-top:12px; }
-.lead-drawer-metrics { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
-.lead-drawer-metric { display:flex;align-items:center;gap:14px;padding:17px; }
-.lead-drawer-metric svg { width:29px;height:29px; }
-.lead-drawer-metric strong { display:block;font-size:17px;font-weight:700;line-height:1.35;margin-top:2px; }
+.lead-drawer-metrics { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.lead-drawer-metric { display:flex;align-items:center;gap:10px;padding:13px; }
+.lead-drawer-metric svg { width:24px;height:24px; }
+.lead-drawer-metric strong { display:block;font-size:15px;font-weight:700;line-height:1.35;margin-top:2px; }
 .lead-drawer-section-title { display:flex;align-items:center;gap:12px;font-size:14px;font-weight:700; }
 .lead-drawer-segments { display:grid;grid-template-columns:1fr 1fr;background:#edf1f5;border-radius:9px;padding:4px;margin-top:14px;gap:4px; }
 .lead-drawer-segments button { min-height:36px;border:1px solid transparent;border-radius:7px;font-size:13px;color:#536177; }
 .lead-drawer-segments button[aria-pressed="true"] { color:#005a4e;border-color:#80bdb0;background:#edf8f3;font-weight:600; }
 .lead-drawer-select { width:100%;height:44px;border:1px solid #d5dfe7;border-radius:8px;padding:0 13px;font-size:13px;background:#fff;margin-top:11px; }
-.lead-drawer-bot { display:flex;align-items:center;gap:14px;padding:17px 18px; }
-.lead-drawer-bot>svg { width:31px;height:31px; }
+.lead-drawer-bot { display:flex;align-items:center;gap:12px;padding:14px; }
+.lead-drawer-bot>svg { width:27px;height:27px; }
 .lead-drawer-bot-info { flex:1; }
 .lead-drawer-bot h3 { font-size:14px;font-weight:700; }
 .lead-drawer-bot-status { display:flex;align-items:center;gap:7px;font-size:12px;color:#536177;margin-top:4px; }
@@ -59,7 +59,7 @@
 .lead-drawer-manage svg { width:17px;height:17px; }
 .lead-drawer-alert { font-size:12px;line-height:1.5;color:#006454;background:#edf7f3;padding:11px 13px;border-radius:8px;margin-top:14px; }
 .lead-drawer-alert-warning { color:#8c5410;background:#fff4df; }
-.lead-drawer-footer { flex-shrink:0;padding:16px 28px max(14px,env(safe-area-inset-bottom));border-top:1px solid #dce4eb;background:#fff;display:grid;gap:9px; }
+.lead-drawer-footer { flex-shrink:0;padding:12px 24px max(12px,env(safe-area-inset-bottom));border-top:1px solid #dce4eb;background:#fff;display:grid;gap:8px; }
 .lead-drawer-action { display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:10px 12px;border:1px solid #007360;border-radius:8px;font-size:14px;font-weight:600;color:#163044; }
 .lead-drawer-action svg { color:#006b5a; }
 .lead-drawer-primary { background:#005d50;color:#fff;border-color:#005d50; }
@@ -75,8 +75,8 @@
   .lead-drawer-body { padding:4px 18px 16px;scrollbar-gutter:auto; }
   .lead-drawer-footer { padding:12px 18px max(12px,env(safe-area-inset-bottom)); }
   .lead-drawer-identity { gap:14px;margin-bottom:18px; }
-  .lead-drawer-avatar { width:65px;height:65px;font-size:25px; }
-  .lead-drawer-name { font-size:23px; }
+  .lead-drawer-avatar { width:64px;height:64px;font-size:24px; }
+  .lead-drawer-name { font-size:20px; }
   .lead-drawer-card { padding:14px;margin-top:12px; }
   .lead-drawer-interest { grid-template-columns:52px minmax(0,1fr) minmax(99px,.85fr);gap:9px; }
   .lead-drawer-tire { height:61px;padding:5px; }
@@ -92,4 +92,9 @@
   .lead-drawer-caption { font-size:11px; }
   .lead-drawer-bot { gap:11px; }
   .lead-drawer-bot-status { font-size:11px; }
+}
+@media(max-width:360px) {
+  .lead-drawer-interest { grid-template-columns:44px minmax(0,1fr);gap:10px; }
+  .lead-drawer-tire { grid-row:1 / span 2;height:64px; }
+  .lead-drawer-quote { grid-column:2;border-left:0;border-top:1px solid #dce4eb;padding:8px 0 0; }
 }
