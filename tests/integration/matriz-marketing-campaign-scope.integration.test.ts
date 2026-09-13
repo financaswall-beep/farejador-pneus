@@ -118,4 +118,78 @@ describe('Marketing — escopo financeiro, histórico e ledger', () => {
     });
     expect((await getStage4('test', db.pool)).status).toBe('green');
   });
+
+  it('serializa sincronização e reclassificação concorrentes sem deixar saldo residual', async () => {
+    let spend = '80.00';
+    const fetcher = (async (input: URL | RequestInfo) => {
+      const level = new URL(String(input)).searchParams.get('level');
+      return new Response(JSON.stringify({ data: [{
+        campaign_id: 'camp-concurrent',
+        campaign_name: 'Campanha concorrente',
+        ...(level === 'ad' ? { ad_id: 'ad-concurrent', ad_name: 'Criativo concorrente' } : {}),
+        date_start: '2026-07-31',
+        spend,
+        account_currency: 'BRL',
+        impressions: '500',
+        clicks: '10',
+        actions: [],
+      }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    await syncMetaInsights({
+      dbPool: db.pool,
+      config: { adAccountId: 'act_123', accessToken: 'server-only', apiVersion: 'v21.0' },
+      fetcher,
+      now: new Date('2026-07-31T20:00:00Z'),
+      lookbackDays: 1,
+    });
+    await setCampaignScope({
+      adAccountId: 'act_123', campaignId: 'camp-concurrent', scope: 'matrix',
+      reason: 'Classificação inicial da matriz', actor: 'Wallace',
+      idempotencyKey: 'scope-concurrent-matrix',
+    }, db.pool);
+
+    spend = '150.00';
+    await Promise.all([
+      syncMetaInsights({
+        dbPool: db.pool,
+        config: { adAccountId: 'act_123', accessToken: 'server-only', apiVersion: 'v21.0' },
+        fetcher,
+        now: new Date('2026-07-31T20:05:00Z'),
+        lookbackDays: 1,
+      }),
+      setCampaignScope({
+        adAccountId: 'act_123', campaignId: 'camp-concurrent', scope: 'external',
+        reason: 'Reclassificação concorrente para operação externa', actor: 'Wallace',
+        idempotencyKey: 'scope-concurrent-external',
+      }, db.pool),
+    ]);
+
+    const proof = await db.pool.query<{
+      scope: string; booked_expense: string; duplicate_sources: number;
+    }>(
+      `SELECT
+         (SELECT scope FROM marketing.campaign_scopes
+           WHERE environment='test' AND ad_account_id='act_123'
+             AND campaign_id='camp-concurrent') scope,
+         (SELECT COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::text
+            FROM finance.matriz_ledger_entries e
+            JOIN finance.matriz_ledger_transactions t ON t.id=e.transaction_id
+           WHERE t.environment='test' AND e.account_code='marketing_expense'
+             AND t.metadata->>'campaign_id'='camp-concurrent') booked_expense,
+         (SELECT count(*)::int FROM (
+           SELECT source_type,source_id
+             FROM finance.matriz_ledger_transactions
+            WHERE environment='test' AND metadata->>'campaign_id'='camp-concurrent'
+            GROUP BY source_type,source_id HAVING count(*)>1
+         ) duplicated) duplicate_sources`,
+    );
+    expect(proof.rows[0]).toEqual({
+      scope: 'external', booked_expense: '0.00', duplicate_sources: 0,
+    });
+    expect(await getStage4('test', db.pool)).toMatchObject({
+      status: 'green', total_errors: 0,
+      pending_operational: { marketing_campaigns_unclassified: 0 },
+    });
+  }, 30_000);
 });
