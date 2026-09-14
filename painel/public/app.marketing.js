@@ -113,10 +113,12 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
+      if (tab !== 'criativos') { this.destroyMarketingCreativeChart(); this.closeMarketingCreativeJourneys(); }
       if (tab === 'campanhas' && this.marketingCampaignDetailId) {
         this.closeMarketingCampaignDetail();
       }
       this.marketingTab = tab;
+      if (tab === 'criativos') void this.loadMarketingCreatives();
       if (tab === 'campanhas') void this.loadMarketingCampaigns();
       if (tab === 'jornadas') void this.loadMarketingJourneys();
       if (tab === 'integracoes') void this.loadMarketingIntegrations();
@@ -127,6 +129,7 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingPeriodChanged() {
+      if (this.marketingTab === 'criativos') void this.loadMarketingCreatives();
       void this.loadMarketing();
       if (this.marketingTab === 'campanhas') {
         const openedCampaign = this.marketingCampaignDetailId;

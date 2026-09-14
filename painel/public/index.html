@@ -199,7 +199,11 @@
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
 <script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260821-marketing-audit1"></script>
+<link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
+<script src="/admin/painel/app.marketing.js?v=20260914-criativos1"></script>
+<script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
+<script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
+<script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1"></script>
@@ -224,7 +228,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260911-demanda1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.js?v=20260910-relatorios1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
@@ -8252,7 +8256,11 @@
 
     <!-- ═══ TELA: MARKETING — leitura executiva, sem atribuição presumida ═══ -->
     <div x-show="currentPage === 'marketing'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" x-cloak>
-      <section x-show="!marketingCampaignDetailId"
+      <header x-show="marketingTab === 'criativos'" class="mc-header">
+        <div><div class="mc-breadcrumb">Matriz / Marketing</div><h1>Criativos</h1><p>Veja quais anúncios geram conversas e vendas.</p></div>
+        <div class="mc-actions"><span class="mc-badge mc-muted" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button type="button" class="mc-button" @click="exportMarketingCreatives()" :disabled="marketingCreativesLoading || !marketingCreativeFiltered().length"><i data-lucide="upload"></i> Exportar CSV</button></div>
+      </header>
+      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos'"
                aria-labelledby="marketing-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
@@ -8281,7 +8289,7 @@
         </div>
       </section>
 
-      <div x-show="!marketingCampaignDetailId"
+      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos'"
            class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções de Marketing" class="flex items-center gap-1 overflow-x-auto">
@@ -8292,7 +8300,7 @@
                       x-text="tab.label"></button>
             </template>
           </nav>
-          <div class="mb-3 flex items-center gap-2 lg:mb-0">
+          <div x-show="marketingTab !== 'criativos'" class="mb-3 flex items-center gap-2 lg:mb-0">
             <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
@@ -9731,7 +9739,84 @@
         </div>
       </section>
 
-      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes'"
+      <!-- Criativos: consulta de anúncios e referências; nenhuma ação de veiculação. -->
+      <section x-show="marketingTab === 'criativos'" x-cloak data-marketing-creatives-screen>
+        <div class="mc-toolbar">
+          <div class="mc-periods" aria-label="Período dos criativos"><button type="button" @click="marketingCreativeSetPeriod('7d')" :class="marketingPeriod === '7d' && 'is-selected'" :aria-pressed="marketingPeriod === '7d'">7 dias</button><button type="button" @click="marketingCreativeSetPeriod('30d')" :class="marketingPeriod === '30d' && 'is-selected'" :aria-pressed="marketingPeriod === '30d'">30 dias</button></div>
+          <div class="mc-range"><i data-lucide="calendar-days"></i><span x-text="marketingCreativeRange()"></span></div>
+          <select aria-label="Campanha dos criativos" x-model="marketingCreativeCampaign" @change="marketingCreativeFiltersChanged()"><option value="all">Todas as campanhas</option><template x-for="campaign in marketingCreativeCampaigns()" :key="campaign.id"><option :value="campaign.id" x-text="campaign.name"></option></template></select>
+          <select aria-label="Formato dos criativos" x-model="marketingCreativeFormat" @change="marketingCreativeFiltersChanged()"><option value="all">Todos os formatos</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="carousel">Carrossel</option><option value="mixed">Múltiplas mídias</option><option value="unknown">Formato indisponível</option></select>
+          <label class="mc-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar criativo" placeholder="Buscar criativo" x-model="marketingCreativeSearch" @input.debounce.150ms="marketingCreativeFiltersChanged()"></label>
+          <button type="button" class="mc-button" @click="loadMarketingCreatives()" :disabled="marketingCreativesLoading" aria-label="Atualizar criativos"><i data-lucide="refresh-cw"></i></button>
+        </div>
+        <div x-show="marketingCreativesLoading" class="mc-loading" role="status">Carregando anúncios e criativos da Meta…</div>
+        <div x-show="marketingCreativesError" class="mc-notice mc-error" role="alert"><span x-text="marketingCreativesError"></span><button type="button" class="mc-button" @click="loadMarketingCreatives()">Tentar novamente</button></div>
+        <div x-show="!marketingCreativesLoading && !marketingCreativesError && marketingCreativesData">
+          <div x-show="marketingCreativesData && !marketingCreativesData.available" class="mc-notice mc-notice-warning">Configure a conta da Meta em Integrações para consultar os criativos. <button type="button" class="underline" @click="marketingSetTab('integracoes')">Ver integrações</button></div>
+          <div class="mc-kpis">
+            <div><strong x-text="marketingCreativeMetrics().count"></strong><span>Anúncios no filtro</span></div>
+            <div><strong x-text="marketingCreativeMoney(marketingCreativeMetrics().investment, marketingCreativeMetrics().currency)"></strong><span>Investimento na Meta</span></div>
+            <div><strong x-text="marketingCreativeMetrics().conversations.toLocaleString('pt-BR')"></strong><span>Conversas na Meta</span></div>
+            <div><strong x-text="marketingCreativeMoney(marketingCreativeMetrics().cost, marketingCreativeMetrics().currency)"></strong><span>Custo por conversa</span></div>
+          </div>
+          <div x-show="marketingCreativesData?.media_status === 'partial'" class="mc-notice">Alguns criativos não puderam ser consultados na Meta. Os indicadores sincronizados continuam disponíveis.</div>
+          <div class="mc-layout">
+            <div class="mc-left">
+              <section class="mc-panel">
+                <div class="mc-gallery-heading"><div><h2>Anúncios com entrega no período</h2><p class="mc-caption">Compare a peça e o resultado, lado a lado.</p></div><select aria-label="Ordenar criativos" x-model="marketingCreativeSort" @change="marketingCreativeFiltersChanged()"><option value="cost">Menor custo por conversa</option><option value="conversations">Mais conversas</option><option value="sales">Mais vendas atribuídas</option><option value="investment">Maior investimento</option></select></div>
+                <div class="mc-grid">
+                  <template x-for="row in marketingCreativePageRows()" :key="row.id">
+                    <article class="mc-card" :class="row.id === marketingCreativeSelectedId && 'is-selected'">
+                      <a class="mc-media" :href="row.preview_url || null" target="_blank" rel="noopener noreferrer" :aria-label="'Abrir prévia na Meta: ' + row.name" :title="row.preview_url ? 'Abrir prévia na Meta em outra aba' : 'Mídia ilustrativa da prévia'">
+                        <template x-if="row.media?.image_url && !row.media.failed"><img :src="row.media.image_url" :alt="row.name" loading="lazy" referrerpolicy="no-referrer" @error="row.media.failed = true"></template>
+                        <div x-show="!row.media?.image_url || row.media?.failed" class="mc-no-media"><i data-lucide="image-off"></i><span>Prévia indisponível</span><span x-show="row.preview_url">Ver anúncio na Meta ↗</span></div>
+                        <span x-show="['video','mixed'].includes(row.media?.format) && row.media?.image_url && !row.media?.failed" class="mc-play"><i data-lucide="play"></i></span>
+                        <span x-show="['video','mixed'].includes(row.media?.format)" class="mc-media-note">Abrir prévia na Meta ↗</span>
+                      </a>
+                      <div class="mc-card-info">
+                        <div class="mc-card-title"><button type="button" @click="marketingCreativeSelect(row)" :aria-pressed="row.id === marketingCreativeSelectedId" x-text="row.name"></button><img x-show="row.channels.includes('whatsapp')" src="/admin/painel/assets/brands/whatsapp.svg" alt="WhatsApp"></div>
+                        <div class="mc-tags"><span class="mc-badge" :class="row.media?.status !== 'ACTIVE' && 'mc-muted'"><span class="mc-dot"></span><span x-text="marketingCreativeStatusLabel(row)"></span></span><span class="mc-badge mc-muted" x-text="marketingCreativeFormatLabel(row.media?.format)"></span></div>
+                        <div class="mc-tags" x-show="marketingCreativeBestCost(row)"><span class="mc-badge">Menor custo por conversa</span></div>
+                        <div class="mc-card-metrics"><div><span>Investimento</span><strong x-text="marketingCreativeMoney(row.investment,row.currency)"></strong></div><div><span>Conversas Meta</span><strong x-text="row.conversations"></strong></div><div><span>Custo / conversa</span><strong x-text="marketingCreativeMoney(row.cost_per_conversation,row.currency)"></strong></div><div :title="marketingCreativeAttributionNote(row)"><span>Vendas atribuídas</span><strong x-text="row.attributed_sales ?? '—'"></strong></div></div>
+                      </div>
+                      <button type="button" class="mc-card-action" @click="marketingCreativeSelect(row)" :aria-pressed="row.id === marketingCreativeSelectedId">Ver análise →</button>
+                    </article>
+                  </template>
+                </div>
+                <div x-show="!marketingCreativeFiltered().length" class="mc-empty"><i data-lucide="images"></i><strong>Nenhum anúncio neste filtro</strong><p>Altere o período ou os filtros para consultar outros anúncios.</p></div>
+                <div class="mc-pagination" x-show="marketingCreativeFiltered().length"><span x-text="'Mostrando ' + ((marketingCreativePage-1)*3+1) + '–' + Math.min(marketingCreativePage*3,marketingCreativeFiltered().length) + ' de ' + marketingCreativeFiltered().length + ' anúncios'"></span><div class="mc-pagination-buttons"><button type="button" @click="marketingCreativeSetPage(marketingCreativePage-1)" :disabled="marketingCreativePage <= 1" aria-label="Página anterior de criativos"><i data-lucide="chevron-left"></i></button><span x-text="marketingCreativePage + ' / ' + marketingCreativePageCount()"></span><button type="button" @click="marketingCreativeSetPage(marketingCreativePage+1)" :disabled="marketingCreativePage >= marketingCreativePageCount()" aria-label="Próxima página de criativos"><i data-lucide="chevron-right"></i></button></div></div>
+              </section>
+              <section class="mc-panel" x-show="marketingCreativeSelected()"><h2>Custo por conversa no período</h2><p class="mc-caption" x-text="marketingCreativeSelected()?.name"></p><div class="mc-chart"><canvas id="chartMarketingCreativeCost" role="img" aria-label="Custo diário por conversa do anúncio selecionado e média dos filtros"></canvas></div><p class="mc-chart-empty">Dias sem conversa ficam sem custo calculado no gráfico.</p></section>
+            </div>
+            <aside class="mc-panel mc-detail">
+              <template x-if="marketingCreativeSelected()">
+                <div>
+                  <div class="mc-detail-head"><div><div class="mc-eyebrow">CRIATIVO SELECIONADO</div><h2 x-text="marketingCreativeSelected().name"></h2><p class="mc-caption" x-text="'Campanha: ' + marketingCreativeSelected().campaign_name"></p><div class="mc-tags"><template x-for="channel in marketingCreativeSelected().channels" :key="channel"><span class="mc-badge" x-text="channel === 'whatsapp' ? 'WhatsApp' : channel === 'instagram' ? 'Instagram' : 'Messenger'"></span></template><span class="mc-badge mc-muted" x-text="marketingCreativeFormatLabel(marketingCreativeSelected().media?.format)"></span></div></div><template x-if="marketingCreativeSelected().media?.image_url && !marketingCreativeSelected().media?.failed"><img class="mc-detail-thumb" :src="marketingCreativeSelected().media.image_url" :alt="marketingCreativeSelected().name" referrerpolicy="no-referrer" @error="marketingCreativeSelected().media.failed=true"></template></div>
+                  <div class="mc-cost"><strong x-text="marketingCreativeMoney(marketingCreativeSelected().cost_per_conversation,marketingCreativeSelected().currency)"></strong><p>por conversa na Meta</p><div class="mc-comparison" x-text="marketingCreativeComparison(marketingCreativeSelected())"></div></div>
+                  <h3>Da conversa à venda</h3>
+                  <div class="mc-steps"><div class="mc-step"><span class="mc-step-icon"><i data-lucide="message-circle"></i></span><div><strong x-text="marketingCreativeSelected().conversations"></strong><p>Conversas na Meta</p></div></div><div class="mc-step"><span class="mc-step-icon"><i data-lucide="user-round"></i></span><div><strong x-text="marketingCreativeSelected().tracked ?? '—'"></strong><p>Conversas identificadas</p></div></div><div class="mc-step"><span class="mc-step-icon"><i data-lucide="chart-no-axes-column-increasing"></i></span><div><strong x-text="marketingCreativeSelected().attributed_sales ?? '—'"></strong><p>Vendas atribuídas</p></div></div></div>
+                  <div x-show="marketingCreativeAttributionNote(marketingCreativeSelected())" class="mc-notice mc-notice-warning" x-text="marketingCreativeAttributionNote(marketingCreativeSelected())"></div>
+                  <div class="mc-revenue"><div class="mc-step"><span class="mc-step-icon"><i data-lucide="coins"></i></span><div><strong x-text="marketingCreativeMoney(marketingCreativeSelected().attributed_revenue)"></strong><p>Receita atribuída</p></div></div><p class="mc-caption">Vendas vinculadas ao anúncio. Receita não representa lucro.</p></div>
+                  <button type="button" class="mc-button mc-button-primary" @click="openMarketingCreativeJourneys(marketingCreativeSelected())">Ver jornadas deste anúncio <i data-lucide="arrow-right"></i></button>
+                  <a x-show="marketingCreativeSelected().meta_url" :href="marketingCreativeSelected().meta_url" target="_blank" rel="noopener noreferrer" class="mc-meta-link">Abrir anúncio na Meta ↗</a>
+                </div>
+              </template>
+              <div x-show="!marketingCreativeSelected()" class="mc-empty"><i data-lucide="mouse-pointer-click"></i><strong>Selecione um anúncio</strong><p>Os detalhes e as vendas atribuídas aparecem aqui.</p></div>
+            </aside>
+          </div>
+          <footer class="mc-footer"><span>Conversas da Meta e vendas atribuídas são indicadores diferentes.</span><span>Cada card representa um anúncio; a mesma peça pode ser usada em mais de um anúncio.</span></footer>
+        </div>
+        <div x-show="marketingCreativeJourneysOpen" class="mc-dialog-overlay" @keydown.escape.window="closeMarketingCreativeJourneys()" @click.self="closeMarketingCreativeJourneys()" x-cloak>
+          <section class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="mc-journeys-title" @keydown.tab="marketingCreativeDialogTab($event)">
+            <div class="mc-dialog-top"><div><h2 id="mc-journeys-title">Jornadas deste anúncio</h2><p class="mc-caption" x-text="marketingCreativeJourneysData?.name || marketingCreativeSelected()?.name"></p></div><button type="button" class="mc-button" @click="closeMarketingCreativeJourneys()" aria-label="Fechar jornadas">Fechar</button></div>
+            <p class="mc-caption">Até 100 conversas vinculadas a este anúncio, por entrada ou venda no período. Uma venda pode vir de uma conversa iniciada antes.</p>
+            <div x-show="marketingCreativeJourneysLoading" class="mc-loading">Carregando jornadas…</div><div x-show="marketingCreativeJourneysError" class="mc-notice mc-error" x-text="marketingCreativeJourneysError"></div>
+            <div class="mc-table-wrap" x-show="!marketingCreativeJourneysLoading && marketingCreativeJourneysData?.rows?.length"><table class="mc-table"><thead><tr><th>Conversa</th><th>Identificada em</th><th>Canal</th><th>Vendas atribuídas</th><th>Receita atribuída</th></tr></thead><tbody><template x-for="journey in marketingCreativeJourneysData?.rows || []" :key="journey.conversation_id"><tr><td x-text="'#' + journey.conversation_id"></td><td x-text="new Date(journey.captured_at).toLocaleString('pt-BR')"></td><td x-text="journey.channels.join(', ')"></td><td x-text="journey.sales ?? '—'"></td><td x-text="marketingCreativeMoney(journey.revenue)"></td></tr></template></tbody></table></div>
+            <div x-show="!marketingCreativeJourneysLoading && !marketingCreativeJourneysError && !marketingCreativeJourneysData?.rows?.length" class="mc-empty">Nenhuma jornada vinculada a este anúncio no período.</div>
+          </section>
+        </div>
+      </section>
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes' && marketingTab !== 'criativos'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
