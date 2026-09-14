@@ -28,6 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'app.marketing.geography.js','app.marketing.geography.actions.js','app.marketing.geography.mock.js',
     'app.marketing.creatives.js', 'app.marketing.creatives.chart.js', 'app.marketing.creatives.mock.js',
     'app.relatorios.demanda.js', 'app.relatorios.demanda.view.js', 'app.relatorios.demanda.charts.js', 'app.relatorios.demanda.export.js', 'app.relatorios.demanda.pdf.js',
     'app.relatorios.faltas.js', 'app.relatorios.faltas.view.js', 'app.relatorios.faltas.export.js', 'app.relatorios.faltas.pdf.js',
@@ -69,6 +70,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   }
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-creatives.css', async (_request, reply) => sendStatic(reply, 'marketing-creatives.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/marketing-geography.css', async (_request, reply) => sendStatic(reply, 'marketing-geography.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/clientes-lead.css', async (_request, reply) => sendStatic(reply, 'clientes-lead.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-entrega.css', async (_request, reply) => sendStatic(reply, 'bot-entrega.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-demanda.css', async (_request, reply) => sendStatic(reply, 'bot-demanda.css', 'text/css; charset=utf-8'));

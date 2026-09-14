@@ -118,6 +118,7 @@ window.PAINEL_MODULES.marketing = function () {
         this.closeMarketingCampaignDetail();
       }
       this.marketingTab = tab;
+      if (tab === 'geografia') void this.loadMarketingGeography();
       if (tab === 'criativos') void this.loadMarketingCreatives();
       if (tab === 'campanhas') void this.loadMarketingCampaigns();
       if (tab === 'jornadas') void this.loadMarketingJourneys();
@@ -129,6 +130,7 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingPeriodChanged() {
+      if (this.marketingTab === 'geografia') void this.loadMarketingGeography();
       if (this.marketingTab === 'criativos') void this.loadMarketingCreatives();
       void this.loadMarketing();
       if (this.marketingTab === 'campanhas') {

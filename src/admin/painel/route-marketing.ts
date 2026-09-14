@@ -24,6 +24,7 @@ import { env } from '../../shared/config/env.js';
 import { recordMarketingAudit } from './marketing-audit.js';
 import { setCampaignScope } from '../../marketing/campaign-scope.js';
 import { registerMarketingCreatives } from './route-marketing-creatives.js';
+import { registerMarketingGeography } from './route-marketing-geography.js';
 
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
@@ -61,6 +62,7 @@ function capiFailureReason(error: unknown): string {
 
 export async function registerPainelMarketing(fastify: FastifyInstance): Promise<void> {
   await registerMarketingCreatives(fastify);
+  await registerMarketingGeography(fastify);
   fastify.get('/admin/api/marketing/overview', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });

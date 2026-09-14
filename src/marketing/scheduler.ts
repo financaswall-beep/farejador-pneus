@@ -6,6 +6,7 @@ import { syncMetaInsights } from './meta-sync.js';
 import { pool } from '../persistence/db.js';
 import { businessDateSaoPaulo } from '../shared/business-time.js';
 import { resolveMetaCatchupLookback } from './catchup.js';
+import { refreshGeographyObservations } from './geography-sync.js';
 
 const ATTRIBUTION_INTERVAL_MS = 5 * 60_000;
 
@@ -25,6 +26,7 @@ async function runSync(triggerType: 'startup' | 'scheduled', lookbackDays: numbe
   try {
     const result = await syncMetaInsights({ triggerType, lookbackDays });
     logger.info(result, 'marketing Meta sync completed');
+    await refreshGeographyObservations().catch(error=>logger.warn({err:error},'marketing geography observations deferred'));
   } catch (error) {
     logger.warn({ err: error }, 'marketing Meta sync deferred');
   }

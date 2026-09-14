@@ -200,7 +200,11 @@
 <script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
-<script src="/admin/painel/app.marketing.js?v=20260914-criativos1"></script>
+<link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
+<script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
+<script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
+<script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -228,7 +232,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260914-criativos1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.js?v=20260910-relatorios1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
@@ -8260,7 +8264,11 @@
         <div><div class="mc-breadcrumb">Matriz / Marketing</div><h1>Criativos</h1><p>Veja quais anúncios geram conversas e vendas.</p></div>
         <div class="mc-actions"><span class="mc-badge mc-muted" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button type="button" class="mc-button" @click="exportMarketingCreatives()" :disabled="marketingCreativesLoading || !marketingCreativeFiltered().length"><i data-lucide="upload"></i> Exportar CSV</button></div>
       </header>
-      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos'"
+      <header x-show="marketingTab === 'geografia'" class="mg-screen mg-header">
+        <div><div class="mg-eyebrow">Matriz / Marketing</div><h1>Geografia e demanda</h1><p>Transforme resultados em decisões de investimento.</p></div>
+        <div class="mg-header-actions"><span class="mg-badge" :class="marketingIsMock() && 'mg-demo'" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button class="mg-button" @click="mgExport()" :disabled="mgLoading || !mgFiltered().length"><i data-lucide="download"></i> Exportar CSV</button></div>
+      </header>
+      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia'"
                aria-labelledby="marketing-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
@@ -8289,7 +8297,7 @@
         </div>
       </section>
 
-      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos'"
+      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos' || marketingTab === 'geografia'"
            class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções de Marketing" class="flex items-center gap-1 overflow-x-auto">
@@ -8300,7 +8308,7 @@
                       x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="marketingTab !== 'criativos'" class="mb-3 flex items-center gap-2 lg:mb-0">
+          <div x-show="marketingTab !== 'criativos' && marketingTab !== 'geografia'" class="mb-3 flex items-center gap-2 lg:mb-0">
             <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
@@ -9816,7 +9824,81 @@
           </section>
         </div>
       </section>
-      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes' && marketingTab !== 'criativos'"
+      <section x-show="marketingTab === 'geografia'" x-cloak class="mg-screen" data-marketing-geography-screen @keydown.escape.window="mgCloseDialogs()">
+        <div class="mg-toolbar">
+          <select aria-label="Período de análise" x-model="marketingPeriod" @change="marketingPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select>
+          <select aria-label="Filtrar campanha" x-model="mgCampaign" @change="mgFiltersChanged()"><option value="all">Todas as campanhas</option><template x-for="c in (mgData?.catalog || []).filter(c => c.scope === 'matrix')" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+          <select aria-label="Filtrar região" x-model="mgRegion" @change="mgFiltersChanged()"><option value="all">Todas as regiões</option><template x-for="r in mgRegions()" :key="r.name"><option :value="r.name" x-text="r.name"></option></template></select>
+          <label class="mg-target">Meta por venda: R$ <input type="number" min="0.01" max="10000" step="0.01" x-model.number="mgTarget" @change="loadMarketingGeography()" aria-label="Meta de custo por venda"></label>
+          <button class="mg-button" @click="mgOpenConfig()" :disabled="mgLoading || !mgData?.available" aria-label="Vincular campanhas" title="Vincular campanhas"><i data-lucide="sliders-horizontal"></i></button>
+          <button class="mg-button" @click="mgRefresh()" :disabled="mgLoading || mgBusy" aria-label="Atualizar configuração Meta"><i data-lucide="refresh-cw"></i></button>
+        </div>
+        <div x-show="mgLoading" class="mg-loading" role="status">Consultando resultados e indicadores da Meta…</div>
+        <div x-show="mgError" class="mg-notice mg-error" role="alert"><span x-text="mgError"></span> <button class="mg-link" @click="loadMarketingGeography()">Tentar novamente</button></div>
+        <div x-show="mgNotice" class="mg-notice" role="status" x-text="mgNotice"></div>
+        <div x-show="!mgLoading && !mgError && mgData">
+          <div x-show="mgData && !mgData.available" class="mg-notice mg-warning">Configure a conta da Meta para consultar esta tela. <button class="mg-link" @click="marketingSetTab('integracoes')">Abrir Integrações</button></div>
+          <div x-show="mgData?.available && !mgData?.attribution_enabled" class="mg-notice mg-warning">A atribuição de vendas está desativada. Conversão e margem ficam indisponíveis.</div>
+          <div x-show="mgData?.available && !mgData?.fresh" class="mg-notice mg-warning">Os dados de investimento estão ausentes ou desatualizados. <button class="mg-link" @click="marketingSetTab('integracoes')">Conferir sincronização</button></div>
+          <div x-show="mgData?.meta_state !== 'ready' && mgData?.available" class="mg-notice">Alguns indicadores adicionais da Meta estão indisponíveis. As recomendações respeitam essa limitação.</div>
+          <div x-show="mgData?.missing_scope" class="mg-notice"><span x-text="mgData?.missing_scope"></span> campanha(s) aguardam classificação como Matriz. <button class="mg-link" @click="marketingSetTab('campanhas')">Conferir campanhas</button></div>
+          <section class="mg-card" aria-labelledby="mg-regions-title">
+            <div class="mg-card-top"><div><h2 id="mg-regions-title">Onde investir agora</h2><p class="mg-subtitle">Selecione uma região para conferir os sinais e as campanhas.</p></div><input class="mg-button mg-search" type="search" placeholder="Buscar região ou campanha" aria-label="Buscar região ou campanha" x-model="mgSearch" @input="mgFiltersChanged()"></div>
+            <div class="mg-table-wrap" x-show="mgFiltered().length"><table class="mg-table"><thead><tr><th>Região</th><th>Custo / venda</th><th>Margem após anúncios</th><th>Conversa → venda</th><th>Atendimento</th><th>Indicação</th></tr></thead><tbody>
+              <template x-for="row in mgPageRows()" :key="row.name"><tr :class="row.name === mgSelected && 'is-selected'" @click="mgSelect(row)">
+                <td><button class="mg-row-button" @click.stop="mgSelect(row)" :aria-pressed="row.name === mgSelected" x-text="row.name"></button><small x-text="row.campaigns.length + ' campanha(s) · ' + mgNumber(row.totals.sales) + ' vendas'"></small></td>
+                <td><strong :class="row.totals.cpa > mgTarget ? 'mg-negative' : 'mg-positive'" x-text="mgMoney(row.totals.cpa)"></strong><small x-show="row.totals.spend == null">Verba sem recorte válido</small></td>
+                <td><strong :class="row.totals.margin < 0 ? 'mg-negative' : 'mg-positive'" x-text="mgMoney(row.totals.margin)"></strong></td>
+                <td><strong x-text="mgPercent(row.totals.conversion)"></strong><small x-text="mgNumber(row.totals.converted) + ' de ' + mgNumber(row.totals.conversations)"></small></td>
+                <td><span x-text="mgAvailability(row.availability)"></span></td>
+                <td><span class="mg-decision" :class="'mg-tone-' + row.decision"><i :data-lucide="mgDecisionIcon(row.decision)"></i><span x-text="mgDecision(row.decision)"></span></span></td>
+              </tr></template>
+            </tbody></table></div>
+            <div class="mg-empty" x-show="!mgFiltered().length">Nenhuma região encontrada neste filtro. As conversas com origem de anúncio aparecerão aqui após a sincronização.</div>
+            <div class="mg-foot"><span>Conversas identificadas no Farejador. Verba compartilhada fica sem custo regional estimado.</span><div class="mg-inline" x-show="mgPageCount() > 1"><button class="mg-link" @click="mgPage--; mgReconcile()" :disabled="mgPage <= 1">Anterior</button><span x-text="mgPage + ' / ' + mgPageCount()"></span><button class="mg-link" @click="mgPage++; mgReconcile()" :disabled="mgPage >= mgPageCount()">Próxima</button></div></div>
+          </section>
+          <div class="mg-detail" x-show="mgSelectedRegion()">
+            <div><div class="mg-detail-title"><h2 x-text="'Por que ' + mgSelected + ' merece atenção?'"></h2><span class="mg-badge" x-text="mgSelected"></span></div>
+              <div class="mg-evidence">
+                <article class="mg-card"><h3><span class="mg-number-badge">1</span> Retorno do investimento</h3><div class="mg-big" :class="mgSelectedRegion()?.totals.margin < 0 ? 'mg-negative' : 'mg-positive'" x-text="mgMoney(mgSelectedRegion()?.totals.margin)"></div><p class="mg-subtitle">margem após anúncios</p><div class="mg-gauge"><span class="mg-gauge-fill" :style="'width:' + mgGauge()"></span><span class="mg-gauge-marker"><span x-text="'Meta ' + mgMoney(mgTarget)"></span></span></div><div class="mg-gauge-labels"><span x-text="'Custo / venda: ' + mgMoney(mgSelectedRegion()?.totals.cpa)"></span></div><p class="mg-caption" x-text="mgBelowTarget()"></p></article>
+                <article class="mg-card"><h3><span class="mg-number-badge">2</span> Conversas que viram vendas</h3><div class="mg-inline"><strong class="mg-big mg-positive" x-text="mgPercent(mgSelectedRegion()?.totals.conversion)"></strong><span :class="mgConversionDelta() < 0 ? 'mg-negative' : 'mg-positive'" x-show="mgConversionDelta() != null" x-text="(mgConversionDelta() > 0 ? '+' : '') + mgNumber(mgConversionDelta()) + ' p.p.'"></span></div><p class="mg-caption" x-text="'Antes: ' + mgPercent(mgSelectedRegion()?.previous.conversion)"></p><div class="mg-conversion"><span>Conversas</span><div class="mg-bar"><span :style="'width:' + (mgSelectedRegion()?.totals.conversations ? 100 : 0) + '%'"></span></div><span x-text="mgNumber(mgSelectedRegion()?.totals.conversations)"></span><span>Com venda</span><div class="mg-bar is-green"><span :style="'width:' + Math.min(100, mgSelectedRegion()?.totals.conversion || 0) + '%'"></span></div><span x-text="mgNumber(mgSelectedRegion()?.totals.converted)"></span></div><p class="mg-caption">Uma conversa conta uma vez. Entradas recentes ainda podem converter.</p></article>
+                <article class="mg-card"><h3><span class="mg-number-badge">3</span> Depois do aumento de verba</h3><p class="mg-caption" x-text="mgSelectedRecord()?.name"></p><div x-show="!mgBudgetChangeReady()" class="mg-muted-box">Aguardando mudança de orçamento observada e sete dias completos antes e depois, com dados identificados.</div><div x-show="mgBudgetChangeReady()"><p class="mg-caption">7 dias antes × 7 dias após a observação</p><table class="mg-compare"><tbody><tr><td>Investimento</td><td x-text="mgMoney(mgSelectedRecord()?.budget_change?.before.spend) + ' → ' + mgMoney(mgSelectedRecord()?.budget_change?.after.spend)"></td><td x-text="mgPercent(mgChange('spend'))"></td></tr><tr><td>Vendas</td><td x-text="mgNumber(mgSelectedRecord()?.budget_change?.before.sales) + ' → ' + mgNumber(mgSelectedRecord()?.budget_change?.after.sales)"></td><td x-text="mgPercent(mgChange('sales'))"></td></tr><tr><td>Custo / venda</td><td x-text="mgMoney(mgSelectedRecord()?.budget_change?.before.cpa) + ' → ' + mgMoney(mgSelectedRecord()?.budget_change?.after.cpa)"></td><td x-text="mgPercent(mgChange('cpa'))"></td></tr></tbody></table></div><p class="mg-caption">Comparação observada; não prova efeito do aumento. O dia da detecção fica fora.</p></article>
+                <article class="mg-card"><h3><span class="mg-number-badge">4</span> Desgaste do anúncio</h3><p class="mg-caption" x-text="mgSelectedRecord()?.name"></p><div class="mg-spark"><strong>Frequência</strong><span x-text="mgNumber(mgSelectedRecord()?.diagnostics.previous?.frequency) + ' → ' + mgNumber(mgSelectedRecord()?.diagnostics.current?.frequency)"></span><svg viewBox="0 0 120 42" role="img" aria-label="Frequência anterior e atual"><polyline :points="mgMiniLine('frequency')" fill="none" stroke="#04889b" stroke-width="3" stroke-linecap="round"></polyline></svg></div><div class="mg-spark"><strong>Cliques no link<small class="mg-caption"> · CTR</small></strong><span x-text="mgPercent(mgSelectedRecord()?.diagnostics.previous?.link_ctr) + ' → ' + mgPercent(mgSelectedRecord()?.diagnostics.current?.link_ctr)"></span><svg viewBox="0 0 120 42" role="img" aria-label="Taxa de cliques anterior e atual"><polyline :points="mgMiniLine('link_ctr')" fill="none" stroke="#dc990e" stroke-width="3" stroke-linecap="round"></polyline></svg></div><p class="mg-caption" x-text="mgFatigueText()"></p></article>
+              </div>
+            </div>
+            <aside class="mg-card mg-aside"><div class="mg-aside-head"><h2>Ação sugerida</h2><p class="mg-subtitle" x-text="mgSelected"></p></div><div class="mg-aside-content">
+              <label class="mg-caption" for="mg-selected-campaign">Campanha nesta região</label><select id="mg-selected-campaign" x-model="mgSelectedCampaign"><template x-for="c in mgSelectedRegion()?.campaigns || []" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+              <h3 :class="'mg-tone-' + (mgSelectedRecord()?.decision || 'wait')" x-text="mgDecision(mgSelectedRecord()?.decision)"></h3>
+              <template x-for="reason in mgSelectedRecord()?.reasons || []" :key="reason"><p class="mg-reasons" x-text="reason"></p></template>
+              <div class="mg-stock"><p class="mg-stock-title">5 · Estoque e cobertura</p><p class="mg-caption" x-text="mgSelectedRecord()?.availability.coverage"></p><template x-for="(o,i) in mgSelectedRecord()?.availability.offers || []" :key="i"><div class="mg-offer"><span x-text="o.measure + ' · ' + o.brand + ' · ' + mgCondition(o.condition)"></span><strong :class="o.available > 0 ? 'mg-positive' : 'mg-negative'" x-text="o.available > 0 ? mgNumber(o.available) + ' un.' : 'Sem saldo'"></strong></div></template><p class="mg-caption" x-show="!mgSelectedRecord()?.availability.offers.length">Vincule os anúncios aos produtos do catálogo.</p><button class="mg-link" @click="mgOpenConfig()">Conferir vínculos</button></div>
+              <div class="mg-basis"><strong>Base da análise</strong><div><i data-lucide="chart-no-axes-column"></i><span x-text="mgNumber(mgSelectedRecord()?.totals.sales) + ' vendas nesta campanha e região'"></span></div><div><i data-lucide="clock-3"></i><span x-text="mgNumber(mgSelectedRecord()?.totals.mature_conversations) + ' conversas com janela de 7 dias encerrada'"></span></div><div><i data-lucide="graduation-cap"></i><span x-text="'Aprendizado: ' + mgLearning()"></span></div></div>
+              <div x-show="mgCanPlan()"><strong>Teste proposto</strong><div class="mg-plan-preview" x-text="mgMoney(mgSelectedRecord()?.meta?.daily_budget) + '/dia → ' + mgMoney((mgSelectedRecord()?.meta?.daily_budget || 0) * 1.1) + '/dia'"></div><p class="mg-caption">Sugestão inicial: +10% por 7 dias. Revisar custo, margem e estoque.</p></div>
+              <div x-show="mgSelectedRecord()?.decision === 'increase' && !mgCanPlan()" class="mg-muted-box">Confirme o orçamento na Meta. Verbas compartilhadas entre conjuntos não recebem aumento automático por região.</div>
+              <button class="mg-button mg-primary mg-full" style="margin-top:14px" @click="mgOpenPlan()" :disabled="!mgCanPlan()">Montar plano de teste <i data-lucide="arrow-right"></i></button>
+              <div class="mg-foot"><button class="mg-link" @click="mgViewCampaign()">Ver campanha</button><a class="mg-link" :href="mgSelectedRecord()?.meta_url || '#'" target="_blank" rel="noopener noreferrer">Abrir na Meta ↗</a></div><p class="mg-caption">O plano é um rascunho. Nenhuma verba ou anúncio é alterado por esta tela.</p>
+            </div></aside>
+          </div>
+          <footer class="mg-page-foot"><span>Margem após anúncios: antes das demais despesas. Localização do cliente e segmentação são informações diferentes.</span><button class="mg-link" @click="mgInfo=true">Como as indicações são calculadas</button></footer>
+        </div>
+        <div class="mg-modal" @keydown.tab="mgTrapFocus($event)" x-show="mgConfigOpen" x-cloak @click.self="mgCloseDialogs()"><section class="mg-dialog" role="dialog" aria-modal="true" aria-labelledby="mg-config-title"><div class="mg-dialog-top"><h2 id="mg-config-title">Vínculos da campanha</h2><button class="mg-button" @click="mgCloseDialogs()" :disabled="mgBusy">Fechar</button></div>
+          <p class="mg-subtitle">Confirme onde a verba é dedicada e quais produtos cada anúncio oferece. Esta configuração só organiza a análise do Farejador.</p>
+          <div class="mg-notice mg-warning">Marque verba dedicada somente se a campanha inteira servir à região declarada durante a validade. O sistema também verifica a origem das conversas.</div>
+          <form @submit.prevent="mgSaveConfig()"><div class="mg-form-grid">
+            <label class="mg-wide">Campanha da Matriz<select x-ref="mgConfigFocus" x-model="mgConfigCampaign" @change="mgLoadForm()" required><option value="">Selecione</option><template x-for="c in (mgData?.catalog || []).filter(c => c.scope === 'matrix')" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select></label>
+            <label>Distribuição da verba<select :value="mgForm?.allocation" @change="mgForm.allocation=$event.target.value"><option value="shared">Compartilhada / não identificada</option><option value="dedicated">Dedicada a uma região</option></select></label>
+            <label>Município<input :value="mgForm?.municipality || ''" @input="mgForm.municipality=$event.target.value" placeholder="Mesmo município informado nas conversas" :required="mgForm?.allocation === 'dedicated'" maxlength="120"><small>Use o nome exibido na tabela. Não inclua a UF se ela não constar no cadastro.</small></label>
+            <label>Válido desde<input type="date" :value="mgForm?.valid_from" @input="mgForm.valid_from=$event.target.value" required></label><label>Válido até<input type="date" :value="mgForm?.valid_until" @input="mgForm.valid_until=$event.target.value" required></label>
+            <label class="mg-wide">Atendimento da oferta<select :value="mgForm?.coverage" @change="mgForm.coverage=$event.target.value"><option value="unknown">Confirmar por endereço</option><option value="pickup">Oferta de retirada na Matriz</option><option value="confirmed">Área anunciada verificada pelo responsável</option></select><small>Uma confirmação vale para a área da oferta. Não declara cobertura de todo o município.</small></label>
+            <label class="mg-wide">Motivo / evidência<textarea rows="2" :value="mgForm?.reason" @input="mgForm.reason=$event.target.value" required minlength="3" maxlength="500" placeholder="Ex.: campanha exclusiva desta região; raio da oferta revisado."></textarea></label>
+          </div><fieldset><legend>Ofertas anunciadas</legend><p class="mg-caption">Selecione a medida, marca e condição exatas. O saldo já desconta as reservas.</p><div class="mg-inline"><select aria-label="Anúncio da oferta" x-model="mgOfferAd"><option value="">Escolha o anúncio</option><template x-for="a in mgAdOptions()" :key="a.id"><option :value="a.id" x-text="a.name || a.id"></option></template></select><select aria-label="Produto anunciado" x-model="mgOfferProduct"><option value="">Escolha o produto</option><template x-for="(o,i) in mgOfferOptions()" :key="i"><option :value="String(i)" x-text="o.measure + ' · ' + o.brand + ' · ' + mgCondition(o.condition)"></option></template></select><button type="button" class="mg-button" @click="mgAddOffer()">Adicionar</button></div><template x-for="(o,i) in mgForm?.offers || []" :key="i"><div class="mg-inline"><span x-text="o.measure + ' · ' + o.brand + ' · ' + mgCondition(o.condition) + ' · anúncio ' + o.ad_id"></span><button type="button" class="mg-link" @click="mgForm.offers.splice(i,1)">Remover</button></div></template></fieldset>
+          <p x-show="mgFormError" class="mg-notice mg-error" x-text="mgFormError" role="alert"></p><button class="mg-button mg-primary" type="submit" :disabled="mgBusy || !mgConfigCampaign" x-text="mgBusy ? 'Salvando…' : 'Salvar vínculos'"></button></form>
+        </section></div>
+        <div class="mg-modal" @keydown.tab="mgTrapFocus($event)" x-show="mgPlanOpen" x-cloak @click.self="mgCloseDialogs()"><section class="mg-dialog" role="dialog" aria-modal="true" aria-labelledby="mg-plan-title"><div class="mg-dialog-top"><h2 id="mg-plan-title">Plano de teste</h2><button class="mg-button" @click="mgCloseDialogs()" :disabled="mgBusy">Fechar</button></div><p x-text="mgPlanCampaign?.name + ' · ' + mgPlanCampaign?.region"></p><div class="mg-notice">Rascunho para revisão. Salvar este plano não altera a campanha na Meta.</div><div class="mg-form-grid"><label>Aumento (%)<input x-ref="mgPlanFocus" type="number" min="1" max="20" x-model.number="mgPlanPercent" :disabled="!!mgPlanResult"></label><label>Duração (dias)<input type="number" min="3" max="14" step="1" x-model.number="mgPlanDays" :disabled="!!mgPlanResult"></label></div><p class="mg-plan-preview" x-text="mgMoney(mgPlanCampaign?.meta?.daily_budget) + ' → ' + mgMoney(mgPlanProposed()) + ' por dia'"></p><p x-text="'Acréscimo previsto: ' + mgMoney(mgPlanExtra())"></p><p class="mg-caption" x-text="'Revisar se o custo por venda ultrapassar ' + mgMoney(mgTarget) + ', se a margem piorar ou faltar estoque.'"></p><p class="mg-notice mg-error" x-show="mgPlanError" x-text="mgPlanError"></p><div class="mg-notice" x-show="mgPlanResult">Plano salvo como rascunho. Nenhuma mudança foi enviada à Meta.</div><div class="mg-inline"><button class="mg-button mg-primary" @click="mgSavePlan()" :disabled="mgBusy || !!mgPlanResult || mgPlanPercent < 1 || mgPlanPercent > 20 || mgPlanDays < 3 || mgPlanDays > 14">Salvar rascunho</button><button class="mg-button" x-show="mgPlanResult" @click="mgDownloadPlan()">Baixar plano</button><a class="mg-link" :href="mgPlanCampaign?.meta_url || '#'" target="_blank" rel="noopener noreferrer">Abrir campanha na Meta ↗</a></div></section></div>
+        <div class="mg-modal" @keydown.tab="mgTrapFocus($event)" x-show="mgInfo" x-cloak @click.self="mgCloseDialogs()"><section class="mg-dialog" role="dialog" aria-modal="true" aria-labelledby="mg-info-title"><div class="mg-dialog-top"><h2 id="mg-info-title">Como as indicações são calculadas</h2><button class="mg-button" @click="mgCloseDialogs()">Fechar</button></div><ul>
+          <li>Esta análise inclui campanhas classificadas como Matriz e vendas da Matriz efetivamente confirmadas. Cancelamentos e entregas ainda não realizadas ficam fora.</li><li>Margem: receita das vendas atribuídas menos o custo registrado dos pneus e o investimento. Custo ausente bloqueia a margem; zero não substitui um dado desconhecido.</li><li>A verba só recebe recorte regional com vínculo dedicado válido durante os dias analisados, moeda BRL e origem das conversas/vendas compatível. Não há divisão proporcional de campanha compartilhada.</li><li>A conversão acompanha conversas iniciadas no período e os pedidos atribuídos a essas mesmas entradas. Uma conversa conta uma vez, inclusive quando compra mais de um pneu. A cidade é a localização atualmente identificada no Farejador.</li><li>As recomendações aguardam pelo menos 10 conversas com janela de 7 dias encerrada e 5 vendas. Testar aumento exige 10 vendas, custo até 80% da meta, margem positiva nos dois períodos e estoque/cobertura confirmados. São critérios de triagem, não significância estatística.</li><li>Dados desatualizados, aprendizado pendente, custo ausente ou oferta não vinculada impedem sugerir aumento. Frequência +20% com CTR do link −20% pede revisão do criativo.</li><li>O comparativo de orçamento depende de mudança observada, com sete dias completos antes e depois. A hora exata da edição e seu efeito causal não são inferidos. Frequência e CTR vêm dos agregados Meta de cada período, sem somar alcance diário.</li><li>Vínculos, observações e planos mantêm histórico. Planos são rascunhos; esta tela não publica anúncios, pausa campanhas nem muda orçamento.</li>
+        </ul></section></div>
+      </section>
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes' && marketingTab !== 'criativos' && marketingTab !== 'geografia'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">

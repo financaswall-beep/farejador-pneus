@@ -95,6 +95,8 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.marketing, // Marketing: visão inicial + Meta read-only + qualidade da atribuição
     window.PAINEL_MODULES.marketingChart, // Marketing: gráfico diário de investimento e conversas
     window.PAINEL_MODULES.marketingCreatives,
+    window.PAINEL_MODULES.marketingGeography,
+    window.PAINEL_MODULES.marketingGeographyActions,
     window.PAINEL_MODULES.marketingCreativeChart,
     window.PAINEL_MODULES.marketingCampaigns, // Marketing: campanhas read-only e filtro real por canal
     window.PAINEL_MODULES.marketingCampaignDetail, // Marketing: detalhe real após clicar em uma campanha

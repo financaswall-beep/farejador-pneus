@@ -42,7 +42,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.chart.js'");
     expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
       .toContain('window.PAINEL_MODULES.marketingChart');
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260914-criativos1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260914-geo1');
     expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1');
