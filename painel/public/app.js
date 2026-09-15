@@ -105,6 +105,7 @@ function painelApp() {
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
     stockTab: 'visao',
+    stockCosts: { data: null, loading: false, error: '', request: 0, mode: 'catalog', condition: '', search: '', detail: null, dialog: '' },
     tireLots: { rows: [], total: 0, summary: null, selectedId: null, search: '', status: 'open', page: 1, request: 0, loading: false, error: '', movements: [], movementTotal: 0, movementPage: 1, movementRequest: 0, movementLoading: false, movementError: '', originLoading: false, separationOpen: false, sources: [], sourceSearch: '', sourceRequest: 0, sourceLoading: false, separationError: '', saving: false, pending: null, form: { stock_id: '', description: '', quantity: '', reason: '' } },
     stockFiltro: 'todos',
     stockOperacao: null,
@@ -292,7 +293,6 @@ function painelApp() {
     raioSalvoMsg: '',
     // 2026-06-01: alertas fake removidos — os alertas reais saem de redeAlertasOperacionais (computa de parceirosRede).
     alertasRede: [],
-
   };
 
   // Montagem (lista de fábricas + compositor) mora em app.montagem.js — fatia 07-14.

@@ -41,7 +41,7 @@ window.PAINEL_PAGES = {
   compras: { scopes: ['matrix', 'partner'], requires: 'compras', load: ['loadCompras'], partnerLoad: ['loadPartnerCompras'] },
   estoque: {
     scopes: ['matrix', 'partner'], requires: 'estoque',
-    load: ['loadAtacado', 'loadGalpaoFilme', 'loadStockReconciliation', 'loadTireLotsPage'],
+    load: ['loadAtacado', 'loadGalpaoFilme', 'loadStockReconciliation', 'loadTireLotsPage', 'loadStockCostsPage'],
     partnerLoad: ['loadPartnerEstoque'],
   },
   logistica: { scopes: ['matrix', 'partner'], requires: 'logistica', load: ['loadLogistica'], partnerLoad: ['loadPartnerLogistica'] },

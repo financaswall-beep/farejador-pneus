@@ -4,8 +4,10 @@ import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { getTireLotPurchase, listLotSeparationSources, listTireLotMovements, listTireLots } from './queries-tire-lots.js';
 import { lotSeparationSchema, separateTireLot } from './tire-lot-separation.js';
+import { getStockCosts } from './queries-stock-costs.js';
 
 export async function registerTireLotRoutes(app: FastifyInstance) {
+  app.get('/admin/api/wholesale/stock/costs', { preHandler: requireAdminAuth }, async () => getStockCosts());
   const page = z.coerce.number().int().min(1).max(100000).default(1);
   const search = z.string().trim().max(100).default('');
   app.get('/admin/api/wholesale/lots/:id/purchase', { preHandler: requireAdminAuth }, async (request, reply) => {

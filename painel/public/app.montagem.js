@@ -111,6 +111,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.galpaoAjuste, // motivo e prévia financeira do ajuste manual
     window.PAINEL_MODULES.galpaoMultibrand, // identidade medida+marca+condição, custos e reposição
     window.PAINEL_MODULES.estoqueLotes,
+    window.PAINEL_MODULES.estoqueCustos,
     window.PAINEL_MODULES.galpaoCorrecao, // transfere condição com trilha, sem editar histórico
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.catalogo,

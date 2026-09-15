@@ -101,7 +101,7 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260915-lot2"></script>
+<script src="/admin/painel/app.nav.js?v=20260915-cost1"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
@@ -134,6 +134,7 @@
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.compras.lotes.js?v=20260915-lot1"></script>
+<script src="/admin/painel/app.estoque.custos.js?v=20260915-cost1"></script>
 <script src="/admin/painel/app.estoque.lotes.js?v=20260915-lot2"></script>
 <script src="/admin/painel/app.compras.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1"></script>
@@ -234,8 +235,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260915-lot2"></script>
-<script src="/admin/painel/app.js?v=20260915-lot2"></script>
+<script src="/admin/painel/app.montagem.js?v=20260915-cost1"></script>
+<script src="/admin/painel/app.js?v=20260915-cost1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
@@ -255,6 +256,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/admin/painel/compras-lotes.css?v=20260915-lot1">
+<link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
 </head>
 
@@ -3870,7 +3872,93 @@
         </section></div></template>
       </section>
     </template>
-    <div x-show="currentPage === 'estoque' && isMatrixPanel() && !['lotes','lotes-movimentos'].includes(stockTab)" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+    <template x-if="currentPage === 'estoque' && isMatrixPanel() && stockTab === 'custos'">
+      <section class="stock-costs" x-effect="stockCosts.mode; stockCosts.condition; stockCosts.search; $nextTick(() => window.lucide?.createIcons())" aria-labelledby="sc-heading" :aria-busy="stockCosts.loading" x-init="$nextTick(() => window.lucide?.createIcons())">
+        <div :inert="stockCosts.dialog ? true : null">
+        <div class="sc-breadcrumb">Matriz &nbsp; / &nbsp; Estoque</div>
+        <header class="sc-heading">
+          <div><h1 id="sc-heading">Custos do estoque</h1><p>Entenda onde está o dinheiro investido no estoque.</p></div>
+          <div class="sc-actions"><button class="sc-icon-button" @click="loadStockCostsPage()" :disabled="stockCosts.loading" aria-label="Atualizar custos"><i data-lucide="refresh-cw"></i></button><button class="sc-btn" @click="scExport()" :disabled="!stockCosts.data || stockCosts.loading"><i data-lucide="download"></i>Exportar CSV</button></div>
+        </header>
+        <nav class="sc-tabs" aria-label="Seções dos custos do estoque">
+          <button @click="stockTab='visao';loadAtacado();tireLotIcons()">Visão geral</button>
+          <button @click="stockTab='movimentacoes';loadGalpaoFilme(null,null);tireLotIcons()">Movimentações</button>
+          <button @click="stockTab='reposicao';loadGalpaoFilme(null,null);tireLotIcons()">Reposição</button>
+          <button @click="scLot()">Lotes</button>
+          <button class="active" aria-current="page" @click="stockCostsOpen()">Custos</button>
+          <button @click="stockTab='conciliacao';loadStockReconciliation();tireLotIcons()">Conciliação</button>
+        </nav>
+        <div x-show="stockCosts.loading" class="sc-loading" role="status">Consultando saldos e custos do estoque…</div>
+        <div x-show="stockCosts.error" class="sc-alert sc-error" role="alert"><i data-lucide="circle-alert"></i><span x-text="stockCosts.error"></span><button class="sc-btn" @click="loadStockCostsPage()">Tentar novamente</button></div>
+        <template x-if="stockCosts.data && !stockCosts.loading">
+          <div>
+            <section class="sc-kpis" aria-label="Capital em estoque">
+              <div class="sc-kpi sc-total"><span class="sc-round"><i data-lucide="wallet"></i></span><div><span x-text="scSummary.zero_cost_quantity ? 'Capital total registrado' : 'Capital total em estoque'"></span><strong x-text="formatCurrency(scSummary.capital)"></strong><p><span x-text="scQuantity(scSummary.quantity)"></span> pneus no estoque físico</p></div></div>
+              <div class="sc-kpi"><span class="sc-round"><i data-lucide="box"></i></span><div><span>Pneus cadastrados</span><strong x-text="formatCurrency(scSummary.catalog_capital)"></strong><p><span x-text="scQuantity(scSummary.catalog_quantity)"></span> pneus <span x-show="scSummary.capital>0">· <span x-text="scPercent(scSummary.catalog_capital,scSummary.capital)"></span> do capital</span></p></div></div>
+              <div class="sc-kpi sc-lot-kpi"><span class="sc-round"><i data-lucide="boxes"></i></span><div><span>Lotes</span><strong x-text="formatCurrency(scSummary.lot_capital)"></strong><p><span x-text="scQuantity(scSummary.lot_quantity)"></span> pneus · <span x-text="scQuantity(scSummary.open_lots)"></span> lotes abertos</p></div></div>
+            </section>
+            <div class="sc-alert" x-show="scSummary.zero_cost_quantity>0"><i data-lucide="triangle-alert"></i><span><b x-text="scQuantity(scSummary.zero_cost_quantity)+' pneus com custo zerado.'"></b> Confira o cadastro antes de usar o total como avaliação completa do estoque.</span></div>
+            <div class="sc-grid">
+              <section class="sc-card" aria-labelledby="sc-capital-heading">
+                <header class="sc-card-head"><div><h2 id="sc-capital-heading">Onde está o capital</h2><p>Pneus cadastrados · agrupados por medida e condição</p></div></header>
+                <div class="sc-bars" x-show="scTop.length" aria-label="Maiores valores em estoque">
+                  <template x-for="(row,index) in scTop" :key="row.key"><button class="sc-bar" @click="scDialog('detail',row)" :aria-label="row.measure+' '+scCondition(row.tire_condition)+': '+formatCurrency(row.capital)+'. Ver marcas.'"><span class="sc-bar-label"><span x-text="row.measure"></span><span class="sc-chip" x-text="scCondition(row.tire_condition)"></span></span><span class="sc-track" :style="{backgroundSize:(100/(scTicks.length-1))+'% 100%'}" aria-hidden="true"><span :style="{width:(row.capital/scScale*100)+'%',opacity:1-index*.13}"></span></span><span class="sc-bar-value" x-text="formatCurrency(row.capital)"></span></button></template>
+                </div>
+                <div class="sc-axis" x-show="scTop.length" aria-hidden="true"><template x-for="tick in scTicks" :key="tick"><span x-text="scQuantity(tick)"></span></template></div>
+                <div x-show="!scTop.length" class="sc-empty"><i data-lucide="chart-no-axes-column"></i><strong>Nenhum capital cadastrado para comparar</strong><span>Os valores aparecem quando há pneus com saldo e custo.</span></div>
+                <div class="sc-insight" x-show="scTop.length"><i data-lucide="chart-no-axes-column-increasing"></i><span><b x-text="scTop[0]?.measure"></b> <span x-text="scCondition(scTop[0]?.tire_condition)"></span> concentra <b x-text="scPercent(scTop[0]?.capital,scSummary.catalog_capital)"></b> do capital cadastrado.</span></div>
+                <small x-show="stockCosts.data.catalog.length>5">Exibindo as 5 maiores posições. Consulte todas na tabela.</small>
+              </section>
+              <aside class="sc-card sc-lots-panel" aria-labelledby="sc-lots-heading">
+                <header class="sc-card-head"><div class="sc-lots-heading"><i data-lucide="boxes"></i><div><h2 id="sc-lots-heading">Lotes em estoque</h2><p>Custo apenas do saldo restante.</p></div></div><strong class="sc-lots-total" x-text="formatCurrency(scSummary.lot_capital)"></strong></header>
+                <div class="sc-lot-list"><template x-for="row in stockCosts.data.lots" :key="row.id"><button class="sc-lot-card" @click="scLot(row)" :aria-label="'Ver lote '+row.lot_code"><span><strong x-text="row.lot_code"></strong><span class="sc-open">● Aberto</span><small x-text="scQuantity(row.quantity_on_hand)+' pneus'"></small></span><span class="sc-money"><strong x-text="formatCurrency(row.capital)"></strong><small x-text="formatCurrency(row.unit_cost)+' por pneu'"></small></span><i data-lucide="chevron-right"></i></button></template></div>
+                <div class="sc-empty" x-show="!stockCosts.data.lots.length"><i data-lucide="boxes"></i><strong>Nenhum lote com saldo físico</strong><span>Os lotes recebidos com saldo aparecerão aqui.</span></div>
+                <button class="sc-btn sc-lots-link" @click="scLot()">Ver lotes <i data-lucide="arrow-right"></i></button>
+              </aside>
+            </div>
+            <section class="sc-card" aria-labelledby="sc-table-heading">
+              <header class="sc-detail-head"><h2 id="sc-table-heading">Detalhamento dos custos</h2><div class="sc-tools">
+                <div class="sc-toggle" role="group" aria-label="Tipo de estoque"><button :aria-pressed="stockCosts.mode==='catalog'" @click="scMode('catalog')">Pneus cadastrados</button><button :aria-pressed="stockCosts.mode==='lots'" @click="scMode('lots')">Lotes</button></div>
+                <select x-show="stockCosts.mode==='catalog'" aria-label="Condição dos pneus nos custos" x-model="stockCosts.condition"><option value="">Todas as condições</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select>
+                <label class="sc-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar medida ou lote nos custos" placeholder="Buscar medida ou lote…" x-model="stockCosts.search" maxlength="100"></label>
+              </div></header>
+              <div class="sc-scroll"><table class="sc-table"><thead><tr><th x-text="stockCosts.mode==='catalog'?'Medida':'Lote'"></th><th x-text="stockCosts.mode==='catalog'?'Condição':'Descrição'"></th><th>Em estoque</th><th>Reservados</th><th>Disponíveis</th><th>Custo médio</th><th>Capital</th><th><span class="sr-only">Detalhes</span></th></tr></thead>
+                <tbody><template x-for="row in scRows" :key="row.key||row.id"><tr :class="{selected:stockCosts.detail?.key===row.key && !!row.key}">
+                  <td><button @click="stockCosts.mode==='catalog'?scDialog('detail',row):scLot(row)" x-text="row.measure||row.lot_code"></button></td>
+                  <td class="sc-description"><span :class="stockCosts.mode==='catalog'?'sc-chip':''" :title="row.description||''" x-text="stockCosts.mode==='catalog'?scCondition(row.tire_condition):row.description"></span></td>
+                  <td x-text="scQuantity(row.quantity_on_hand)"></td><td x-text="scQuantity(row.quantity_reserved)"></td><td x-text="scQuantity(row.quantity_available)"></td><td><span x-text="formatCurrency(row.unit_cost)"></span><small x-show="row.zero_cost_quantity>0" x-text="scQuantity(row.zero_cost_quantity)+' com custo zero'"></small></td><td><b x-text="formatCurrency(row.capital)"></b></td><td><button @click="stockCosts.mode==='catalog'?scDialog('detail',row):scLot(row)" :aria-label="'Detalhes de '+(row.measure||row.lot_code)"><i data-lucide="chevron-right"></i></button></td>
+                </tr></template><tr x-show="!scRows.length"><td colspan="8"><div class="sc-empty"><strong>Nenhum item neste filtro</strong><span>Revise a busca e o tipo de estoque selecionado.</span></div></td></tr></tbody>
+                <tfoot><tr><td colspan="2" x-text="stockCosts.search || (stockCosts.mode==='catalog' && stockCosts.condition) ? 'Total do filtro' : stockCosts.mode==='catalog'?'Total cadastrado':'Total dos lotes'"></td><td x-text="scQuantity(scTotals.quantity_on_hand)"></td><td x-text="scQuantity(scTotals.quantity_reserved)"></td><td x-text="scQuantity(scTotals.quantity_available)"></td><td>—</td><td x-text="formatCurrency(scTotals.cents/100)"></td><td></td></tr></tfoot>
+              </table></div>
+              <footer class="sc-footer"><p><i data-lucide="info"></i>Reservados continuam no capital até a saída. Compras a caminho ficam fora deste total.</p><button class="sc-link" @click="scDialog('help')">Como os custos são calculados <i data-lucide="arrow-up-right"></i></button></footer>
+            </section>
+            <p class="sc-asof" x-text="'Posição consultada em '+new Date(stockCosts.data.as_of).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})"></p>
+          </div>
+        </template>
+        </div>
+        <template x-if="stockCosts.dialog">
+          <div class="sc-backdrop" @click.self="scClose()"><section class="sc-dialog sc-card" role="dialog" aria-modal="true" aria-labelledby="sc-dialog-heading" @keydown="scDialogKeys($event)">
+            <header><h2 id="sc-dialog-heading" x-text="stockCosts.dialog==='help'?'Como os custos são calculados':stockCosts.detail?.measure+' · '+scCondition(stockCosts.detail?.tire_condition)"></h2><button id="sc-dialog-close" aria-label="Fechar detalhes dos custos" @click="scClose()"><i data-lucide="x"></i></button></header>
+            <template x-if="stockCosts.dialog==='help'"><div>
+              <p><b>Pneus cadastrados:</b> saldo físico × custo médio de cada marca e condição. Somamos as marcas de uma mesma medida e condição. A média do grupo é ponderada pela quantidade.</p>
+              <p><b>Lotes:</b> custo registrado do saldo restante. O custo por pneu vem da entrada; o capital restante preserva os centavos das saídas.</p>
+              <div class="sc-insight"><i data-lucide="calculator"></i><b>Capital total = capital dos pneus cadastrados + custo restante dos lotes.</b></div>
+              <p><b>Reservas:</b> os pneus reservados continuam fisicamente em estoque. Disponíveis = em estoque − reservados. Compras ainda a caminho e lotes cancelados ficam fora.</p>
+              <p><b>Separação para lote:</b> o saldo e seu custo saem dos pneus cadastrados e passam para o lote. A transferência não cria outro custo nem outro pagamento.</p>
+              <p><b>Custo zerado:</b> o sistema mostra o valor registrado e avisa para conferência. Não estima um custo que não foi informado.</p>
+              <p>O gráfico mostra até cinco posições. Os filtros alteram a tabela e o CSV; os cartões acima mantêm a visão de todo o estoque. Valores de capital são arredondados por variante, em centavos.</p>
+            </div></template>
+            <template x-if="stockCosts.dialog==='detail' && stockCosts.detail"><div>
+              <p>Composição por marca · estoque físico atual</p><div class="sc-insight"><i data-lucide="box"></i><b x-text="scQuantity(stockCosts.detail.quantity_on_hand)+' pneus · '+formatCurrency(stockCosts.detail.capital)+' em capital'"></b></div>
+              <div class="sc-scroll"><table class="sc-table"><thead><tr><th>Marca</th><th>Em estoque</th><th>Reservados</th><th>Disponíveis</th><th>Custo médio</th><th>Capital</th></tr></thead><tbody><template x-for="variant in stockCosts.detail.variants" :key="variant.id"><tr><td x-text="variant.brand||'Sem marca'"></td><td x-text="scQuantity(variant.quantity_on_hand)"></td><td x-text="scQuantity(variant.quantity_reserved)"></td><td x-text="scQuantity(variant.quantity_available)"></td><td x-text="formatCurrency(variant.unit_cost)"></td><td x-text="formatCurrency(variant.capital)"></td></tr></template></tbody></table></div>
+              <p>As reservas já estão incluídas no capital. O custo médio exibido é arredondado; o cálculo usa a precisão registrada.</p>
+            </div></template>
+          </section></div>
+        </template>
+      </section>
+    </template>
+
+    <div x-show="currentPage === 'estoque' && isMatrixPanel() && !['lotes','lotes-movimentos','custos'].includes(stockTab)" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
       <section aria-labelledby="estoque-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10">
@@ -3900,14 +3988,14 @@
       <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
           <nav aria-label="Seções de Estoque" class="flex items-center gap-1 overflow-x-auto">
-            <button @click="tireLotsOpen()" class="px-4 py-3.5 text-sm font-medium border-b-2 border-transparent whitespace-nowrap text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-300">Lotes</button>
             <button @click="stockTab = 'visao'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
             <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme(null, null)" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'movimentacoes' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Movimentações</button>
             <button @click="stockTab = 'reposicao'; loadGalpaoFilme(null, null)" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'reposicao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
-            <button @click="stockTab = 'custos'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            <button @click="tireLotsOpen()" class="px-4 py-3.5 text-sm font-medium border-b-2 border-transparent whitespace-nowrap text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-300">Lotes</button>
+            <button @click="stockCostsOpen()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'custos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
             <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
@@ -4828,179 +4916,6 @@
         </aside>
       </div>
 
-      <!-- CUSTOS: derivado localmente de quantidade × custo médio, igual ao Financeiro. -->
-      <div x-show="stockTab === 'custos'" x-cloak
-           x-data="{
-             custoBusca: '',
-             custoOrdem: 'capital'
-           }"
-           class="space-y-5">
-        <div class="grid grid-cols-1 items-stretch gap-5 2xl:grid-cols-12">
-          <section aria-labelledby="capital-medida-heading" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm 2xl:col-span-7">
-            <div class="flex items-start gap-3">
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
-                <i data-lucide="chart-no-axes-combined" class="h-5 w-5"></i>
-              </span>
-              <div>
-                <h3 id="capital-medida-heading" class="text-lg font-semibold text-slate-950">Capital por medida</h3>
-                <p class="mt-1 text-xs text-slate-500">Onde o dinheiro do galpão está concentrado</p>
-              </div>
-            </div>
-
-            <div class="mt-6 space-y-4">
-              <template x-for="(row, index) in custoTopRows()" :key="'capital-rank-' + row.measure + row.tire_condition">
-                <article class="grid grid-cols-[28px_minmax(115px,170px)_minmax(120px,1fr)_112px_58px] items-center gap-3">
-                  <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-900 text-[11px] font-semibold text-white" x-text="index + 1"></span>
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-slate-900" x-text="row.measure"></p>
-                    <p class="mt-0.5 truncate text-[10px] text-slate-400"><span x-text="row.quantity_on_hand"></span> pneus · <span x-text="catalogoConditionLabel(row.tire_condition)"></span> · <span x-text="row.brands.join(', ')"></span></p>
-                  </div>
-                  <div class="h-3 overflow-hidden rounded-full bg-emerald-50">
-                    <div class="h-full rounded-full bg-emerald-800" :style="{ width: Math.max(3, custoCapital(row) / custoMaxCapital() * 100) + '%', opacity: Math.max(.28, 1 - index * .15) }"></div>
-                  </div>
-                  <p class="text-right text-sm font-semibold tabular-nums text-slate-800" x-text="formatCurrency(custoCapital(row))"></p>
-                  <p class="text-right text-xs font-semibold tabular-nums text-emerald-800" x-text="custoPercentual(row).toFixed(1).replace('.', ',') + '%'"></p>
-                </article>
-              </template>
-              <div x-show="custoTopRows().length === 0" class="py-12 text-center">
-                <i data-lucide="chart-bar-decreasing" class="mx-auto h-9 w-9 text-emerald-300"></i>
-                <p class="mt-3 text-sm font-semibold text-slate-700">Ainda não há capital calculado</p>
-                <p class="mt-1 text-xs text-slate-500">Informe saldo e custo médio nas medidas do galpão.</p>
-              </div>
-            </div>
-          </section>
-
-          <section aria-labelledby="leitura-custos-heading" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm 2xl:col-span-5">
-            <div class="flex items-center gap-3">
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
-                <i data-lucide="calculator" class="h-5 w-5"></i>
-              </span>
-              <div>
-                <h3 id="leitura-custos-heading" class="text-lg font-semibold text-slate-950">Leitura dos custos</h3>
-                <p class="mt-1 text-xs text-slate-500">Indicadores calculados sobre o estoque oficial</p>
-              </div>
-            </div>
-
-            <div class="mt-5 grid grid-cols-1 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-slate-50/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Pneus com custo conhecido</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-emerald-800"><span x-text="custoPneusComCusto()"></span> <span class="text-sm font-medium">pneus</span></p>
-              </div>
-              <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Medida + condição com custo</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900"><span x-text="custoComCusto()"></span> <span class="text-sm font-medium text-slate-500">de <span x-text="custoRowsBase().length"></span></span></p>
-              </div>
-              <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Concentração no Top 3</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-emerald-800" x-text="custoTop3Percentual().toFixed(1).replace('.', ',') + '%'"></p>
-              </div>
-            </div>
-
-            <div class="mt-5 grid grid-cols-1 items-center gap-5 sm:grid-cols-[176px_minmax(0,1fr)]">
-              <div class="relative mx-auto flex h-40 w-40 items-center justify-center rounded-full p-4"
-                   :style="'background: conic-gradient(#047857 0 ' + custoPercentual(custoLider() || {}) + '%, #6ee7b7 ' + custoPercentual(custoLider() || {}) + '% ' + Math.min(100, custoTop3Percentual()) + '%, #d1fae5 ' + Math.min(100, custoTop3Percentual()) + '% 100%)'">
-                <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
-                  <strong class="text-2xl font-bold tracking-tight text-emerald-900" x-text="custoPercentual(custoLider() || {}).toFixed(1).replace('.', ',') + '%'"></strong>
-                  <span class="mt-1 max-w-20 text-[10px] leading-tight text-slate-500">maior concentração</span>
-                </div>
-              </div>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-700">Maior posição</p>
-                <p class="mt-2 text-xl font-semibold text-slate-950" x-text="custoLider()?.measure || '—'"></p>
-                <p class="mt-1 text-xs text-emerald-700" x-text="custoLider() ? `${catalogoConditionLabel(custoLider().tire_condition)} · ${custoLider().brands.join(' · ')}` : '—'"></p>
-                <p class="mt-1 text-sm tabular-nums text-slate-600" x-text="custoLider() ? formatCurrency(custoCapital(custoLider())) : formatCurrency(0)"></p>
-                <p class="mt-3 text-xs leading-relaxed text-slate-500">A concentração mostra quanto do capital total depende de poucas medidas.</p>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
-          <section aria-labelledby="custos-medida-heading" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm 2xl:col-span-9">
-            <div class="border-b border-gray-100 p-5">
-              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div class="flex items-start gap-3">
-                  <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="table-properties" class="h-5 w-5"></i></span>
-                  <div><h3 id="custos-medida-heading" class="text-lg font-semibold text-slate-950">Custos por medida e condição</h3><p class="mt-1 text-xs text-slate-500">Novo, meia-vida e remold nunca entram na mesma média</p></div>
-                </div>
-                <label class="relative block">
-                  <span class="sr-only">Buscar medida nos custos</span>
-                  <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-                  <input x-model="custoBusca" type="search" placeholder="Buscar medida ou marca" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
-                </label>
-              </div>
-              <div class="mt-4 flex flex-wrap gap-2" aria-label="Ordenar custos">
-                <button @click="custoOrdem = 'capital'" :class="custoOrdem === 'capital' ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-gray-200 bg-white text-slate-600 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-medium">Maior capital</button>
-                <button @click="custoOrdem = 'maior_custo'" :class="custoOrdem === 'maior_custo' ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-gray-200 bg-white text-slate-600 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-medium">Maior custo</button>
-                <button @click="custoOrdem = 'menor_custo'" :class="custoOrdem === 'menor_custo' ? 'border-emerald-800 bg-emerald-800 text-white' : 'border-gray-200 bg-white text-slate-600 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-medium">Menor custo</button>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-[900px] text-sm">
-                <thead class="border-b border-gray-200 bg-slate-50/80">
-                  <tr class="text-left text-[11px] text-slate-500">
-                    <th class="px-5 py-3 font-medium">Medida e condição</th>
-                    <th class="px-4 py-3 text-center font-medium">Saldo</th>
-                    <th class="px-4 py-3 text-right font-medium">Custo médio</th>
-                    <th class="px-4 py-3 text-right font-medium">Capital</th>
-                    <th class="px-4 py-3 text-right font-medium">Participação</th>
-                    <th class="px-4 py-3 font-medium">Situação</th>
-                    <th class="px-5 py-3 text-right font-medium">Ação</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <template x-for="row in custoRows()" :key="'custo-analitico-' + row.measure + row.tire_condition">
-                    <tr class="hover:bg-emerald-50/30">
-                      <td class="px-5 py-3"><p class="font-semibold text-slate-900" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-emerald-700" x-text="`${catalogoConditionLabel(row.tire_condition)} · ${row.brands.join(' · ')}`"></p></td>
-                      <td class="px-4 py-3 text-center tabular-nums text-slate-700" x-text="row.quantity_on_hand + ' pneus'"></td>
-                      <td class="px-4 py-3 text-right tabular-nums text-slate-700" x-text="custoValido(row) ? formatCurrency(Number(row.unit_cost)) : '—'"></td>
-                      <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900" x-text="formatCurrency(custoCapital(row))"></td>
-                      <td class="px-4 py-3 text-right font-semibold tabular-nums text-emerald-800" x-text="custoPercentual(row).toFixed(1).replace('.', ',') + '%'"></td>
-                      <td class="px-4 py-3">
-                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
-                              :class="custoValido(row) && row.cost_complete ? 'bg-emerald-50 text-emerald-800' : 'border border-dashed border-emerald-800/50 bg-white text-emerald-950'">
-                          <span class="h-1.5 w-1.5 rounded-full" :class="custoValido(row) && row.cost_complete ? 'bg-emerald-600' : 'bg-emerald-950'"></span>
-                          <span x-text="!custoValido(row) ? 'Sem custo' : (row.cost_complete ? 'Todas as marcas' : 'Custo parcial')"></span>
-                        </span>
-                      </td>
-                      <td class="px-5 py-3 text-right">
-                        <button @click="stockTab = 'visao'; stockBusca = row.measure; stockOperacao = null"
-                                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
-                          <i data-lucide="list" class="h-3.5 w-3.5"></i> Ver marcas
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                  <tr x-show="atacadoStock.length === 0"><td colspan="7" class="px-5 py-14 text-center text-sm text-slate-500">Cadastre o estoque para acompanhar o capital por medida.</td></tr>
-                  <tr x-show="atacadoStock.length > 0 && custoRows().length === 0"><td colspan="7" class="px-5 py-14 text-center text-sm text-slate-500">Nenhuma medida corresponde à busca.</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <aside aria-label="Metodologia dos custos" class="space-y-5 2xl:col-span-3">
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="shield-check" class="h-6 w-6"></i></span>
-              <h3 class="mt-4 text-lg font-semibold text-slate-950">Como este valor é calculado</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-600">Quantidade atual × custo médio oficial de cada medida.</p>
-              <div class="mt-5 border-t border-gray-100 pt-4">
-                <p class="flex items-start gap-2 text-xs leading-relaxed text-emerald-900"><i data-lucide="badge-check" class="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-700"></i>Mesma conta usada no Financeiro para o capital parado.</p>
-              </div>
-            </section>
-
-            <section class="rounded-xl border border-emerald-100 bg-emerald-50/70 p-5">
-              <div class="flex items-start gap-3">
-                <i data-lucide="database" class="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-800"></i>
-                <div>
-                  <h3 class="text-sm font-semibold text-emerald-950">Fonte única preservada</h3>
-                  <p class="mt-2 text-xs leading-relaxed text-emerald-800">Saldo e custo vêm de <span class="font-mono font-semibold">commerce.wholesale_stock</span>. A tela não cria outro livro de custos.</p>
-                </div>
-              </div>
-            </section>
-          </aside>
-        </div>
-      </div>
     </div>
 
     <!-- ═══ TELA: LOGÍSTICA da matriz — cockpit operacional ═══ -->
