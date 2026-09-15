@@ -4,6 +4,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
 import { MATRIZ_COORD, MATRIZ_MAX_DELIVERY_KM, DEFAULT_MATRIZ_FREIGHT } from './matriz-freight.js';
 import type { PoliticaComercial } from '../atendente/tools/commerce-tools.js';
+import { storeHoursSchema,matrizStoreHoursText } from './matriz-store-hours.js';
 
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const freightPrice = z.number().min(0).max(10000).multipleOf(0.01);
@@ -24,6 +25,7 @@ export const deliverySettingsSchema = z.object({
   days: z.array(z.number().int().min(0).max(6)).max(7),
   opens_at: clock.nullable(), closes_at: clock.nullable(),
   delivery_days: z.number().int().min(0).max(30).nullable(),
+  store_hours: storeHoursSchema.nullable().optional(),
 }).strict().superRefine((v, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code:'custom', path:[path], message });
   if (v.delivery_enabled && v.radius_km == null) issue('radius_km','Informe o limite de entrega.');
@@ -85,6 +87,10 @@ export function applyMatrizDeliveryPolicies(policies:PoliticaComercial[],saved:S
     prazo_entrega_descricao:matrizScheduleText(s),
     area_entrega:`Matriz: ${s.delivery_enabled?`até ${s.radius_km} km da loja, após calcular_frete confirmar localização e estoque`:'entregas pausadas'}. Retirada na Matriz: ${s.pickup_enabled?'habilitada':'desabilitada'}. Parceiros seguem sua própria cobertura.`,
   };
+  if (s.store_hours !== undefined) {
+    managed.horario_funcionamento = matrizStoreHoursText(s.store_hours)
+      ?? 'Horário de funcionamento da loja Matriz não cadastrado. Confirme com o atendimento; não use os horários de entrega como horário da loja.';
+  }
   return [...policies.filter(p=>!(p.policy_key in managed)&&p.policy_key!=='rotas_hoje'),
     ...Object.entries(managed).map(([policy_key,policy_value])=>({policy_key,policy_value,
       description:'Configuração vigente da Matriz; não aplicar aos parceiros.',policy_version:`matriz-delivery-${saved.version}`}))];

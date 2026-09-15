@@ -444,7 +444,7 @@ export async function buscarPoliticaComercial(
   const values: unknown[] = [parsed.environment];
   let keyFilter = '';
   if (parsed.policy_keys && parsed.policy_keys.length > 0) {
-    values.push(parsed.policy_keys);
+    values.push([...new Set(parsed.policy_keys.map(key => key === 'horario' ? 'horario_funcionamento' : key))]);
     keyFilter = `AND policy_key = ANY($${values.length})`;
   }
 

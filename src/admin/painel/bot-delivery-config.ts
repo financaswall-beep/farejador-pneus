@@ -12,7 +12,7 @@ export async function getBotDeliveryConfig(db:Pool=pool) {
   return { version:saved?.version??0,updated_at:saved?.updated_at??null,configured:!!saved,
     settings:saved?.settings??{delivery_enabled:true,pickup_enabled:true,radius_km:null,freight:{...DEFAULT_MATRIZ_FREIGHT},
       address:typeof value==='string'?value:'Matriz · São Gonçalo',latitude:MATRIZ_COORD.lat,longitude:MATRIZ_COORD.lng,
-      days:[],opens_at:null,closes_at:null,delivery_days:null},
+      days:[],opens_at:null,closes_at:null,delivery_days:null,store_hours:null},
     maps_browser_key:env.GOOGLE_MAPS_BROWSER_API_KEY??null,
     routing:{geo:env.ROUTING_GEO,proximity:env.ROUTING_PROXIMITY_FIRST,matriz_competes:env.ROUTING_MATRIZ_COMPETES&&env.WHOLESALE_UNIFIED_STOCK,
       road_distance:env.ROUTING_GEO_ROAD_DISTANCE},
@@ -27,6 +27,10 @@ export async function saveBotDeliveryConfig(settings:DeliverySettings,expectedVe
     await client.query("SELECT pg_advisory_xact_lock(hashtext('matriz_delivery'),hashtext($1))",[env.FAREJADOR_ENV]);
     const previous=await readDeliverySettings(client,env.FAREJADOR_ENV);
     if ((previous?.version??0)!==expectedVersion) throw new Error('delivery_settings_conflict');
+    // Uma aba antiga do painel pode enviar só a configuração de entrega.
+    if (value.store_hours === undefined && previous?.settings.store_hours !== undefined) {
+      value.store_hours = previous.settings.store_hours;
+    }
     const result=await client.query<{version:number;updated_at:Date}>(`INSERT INTO commerce.matriz_delivery_settings
       (environment,settings,version,updated_by) VALUES ($1,$2::jsonb,$3,$4)
       ON CONFLICT (environment) DO UPDATE SET settings=EXCLUDED.settings,version=EXCLUDED.version,

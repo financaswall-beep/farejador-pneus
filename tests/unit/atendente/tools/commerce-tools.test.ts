@@ -287,6 +287,13 @@ describe('commerce tools deterministicas da Atendente', () => {
     expect(client.calls[0]!.values).toEqual(['test', ['desconto_maximo']]);
   });
 
+  it('aceita horario como sinônimo da chave cadastrada, sem consultar outro ambiente', async () => {
+    const client=clientWithRows([[{policy_key:'horario_funcionamento',policy_value:'Segunda: 08:00 às 18:00',policy_version:'v1',description:null}]]);
+    const result=await buscarPoliticaComercial(client,{environment:'test',policy_keys:['horario','horario_funcionamento']});
+    expect(client.calls[0]?.values).toEqual(['test',['horario_funcionamento']]);
+    expect(result[0]?.policy_value).toBe('Segunda: 08:00 às 18:00');
+  });
+
   it('buscarPoliticaComercial ignora policy_key desconhecida sem abortar conhecidas', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const client = clientWithRows([

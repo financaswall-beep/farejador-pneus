@@ -50,6 +50,7 @@ import { recordGeoRoutingDecision, recordPartnerRoutingDecision } from './routin
 import { resolveDeliveryAddress } from './previous-delivery-address.js';
 import { decideConfiguredStore as decideStoreForItemsGeo } from './configured-routing.js';
 import { readDeliverySettings,deliveryBlockResponse,applyMatrizDeliveryPolicies } from './matriz-delivery-settings.js';
+import { matrizStoreHoursText } from './matriz-store-hours.js';
 import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
 import { observeSearchProducts, observeSearchMunicipality } from './stock-search-trace.js';
 
@@ -835,7 +836,7 @@ export async function executeTool(
               if(matrix.block)return JSON.stringify(deliveryBlockResponse(matrix.block));
               return JSON.stringify({encontrado:(matrix.distanceKm??Infinity)<=15,nome_loja:'Matriz',
                 ...((matrix.distanceKm??Infinity)>15?{motivo:'retirada_so_longe',nome_loja_distante:'Matriz'}:{}),
-                distancia_km:matrix.distanceKm==null?null:Math.round(matrix.distanceKm),horario:null,taxa_instalacao:null});
+                distancia_km:matrix.distanceKm==null?null:Math.round(matrix.distanceKm),horario:matrizStoreHoursText(pickupSettings.store_hours),taxa_instalacao:null});
             }
             // geo.kind === 'matriz': com ROUTING_MATRIZ_AS_STORE verifica se a matriz
             // tem o pneu e a que distância fica. Três casos:
@@ -1526,7 +1527,7 @@ async function criarPedido(
         nome_loja: nameRow.rows[0]?.name ?? 'Farejador',
         endereco: matrixSettings?.address??null,
         maps_url: matrixSettings?`https://www.google.com/maps/search/?api=1&query=${matrixSettings.latitude},${matrixSettings.longitude}`:MATRIZ_MAPS_URL,
-        horario: null,
+        horario: matrizStoreHoursText(matrixSettings?.store_hours),
       };
     }
 

@@ -10,6 +10,17 @@ import { DEFAULT_MATRIZ_FREIGHT } from '../../../src/atendente-v2/matriz-freight
 const settings={delivery_enabled:true,pickup_enabled:true,radius_km:12,address:'Matriz teste',latitude:0,longitude:0,days:[],opens_at:null,closes_at:null,delivery_days:null,freight:{...DEFAULT_MATRIZ_FREIGHT}};
 beforeEach(()=>{vi.clearAllMocks();m.owner=true;});
 describe('rotas de entrega',()=>{
+  it('salva horário da loja separado da entrega e rejeita dia incompleto antes de gravar',async()=>{
+    const app=Fastify();await registerBotDeliveryRoutes(app);
+    const value={...settings,store_hours:[{day:6,opens_at:'08:00',closes_at:'13:00'}]};
+    m.save.mockResolvedValue({configured:true,version:2,settings:value});
+    const response=await app.inject({method:'PUT',url:'/admin/api/bot/entrega',payload:{expected_version:1,settings:value}});
+    expect(response.statusCode).toBe(200);
+    expect(response.json().settings.store_hours).toEqual(value.store_hours);
+    expect(m.save).toHaveBeenCalledWith(value,1,'owner:test');m.save.mockClear();
+    expect((await app.inject({method:'PUT',url:'/admin/api/bot/entrega',payload:{expected_version:2,settings:{...value,store_hours:[{day:6,opens_at:'08:00',closes_at:''}]}}})).statusCode).toBe(400);
+    expect(m.save).not.toHaveBeenCalled();await app.close();
+  });
   it('valida os 55 km e o frete antes de salvar, inclusive com a entrega pausada',async()=>{
     const app=Fastify();await registerBotDeliveryRoutes(app);
     m.save.mockResolvedValue({configured:true,version:1});

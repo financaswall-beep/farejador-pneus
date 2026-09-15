@@ -12,6 +12,7 @@ import { deliveryProducts,simulateBotDelivery } from '../../src/admin/painel/bot
 import { assertRequiredSchema } from '../../src/persistence/required-schema.js';
 import type { DeliverySettings } from '../../src/atendente-v2/matriz-delivery-settings.js';
 import { DEFAULT_MATRIZ_FREIGHT } from '../../src/atendente-v2/matriz-freight.js';
+import { readDeliverySettings,applyMatrizDeliveryPolicies } from '../../src/atendente-v2/matriz-delivery-settings.js';
 let db:IntegrationDb;
 const settings:DeliverySettings={delivery_enabled:true,pickup_enabled:true,radius_km:12,address:'Matriz de teste',latitude:-22.87,longitude:-42.99,
   days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT}};
@@ -55,5 +56,20 @@ describe('cadastro de entrega em Postgres isolado',()=>{
     expect(await getBotDeliveryConfig(db.pool)).toMatchObject({version:2,settings:updated});
     const audit=await db.pool.query('SELECT version,settings FROM commerce.matriz_delivery_settings_events ORDER BY version');
     expect(audit.rows).toEqual([{version:1,settings},{version:2,settings:updated}]);
+  });
+  it('salva horário por dia, disponibiliza ao bot e preserva ao editar por um cliente antigo',async()=>{
+    const current=(await getBotDeliveryConfig(db.pool)).settings;
+    const store_hours=[{day:1,opens_at:'07:30',closes_at:'17:00'},{day:6,opens_at:'08:00',closes_at:'12:00'}];
+    await saveBotDeliveryConfig({...current,store_hours},2,'owner:a',db.pool);
+    const saved=(await readDeliverySettings(db.pool,'test'))!;
+    expect(saved.settings.store_hours).toEqual(store_hours);
+    expect(applyMatrizDeliveryPolicies([],saved).find(p=>p.policy_key==='horario_funcionamento')?.policy_value).toContain('sábado: 08:00 às 12:00');
+    await saveBotDeliveryConfig(current,3,'owner:old-client',db.pool);
+    expect((await getBotDeliveryConfig(db.pool)).settings.store_hours).toEqual(store_hours);
+    await saveBotDeliveryConfig({...current,store_hours:null},4,'owner:a',db.pool);
+    expect((await getBotDeliveryConfig(db.pool)).settings.store_hours).toBeNull();
+    const audit=await db.pool.query('SELECT version,settings FROM commerce.matriz_delivery_settings_events WHERE version>=3 ORDER BY version');
+    expect(audit.rows.map(row=>[row.version,row.settings.store_hours])).toEqual([[3,store_hours],[4,store_hours],[5,null]]);
+    expect(await readDeliverySettings(db.pool,'prod')).toBeNull();
   });
 });

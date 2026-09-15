@@ -1,10 +1,39 @@
 import { describe,it,expect } from 'vitest';
 import { deliverySettingsSchema,matrizCoverageBlock,matrizScheduleText,applyMatrizDeliveryPolicies,type DeliverySettings } from '../../../src/atendente-v2/matriz-delivery-settings.js';
 import { DEFAULT_MATRIZ_FREIGHT } from '../../../src/atendente-v2/matriz-freight.js';
+import { matrizStoreHoursText } from '../../../src/atendente-v2/matriz-store-hours.js';
 const settings:DeliverySettings={delivery_enabled:true,pickup_enabled:true,radius_km:12,
   address:'Matriz São Gonçalo',latitude:-22.8777701,longitude:-42.9900824,
   days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT}};
 describe('limites de entrega da Matriz',()=>{
+  const storeHours=[{day:1,opens_at:'08:00',closes_at:'18:00'},{day:6,opens_at:'08:00',closes_at:'13:00'}];
+  it('separa atendimento da loja da entrega e informa sábado e dias fechados',()=>{
+    const configured=deliverySettingsSchema.parse({...settings,store_hours:storeHours});
+    const result=applyMatrizDeliveryPolicies([],{settings:configured,version:3,updated_at:'2026-09-15'});
+    const hours=result.find(p=>p.policy_key==='horario_funcionamento')!;
+    expect(hours.policy_version).toBe('matriz-delivery-3');
+    expect(hours.policy_value).toContain('sábado: 08:00 às 13:00');
+    expect(hours.policy_value).toContain('domingo: fechado');
+    expect(hours.policy_value).toContain('Horário de Brasília');
+    expect(result.find(p=>p.policy_key==='prazo_entrega_descricao')?.policy_value).toContain('18:00');
+    expect(matrizStoreHoursText(null)).toBeNull();
+    expect(matrizStoreHoursText(undefined)).toBeNull();
+  });
+  it('limpar cadastro retira horário antigo sem assumir a janela de entrega',()=>{
+    const previous={policy_key:'horario_funcionamento',policy_value:'antigo',policy_version:'v1',description:null};
+    const result=applyMatrizDeliveryPolicies([previous],{settings:{...settings,store_hours:null},version:4,updated_at:'2026-09-15'});
+    const hours=result.filter(p=>p.policy_key==='horario_funcionamento');
+    expect(hours).toHaveLength(1);
+    expect(hours[0]?.policy_value).toContain('não cadastrado');
+    expect(hours[0]?.policy_value).not.toContain('18:00');
+  });
+  it.each([
+    [],[storeHours[0],storeHours[0]],[{day:7,opens_at:'08:00',closes_at:'18:00'}],
+    [{day:1,opens_at:'25:00',closes_at:'18:00'}],[{day:1,opens_at:'08:00',closes_at:null}],
+    [{day:1,opens_at:'18:00',closes_at:'08:00'}],[{day:1,opens_at:'08:00',closes_at:'08:00'}],
+  ].map(hours=>({hours})))('rejeita cadastro de funcionamento inválido: %j',({hours})=>{
+    expect(deliverySettingsSchema.safeParse({...settings,store_hours:hours}).success).toBe(false);
+  });
   it('lê cadastro anterior com o mesmo frete e sem ampliar o raio salvo',()=>{
     const {freight,...previous}=settings;
     expect(deliverySettingsSchema.parse(previous)).toEqual(settings);

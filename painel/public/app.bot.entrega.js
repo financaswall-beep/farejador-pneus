@@ -1,6 +1,8 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.botEntrega = function () {
+  const week = [1,2,3,4,5,6,0];
   const empty = { delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'',latitude:0,longitude:0,days:[],opens_at:null,closes_at:null,delivery_days:null,
+    store_hours:week.map(day=>({day,enabled:false,opens_at:'',closes_at:''})),
     freight:{first_limit_km:null,first_price_brl:'',second_limit_km:null,second_price_brl:'',above_price_brl:''} };
   const copy = value => JSON.parse(JSON.stringify(value));
   return {
@@ -10,6 +12,7 @@ window.PAINEL_MODULES.botEntrega = function () {
     botEntregaOrigemEditando:false,botEntregaOrigemTexto:'',botEntregaLocalizando:false,
     botEntregaDias:[{id:1,label:'Seg'},{id:2,label:'Ter'},{id:3,label:'Qua'},{id:4,label:'Qui'},{id:5,label:'Sex'},{id:6,label:'Sáb'},{id:0,label:'Dom'}],
     get botEntregaDirty(){return JSON.stringify(this.botEntregaForm)!==this.botEntregaOriginal;},
+    get botLojaHorarioConfigurado(){return this.botEntregaForm.store_hours.some(day=>day.enabled);},
     get botEntregaStale(){return !!this.botEntregaResult && this.botEntregaFingerprint()!==this.botEntregaSnapshot;},
     botEntregaFingerprint(){return JSON.stringify([this.botEntregaForm,this.botEntregaAddress,this.botEntregaItems]);},
     async botEntregaAbrir(){
@@ -33,13 +36,17 @@ window.PAINEL_MODULES.botEntrega = function () {
       const text=e?.message||'';
       if(text.includes('conflict'))return 'Outra pessoa salvou alterações. Recarregue o cadastro antes de salvar novamente.';
       if(text.includes('address_not_found'))return 'Não encontramos esse endereço. Inclua rua, número, cidade e estado.';
-      if(text.includes('403')||text.includes('owner'))return 'Somente o proprietário pode configurar a entrega.';
+      if(text.includes('403')||text.includes('owner'))return 'Somente o proprietário pode configurar a loja e a entrega.';
       if(text.includes('invalid_'))return 'Confira o raio, os dias, os horários e os produtos informados.';
       return 'Não foi possível concluir. Tente novamente; suas alterações continuam na tela.';
     },
     botEntregaNumero(value){return typeof value==='number'?value:typeof value==='string'&&value.trim()?Number(value.trim().replace(',','.')):NaN;},
     botEntregaEditar(settings){
       const f=copy(settings);
+      f.store_hours=week.map(day=>{
+        const saved=settings.store_hours?.find(period=>period.day===day);
+        return {day,enabled:!!saved,opens_at:saved?.opens_at||'',closes_at:saved?.closes_at||''};
+      });
       for(const key of ['first_price_brl','second_price_brl','above_price_brl'])f.freight[key]=f.freight[key].toFixed(2).replace('.',',');
       return f;
     },
@@ -54,6 +61,12 @@ window.PAINEL_MODULES.botEntrega = function () {
       }
       if((f.opens_at||f.closes_at)&&(!f.opens_at||!f.closes_at||f.opens_at>=f.closes_at))return 'Preencha um horário de início e fim válido.';
       if((f.opens_at||f.delivery_days!==null)&&!f.days.length)return 'Selecione os dias em que a Matriz entrega.';
+      const clock=/^([01]\d|2[0-3]):[0-5]\d$/;
+      for(const day of f.store_hours.filter(period=>period.enabled)){
+        if(!clock.test(day.opens_at)||!clock.test(day.closes_at)||day.opens_at>=day.closes_at){
+          return 'Funcionamento da loja: preencha a abertura e o fechamento de '+this.botEntregaDias.find(d=>d.id===day.day).label+', com o fechamento depois da abertura.';
+        }
+      }
       return '';
     },
     botEntregaPayload(){
@@ -61,6 +74,8 @@ window.PAINEL_MODULES.botEntrega = function () {
       f.radius_km=f.radius_km===''?null:f.radius_km===null?null:Number(f.radius_km);
       f.delivery_days=f.delivery_days===''?null:f.delivery_days===null?null:Number(f.delivery_days);
       f.opens_at=f.opens_at||null;f.closes_at=f.closes_at||null;
+      const storeHours=f.store_hours.filter(day=>day.enabled).map(({day,opens_at,closes_at})=>({day,opens_at,closes_at}));
+      f.store_hours=storeHours.length?storeHours:null;
       for(const key of Object.keys(f.freight))f.freight[key]=this.botEntregaNumero(f.freight[key]);
       return f;
     },
