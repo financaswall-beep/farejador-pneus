@@ -87,4 +87,46 @@ describe('funcionamento da loja no painel',()=>{
     expect(ui.botEntregaErro).toContain('Outra pessoa salvou');
     expect(ui.botEntregaMensagem).toBe('');
   });
+  it('mostra o domingo cadastrado sem assumir que a loja está fechada',()=>{
+    const ui=panel();
+    expect(ui.botLojaHorarioDia(0)).toBe('Não cadastrado');
+    ui.botLojaDia(1);ui.botLojaAplicarHora('opens_at','08:00');ui.botLojaAplicarHora('closes_at','18:00');
+    expect(ui.botLojaHorarioDia(0)).toBe('Fechado');
+    ui.botLojaDia(0);
+    ui.botEntregaForm.store_hours.find((day:any)=>day.day===0).closes_at='12:00';
+    expect(ui.botLojaHorarioDia(0)).toBe('08:00 às 12:00');
+  });
+});
+
+describe('seletor compacto de pneus da simulação',()=>{
+  it('envia todos os produtos e quantidades selecionados sem salvar a configuração',async()=>{
+    const ui=panel();
+    ui.botEntregaAdicionar({id:'a',product_name:'Pneu A',tire_size:'130/70-13'});
+    expect(ui.botEntregaSelecaoLabel).toBe('130/70-13 · 1 pneu');
+    ui.botEntregaAdicionar({id:'b',product_name:'Pneu B',tire_size:'90/90-12'});
+    ui.botEntregaItems[0].quantity=2;
+    expect(ui.botEntregaSelecaoLabel).toBe('2 itens · 3 pneus');
+    ui.botEntregaAddress='Endereço de teste';ui.botEntregaSeletorAberto=true;
+    ui.apiPost=vi.fn(async()=>({selected:false,diagnostics:[]}));ui.apiPut=vi.fn();ui.$nextTick=vi.fn();
+    await ui.botEntregaSimular();
+    expect(ui.apiPost).toHaveBeenCalledWith('/admin/api/bot/entrega/simular',expect.objectContaining({
+      address:'Endereço de teste',items:[{product_id:'a',quantity:2},{product_id:'b',quantity:1}],
+    }));
+    expect(ui.apiPut).not.toHaveBeenCalled();
+    expect(ui.botEntregaSeletorAberto).toBe(false);
+    expect(ui.botEntregaStale).toBe(false);
+    ui.botEntregaItems[0].quantity=1;
+    expect(ui.botEntregaStale).toBe(true);
+  });
+  it('reabre o seletor quando uma quantidade inválida foi recolhida',async()=>{
+    const ui=panel();ui.apiPost=vi.fn();ui.botEntregaAddress='Endereço de teste';
+    ui.botEntregaAdicionar({id:'a',product_name:'Pneu A'});
+    for(const quantity of ['',0,-1,1.5,51]){
+      ui.botEntregaItems[0].quantity=quantity;ui.botEntregaSeletorAberto=false;
+      await ui.botEntregaSimular();
+      expect(ui.apiPost).not.toHaveBeenCalled();
+      expect(ui.botEntregaSeletorAberto).toBe(true);
+      expect(ui.botEntregaErro).toContain('quantidade inteira');
+    }
+  });
 });
