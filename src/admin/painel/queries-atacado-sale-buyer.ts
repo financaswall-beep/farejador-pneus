@@ -57,6 +57,7 @@ export async function resolveAdditionBuyer(
        JOIN commerce.wholesale_customers c
          ON c.environment=o.environment AND c.id=o.buyer_id AND c.deleted_at IS NULL
       WHERE o.environment=$1 AND o.id=$2
+        AND COALESCE((to_jsonb(o)->>'is_lot_sale')::boolean,false)=false
         AND (o.status='confirmed'
           OR (o.status='pending' AND o.partner_transfer_status='in_transit'))
         AND o.parent_order_id IS NULL

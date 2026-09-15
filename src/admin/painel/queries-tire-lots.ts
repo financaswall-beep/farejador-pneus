@@ -40,7 +40,7 @@ export async function listTireLots(filters: TireLotFilters = {}, db: Pool = defa
 
 export async function listTireLotMovements(filters: { lot_id?: string; page?: number } = {}, db: Pool = defaultPool) {
   const result = await db.query(`WITH filtered AS (
-    SELECT m.id,m.lot_id,m.source,m.quantity_delta,m.cost_delta,m.occurred_at,
+    SELECT m.id,m.lot_id,m.source,m.quantity_delta,m.cost_delta,m.occurred_at,to_jsonb(m)->>'order_id' order_id,
       'LT-'||lpad(l.lot_number::text,6,'0') lot_code,
       CASE WHEN o.id IS NOT NULL THEN 'OC-'||to_char(o.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY')
         ||'-'||lpad(o.order_number::text,6,'0') ELSE left(p.id::text,8) END purchase_code

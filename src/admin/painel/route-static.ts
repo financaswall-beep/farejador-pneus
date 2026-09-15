@@ -29,7 +29,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
     'app.estoque.lotes.js',
-    'app.estoque.custos.js',
+    'app.estoque.custos.js', 'app.vendas.lotes.js',
     'app.marketing.geography.js','app.marketing.geography.actions.js','app.marketing.geography.mock.js',
     'app.marketing.creatives.js', 'app.marketing.creatives.chart.js', 'app.marketing.creatives.mock.js',
     'app.relatorios.demanda.js', 'app.relatorios.demanda.view.js', 'app.relatorios.demanda.charts.js', 'app.relatorios.demanda.export.js', 'app.relatorios.demanda.pdf.js',
@@ -71,6 +71,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
       ));
   }
   fastify.get('/admin/painel/compras-lotes.css', async (_request, reply) => sendStatic(reply, 'compras-lotes.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/vendas-lotes.css', async (_request, reply) => sendStatic(reply, 'vendas-lotes.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/estoque-custos.css', async (_request, reply) => sendStatic(reply, 'estoque-custos.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/estoque-lotes.css', async (_request, reply) => sendStatic(reply, 'estoque-lotes.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));

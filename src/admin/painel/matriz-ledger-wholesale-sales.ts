@@ -242,6 +242,7 @@ export async function postWholesaleSaleCancellation(
   cancelledAt: string,
   cancelledBy: string,
   reason: string,
+  verifiedReturnedCogs?: number,
 ): Promise<void> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return;
   const revenueAmount = matrizLedgerAmount(sale.totalAmount, 'sale_ledger_amount_invalid');
@@ -267,7 +268,7 @@ export async function postWholesaleSaleCancellation(
 
   const originalCogs = await ensureWholesaleSaleCogs(client, sale);
   if (!originalCogs) return;
-  const recovered = await returnedCogs(client, sale, returned);
+  const recovered = verifiedReturnedCogs ?? await returnedCogs(client, sale, returned);
   if (recovered === 0) return;
   const fullCogs = matrizLedgerAmount(sale.cogsAmount, 'sale_ledger_cogs_invalid');
   if (recovered === fullCogs) {

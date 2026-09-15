@@ -13,7 +13,7 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
       this.atacadoForm.receiving_unit_id = units.length === 1 ? units[0].partner_unit_id : '';
     },
     atacadoStartAddition(v) {
-      if (!v || (v.status !== 'confirmed' && v.partner_transfer_status !== 'in_transit')) return;
+      if (!v || v.is_lot_sale || (v.status !== 'confirmed' && v.partner_transfer_status !== 'in_transit')) return;
       const rootId = v.parent_order_id || v.id;
       const root = this.atacadoVendas.find((row) => row.id === rootId) || v;
       this.atacadoForm = {

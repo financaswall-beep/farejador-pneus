@@ -12,8 +12,10 @@ import {
 import type { TireCondition } from '../../shared/tire-condition.js';
 import { salesPeriodWhere, type SalesPeriod } from './queries-galpao.js';
 import { cancelLinkedPartnerPurchase } from './wholesale-partner-bridge.js';
+import { cancelLotSaleInTransaction } from './cancel-lot-sale.js';
 
 export interface WholesaleSaleRow {
+  is_lot_sale: boolean;
   id: string;
   buyer_id: string;
   partner_id: string | null;
@@ -36,7 +38,7 @@ export interface WholesaleSaleRow {
   due_date: string | null;
   status: string;
   items_count: number;
-  items: Array<{ measure: string; brand: string | null; tire_condition: TireCondition;
+  items: Array<{ measure: string; brand: string | null; tire_condition: TireCondition | null;
     quantity: number; dispatched_quantity: number; accepted_quantity: number | null;
     source_cargo_lot_id: string | null;
     unit_price: string }>;
@@ -48,7 +50,7 @@ export async function listWholesaleSales(
   limit = 15,
 ): Promise<WholesaleSaleRow[]> {
   const result = await dbPool.query<WholesaleSaleRow>(
-    `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
+    `SELECT o.id,COALESCE((to_jsonb(o)->>'is_lot_sale')::boolean,false) is_lot_sale,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
             o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
             o.settled_total_amount,o.partner_payment_terms,
             linked.partner_purchase_id,linked.partner_receipt_status,
@@ -95,7 +97,7 @@ export async function listWholesaleSalesHistory(
 ): Promise<WholesaleSaleRow[]> {
   const periodWhere = salesPeriodWhere(period, 'o.sold_at');
   const result = await dbPool.query<WholesaleSaleRow>(
-    `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
+    `SELECT o.id,COALESCE((to_jsonb(o)->>'is_lot_sale')::boolean,false) is_lot_sale,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
             o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
             o.settled_total_amount,o.partner_payment_terms,
             linked.partner_purchase_id,linked.partner_receipt_status,
@@ -183,14 +185,19 @@ export async function cancelWholesaleSale(
     }
 
     const current = await client.query<{
-      status: string; payment_status: string; partner_transfer_status: string | null;
+      status: string; payment_status: string; partner_transfer_status: string | null; is_lot_sale: boolean;
     }>(
-      `SELECT status,payment_status,partner_transfer_status FROM commerce.wholesale_orders
+      `SELECT status,payment_status,partner_transfer_status,COALESCE((to_jsonb(o)->>'is_lot_sale')::boolean,false) is_lot_sale FROM commerce.wholesale_orders o
         WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.order_id, environment]);
     if (!current.rows[0]) throw new Error('sale_not_found');
     if (current.rows[0].status !== 'confirmed') throw new Error('sale_already_cancelled');
     if (current.rows[0].partner_transfer_status) {
       throw new Error('matrix_partner_transfer_requires_arrival_adjustment');
+    }
+    if (current.rows[0].is_lot_sale) {
+      const result = integrityResult(await cancelLotSaleInTransaction(client,environment,input));
+      await completeIntegrityOperation(client,operation,'commerce.wholesale_orders',input.order_id,result);
+      await client.query('COMMIT'); return result;
     }
     const activeAdditions = await client.query<{ id: string }>(
       `SELECT id FROM commerce.wholesale_orders

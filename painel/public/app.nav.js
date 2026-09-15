@@ -32,7 +32,7 @@ window.PAINEL_PAGES = {
     'renderParceiroChart',
   ] },
   unidade: { scopes: ['matrix'], requires: 'rede', render: ['renderParceiroChart'] },
-  vendas: { scopes: ['matrix', 'partner'], requires: 'vendas', load: ['loadVendasData'], partnerLoad: ['loadPartnerVendas'] },
+  vendas: { scopes: ['matrix', 'partner'], requires: 'vendas', load: ['loadVendasData', 'loadLotSalesPage'], partnerLoad: ['loadPartnerVendas'] },
   retiradas: {
     scopes: ['matrix', 'partner'], requires: 'retiradas',
     load: ['loadPartnerRetiradas'], partnerLoad: ['loadPartnerRetiradas'],
