@@ -16,6 +16,31 @@ function panel() {
 }
 
 describe('funcionamento da loja no painel',()=>{
+  it('aplica o horário comum nos dias selecionados e mantém o sábado diferente ao reabrir',()=>{
+    const ui=panel();
+    ui.botLojaDia(1);ui.botLojaDia(2);
+    ui.botLojaAplicarHora('opens_at','08:00');ui.botLojaAplicarHora('closes_at','18:00');
+    ui.botLojaDia(6);
+    expect(ui.botLojaMostrarPorDia).toBe(false);
+    expect(ui.botEntregaPayload().store_hours).toEqual([1,2,6].map(day=>({day,opens_at:'08:00',closes_at:'18:00'})));
+    ui.botEntregaForm.store_hours.find((day:any)=>day.day===6).closes_at='13:00';
+    expect(ui.botLojaMostrarPorDia).toBe(true);
+    const saved=ui.botEntregaPayload();
+    ui.botEntregaForm=ui.botEntregaEditar(saved);
+    expect(ui.botLojaMostrarPorDia).toBe(true);
+    expect(ui.botEntregaPayload().store_hours[2].closes_at).toBe('13:00');
+    ui.botLojaUsarMesmoHorario();
+    expect(ui.botLojaMostrarPorDia).toBe(false);
+    expect(ui.botEntregaPayload().store_hours.every((day:any)=>day.closes_at==='18:00')).toBe(true);
+  });
+  it('desmarcar um dia conserva seu horário caso seja selecionado novamente',()=>{
+    const ui=panel();
+    ui.botLojaDia(1);ui.botLojaAplicarHora('opens_at','08:00');ui.botLojaAplicarHora('closes_at','18:00');
+    ui.botLojaDia(1);
+    expect(ui.botEntregaPayload().store_hours).toBeNull();
+    ui.botLojaDia(1);
+    expect(ui.botLojaHoraComum('closes_at')).toBe('18:00');
+  });
   it('carrega cadastro antigo vazio sem copiar horários de entrega nem marcar alteração',()=>{
     const ui=panel();
     expect(ui.botLojaHorarioConfigurado).toBe(false);

@@ -10,9 +10,32 @@ window.PAINEL_MODULES.botEntrega = function () {
     botEntregaErro:'',botEntregaMensagem:'',botEntregaAddress:'',botEntregaItems:[],botEntregaBusca:'',
     botEntregaProdutos:[],botEntregaBuscando:false,botEntregaResult:null,botEntregaSnapshot:'',
     botEntregaOrigemEditando:false,botEntregaOrigemTexto:'',botEntregaLocalizando:false,
+    botLojaEditarPorDia:false,
     botEntregaDias:[{id:1,label:'Seg'},{id:2,label:'Ter'},{id:3,label:'Qua'},{id:4,label:'Qui'},{id:5,label:'Sex'},{id:6,label:'Sáb'},{id:0,label:'Dom'}],
     get botEntregaDirty(){return JSON.stringify(this.botEntregaForm)!==this.botEntregaOriginal;},
     get botLojaHorarioConfigurado(){return this.botEntregaForm.store_hours.some(day=>day.enabled);},
+    get botLojaHorariosDiferentes(){
+      return new Set(this.botEntregaForm.store_hours.filter(day=>day.enabled).map(day=>day.opens_at+'-'+day.closes_at)).size>1;
+    },
+    get botLojaMostrarPorDia(){return this.botLojaEditarPorDia||this.botLojaHorariosDiferentes;},
+    botLojaHoraComum(field){
+      const hours=[...new Set(this.botEntregaForm.store_hours.filter(day=>day.enabled).map(day=>day[field]))];
+      return hours.length===1?hours[0]:'';
+    },
+    botLojaAplicarHora(field,value){
+      for(const day of this.botEntregaForm.store_hours.filter(day=>day.enabled))day[field]=value;
+    },
+    botLojaDia(id){
+      const day=this.botEntregaForm.store_hours.find(period=>period.day===id);
+      const opens=this.botLojaHoraComum('opens_at'),closes=this.botLojaHoraComum('closes_at');
+      if(!day.enabled){day.opens_at=day.opens_at||opens;day.closes_at=day.closes_at||closes;}
+      day.enabled=!day.enabled;
+    },
+    botLojaUsarMesmoHorario(){
+      const first=this.botEntregaForm.store_hours.find(day=>day.enabled);
+      if(first){this.botLojaAplicarHora('opens_at',first.opens_at);this.botLojaAplicarHora('closes_at',first.closes_at);}
+      this.botLojaEditarPorDia=false;
+    },
     get botEntregaStale(){return !!this.botEntregaResult && this.botEntregaFingerprint()!==this.botEntregaSnapshot;},
     botEntregaFingerprint(){return JSON.stringify([this.botEntregaForm,this.botEntregaAddress,this.botEntregaItems]);},
     async botEntregaAbrir(){

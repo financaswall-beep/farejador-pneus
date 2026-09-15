@@ -194,7 +194,7 @@
 <script src="/admin/painel/app.relatorios.export.js?v=20260910-1"></script>
 <script src="/admin/painel/app.relatorios.pdf.js?v=20260910-compras1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260912-kanban-controls1"></script>
-<script src="/admin/painel/app.bot.entrega.js?v=20260915-store-hours1"></script>
+<script src="/admin/painel/app.bot.entrega.js?v=20260915-store-hours2"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda3"></script>
@@ -240,7 +240,7 @@
 <script src="/admin/painel/app.js?v=20260915-cost1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-store-hours1" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-store-hours2" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
@@ -7307,7 +7307,7 @@
         <p x-show="botEntregaBusy && !botEntregaConfig" role="status">Carregando configuração…</p>
         <div class="bd-layout" x-show="botEntregaConfig">
           <fieldset class="bd-controls" :disabled="botEntregaBusy">
-            <article class="bd-card"><h2><i data-lucide="truck"></i>Atendimento <span class="bd-badge" x-text="botEntregaForm.delivery_enabled ? 'Entrega ativa' : 'Entrega pausada'"></span></h2>
+            <article class="bd-card bd-coverage"><h2><i data-lucide="truck"></i>Atendimento <span class="bd-badge" x-text="botEntregaForm.delivery_enabled ? 'Entrega ativa' : 'Entrega pausada'"></span></h2>
               <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.delivery_enabled">Entregar pela Matriz</label>
               <label class="bd-check"><input type="checkbox" x-model="botEntregaForm.pickup_enabled">Permitir retirada na loja</label>
               <hr><label class="bd-label" for="bd-radius">Até onde a Matriz entrega</label>
@@ -7320,23 +7320,7 @@
               <hr><h3>Quem o bot oferece primeiro?</h3><div class="bd-rule"><i data-lucide="route"></i><div><strong>Regra atual da rede</strong><p>Parceiros com o pedido completo e cobertura válida, no anel mais próximo. A distribuição entre eles segue a regra de justiça.</p><p x-text="botEntregaConfig?.routing.matriz_competes ? 'A Matriz participa quando está mais perto que todos os parceiros aptos desse anel.' : 'A Matriz entra quando não há parceiro apto no anel.'"></p></div></div>
               <p class="bd-help">A cidade localiza o cliente. Com este cadastro salvo, a entrega é limitada pela distância e pelo raio de cada loja.</p>
             </article>
-            <article class="bd-card" aria-labelledby="bd-store-hours-heading">
-              <h2 id="bd-store-hours-heading"><i data-lucide="store"></i>Funcionamento da loja</h2>
-              <p class="bd-help">Dias e horários para atendimento presencial e retirada na Matriz. O bot consulta este cadastro quando o cliente pergunta até que horas a loja atende.</p>
-              <div class="bd-store-hours">
-                <div class="bd-store-hours-head" aria-hidden="true"><span>Dia</span><span>Abre</span><span>Fecha</span></div>
-                <template x-for="day in botEntregaForm.store_hours" :key="'store-hours-'+day.day">
-                  <div class="bd-store-hours-row">
-                    <label class="bd-check"><input type="checkbox" x-model="day.enabled" :aria-label="'A Matriz abre: '+botEntregaDias.find(d=>d.id===day.day).label"><span x-text="botEntregaDias.find(d=>d.id===day.day).label"></span></label>
-                    <template x-if="day.enabled"><div class="bd-store-hours-inputs"><input type="time" x-model="day.opens_at" :aria-label="'Abertura da loja: '+botEntregaDias.find(d=>d.id===day.day).label"><input type="time" x-model="day.closes_at" :aria-label="'Fechamento da loja: '+botEntregaDias.find(d=>d.id===day.day).label"></div></template>
-                    <span x-show="!day.enabled" class="bd-store-hours-closed" x-text="botLojaHorarioConfigurado ? 'Fechado' : 'Não definido'"></span>
-                  </div>
-                </template>
-              </div>
-              <p class="bd-help" x-show="!botLojaHorarioConfigurado">Horário não cadastrado. Marque os dias de funcionamento e preencha os horários.</p>
-              <p class="bd-help">Horário de Brasília. Entregas seguem as regras abaixo. Atendimento em feriados deve ser confirmado.</p>
-            </article>
-            <article class="bd-card"><h2><i data-lucide="calendar-days"></i>Regras da entrega</h2>
+            <article class="bd-card bd-delivery-rules" aria-labelledby="bd-delivery-rules-heading"><h2 id="bd-delivery-rules-heading"><i data-lucide="calendar-days"></i>Regras da entrega</h2>
               <span class="bd-label">Dias de entrega</span><div class="bd-days"><template x-for="d in botEntregaDias" :key="d.id"><button type="button" @click="botEntregaDia(d.id)" :class="botEntregaForm.days.includes(d.id) ? 'active' : ''" :aria-pressed="botEntregaForm.days.includes(d.id)" x-text="d.label"></button></template></div>
               <div class="bd-time"><label>Das<input type="time" x-model="botEntregaForm.opens_at"></label><label>Até<input type="time" x-model="botEntregaForm.closes_at"></label></div>
               <label class="bd-label" for="bd-prazo">Prazo da Matriz</label><select id="bd-prazo" x-model.number="botEntregaForm.delivery_days"><option :value="null">Confirmar no atendimento</option><option :value="0">Próximo dia de entrega disponível</option><option :value="1">Até 1 dia de entrega</option><option :value="2">Até 2 dias de entrega</option><option :value="3">Até 3 dias de entrega</option><option :value="5">Até 5 dias de entrega</option><option :value="7">Até 7 dias de entrega</option></select>
@@ -7357,6 +7341,28 @@
               <div class="bd-info-row"><span>Fora da cobertura</span><strong>Consultar retirada</strong></div>
               <p class="bd-help">Sem entrega disponível, o bot consulta uma opção de retirada. A Matriz também precisa ter todos os itens em estoque.</p>
               <button class="bd-secondary bd-pause" @click="botEntregaForm.delivery_enabled = !botEntregaForm.delivery_enabled" x-text="botEntregaForm.delivery_enabled ? 'Ⅱ Pausar entregas da Matriz' : '▶ Retomar entregas da Matriz'"></button><p class="bd-help">A mudança entra em vigor ao salvar.</p>
+            </article>
+            <article class="bd-card bd-store-card" aria-labelledby="bd-store-hours-heading">
+              <h2 id="bd-store-hours-heading"><i data-lucide="store"></i>Funcionamento da loja</h2>
+              <span class="bd-label">Dias de funcionamento</span>
+              <div class="bd-days" role="group" aria-label="Dias de funcionamento da loja"><template x-for="day in botEntregaForm.store_hours" :key="'store-day-'+day.day"><button type="button" @click="botLojaDia(day.day)" :class="day.enabled ? 'active' : ''" :aria-pressed="day.enabled" :aria-label="'Funcionamento: '+botEntregaDias.find(d=>d.id===day.day).label" x-text="botEntregaDias.find(d=>d.id===day.day).label"></button></template></div>
+              <div x-show="!botLojaMostrarPorDia" class="bd-time"><label>Das<input type="time" :value="botLojaHoraComum('opens_at')" @input="botLojaAplicarHora('opens_at',$event.target.value)" :disabled="!botLojaHorarioConfigurado" aria-label="Abertura da loja nos dias selecionados"></label><label>Até<input type="time" :value="botLojaHoraComum('closes_at')" @input="botLojaAplicarHora('closes_at',$event.target.value)" :disabled="!botLojaHorarioConfigurado" aria-label="Fechamento da loja nos dias selecionados"></label></div>
+              <p class="bd-help" x-show="!botLojaMostrarPorDia">O mesmo horário vale para os dias selecionados.</p>
+              <div x-show="botLojaMostrarPorDia" class="bd-store-hours">
+                <div class="bd-store-hours-head" aria-hidden="true"><span>Dia</span><span>Das</span><span>Até</span></div>
+                <template x-for="day in botEntregaForm.store_hours" :key="'store-hours-'+day.day">
+                  <div class="bd-store-hours-row" x-show="day.enabled">
+                    <span x-text="botEntregaDias.find(d=>d.id===day.day).label"></span>
+                    <template x-if="day.enabled"><div class="bd-store-hours-inputs"><input type="time" x-model="day.opens_at" :aria-label="'Abertura da loja: '+botEntregaDias.find(d=>d.id===day.day).label"><input type="time" x-model="day.closes_at" :aria-label="'Fechamento da loja: '+botEntregaDias.find(d=>d.id===day.day).label"></div></template>
+                  </div>
+                </template>
+              </div>
+              <button type="button" class="bd-link bd-store-adjust" x-show="!botLojaMostrarPorDia" :disabled="!botLojaHorarioConfigurado" @click="botLojaEditarPorDia=true">Ajustar horários por dia</button>
+              <button type="button" class="bd-link bd-store-adjust" x-show="botLojaMostrarPorDia" @click="botLojaUsarMesmoHorario()">Usar o horário do primeiro dia em todos</button>
+              <p class="bd-help" x-show="!botLojaHorarioConfigurado">Horário não cadastrado. Marque os dias de funcionamento e preencha os horários.</p>
+              <hr><div class="bd-info-row"><span>Válido para</span><strong>Atendimento e retirada</strong></div>
+              <p class="bd-help">O bot usa este horário quando o cliente pergunta até que horas a Matriz atende. Dias não selecionados ficam fechados.</p>
+              <p class="bd-help">Horário de Brasília. Atendimento em feriados deve ser confirmado.</p>
             </article>
           </fieldset>
           <article class="bd-card bd-simulation"><div class="bd-simulation-head"><h2>Teste a decisão do bot</h2><span class="bd-badge">Simulação</span></div>
