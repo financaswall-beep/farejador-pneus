@@ -52,7 +52,7 @@ function analyticsWhere(environment: 'prod' | 'test', filters: PurchaseReportFil
   if (search) {
     params.push(`%${search}%`);
     where.push(`(lower(s.name) LIKE $${params.length}
-      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_items si
+      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_lines si
         WHERE si.environment=p.environment AND si.purchase_id=p.id
           AND lower(si.measure) LIKE $${params.length}))`);
   }
@@ -92,7 +92,7 @@ export async function getWholesalePurchaseAnalytics(
          LEFT JOIN LATERAL (
            SELECT COALESCE(sum(COALESCE(i.accepted_quantity,i.quantity)),0) tires,
                   COALESCE(sum(i.allocated_cost),0) allocated
-             FROM commerce.wholesale_purchase_items i
+             FROM commerce.wholesale_purchase_lines i
             WHERE i.environment=p.environment AND i.purchase_id=p.id
          ) items ON true
          LEFT JOIN finance.matriz_ledger_transactions obligation
@@ -108,7 +108,7 @@ export async function getWholesalePurchaseAnalytics(
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s
            ON s.id=p.supplier_id AND s.environment=p.environment
-         JOIN commerce.wholesale_purchase_items i
+         JOIN commerce.wholesale_purchase_lines i
            ON i.environment=p.environment AND i.purchase_id=p.id
         WHERE ${current.sql}
      )
@@ -135,7 +135,7 @@ export async function getWholesalePurchaseAnalytics(
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s
            ON s.id=p.supplier_id AND s.environment=p.environment
-         LEFT JOIN commerce.wholesale_purchase_items i
+         LEFT JOIN commerce.wholesale_purchase_lines i
            ON i.environment=p.environment AND i.purchase_id=p.id
         WHERE ${current.sql}
         GROUP BY bucket,p.id
@@ -157,7 +157,7 @@ export async function getWholesalePurchaseAnalytics(
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s
            ON s.id=p.supplier_id AND s.environment=p.environment
-         JOIN commerce.wholesale_purchase_items i
+         JOIN commerce.wholesale_purchase_lines i
            ON i.environment=p.environment AND i.purchase_id=p.id
         WHERE ${previous.sql} AND p.status<>'cancelled'`, previous.params);
     previousAverage = result.rows[0]?.average_cost ?? null;

@@ -98,8 +98,8 @@ export async function listWholesalePurchases(
               'OC-'||to_char(o.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY')
                 ||'-'||lpad(o.order_number::text,6,'0') END AS order_code,
             (SELECT COALESCE(sum(COALESCE(i.accepted_quantity,i.quantity)),0)
-               FROM commerce.wholesale_purchase_items i
-              WHERE i.purchase_id=p.id)::int AS items_count,
+               FROM commerce.wholesale_purchase_lines i
+              WHERE i.environment=p.environment AND i.purchase_id=p.id)::int AS items_count,
             p.payment_status,p.due_date,p.status,p.stock_applied,p.cancelled_at
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment

@@ -15,6 +15,7 @@ describe('guardas finais das auditorias de Compras', () => {
     for (const endpoint of [
       '/admin/api/wholesale/suppliers',
       '/admin/api/wholesale/purchases',
+      '/admin/api/wholesale/lot-purchases',
       '/admin/api/wholesale/purchases/confirm',
       '/admin/api/wholesale/purchases/link-order',
       '/admin/api/wholesale/purchases/cancel',

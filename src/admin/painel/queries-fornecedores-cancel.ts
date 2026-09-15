@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import { postWholesalePurchaseCancellation } from './matriz-ledger-purchases.js';
+import { reverseLotPurchaseStock } from './lot-purchase-stock.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
@@ -133,6 +134,7 @@ export async function cancelWholesalePurchase(
       status: 'pending' | 'confirmed' | 'cancelled';
       payment_status: 'paid' | 'pending';
       stock_applied: boolean;
+      purchase_kind: string;
       supplier_id: string;
       total_amount: string;
       purchased_at: string;
@@ -140,14 +142,16 @@ export async function cancelWholesalePurchase(
       paid_at: string | null;
       created_by: string | null;
     }>(
-      `SELECT status,payment_status,stock_applied,supplier_id,total_amount,
+      `SELECT purchase_kind,status,payment_status,stock_applied,supplier_id,total_amount,
               purchased_at,due_date,paid_at,created_by
          FROM commerce.wholesale_purchases
         WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.purchase_id, environment]);
     if (!current.rows[0]) throw new Error('purchase_not_found');
     if (current.rows[0].status === 'cancelled') throw new Error('purchase_already_cancelled');
     const reversed = current.rows[0].stock_applied
-      ? await reversePurchaseStock(client, environment, input.purchase_id) : [];
+      ? current.rows[0].purchase_kind === 'lot'
+        ? [await reverseLotPurchaseStock(client, environment, input.purchase_id, input.cancelled_by)]
+        : await reversePurchaseStock(client, environment, input.purchase_id) : [];
     const updated = await client.query<{ cancelled_at: string }>(
       `UPDATE commerce.wholesale_purchases
           SET status='cancelled',cancelled_at=now(),cancelled_by=$3,cancel_reason=$4

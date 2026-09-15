@@ -10,6 +10,7 @@ import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurc
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 import { registerPurchaseReportRoutes } from './route-purchase-report.js';
+import { registerLotPurchaseSchema } from './route-schemas-lot-purchases.js';
 
 const purchaseReportQuerySchema = z.object({
   period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
@@ -29,6 +30,18 @@ const priceReportQuerySchema = z.object({
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   await registerPurchaseReportRoutes(fastify);
+  fastify.post('/admin/api/wholesale/lot-purchases', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = registerLotPurchaseSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    try {
+      const result = await registerWholesalePurchase({ ...parsed.data, items: [], created_by: operatorLabel(request) });
+      return reply.status(201).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel lot purchase failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
   fastify.get('/admin/api/wholesale/purchase-orders', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = z.object({ supplier_id: z.string().uuid().optional(),
       status: z.enum(['open', 'closed', 'cancelled']).optional() }).safeParse(request.query);

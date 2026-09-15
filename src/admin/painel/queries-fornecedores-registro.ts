@@ -1,9 +1,7 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
-import { addWholesaleStockEntry } from './queries-galpao.js';
-import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import {
   ensureWholesalePurchaseAccrual,
   postWholesalePurchaseQuantityAdjustment,
@@ -21,18 +19,17 @@ import {
   getPurchaseCatalogBlockers, type PurchaseCatalogBlocker,
 } from './purchase-catalog-readiness.js';
 import { resolveWholesalePurchaseOrder } from './queries-purchase-orders.js';
-type AllocatedPurchaseItem = PurchaseItemInput & {
-  id?: string;
-  ordered_quantity?: number;
-  accepted_quantity?: number | null;
-  allocated_cost: number;
-};
+import { calculateLotPurchaseMoney, type PurchaseLotInput } from './lot-purchase-money.js';
+import { confirmLotPurchaseStock, insertPurchaseLot, receivePurchaseLot } from './lot-purchase-stock.js';
+import { resolveSupplier, applyPurchaseStock, type AllocatedPurchaseItem } from './purchase-registration-helpers.js';
 
 export interface RegisterWholesalePurchaseInput {
   environment?: 'prod' | 'test';
   supplier_id?: string | null;
   new_supplier?: { name: string; phone?: string | null; document?: string | null } | null;
   items: PurchaseItemInput[];
+  lot?: PurchaseLotInput;
+  received_at?: string;
   purchased_at?: string | null;
   paid_at?: string | null;
   notes?: string | null;
@@ -50,6 +47,8 @@ export interface RegisterWholesalePurchaseInput {
 }
 
 export interface RegisterWholesalePurchaseResult {
+  lot_id?: string;
+  lot_code?: string;
   purchase_id: string;
   supplier_id: string;
   supplier_name: string;
@@ -65,76 +64,27 @@ export interface RegisterWholesalePurchaseResult {
   catalog_blockers: PurchaseCatalogBlocker[];
 }
 
-async function resolveSupplier(
-  client: PoolClient,
-  environment: 'prod' | 'test',
-  input: RegisterWholesalePurchaseInput,
-): Promise<{ id: string; name: string }> {
-  if (input.supplier_id) {
-    const found = await client.query<{ id: string; name: string }>(
-      `SELECT id,name FROM commerce.wholesale_suppliers
-        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL FOR SHARE`,
-      [input.supplier_id, environment]);
-    if (!found.rows[0]) throw new Error('supplier_not_found');
-    return found.rows[0];
-  }
-  const name = input.new_supplier?.name.trim();
-  if (!name) throw new Error('supplier_required');
-  const created = await client.query<{ id: string; name: string }>(
-    `INSERT INTO commerce.wholesale_suppliers (environment,name,phone,document)
-     VALUES ($1,$2,$3,$4) RETURNING id,name`,
-    [environment, name, input.new_supplier?.phone
-      ? normalizeBrazilianPhone(input.new_supplier.phone) : null,
-     input.new_supplier?.document?.trim() || null]);
-  return created.rows[0]!;
-}
-
-async function applyPurchaseStock(
-  client: PoolClient,
-  environment: 'prod' | 'test',
-  purchaseId: string,
-  supplierName: string,
-  items: AllocatedPurchaseItem[],
-): Promise<void> {
-  await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
-  const consolidated = new Map<string, {
-    measure: string; quantity: number; valueCents: number; brand: string;
-    tire_condition: PurchaseItemInput['tire_condition'];
-  }>();
-  for (const item of items) {
-    const quantity = item.accepted_quantity ?? item.quantity;
-    if (quantity <= 0) continue;
-    const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
-    const key = `${item.measure}\u0000${brand}\u0000${item.tire_condition}`;
-    const current = consolidated.get(key) ?? {
-      measure: item.measure, quantity: 0, valueCents: 0, brand,
-      tire_condition: item.tire_condition,
-    };
-    current.quantity += quantity;
-    current.valueCents += moneyCents(item.allocated_cost);
-    consolidated.set(key, current);
-  }
-  for (const [, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
-    await addWholesaleStockEntry({ measure: item.measure, brand: item.brand,
-      tire_condition: item.tire_condition, quantity_in: item.quantity,
-      unit_cost: item.valueCents / item.quantity / 100, environment,
-      actor_label: `compra:${purchaseId}` }, client);
-  }
-}
-
 export async function registerWholesalePurchase(
   input: RegisterWholesalePurchaseInput,
   dbPool: Pool = defaultPool,
 ): Promise<RegisterWholesalePurchaseResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  calculateWholesalePurchaseMoney(
-    input.items ?? [], input.freight_amount ?? 0, input.discount_amount ?? 0,
-  );
+  const lotTotals = input.lot
+    ? calculateLotPurchaseMoney(input.lot, input.freight_amount ?? 0, input.discount_amount ?? 0)
+    : null;
+  if (input.lot && input.items.length) throw new Error('purchase_kind_items_mismatch');
+  if (input.lot && input.payment_status === 'pending' && !env.WHOLESALE_FINANCE) {
+    throw new Error('wholesale_finance_disabled');
+  }
+  if (!lotTotals) calculateWholesalePurchaseMoney(
+    input.items ?? [], input.freight_amount ?? 0, input.discount_amount ?? 0);
   const requestNow = new Date();
   const purchasedAt = normalizeBusinessFactInstant(
     input.purchased_at, requestNow, 'purchased_at_future',
   );
   const paidAt = normalizeBusinessFactInstant(input.paid_at, requestNow, 'paid_at_future');
+  const receivedAt = input.lot
+    ? normalizeBusinessFactInstant(input.received_at, requestNow, 'received_at_future') : null;
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -158,6 +108,9 @@ export async function registerWholesalePurchase(
           due_date: row.due_date, amount_cents: moneyCents(row.amount),
         })),
         receipt_status: receiptStatus,
+        ...(input.lot ? { lot: { description: input.lot.description.trim(),
+          quantity: input.lot.quantity, total_cost_cents: moneyCents(input.lot.total_cost) },
+          received_at: input.received_at ?? null } : {}),
         items: rawItems.map((item) => ({ measure: item.measure.trim(),
           brand: canonicalCatalogBrand(item.brand),
           tire_condition: item.tire_condition,
@@ -169,8 +122,8 @@ export async function registerWholesalePurchase(
       return started.result;
     }
 
-    const canonicalItems = await canonicalPurchaseItems(client, environment, rawItems, input.created_by);
-    const totals = calculateWholesalePurchaseMoney(
+    const canonicalItems = input.lot ? [] : await canonicalPurchaseItems(client, environment, rawItems, input.created_by);
+    const totals = lotTotals ?? calculateWholesalePurchaseMoney(
       canonicalItems, input.freight_amount ?? 0, input.discount_amount ?? 0,
     );
     const items: AllocatedPurchaseItem[] = canonicalItems.map((item, index) => ({
@@ -199,9 +152,9 @@ export async function registerWholesalePurchase(
         (environment,supplier_id,purchased_at,total_amount,status,stock_applied,
          stock_applied_at,stock_applied_by,created_by,notes,payment_status,due_date,paid_at,
          purchase_order_id,supplier_reference,products_amount,freight_amount,
-         discount_amount,payment_method)
+         discount_amount,payment_method,purchase_kind)
        VALUES ($1,$2,COALESCE($3::timestamptz,now()),$9,'pending',false,NULL,NULL,
-         $4,$5,$6,$7::date,$8::timestamptz,$10,$11,$12,$13,$14,$15)
+         $4,$5,$6,$7::date,$8::timestamptz,$10,$11,$12,$13,$14,$15,$16)
        RETURNING id,purchased_at,paid_at`,
       [environment, supplier.id, purchasedAt ?? null, input.created_by, input.notes ?? null,
        pendingPayment ? 'pending' : 'paid', dueDate,
@@ -209,8 +162,11 @@ export async function registerWholesalePurchase(
          ? paidAt ?? purchasedAt ?? requestNow.toISOString() : null,
        totals.totalCents / 100, order.id, input.supplier_reference?.trim() || null,
        totals.productsCents / 100, totals.freightCents / 100, totals.discountCents / 100,
-       input.payment_method?.trim() || null]);
+       input.payment_method?.trim() || null, input.lot ? 'lot' : 'catalog']);
     const purchaseId = purchase.rows[0]!.id;
+    const lotRecord = input.lot
+      ? await insertPurchaseLot(client, environment, purchaseId, input.lot, totals.totalCents / 100)
+      : null;
     for (const item of items) {
       await client.query(
         `INSERT INTO commerce.wholesale_purchase_items
@@ -234,11 +190,13 @@ export async function registerWholesalePurchase(
     }
     const received = receiptStatus === 'received';
     if (received) {
-      await applyPurchaseStock(client, environment, purchaseId, supplier.name, items);
+      if (input.lot) await receivePurchaseLot(client, environment, purchaseId,
+        input.created_by, receivedAt ?? requestNow.toISOString());
+      else await applyPurchaseStock(client, environment, purchaseId, supplier.name, items);
       await client.query(
         `UPDATE commerce.wholesale_purchases
-            SET status='confirmed',stock_applied=true,stock_applied_at=now(),stock_applied_by=$2
-          WHERE id=$1`, [purchaseId, input.created_by]);
+            SET status='confirmed',stock_applied=true,stock_applied_at=COALESCE($3::timestamptz,now()),stock_applied_by=$2
+          WHERE id=$1`, [purchaseId, input.created_by, receivedAt]);
     }
     await ensureWholesalePurchaseAccrual(client, {
       environment, purchaseId, supplierId: supplier.id,
@@ -249,10 +207,11 @@ export async function registerWholesalePurchase(
       paidAt: purchase.rows[0]!.paid_at,
       stockApplied: received, createdBy: input.created_by,
     });
-    const catalogBlockers = await getPurchaseCatalogBlockers(client, environment, items);
+    const catalogBlockers = input.lot ? [] : await getPurchaseCatalogBlockers(client, environment, items);
     const result = { purchase_id: purchaseId, supplier_id: supplier.id,
       supplier_name: supplier.name, total_amount: (totals.totalCents / 100).toFixed(2),
-      items_count: items.length, status: received ? 'confirmed' as const : 'pending' as const,
+      items_count: input.lot ? 1 : items.length, status: received ? 'confirmed' as const : 'pending' as const,
+      ...(lotRecord ? { lot_id: lotRecord.id, lot_code: lotRecord.lot_code } : {}),
       stock_applied: received, order_id: order.id, order_code: order.order_code,
       products_amount: (totals.productsCents / 100).toFixed(2),
       freight_amount: (totals.freightCents / 100).toFixed(2),
@@ -307,8 +266,9 @@ export async function confirmWholesalePurchase(
       total_amount: string; purchased_at: string; payment_status: 'paid' | 'pending';
       due_date: string | null; paid_at: string | null; created_by: string | null;
       products_amount: string; freight_amount: string; discount_amount: string;
+      purchase_kind: string;
     }>(
-      `SELECT p.status,p.stock_applied,p.supplier_id,p.total_amount,p.purchased_at,
+      `SELECT p.purchase_kind,p.status,p.stock_applied,p.supplier_id,p.total_amount,p.purchased_at,
               p.payment_status,p.due_date,p.paid_at,p.created_by,p.products_amount,
               p.freight_amount,p.discount_amount,s.name AS supplier_name
          FROM commerce.wholesale_purchases p
@@ -318,6 +278,22 @@ export async function confirmWholesalePurchase(
     if (purchase.rows[0].status !== 'pending' || purchase.rows[0].stock_applied) {
       throw new Error(purchase.rows[0].status === 'cancelled'
         ? 'purchase_already_cancelled' : 'purchase_already_confirmed');
+    }
+    if (purchase.rows[0].purchase_kind === 'lot') {
+      const row = purchase.rows[0];
+      const result = await confirmLotPurchaseStock(client, {
+        environment, purchaseId: input.purchase_id, supplierId: row.supplier_id,
+        totalAmount: row.total_amount, purchasedAt: row.purchased_at,
+        paymentStatus: row.payment_status, dueDate: row.due_date, paidAt: row.paid_at,
+        stockApplied: false, createdBy: row.created_by,
+      }, input.confirmed_by, input.items);
+      await recordIntegrityEvent(client, { environment, domain: 'wholesale_purchase',
+        entityTable: 'commerce.wholesale_purchases', entityId: input.purchase_id,
+        eventType: 'stock_received', actorLabel: input.confirmed_by,
+        idempotencyKey: operation.idempotencyKey, after: result });
+      await completeIntegrityOperation(client, operation, 'commerce.wholesale_purchases', input.purchase_id, result);
+      await client.query('COMMIT');
+      return result;
     }
     const items = await client.query<AllocatedPurchaseItem>(
       `SELECT id,measure,brand,tire_condition,quantity,ordered_quantity,

@@ -33,15 +33,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
         reason = operation.reason || '';
       }
       this.compraReceiptItems = kind === 'confirm'
-        ? (purchase.items || []).map((item) => ({
-          item_id: item.id,
-          measure: item.measure,
-          brand: item.brand,
-          tire_condition: item.tire_condition,
-          ordered_quantity: Number(item.ordered_quantity ?? item.quantity ?? 0),
-          accepted_quantity: Number(item.ordered_quantity ?? item.quantity ?? 0),
-          unit_cost: Number(item.unit_cost || 0),
-        })) : [];
+        ? (purchase.items || []).map((item) => this.compraReceiptItem(item)) : [];
       this.compraDialog = {
         open: true, kind, purchase, supplier: null, reason, error: '',
       };
@@ -89,6 +81,9 @@ window.PAINEL_MODULES.comprasAcoes = function () {
     },
     compraDialogDescription() {
       const row = this.compraDialog.purchase;
+      if (this.compraDialog.kind === 'confirm' && row?.purchase_kind === 'lot') {
+        return 'Confira a chegada do lote completo. Se a quantidade ou o valor estiver errado, cancele a compra e registre os dados corrigidos.';
+      }
       if (this.compraDialog.kind === 'confirm') {
         return `Confira o que realmente chegou de ${row?.supplier_name || 'fornecedor'}. Só a quantidade aceita entrará no galpão e no custo.`;
       }
@@ -168,7 +163,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
         this.compraCloseDialog(true);
         const catalogoTxt = result.catalog_blockers?.length
           ? ` ${result.catalog_blockers.length} variante(s) ainda precisam de produto ou preço no Catálogo antes da venda.` : '';
-        this.compraMsg = { ok: true, text: `Recebimento confirmado. Galpão, custo médio e filme foram atualizados.${catalogoTxt}` };
+        this.compraMsg = { ok: true, text: `Recebimento confirmado. Estoque e financeiro foram atualizados.${catalogoTxt}` };
         await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);
       } catch (err) {
         this.compraDialog.error = `Não consegui confirmar o recebimento (${err.message}).`;
@@ -177,6 +172,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     compraReceiptTotal() {
+      if (this.compraDialog.purchase?.purchase_kind === 'lot') return Number(this.compraDialog.purchase.products_amount || 0);
       return this.compraReceiptItems.reduce((sum, item) => sum
         + Number(item.accepted_quantity || 0) * Number(item.unit_cost || 0), 0);
     },

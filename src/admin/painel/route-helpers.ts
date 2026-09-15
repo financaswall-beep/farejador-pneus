@@ -62,7 +62,10 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
        'reason_required'].includes(err.message)) {
     return { status: 400, error: err.message };
   }
-  if (['purchase_quantity_invalid', 'purchase_unit_cost_invalid',
+  if (['lot_description_required', 'lot_total_cost_invalid', 'lot_receipt_quantity_mismatch',
+       'wholesale_finance_disabled', 'received_at_required', 'received_before_purchase',
+       'payment_details_required', 'purchase_kind_items_mismatch',
+       'purchase_quantity_invalid', 'purchase_unit_cost_invalid',
        'unit_cost_cent_precision', 'purchase_line_total_too_large',
        'purchase_total_too_large', 'purchased_at_future', 'paid_at_future',
        'freight_amount_invalid', 'discount_amount_invalid',

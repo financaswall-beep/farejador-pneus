@@ -47,7 +47,7 @@ export async function readPurchaseReportLines(db: Pool, environment: string, fil
       i.measure,i.brand,i.tire_condition AS "condition",
       COALESCE(i.accepted_quantity,i.quantity)::int quantity,i.ordered_quantity::int ordered,
       i.allocated_cost::text value,i.unit_cost::text base_unit_cost
-    FROM purchases p JOIN commerce.wholesale_purchase_items i ON i.purchase_id=p.id AND i.environment=p.environment
+    FROM purchases p JOIN commerce.wholesale_purchase_lines i ON i.purchase_id=p.id AND i.environment=p.environment
     ORDER BY p."day" DESC,p.id,i.id LIMIT 50001`,
   [environment, filter.from, filter.to, previous?.from ?? null, previous?.to ?? null]);
   if (result.rows.length > 50000) throw new PurchaseReportLimitError('report_limit_reduce_period');

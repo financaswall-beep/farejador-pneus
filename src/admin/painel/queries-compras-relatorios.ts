@@ -87,7 +87,7 @@ function purchaseWhere(
   if (search) {
     params.push(`%${search}%`);
     where.push(`(lower(s.name) LIKE $${params.length}
-      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_items si
+      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_lines si
         WHERE si.environment=p.environment AND si.purchase_id=p.id
           AND lower(si.measure) LIKE $${params.length}))`);
   }
@@ -104,7 +104,7 @@ export async function getWholesalePurchaseReport(
     `WITH filtered AS (
        SELECT p.id,p.status,p.payment_status,p.total_amount,
               COALESCE((SELECT sum(COALESCE(i.accepted_quantity,i.quantity))
-                FROM commerce.wholesale_purchase_items i
+                FROM commerce.wholesale_purchase_lines i
                 WHERE i.environment=p.environment AND i.purchase_id=p.id),0)::int AS tires
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s
@@ -124,7 +124,7 @@ export async function getWholesalePurchaseReport(
   const rowParams = [...query.params, filters.pageSize, offset];
   const rows = await dbPool.query(
     `SELECT p.id,p.supplier_id,s.name AS supplier_name,s.deleted_at AS supplier_archived_at,
-            p.purchased_at,p.total_amount,p.products_amount,p.freight_amount,
+            p.purchase_kind,p.purchased_at,p.total_amount,p.products_amount,p.freight_amount,
             p.discount_amount,p.payment_status,p.payment_method,p.due_date,p.paid_at,
             p.supplier_reference,p.purchase_order_id,
             CASE WHEN o.id IS NULL THEN NULL ELSE
@@ -134,7 +134,7 @@ export async function getWholesalePurchaseReport(
             p.cancelled_at,p.cancelled_by,p.cancel_reason,
             COALESCE(sum(COALESCE(i.accepted_quantity,i.quantity)),0)::int AS items_count,
             COALESCE(jsonb_agg(jsonb_build_object(
-              'id',i.id,'measure',i.measure,'brand',i.brand,
+              'id',i.id,'item_kind',i.item_kind,'measure',i.measure,'brand',i.brand,
               'tire_condition',i.tire_condition,'quantity',i.quantity,
               'ordered_quantity',i.ordered_quantity,
               'accepted_quantity',i.accepted_quantity,
@@ -150,7 +150,7 @@ export async function getWholesalePurchaseReport(
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s
          ON s.id=p.supplier_id AND s.environment=p.environment
-       LEFT JOIN commerce.wholesale_purchase_items i
+       LEFT JOIN commerce.wholesale_purchase_lines i
          ON i.purchase_id=p.id AND i.environment=p.environment
        LEFT JOIN commerce.wholesale_purchase_orders o
          ON o.environment=p.environment AND o.id=p.purchase_order_id

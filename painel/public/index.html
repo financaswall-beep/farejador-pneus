@@ -133,13 +133,14 @@
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260818-business-time1"></script>
+<script src="/admin/painel/app.compras.lotes.js?v=20260915-lot1"></script>
 <script src="/admin/painel/app.compras.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260825-price-history1"></script>
 <script src="/admin/painel/app.compras.reposicao.js?v=20260825-replenishment3"></script>
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
-<script src="/admin/painel/app.compras.acoes.js?v=20260825-purchase-orders1"></script>
+<script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.logistica.resultado.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260821-auditfix1"></script>
@@ -232,8 +233,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.js?v=20260910-relatorios1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260915-lot1"></script>
+<script src="/admin/painel/app.js?v=20260915-lot1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
@@ -252,6 +253,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/painel/compras-lotes.css?v=20260915-lot1">
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
@@ -3206,7 +3208,7 @@
     </div>
 
     <div x-show="currentPage === 'compras' && isMatrixPanel()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="compras-heading"
+      <section x-show="comprasTab !== 'lote'" aria-labelledby="compras-heading"
                class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
         <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
           <h1 id="compras-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Compras</h1>
@@ -3231,7 +3233,7 @@
         </div>
       </section>
 
-      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+      <div x-show="comprasTab !== 'lote'" class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
           <nav aria-label="Seções de Compras" class="flex items-center gap-1 overflow-x-auto">
             <button @click="comprasOpenTab('visao')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Visão geral</button>
@@ -3240,6 +3242,7 @@
             <button @click="comprasOpenTab('fornecedores')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'fornecedores' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Fornecedores</button>
             <button @click="comprasOpenTab('precos')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'precos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Preços por medida</button>
           </nav>
+          <button x-show="adminUser?.role === 'owner'" @click="lotPurchaseOpen()" class="mb-3 inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 py-2 text-xs font-semibold text-emerald-800 xl:mb-0"><i data-lucide="package-plus" class="h-4 w-4"></i>Comprar lote</button>
           <button x-show="adminUser?.role === 'owner'" @click="comprasOpenTab('nova')"
                   class="mb-3 inline-flex self-start items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-emerald-800 xl:mb-0 xl:self-auto">
             <i data-lucide="plus" class="h-4 w-4"></i>
@@ -3253,6 +3256,87 @@
       <div x-show="adminUser?.role !== 'owner'" x-cloak class="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         Compras está em modo somente leitura para este perfil. Registrar, receber, cancelar, pagar ou alterar fornecedores exige acesso de proprietário.
       </div>
+
+      <template x-if="comprasTab === 'lote' && lotPurchaseForm && adminUser?.role === 'owner'">
+        <section class="lot-purchase" aria-labelledby="lot-purchase-title">
+          <header class="lot-purchase-header">
+            <div><p>Matriz / Compras</p><h1 id="lot-purchase-title" x-ref="lotPurchaseHeading" tabindex="-1">Nova compra de lote</h1><p>Informe o valor total do lote. O custo por pneu é calculado para você.</p></div>
+            <button type="button" class="lot-purchase-btn" @click="comprasOpenTab('visao')"><i data-lucide="arrow-left"></i>Voltar às compras</button>
+          </header>
+          <div x-show="lotPurchaseMsg" class="lot-purchase-message" :class="{ ok: lotPurchaseMsg?.ok }" role="status" aria-live="polite">
+            <span x-text="lotPurchaseMsg?.text"></span>
+            <button type="button" x-show="lotPurchaseResult && lotPurchaseMsg?.ok" class="ml-2 underline" @click="comprasOpenTab('historico')">Ver no histórico</button>
+          </div>
+          <form @submit.prevent="lotPurchaseSubmit()" class="lot-purchase-grid">
+            <fieldset class="lot-purchase-main" :disabled="lotPurchaseSaving || !!lotPurchasePendingBody">
+              <section class="lot-purchase-card">
+                <h2>Fornecedor e compra</h2>
+                <div class="lot-purchase-fields">
+                  <label class="lot-wide">Fornecedor
+                    <select x-model="lotPurchaseForm.supplierKey" aria-label="Fornecedor" required><option value="">Selecione o fornecedor</option><option value="new">+ Cadastrar novo fornecedor</option><template x-for="s in fornecedores" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select>
+                  </label>
+                  <template x-if="lotPurchaseForm.supplierKey === 'new'"><div class="lot-wide lot-purchase-fields">
+                    <label class="lot-wide">Nome do fornecedor<input x-model="lotPurchaseForm.newName" maxlength="200" required autocomplete="organization"></label>
+                    <label>Telefone (opcional)<input x-model="lotPurchaseForm.newPhone" maxlength="40" type="tel" autocomplete="tel"></label>
+                    <label>CPF/CNPJ (opcional)<input x-model="lotPurchaseForm.newDocument" maxlength="30"></label>
+                  </div></template>
+                  <label>Data da compra<input x-model="lotPurchaseForm.purchased_at" type="date" :max="finHoje()" required></label>
+                  <label>Referência do fornecedor (opcional)<input x-model="lotPurchaseForm.supplier_reference" maxlength="160" placeholder="Nota, recibo ou referência"></label>
+                </div>
+              </section>
+              <section class="lot-purchase-card">
+                <h2>Dados do lote</h2>
+                <div class="lot-purchase-fields">
+                  <label class="lot-wide">Descrição do lote<input x-model="lotPurchaseForm.description" maxlength="200" placeholder="Ex.: pneus para borracharia" required></label>
+                  <label>Quantidade de pneus<input x-model="lotPurchaseForm.quantity" type="number" min="1" max="100000" step="1" placeholder="0" required></label>
+                  <label>Valor total do lote (R$)<input x-model="lotPurchaseForm.total_cost" type="number" min="0.01" max="9999999.99" step="0.01" placeholder="0,00" required></label>
+                  <label>Frete da compra (R$)<input x-model="lotPurchaseForm.freight_amount" type="number" min="0" max="9999999.99" step="0.01" placeholder="0,00"></label>
+                  <label>Desconto (R$)<input x-model="lotPurchaseForm.discount_amount" type="number" min="0" max="9999999.99" step="0.01" placeholder="0,00"></label>
+                </div>
+                <div class="lot-purchase-calculator" aria-live="polite">
+                  <i data-lucide="calculator" class="lot-icon w-16 h-16 shrink-0"></i>
+                  <div><span>Custo calculado por pneu</span><b x-text="lotPurchaseUnitText()"></b><span x-text="lotPurchaseTotals().quantity > 0 ? formatCurrency(lotPurchaseTotals().total) + ' ÷ ' + lotPurchaseTotals().quantity + ' pneus' : 'Preencha a quantidade e o valor do lote'"></span></div>
+                </div>
+                <p class="lot-purchase-help"><i data-lucide="info"></i>O custo inclui frete e desconto. O valor total da compra é preservado, mesmo quando a divisão não é exata.</p>
+                <p class="lot-purchase-help"><i data-lucide="package"></i>Este lote é controlado pela quantidade total, sem cadastro de marca ou medida.</p>
+              </section>
+              <section class="lot-purchase-card">
+                <h2>Recebimento e pagamento</h2>
+                <div class="lot-purchase-fields">
+                  <div><p class="text-sm font-semibold">Recebimento</p>
+                    <div class="lot-purchase-segments" role="group" aria-label="Recebimento do lote"><button type="button" :aria-pressed="lotPurchaseForm.receipt_status === 'received'" @click="lotPurchaseForm.receipt_status='received'">Já recebi</button><button type="button" :aria-pressed="lotPurchaseForm.receipt_status === 'pending'" @click="lotPurchaseForm.receipt_status='pending'">A caminho</button></div>
+                    <label x-show="lotPurchaseForm.receipt_status === 'received'">Data do recebimento<input x-model="lotPurchaseForm.received_at" type="date" :min="lotPurchaseForm.purchased_at" :max="finHoje()" :required="lotPurchaseForm.receipt_status === 'received'"></label>
+                    <p class="lot-purchase-help" x-show="lotPurchaseForm.receipt_status === 'pending'">A compra ficará aguardando recebimento. Confirme a chegada pelo histórico de Compras.</p>
+                  </div>
+                  <div><p class="text-sm font-semibold">Pagamento</p>
+                    <div class="lot-purchase-segments" role="group" aria-label="Pagamento da compra"><button type="button" :aria-pressed="lotPurchaseForm.payment_status === 'paid'" @click="lotPurchaseForm.payment_status='paid'">Pago</button><button type="button" :disabled="!atacadoFinance" :aria-pressed="lotPurchaseForm.payment_status === 'pending'" @click="lotPurchaseForm.payment_status='pending'">A pagar</button></div>
+                    <template x-if="lotPurchaseForm.payment_status === 'paid'"><div class="lot-purchase-fields">
+                      <label>Forma de pagamento<select x-model="lotPurchaseForm.payment_method" required><option>Pix</option><option>Dinheiro</option><option>Transferência</option><option>Cartão</option><option>Outro</option></select></label>
+                      <label>Data do pagamento<input x-model="lotPurchaseForm.paid_at" type="date" :max="finHoje()" required></label>
+                    </div></template>
+                    <label x-show="lotPurchaseForm.payment_status === 'pending'">Vencimento<input x-model="lotPurchaseForm.due_date" type="date" :min="lotPurchaseForm.purchased_at" :required="lotPurchaseForm.payment_status === 'pending'"></label>
+                    <p class="lot-purchase-help" x-show="!atacadoFinance">Pagamento a prazo depende do financeiro de Compras estar ativo.</p>
+                  </div>
+                  <label class="lot-wide">Observações (opcional)<textarea x-model="lotPurchaseForm.notes" rows="2" maxlength="1000" placeholder="Informações sobre esta compra"></textarea></label>
+                </div>
+              </section>
+            </fieldset>
+            <aside class="lot-purchase-card lot-purchase-summary">
+              <h2>Resumo da compra</h2>
+              <div class="lot-purchase-quantity"><b><i data-lucide="package" class="w-10 h-10"></i></b><div><strong x-text="lotPurchaseTotals().quantity + ' pneus'"></strong><span class="lot-muted" x-text="lotPurchaseForm.description || 'Novo lote de pneus'"></span></div></div>
+              <dl><div><dt>Valor dos pneus</dt><dd x-text="formatCurrency(lotPurchaseTotals().products)"></dd></div><div><dt>Frete</dt><dd x-text="formatCurrency(lotPurchaseTotals().freight)"></dd></div><div><dt>Desconto</dt><dd x-text="formatCurrency(lotPurchaseTotals().discount)"></dd></div><div class="lot-total"><dt class="font-semibold">Total da compra</dt><dd x-text="formatCurrency(lotPurchaseTotals().total)"></dd></div></dl>
+              <h2>Ao confirmar</h2>
+              <div class="lot-purchase-effects">
+                <div><i data-lucide="warehouse"></i><div><b>Estoque</b><p class="lot-muted" x-text="lotPurchaseForm.receipt_status === 'received' ? 'Novo lote com ' + lotPurchaseTotals().quantity + ' pneus disponíveis.' : 'Compra a caminho. O saldo disponível só aumenta no recebimento.'"></p></div></div>
+                <div><i data-lucide="wallet"></i><div><b>Financeiro</b><p class="lot-muted" x-text="lotPurchaseForm.payment_status === 'paid' ? 'Pagamento de ' + formatCurrency(lotPurchaseTotals().total) + ' por ' + lotPurchaseForm.payment_method + '.' : 'Conta a pagar de ' + formatCurrency(lotPurchaseTotals().total) + (lotPurchaseForm.due_date ? ', vencimento em ' + financeDate(lotPurchaseForm.due_date) : ', com o vencimento informado') + '.'"></p></div></div>
+              </div>
+              <button type="submit" class="lot-purchase-btn primary" :disabled="lotPurchaseSaving"><i data-lucide="circle-check"></i><span x-text="lotPurchaseSaving ? 'Registrando…' : lotPurchasePendingBody ? 'Tentar novamente a mesma compra' : lotPurchaseForm.receipt_status === 'received' ? 'Confirmar compra e recebimento' : 'Registrar compra a caminho'"></span></button>
+              <button type="button" class="lot-purchase-btn" :disabled="lotPurchaseSaving" @click="lotPurchaseSaveDraft()"><i data-lucide="save"></i>Salvar rascunho nesta sessão</button>
+              <p class="lot-purchase-help"><i data-lucide="link"></i>A compra e o lote ficam vinculados. O recebimento não gera uma segunda cobrança.</p>
+            </aside>
+          </form>
+        </section>
+      </template>
 
       <!-- VISÃO GERAL: tudo derivado das coleções que loadAtacado já carrega. -->
       <div x-show="comprasTab === 'visao'" x-cloak class="space-y-5">
@@ -11443,7 +11527,7 @@
           <div class="mt-3 flex flex-col gap-2 sm:flex-row"><select x-model="compraOrderSelection" :disabled="compraOrderLoading" class="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2.5 text-sm"><option value="" x-text="compraOrderLoading ? 'Carregando…' : 'Escolha uma ordem aberta'"></option><template x-for="order in compraOrderOptions" :key="order.id"><option :value="order.id" x-text="`${order.order_code} · ${order.purchases_count} compra(s) · ${formatCurrency(Number(order.total_amount || 0))}`"></option></template></select><button type="button" @click="compraLinkOrder()" :disabled="!compraOrderSelection || compraActionSaving" class="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Vincular</button></div>
           <p x-show="!compraOrderLoading && compraOrderOptions.length === 0" class="mt-2 text-xs text-gray-500">Não há ordem aberta desse fornecedor. Novas compras já recebem uma ordem automaticamente.</p>
         </div>
-        <div><p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Itens</p><div class="border border-gray-200 rounded-xl overflow-hidden"><template x-for="item in (compraDetalhe?.items || [])" :key="item.id"><div class="px-4 py-3 border-b last:border-b-0 border-gray-100 flex items-center justify-between gap-4 text-sm"><div><span class="font-medium" x-text="(item.accepted_quantity ?? item.ordered_quantity ?? item.quantity)+'× '+item.measure"></span><span x-show="item.brand" class="text-gray-500" x-text="' · '+item.brand"></span><span class="text-emerald-700" x-text="' · '+catalogoConditionLabel(item.tire_condition)"></span><p x-show="item.accepted_quantity !== null && Number(item.accepted_quantity) !== Number(item.ordered_quantity ?? item.quantity)" class="mt-1 text-[11px] font-medium text-amber-700" x-text="`Pedido: ${item.ordered_quantity ?? item.quantity} · Aceito: ${item.accepted_quantity}`"></p></div><div class="text-right"><p class="font-semibold num" x-text="formatCurrency(Number(item.allocated_cost ?? item.line_total))"></p><p class="text-[11px] text-gray-500 num" x-text="formatCurrency(Number(item.unit_cost))+' cada, sem rateio'"></p></div></div></template></div></div>
+        <div><p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Itens</p><div class="border border-gray-200 rounded-xl overflow-hidden"><template x-for="item in (compraDetalhe?.items || [])" :key="item.id"><div class="px-4 py-3 border-b last:border-b-0 border-gray-100 flex items-center justify-between gap-4 text-sm"><div><span class="font-medium" x-text="(item.accepted_quantity ?? item.ordered_quantity ?? item.quantity)+'× '+item.measure"></span><span x-show="item.brand" class="text-gray-500" x-text="' · '+item.brand"></span><span class="text-emerald-700" x-show="item.item_kind !== 'lot'" x-text="' · '+catalogoConditionLabel(item.tire_condition)"></span><p x-show="item.accepted_quantity !== null && Number(item.accepted_quantity) !== Number(item.ordered_quantity ?? item.quantity)" class="mt-1 text-[11px] font-medium text-amber-700" x-text="`Pedido: ${item.ordered_quantity ?? item.quantity} · Aceito: ${item.accepted_quantity}`"></p></div><div class="text-right"><p class="font-semibold num" x-text="formatCurrency(Number(item.allocated_cost ?? item.line_total))"></p><p class="text-[11px] text-gray-500 num" x-text="item.item_kind === 'lot' ? 'Valor total do lote com frete e desconto' : formatCurrency(Number(item.unit_cost))+' cada, sem rateio'"></p></div></div></template></div></div>
         <div x-show="(compraDetalhe?.installments || []).length" class="rounded-xl border border-gray-200 p-4"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Parcelas previstas</p><div class="mt-3 divide-y divide-gray-100"><template x-for="row in compraDetalhe?.installments || []" :key="row.id"><div class="flex items-center justify-between py-2 text-sm"><span x-text="`${row.number}ª · ${financeDate(row.due_date)}`"></span><b class="num" x-text="formatCurrency(Number(row.amount))"></b></div></template></div></div>
         <div class="space-y-2 border-t border-gray-100 pt-4 text-sm"><div class="flex items-center justify-between"><span class="text-gray-500">Produtos</span><b x-text="formatCurrency(Number(compraDetalhe?.products_amount || 0))"></b></div><div class="flex items-center justify-between"><span class="text-gray-500">Frete</span><b x-text="formatCurrency(Number(compraDetalhe?.freight_amount || 0))"></b></div><div class="flex items-center justify-between"><span class="text-gray-500">Desconto</span><b x-text="'- '+formatCurrency(Number(compraDetalhe?.discount_amount || 0))"></b></div><div class="flex items-center justify-between pt-2"><span class="font-medium">Total da compra</span><span class="text-2xl font-semibold num" x-text="formatCurrency(Number(compraDetalhe?.total_amount || 0))"></span></div></div>
         <div x-show="compraDetalhe?.notes" class="p-4 rounded-xl bg-gray-50"><p class="text-xs font-medium text-gray-500">Observação</p><p class="text-sm mt-1 whitespace-pre-wrap" x-text="compraDetalhe?.notes"></p></div>
@@ -11454,7 +11538,7 @@
       <div x-show="compraDialog.kind === 'confirm'" class="space-y-4">
         <div class="overflow-hidden rounded-xl border border-gray-200">
           <div class="hidden grid-cols-[minmax(0,1fr)_100px_130px] gap-3 bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:grid"><span>Item</span><span class="text-center">Comprado</span><span class="text-center">Recebido</span></div>
-          <template x-for="item in compraReceiptItems" :key="item.item_id"><div class="grid grid-cols-[minmax(0,1fr)_90px] items-center gap-3 border-t border-gray-100 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_100px_130px]"><div class="min-w-0"><p class="truncate text-sm font-semibold" x-text="`${item.measure} · ${item.brand || 'Sem marca'}`"></p><p class="mt-0.5 text-xs text-gray-500" x-text="catalogoConditionLabel(item.tire_condition)+' · '+formatCurrency(item.unit_cost)+' cada'"></p></div><span class="hidden text-center text-sm font-semibold sm:block" x-text="item.ordered_quantity"></span><label><span class="mb-1 block text-[10px] font-medium uppercase text-gray-500 sm:hidden" x-text="`de ${item.ordered_quantity}`"></span><input x-model.number="item.accepted_quantity" type="number" min="0" :max="item.ordered_quantity" step="1" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-sm font-semibold focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"></label></div></template>
+          <template x-for="item in compraReceiptItems" :key="item.item_id"><div class="grid grid-cols-[minmax(0,1fr)_90px] items-center gap-3 border-t border-gray-100 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_100px_130px]"><div class="min-w-0"><p class="truncate text-sm font-semibold" x-text="item.item_kind === 'lot' ? item.measure : `${item.measure} · ${item.brand || 'Sem marca'}`"></p><p class="mt-0.5 text-xs text-gray-500" x-text="item.item_kind === 'lot' ? 'Recebimento integral do lote' : catalogoConditionLabel(item.tire_condition)+' · '+formatCurrency(item.unit_cost)+' cada'"></p></div><span class="hidden text-center text-sm font-semibold sm:block" x-text="item.ordered_quantity"></span><label><span class="mb-1 block text-[10px] font-medium uppercase text-gray-500 sm:hidden" x-text="`de ${item.ordered_quantity}`"></span><input :disabled="item.item_kind === 'lot'" x-model.number="item.accepted_quantity" type="number" min="0" :max="item.ordered_quantity" step="1" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-sm font-semibold focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"></label></div></template>
         </div>
         <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm"><div class="flex items-center justify-between"><span class="text-emerald-900">Produtos aceitos</span><b class="num text-emerald-900" x-text="formatCurrency(compraReceiptTotal())"></b></div><div class="mt-2 flex items-center justify-between border-t border-emerald-100 pt-2"><span class="font-semibold text-emerald-950">Novo total financeiro</span><b class="num text-lg text-emerald-950" x-text="formatCurrency(compraReceiptFinalTotal())"></b></div><p class="mt-2 text-xs leading-5 text-emerald-800">Frete e desconto permanecem os mesmos. Pneus recusados não entram no estoque; a obrigação financeira e as parcelas são reduzidas automaticamente.</p></div>
       </div>
