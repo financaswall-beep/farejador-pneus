@@ -101,7 +101,7 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260911-faltas1"></script>
+<script src="/admin/painel/app.nav.js?v=20260915-lot2"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
@@ -134,6 +134,7 @@
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.compras.lotes.js?v=20260915-lot1"></script>
+<script src="/admin/painel/app.estoque.lotes.js?v=20260915-lot2"></script>
 <script src="/admin/painel/app.compras.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260825-price-compare1"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260825-price-history1"></script>
@@ -233,8 +234,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260915-lot1"></script>
-<script src="/admin/painel/app.js?v=20260915-lot1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260915-lot2"></script>
+<script src="/admin/painel/app.js?v=20260915-lot2"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260910-1" />
@@ -254,6 +255,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/admin/painel/compras-lotes.css?v=20260915-lot1">
+<link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
@@ -3799,7 +3801,76 @@
       <div x-show="partnerEstoqueBalance.open" class="fixed inset-0 z-[90] flex items-center justify-center bg-gray-950/60 p-4" @click.self="partnerEstoqueCloseBalance()"><form @submit.prevent="partnerEstoqueSubmitBalance()" class="w-full max-w-md rounded-2xl bg-white p-5"><h2 class="text-xl font-bold">Corrigir saldo</h2><p class="mt-1 text-sm text-gray-500">Conte os pneus e informe quanto existe na loja agora.</p><label class="mt-4 block text-sm font-bold">Pneu<select :value="partnerEstoqueBalance.row?.stock_id||''" @change="partnerEstoqueBalance.row=partnerEstoque.rows.find(r=>r.stock_id===$event.target.value);partnerEstoqueBalance.quantity_on_hand=Number(partnerEstoqueBalance.row?.quantity_on_hand||0)" class="mt-1 w-full rounded-lg border p-3"><template x-for="row in partnerEstoqueActionRows()" :key="'balance-'+row.stock_id"><option :value="row.stock_id" x-text="partnerEstoqueIdentity(row)+' · '+(row.brand||'Sem marca')"></option></template></select></label><label class="mt-3 block text-sm font-bold">Quantidade que existe agora<input type="number" min="0" step="1" x-model.number="partnerEstoqueBalance.quantity_on_hand" class="mt-1 w-full rounded-lg border p-3"></label><p x-show="partnerEstoqueBalance.row?.quantity_reserved>0" class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><b x-text="partnerEstoqueBalance.row?.quantity_reserved"></b> pneu(s) já estão reservados e precisam continuar no saldo.</p><p x-show="partnerEstoqueBalance.error" class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700" x-text="partnerEstoqueBalance.error"></p><div class="mt-5 grid grid-cols-2 gap-2"><button type="button" @click="partnerEstoqueCloseBalance()" class="rounded-lg border p-3 font-bold">Cancelar</button><button type="submit" :disabled="partnerEstoqueBalance.saving" class="rounded-lg bg-emerald-800 p-3 font-bold text-white disabled:opacity-50" x-text="partnerEstoqueBalance.saving?'Salvando…':'Atualizar saldo'"></button></div></form></div>
       <div x-show="partnerEstoquePrice.open" class="fixed inset-0 z-[90] flex items-center justify-center bg-gray-950/60 p-4" @click.self="partnerEstoqueClosePrice()"><form @submit.prevent="partnerEstoqueSubmitPrice()" class="w-full max-w-md rounded-2xl bg-white p-5"><h2 class="text-xl font-bold">Alterar preço</h2><p class="mt-1 text-sm text-gray-500">Este é o preço da venda feita diretamente pela sua loja.</p><label class="mt-4 block text-sm font-bold">Pneu<select :value="partnerEstoquePrice.row?.stock_id||''" @change="partnerEstoquePrice.row=partnerEstoque.rows.find(r=>r.stock_id===$event.target.value);partnerEstoquePrice.sale_price=partnerEstoquePrice.row?.sale_price??''" class="mt-1 w-full rounded-lg border p-3"><template x-for="row in partnerEstoqueActionRows()" :key="'price-'+row.stock_id"><option :value="row.stock_id" x-text="partnerEstoqueIdentity(row)+' · '+(row.brand||'Sem marca')"></option></template></select></label><label class="mt-3 block text-sm font-bold">Novo preço<input type="number" min="0.01" step="0.01" x-model.number="partnerEstoquePrice.sale_price" class="mt-1 w-full rounded-lg border p-3"></label><p x-show="partnerEstoquePrice.error" class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700" x-text="partnerEstoquePrice.error"></p><div class="mt-5 grid grid-cols-2 gap-2"><button type="button" @click="partnerEstoqueClosePrice()" class="rounded-lg border p-3 font-bold">Cancelar</button><button type="submit" :disabled="partnerEstoquePrice.saving" class="rounded-lg bg-emerald-800 p-3 font-bold text-white disabled:opacity-50" x-text="partnerEstoquePrice.saving?'Salvando…':'Salvar preço'"></button></div></form></div>
     </div>
-    <div x-show="currentPage === 'estoque' && isMatrixPanel()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+    <template x-if="currentPage === 'estoque' && isMatrixPanel() && ['lotes','lotes-movimentos'].includes(stockTab)">
+      <section class="tire-lots" aria-label="Lotes de pneus">
+        <div class="tl-breadcrumb">Matriz / Estoque</div>
+        <header class="tl-heading"><div><h1>Lotes de pneus</h1><p>Acompanhe as entradas, o saldo e o custo dos pneus disponíveis.</p></div>
+          <div class="tl-actions" x-show="adminUser?.role === 'owner'"><button class="tl-btn" @click="tireLotSeparationOpen()"><i data-lucide="git-fork"></i>Registrar separação</button><button class="tl-btn tl-primary" @click="tireLotBuy()"><i data-lucide="shopping-cart"></i>Comprar lote <i data-lucide="arrow-up-right"></i></button></div>
+        </header>
+        <nav class="tl-tabs" aria-label="Seções do estoque de lotes"><button @click="stockTab='visao'; loadAtacado(); tireLotIcons()">Pneus cadastrados</button><button @click="tireLotsOpen('lotes')" :class="{active:stockTab==='lotes'}" :aria-current="stockTab==='lotes'?'page':null">Lotes</button><button @click="tireLotsOpen('lotes-movimentos')" :class="{active:stockTab==='lotes-movimentos'}" :aria-current="stockTab==='lotes-movimentos'?'page':null">Movimentações</button></nav>
+        <div x-show="tireLots.error" class="tl-error" role="alert"><span x-text="tireLots.error"></span><button @click="tireLotsLoad()">Tentar novamente</button></div>
+        <div class="tl-card tl-kpis" :aria-busy="tireLots.loading">
+          <div class="tl-kpi"><span class="tl-round"><i data-lucide="boxes"></i></span><div><strong x-text="tireLots.summary?.open_lots ?? '—'"></strong><span>Lotes abertos</span><small>Apenas lotes recebidos no estoque.</small></div></div>
+          <div class="tl-kpi"><span class="tl-round"><i data-lucide="box"></i></span><div><strong x-text="tireLots.summary ? tireLots.summary.available_quantity+' pneus' : '—'"></strong><span>Saldo disponível</span><small>Já desconta as reservas dos lotes.</small></div></div>
+          <div class="tl-kpi"><span class="tl-round amber"><i data-lucide="chart-no-axes-column-increasing"></i></span><div><strong x-text="tireLots.summary ? formatCurrency(tireLots.summary.remaining_cost) : '—'"></strong><span>Custo do estoque restante</span><small>Inclui pneus disponíveis e reservados.</small></div></div>
+        </div>
+        <div class="tl-grid" :style="stockTab==='lotes-movimentos'?'grid-template-columns:1fr':''">
+          <div class="tl-left">
+            <article class="tl-card" x-show="stockTab==='lotes'" aria-label="Lotes disponíveis">
+              <header class="tl-card-head"><h2>Lotes disponíveis</h2><div class="tl-tools"><label class="tl-search"><i data-lucide="search"></i><input aria-label="Buscar lote" placeholder="Buscar lote..." x-model="tireLots.search" @input.debounce.300ms="tireLotsLoad(true)"></label><select aria-label="Situação dos lotes" x-model="tireLots.status" @change="tireLotsLoad(true)"><option value="open">Abertos</option><option value="all">Todos</option><option value="pending">A caminho</option><option value="closed">Esgotados</option><option value="cancelled">Cancelados</option></select></div></header>
+              <p x-show="tireLots.loading" class="tl-refresh" role="status">Atualizando lotes…</p>
+              <div class="tl-scroll"><table class="tl-table"><thead><tr><th>Lote</th><th class="tl-num">Entraram</th><th class="tl-num">Saíram</th><th class="tl-num">Disponível</th><th class="tl-num">Custo / pneu</th><th><span class="sr-only">Detalhes</span></th></tr></thead>
+                <tbody><template x-for="lot in tireLots.rows" :key="lot.id"><tr class="lot-row" :class="{selected:lot.id===tireLots.selectedId}" @click="tireLotSelect(lot.id)">
+                  <td><div class="tl-lot-label"><i data-lucide="boxes"></i><button :aria-label="'Selecionar lote '+lot.lot_code" :aria-pressed="lot.id===tireLots.selectedId" @click.stop="tireLotSelect(lot.id)"><b x-text="lot.lot_code"></b><small x-text="(lot.origin_type==='separation'?'Separação':'Compra '+lot.purchase_code)+' · '+tireLotDate(lot.received_at || lot.created_at)"></small><small x-show="lot.status!=='open'" x-text="tireLotStatus(lot)"></small></button></div></td>
+                  <td class="tl-num" x-text="lot.accepted_quantity ?? 0"></td><td class="tl-num" x-text="lot.exited_quantity"></td><td class="tl-num"><span class="tl-badge" x-text="lot.available_quantity+' pneus'"></span></td><td class="tl-num" x-text="formatCurrency(lot.unit_cost)"></td><td><i data-lucide="chevron-right"></i></td>
+                </tr></template></tbody></table></div>
+              <div class="tl-empty" x-show="!tireLots.loading && !tireLots.rows.length && !tireLots.error"><b>Nenhum lote neste filtro</b><p>Os lotes aparecem após o registro da compra ou da separação.</p></div>
+              <div class="tl-pagination" x-show="tireLots.total>25"><span x-text="'Página '+tireLots.page+' · '+tireLots.total+' lotes'"></span><button aria-label="Página anterior de lotes" :disabled="tireLots.page===1 || tireLots.loading" @click="tireLots.page--; tireLotsLoad()"><i data-lucide="chevron-left"></i></button><button aria-label="Próxima página de lotes" :disabled="tireLots.page*25>=tireLots.total || tireLots.loading" @click="tireLots.page++; tireLotsLoad()"><i data-lucide="chevron-right"></i></button></div>
+              <div class="tl-info"><i data-lucide="info"></i>Novas entradas convivem com o saldo dos lotes anteriores.</div>
+            </article>
+            <article class="tl-card tl-movements" aria-label="Movimentações dos lotes"><header class="tl-card-head"><h2>Movimentações dos lotes</h2><button x-show="stockTab==='lotes-movimentos'" class="tl-link" @click="tireLotsLoadMovements()"><i data-lucide="refresh-cw"></i>Atualizar</button></header>
+              <p x-show="tireLots.movementLoading" class="tl-refresh" role="status">Atualizando movimentações…</p><div class="tl-error" x-show="tireLots.movementError" role="alert"><span x-text="tireLots.movementError"></span><button @click="tireLotsLoadMovements()">Tentar novamente</button></div>
+              <div class="tl-scroll"><table class="tl-table"><thead><tr><th>Data</th><th>Lote</th><th>Movimentação</th><th class="tl-num">Quantidade</th></tr></thead><tbody><template x-for="movement in (stockTab==='lotes' ? tireLots.movements.slice(0,4) : tireLots.movements)" :key="movement.id"><tr><td x-text="tireLotDate(movement.occurred_at,true)"></td><td><b x-text="movement.lot_code"></b></td><td><div class="tl-move-label"><span :class="movement.quantity_delta>0?'tl-positive':'tl-negative'"><template x-if="movement.quantity_delta>0"><i data-lucide="arrow-down"></i></template><template x-if="movement.quantity_delta<0"><i data-lucide="arrow-up"></i></template></span><span x-text="tireLotMovement(movement)"></span></div></td><td class="tl-num" :class="movement.quantity_delta>0?'tl-positive':'tl-negative'" x-text="(movement.quantity_delta>0?'+':'')+movement.quantity_delta"></td></tr></template></tbody></table></div>
+              <p class="tl-empty" x-show="!tireLots.movements.length && !tireLots.movementLoading && !tireLots.movementError">Nenhuma movimentação registrada.</p>
+              <button class="tl-link" x-show="stockTab==='lotes'" @click="tireLotsOpen('lotes-movimentos')">Ver todas as movimentações <i data-lucide="arrow-right"></i></button>
+              <div class="tl-pagination" x-show="stockTab==='lotes-movimentos' && tireLots.movementTotal>25"><span x-text="'Página '+tireLots.movementPage+' · '+tireLots.movementTotal+' movimentos'"></span><button aria-label="Página anterior de movimentos" :disabled="tireLots.movementPage===1 || tireLots.movementLoading" @click="tireLots.movementPage--; tireLotsLoadMovements()"><i data-lucide="chevron-left"></i></button><button aria-label="Próxima página de movimentos" :disabled="tireLots.movementPage*25>=tireLots.movementTotal || tireLots.movementLoading" @click="tireLots.movementPage++; tireLotsLoadMovements()"><i data-lucide="chevron-right"></i></button></div>
+              <div class="tl-info"><i data-lucide="info"></i>Registrar separação cria um lote a partir de uma origem já registrada, sem uma nova compra.</div>
+            </article>
+          </div>
+          <template x-if="stockTab==='lotes' && tireLotSelected"><aside class="tl-card tl-detail" aria-label="Detalhes do lote selecionado" aria-live="polite">
+            <header><small>Lote selecionado</small><div class="tl-detail-title"><h2 x-text="tireLotSelected.lot_code"></h2><span class="tl-badge" :class="tireLotSelected.status" x-text="tireLotStatus(tireLotSelected)"></span></div><p x-text="tireLotSelected.description"></p></header>
+            <div class="tl-balance"><div class="tl-round"><i data-lucide="box"></i></div><div><strong x-text="tireLotSelected.available_quantity+' pneus'"></strong><span>Disponíveis</span></div></div>
+            <small x-show="tireLotSelected.quantity_reserved>0" x-text="tireLotSelected.quantity_reserved+' pneus reservados neste lote.'"></small>
+            <div class="tl-mini-grid"><div><b x-text="tireLotSelected.accepted_quantity ?? 0"></b><span>Entraram</span></div><div><b x-text="tireLotSelected.exited_quantity"></b><span>Saíram</span></div></div>
+            <div><h3>Custo do lote</h3><dl class="tl-cost"><div><dt>Valor de entrada</dt><dd x-text="formatCurrency(tireLotSelected.allocated_cost)"></dd></div><div><dt>Custo por pneu</dt><dd x-text="formatCurrency(tireLotSelected.unit_cost)"></dd></div><div><dt>Custo do saldo</dt><dd x-text="formatCurrency(tireLotSelected.remaining_cost)"></dd></div></dl></div>
+            <section class="tl-origin"><h3>Origem</h3><div class="tl-origin-head"><b x-text="tireLotSelected.origin_type==='separation'?'Separação de estoque':'Compra '+tireLotSelected.purchase_code"></b><button x-show="tireLotSelected.purchase_id && hasPanelModule('compras')" class="tl-link" :disabled="tireLots.originLoading" @click="tireLotOrigin()">Ver compra de origem <i data-lucide="arrow-up-right"></i></button></div>
+              <template x-if="tireLotSelected.origin_type==='purchase'"><dl><dt>Fornecedor</dt><dd x-text="tireLotSelected.supplier_name || '—'"></dd><dt>Recebido em</dt><dd x-text="tireLotSelected.received_at ? tireLotDate(tireLotSelected.received_at) : 'Aguardando recebimento'"></dd></dl></template>
+              <template x-if="tireLotSelected.origin_type==='separation'"><dl><dt>Pneus de origem</dt><dd x-text="tireLotSelected.origin_snapshot.measure+' · '+(tireLotSelected.origin_snapshot.brand || 'Sem marca')"></dd><dt>Separado em</dt><dd x-text="tireLotDate(tireLotSelected.created_at)"></dd><dt>Motivo</dt><dd x-text="tireLotSelected.origin_snapshot.reason"></dd></dl></template>
+              <div class="tl-payment"><i data-lucide="circle-check"></i><span x-text="tireLotSelected.origin_type==='separation'?'Custo transferido da origem, sem novo pagamento.':tireLotSelected.status==='cancelled'?'Compra cancelada.':tireLotSelected.payment_status==='paid'?'Pagamento registrado na compra.':'Pagamento a acompanhar em Compras.'"></span></div>
+            </section>
+            <div class="tl-sale"><button class="tl-btn tl-primary" disabled aria-describedby="lot-sale-next"><i data-lucide="play"></i>Iniciar venda com este lote <i data-lucide="arrow-right"></i></button><small id="lot-sale-next">A venda de lotes será habilitada na próxima etapa.</small></div>
+          </aside></template>
+          <aside class="tl-card tl-empty" x-show="stockTab==='lotes' && !tireLotSelected"><i data-lucide="boxes" style="margin:25px auto 12px;width:36px;height:36px"></i><h2>Detalhes do lote</h2><p>Selecione um lote para acompanhar saldo, custo e origem.</p></aside>
+        </div>
+        <template x-if="tireLots.separationOpen"><div class="tl-modal-backdrop" @keydown.escape.window="if(!tireLots.saving)tireLots.separationOpen=false"><section class="tl-card tl-modal" role="dialog" aria-modal="true" aria-labelledby="lot-separation-title" @keydown.tab="tireLotTrap($event)">
+          <header><h2 id="lot-separation-title" tabindex="-1">Registrar separação</h2><button aria-label="Fechar separação" :disabled="tireLots.saving" @click="tireLots.separationOpen=false"><i data-lucide="x"></i></button></header><p>Transfira pneus já registrados no estoque para um lote.</p>
+          <form class="tl-form" @submit.prevent="tireLotSeparationSubmit()"><fieldset :disabled="tireLots.saving || !!tireLots.pending">
+            <label>Buscar pneu de origem<input placeholder="Medida ou marca" x-model="tireLots.sourceSearch" @input.debounce.300ms="tireLotSourcesLoad()"></label>
+            <label>Estoque de origem<select required aria-label="Estoque de origem" x-model="tireLots.form.stock_id"><option value="">Selecione um pneu disponível</option><template x-for="source in tireLots.sources" :key="source.id"><option :value="source.id" x-text="source.measure+' · '+(source.brand || 'Sem marca')+' · '+(source.tire_condition==='meia_vida'?'Meia-vida':source.tire_condition==='novo'?'Novo':'Remold')+' · '+source.available_quantity+' disponíveis'"></option></template></select></label>
+            <small x-show="tireLots.sourceLoading">Consultando estoque…</small><small x-show="!tireLots.sourceLoading && !tireLots.sources.length">Nenhum pneu disponível nesta busca. Para uma compra ainda não registrada, use Comprar lote.</small>
+            <label>Descrição do lote<input required maxlength="200" placeholder="Pneus para borracharia" x-model="tireLots.form.description"></label>
+            <label>Quantidade a separar<input required type="number" min="1" step="1" :max="tireLotSource?.available_quantity || 100000" x-model.number="tireLots.form.quantity"></label>
+            <label>Motivo da separação<textarea required minlength="5" maxlength="500" placeholder="Ex.: pneus separados para venda em lote" x-model="tireLots.form.reason"></textarea></label>
+          </fieldset>
+          <div class="tl-balance" x-show="tireLotSource"><i data-lucide="calculator"></i><div><small>Custo transferido para o lote</small><strong x-text="formatCurrency(tireLotSeparationCost)"></strong><small x-text="formatCurrency(tireLotSource?.unit_cost || 0)+' por pneu · custo da origem'"></small></div></div>
+          <div class="tl-info"><i data-lucide="info"></i>A quantidade sai do estoque cadastrado. O custo é reaproveitado, sem outra compra ou pagamento.</div>
+          <div class="tl-error" x-show="tireLots.separationError" role="alert" x-text="tireLots.separationError"></div>
+          <footer><button type="button" class="tl-btn" :disabled="tireLots.saving" @click="tireLots.separationOpen=false">Cancelar</button><button type="submit" class="tl-btn tl-primary" :disabled="tireLots.saving || tireLots.sourceLoading"><i data-lucide="check"></i><span x-text="tireLots.saving?'Registrando…':tireLots.pending?'Confirmar mesma separação':'Confirmar separação'"></span></button></footer>
+          </form>
+        </section></div></template>
+      </section>
+    </template>
+    <div x-show="currentPage === 'estoque' && isMatrixPanel() && !['lotes','lotes-movimentos'].includes(stockTab)" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
       <section aria-labelledby="estoque-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10">
@@ -3829,6 +3900,7 @@
       <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
           <nav aria-label="Seções de Estoque" class="flex items-center gap-1 overflow-x-auto">
+            <button @click="tireLotsOpen()" class="px-4 py-3.5 text-sm font-medium border-b-2 border-transparent whitespace-nowrap text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-300">Lotes</button>
             <button @click="stockTab = 'visao'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
             <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme(null, null)" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"

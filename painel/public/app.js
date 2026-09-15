@@ -105,6 +105,7 @@ function painelApp() {
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
     stockTab: 'visao',
+    tireLots: { rows: [], total: 0, summary: null, selectedId: null, search: '', status: 'open', page: 1, request: 0, loading: false, error: '', movements: [], movementTotal: 0, movementPage: 1, movementRequest: 0, movementLoading: false, movementError: '', originLoading: false, separationOpen: false, sources: [], sourceSearch: '', sourceRequest: 0, sourceLoading: false, separationError: '', saving: false, pending: null, form: { stock_id: '', description: '', quantity: '', reason: '' } },
     stockFiltro: 'todos',
     stockOperacao: null,
     stockBusca: '',

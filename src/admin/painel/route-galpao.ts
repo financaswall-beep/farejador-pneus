@@ -15,6 +15,7 @@ import {
 } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { registerStockReportRoutes } from './route-stock-report.js';
+import { registerTireLotRoutes } from './route-tire-lots.js';
 import {
   baixaWholesaleStockSchema, correctWholesaleStockBrandSchema,
   entryWholesaleStockSchema, physicalStockCountSchema,
@@ -23,6 +24,7 @@ import {
 } from './route-schemas-stock.js';
 
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
+  await registerTireLotRoutes(fastify);
   await registerStockReportRoutes(fastify);
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleStock()));
