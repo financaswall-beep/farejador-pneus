@@ -1,3 +1,4 @@
+import { tireVehicleLabel } from '../../shared/tire-vehicle-type.js';
 import type { buildPurchaseReport } from './queries-purchase-report.js';
 import { salesReportCsvCell } from './route-sales-report.js';
 
@@ -22,9 +23,10 @@ export function purchaseReportCsv(report: ReturnType<typeof buildPurchaseReport>
       report.export_purchases.forEach((row, index) => rows[index]!.push(amount(row.full_total), amount(row.paid), amount(row.open)));
     }
   } else {
-    columns = ['Medida', 'Marca', 'Condição', 'Quantidade do recorte', 'Recebidos', 'Em trânsito', 'Valor com rateio', 'Custo médio', 'Custo médio anterior', 'Variação percentual', 'Fornecedores'];
-    rows = report.products.map(row => [row.measure, row.brand, condition(row.condition), row.quantity, row.received, row.transit,
+    columns = ['Medida', 'Marca', 'Condição', 'Tipo de veículo', 'Quantidade do recorte', 'Recebidos', 'Em trânsito', 'Valor com rateio', 'Custo médio', 'Custo médio anterior', 'Variação percentual', 'Fornecedores'];
+    rows = report.products.map(row => [row.measure, row.brand, condition(row.condition), tireVehicleLabel(row.vehicle_type), row.quantity, row.received, row.transit,
       amount(row.value), amount(row.average_cost), amount(row.previous_average), amount(row.change_pct), row.suppliers]);
   }
+  columns.push('Filtro de veículo'); rows.forEach(row=>row.push(tireVehicleLabel(report.filters.vehicle_type || 'all')));
   return '\uFEFF' + [columns, ...rows].map(row => row.map(salesReportCsvCell).join(';')).join('\r\n');
 }

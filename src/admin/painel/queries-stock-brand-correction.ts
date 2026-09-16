@@ -17,6 +17,7 @@ import {
 } from './stage5-integrity.js';
 
 interface StockVariant {
+  vehicle_type: 'motorcycle' | 'car' | null;
   id: string;
   measure: string;
   brand: string;
@@ -113,7 +114,7 @@ export async function correctWholesaleStockBrand(
       [`stock-brand:${environment}:${tireSizeKey(measure)}:${tireCondition}`],
     );
     const lockedStock = await client.query<StockVariant>(
-      `SELECT id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text,
+      `SELECT commerce.stock_vehicle_type(environment,measure,brand,tire_condition) vehicle_type,id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text,
               min_quantity,notes,tire_width_mm,tire_aspect_ratio,
               tire_rim_diameter,created_at::text
          FROM commerce.wholesale_stock
@@ -196,8 +197,8 @@ export async function correctWholesaleStockBrand(
     const inserted = await client.query<StockVariant>(
       `INSERT INTO commerce.wholesale_stock (
          id,environment,measure,brand,tire_condition,quantity_on_hand,unit_cost,
-         min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter,created_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter,created_at,vehicle_type
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text,
                  min_quantity,notes,tire_width_mm,tire_aspect_ratio,
                  tire_rim_diameter,created_at::text`,
@@ -205,7 +206,7 @@ export async function correctWholesaleStockBrand(
         source.id, environment, source.measure, toBrand, source.tire_condition,
         source.quantity_on_hand, Number(source.unit_cost), source.min_quantity,
         source.notes, source.tire_width_mm, source.tire_aspect_ratio,
-        source.tire_rim_diameter, source.created_at,
+        source.tire_rim_diameter, source.created_at, source.vehicle_type,
       ],
     );
     const target = inserted.rows[0]!;

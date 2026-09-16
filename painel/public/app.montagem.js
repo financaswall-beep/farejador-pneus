@@ -11,6 +11,7 @@ window.PAINEL_MONTAR = function (estado) {
     'comprasResumo:compras->comprasRelatorios',
   ]);
   const fabricas = [
+    window.PAINEL_MODULES.vehicleTypes,
     window.PAINEL_MODULES.nav, // app.nav.js (linhas 208-262 pré-obra): título/menu/badge + seleção de unidade (abrir/voltar)
     window.PAINEL_MODULES.redeKpis, // app.rede.kpis.js (linhas 263-455 pré-obra): derivadas da Rede: metas, séries, totais, rankings, alertas
     window.PAINEL_MODULES.redeOperacao, // app.rede.operacao.js (23/07): apresentação padrão de Operação e saúde + fallback legado explícito
@@ -120,6 +121,8 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.catalogo,
     window.PAINEL_MODULES.catalogoBootstrap,
+    window.PAINEL_MODULES.catalogoFicha,
+    window.PAINEL_MODULES.catalogoDescobertas,
     window.PAINEL_MODULES.catalogoCompatibilidade,
     window.PAINEL_MODULES.catalogoMarca,
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)

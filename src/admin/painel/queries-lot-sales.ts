@@ -7,7 +7,7 @@ export async function lotSalesReady(db: Pool = defaultPool) {
   return result.rows[0].ready as boolean;
 }
 export async function listSaleLots(db: Pool = defaultPool) {
-  const result = await db.query(`SELECT l.id,'LT-'||lpad(l.lot_number::text,6,'0') lot_code,l.description,
+  const result = await db.query(`SELECT l.id,'LT-'||lpad(l.lot_number::text,6,'0') lot_code,l.description,l.vehicle_type,
     l.quantity_on_hand,l.quantity_reserved,l.quantity_on_hand-l.quantity_reserved available_quantity,
     l.remaining_cost,l.allocated_cost/l.ordered_quantity unit_cost,l.created_at,
     COALESCE(p.stock_applied_at,l.created_at) received_at
@@ -24,7 +24,7 @@ export async function listLotSales(page=1, db: Pool = defaultPool) {
       COALESCE((SELECT sum(quantity) FROM commerce.wholesale_order_items i WHERE i.environment=o.environment AND i.order_id=o.id),0) quantity,
       COALESCE((SELECT sum(round(quantity*unit_cost,2)) FROM commerce.wholesale_order_items i WHERE i.environment=o.environment AND i.order_id=o.id),0) cost,
       (SELECT jsonb_agg(jsonb_build_object('lot_id',l.id,'lot_code','LT-'||lpad(l.lot_number::text,6,'0'),
-        'quantity',i.quantity,'cost',round(i.quantity*i.unit_cost,2),'amount',i.line_total) ORDER BY l.created_at,l.id)
+        'vehicle_type',i.vehicle_type,'quantity',i.quantity,'cost',round(i.quantity*i.unit_cost,2),'amount',i.line_total) ORDER BY l.created_at,l.id)
         FROM commerce.wholesale_order_items i JOIN commerce.tire_lots l ON l.environment=i.environment AND l.id=i.tire_lot_id
         WHERE i.environment=o.environment AND i.order_id=o.id) allocations
     FROM commerce.wholesale_orders o JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment

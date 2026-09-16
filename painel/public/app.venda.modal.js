@@ -5,7 +5,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.vendaModal = function () {
   return {
     openSaleModal(conv) {
-      this.modalConv = conv;
+      this.modalConv = conv; this.saleVehicleType = 'all';
       const firstProduct = this.produtos.find((product) => product.walkin_sellable) || null;
       const hasDraft = Boolean(conv?.draft_id);
       this.saleForm = {
@@ -27,7 +27,7 @@ window.PAINEL_MODULES.vendaModal = function () {
     },
 
     async openWalkinModal() {
-      this.modalConv = null;
+      this.modalConv = null; this.saleVehicleType = 'all';
       // O estoque pode ter mudado em Compras sem que o shell do painel tenha
       // sido recarregado. A venda sempre abre sobre uma fotografia nova do
       // catálogo para não exibir saldo/custo antigos ao operador.

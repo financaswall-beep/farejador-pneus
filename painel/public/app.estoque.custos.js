@@ -9,7 +9,7 @@ window.PAINEL_MODULES.estoqueCustos = function () {
       const s = this.stockCosts, request = ++s.request;
       s.loading = true; s.error = ''; s.data = null; s.detail = null;
       try {
-        const data = await this.apiGet('/admin/api/wholesale/stock/costs');
+        const data = await this.apiGet('/admin/api/wholesale/stock/costs?vehicle_type='+encodeURIComponent(this.stockVehicleType || 'all'));
         if (request !== s.request) return;
         s.data = data; this.$nextTick(() => window.lucide?.createIcons());
       } catch (_) {
@@ -44,7 +44,7 @@ window.PAINEL_MODULES.estoqueCustos = function () {
     scCondition(value) { return ({ meia_vida: 'Meia-vida', novo: 'Novo', remold: 'Remold' })[value] || value || '—'; },
     scMode(mode) { this.stockCosts.mode = mode; this.stockCosts.search = ''; this.stockCosts.detail = null; },
     async scLot(row) {
-      this.tireLots.status = 'open'; this.tireLots.search = row?.lot_code || '';
+      this.tireLotVehicleType = this.stockVehicleType || 'all'; this.tireLots.status = 'open'; this.tireLots.search = row?.lot_code || '';
       this.tireLots.page = 1; this.tireLots.selectedId = row?.id || null;
       await this.tireLotsOpen();
     },
@@ -67,10 +67,11 @@ window.PAINEL_MODULES.estoqueCustos = function () {
       const money = value => number(value).toFixed(2).replace('.', ',');
       const records = [
         ['Custos do estoque', new Date(this.stockCosts.data.as_of).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })],
+        ['Tipo de veículo', this.vehicleFilterLabel(this.stockVehicleType)],
         ['Recorte', catalog ? 'Pneus cadastrados' : 'Lotes', 'Condição', catalog ? this.scCondition(this.stockCosts.condition || 'Todas') : 'Não se aplica', 'Busca', this.stockCosts.search],
-        [catalog ? 'Medida' : 'Lote', catalog ? 'Condição' : 'Descrição', 'Em estoque', 'Reservados', 'Disponíveis', 'Custo médio', 'Capital', 'Pneus com custo zero'],
+        [catalog ? 'Medida' : 'Lote', catalog ? 'Condição' : 'Descrição', 'Em estoque', 'Reservados', 'Disponíveis', 'Custo médio', 'Capital', 'Pneus com custo zero', 'Tipo de veículo'],
         ...this.scRows.map(row => [catalog ? row.measure : row.lot_code, catalog ? this.scCondition(row.tire_condition) : row.description,
-          row.quantity_on_hand, row.quantity_reserved, row.quantity_available, money(row.unit_cost), money(row.capital), row.zero_cost_quantity]),
+          row.quantity_on_hand, row.quantity_reserved, row.quantity_available, money(row.unit_cost), money(row.capital), row.zero_cost_quantity, this.vehicleTypeLabel(row.vehicle_type)]),
         ['Total do filtro', '', this.scTotals.quantity_on_hand, this.scTotals.quantity_reserved, this.scTotals.quantity_available, '', money(this.scTotals.cents / 100)],
         ['Reservados continuam no capital até a saída. Compras a caminho ficam fora deste total.']
       ];

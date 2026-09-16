@@ -1,6 +1,8 @@
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 import { z } from 'zod';
 
 export const stockReportQuery = z.object({
+  vehicle_type: vehicleReportFilterSchema.default('all'),
   days: z.enum(['30','60','90']).default('30'),
   condition: z.enum(['','novo','meia_vida','remold']).default(''),
   status: z.enum(['all','replenish','zero','incoming','healthy','no_sales','no_minimum']).default('all'),

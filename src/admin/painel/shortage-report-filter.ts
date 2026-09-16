@@ -1,6 +1,8 @@
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 import { z } from 'zod';
 import { reportDate,validReportRange } from './report-period.js';
 export const shortageReportQuery=z.object({
+  vehicle_type: vehicleReportFilterSchema.default('all'),
   from:reportDate,to:reportDate,mode:z.enum(['month','week','custom']).default('month'),
   store:z.union([z.literal(''),z.literal('matriz'),z.string().uuid()]).default(''),
   measure:z.string().trim().max(80).default(''),search:z.string().trim().max(80).default(''),

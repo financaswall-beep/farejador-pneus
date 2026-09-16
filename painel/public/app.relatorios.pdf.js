@@ -8,7 +8,7 @@ window.PAINEL_MODULES.relatoriosPdf = function () {
       const source=tab==='sales'?report.sales.rows:tab==='products'?report.products:report.measures;
       if(source.length>1000)throw Error('Para PDF, reduza os filtros a até 1.000 linhas. O CSV permite um relatório maior.');
       const filters=[this.rpDate(f.from)+' a '+this.rpDate(f.to),f.channel==='all'?'Atacado e varejo':f.channel,
-        f.brand||'Todas as marcas',f.condition?condition(f.condition):'Todas as condições',f.measure?'Busca: '+f.measure:''].filter(Boolean).join(' / ');
+        f.brand||'Todas as marcas',this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?condition(f.condition):'Todas as condições',f.measure?'Busca: '+f.measure:''].filter(Boolean).join(' / ');
       const filterLines=wrap(filters);
       const contents=[];
       const header=(title,page)=>{

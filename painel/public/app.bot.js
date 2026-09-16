@@ -6,6 +6,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.bot = function () {
   let latestVisaoRequestId = 0;
   return {
+    botVehicleType: 'all',
     botResilience: null,
     botResilienceMsg: null,
     botFilaErro: false,
@@ -43,7 +44,7 @@ window.PAINEL_MODULES.bot = function () {
       if (!silent) this.botLoading = true;
       try {
         const [visao, resilience] = await Promise.allSettled([
-          this.apiGet('/admin/api/bot/visao?period=' + encodeURIComponent(period)),
+          this.apiGet('/admin/api/bot/visao?period=' + encodeURIComponent(period)+'&vehicle_type='+encodeURIComponent(this.botVehicleType || 'all')),
           silent ? Promise.resolve(null) : this.apiGet('/admin/api/bot/resiliencia'),
         ]);
         if (requestId !== latestVisaoRequestId || period !== this.botPeriodo) return;

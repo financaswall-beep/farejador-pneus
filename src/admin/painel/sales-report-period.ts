@@ -1,7 +1,9 @@
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 import { z } from 'zod';
 import { reportDate as date, validReportRange } from './report-period.js';
 export { reportDay, reportAddDays, reportComparison as salesReportComparison } from './report-period.js';
 export const salesReportQuery = z.object({
+  vehicle_type: vehicleReportFilterSchema.default('all'),
   from: date, to: date,
   mode: z.enum(['month', 'week', 'custom']).default('month'),
   compare: z.enum(['true', 'false']).default('true'),

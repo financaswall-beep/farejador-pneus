@@ -2,10 +2,10 @@ window.PAINEL_MODULES=window.PAINEL_MODULES||{};
 window.PAINEL_MODULES.relatoriosEstoque=function(){
   let request=0;
   return {
-    rst:{tab:'overview',days:'30',condition:'',status:'all',measure:'',exact:false,movement:'all',source:'all',offset:0,
+    rst: {vehicle_type:'all',tab:'overview',days:'30',condition:'',status:'all',measure:'',exact:false,movement:'all',source:'all',offset:0,
       page:1,selected:'',data:null,loading:false,error:'',exporting:false,exportError:'',saved:false,notice:'',showRules:false,openingPlan:false},
     rstOpen(){try{this.rst.saved=!!localStorage.getItem(this.rstStorageKey());}catch(_){}void this.rstLoad();},
-    rstQuery(filters=null,view=this.rst.tab){const f=filters||this.rst;return new URLSearchParams({days:f.days,condition:f.condition,
+    rstQuery(filters=null,view=this.rst.tab){const f=filters||this.rst;return new URLSearchParams({vehicle_type:f.vehicle_type || 'all',days:f.days,condition:f.condition,
       status:f.status,measure:f.measure,exact:String(f.exact),view,movement:f.movement,source:f.source,offset:String(f.offset||0)}).toString();},
     async rstLoad(offset=0){
       const id=++request;Object.assign(this.rst,{loading:true,error:'',exportError:'',offset,page:1});
@@ -18,7 +18,7 @@ window.PAINEL_MODULES.relatoriosEstoque=function(){
         :'Não foi possível consultar o estoque. Tente novamente.';}}
       finally{if(id===request)this.rst.loading=false;}
     },
-    rstReset(){Object.assign(this.rst,{condition:'',status:'all',measure:'',exact:false,movement:'all',source:'all'});void this.rstLoad();},
+    rstReset(){Object.assign(this.rst,{vehicle_type:'all',condition:'',status:'all',measure:'',exact:false,movement:'all',source:'all'});void this.rstLoad();},
     rstSearch(){this.rst.exact=false;void this.rstLoad();},
     rstTab(tab){this.rst.tab=tab;this.rst.page=1;if(tab==='replenishment'&&!this.rstRows.some(row=>row.key===this.rst.selected))this.rst.selected=this.rstRows[0]?.key||'';},
     rstSeeMovements(row){Object.assign(this.rst,{tab:'movements',measure:row.measure,condition:row.condition,exact:true,status:'all',movement:'all',source:'all'});void this.rstLoad();},
@@ -32,7 +32,7 @@ window.PAINEL_MODULES.relatoriosEstoque=function(){
       try{const value=JSON.parse(localStorage.getItem(this.rstStorageKey())||'null');if(!value?.filters)return;
         for(const key of ['days','condition','status','measure','movement','source']){if(typeof value.filters[key]!=='string'||value.filters[key].length>200)throw Error('invalid');this.rst[key]=value.filters[key];}
         this.rst.exact=String(value.filters.exact)==='true';this.rst.tab=['overview','products','replenishment','movements'].includes(value.tab)?value.tab:'overview';
-        this.rst.notice='Visão restaurada com o estoque atual.';void this.rstLoad();
+        this.rst.notice='Visão restaurada com o estoque atual.';this.rst.vehicle_type = ['motorcycle','car','mixed','unknown'].includes(value.filters.vehicle_type) ? value.filters.vehicle_type : 'all';void this.rstLoad();
       }catch(_){this.rst.notice='A visão salva não está disponível. Selecione os filtros novamente.';}
     },
     async rstOpenPlan(){

@@ -4,7 +4,7 @@ window.PAINEL_MODULES.relatoriosCompras = function () {
   const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'America/Sao_Paulo'}).format(new Date());
   const day = d => d.toISOString().slice(0,10), parse = d => new Date(d+'T12:00:00Z');
   return {
-    rcomp:{tab:'overview',mode:'month',month:today().slice(0,7),from:'',to:'',compare:true,supplier:'',brand:'',condition:'',
+    rcomp: {vehicle_type:'all',tab:'overview',mode:'month',month:today().slice(0,7),from:'',to:'',compare:true,supplier:'',brand:'',condition:'',
       receipt:'all',measure:'',exact:false,offset:0,productPage:1,supplierPage:1,supplierSearch:'',chart:'value',
       data:null,loading:false,error:'',expanded:'',selectedSupplier:null,selectedPurchase:null,
       saved:false,notice:'',exporting:false,exportError:'',showRules:false},
@@ -29,7 +29,7 @@ window.PAINEL_MODULES.relatoriosCompras = function () {
     },
     rcompQuery(filters=null,view=this.rcomp.tab) {
       const f=filters||this.rcomp;
-      return new URLSearchParams({from:f.from,to:f.to,mode:f.mode,compare:String(f.compare),supplier:f.supplier,
+      return new URLSearchParams({vehicle_type:f.vehicle_type || 'all',from:f.from,to:f.to,mode:f.mode,compare:String(f.compare),supplier:f.supplier,
         brand:f.brand,condition:f.condition,receipt:f.receipt,measure:f.measure,exact:String(f.exact),offset:String(f.offset||0),view}).toString();
     },
     async rcompLoad(offset=0) {
@@ -49,9 +49,9 @@ window.PAINEL_MODULES.relatoriosCompras = function () {
       }
       }finally{if(id===request)this.rcomp.loading=false;}
     },
-    rcompResetFilters() {Object.assign(this.rcomp,{supplier:'',brand:'',condition:'',receipt:'all',measure:'',exact:false,supplierSearch:''});void this.rcompLoad();},
+    rcompResetFilters() {Object.assign(this.rcomp,{vehicle_type:'all',supplier:'',brand:'',condition:'',receipt:'all',measure:'',exact:false,supplierSearch:''});void this.rcompLoad();},
     rcompSearchMeasure() {this.rcomp.exact=false;void this.rcompLoad();},
-    rcompSeePurchases(row) {Object.assign(this.rcomp,{measure:row.measure,brand:row.brand,condition:row.condition,exact:true,tab:'purchases'});void this.rcompLoad();},
+    rcompSeePurchases(row) {Object.assign(this.rcomp,{measure:row.measure,brand:row.brand,condition:row.condition,vehicle_type:row.vehicle_type || 'unknown',exact:true,tab:'purchases'});void this.rcompLoad();},
     rcompSupplierReport(id,tab) {Object.assign(this.rcomp,{supplier:id,tab});void this.rcompLoad();},
     rcompStorageKey() {return this.rpStorageKey()+':compras';},
     rcompSaveView() {
@@ -68,7 +68,7 @@ window.PAINEL_MODULES.relatoriosCompras = function () {
         }
         this.rcomp.compare=String(saved.filters.compare)==='true';this.rcomp.exact=String(saved.filters.exact)==='true';
         this.rcomp.month=this.rcomp.from.slice(0,7);this.rcomp.tab=['overview','products','suppliers','purchases'].includes(saved.tab)?saved.tab:'overview';
-        this.rcomp.notice='Visão restaurada. Os números foram consultados novamente.';void this.rcompLoad();
+        this.rcomp.notice='Visão restaurada. Os números foram consultados novamente.';this.rcomp.vehicle_type = ['motorcycle','car','mixed','unknown'].includes(saved.filters.vehicle_type) ? saved.filters.vehicle_type : 'all';void this.rcompLoad();
       }catch(_){this.rcomp.notice='A visão salva não está disponível. Escolha os filtros novamente.';}
     },
   };

@@ -3,7 +3,7 @@ window.PAINEL_MODULES.relatoriosDemandaPdf=function(){return{
   rdemPdfBytes(r){const {text,rect,rule,fit,wrap,build,green,muted}=window.REPORT_PDF,f=r.filters;
     const tabs={overview:'Visão geral',cities:'Municípios',measures:'Medidas',evolution:'Evolução'},series=f.view==='measures'?r.measure_series:r.series;
     const header=page=>rect(0,509,842,86,green)+text('FAREJADOR / MATRIZ',30,566,12,true,'1 1 1')+text('Demanda por município / '+tabs[f.view],30,536,22,true,'1 1 1')
-      +text(this.rpDate(f.from)+' a '+this.rpDate(f.to)+' / '+fit(r.city_name,70),30,487,10,true)
+      +text((this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus')+' / '+this.rpDate(f.from)+' a '+this.rpDate(f.to)+' / '+fit(r.city_name,70),30,487,10,true)
       +text('Comparação: '+(r.comparison?this.rpDate(r.comparison.from)+' a '+this.rpDate(r.comparison.to):'desativada')+' / Posição: '+this.rdemTime(r.as_of),30,469,9,false,muted)
       +rule(33)+text('Conversas distintas no período. Localização e estoque atuais. Não representa clientes únicos.',30,20,8,false,muted)+text('Página '+page,765,20,8,false,muted);
     let cover=header(1);const metrics=[['Conversas',r.scope.conversations],['Com pedido',r.scope.orders],['Com falta',r.scope.shortages],['Conversão',this.rdemPercent(r.scope.conversion)]];

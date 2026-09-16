@@ -4,6 +4,7 @@ import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
 
 export interface WholesaleStockRow {
+  vehicle_type?: 'motorcycle' | 'car' | null;
   measure: string;
   brand: string;
   tire_condition: TireCondition;
@@ -38,10 +39,10 @@ export async function listWholesaleStock(
           AND created_at>=now()-INTERVAL '30 days'
         GROUP BY environment,measure,brand,tire_condition
      ), stock_by_measure AS (
-       SELECT environment,measure,tire_condition,
+       SELECT environment,measure,tire_condition,commerce.stock_vehicle_type(environment,measure,brand,tire_condition) vehicle_type,
               sum(quantity_on_hand-quantity_reserved)::int AS units
          FROM commerce.wholesale_stock
-        GROUP BY environment,measure,tire_condition
+        GROUP BY environment,measure,tire_condition,commerce.stock_vehicle_type(environment,measure,brand,tire_condition)
      ), pending_receipts AS (
        SELECT i.environment,i.measure,COALESCE(i.brand,'Sem marca') brand,i.tire_condition,
               COALESCE(sum(GREATEST(i.quantity-COALESCE(i.accepted_quantity,0),0)),0)::int units
@@ -52,6 +53,7 @@ export async function listWholesaleStock(
         GROUP BY i.environment,i.measure,COALESCE(i.brand,'Sem marca'),i.tire_condition
      )
      SELECT ws.measure,ws.brand,ws.tire_condition,ws.quantity_on_hand,
+            commerce.stock_vehicle_type(ws.environment,ws.measure,ws.brand,ws.tire_condition) vehicle_type,
             ws.quantity_reserved,
             (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,
             COALESCE(pr.units,0)::int AS in_transit_quantity,
@@ -69,9 +71,11 @@ export async function listWholesaleStock(
        LEFT JOIN stock_by_measure sm
          ON sm.environment=ws.environment AND sm.measure=ws.measure
         AND sm.tire_condition=ws.tire_condition
+        AND sm.vehicle_type IS NOT DISTINCT FROM commerce.stock_vehicle_type(ws.environment,ws.measure,ws.brand,ws.tire_condition)
        LEFT JOIN commerce.wholesale_replenishment_policies rp
          ON rp.environment=ws.environment AND rp.measure=ws.measure
         AND rp.tire_condition=ws.tire_condition
+        AND rp.vehicle_type IS NOT DISTINCT FROM commerce.stock_vehicle_type(ws.environment,ws.measure,ws.brand,ws.tire_condition)
       WHERE ws.environment=$1
       ORDER BY ws.measure,ws.brand,ws.tire_condition`,
     [environment],

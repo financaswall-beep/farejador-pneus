@@ -83,19 +83,19 @@ export async function getMatrizNotificacoes(
            AND p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS pagar_total,
 
        (SELECT json_agg(json_build_object(
-                 'measure', p.measure, 'tire_condition', p.tire_condition,
+                 'measure', p.measure, 'tire_condition', p.tire_condition, 'vehicle_type', p.vehicle_type,
                  'quantity_on_hand', COALESCE(s.quantity_available,0),
                  'min_quantity', p.min_quantity)
                ORDER BY COALESCE(s.quantity_available,0)::numeric
                  / NULLIF(p.min_quantity,0), p.measure, p.tire_condition)
           FROM commerce.wholesale_replenishment_policies p
           LEFT JOIN (
-            SELECT environment,measure,tire_condition,
+            SELECT environment,measure,tire_condition,commerce.stock_vehicle_type(environment,measure,brand,tire_condition) vehicle_type,
                    sum(quantity_on_hand-quantity_reserved)::int AS quantity_available
               FROM commerce.wholesale_stock
-             GROUP BY environment,measure,tire_condition
+             GROUP BY environment,measure,tire_condition,commerce.stock_vehicle_type(environment,measure,brand,tire_condition)
           ) s ON s.environment=p.environment AND s.measure=p.measure
-             AND s.tire_condition=p.tire_condition
+             AND s.tire_condition=p.tire_condition AND s.vehicle_type IS NOT DISTINCT FROM p.vehicle_type
          WHERE p.environment=$1
            AND COALESCE(s.quantity_available,0) <= p.min_quantity) AS galpao_repor`,
     [environment],

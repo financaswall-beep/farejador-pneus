@@ -1,3 +1,4 @@
+import { tireVehicleLabel } from '../../shared/tire-vehicle-type.js';
 import type { buildShortageReport } from './queries-shortage-report.js';
 export const shortageReportCell=(value:unknown)=>{
   let text=String(value??'');if(/^[\s]*[=+@-]/.test(text)||/^[\t\r\n]/.test(text))text="'"+text;
@@ -5,7 +6,7 @@ export const shortageReportCell=(value:unknown)=>{
 };
 export function shortageReportCsv(r:ReturnType<typeof buildShortageReport>){
   const money=(v:number|null)=>v===null?'Sem referência':v.toFixed(2).replace('.',',');
-  const rows:unknown[][]=[['Faltas por loja',r.store?.name||'Sem loja no recorte'],['Período',r.filters.from,r.filters.to],
+  const rows:unknown[][]=[['Faltas por loja',r.store?.name||'Sem loja no recorte'],['Tipo de veículo',tireVehicleLabel(r.filters.vehicle_type || 'all')],['Período',r.filters.from,r.filters.to],
     ['Posição do estoque e dos preços',r.as_of],[['overview','measures'].includes(r.filters.view)?'Medida selecionada no detalhe (lista completa abaixo)':'Medida filtrada',r.filters.measure||'Todas'],['Busca de medida',r.filters.search],
     ['Metodologia','Receita potencial estimada, não lucro nem perda confirmada. Uma unidade por conversa e medida na loja; menor preço atual elegível da Matriz ou da Rede.'],
     ['Contagem de faltas','Uma falta por conversa, medida e loja no período. Medidas diferentes contam separadamente; buscas repetidas permanecem apenas no histórico.'],

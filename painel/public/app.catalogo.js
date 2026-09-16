@@ -11,6 +11,7 @@ const catalogoPresentationText = (value) => String(value || '')
   .replace(/\b(\d[.,]\d{1,2})\s*R\s*(\d{2})(?!\d)/gi, '$1-$2');
 window.PAINEL_MODULES.catalogo = function () {
   return {
+
     catalogoMeasureLabel(value) {
       return catalogoPresentationText(value).trim() || '—';
     },
@@ -61,6 +62,8 @@ window.PAINEL_MODULES.catalogo = function () {
     catalogoFiltrados() {
       const search = String(this.catalogoBusca || '').trim().toLocaleLowerCase('pt-BR');
       return this.catalogoRows.filter((row) => {
+        const type = this.catalogoVehicleType || 'all';
+        if (type !== 'all' && (row.product_type !== 'tire' || (type === 'unknown' ? row.vehicle_type != null : row.vehicle_type !== type))) return false;
         if (this.catalogoFiltro === 'incompleto' && !row.measure_draft) return false;
         if (this.catalogoMarca !== 'todas' && row.brand !== this.catalogoMarca) return false;
         if (this.catalogoFiltro === 'estoque' && Number(row.total_stock_available ?? row.official_quantity_on_hand ?? 0) <= 0) return false;
@@ -70,7 +73,7 @@ window.PAINEL_MODULES.catalogo = function () {
         if (!search) return true;
         return [row.product_code, row.product_name, row.brand, row.tire_size,
           this.catalogoMeasureLabel(row.tire_size), this.catalogoProductLabel(row),
-          this.catalogoConditionLabel(row.tire_condition), row.tread_pattern,
+          this.catalogoConditionLabel(row.tire_condition), this.vehicleTypeLabel(row.vehicle_type), row.tread_pattern,
           row.load_index, row.speed_rating, row.application_search,
           this.catalogoPositionLabel(row.tire_position)]
           .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(search));
@@ -142,7 +145,7 @@ window.PAINEL_MODULES.catalogo = function () {
 
     catalogoApplicationPositionLabel(row) {
       const positions = row?.application_positions || [];
-      if (positions.length > 1) return 'Dianteiro ou traseiro, conforme a moto';
+      if (positions.length > 1) return 'Dianteiro ou traseiro, conforme o veículo';
       if (positions.length === 1) return this.catalogoPositionLabel(positions[0]) + ' nas aplicações';
       return 'Aplicações pendentes de conferência';
     },
@@ -153,6 +156,7 @@ window.PAINEL_MODULES.catalogo = function () {
         this.catalogoCreateNew();
         this.catalogoCadastro.row = row;
         this.catalogoCadastro.form.measure = row.tire_size;
+        this.catalogoCadastro.form.vehicle_type = row.vehicle_type || '';
         this.catalogoCadastro.form.tire_condition = '';
         return;
       }
@@ -171,6 +175,7 @@ window.PAINEL_MODULES.catalogo = function () {
         marginPreset: null,
       };
       this.catalogoSpecForm = {
+        vehicle_type: row.vehicle_type || '',
         tread_pattern: row.tread_pattern || '',
         load_index: row.load_index || '',
         speed_rating: row.speed_rating || '',
@@ -263,58 +268,6 @@ window.PAINEL_MODULES.catalogo = function () {
         };
       } finally {
         this.catalogoSaving = false;
-        this.$nextTick(() => window.lucide && window.lucide.createIcons());
-      }
-    },
-
-    catalogoPodeSalvarSpec() {
-      return this.adminUser?.role === 'owner' && !this.catalogoSpecSaving
-        && this.catalogoSelecionado?.product_type === 'tire'
-        && String(this.catalogoSpecForm?.reason || '').trim().length >= 2;
-    },
-
-    async catalogoSaveSpec() {
-      if (!this.catalogoPodeSalvarSpec()) return;
-      const productId = this.catalogoSelecionado.product_id;
-      const form = this.catalogoSpecForm;
-      this.catalogoSpecSaving = true;
-      this.catalogoSpecMessage = null;
-      try {
-        const nullable = (value) => String(value || '').trim() || null;
-        const result = await this.apiPost(`/admin/api/catalog/${encodeURIComponent(productId)}/spec`, {
-          tread_pattern: nullable(form.tread_pattern),
-          load_index: nullable(form.load_index),
-          speed_rating: nullable(form.speed_rating),
-          position: nullable(form.position),
-          reason: String(form.reason || '').trim(),
-        });
-        await this.loadCatalogo();
-        const refreshed = this.catalogoRows.find((row) => row.product_id === productId) || null;
-        this.catalogoSelecionado = refreshed;
-        if (refreshed) {
-          this.catalogoSpecForm = {
-            tread_pattern: refreshed.tread_pattern || '',
-            load_index: refreshed.load_index || '',
-            speed_rating: refreshed.speed_rating || '',
-            position: refreshed.tire_position || '',
-            reason: '',
-          };
-        }
-        this.catalogoSpecMessage = {
-          ok: true,
-          text: result.changed ? 'Ficha técnica atualizada e registrada no histórico de auditoria.'
-            : 'A ficha técnica já estava com esses dados.',
-        };
-      } catch (error) {
-        const code = error instanceof Error ? error.message : String(error);
-        this.catalogoSpecMessage = {
-          ok: false,
-          text: code.includes('catalog_spec_reason') ? 'Informe o motivo da alteração.'
-            : code.includes('catalog_product_not_found') ? 'Produto não encontrado.'
-              : 'Não foi possível salvar a ficha técnica. Recarregue e tente novamente.',
-        };
-      } finally {
-        this.catalogoSpecSaving = false;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },

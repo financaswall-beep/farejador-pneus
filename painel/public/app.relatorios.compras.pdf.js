@@ -8,7 +8,7 @@ window.PAINEL_MODULES.relatoriosComprasPdf = function () {
       if(source.length>1000)throw Error('Para PDF, reduza os filtros a até 1.000 linhas. O CSV permite um relatório maior.');
       const supplier=report.facets.suppliers.find(row=>row.id===f.supplier)?.name||(f.supplier?'Fornecedor selecionado':'Todos os fornecedores');
       const filters=wrap([this.rpDate(f.from)+' a '+this.rpDate(f.to),fit(supplier,65),f.brand||'Todas as marcas',
-        f.condition?this.rpCondition(f.condition):'Todas as condições',f.receipt==='all'?'Todos os recebimentos':f.receipt==='received'?'Recebidas':'Em trânsito',f.measure||''].filter(Boolean).join(' / '),105);
+        this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?this.rpCondition(f.condition):'Todas as condições',f.receipt==='all'?'Todos os recebimentos':f.receipt==='received'?'Recebidas':'Em trânsito',f.measure||''].filter(Boolean).join(' / '),105);
       const header=(title,page)=>{
         let out=rect(0,509,842,86,green)+text('FAREJADOR / MATRIZ',30,566,12,true,'1 1 1')+text(title,30,539,20,true,'1 1 1');
         out+=text('Gerado em '+new Date(report.generated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),568,561,8,false,'1 1 1');

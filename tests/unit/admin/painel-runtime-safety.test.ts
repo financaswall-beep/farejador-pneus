@@ -153,14 +153,14 @@ describe('seguranca de inicializacao do painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
 
     expect(html).toContain('app.atacado.js?v=20260822-continuity1');
-    expect(html).toContain('app.atacado.transfer.js?v=20260818-business-time1');
+    expect(html).toContain('app.atacado.transfer.js?v=20260915-lotsale1');
     expect(html).toContain('app.compras.relatorios.js?v=20260825-price-compare1');
     expect(html).toContain('app.compras.precos.js?v=20260825-price-history1');
-    expect(html).toContain('app.compras.reposicao.js?v=20260825-replenishment3');
+    expect(html).toContain('app.compras.reposicao.js?v=20260916-vehicle-ui1');
     expect(html).toContain('app.compras.reposicao.pdf.js?v=20260825-replenishment3');
-    expect(html).toContain('app.compras.acoes.js?v=20260825-purchase-orders1');
+    expect(html).toContain('app.compras.acoes.js?v=20260915-lot1');
     expect(html).toContain('app.core.js?v=20260907-ficha1');
-    expect(html).toContain('app.clientes.js?v=20260907-ficha1');
+    expect(html).toContain('app.clientes.js?v=20260912-kanban-controls1');
     expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });
 });

@@ -5,7 +5,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
     ? Math.floor((Date.now() - new Date(value).getTime()) / 86400000) : Infinity;
   return {
     comprasReplenishmentKey(row) {
-      return [String(row.measure || '').trim().toLowerCase(), row.tire_condition].join('\0');
+      return [String(row.measure || '').trim().toLowerCase(), row.tire_condition, row.vehicle_type || 'unknown'].join('\0');
     },
     comprasReplenishmentPriceGroups(priceRows) {
       const groups = new Map();
@@ -30,7 +30,7 @@ window.PAINEL_MODULES.comprasReposicao = function () {
       for (const stock of stockRows || []) {
         const key = this.comprasReplenishmentKey(stock);
         if (!groups.has(key)) groups.set(key, {
-          measure: stock.measure, tire_condition: stock.tire_condition,
+          measure: stock.measure, tire_condition: stock.tire_condition, vehicle_type: stock.vehicle_type || null,
           quantity_available: 0, in_transit_quantity: 0, sales_30d: 0,
           min_quantity: null, brands: [],
         });

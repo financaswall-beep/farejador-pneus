@@ -54,7 +54,7 @@ export async function getWholesaleSupplierMeasureBreakdown(
 ): Promise<unknown[]> {
   const result = await dbPool.query(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,pi.measure,pi.brand,
-            pi.tire_condition,
+            pi.tire_condition,pi.vehicle_type,
             SUM(COALESCE(pi.accepted_quantity,pi.quantity)) AS qty_total,
             ROUND(SUM(COALESCE(pi.accepted_quantity,pi.quantity)*pi.unit_cost)
               /NULLIF(SUM(COALESCE(pi.accepted_quantity,pi.quantity)),0),2) AS avg_cost,
@@ -63,7 +63,7 @@ export async function getWholesaleSupplierMeasureBreakdown(
        JOIN commerce.wholesale_purchases p ON p.id=pi.purchase_id AND p.environment=pi.environment
        JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment
       WHERE pi.environment=$1 AND p.status='confirmed' AND s.deleted_at IS NULL
-      GROUP BY s.id,s.name,pi.measure,pi.brand,pi.tire_condition
+      GROUP BY s.id,s.name,pi.measure,pi.brand,pi.tire_condition,pi.vehicle_type
       ORDER BY pi.measure,pi.brand,pi.tire_condition,avg_cost,qty_total DESC`, [environment]);
   return result.rows;
 }

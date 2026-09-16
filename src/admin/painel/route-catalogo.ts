@@ -104,7 +104,8 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     } catch (error) {
       const message = error instanceof Error ? error.message : 'internal_server_error';
       const status = message === 'catalog_product_not_found' ? 404
-        : message.startsWith('catalog_spec_') || message === 'catalog_vehicle_type_invalid' ? 400 : 500;
+        : message === 'catalog_stock_vehicle_type_conflict' ? 409
+          : message.startsWith('catalog_spec_') || message === 'catalog_vehicle_type_invalid' ? 400 : 500;
       if (status === 500) logger.error({ error }, 'painel catalog tire spec update failed');
       return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
     }

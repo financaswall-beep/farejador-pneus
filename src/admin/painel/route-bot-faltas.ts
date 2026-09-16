@@ -1,3 +1,4 @@
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
@@ -10,6 +11,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===v;
 });
 export const shortageQuery = z.object({
+  vehicle_type: vehicleReportFilterSchema.default('all'),
   from: date, to: date, store: z.union([z.literal('matriz'),z.string().uuid()]).optional(),
   measure: z.string().trim().max(80).optional(), offset: z.coerce.number().int().min(0).max(100000).default(0),
 }).strict().refine(v => v.from<=v.to && v.to<=businessDateSaoPaulo(new Date())

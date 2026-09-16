@@ -43,7 +43,7 @@ window.PAINEL_MODULES.estoqueLotes = function () {
       const request = ++s.request;
       s.loading = true; s.error = '';
       try {
-        const data = await this.apiGet('/admin/api/wholesale/lots?' + new URLSearchParams({
+        const data = await this.apiGet('/admin/api/wholesale/lots?' + new URLSearchParams({ vehicle_type: this.tireLotVehicleType || 'all',
           status: s.status, search: s.search, page: s.page }));
         if (request !== s.request) return;
         s.rows = data.rows; s.total = data.total; s.summary = data.summary;

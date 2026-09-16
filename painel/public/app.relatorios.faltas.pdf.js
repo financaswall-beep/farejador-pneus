@@ -6,7 +6,7 @@ window.PAINEL_MODULES.relatoriosFaltasPdf=function(){return{
     const header=page=>rect(0,509,842,86,green)+text('FAREJADOR / MATRIZ',30,566,12,true,'1 1 1')+text('Faltas por loja',30,536,22,true,'1 1 1')
       +text(fit((r.store?.name||'Sem loja no recorte')+' / '+this.rpDate(f.from)+' a '+this.rpDate(f.to),120),30,488,10,true)
       +text(fit((['overview','measures'].includes(tab)?'Medida selecionada no detalhe: ':'Filtro de medida: ')+(f.measure||'Todas')+' / Busca: '+(f.search||'Todas'),125),30,469,9,false,muted)
-      +text('Preços e estoque consultados em '+this.rfalTime(r.as_of),30,450,9,false,muted)
+      +text((this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus')+' / Preços e estoque consultados em '+this.rfalTime(r.as_of),30,450,9,false,muted)
       +rule(33)+text('Potencial estimado; não é lucro ou perda confirmada. Uma unidade por conversa e medida na loja.',30,20,8,false,muted)+text('Página '+page,765,20,8,false,muted);
     const scopes=['overview','measures'].includes(tab)?r.measures.map(m=>m.potential):r.opportunities.map(o=>({amount:o.reference?.amount??null,opportunities:1,priced:o.reference?1:0,unpriced:o.reference?0:1,repeated:o.searches-1}));
     const p=scopes.reduce((sum,item)=>({amount:sum.amount==null&&item.amount==null?null:((Math.round((sum.amount||0)*100)+Math.round((item.amount||0)*100))/100),

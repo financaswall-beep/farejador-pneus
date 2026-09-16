@@ -14,6 +14,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
         mode: 'stock',
         row,
         form: {
+          vehicle_type: row.vehicle_type || '',
           measure: row.tire_size,
           brand: row.brand,
           tire_condition: row.tire_condition,
@@ -39,7 +40,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
         mode: 'manual',
         row: null,
         form: {
-          measure: '', brand: '', tire_condition: 'meia_vida',
+          vehicle_type: '', measure: '', brand: '', tire_condition: 'meia_vida',
           product_code: '', product_name: '', price_amount: '',
           tread_pattern: '', load_index: '', speed_rating: '', position: '',
         },
@@ -168,6 +169,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
           speed_rating: String(form.speed_rating || '').trim() || null,
           position: String(form.position || '').trim() || null,
         };
+        payload.vehicle_type = form.vehicle_type || null;
         const created = await this.apiPost('/admin/api/catalog/products', payload);
         await this.loadCatalogo();
         const product = this.catalogoRows.find((item) =>
@@ -181,6 +183,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
             item = this.compraForm.items[this.compraForm.items.length - 1];
           }
           if (item) {
+            item.vehicle_type = form.vehicle_type || null;
             item.measure = created.tire_size;
             item.brand = created.brand;
             item.tire_condition = created.tire_condition;

@@ -20,6 +20,7 @@ export const registerSupplierSchema = z.object({
 });
 
 export const purchaseItemSchema = z.object({
+  vehicle_type: z.enum(['motorcycle','car']).nullable().optional(),
   measure: z.string().min(1).max(60),
   brand: z.string().trim().min(1, 'brand_required').max(60),
   tire_condition: tireConditionSchema,

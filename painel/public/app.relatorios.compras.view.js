@@ -28,7 +28,7 @@ window.PAINEL_MODULES.relatoriosComprasView = function () {
       const f=this.rcomp.data?.filters;if(!f)return '';
       const supplier=this.rcomp.data.facets.suppliers.find(row=>row.id===f.supplier)?.name;
       return [this.rpDate(f.from)+' a '+this.rpDate(f.to),supplier||(f.supplier?'Fornecedor selecionado':'Todos os fornecedores'),f.brand||'Todas as marcas',
-        f.condition?this.rpCondition(f.condition):'Todas as condições',f.receipt==='all'?'Todos os recebimentos':f.receipt==='received'?'Recebidas':'Em trânsito',f.measure||''].filter(Boolean).join(' · ');
+        this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?this.rpCondition(f.condition):'Todas as condições',f.receipt==='all'?'Todos os recebimentos':f.receipt==='received'?'Recebidas':'Em trânsito',f.measure||''].filter(Boolean).join(' · ');
     },
   };
 };

@@ -8,6 +8,6 @@ window.PAINEL_MODULES.relatoriosEstoqueView=function(){return {
   rstCoverage(row){return row?.coverage_days==null?'Sem giro para estimar':Number(row.coverage_days).toLocaleString('pt-BR',{maximumFractionDigits:1})+' dias';},
   rstTime(value){return value?new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}):'—';},
   rstSigned(value){return(value>0?'+':'')+this.rpNumber(value);},
-  get rstFiltersLabel(){const f=this.rst.data?.filters;return f?['Giro: '+f.days+' dias',f.condition?this.rpCondition(f.condition):'Todas as condições',
+  get rstFiltersLabel(){const f=this.rst.data?.filters;return f?['Giro: '+f.days+' dias',this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?this.rpCondition(f.condition):'Todas as condições',
     f.status==='all'?'Todas as situações':this.rstStatus(f.status),f.measure].filter(Boolean).join(' · '):'';},
 };};

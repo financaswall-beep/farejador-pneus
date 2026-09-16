@@ -11,7 +11,7 @@ window.PAINEL_MODULES.comprasLotes = function () {
     lotPurchaseFreshForm() {
       const today = this.finHoje();
       return { supplierKey: '', newName: '', newPhone: '', newDocument: '',
-        description: '', quantity: '', total_cost: '', freight_amount: '', discount_amount: '',
+        vehicle_type: '', description: '', quantity: '', total_cost: '', freight_amount: '', discount_amount: '',
         purchased_at: today, received_at: today, paid_at: today,
         supplier_reference: '', notes: '', receipt_status: 'received', payment_status: 'paid',
         payment_method: 'Pix', due_date: '', idempotency_key: '' };
@@ -100,7 +100,7 @@ window.PAINEL_MODULES.comprasLotes = function () {
       return {
         ...(f.supplierKey === 'new' ? { new_supplier: { name: f.newName.trim(),
           phone: f.newPhone.trim() || null, document: f.newDocument.trim() || null } } : { supplier_id: f.supplierKey }),
-        lot: { description: f.description.trim(), quantity, total_cost: Number(f.total_cost) },
+        lot: { vehicle_type: f.vehicle_type || null, description: f.description.trim(), quantity, total_cost: Number(f.total_cost) },
         purchased_at: this.businessFactInstant(f.purchased_at),
         ...(f.receipt_status === 'received' ? { received_at: this.businessFactInstant(f.received_at) } : {}),
         ...(f.payment_status === 'paid' ? { paid_at: this.businessFactInstant(f.paid_at), payment_method: f.payment_method }

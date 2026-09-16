@@ -7,6 +7,7 @@ import {
 } from '../../shared/tire-condition.js';
 
 export interface PurchaseItemInput {
+  vehicle_type?: 'motorcycle' | 'car' | null;
   measure: string;
   brand?: string | null;
   tire_condition: TireCondition | string;

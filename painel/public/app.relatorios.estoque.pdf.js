@@ -8,7 +8,7 @@ window.PAINEL_MODULES.relatoriosEstoquePdf=function(){return {
       let out=rect(0,509,842,86,green)+text('FAREJADOR / MATRIZ',30,566,12,true,'1 1 1')+text(title,30,539,20,true,'1 1 1');
       out+=text('Estoque consultado em '+this.rstTime(report.as_of),530,565,8,false,'1 1 1');
       const filters=['Base do giro: '+f.days+' dias ('+this.rpDate(report.from)+' a '+this.rpDate(report.to)+')',
-        f.condition?this.rpCondition(f.condition):'Todas as condições',f.status==='all'?'Todas as situações':this.rstStatus(f.status),f.measure||'',
+        this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?this.rpCondition(f.condition):'Todas as condições',f.status==='all'?'Todas as situações':this.rstStatus(f.status),f.measure||'',
         events?'Movimentos: '+({all:'todos',in:'entradas',out:'saídas',unchanged:'sem mudança de saldo'})[f.movement]:'',
         events?'Origem: '+({all:'todas',purchase:'compras',sale:'vendas',return:'devoluções',adjustment:'ajustes',other:'outras'})[f.source]:''].filter(Boolean).join(' / ');
       wrap(filters,115).forEach((line,i)=>{out+=text(line,30,493-i*9,8,false,muted);});

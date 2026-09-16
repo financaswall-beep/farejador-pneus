@@ -47,7 +47,7 @@ export async function applyPurchaseStock(
   await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
   const consolidated = new Map<string, {
     measure: string; quantity: number; valueCents: number; brand: string;
-    tire_condition: PurchaseItemInput['tire_condition'];
+    tire_condition: PurchaseItemInput['tire_condition']; vehicle_type?: PurchaseItemInput['vehicle_type'];
   }>();
   for (const item of items) {
     const quantity = item.accepted_quantity ?? item.quantity;
@@ -56,15 +56,17 @@ export async function applyPurchaseStock(
     const key = `${item.measure}\u0000${brand}\u0000${item.tire_condition}`;
     const current = consolidated.get(key) ?? {
       measure: item.measure, quantity: 0, valueCents: 0, brand,
-      tire_condition: item.tire_condition,
+      tire_condition: item.tire_condition, vehicle_type: item.vehicle_type,
     };
+    if (current.vehicle_type && item.vehicle_type && current.vehicle_type !== item.vehicle_type) throw new Error('operation_vehicle_type_conflict');
+    current.vehicle_type ??= item.vehicle_type;
     current.quantity += quantity;
     current.valueCents += moneyCents(item.allocated_cost);
     consolidated.set(key, current);
   }
   for (const [, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
     await addWholesaleStockEntry({ measure: item.measure, brand: item.brand,
-      tire_condition: item.tire_condition, quantity_in: item.quantity,
+      tire_condition: item.tire_condition, vehicle_type: item.vehicle_type, quantity_in: item.quantity,
       unit_cost: item.valueCents / item.quantity / 100, environment,
       actor_label: `compra:${purchaseId}` }, client);
   }

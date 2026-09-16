@@ -5,9 +5,15 @@ import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { getTireLotPurchase, listLotSeparationSources, listTireLotMovements, listTireLots } from './queries-tire-lots.js';
 import { lotSeparationSchema, separateTireLot } from './tire-lot-separation.js';
 import { getStockCosts } from './queries-stock-costs.js';
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 
 export async function registerTireLotRoutes(app: FastifyInstance) {
-  app.get('/admin/api/wholesale/stock/costs', { preHandler: requireAdminAuth }, async () => getStockCosts());
+  const vehicle_type = vehicleReportFilterSchema.default('all');
+  app.get('/admin/api/wholesale/stock/costs', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const query = z.object({ vehicle_type }).safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: 'invalid_query' });
+    return getStockCosts(undefined, query.data.vehicle_type);
+  });
   const page = z.coerce.number().int().min(1).max(100000).default(1);
   const search = z.string().trim().max(100).default('');
   app.get('/admin/api/wholesale/lots/:id/purchase', { preHandler: requireAdminAuth }, async (request, reply) => {
@@ -17,12 +23,12 @@ export async function registerTireLotRoutes(app: FastifyInstance) {
     return purchase ?? reply.status(404).send({ error: 'purchase_not_found' });
   });
   app.get('/admin/api/wholesale/lots', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const query = z.object({ page, search, status: z.enum(['all','open','pending','closed','cancelled']).default('open') }).safeParse(request.query);
+    const query = z.object({ page, search, vehicle_type, status: z.enum(['all','open','pending','closed','cancelled']).default('open') }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_query' });
     return listTireLots(query.data);
   });
   app.get('/admin/api/wholesale/lot-movements', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const query = z.object({ page, lot_id: z.string().uuid().optional() }).safeParse(request.query);
+    const query = z.object({ page, vehicle_type, lot_id: z.string().uuid().optional() }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_query' });
     return listTireLotMovements(query.data);
   });

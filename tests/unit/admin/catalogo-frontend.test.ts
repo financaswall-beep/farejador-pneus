@@ -12,6 +12,8 @@ function loadCatalogModule() {
     console,
     setTimeout,
   };
+  vm.runInNewContext(readFileSync('painel/public/app.vehicle-types.js', 'utf8'), sandbox);
+  for (const name of ['ficha', 'descobertas']) vm.runInNewContext(readFileSync('painel/public/app.catalogo.'+name+'.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.bootstrap.js', 'utf8'), sandbox);
   vm.runInNewContext(
@@ -20,7 +22,10 @@ function loadCatalogModule() {
   );
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.marca.js', 'utf8'), sandbox);
   return {
+    ...sandbox.window.PAINEL_MODULES.vehicleTypes(),
     ...sandbox.window.PAINEL_MODULES.catalogo(),
+    ...sandbox.window.PAINEL_MODULES.catalogoFicha(),
+    ...sandbox.window.PAINEL_MODULES.catalogoDescobertas(),
     ...sandbox.window.PAINEL_MODULES.catalogoBootstrap(),
     ...sandbox.window.PAINEL_MODULES.catalogoCompatibilidade(),
     ...sandbox.window.PAINEL_MODULES.catalogoMarca(),
@@ -249,8 +254,8 @@ describe('catalogo no painel', () => {
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
-    expect(html.includes('app.catalogo.js?v=20260911-measure-registration1')).toBe(true);
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260916-vehicle-ui1');
+    expect(html.includes('app.catalogo.js?v=20260916-vehicle-ui1')).toBe(true);
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -288,7 +293,7 @@ describe('catalogo no painel', () => {
     expect(html).toContain('style="width:min(440px, calc(100vw - 24px));"');
     expect(html).toContain('id="catalog-brand-options"');
     expect(html).toContain('x-model="stockForm.brand"');
-    expect(html).toContain('x-model="it.brand" list="catalog-brand-options"');
+    expect(html).toContain('x-model="it.brand" @change="purchaseVehicleResolve(it)" list="catalog-brand-options"');
     expect(html).toContain(':disabled="!catalogoRows.some((row) => row.brand === brand)"');
     for (const brand of ['Pirelli', 'Michelin', 'Maggion', 'Kenda']) {
       expect(html).toContain(`<option value="${brand}"></option>`);
@@ -338,6 +343,7 @@ describe('catalogo no painel', () => {
 
     await module.catalogoCreateSave.call(context);
     expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
+      vehicle_type: null,
       measure: '90/90-18',
       brand: 'Metzeler',
       tire_condition: 'meia_vida',
@@ -390,6 +396,7 @@ describe('catalogo no painel', () => {
 
     expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
       measure: '90/90-18', brand: 'Levorin', tire_condition: 'meia_vida',
+      vehicle_type: null,
       product_code: 'LEV-909018-MV', product_name: 'Pneu Levorin 90/90-18',
       creation_mode: 'manual', price_amount: 45,
       price_reason: 'Preço inicial do cadastro',
@@ -433,6 +440,7 @@ describe('catalogo no painel', () => {
     });
     await module.catalogoSaveSpec.call(context);
     expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/produto-1/spec', {
+      vehicle_type: null,
       tread_pattern: 'City   Extra', load_index: '63', speed_rating: 'p',
       position: 'rear', reason: 'Conferido na lateral do pneu',
     });
@@ -656,7 +664,7 @@ describe('catalogo no painel', () => {
       "discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 }",
     );
     const html = readFileSync('painel/public/index.html', 'utf8');
-    expect(html).toContain('app.js?v=20260910-relatorios1');
+    expect(html).toContain('app.js?v=20260916-vehicle-ui1');
   });
 
   it('deixa funcionário somente consultar e não trata serviço como pneu sem marca', async () => {

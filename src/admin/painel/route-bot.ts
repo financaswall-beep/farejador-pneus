@@ -1,3 +1,4 @@
+import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 // TELA DO BOT (2026-07-06): rotas do agregador do atendente pro painel da matriz.
 // Registrada por ./route.js (porta de entrada). Admin-only — conversa de cliente
 // é dado sensível: NUNCA servir ao parceiro (zero grant, mesma régua do sino).
@@ -47,11 +48,13 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
   // Visão: mapa por município + radar de medidas + cards — carrega ao entrar na aba.
   fastify.get('/admin/api/bot/visao', { preHandler: requireAdminAuth }, async (request, reply) => {
     try {
-      const q = (request.query ?? {}) as { period?: string };
+      const q = (request.query ?? {}) as { period?: string; vehicle_type?: string };
+      const type = vehicleReportFilterSchema.safeParse(q.vehicle_type ?? 'all');
+      if (!type.success) return reply.status(400).send({ error: 'invalid_vehicle_type' });
       const period: PainelRedePeriod = PERIODOS.includes(q.period as PainelRedePeriod)
         ? (q.period as PainelRedePeriod)
         : '30d';
-      return reply.status(200).send(await getBotVisao(period));
+      return reply.status(200).send(await getBotVisao(period,undefined,undefined,type.data));
     } catch (err) {
       logger.error({ err }, 'painel bot visao failed');
       return reply.status(500).send({ error: 'internal_error' });

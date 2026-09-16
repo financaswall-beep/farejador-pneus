@@ -35,7 +35,7 @@ window.PAINEL_MODULES.relatoriosView = function () {
     get rpFiltersLabel() {
       const f=this.rp.data?.filters;if(!f)return '';
       return [this.rpDate(f.from)+' a '+this.rpDate(f.to),f.channel==='all'?'Atacado e varejo':f.channel==='atacado'?'Atacado':'Varejo',
-        f.brand||'Todas as marcas',f.condition?this.rpCondition(f.condition):'Todas as condições',f.measure||''].filter(Boolean).join(' · ');
+        f.brand||'Todas as marcas',this.vehicleFilterLabel?.(f.vehicle_type)||'Todos os pneus',f.condition?this.rpCondition(f.condition):'Todas as condições',f.measure||''].filter(Boolean).join(' · ');
     },
     get rpChart() {
       const days=this.rp.data?.daily||[],size=Math.max(1,Math.ceil(days.length/31)),buckets=[];

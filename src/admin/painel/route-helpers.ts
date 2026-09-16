@@ -37,6 +37,10 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (['idempotency_conflict', 'idempotency_incomplete'].includes(err.message)) {
     return { status: 409, error: err.message };
   }
+  if (['operation_vehicle_type_conflict','stock_vehicle_type_conflict',
+    'catalog_stock_vehicle_type_conflict','purchase_vehicle_type_conflict'].includes(err.message)) {
+    return { status: 409, error: 'vehicle_type_conflict' };
+  }
   if (err.message === 'idempotency_key_required') {
     return { status: 400, error: err.message };
   }

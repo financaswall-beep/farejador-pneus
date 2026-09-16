@@ -1,3 +1,4 @@
+import { matchesTireVehicleType } from '../../shared/tire-vehicle-type.js';
 import type { Pool } from 'pg';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -7,6 +8,8 @@ import type { StockReportFilter } from './stock-report-filter.js';
 import { stockGroupKey,stockMovementSource,stockStatus } from './stock-report-rules.js';
 
 export function buildStockReport(snapshot:StockReportSnapshot,filter:StockReportFilter) {
+  snapshot={...snapshot,variants:snapshot.variants.filter(row=>matchesTireVehicleType(row.vehicle_type,filter.vehicle_type)),
+    movements:snapshot.movements.filter(row=>matchesTireVehicleType(row.vehicle_type,filter.vehicle_type))};
   const brand=(value:string)=>canonicalCatalogBrand(value)||'Sem marca';
   const turnover=new Map<string,number>();
   const movements=snapshot.movements.map(row=>({...row,measure:row.measure.trim().toUpperCase(),brand:brand(row.brand),
@@ -15,9 +18,9 @@ export function buildStockReport(snapshot:StockReportSnapshot,filter:StockReport
     const key=JSON.stringify([row.key,row.brand]);turnover.set(key,(turnover.get(key)||0)-row.delta);
   }
   type Variant={brand:string;physical:number;reserved:number;available:number;incoming:number;sold:number;net_sales:number;has_stock:boolean};
-  const collection=new Map<string,{key:string;measure:string;condition:string;minimum:number|null;brands:Variant[]}>();
+  const collection=new Map<string,{key:string;measure:string;condition:string;vehicle_type:string|null;minimum:number|null;brands:Variant[]}>();
   for(const line of snapshot.variants){
-    const key=stockGroupKey(line),row=collection.get(key)??{key,measure:line.measure.trim().toUpperCase(),condition:line.condition,minimum:null,brands:[]};
+    const key=stockGroupKey(line),row=collection.get(key)??{key,measure:line.measure.trim().toUpperCase(),condition:line.condition,vehicle_type:line.vehicle_type??null,minimum:null,brands:[]};
     if(line.minimum!==null)row.minimum=Math.max(row.minimum??0,line.minimum);
     const name=brand(line.brand),variant=row.brands.find(item=>item.brand===name)??{brand:name,physical:0,reserved:0,available:0,incoming:0,sold:0,net_sales:0,has_stock:false};
     if(!row.brands.includes(variant))row.brands.push(variant);

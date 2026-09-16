@@ -5,7 +5,7 @@ window.PAINEL_MODULES.botFaltas = function () {
   const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const date = value => new Date(value+'T12:00:00Z');
   return {
-    bf: { mode:'month', anchor:today(), from:'', to:'', draftFrom:'', draftTo:'', search:'', store:'', measure:'',
+    bf: { vehicle_type:'all', mode:'month', anchor:today(), from:'', to:'', draftFrom:'', draftTo:'', search:'', store:'', measure:'',
       data:null, loading:false, error:'', details:[], stock:[], selected:null, detailLoading:false,
       detailError:'', total:0, offset:0, showAll:false, exporting:false, exportError:'' },
     bfOpen() { this.botTab='faltas'; if(!this.bf.from) this.bfPeriod('month'); else void this.bfLoad(); },
@@ -28,7 +28,7 @@ window.PAINEL_MODULES.botFaltas = function () {
       if(this.bf.mode==='month') return date(this.bf.from).toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'});
       return date(this.bf.from).toLocaleDateString('pt-BR',{timeZone:'UTC'})+' — '+date(this.bf.to).toLocaleDateString('pt-BR',{timeZone:'UTC'});
     },
-    bfQuery(extra={}) {return new URLSearchParams({from:this.bf.from,to:this.bf.to,...extra}).toString();},
+    bfQuery(extra={}) {return new URLSearchParams({from:this.bf.from,to:this.bf.to,vehicle_type:this.bf.vehicle_type || 'all',...extra}).toString();},
     bfApplyPeriod() {this.bf.from=this.bf.draftFrom;this.bf.to=this.bf.draftTo;void this.bfLoad();},
     async bfLoad() {
       const id=++request;++detailRequest;

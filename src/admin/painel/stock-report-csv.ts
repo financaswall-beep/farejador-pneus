@@ -1,3 +1,4 @@
+import { tireVehicleLabel } from '../../shared/tire-vehicle-type.js';
 import type { buildStockReport } from './queries-stock-report.js';
 import { salesReportCsvCell } from './route-sales-report.js';
 import { stockStatusLabels } from './stock-report-rules.js';
@@ -15,5 +16,6 @@ export function stockReportCsv(report:ReturnType<typeof buildStockReport>):strin
       row.physical,row.reserved,row.available,row.incoming,row.sold,f.days,row.coverage_days===null?'Sem giro':String(row.coverage_days).replace('.',','),
       row.minimum===null?'Não definido':row.minimum,row.suggested===null?'Sem mínimo':row.suggested,stockStatusLabels[row.status],report.as_of]);
   }
+  columns.push('Tipo de veículo'); rows.forEach((row,index)=>row.push(tireVehicleLabel((f.view==='movements'?report.export_movements:report.groups.filter(g=>f.view!=='replenishment'||(g.suggested??0)>0))[index]?.vehicle_type)));
   return '\uFEFF'+[columns,...rows].map(row=>row.map(salesReportCsvCell).join(';')).join('\r\n');
 }

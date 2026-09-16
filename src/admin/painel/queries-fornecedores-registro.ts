@@ -109,11 +109,13 @@ export async function registerWholesalePurchase(
         })),
         receipt_status: receiptStatus,
         ...(input.lot ? { lot: { description: input.lot.description.trim(),
+          ...(input.lot.vehicle_type ? {vehicle_type: input.lot.vehicle_type} : {}),
           quantity: input.lot.quantity, total_cost_cents: moneyCents(input.lot.total_cost) },
           received_at: input.received_at ?? null } : {}),
         items: rawItems.map((item) => ({ measure: item.measure.trim(),
           brand: canonicalCatalogBrand(item.brand),
           tire_condition: item.tire_condition,
+          ...(item.vehicle_type ? {vehicle_type: item.vehicle_type} : {}),
           quantity: item.quantity, unit_cost_cents: moneyCents(item.unit_cost) })),
       }) };
     const started = await beginIntegrityOperation<RegisterWholesalePurchaseResult>(client, operation);
@@ -171,12 +173,12 @@ export async function registerWholesalePurchase(
       await client.query(
         `INSERT INTO commerce.wholesale_purchase_items
           (environment,purchase_id,measure,brand,tire_condition,quantity,unit_cost,
-           ordered_quantity,accepted_quantity,allocated_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$6,$8,$9)`,
+           ordered_quantity,accepted_quantity,allocated_cost,vehicle_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$6,$8,$9,$10)`,
         [
           environment, purchaseId, item.measure, item.brand ?? null,
           item.tire_condition, item.quantity, item.unit_cost,
-          receiptStatus === 'received' ? item.quantity : null, item.allocated_cost,
+          receiptStatus === 'received' ? item.quantity : null, item.allocated_cost, item.vehicle_type ?? null,
         ]);
     }
     for (const installment of installments) {
@@ -296,7 +298,7 @@ export async function confirmWholesalePurchase(
       return result;
     }
     const items = await client.query<AllocatedPurchaseItem>(
-      `SELECT id,measure,brand,tire_condition,quantity,ordered_quantity,
+      `SELECT id,measure,brand,tire_condition,vehicle_type,quantity,ordered_quantity,
               accepted_quantity,unit_cost::float8 AS unit_cost,
               allocated_cost::float8 AS allocated_cost
          FROM commerce.wholesale_purchase_items

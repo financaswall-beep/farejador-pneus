@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 
 export interface TireLotFilters {
+  vehicle_type?: string;
   search?: string; status?: 'all' | 'open' | 'pending' | 'closed' | 'cancelled'; page?: number;
 }
 
@@ -24,7 +25,7 @@ export async function listTireLots(filters: TireLotFilters = {}, db: Pool = defa
     LEFT JOIN commerce.wholesale_purchases p ON p.environment=l.environment AND p.id=l.purchase_id
     LEFT JOIN commerce.wholesale_purchase_orders o ON o.environment=p.environment AND o.id=p.purchase_order_id
     LEFT JOIN commerce.wholesale_suppliers s ON s.environment=p.environment AND s.id=p.supplier_id
-    WHERE l.environment=$1
+    WHERE l.environment=$1 AND ($5='all' OR COALESCE(l.vehicle_type,'unknown')=$5)
   ), filtered AS (
     SELECT * FROM lots WHERE ($2='all' OR status=$2)
       AND ($3='' OR strpos(lower(lot_code||' '||description||' '||COALESCE(purchase_code,'')),lower($3))>0)
@@ -34,11 +35,11 @@ export async function listTireLots(filters: TireLotFilters = {}, db: Pool = defa
     'summary',(SELECT jsonb_build_object('open_lots',count(*) FILTER (WHERE status='open'),
       'available_quantity',COALESCE(sum(available_quantity),0),'remaining_cost',COALESCE(sum(remaining_cost),0)) FROM lots),
     'as_of',now()) payload`,
-  [env.FAREJADOR_ENV, filters.status ?? 'open', filters.search ?? '', ((filters.page ?? 1) - 1) * 25]);
+  [env.FAREJADOR_ENV, filters.status ?? 'open', filters.search ?? '', ((filters.page ?? 1) - 1) * 25, filters.vehicle_type ?? 'all']);
   return result.rows[0].payload;
 }
 
-export async function listTireLotMovements(filters: { lot_id?: string; page?: number } = {}, db: Pool = defaultPool) {
+export async function listTireLotMovements(filters: { lot_id?: string; page?: number; vehicle_type?: string } = {}, db: Pool = defaultPool) {
   const result = await db.query(`WITH filtered AS (
     SELECT m.id,m.lot_id,m.source,m.quantity_delta,m.cost_delta,m.occurred_at,to_jsonb(m)->>'order_id' order_id,
       'LT-'||lpad(l.lot_number::text,6,'0') lot_code,
@@ -49,10 +50,11 @@ export async function listTireLotMovements(filters: { lot_id?: string; page?: nu
     LEFT JOIN commerce.wholesale_purchases p ON p.environment=l.environment AND p.id=l.purchase_id
     LEFT JOIN commerce.wholesale_purchase_orders o ON o.environment=p.environment AND o.id=p.purchase_order_id
     WHERE m.environment=$1 AND ($2::uuid IS NULL OR m.lot_id=$2)
+      AND ($4='all' OR COALESCE(l.vehicle_type,'unknown')=$4)
   ), page AS (SELECT * FROM filtered ORDER BY occurred_at DESC,id DESC LIMIT 25 OFFSET $3)
   SELECT jsonb_build_object('rows',COALESCE((SELECT jsonb_agg(page ORDER BY occurred_at DESC,id DESC) FROM page),'[]'),
     'total',(SELECT count(*) FROM filtered),'page_size',25) payload`,
-  [env.FAREJADOR_ENV, filters.lot_id ?? null, ((filters.page ?? 1) - 1) * 25]);
+  [env.FAREJADOR_ENV, filters.lot_id ?? null, ((filters.page ?? 1) - 1) * 25, filters.vehicle_type ?? 'all']);
   return result.rows[0].payload;
 }
 

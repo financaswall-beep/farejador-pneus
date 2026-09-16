@@ -144,7 +144,7 @@ window.PAINEL_MODULES.galpao = function () {
       const digits = (s) => (s || '').replace(/\D/g, '');
       const q = (this.stockBusca || '').trim().toLowerCase();
       const qd = digits(q);
-      let rows = this.atacadoStock;
+      let rows = this.stockVehicleRows;
       if (q) rows = rows.filter((r) => r.measure.toLowerCase().includes(q)
         || String(r.brand || '').toLowerCase().includes(q)
         || String(r.tire_condition || '').toLowerCase().includes(q)
@@ -157,12 +157,12 @@ window.PAINEL_MODULES.galpao = function () {
     // que JÁ veio (nunca diverge da tabela ao lado).
     stockResumo() {
       let pneus = 0, capital = 0, zeradas = 0, repor = 0;
-      for (const r of this.atacadoStock) {
+      for (const r of this.stockVehicleRows) {
         const q = Number(r.quantity_on_hand) || 0;
         pneus += q;
         capital += q * (Number(r.unit_cost) || 0);
       }
-      for (const group of this.comprasReplenishmentStockGroups(this.atacadoStock)) {
+      for (const group of this.comprasReplenishmentStockGroups(this.stockVehicleRows)) {
         if (group.quantity_available === 0) zeradas++;
         else if (group.min_quantity != null && group.quantity_available < group.min_quantity) repor++;
       }
@@ -250,7 +250,7 @@ window.PAINEL_MODULES.galpao = function () {
         const m = this.galpaoFilme.measure;
         const b = this.galpaoFilme.brand;
         const condition = this.galpaoFilme.tire_condition;
-        const params = new URLSearchParams();
+        const params = new URLSearchParams({vehicle_type:this.stockVehicleType || 'all'});
         if (m) params.set('measure', m);
         if (b) params.set('brand', b);
         if (condition) params.set('tire_condition', condition);

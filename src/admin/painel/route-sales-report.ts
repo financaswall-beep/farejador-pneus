@@ -1,3 +1,4 @@
+import { tireVehicleLabel } from '../../shared/tire-vehicle-type.js';
 import type { FastifyInstance } from 'fastify';
 import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { logger } from '../../shared/logger.js';
@@ -22,10 +23,10 @@ export async function registerSalesReportRoutes(fastify: FastifyInstance): Promi
         const report = await getSalesReport(parsed.data, showCosts);
         if (operation === '/exportar') {
           const formatMoney = (n: number | null) => n === null ? 'Custo pendente' : n.toFixed(2).replace('.', ',');
-          const columns = ['Venda', 'Data (São Paulo)', 'Canal', 'Medida / item', 'Marca', 'Condição', 'Quantidade', 'Valor dos itens'];
+          const columns = ['Venda', 'Data (São Paulo)', 'Canal', 'Medida / item', 'Marca', 'Condição', 'Tipo de veículo', 'Quantidade', 'Valor dos itens'];
           if (showCosts) columns.push('Custo histórico', 'Margem bruta');
           const rows = report.export_sales.flatMap(sale => sale.items.map(item => {
-            const cells: unknown[] = [sale.id, sale.day, sale.channel, item.measure, item.brand, item.condition, item.quantity, formatMoney(item.revenue)];
+            const cells: unknown[] = [sale.id, sale.day, sale.channel, item.measure, item.brand, item.condition, tireVehicleLabel(item.vehicle_type), item.quantity, formatMoney(item.revenue)];
             if (showCosts) cells.push(formatMoney(item.cost), formatMoney(item.margin));
             return cells;
           }));

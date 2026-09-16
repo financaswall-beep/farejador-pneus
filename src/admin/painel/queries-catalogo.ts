@@ -19,6 +19,7 @@ interface CatalogRow {
   compatibility_count: number | string;
 }
 interface StockRow {
+  vehicle_type: TireVehicleType | null;
   measure: string; brand: string; quantity_on_hand: number | string;
   quantity_reserved: number | string;
   tire_condition: TireCondition;
@@ -71,7 +72,7 @@ export async function getCatalogOverview(
       [environment],
     ),
     dbPool.query<StockRow>(
-      `SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost,updated_at
+      `SELECT measure,brand,tire_condition,vehicle_type,quantity_on_hand,quantity_reserved,unit_cost,updated_at
          FROM commerce.wholesale_stock WHERE environment=$1`,
       [environment],
     ),
@@ -170,7 +171,7 @@ export async function getCatalogOverview(
         product_name: row.brand,
         product_type: 'tire',
         tire_condition: row.tire_condition,
-        vehicle_type: null,
+        vehicle_type: row.vehicle_type ?? null,
         brand: row.brand,
         tire_size: row.measure,
         tire_position: null,

@@ -1,3 +1,4 @@
+import { matchesTireVehicleType } from '../../shared/tire-vehicle-type.js';
 import type { Pool } from 'pg';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -6,7 +7,7 @@ import { reportAddDays, reportComparison } from './report-period.js';
 import type { PurchaseReportFilter } from './purchase-report-period.js';
 
 const money = (value: number) => value / 100;
-const variantKey = (line: PurchaseReportLine) => JSON.stringify([line.measure, line.brand, line.condition]);
+const variantKey = (line: PurchaseReportLine) => JSON.stringify([line.measure, line.brand, line.condition, line.vehicle_type ?? null]);
 function groups(lines: PurchaseReportLine[], key: (line: PurchaseReportLine) => string) {
   const result = new Map<string, PurchaseReportLine[]>();
   for (const line of lines) { const id = key(line); const rows = result.get(id) ?? []; rows.push(line); result.set(id, rows); }
@@ -28,10 +29,12 @@ function costChange(current: number | null, previous: number | null) {
 }
 export function buildPurchaseReport(source: PurchaseReportLine[], filter: PurchaseReportFilter, payments: boolean) {
   const comparison = reportComparison(filter);
+  // A filtered item total cannot be presented as the document's payment or debt.
+  payments = payments && (!filter.vehicle_type || filter.vehicle_type === 'all');
   const suppliers = [...new Map(source.map(row => [row.supplier_id, { id: row.supplier_id, name: row.supplier_name }])).values()]
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const brands = [...new Set(source.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const lines = source.filter(row => (!filter.supplier || row.supplier_id === filter.supplier)
+  const lines = source.filter(row => matchesTireVehicleType(row.vehicle_type, filter.vehicle_type) && (!filter.supplier || row.supplier_id === filter.supplier)
     && (!filter.brand || row.brand === filter.brand) && (!filter.condition || row.condition === filter.condition)
     && (filter.receipt === 'all' || row.status === (filter.receipt === 'received' ? 'confirmed' : 'pending'))
     && (!filter.measure || (filter.exact === 'true' ? row.measure === filter.measure : row.measure.includes(filter.measure.toUpperCase()))));
@@ -39,7 +42,7 @@ export function buildPurchaseReport(source: PurchaseReportLine[], filter: Purcha
   const previous = comparison ? lines.filter(row => row.day >= comparison.from && row.day <= comparison.to) : [];
   const summary = summarizePurchases(current, payments), old = comparison ? summarizePurchases(previous, payments) : null;
   const productRows = (rows: PurchaseReportLine[]) => groups(rows, variantKey).map(([key, items]) => ({
-    key, measure: items[0]!.measure, brand: items[0]!.brand, condition: items[0]!.condition, ...summarizePurchases(items, false),
+    key, vehicle_type: items[0]!.vehicle_type ?? null, measure: items[0]!.measure, brand: items[0]!.brand, condition: items[0]!.condition, ...summarizePurchases(items, false),
   })).sort((a, b) => b.value - a.value || a.key.localeCompare(b.key));
   const oldProducts = new Map(productRows(previous).map(row => [row.key, row]));
   const productSuppliers = new Map(groups(current, variantKey).map(([key, items]) => [key,
@@ -57,7 +60,7 @@ export function buildPurchaseReport(source: PurchaseReportLine[], filter: Purcha
     id, order_code: items[0]!.order_code, day: items[0]!.day, received_on: items[0]!.received_on,
     supplier_id: items[0]!.supplier_id, supplier_name: items[0]!.supplier_name, status: items[0]!.status,
     ...summarizePurchases(items, payments),
-    items: items.map(row => ({ id: row.id, measure: row.measure, brand: row.brand, condition: row.condition,
+    items: items.map(row => ({ id: row.id, vehicle_type: row.vehicle_type ?? null, measure: row.measure, brand: row.brand, condition: row.condition,
       ordered: row.ordered, quantity: row.quantity, received: row.received, transit: row.transit,
       base_unit_cost: money(row.base_unit_cost), value: money(row.value),
       average_cost: row.quantity ? money(Math.round(row.value / row.quantity)) : null })),
@@ -72,7 +75,7 @@ export function buildPurchaseReport(source: PurchaseReportLine[], filter: Purcha
       previous_received: oldDay ? dailyPrevious.get(oldDay)?.received ?? 0 : null });
   }
   return { filters: filter, comparison, generated_at: new Date().toISOString(), can_view_payments: payments,
-    item_filtered: !!(filter.brand || filter.condition || filter.measure), facets: { suppliers, brands },
+    item_filtered: !!(filter.brand || filter.condition || filter.measure || (filter.vehicle_type && filter.vehicle_type !== 'all')), facets: { suppliers, brands },
     summary, previous: old, average_change_pct: costChange(summary.average_cost, old?.average_cost ?? null),
     daily, products, suppliers: supplierRows,
     purchases: { total: purchases.length, offset: filter.offset, rows: purchases.slice(filter.offset, filter.offset + 25) },

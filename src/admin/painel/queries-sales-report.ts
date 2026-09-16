@@ -1,3 +1,4 @@
+import { matchesTireVehicleType } from '../../shared/tire-vehicle-type.js';
 import type { Pool } from 'pg';
 import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -29,7 +30,7 @@ function groupLines(lines: ReportLine[], key: (line: ReportLine) => string) {
 export function buildSalesReport(source: ReportLine[], filter: SalesReportFilter, showCosts: boolean) {
   const comparison = salesReportComparison(filter);
   const brands = [...new Set(source.map(line => line.brand))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const lines = source.filter(line => (!filter.brand || line.brand === filter.brand)
+  const lines = source.filter(line => matchesTireVehicleType(line.vehicle_type, filter.vehicle_type) && (!filter.brand || line.brand === filter.brand)
     && (!filter.condition || line.condition === filter.condition)
     && (!filter.measure || (filter.exact === 'true' ? line.measure === filter.measure
       : line.measure.toLocaleUpperCase('pt-BR').includes(filter.measure.toLocaleUpperCase('pt-BR')))));
@@ -38,10 +39,10 @@ export function buildSalesReport(source: ReportLine[], filter: SalesReportFilter
   const summary = summarizeSalesReport(current, showCosts);
   const old = comparison ? summarizeSalesReport(previous, showCosts) : null;
   const group = (rows: ReportLine[], key: (line: ReportLine) => string) => groupLines(rows, key).map(([id, items]) => ({
-    key: id, measure: items[0]!.measure, brand: items[0]!.brand, condition: items[0]!.condition, kind: items[0]!.kind,
+    key: id, vehicle_type: items[0]!.vehicle_type ?? null, measure: items[0]!.measure, brand: items[0]!.brand, condition: items[0]!.condition, kind: items[0]!.kind,
     ...summarizeSalesReport(items, showCosts),
   })).sort((a, b) => b.revenue - a.revenue || a.key.localeCompare(b.key));
-  const products = group(current, line => JSON.stringify([line.kind, line.measure, line.brand, line.condition]));
+  const products = group(current, line => JSON.stringify([line.kind, line.measure, line.brand, line.condition, line.vehicle_type ?? null]));
   const variants = new Map<string, typeof products>();
   for (const product of products) {
     const key = JSON.stringify([product.kind, product.measure]);
@@ -53,7 +54,7 @@ export function buildSalesReport(source: ReportLine[], filter: SalesReportFilter
   const sales = groupLines(current, line => line.channel + ':' + line.sale_id).map(([key, items]) => ({
     key, id: items[0]!.sale_id, channel: items[0]!.channel, day: items[0]!.day,
     ...summarizeSalesReport(items, showCosts),
-    items: items.map(line => ({ id: line.id, measure: line.measure, brand: line.brand, condition: line.condition,
+    items: items.map(line => ({ id: line.id, vehicle_type: line.vehicle_type ?? null, measure: line.measure, brand: line.brand, condition: line.condition,
       kind: line.kind, quantity: line.quantity, revenue: money(line.revenue), cost: showCosts && line.cost !== null ? money(line.cost) : null,
       margin: showCosts && line.cost !== null ? money(line.revenue - line.cost) : null })),
   })).sort((a, b) => b.day.localeCompare(a.day) || a.key.localeCompare(b.key));

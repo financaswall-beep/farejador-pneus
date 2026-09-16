@@ -109,7 +109,7 @@ Primeiro pacote sugerido para implementação: inventário, classificação do c
 
 Não há variável de ambiente nova. A migration 0233 deve anteceder a versão do código que lê as colunas novas. Em 16/09/2026 ela foi ensaiada com rollback e aplicada no banco novo de produção de São Paulo, antes do push. Foram verificadas as três colunas e as três guardas; as impressões dos registros existentes de catálogo, aplicações, compatibilidades, estoque e livro financeiro permaneceram iguais dentro da transação. Não foi executada classificação automática dos dados existentes.
 
-A conferência também identificou as migrations anteriores `0231_tire_lot_separation.sql` e `0232_tire_lot_sales.sql` ainda ausentes nesse banco. Elas não são dependências da 0233 e não foram aplicadas neste pacote. Continuam pendentes para o fluxo de lotes; a versão máxima do schema não comprova que todas as migrations anteriores foram executadas, sendo necessário conferir o ledger individual.
+A conferência também identificou as migrations anteriores `0231_tire_lot_separation.sql` e `0232_tire_lot_sales.sql` ainda ausentes nesse banco. Elas não são dependências da 0233 e não foram aplicadas neste pacote. A pendência foi resolvida em uma operação posterior autorizada em 16/09/2026, descrita em [APLICACAO_LOTES_0231_0232_2026-09-16.md](APLICACAO_LOTES_0231_0232_2026-09-16.md). A versão máxima do schema não comprova que todas as migrations anteriores foram executadas, sendo necessário conferir o ledger individual.
 
 Esta é a fundação, não a conclusão de toda a expansão: ainda faltam a categoria histórica nos itens de compras/vendas/movimentos/lotes, propagação operacional, filtros nos relatórios comerciais e de demanda e a ferramenta/prompt do bot. Não liberar identidades duplicadas entre categorias antes dessa etapa. Medidas, produtos e aplicações antigos sem classificação permanecem desconhecidos; aplicações antigas precisam de revisão/classificação antes de aparecerem em consultas com categoria explícita. A API de inventário permite preparar essa revisão, sem usar medida, aro ou letra R como prova.
 
@@ -122,3 +122,32 @@ Esta é a fundação, não a conclusão de toda a expansão: ainda faltam a cate
 - Manifesto de migrations e `git diff --check` passaram. Nenhuma migration anterior foi alterada.
 - Os arquivos alterados respeitam o limite de tamanho após separar schemas HTTP, preços e consulta de modelos. A checagem global ainda aponta nove arquivos anteriores fora do limite, nenhum alterado neste pacote.
 - Teste visual legado separado: 27 passaram e 1 já falha no HEAD por esperar `app.js?v=20260910-relatorios1`, enquanto o HTML existente usa `20260915-cost1`. Nenhum arquivo de frontend foi alterado nesta entrega.
+
+## Segunda entrega — telas e classificação das operações (16/09/2026)
+
+Implementação local nas telas existentes da Matriz:
+
+- Catálogo: filtro e identificação de carro/moto; classificação no cadastro e edição. A consulta de compatibilidades respeita o tipo explicitamente cadastrado.
+- Compras: categoria por item, inclusive compra com itens de ambos os tipos. Lotes admitem carro, moto, misto ou não identificado. O fornecedor e o financeiro continuam sendo os mesmos.
+- Estoque: filtros em saldo, reposição, custos, lotes e movimentos; mínimos e disponibilidade da reposição separados por tipo. Entradas e correções preservam a categoria do estoque.
+- Vendas: seleção de produtos por tipo e identificação dos itens de atacado/lotes. A operação continua usando os fluxos existentes de reserva, baixa e financeiro.
+- Bot: filtros nas consultas de demanda e faltas. Uma conversa mista pode aparecer nos dois filtros; pedidos só de moto não são conversão de carro.
+- Relatórios: compras, vendas, estoque, demanda e faltas filtram os itens antes dos totais e exportações; visões salvas conservam o filtro. Em compra mista, pagamento e saldo a pagar do documento não são apresentados como exclusivos da categoria filtrada.
+
+### Banco e publicação
+
+A migration **0234_vehicle_type_operation_snapshots.sql** é necessária **antes de publicar esse frontend e backend**. Acrescenta a categoria observada em novas operações e pesquisas, mantém a classificação histórica imutável e separa as políticas de reposição por categoria. Não reclassifica registros antigos nem modifica quantidades, custos ou lançamentos financeiros. “Não identificado” é um estado real, não sinônimo de moto. Lotes mistos não são rateados artificialmente entre carro e moto.
+
+A categoria das pesquisas é determinada por catálogo explícito, com fallback para medida cadastrada sem SKU; não é deduzida pelo aro ou pela letra R. Repetições da mesma medida na conversa permanecem deduplicadas. A identidade comercial antiga de medida/marca/condição permanece única; esta entrega não libera duas variantes iguais de categorias diferentes.
+
+Não há nova variável de ambiente. A migration foi **aplicada em produção em 16/09/2026, às 02:21 BRT**, após ensaio com rollback e backup direcionado. Schema 234 e checksum conferidos por uma nova conexão. Dados existentes, RLS e permissões preservados. O código desta entrega deve ser publicado em seguida: o novo índice de mínimos de reposição exige o contrato com categoria. Reversão não deve excluir colunas ou registros de operações.
+
+Evidências locais fora do Git: `.codex-tmp/vehicle-0234-applied.json` e backup `.codex-tmp/backups/vehicle-0234-2026-09-16T05-21-41-425Z.json` (SHA-256 `87104724e810a01ae170587ca1bdc75fb63dbde5b37259d163a0c96cdc3f18ce`). Foram conferidas nove colunas novas, oito triggers de captura, o guard do catálogo, a chave de mínimos por categoria e a view de compras. O backup é direcionado às dez tabelas afetadas, não um dump integral.
+
+### Verificação desta entrega
+
+Build, TypeScript, testes unitários de telas/contratos e testes de integração de compras, vendas, classificação, demanda, faltas e lotes. Prévia visual local com produtos fictícios de carro, moto e categoria desconhecida. Foram corrigidos também os loops SVG do histórico de compras, que geravam referências sem escopo no Alpine.
+
+Resultado: **203 testes unitários e 45 testes de integração aprovados**, incluindo os testes do estoque com múltiplas marcas e da procura por medida ainda sem SKU. Manifesto das 235 migrations e `git diff --check` conferidos. A checagem global de tamanho ainda aponta sete arquivos anteriores fora do limite; os arquivos desta entrega respeitam os limites. A prova de paridade estática tem inventário desatualizado (novos métodos, sem métodos removidos), sem alteração automática desse inventário.
+
+Integrações executadas em PostgreSQL embarcado/PGlite isolado com replay das migrations; isso não substitui ensaio de concorrência em PostgreSQL externo. Nenhuma compra, venda, conversa ou alteração de estoque foi criada na produção nesta etapa.

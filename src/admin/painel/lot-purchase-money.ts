@@ -1,6 +1,7 @@
 import { calculateWholesalePurchaseMoney, hasCentPrecision } from './purchase-money.js';
 
 export interface PurchaseLotInput {
+  vehicle_type?: 'motorcycle' | 'car' | 'mixed' | null;
   description: string;
   quantity: number;
   total_cost: number;

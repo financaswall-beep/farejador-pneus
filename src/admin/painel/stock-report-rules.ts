@@ -1,4 +1,4 @@
-export const stockGroupKey=(row:{measure:string;condition:string})=>JSON.stringify([row.measure.trim().toUpperCase(),row.condition]);
+export const stockGroupKey=(row:{measure:string;condition:string;vehicle_type?:string|null})=>JSON.stringify([row.measure.trim().toUpperCase(),row.condition,...(row.vehicle_type?[row.vehicle_type]:[])]);
 const sources:Record<string,{label:string;category:string}>= {
   compra:{label:'Recebimento de compra',category:'purchase'},cancelamento_compra:{label:'Cancelamento de compra',category:'purchase'},
   venda_atacado:{label:'Venda de atacado',category:'sale'},varejo:{label:'Venda de varejo',category:'sale'},

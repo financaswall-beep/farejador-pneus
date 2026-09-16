@@ -68,8 +68,8 @@ describe('estoque do galpão por medida, marca e condição', () => {
     );
     await db.pool.query(
       `INSERT INTO commerce.tire_specs
-         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
-       VALUES ('test',$1,'90/90-18',90,90,18)`,
+         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter,vehicle_type)
+       VALUES ('test',$1,'90/90-18',90,90,18,'motorcycle')`,
       [product.rows[0]!.id],
     );
   }, 180_000);
@@ -263,6 +263,7 @@ describe('estoque do galpão por medida, marca e condição', () => {
         measure: '90/90-18',
         brand: 'Pirelli',
         tireCondition: entry.condition,
+        vehicleType: 'motorcycle',
         productCode: `PIRELLI-909018-${entry.condition}-${Date.now()}`,
         productName: `Pneu Pirelli 90/90-18 ${entry.condition}`,
         actorLabel: 'teste-condicoes',

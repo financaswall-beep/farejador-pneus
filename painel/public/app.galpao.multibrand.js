@@ -77,6 +77,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       if (Object.prototype.hasOwnProperty.call(item, 'tire_condition') && row?.tire_condition) {
         item.tire_condition = clean(row.tire_condition);
       }
+      if (Object.prototype.hasOwnProperty.call(item, 'vehicle_type')) this.purchaseVehicleResolve?.(item);
       this.measureBox = { key: null, hits: [] };
     },
     filmeMatches(row) {
@@ -86,7 +87,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
         && clean(this.galpaoFilme.tire_condition) === clean(row.tire_condition);
     },
     repoKey(row) {
-      return variantKey(row?.measure, row?.brand, row?.tire_condition);
+      return variantKey(row?.measure, row?.brand, row?.tire_condition) + '\u0000' + (row?.vehicle_type || 'unknown');
     },
     repoGiro(row) {
       if (row?.sales_30d != null) return Math.max(0, Number(row.sales_30d) || 0);
@@ -114,7 +115,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       this.repoQuantidades = { ...this.repoQuantidades, [this.repoKey(row)]: next };
     },
     repoRows() {
-      return this.comprasReplenishmentBuild(this.atacadoStock, this.fornecedorBreakdown)
+      return this.comprasReplenishmentBuild(this.stockVehicleRows, this.fornecedorBreakdown)
         .filter((row) => row.suggested_quantity > 0)
         .map((row) => ({ ...row, unit_cost: row.historical_unit_cost ?? 0 }))
         .sort((a, b) => {
@@ -190,9 +191,9 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
         .filter((row) => row?.measure && row?.brand
           && Number(row.suggested_quantity || this.repoQuantidade(row)) > 0)
         .map((row) => ({
-          measure: row.measure,
-          brand: row.brand,
+          measure: row.measure, brand: row.brand,
           tire_condition: row.tire_condition,
+          vehicle_type: row.vehicle_type || '',
           quantity: Number(row.suggested_quantity || this.repoQuantidade(row)),
           unit_cost: '',
         }));
@@ -224,7 +225,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     },
     custoRowsBase() {
       const groups = new Map();
-      for (const variant of this.atacadoStock) {
+      for (const variant of this.stockVehicleRows) {
         const measure = clean(variant.measure);
         const condition = clean(variant.tire_condition);
         const groupKey = `${measure}\u0000${condition}`;

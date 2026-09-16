@@ -139,11 +139,12 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
     product_id: string; product_code: string; product_name: string; product_type: string;
     tire_condition: 'meia_vida' | 'novo' | 'remold' | null;
     brand: string | null; tire_size: string | null; tire_position: string | null;
+    vehicle_type: 'motorcycle' | 'car' | null;
     price_amount: number | string | null; currency: string | null;
   }>(
     `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type,
             p.tire_condition,p.brand,
-            ts.tire_size, ts.position AS tire_position, cp.price_amount, cp.currency
+            ts.tire_size, ts.vehicle_type, ts.position AS tire_position, cp.price_amount, cp.currency
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts
          ON ts.product_id = p.id AND ts.environment = p.environment

@@ -60,7 +60,7 @@ export async function listWholesaleSales(
             o.payment_status,o.due_date,o.status,
             (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id=o.id)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,'vehicle_type',i.vehicle_type,
               'quantity',CASE WHEN o.partner_transfer_status IN ('settled','received')
                 THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END,
               'dispatched_quantity',i.quantity,'accepted_quantity',i.accepted_quantity,
@@ -108,7 +108,7 @@ export async function listWholesaleSalesHistory(
             (SELECT count(*) FROM commerce.wholesale_order_items i
               WHERE i.order_id=o.id AND i.environment=o.environment)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,'vehicle_type',i.vehicle_type,
               'quantity',CASE WHEN o.partner_transfer_status IN ('settled','received')
                 THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END,
               'dispatched_quantity',i.quantity,'accepted_quantity',i.accepted_quantity,

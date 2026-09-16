@@ -3,6 +3,7 @@ import { canonicalCatalogBrand } from './catalog-brand.js';
 import { salesReportComparison, type SalesReportFilter } from './sales-report-period.js';
 
 export interface ReportLine {
+  vehicle_type?: string | null;
   id: string; sale_id: string; channel: 'varejo' | 'atacado'; day: string;
   measure: string; brand: string; condition: string; kind: string;
   quantity: number; revenue: number; cost: number | null;
@@ -17,6 +18,7 @@ export class SalesReportLimitError extends Error {}
 export async function readSalesReportLines(db: Pool, environment: string, filter: SalesReportFilter): Promise<ReportLine[]> {
   const previous = salesReportComparison(filter);
   const result = await db.query<{
+    vehicle_type: string | null;
     id: string; sale_id: string; channel: 'varejo' | 'atacado'; day: string;
     measure: string; brand: string | null; condition: string | null; kind: string;
     quantity: number; revenue: string; cost: string | null;
@@ -29,7 +31,7 @@ export async function readSalesReportLines(db: Pool, environment: string, filter
     SELECT i.id,o.id sale_id,'varejo'::text channel,
       (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS "day",
       COALESCE(NULLIF(btrim(ts.tire_size),''),p.product_name,'Item sem identificação') measure,
-      p.brand,i.tire_condition AS "condition",p.product_type::text kind,i.quantity,
+      p.brand,i.tire_condition AS "condition",i.vehicle_type,p.product_type::text kind,i.quantity,
       (i.quantity*i.unit_price-i.discount_amount)::text revenue,
       round(i.quantity*i.matriz_unit_cost,2)::text cost
     FROM commerce.orders o
@@ -46,7 +48,7 @@ export async function readSalesReportLines(db: Pool, environment: string, filter
     UNION ALL
     SELECT i.id,o.id,'atacado',
       (o.sold_at AT TIME ZONE 'America/Sao_Paulo')::date::text,
-      i.measure,i.brand,i.tire_condition,'tire',q.quantity,
+      i.measure,i.brand,i.tire_condition,i.vehicle_type,'tire',q.quantity,
       (q.quantity*i.unit_price)::text,round(q.quantity*i.unit_cost,2)::text
     FROM commerce.wholesale_orders o
     JOIN commerce.wholesale_order_items i ON i.order_id=o.id AND i.environment=o.environment

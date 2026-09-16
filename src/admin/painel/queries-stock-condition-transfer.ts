@@ -17,6 +17,7 @@ import {
 import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inventory.js';
 
 interface StockVariant {
+  vehicle_type: 'motorcycle' | 'car' | null;
   id: string;
   measure: string;
   brand: string;
@@ -90,7 +91,7 @@ export async function transferWholesaleStockCondition(
     }
 
     const locked = await client.query<StockVariant>(
-      `SELECT id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost::text,
+      `SELECT commerce.stock_vehicle_type(environment,measure,brand,tire_condition) vehicle_type,id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost::text,
               min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter
          FROM commerce.wholesale_stock
         WHERE environment=$1 AND measure=$2 AND brand=$3
@@ -125,9 +126,10 @@ export async function transferWholesaleStockCondition(
     }>(
       `INSERT INTO commerce.wholesale_stock (
          environment,measure,brand,tire_condition,quantity_on_hand,unit_cost,
-         min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter,vehicle_type
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (environment,measure,brand,tire_condition) DO UPDATE SET
+         vehicle_type=COALESCE(EXCLUDED.vehicle_type,commerce.wholesale_stock.vehicle_type),
          unit_cost=round(
            (commerce.wholesale_stock.quantity_on_hand*commerce.wholesale_stock.unit_cost
              + EXCLUDED.quantity_on_hand*EXCLUDED.unit_cost)
@@ -139,7 +141,7 @@ export async function transferWholesaleStockCondition(
       [
         environment, source.measure, source.brand, toCondition, input.quantity,
         Number(source.unit_cost), source.min_quantity, source.notes,
-        source.tire_width_mm, source.tire_aspect_ratio, source.tire_rim_diameter,
+        source.tire_width_mm, source.tire_aspect_ratio, source.tire_rim_diameter, source.vehicle_type,
       ],
     );
     const target = targetAfter.rows[0]!;

@@ -1,3 +1,4 @@
+import { tireVehicleFilterSchema } from '../../shared/tire-vehicle-type.js';
 // Obra 300 (2026-07-05): fatia da PORTARIA da matriz — estoque do galpão (entrada/definir/remover).
 // VERBATIM das linhas 543-599 do route.ts pré-obra (corpo de registerPainelRoute).
 // Registrada por ./route.js (porta de entrada) na ordem original.
@@ -210,11 +211,14 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
   // O FILME do galpão (0128): últimos movimentos, todos ou de uma medida (?measure=&limit=).
   fastify.get('/admin/api/wholesale/stock/movimentos', { preHandler: requireAdminAuth }, async (request, reply) => {
     const q = request.query as {
-      measure?: string; brand?: string;
+      measure?: string; brand?: string; vehicle_type?: string;
       tire_condition?: 'meia_vida' | 'novo' | 'remold'; limit?: string;
     };
     const limit = Math.min(Math.max(1, Number(q.limit) || 50), 200);
+    const vehicle = tireVehicleFilterSchema.safeParse(q.vehicle_type || 'all');
+    if (!vehicle.success) return reply.code(400).send({error:'invalid_vehicle_type'});
     const rows = await listGalpaoMovements({
+      vehicle_type: vehicle.data,
       measure: q.measure?.slice(0, 60) || null,
       brand: q.brand?.slice(0, 60) || null,
       tire_condition: q.tire_condition ?? null,

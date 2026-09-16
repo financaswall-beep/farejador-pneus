@@ -5,6 +5,8 @@ export const tireVehicleTypeSchema = z.enum(['motorcycle', 'car']);
 export type TireVehicleType = z.infer<typeof tireVehicleTypeSchema>;
 export const tireVehicleFilterSchema = z.enum(['all', 'motorcycle', 'car', 'unknown']);
 export type TireVehicleFilter = z.infer<typeof tireVehicleFilterSchema>;
+export const vehicleReportFilterSchema = z.enum(['all', 'motorcycle', 'car', 'unknown', 'mixed']);
+export type VehicleReportFilter = z.infer<typeof vehicleReportFilterSchema>;
 
 export function requireTireVehicleType(value: unknown): TireVehicleType | null {
   if (value === undefined || value === null) return null;
@@ -14,7 +16,11 @@ export function requireTireVehicleType(value: unknown): TireVehicleType | null {
 }
 
 export function matchesTireVehicleType(
-  value: TireVehicleType | null | undefined, filter: TireVehicleFilter = 'all',
+  value: string | null | undefined, filter: VehicleReportFilter = 'all',
 ): boolean {
   return filter === 'all' || (filter === 'unknown' ? value == null : value === filter);
+}
+
+export function tireVehicleLabel(value?: string | null): string {
+  return ({ all:'Todos os pneus', motorcycle:'Moto', car:'Carro', mixed:'Lotes mistos' } as Record<string,string>)[value ?? 'unknown'] ?? 'Não identificado';
 }

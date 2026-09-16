@@ -53,7 +53,7 @@ export async function setWholesaleStock(
                    tire_width_mm     = EXCLUDED.tire_width_mm,
                    tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
                    tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
+       RETURNING vehicle_type, measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
                  (quantity_on_hand-quantity_reserved)::int AS quantity_available, unit_cost,
                  min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
@@ -63,7 +63,7 @@ export async function setWholesaleStock(
   );
   await setWholesaleReplenishmentPolicy(dbPool, {
     environment, measure: cat.measure, tireCondition, minQuantity,
-    actorLabel: input.actor_label,
+    actorLabel: input.actor_label, vehicleType: r.rows[0]?.vehicle_type ?? null,
   });
   return r.rows[0]!;
 }
@@ -71,7 +71,7 @@ export async function setWholesaleStock(
 /** Entrada com custo médio ponderado, atômica no ON CONFLICT. */
 export async function addWholesaleStockEntry(
   input: { measure: string; brand?: string | null; tire_condition: TireCondition | string;
-    quantity_in: number; unit_cost: number; actor_label?: string | null;
+    vehicle_type?: 'motorcycle' | 'car' | null; quantity_in: number; unit_cost: number; actor_label?: string | null;
     environment?: 'prod' | 'test' },
   dbPool: Pool | PoolClient = defaultPool,
 ): Promise<WholesaleStockRow> {
@@ -88,9 +88,9 @@ export async function addWholesaleStockEntry(
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
             (environment, measure, brand, tire_condition, quantity_on_hand, unit_cost,
-             tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT (environment, measure, brand, tire_condition) DO UPDATE SET
+             tire_width_mm, tire_aspect_ratio, tire_rim_diameter, vehicle_type)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (environment, measure, brand, tire_condition) DO UPDATE SET vehicle_type = COALESCE(EXCLUDED.vehicle_type, commerce.wholesale_stock.vehicle_type),
        unit_cost = round(
          (commerce.wholesale_stock.quantity_on_hand * commerce.wholesale_stock.unit_cost
             + EXCLUDED.quantity_on_hand * EXCLUDED.unit_cost)
@@ -99,12 +99,12 @@ export async function addWholesaleStockEntry(
        tire_width_mm     = EXCLUDED.tire_width_mm,
        tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
        tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
+       RETURNING vehicle_type, measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
                  (quantity_on_hand-quantity_reserved)::int AS quantity_available, unit_cost,
                  0::int AS sales_30d,min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, brand, tireCondition, input.quantity_in, input.unit_cost,
-     cat.width, cat.aspect, cat.rim],
+     cat.width, cat.aspect, cat.rim, input.vehicle_type ?? null],
   );
   return r.rows[0]!;
 }

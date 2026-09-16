@@ -5,7 +5,7 @@ window.PAINEL_MODULES.relatorios = function () {
   const parse = d => new Date(d + 'T12:00:00Z');
   const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'America/Sao_Paulo'}).format(new Date());
   return {
-    rp: {report:'vendas', tab:'overview', librarySearch:'', mode:'month', month:today().slice(0,7),
+    rp: {vehicle_type:'all',report:'vendas', tab:'overview', librarySearch:'', mode:'month', month:today().slice(0,7),
       from:'', to:'', compare:true, channel:'all', brand:'', condition:'', measure:'', exact:false,
       data:null, loading:false, error:'', offset:0, productPage:1, expanded:'', selectedSale:null,
       saved:false, notice:'', exporting:false, exportError:'', showRules:false},
@@ -39,7 +39,7 @@ window.PAINEL_MODULES.relatorios = function () {
     },
     rpQuery(filters=null) {
       const f=filters||this.rp;
-      return new URLSearchParams({from:f.from,to:f.to,mode:f.mode,compare:String(f.compare),channel:f.channel,
+      return new URLSearchParams({vehicle_type:f.vehicle_type || 'all',from:f.from,to:f.to,mode:f.mode,compare:String(f.compare),channel:f.channel,
         brand:f.brand,condition:f.condition,measure:f.measure,exact:String(f.exact),offset:String(f.offset||0)}).toString();
     },
     async rpLoad(offset=0) {
@@ -59,7 +59,7 @@ window.PAINEL_MODULES.relatorios = function () {
           :'Não foi possível carregar o relatório. Tente novamente.';
       } finally {if(id===request)this.rp.loading=false;}
     },
-    rpResetFilters() {Object.assign(this.rp,{channel:'all',brand:'',condition:'',measure:'',exact:false});void this.rpLoad();},
+    rpResetFilters() {Object.assign(this.rp,{vehicle_type:'all',channel:'all',brand:'',condition:'',measure:'',exact:false});void this.rpLoad();},
     rpSearchMeasure() {this.rp.exact=false;void this.rpLoad();},
     rpSeeSales(measure,brand=null,condition=null) {
       Object.assign(this.rp,{measure,exact:true,tab:'sales'});
@@ -99,7 +99,7 @@ window.PAINEL_MODULES.relatorios = function () {
         this.rp.compare=String(saved.filters.compare)==='true';this.rp.exact=String(saved.filters.exact)==='true';
         this.rp.month=this.rp.from.slice(0,7);this.rp.report='vendas';
         this.rp.tab=['overview','products','sales'].includes(saved.tab)?saved.tab:'overview';
-        this.rp.notice='Visão restaurada. Os números foram consultados novamente.';void this.rpLoad();
+        this.rp.notice='Visão restaurada. Os números foram consultados novamente.';this.rp.vehicle_type = ['motorcycle','car','mixed','unknown'].includes(saved.filters.vehicle_type) ? saved.filters.vehicle_type : 'all';void this.rpLoad();
       }catch(_){this.rp.notice='A visão salva não está disponível. Escolha os filtros novamente.';}
     },
   };

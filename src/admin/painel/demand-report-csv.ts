@@ -1,7 +1,8 @@
+import { tireVehicleLabel } from '../../shared/tire-vehicle-type.js';
 import type { buildDemandReport } from './queries-demand-report.js';
 import { shortageReportCell } from './shortage-report-csv.js';
 export function demandReportCsv(r:ReturnType<typeof buildDemandReport>){
-  const rows:unknown[][]=[['Demanda por município',r.filters.view],['Período',r.filters.from,r.filters.to],['Comparação',r.comparison?.from,r.comparison?.to],
+  const rows:unknown[][]=[['Demanda por município',r.filters.view],['Tipo de veículo',tireVehicleLabel(r.filters.vehicle_type || 'all')],['Período',r.filters.from,r.filters.to],['Comparação',r.comparison?.from,r.comparison?.to],
     ['Município do detalhe',r.city_name],['Busca na lista de municípios',r.filters.citySearch],['Busca de medida',r.filters.search],['Medida do detalhe',r.selected_measure?.measure||'Nenhuma'],
     ['Posição atual',r.as_of],['Metodologia','Conversas distintas com atividade registrada no período. Cada indicador é contado uma vez por conversa, no primeiro dia em que ocorreu no intervalo. Pedidos e entregas usam suas próprias datas; cancelados excluídos.'],
     ['Localização','Último município conhecido da conversa, inclusive para períodos anteriores. Sem município fica separado; não representa clientes únicos.'],

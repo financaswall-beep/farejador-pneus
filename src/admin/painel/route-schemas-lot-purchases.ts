@@ -7,7 +7,7 @@ export const registerLotPurchaseSchema = z.object({
   new_supplier: z.object({ name: z.string().trim().min(1).max(200),
     phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(),
   }).optional(),
-  lot: z.object({ description: z.string().trim().min(1).max(200),
+  lot: z.object({ vehicle_type: z.enum(['motorcycle','car','mixed']).nullable().optional(), description: z.string().trim().min(1).max(200),
     quantity: z.number().int().positive().max(100000), total_cost: z.number().positive(), }).strict(),
   purchased_at: z.string().datetime({ offset: true }),
   received_at: z.string().datetime({ offset: true }).optional(),

@@ -37,7 +37,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         state.loading = true;
         state.error = null;
         try {
-          const data = await this.apiGet(`/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}`);
+          const data = await this.apiGet(`/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}${state.row.vehicle_type ? '&vehicle_type='+encodeURIComponent(state.row.vehicle_type) : ''}`);
           if (this.catalogoCompatibilidade !== state) return;
           state.applications = Array.isArray(data.applications) ? data.applications : [];
           state.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
@@ -93,123 +93,25 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       };
     },
 
-    async catalogoDiscoveryLoad(productId) {
-      if (!productId || this.catalogoCompatibilidade.row?.product_id !== productId) return;
-      this.catalogoCompatibilidade.discoveriesLoading = true;
-      try {
-        const data = await this.apiGet(
-          `/admin/api/catalog/${encodeURIComponent(productId)}/fitment-discoveries`,
-        );
-        if (this.catalogoCompatibilidade.row?.product_id === productId) {
-          this.catalogoCompatibilidade.discoveries = Array.isArray(data.rows) ? data.rows : [];
-        }
-      } catch {
-        if (this.catalogoCompatibilidade.row?.product_id === productId) {
-          this.catalogoCompatibilidade.message = {
-            ok: false, text: 'As compatibilidades oficiais abriram, mas a fila de pesquisa não carregou.',
-          };
-        }
-      } finally {
-        this.catalogoCompatibilidade.discoveriesLoading = false;
-      }
-    },
-
-    catalogoDiscoveryCanCreate() {
-      const state = this.catalogoCompatibilidade;
-      const form = state.discoveryForm || {};
-      return this.adminUser?.role === 'owner' && !state.saving
-        && Boolean(state.selectedVehicle?.vehicle_model_id)
-        && /^https?:\/\//i.test(String(form.source_url || '').trim())
-        && String(form.evidence_summary || '').trim().length >= 5
-        && this.catalogoCompatibilityYearsValid();
-    },
-
-    async catalogoDiscoveryCreate() {
-      const state = this.catalogoCompatibilidade;
-      const productId = state.row?.product_id;
-      if (!productId || !this.catalogoDiscoveryCanCreate()) return;
-      state.saving = true;
-      state.message = null;
-      try {
-        await this.apiPost(`/admin/api/catalog/${encodeURIComponent(productId)}/fitment-discoveries`, {
-          vehicle_model_id: state.selectedVehicle.vehicle_model_id,
-          position: state.form.position,
-          source_url: String(state.discoveryForm.source_url).trim(),
-          source_title: String(state.discoveryForm.source_title || '').trim() || null,
-          evidence_summary: String(state.discoveryForm.evidence_summary).trim(),
-          suggested_is_oem: Boolean(state.form.is_oem),
-          confidence_level: Number(state.discoveryForm.confidence_level || 0.8),
-          year_start: this.catalogoCompatibilityYearValue(state.form.year_start),
-          year_end: this.catalogoCompatibilityYearValue(state.form.year_end),
-        });
-        state.discoveryForm = { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 };
-        state.search = '';
-        state.selectedVehicle = null;
-        state.form.year_start = '';
-        state.form.year_end = '';
-        state.message = { ok: true, text: 'Pesquisa registrada como candidata. O Bot ainda não usa esse dado até a aprovação.' };
-        await this.catalogoDiscoveryLoad(productId);
-      } catch (error) {
-        const code = error instanceof Error ? error.message : String(error);
-        state.message = {
-          ok: false,
-          text: code.includes('catalog_discovery_already_pending')
-            ? 'Já existe uma pesquisa pendente para esta moto, posição e medida.'
-            : 'Não foi possível registrar a pesquisa.',
-        };
-      } finally {
-        state.saving = false;
-      }
-    },
-
-    async catalogoDiscoveryReview(item, decision) {
-      const state = this.catalogoCompatibilidade;
-      const productId = state.row?.product_id;
-      if (this.adminUser?.role !== 'owner' || !productId || state.saving) return;
-      if (item.active_reference) {
-        state.message = { ok: true, text: 'Esta referência já está em uso pelo Bot. Não precisa aprovar para consultar por medida.' };
-        return;
-      }
-      const action = decision === 'approve' ? 'aprovar' : 'rejeitar';
-      const reason = window.prompt(`Motivo para ${action} esta pesquisa:`);
-      if (!reason || reason.trim().length < 2) return;
-      state.saving = true;
-      state.message = null;
-      try {
-        const result = await this.apiPost(
-          `/admin/api/catalog/${encodeURIComponent(productId)}/fitment-discoveries/${encodeURIComponent(item.discovery_id)}/review`,
-          { decision, reason: reason.trim() },
-        );
-        state.message = { ok: true, text: result.status === 'promoted'
-          ? 'Pesquisa aprovada e propagada para todos os produtos desta medida.'
-          : 'Pesquisa rejeitada e preservada no histórico.' };
-        await Promise.all([
-          this.catalogoDiscoveryLoad(productId),
-          this.catalogoCompatibilityLoad(productId),
-          this.loadCatalogo(),
-        ]);
-      } catch {
-        state.message = { ok: false, text: 'Não foi possível revisar esta pesquisa.' };
-      } finally {
-        state.saving = false;
-      }
-    },
-
     async catalogoCompatibilitySearch() {
       const term = String(this.catalogoCompatibilidade.search || '').trim();
       this.catalogoCompatibilidade.selectedVehicle = null;
       this.catalogoCompatibilidade.searchRows = [];
       if (term.length < 2) return;
+      if (!this.catalogoCompatibilidade.row?.vehicle_type) {
+        this.catalogoCompatibilidade.message = { ok: false, text: 'Classifique o pneu como Moto ou Carro na ficha técnica antes de vincular um veículo.' };
+        return;
+      }
       this.catalogoCompatibilidade.searching = true;
       this.catalogoCompatibilidade.message = null;
       try {
         const data = await this.apiGet(
-          `/admin/api/catalog/vehicle-models?q=${encodeURIComponent(term)}`,
+          `/admin/api/catalog/vehicle-models?q=${encodeURIComponent(term)}&vehicle_type=${encodeURIComponent(this.catalogoCompatibilidade.row.vehicle_type)}`,
         );
         this.catalogoCompatibilidade.searchRows = Array.isArray(data.rows) ? data.rows : [];
       } catch {
         this.catalogoCompatibilidade.message = {
-          ok: false, text: 'Não foi possível pesquisar os modelos de moto.',
+          ok: false, text: 'Não foi possível pesquisar os modelos de veículo.',
         };
       } finally {
         this.catalogoCompatibilidade.searching = false;
@@ -273,7 +175,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         state.searchRows = [];
         state.selectedVehicle = null;
         state.form = { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' };
-        state.message = { ok: true, text: 'Compatibilidade salva para todos os produtos desta medida.' };
+        state.message = { ok: true, text: 'Compatibilidade salva no escopo da categoria deste produto.' };
         await this.catalogoCompatibilityLoad(productId);
         await this.loadCatalogo();
       } catch {
@@ -289,7 +191,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       if (this.adminUser?.role !== 'owner' || !productId || state.saving) return;
       const reason = window.prompt('Motivo da remoção desta compatibilidade:');
       if (!reason || reason.trim().length < 2) return;
-      if (!window.confirm('Remover esta moto de todos os produtos desta medida?')) return;
+      if (!window.confirm('Remover esta compatibilidade do produto e dos vínculos compartilhados da mesma categoria?')) return;
       state.saving = true;
       state.message = null;
       try {

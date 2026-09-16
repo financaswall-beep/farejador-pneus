@@ -26,7 +26,7 @@ function moduleState() {
       unit_cost: 12, min_quantity: 20, sales_30d: 2,
     },
   ];
-  return {
+  const state = {
     ...methods,
     atacadoMeasures: stock,
     atacadoStock: stock,
@@ -55,6 +55,8 @@ function moduleState() {
     comprasOpenTab: vi.fn(),
     $nextTick: (callback: () => void) => callback(),
   };
+  Object.defineProperties(state, Object.getOwnPropertyDescriptors(painelModule('app.vehicle-types.js', 'vehicleTypes')));
+  return state;
 }
 
 describe('Painel do galpão com duas marcas na mesma medida', () => {
@@ -147,7 +149,7 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     state.repoAbrirCompra([{ ...plan[0], suggested_quantity: 11 }]);
     expect(state.compraForm.items).toEqual([
       { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
-        quantity: 11, unit_cost: '' },
+        vehicle_type: '', quantity: 11, unit_cost: '' },
     ]);
   });
 

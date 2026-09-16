@@ -15,7 +15,7 @@ describe('política de reposição por medida e condição', () => {
     expect(db.query.mock.calls[0][0]).toContain('wholesale_replenishment_policies');
     expect(db.query.mock.calls[1][0]).toContain('SET min_quantity=$4');
     expect(db.query.mock.calls[1][0]).not.toMatch(/quantity_on_hand|unit_cost/);
-    expect(db.query.mock.calls[1][1]).toEqual(['test', '110/70-13', 'meia_vida', 8]);
+    expect(db.query.mock.calls[1][1]).toEqual(['test', '110/70-13', 'meia_vida', 8, null]);
   });
 
   it('a migration usa o maior mínimo legado, nunca soma marcas', () => {

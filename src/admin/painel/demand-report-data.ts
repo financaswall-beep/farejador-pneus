@@ -8,10 +8,10 @@ export async function readDemandSnapshot(f:DemandReportFilter,environment=env.FA
   const c=await db.connect();try{
     await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await c.query("SET LOCAL statement_timeout='15s'");
     const asOf=(await c.query<{at:Date}>('SELECT now() AS at')).rows[0]!.at.toISOString();
-    const current=(await c.query<DemandEvent>(demandEventsSql,[environment,f.from,f.to])).rows;
-    const comparison=demandComparison(f),previous=comparison?(await c.query<DemandEvent>(demandEventsSql,[environment,comparison.from,comparison.to])).rows:[];
+    const current=(await c.query<DemandEvent>(demandEventsSql,[environment,f.from,f.to,f.vehicle_type || 'all'])).rows;
+    const comparison=demandComparison(f),previous=comparison?(await c.query<DemandEvent>(demandEventsSql,[environment,comparison.from,comparison.to,f.vehicle_type || 'all'])).rows:[];
     const stock=(await c.query<{measure:string;quantity:number}>(`SELECT measure,sum(quantity_on_hand)::float8 AS quantity
-      FROM commerce.wholesale_stock WHERE environment=$1 GROUP BY measure ORDER BY measure LIMIT 20001`,[environment])).rows;
+      FROM commerce.wholesale_stock WHERE environment=$1 AND ($2='all' OR ($2='unknown' AND commerce.stock_vehicle_type(environment,measure,brand,tire_condition) IS NULL) OR commerce.stock_vehicle_type(environment,measure,brand,tire_condition)=$2) GROUP BY measure ORDER BY measure LIMIT 20001`,[environment,f.vehicle_type || 'all'])).rows;
     if(current.length>50000||previous.length>50000||stock.length>20000)throw new DemandReportLimitError();
     await c.query('COMMIT');return{as_of:asOf,current,previous,stock};
   }catch(error){await c.query('ROLLBACK').catch(()=>undefined);throw error;}finally{c.release();}

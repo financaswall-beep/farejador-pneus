@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { requiredMatrixModules } from '../../../src/admin/panel-modules.js';
 function app() {
   const window: any = { PAINEL_MODULES: {} };
+  vm.runInNewContext(fs.readFileSync('painel/public/app.vehicle-types.js', 'utf8'), { window });
   vm.runInNewContext(fs.readFileSync('painel/public/app.estoque.custos.js', 'utf8'), { window, Intl, URLSearchParams });
   const state: any = { stockTab: 'custos', isMatrixPanel: () => true, $nextTick: vi.fn(), apiGet: vi.fn(), tireLotsOpen: vi.fn(),
     stockCosts: { data: null, request: 0, mode: 'catalog', condition: '', search: '', detail: null }, tireLots: {} };
+  Object.defineProperties(state, Object.getOwnPropertyDescriptors(window.PAINEL_MODULES.vehicleTypes()));
   Object.defineProperties(state, Object.getOwnPropertyDescriptors(window.PAINEL_MODULES.estoqueCustos()));
   return state;
 }

@@ -55,7 +55,7 @@ describe('envio de compra no navegador', () => {
     const a=app(); a.apiPost.mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({lot_code:'LT-000001',order_code:'CP-001',stock_applied:true});
     await a.lotPurchaseSubmit(); const first=a.apiPost.mock.calls[0][1];
-    expect(first.lot).toEqual({description:'Lote para borracharia',quantity:80,total_cost:480});
+    expect(first.lot).toEqual({description:'Lote para borracharia',quantity:80,total_cost:480,vehicle_type:null});
     expect(first.items).toBeUndefined();
     a.lotPurchaseForm.quantity='99'; await a.lotPurchaseSubmit();
     expect(a.apiPost.mock.calls[1][1]).toBe(first);

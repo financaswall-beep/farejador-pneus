@@ -1,3 +1,5 @@
+import type { VehicleReportFilter } from '../../shared/tire-vehicle-type.js';
+import { getBotVehicleDemand } from './bot-vehicle-demand.js';
 // Visão do Bot: agregadores somente leitura, exclusivos do painel da matriz.
 // Facts, classificações e sinais vêm do analytics determinístico (0102–0104/0218).
 // O mapa também lê municípios de pinos já geocodificados; não expõe coordenadas.
@@ -39,6 +41,7 @@ export async function getBotVisao(
   period: PainelRedePeriod = '30d',
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  vehicleType: VehicleReportFilter = 'all',
 ): Promise<BotVisaoPayload> {
   // Janela constante por id (sem input do usuário na string) — mesma régua do getMatrizResumo.
   const todaySql = `(now() AT TIME ZONE 'America/Sao_Paulo')::date`;
@@ -292,5 +295,6 @@ export async function getBotVisao(
     out.medidas_top = r.rows;
   } catch { /* bloco vazio */ }
 
+  if (vehicleType !== 'all') Object.assign(out, await getBotVehicleDemand(period,vehicleType,environment,dbPool));
   return out;
 }

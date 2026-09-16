@@ -5,6 +5,7 @@ import type { PurchaseReportFilter } from './purchase-report-period.js';
 
 /** Monetary values are integer cents. No current stock or customer data is read. */
 export interface PurchaseReportLine {
+  vehicle_type?: string | null;
   id: string; purchase_id: string; order_code: string | null; day: string; received_on: string | null;
   supplier_id: string; supplier_name: string; status: 'pending' | 'confirmed';
   full_total: number; open: number; measure: string; brand: string; condition: string;
@@ -14,6 +15,7 @@ export class PurchaseReportLimitError extends Error {}
 export async function readPurchaseReportLines(db: Pool, environment: string, filter: PurchaseReportFilter): Promise<PurchaseReportLine[]> {
   const previous = reportComparison(filter);
   const result = await db.query<{
+    vehicle_type: string | null;
     id: string; purchase_id: string; order_code: string | null; day: string; received_on: string | null;
     supplier_id: string; supplier_name: string; status: 'pending' | 'confirmed';
     full_total: string; open: string; measure: string; brand: string | null; condition: string | null;
@@ -44,7 +46,7 @@ export async function readPurchaseReportLines(db: Pool, environment: string, fil
         OR (p.purchased_at>=b.previous_start AND p.purchased_at<b.previous_end))
   ) SELECT i.id,p.id purchase_id,p.order_code,p."day",p.received_on,p.supplier_id,p.supplier_name,p.status,
       p.total_amount::text full_total,p.open_amount::text open,
-      i.measure,i.brand,i.tire_condition AS "condition",
+      i.measure,i.brand,i.tire_condition AS "condition",i.vehicle_type,
       COALESCE(i.accepted_quantity,i.quantity)::int quantity,i.ordered_quantity::int ordered,
       i.allocated_cost::text value,i.unit_cost::text base_unit_cost
     FROM purchases p JOIN commerce.wholesale_purchase_lines i ON i.purchase_id=p.id AND i.environment=p.environment

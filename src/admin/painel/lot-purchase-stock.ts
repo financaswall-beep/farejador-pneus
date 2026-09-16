@@ -6,9 +6,9 @@ export async function insertPurchaseLot(client: PoolClient, environment: string,
   purchaseId: string, lot: PurchaseLotInput, allocatedCost: number) {
   const result = await client.query<{ id: string; lot_code: string }>(
     `INSERT INTO commerce.tire_lots
-      (environment,purchase_id,description,ordered_quantity,products_amount,allocated_cost)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,'LT-'||lpad(lot_number::text,6,'0') lot_code`,
-    [environment, purchaseId, lot.description.trim(), lot.quantity, lot.total_cost, allocatedCost]);
+      (environment,purchase_id,description,ordered_quantity,products_amount,allocated_cost,vehicle_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,'LT-'||lpad(lot_number::text,6,'0') lot_code`,
+    [environment, purchaseId, lot.description.trim(), lot.quantity, lot.total_cost, allocatedCost, lot.vehicle_type ?? null]);
   return result.rows[0]!;
 }
 

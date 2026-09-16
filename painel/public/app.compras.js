@@ -4,7 +4,7 @@ window.PAINEL_MODULES.compras = function () {
     compraAddItem() {
       if (this.adminUser?.role !== 'owner') return;
       this.compraForm.items.push({
-        measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '',
+        vehicle_type: '', measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '',
       });
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
@@ -109,7 +109,7 @@ window.PAINEL_MODULES.compras = function () {
       const items = f.items
         .filter((it) => it.measure && it.measure.trim() && Number(it.quantity) > 0)
         .map((it) => ({
-          measure: it.measure.trim(),
+          vehicle_type: it.vehicle_type || null, measure: it.measure.trim(),
           brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
           tire_condition: it.tire_condition || null,
           quantity: Number(it.quantity),
@@ -217,6 +217,7 @@ window.PAINEL_MODULES.compras = function () {
     },
     compraErrText(code) {
       const map = {
+        vehicle_type_conflict: 'O tipo de veículo diverge do catálogo ou do estoque. Confira carro/moto em cada item.',
         supplier_required: 'Escolha ou cadastre o fornecedor.',
         supplier_not_found: 'Fornecedor não encontrado.',
         items_required: 'Adicione ao menos um pneu.',
