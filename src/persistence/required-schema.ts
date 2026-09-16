@@ -44,7 +44,17 @@ export const REQUIRED_SCHEMA_SQL = `
        WHERE table_schema='commerce'
          AND table_name='wholesale_order_items'
          AND column_name='tire_condition'
-         AND is_nullable='NO'
+         AND (
+           is_nullable='NO'
+           OR EXISTS (
+             -- A partir da 0232, lotes não têm condição individual. O CHECK
+             -- continua exigindo a condição para todos os itens de catálogo.
+             SELECT 1 FROM pg_constraint
+              WHERE conrelid='commerce.wholesale_order_items'::regclass
+                AND conname='wholesale_item_kind_check'
+                AND contype='c' AND convalidated
+           )
+         )
     )
     AND EXISTS (
       SELECT 1
