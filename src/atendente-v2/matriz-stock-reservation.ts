@@ -18,6 +18,7 @@ async function buildReservationPlan(
   client: PoolClient,
   environment: 'prod' | 'test',
   items: RequestedItem[],
+  credit: ReservationMovement[] = [],
 ): Promise<ReservationMovement[]> {
   const qtyByProduct = new Map<string, number>();
   for (const item of items) {
@@ -46,9 +47,16 @@ async function buildReservationPlan(
     requested.set(variantKey, current);
   }
 
-  const stockIndex = buildMatrizStockIndex(
-    await loadMatrizOfficialStock(client, environment, true),
-  );
+  const stockRows = await loadMatrizOfficialStock(client, environment, true);
+  // Na edição, a reserva do próprio pedido conta como disponível para ele.
+  // O crédito é apenas em memória; nenhuma reserva é solta antes da confirmação.
+  for (const row of stockRows) {
+    const own = credit.find(c => c.measure === row.measure && c.brand === row.brand
+      && c.tire_condition === row.tire_condition)?.qty ?? 0;
+    if (Number(row.quantity_reserved ?? 0) < own) throw new Error('stock_reservation_items_mismatch');
+    row.quantity_reserved = Number(row.quantity_reserved ?? 0) - own;
+  }
+  const stockIndex = buildMatrizStockIndex(stockRows);
   const plan: ReservationMovement[] = [];
   for (const item of requested.values()) {
     const state = matrizStockForMeasure(
@@ -62,6 +70,56 @@ async function buildReservationPlan(
     });
   }
   return plan;
+}
+
+/** O pedido deve estar travado pelo chamador. Valida inclusive SKUs que dividem
+ * o mesmo saldo físico e nunca usa reservas de outros pedidos como crédito. */
+export async function planMatrizReservationEdit(
+  client: PoolClient, environment: 'prod' | 'test', orderId: string,
+  current: RequestedItem[], desired: RequestedItem[],
+) {
+  if (await hasEvent(client, environment, orderId, 'matriz_galpao_decrement')
+    || await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) {
+    throw new Error('stock_reservation_not_editable');
+  }
+  const previous = await reservationMovements(client, environment, orderId);
+  if (!previous.length) throw new Error('stock_reservation_not_found');
+  const normalize = (rows: ReservationMovement[]) => JSON.stringify(rows
+    .map(r=>[r.measure,r.brand,r.tire_condition,r.qty]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  const expected = await buildReservationPlan(client, environment, current, previous);
+  if (normalize(previous) !== normalize(expected)) throw new Error('stock_reservation_items_mismatch');
+  const movements = await buildReservationPlan(client, environment, desired, previous);
+  return { previous, movements };
+}
+
+export async function applyMatrizReservationEdit(
+  client: PoolClient, environment: 'prod' | 'test', orderId: string,
+  plan: Awaited<ReturnType<typeof planMatrizReservationEdit>>,
+): Promise<void> {
+  const changes = new Map<string, ReservationMovement>();
+  for (const [rows, sign] of [[plan.previous,-1],[plan.movements,1]] as const) {
+    for (const row of rows) {
+      const key = JSON.stringify([row.measure,row.brand,row.tire_condition]);
+      const change = changes.get(key) ?? { ...row, qty: 0 };
+      change.qty += sign * row.qty;
+      changes.set(key,change);
+    }
+  }
+  for (const row of [...changes.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))) {
+    if (!row.qty) continue;
+    const updated = await client.query(
+      `UPDATE commerce.wholesale_stock SET quantity_reserved=quantity_reserved+$5
+        WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
+          AND quantity_reserved+$5 BETWEEN 0 AND quantity_on_hand RETURNING measure`,
+      [environment,row.measure,row.brand,row.tire_condition,row.qty],
+    );
+    if (updated.rowCount !== 1) throw new Error('stock_reservation_insufficient');
+  }
+  await client.query(
+    `INSERT INTO audit.events(environment,domain,entity_table,entity_id,event_type,actor_label,payload_before,payload_after,created_at)
+     VALUES ($1,'stock','commerce.wholesale_stock',$2,'matriz_galpao_reservation_adjusted','agent_v2_bot',$3::jsonb,$4::jsonb,clock_timestamp())`,
+    [environment,orderId,JSON.stringify({movements:plan.previous}),JSON.stringify({order_id:orderId,movements:plan.movements})],
+  );
 }
 
 async function hasEvent(

@@ -14,13 +14,16 @@ export interface MatrixEligibility {
 export async function evaluateMatrizDelivery(client:PoolClient,environment:Environment,input:{
   items:{ product_id:string; quantity:number }[]; modalidade:'delivery'|'pickup';
   customerLocation:GeoPoint|null; settings?:DeliverySettings|null;
+  requireConfiguredDistance?:boolean;
 }):Promise<MatrixEligibility> {
   const settings=input.settings===undefined ? (await readDeliverySettings(client,environment))?.settings??null : input.settings;
   const origin=matrizOrigin(settings);
   let distanceKm=input.customerLocation ? haversineKm(input.customerLocation,origin) : null;
   if (input.customerLocation && env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY) {
     const measured=await cachedRoadDistanceKm(client,input.customerLocation,[origin],env.GOOGLE_MAPS_API_KEY);
-    distanceKm=measured?.[0]??distanceKm;
+    distanceKm=measured?.[0]??(input.requireConfiguredDistance?null:distanceKm);
+  } else if(input.requireConfiguredDistance&&env.ROUTING_GEO_ROAD_DISTANCE) {
+    distanceKm=null;
   }
   let block=matrizCoverageBlock(settings,input.modalidade,distanceKm);
   let canFulfill=false;

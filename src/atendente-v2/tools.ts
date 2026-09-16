@@ -59,6 +59,7 @@ import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './de
 import { prepareToolLocation } from './tool-location.js';
 import { AmbiguousNeighborhoodError } from './neighborhood-resolution.js';
 import { removeOpenOrderItems } from './order-item-removal.js';
+import { editOpenOrder } from './order-edit.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -348,15 +349,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'editar_pedido',
-      description: 'Edita endereço/pagamento ou remove pneus de um pedido aberto da Matriz, ainda não pago ou em atendimento. Para remover, consulte o pedido e passe os product_ids em remover_itens; o sistema recalcula total e libera reservas. Não mistura remoção com outros campos. Adição, troca, quantidade parcial ou pedido de parceiro precisam de humano.',
+      description: 'Altera pedido aberto da Matriz antes de pagamento/atendimento. Consulte o pedido primeiro. Para incluir, trocar ou mudar quantidade, envie itens_finais com TODOS os pneus e suas quantidades finais. Endereço novo deve incluir rua, número e município: o sistema recota frete/cobertura. A primeira chamada devolve prévia sem alterar o pedido. Apresente o resultado e, só após nova confirmação do cliente, chame com order_number e confirmar_alteracao_id. Remover produtos inteiros explicitamente pedidos continua disponível via remover_itens, sem misturar outros campos. Pedido pago, em rota, atendimento ou de parceiro exige humano.',
       parameters: {
         type: 'object',
         properties: {
           order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
-          novo_endereco: { type: 'string', description: 'Novo endereço completo (rua, número, bairro). Opcional.' },
+          novo_endereco: { type: 'string', description: 'Novo endereço completo com rua, número, bairro, município e estado. Recalcula frete e cobertura da Matriz antes de confirmar.' },
           nova_forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'], description: 'Nova forma de pagamento. Opcional.' },
           remover_itens: { type: 'array', items: { type: 'string', format: 'uuid' }, minItems: 1, maxItems: 30,
             description: 'product_ids retornados por consultar_pedido. Remove todas as unidades destes produtos, mantendo os demais. Não use para cancelar o pedido inteiro.' },
+          itens_finais: { type: 'array', minItems: 1, maxItems: 30,
+            description: 'Lista COMPLETA de como o pedido deve ficar, inclusive os pneus que serão mantidos. Quantidade FINAL, nunca incremento. Não envie preços. Para trocar, omita o antigo e inclua o novo; para incluir, mantenha também os atuais.',
+            items: { type: 'object', properties: { product_id: { type: 'string' }, quantidade: { type: 'integer', minimum: 1, maximum: 1000 } }, required: ['product_id','quantidade'], additionalProperties: false } },
+          confirmar_alteracao_id: { type: 'string', description: 'ID da prévia retornada por esta ferramenta. SOMENTE após apresentar o resumo e receber nova confirmação do cliente. Envie apenas este campo e order_number, sem repetir alterações.' },
           motivo: { type: 'string', description: 'Motivo livre da edição (ex: "cliente trocou bairro de entrega")' },
         },
         required: ['order_number'],
@@ -1876,125 +1881,14 @@ async function cancelarPedido(
 
 // ─── editar_pedido ─────────────────────────────────────────────────────────
 
-interface ItemAdicionar {
-  product_id: string;
-  quantidade: number;
-  preco_unitario: number;
-}
-
 async function editarPedido(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
   args: Record<string, unknown>,
 ): Promise<string> {
-  const orderNumber = (args.order_number as string)?.toUpperCase().trim();
-  if (!orderNumber) {
-    return JSON.stringify({ erro: 'order_number obrigatorio' });
-  }
-
-  const novoEndereco = args.novo_endereco as string | undefined;
-  const novaFormaPagamento = args.nova_forma_pagamento as string | undefined;
-  const removerItens = (args.remover_itens as string[] | undefined) ?? [];
-  const adicionarItens = (args.adicionar_itens as ItemAdicionar[] | undefined) ?? [];
-  const motivo = (args.motivo as string | undefined) ?? 'cliente_solicitou';
-
-  if (adicionarItens.length > 0) {
-    return JSON.stringify({
-      erro: 'Adicionar ou substituir pneus precisa de atendente humano.',
-      sugestao: 'A edição automática permite remover produtos inteiros de pedidos elegíveis. Não adicione itens nem altere preços.',
-    });
-  }
-
   if (args.remover_itens !== undefined) {
     return JSON.stringify(await removeOpenOrderItems(client, environment, conversationId, args));
   }
-
-  if (!novoEndereco && !novaFormaPagamento && removerItens.length === 0 && adicionarItens.length === 0) {
-    return JSON.stringify({ erro: 'Nenhuma mudanca informada. Passe ao menos um campo.' });
-  }
-
-  // Busca pedido + valida ownership
-  const orderResult = await client.query<{
-    id: string;
-    status: string;
-    contact_id: string | null;
-    conv_contact_id: string | null;
-    fulfillment_mode: string;
-    partner_order_id: string | null;
-  }>(
-    `SELECT o.id, o.status, o.contact_id, o.fulfillment_mode, o.partner_order_id,
-            (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
-     FROM commerce.orders o
-     WHERE o.environment = $1 AND o.order_number = $3
-     LIMIT 1`,
-    [environment, conversationId, orderNumber],
-  );
-
-  const order = orderResult.rows[0];
-  if (!order) return JSON.stringify({ erro: `Pedido ${orderNumber} nao encontrado.` });
-
-  if (order.contact_id && order.conv_contact_id && order.contact_id !== order.conv_contact_id) {
-    return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
-  }
-
-  // Tijolo 3.4: edição de pedido de parceiro fica ADIADA de propósito (escala
-  // humano — seguro, sem órfão). Não existe `edit_partner_local_order` (re-reserva
-  // de estoque) na máquina do parceiro; editar só metade (endereço sim, itens não)
-  // faria o espelho e o dono divergirem → viola a LEI ("um dono por número").
-  // Propagação real de edição é follow-up (precisa da função de re-reserva).
-  if (order.partner_order_id) {
-    return JSON.stringify({
-      erro: 'Pedido de parceiro: alteração precisa de atendente humano.',
-      sugestao: 'Escalando pra humano (pedido roteado a parceiro).',
-    });
-  }
-
-  if (order.status !== 'open') {
-    return JSON.stringify({
-      erro: `Pedido com status '${order.status}' nao pode ser editado automaticamente.`,
-      sugestao: 'Escalando pra humano.',
-    });
-  }
-
-  // Tudo dentro de uma transacao
-  try {
-    await client.query('BEGIN');
-
-    if (novoEndereco) {
-      await client.query(
-        `UPDATE commerce.orders SET delivery_address = $1, updated_at = now() WHERE id = $2`,
-        [novoEndereco, order.id],
-      );
-    }
-
-    if (novaFormaPagamento) {
-      await client.query(
-        `UPDATE commerce.orders SET payment_method = $1, updated_at = now() WHERE id = $2`,
-        [novaFormaPagamento, order.id],
-      );
-    }
-
-    await client.query('COMMIT');
-
-    logger.info(
-      {
-        environment, conversation_id: conversationId, order_number: orderNumber,
-        novoEndereco: !!novoEndereco, novaFormaPagamento, motivo,
-      },
-      'agent_v2: pedido editado via bot (campos nao-financeiros)',
-    );
-
-    return JSON.stringify({
-      ok: true,
-      order_number: orderNumber,
-      mensagem: `Pedido ${orderNumber} atualizado.`,
-    });
-
-  } catch (err) {
-    await client.query('ROLLBACK');
-    const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ environment, order_number: orderNumber, err: message }, 'agent_v2: erro ao editar pedido');
-    return JSON.stringify({ erro: `Nao foi possivel editar: ${message}` });
-  }
+  return JSON.stringify(await editOpenOrder(client, environment, conversationId, args));
 }
