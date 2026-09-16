@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
+import { requireTireVehicleType } from '../../shared/tire-vehicle-type.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { requireTireCondition, type TireCondition } from '../../shared/tire-condition.js';
 import type { CreateCatalogProductInput, CreatedCatalogProduct } from './queries-catalogo-create.js';
@@ -45,6 +46,7 @@ export async function createCatalogProductFromStock(
   const loadIndex = optionalTechnicalText(input.loadIndex);
   const speedRating = optionalTechnicalText(input.speedRating)?.toUpperCase() ?? null;
   const position = input.position ?? null;
+  const vehicleType = requireTireVehicleType(input.vehicleType);
   if (!measure) throw new Error('catalog_measure_required');
   if (!tireSizeKey(measure)) throw new Error('catalog_measure_invalid');
   const measureKey = measure.replace(/\D/g, '');
@@ -120,13 +122,13 @@ export async function createCatalogProductFromStock(
     const tireSpec = await client.query<{ id: string }>(
       `INSERT INTO commerce.tire_specs
          (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter,
-          tread_pattern,load_index,speed_rating,position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          tread_pattern,load_index,speed_rating,position,vehicle_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id`,
       [
         environment, productId, variant.measure, variant.tire_width_mm,
         variant.tire_aspect_ratio, variant.tire_rim_diameter, treadPattern,
-        loadIndex, speedRating, position,
+        loadIndex, speedRating, position, vehicleType,
       ],
     );
     const tireSpecId = tireSpec.rows[0]?.id ?? (await client.query<{ id: string }>(
@@ -144,14 +146,22 @@ export async function createCatalogProductFromStock(
          FROM commerce.vehicle_fitments vf
          JOIN commerce.tire_specs source_spec
            ON source_spec.id=vf.tire_spec_id AND source_spec.environment=vf.environment
+         JOIN commerce.vehicle_models vm
+           ON vm.id=vf.vehicle_model_id AND vm.environment=vf.environment
+         JOIN commerce.products source_product
+           ON source_product.id=source_spec.product_id AND source_product.environment=source_spec.environment
         WHERE vf.environment=$1::env_t
+          AND source_spec.vehicle_type=$4 AND vm.vehicle_type=$4
+          AND $4='motorcycle'
+          AND source_product.deleted_at IS NULL AND vm.deleted_at IS NULL
+          AND ($5::text IS NULL OR $5='both' OR vf.position=$5 OR vf.position='both')
           AND source_spec.id<>$2
           AND regexp_replace(source_spec.tire_size,'[^0-9]+','','g')
               =regexp_replace($3,'[^0-9]+','','g')
         ORDER BY vf.vehicle_model_id,vf.position,vf.is_oem DESC,
                  vf.confidence_level DESC NULLS LAST,vf.created_at
        ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position) DO NOTHING`,
-      [environment, tireSpecId, variant.measure],
+      [environment, tireSpecId, variant.measure, vehicleType, position],
     );
     await client.query(
       `INSERT INTO audit.events
@@ -169,6 +179,7 @@ export async function createCatalogProductFromStock(
           load_index: loadIndex,
           speed_rating: speedRating,
           position,
+          vehicle_type: vehicleType,
           source: 'wholesale_stock',
           inherited_fitments: copiedFitments.rowCount ?? 0,
           supersedes_archived_product_ids: archivedProductIds,
@@ -183,6 +194,7 @@ export async function createCatalogProductFromStock(
       brand: variant.brand,
       tire_condition: tireCondition,
       tire_size: variant.measure,
+      vehicle_type: vehicleType,
     };
   } catch (error) {
     await client.query('ROLLBACK');

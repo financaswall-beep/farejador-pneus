@@ -33,7 +33,7 @@ export async function getCatalogFitmentDiscoveries(
 ): Promise<CatalogFitmentDiscoveryRow[]> {
   const result = await dbPool.query<CatalogFitmentDiscoveryRow & { discovery_measure: string }>(
     `WITH selected AS (
-       SELECT regexp_replace(ts.tire_size,'[^0-9]+','','g') measure_key
+       SELECT regexp_replace(ts.tire_size,'[^0-9]+','','g') measure_key,ts.vehicle_type
          FROM commerce.products p
          JOIN commerce.tire_specs ts
            ON ts.product_id=p.id AND ts.environment=p.environment
@@ -54,6 +54,7 @@ export async function getCatalogFitmentDiscoveries(
          ON vm.id=d.vehicle_model_id AND vm.environment=d.environment
        JOIN selected s
          ON s.measure_key=regexp_replace(ts.tire_size,'[^0-9]+','','g')
+        AND ts.vehicle_type IS NOT DISTINCT FROM s.vehicle_type
       WHERE d.environment=$1
       ORDER BY CASE d.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1
                  WHEN 'promoted' THEN 2 ELSE 3 END,d.discovered_at DESC`,
@@ -114,7 +115,7 @@ export async function createCatalogFitmentDiscovery(
     const { tireSize, tireSpecIds } = await loadCatalogMeasureSpecs(client, environment, input.productId);
     const vehicle = await client.query(
       `SELECT id FROM commerce.vehicle_models
-        WHERE environment=$1 AND id=$2 AND vehicle_type='motorcycle'
+        WHERE environment=$1 AND id=$2 AND vehicle_type IN ('motorcycle','car')
           AND deleted_at IS NULL FOR UPDATE`,
       [environment, input.vehicleModelId],
     );

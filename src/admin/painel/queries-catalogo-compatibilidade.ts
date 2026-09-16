@@ -4,6 +4,7 @@ import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
 import { applicationMeasureKey, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
 import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
+import type { TireVehicleType } from '../../shared/tire-vehicle-type.js';
 
 export interface CatalogCompatibilityRow {
   vehicle_model_id: string;
@@ -18,15 +19,6 @@ export interface CatalogCompatibilityRow {
   confidence_level: string | null;
 }
 
-export interface CatalogVehicleModelRow {
-  vehicle_model_id: string;
-  make: string;
-  model: string;
-  variant: string | null;
-  year_start: number | null;
-  year_end: number | null;
-  displacement_cc: number | null;
-}
 
 interface CompatibilityMutationInput {
   productId: string;
@@ -61,37 +53,13 @@ export function validateFitmentYears(
   }
 }
 
-export async function searchCatalogVehicleModels(
-  term: string,
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<CatalogVehicleModelRow[]> {
-  const query = term.trim();
-  if (query.length < 2) return [];
-  const result = await dbPool.query<CatalogVehicleModelRow>(
-    `SELECT id AS vehicle_model_id,make,model,variant,year_start,year_end,displacement_cc
-       FROM commerce.vehicle_models
-      WHERE environment=$1 AND vehicle_type='motorcycle' AND deleted_at IS NULL
-        AND (make ILIKE $2 OR model ILIKE $2 OR COALESCE(variant,'') ILIKE $2
-          OR COALESCE(aliases::text,'') ILIKE $2
-          OR concat_ws(' ',make,model,variant,displacement_cc::text) ILIKE $2)
-      ORDER BY
-        CASE WHEN lower(model)=lower($3) THEN 0
-             WHEN lower(model) LIKE lower($3) || '%' THEN 1 ELSE 2 END,
-        make,model,variant NULLS FIRST,year_start NULLS FIRST
-      LIMIT 30`,
-    [environment, `%${query}%`, query],
-  );
-  return result.rows;
-}
-
 export async function loadCatalogMeasureSpecs(
   client: PoolClient,
   environment: 'prod' | 'test',
   productId: string,
 ): Promise<{ tireSize: string; tireSpecIds: string[] }> {
-  const selected = await client.query<{ tire_size: string }>(
-    `SELECT ts.tire_size
+  const selected = await client.query<{ tire_size: string; vehicle_type: TireVehicleType | null }>(
+    `SELECT ts.tire_size,ts.vehicle_type
        FROM commerce.products p
        JOIN commerce.tire_specs ts
          ON ts.product_id=p.id AND ts.environment=p.environment
@@ -108,10 +76,12 @@ export async function loadCatalogMeasureSpecs(
        JOIN commerce.products p
          ON p.id=ts.product_id AND p.environment=ts.environment
       WHERE ts.environment=$1 AND p.deleted_at IS NULL AND p.product_type='tire'
+        AND ts.vehicle_type IS NOT DISTINCT FROM $3::text
+        AND ($3::text IS DISTINCT FROM 'car' OR p.id=$4)
         AND regexp_replace(ts.tire_size,'[^0-9]+','','g')
             =regexp_replace($2,'[^0-9]+','','g')
       ORDER BY ts.id FOR UPDATE OF ts`,
-    [environment, tireSize],
+    [environment, tireSize, selected.rows[0].vehicle_type ?? null, productId],
   );
   return { tireSize, tireSpecIds: specs.rows.map((row) => row.id) };
 }
@@ -135,7 +105,7 @@ export async function addCatalogCompatibility(
     ]);
     const vehicle = await client.query<{ id: string; make: string; model: string }>(
       `SELECT id,make,model FROM commerce.vehicle_models
-        WHERE environment=$1 AND id=$2 AND vehicle_type='motorcycle'
+        WHERE environment=$1 AND id=$2 AND vehicle_type IN ('motorcycle','car')
           AND deleted_at IS NULL FOR UPDATE`,
       [environment, input.vehicleModelId],
     );
@@ -225,13 +195,15 @@ export async function getCatalogMeasureApplications(
   measure: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  vehicleType?: TireVehicleType | null,
 ) {
   const key = applicationMeasureKey(measure);
-  const applications = await loadVehicleApplicationCatalog(dbPool, environment, key);
-  const reviews = await dbPool.query(`SELECT application_id,make,model,position,year_start,year_end,status,review_note
+  const applications = await loadVehicleApplicationCatalog(dbPool, environment, key, vehicleType);
+  const reviews = await dbPool.query(`SELECT application_id,vehicle_type,make,model,position,year_start,year_end,status,review_note
     FROM commerce.vehicle_measure_applications WHERE environment=$1
-      AND display_measure=$2 AND status<>'verified' ORDER BY make,model,application_id`,
-  [environment, key]);
+      AND display_measure=$2 AND status<>'verified' AND ($3::text IS NULL OR vehicle_type=$3)
+    ORDER BY make,model,application_id`,
+  [environment, key, vehicleType ?? null]);
   return { applications, application_reviews: reviews.rows };
 }
 
@@ -255,6 +227,7 @@ export async function getCatalogCompatibility(
     position: string; year_start: number | null; year_end: number | null; status: string; review_note: string }>;
 }> {
   const product = await dbPool.query<{
+    vehicle_type: TireVehicleType | null;
     product_id: string;
     product_code: string;
     product_name: string;
@@ -263,7 +236,7 @@ export async function getCatalogCompatibility(
     tire_size: string | null;
   }>(
     `SELECT p.id AS product_id,p.product_code,p.product_name,p.brand,p.tire_condition,
-            ts.tire_size
+            ts.tire_size,ts.vehicle_type
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts
          ON ts.product_id=p.id AND ts.environment=p.environment
@@ -291,7 +264,7 @@ export async function getCatalogCompatibility(
       ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position`,
     [environment, productId],
   );
-  const measureApplications = await getCatalogMeasureApplications(selected.tire_size ?? '', environment, dbPool);
+  const measureApplications = await getCatalogMeasureApplications(selected.tire_size ?? '', environment, dbPool, selected.vehicle_type);
   return {
     product: selected,
     summary: {
@@ -304,3 +277,5 @@ export async function getCatalogCompatibility(
 }
 
 export * from './queries-catalogo-discoveries.js';
+
+export { searchCatalogVehicleModels, type CatalogVehicleModelRow } from './catalog-vehicle-models.js';

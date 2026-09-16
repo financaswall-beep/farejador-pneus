@@ -4,6 +4,7 @@ import { env } from '../../shared/config/env.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { moneyCents } from '../../shared/catalog-pricing.js';
 import { parseCatalogTireMeasure } from './catalog-tire-measure.js';
+import { requireTireVehicleType, type TireVehicleType } from '../../shared/tire-vehicle-type.js';
 import {
   requireTireCondition,
   type TireCondition,
@@ -23,6 +24,7 @@ export interface CreateCatalogProductInput {
   loadIndex?: string | null;
   speedRating?: string | null;
   position?: 'front' | 'rear' | 'both' | null;
+  vehicleType?: TireVehicleType | null;
 }
 
 export interface CreatedCatalogProduct {
@@ -32,6 +34,7 @@ export interface CreatedCatalogProduct {
   brand: string;
   tire_condition: TireCondition;
   tire_size: string;
+  vehicle_type: TireVehicleType | null;
   price_amount?: number | null;
 }
 
@@ -87,6 +90,7 @@ export async function createCatalogProduct(
   const loadIndex = optionalTechnicalText(input.loadIndex);
   const speedRating = optionalTechnicalText(input.speedRating)?.toUpperCase() ?? null;
   const position = input.position ?? null;
+  const vehicleType = requireTireVehicleType(input.vehicleType);
   if (!brand || brand.toLowerCase() === 'sem marca') throw new Error('catalog_brand_required');
   const productName = normalizeName(`Pneu ${brand} ${parsedMeasure.canonical}`);
   if (!/^[A-Z0-9][A-Z0-9._/-]{1,79}$/.test(productCode)) {
@@ -144,12 +148,12 @@ export async function createCatalogProduct(
     const tireSpec = await client.query<{ id: string }>(
       `INSERT INTO commerce.tire_specs
          (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter,
-          tread_pattern,load_index,speed_rating,position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          tread_pattern,load_index,speed_rating,position,vehicle_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id`,
       [environment, productId, parsedMeasure.canonical, parsedMeasure.widthMm,
        parsedMeasure.aspectRatio, parsedMeasure.rimDiameter, treadPattern,
-       loadIndex, speedRating, position],
+       loadIndex, speedRating, position, vehicleType],
     );
     const tireSpecId = tireSpec.rows[0]!.id;
     const copiedFitments = await client.query(
@@ -162,13 +166,21 @@ export async function createCatalogProduct(
          FROM commerce.vehicle_fitments vf
          JOIN commerce.tire_specs source_spec
            ON source_spec.id=vf.tire_spec_id AND source_spec.environment=vf.environment
+         JOIN commerce.vehicle_models vm
+           ON vm.id=vf.vehicle_model_id AND vm.environment=vf.environment
+         JOIN commerce.products source_product
+           ON source_product.id=source_spec.product_id AND source_product.environment=source_spec.environment
         WHERE vf.environment=$1::env_t
+          AND source_spec.vehicle_type=$4 AND vm.vehicle_type=$4
+          AND $4='motorcycle'
+          AND source_product.deleted_at IS NULL AND vm.deleted_at IS NULL
+          AND ($5::text IS NULL OR $5='both' OR vf.position=$5 OR vf.position='both')
           AND source_spec.id<>$2
           AND regexp_replace(source_spec.tire_size,'[^0-9]+','','g')=$3
         ORDER BY vf.vehicle_model_id,vf.position,vf.is_oem DESC,
                  vf.confidence_level DESC NULLS LAST,vf.created_at
        ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position) DO NOTHING`,
-      [environment, tireSpecId, parsedMeasure.canonical.replace(/\D/g, '')],
+      [environment, tireSpecId, parsedMeasure.canonical.replace(/\D/g, ''), vehicleType, position],
     );
 
     let priceId: string | null = null;
@@ -205,6 +217,7 @@ export async function createCatalogProduct(
          load_index: loadIndex,
          speed_rating: speedRating,
          position,
+         vehicle_type: vehicleType,
          source: 'catalog_manual',
          initial_price_id: priceId,
          inherited_fitments: copiedFitments.rowCount ?? 0,
@@ -221,6 +234,7 @@ export async function createCatalogProduct(
       brand,
       tire_condition: tireCondition,
       tire_size: parsedMeasure.canonical,
+      vehicle_type: vehicleType,
       price_amount: initialPrice.amount,
     };
   } catch (error) {

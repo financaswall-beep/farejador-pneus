@@ -45,6 +45,7 @@ describe('cadastro inicial antes da compra', () => {
       product_id: 'produto-novo', product_code: 'LEV-909018-MV',
       product_name: 'Pneu Levorin 90/90-18', brand: 'Levorin',
       tire_condition: 'meia_vida', tire_size: '90/90-18', price_amount: 45,
+      vehicle_type: null,
     });
 
     const sql = query.mock.calls.map(([statement]) => String(statement)).join('\n');
@@ -121,6 +122,7 @@ describe('cadastro de produto a partir do estoque', () => {
       brand: 'Metzeler',
       tire_condition: 'meia_vida',
       tire_size: '90/90-18',
+      vehicle_type: null,
     });
 
     const stockSql = query.mock.calls

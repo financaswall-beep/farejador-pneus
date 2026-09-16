@@ -44,6 +44,9 @@ export async function reviewCatalogFitmentDiscovery(
     if (candidate.discovery_measure.replace(/\D/g, '') !== tireSize.replace(/\D/g, '')) {
       throw new Error('catalog_discovery_measure_mismatch');
     }
+    if (!tireSpecIds.includes(candidate.tire_spec_id)) {
+      throw new Error('catalog_discovery_vehicle_type_mismatch');
+    }
     if (candidate.status !== 'pending' && candidate.status !== 'approved') {
       throw new Error('catalog_discovery_already_reviewed');
     }

@@ -1,27 +1,31 @@
 import type { Pool, PoolClient } from 'pg';
 import { applicationMeasureKey, type VehicleTireApplication } from './vehicle-tire-applications.js';
+import type { TireVehicleType } from './tire-vehicle-type.js';
 
 export interface CatalogApplication extends VehicleTireApplication {
+  vehicle_type?: TireVehicleType | null;
   aliases?: string[];
   // Revisão explícita da família: uma única edição não comprova todos os anos.
   year_optional?: boolean;
 }
 type CatalogRow = Pick<CatalogApplication, 'application_id' | 'make' | 'model' | 'aliases' |
-  'position' | 'tire_size' | 'display_measure' | 'year_start' | 'year_end'> & {
+  'position' | 'tire_size' | 'display_measure' | 'year_start' | 'year_end' | 'vehicle_type'> & {
   reference: VehicleTireApplication;
 };
 
 export async function loadVehicleApplicationCatalog(
   db: Pick<Pool | PoolClient, 'query'>, environment: 'prod' | 'test', measure?: string | null,
+  vehicleType?: TireVehicleType | null,
 ): Promise<CatalogApplication[]> {
   const key = measure === undefined ? null : applicationMeasureKey(measure);
   if (key === '') return [];
   const result = await db.query<CatalogRow>(`SELECT application_id,make,model,aliases,
-      position,tire_size,display_measure,year_start,year_end,reference
+      position,tire_size,display_measure,year_start,year_end,vehicle_type,reference
     FROM commerce.vehicle_measure_applications
     WHERE environment=$1 AND status='verified' AND application_kind='original'
       AND ($2::text IS NULL OR display_measure=$2)
-    ORDER BY make,model,year_start NULLS LAST,position,application_id`, [environment, key]);
+      AND ($3::text IS NULL OR vehicle_type=$3)
+    ORDER BY make,model,year_start NULLS LAST,position,application_id`, [environment, key, vehicleType ?? null]);
   return result.rows.map(({ reference, ...row }) => ({ ...reference, ...row,
     validation_scope: 'manufacturer_measure', product_fitment_confirmed: false,
   }));
@@ -35,10 +39,13 @@ function tokens(value: string): string[] {
 
 export function matchCatalogApplications(
   catalog: CatalogApplication[], model: string, year?: number, position?: 'front' | 'rear' | 'both',
+  vehicleType: TireVehicleType = 'motorcycle',
 ): CatalogApplication[] {
   const query = tokens(model);
   if (!query.length) return [];
   return catalog.filter(row => {
+    // Chamadas históricas são de motos. Aplicação de carro exige classificação explícita.
+    if (row.vehicle_type ? row.vehicle_type !== vehicleType : vehicleType !== 'motorcycle') return false;
     // Cada alias é uma identificação completa; não juntar tokens de variantes distintas.
     const names = [row.model, row.reference_model, ...(row.aliases ?? [])];
     if (!names.some(name => {

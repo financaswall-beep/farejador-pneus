@@ -16,89 +16,32 @@ import {
 import { createCatalogProduct, createCatalogProductFromStock } from './queries-catalogo-create.js';
 import { updateCatalogTireSpec } from './queries-catalogo-spec.js';
 import { operatorLabel } from './route-helpers.js';
+import { tireVehicleTypeSchema, tireVehicleFilterSchema } from '../../shared/tire-vehicle-type.js';
+import { getCatalogVehicleInventory } from './catalog-vehicle-inventory.js';
 
-const productParams = z.object({ product_id: z.string().uuid() });
-const priceBody = z.object({
-  price_amount: z.number().positive().max(9_999_999.99)
-    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
-      'catalog_price_cent_precision'),
-  reason: z.string().trim().min(2).max(500),
-});
-const createProductBody = z.object({
-  measure: z.string().trim().min(1).max(60),
-  brand: z.string().trim().min(1).max(60),
-  tire_condition: z.enum(['meia_vida', 'novo', 'remold']),
-  product_code: z.string().trim().min(2).max(80),
-  product_name: z.string().trim().min(2).max(160),
-  creation_mode: z.enum(['stock', 'manual']).default('stock'),
-  price_amount: z.number().positive().max(9_999_999.99)
-    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
-      'catalog_price_cent_precision')
-    .nullable().optional(),
-  price_reason: z.string().trim().min(2).max(500).nullable().optional(),
-  tread_pattern: z.string().trim().max(120).nullable().optional(),
-  load_index: z.string().trim().max(20).nullable().optional(),
-  speed_rating: z.string().trim().max(20).nullable().optional(),
-  position: z.enum(['front', 'rear', 'both']).nullable().optional(),
-});
-const tireSpecBody = z.object({
-  tread_pattern: z.string().trim().max(120).nullable().optional(),
-  load_index: z.string().trim().max(20).nullable().optional(),
-  speed_rating: z.string().trim().max(20).nullable().optional(),
-  position: z.enum(['front', 'rear', 'both']).nullable().optional(),
-  reason: z.string().trim().min(2).max(500),
-});
-const vehicleSearchQuery = z.object({ q: z.string().trim().min(2).max(120) });
-const fitmentYear = z.number().int().min(1900).max(2100).nullable().optional();
-function withValidFitmentRange<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
-  return schema.superRefine((body, context) => {
-    const years = body as { year_start?: number | null; year_end?: number | null };
-    if (years.year_start !== null && years.year_start !== undefined
-      && years.year_end !== null && years.year_end !== undefined
-      && years.year_end < years.year_start) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['year_end'],
-        message: 'catalog_compatibility_year_range_invalid',
-      });
-    }
-  });
-}
-const compatibilityBody = withValidFitmentRange(z.object({
-  vehicle_model_id: z.string().uuid(),
-  position: z.enum(['front', 'rear', 'both']),
-  is_oem: z.boolean().default(false),
-  source: z.enum(['manufacturer', 'manual']).default('manual'),
-  confidence_level: z.number().min(0).max(1).default(1),
-  year_start: fitmentYear,
-  year_end: fitmentYear,
-  reason: z.string().trim().min(2).max(500),
-}));
-const compatibilityDeleteParams = productParams.extend({
-  vehicle_model_id: z.string().uuid(),
-  position: z.enum(['front', 'rear', 'both']),
-});
-const compatibilityDeleteBody = z.object({ reason: z.string().trim().min(2).max(500) });
-const discoveryBody = withValidFitmentRange(z.object({
-  vehicle_model_id: z.string().uuid(),
-  position: z.enum(['front', 'rear', 'both']),
-  source_url: z.string().trim().url().max(2000),
-  source_title: z.string().trim().max(300).nullable().optional(),
-  evidence_summary: z.string().trim().min(5).max(2000),
-  suggested_is_oem: z.boolean().default(false),
-  confidence_level: z.number().min(0).max(1).default(0.8),
-  year_start: fitmentYear,
-  year_end: fitmentYear,
-}));
-const discoveryParams = productParams.extend({ discovery_id: z.string().uuid() });
-const discoveryReviewBody = z.object({
-  decision: z.enum(['approve', 'reject']),
-  reason: z.string().trim().min(2).max(500),
-});
+import {
+  productParams,
+  priceBody,
+  createProductBody,
+  tireSpecBody,
+  vehicleSearchQuery,
+  compatibilityBody,
+  compatibilityDeleteParams,
+  compatibilityDeleteBody,
+  discoveryBody,
+  discoveryParams,
+  discoveryReviewBody
+} from './route-catalogo-schemas.js';
 
 export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<void> {
-  fastify.get('/admin/api/catalog', { preHandler: requireAdminAuth }, async (_request, reply) => {
-    return reply.status(200).send(await getCatalogOverview());
+  fastify.get('/admin/api/catalog', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const query = z.object({ vehicle_type: tireVehicleFilterSchema.default('all') }).safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: 'invalid_vehicle_type' });
+    return reply.status(200).send(await getCatalogOverview(undefined, undefined, query.data.vehicle_type));
+  });
+
+  fastify.get('/admin/api/catalog/vehicle-inventory', { preHandler: requireAdminOwner }, async (_request, reply) => {
+    return reply.send(await getCatalogVehicleInventory());
   });
 
   fastify.post('/admin/api/catalog/products', { preHandler: requireAdminOwner }, async (request, reply) => {
@@ -111,6 +54,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         measure: body.data.measure,
         brand: body.data.brand,
         tireCondition: body.data.tire_condition,
+        vehicleType: body.data.vehicle_type,
         productCode: body.data.product_code,
         productName: body.data.product_name,
         actorLabel: operatorLabel(request),
@@ -134,9 +78,10 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
   });
 
   fastify.get('/admin/api/catalog/measure-applications', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const query = z.object({ measure: z.string().trim().min(1).max(60) }).safeParse(request.query);
+    const query = z.object({ measure: z.string().trim().min(1).max(60),
+      vehicle_type: tireVehicleTypeSchema.optional() }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_measure' });
-    return reply.send(await getCatalogMeasureApplications(query.data.measure));
+    return reply.send(await getCatalogMeasureApplications(query.data.measure, undefined, undefined, query.data.vehicle_type));
   });
 
   fastify.post('/admin/api/catalog/:product_id/spec', { preHandler: requireAdminOwner }, async (request, reply) => {
@@ -148,6 +93,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     try {
       return reply.status(200).send(await updateCatalogTireSpec({
         productId: params.data.product_id,
+        vehicleType: body.data.vehicle_type,
         treadPattern: body.data.tread_pattern,
         loadIndex: body.data.load_index,
         speedRating: body.data.speed_rating,
@@ -158,7 +104,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     } catch (error) {
       const message = error instanceof Error ? error.message : 'internal_server_error';
       const status = message === 'catalog_product_not_found' ? 404
-        : message.startsWith('catalog_spec_') ? 400 : 500;
+        : message.startsWith('catalog_spec_') || message === 'catalog_vehicle_type_invalid' ? 400 : 500;
       if (status === 500) logger.error({ error }, 'painel catalog tire spec update failed');
       return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
     }
@@ -167,7 +113,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
   fastify.get('/admin/api/catalog/vehicle-models', { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = vehicleSearchQuery.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_vehicle_search' });
-    return reply.status(200).send({ rows: await searchCatalogVehicleModels(query.data.q) });
+    return reply.status(200).send({ rows: await searchCatalogVehicleModels(query.data.q, undefined, undefined, query.data.vehicle_type) });
   });
 
   fastify.get('/admin/api/catalog/:product_id/history', { preHandler: requireAdminAuth }, async (request, reply) => {

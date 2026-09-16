@@ -56,7 +56,7 @@ describe('catálogo de aplicações independente de SKU', () => {
   it('lê exclusivamente o ambiente e as aplicações originais verificadas; erro do banco não usa lista desatualizada', async () => {
     const query = vi.fn().mockResolvedValue({rows:[]});
     expect(await loadVehicleApplicationCatalog({query},'test','140/70R17')).toEqual([]);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='verified' AND application_kind='original'"),['test','140/70-17']);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='verified' AND application_kind='original'"),['test','140/70-17',null]);
     query.mockRejectedValue(new Error('offline'));
     await expect(loadVehicleApplicationCatalog({query},'prod')).rejects.toThrow('offline');
   });

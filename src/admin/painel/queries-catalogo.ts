@@ -1,15 +1,17 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { moneyCents } from '../../shared/catalog-pricing.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
+import { matchesTireVehicleType, type TireVehicleType, type TireVehicleFilter } from '../../shared/tire-vehicle-type.js';
 import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
 import { catalogApplicationSummary, pendingCatalogMeasures } from './catalog-measure-registration.js';
 interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
   tire_condition: TireCondition | null;
+  vehicle_type: TireVehicleType | null;
   brand: string | null; tire_size: string | null; tire_position: string | null;
   tire_construction?: 'radial' | 'bias' | null;
   tread_pattern: string | null; load_index: string | null; speed_rating: string | null;
@@ -26,10 +28,6 @@ interface StockRow {
 interface PurchaseRow {
   measure: string; brand: string | null; unit_cost: number | string; purchased_at: string;
   tire_condition: TireCondition;
-}
-export interface CatalogPriceInput {
-  productId: string; priceAmount: number; reason: string; actorLabel: string;
-  environment?: 'prod' | 'test';
 }
 
 function brandKey(value: string | null | undefined): string {
@@ -48,12 +46,13 @@ function catalogVariantKey(
 export async function getCatalogOverview(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  vehicleType: TireVehicleFilter = 'all',
 ): Promise<{ summary: Record<string, number>; brands: string[]; rows: unknown[] }> {
   const [catalog, stock, purchases, measures] = await Promise.all([
     dbPool.query<CatalogRow>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,
-              ts.tire_size,ts.position tire_position,ts.construction tire_construction,
+              ts.tire_size,ts.vehicle_type,ts.position tire_position,ts.construction tire_construction,
               ts.tread_pattern,ts.load_index,ts.speed_rating,
               cp.price_amount,cp.currency,cp.price_type,
               COALESCE((
@@ -85,8 +84,8 @@ export async function getCatalogOverview(
         ORDER BY p.purchased_at DESC,i.created_at DESC`,
       [environment],
     ),
-    dbPool.query<{ measure: string }>(
-      `SELECT measure FROM commerce.catalog_measure_registrations WHERE environment=$1 ORDER BY measure`,
+    dbPool.query<{ measure: string; vehicle_type: TireVehicleType | null }>(
+      `SELECT measure,vehicle_type FROM commerce.catalog_measure_registrations WHERE environment=$1 ORDER BY measure`,
       [environment],
     ),
   ]);
@@ -138,7 +137,7 @@ export async function getCatalogOverview(
     return {
       ...product,
       compatibility_count: Number(product.compatibility_count ?? 0),
-      ...catalogApplicationSummary(applications, product.tire_size),
+      ...catalogApplicationSummary(applications, product.tire_size, product.vehicle_type),
       row_key: `product:${product.product_id}`,
       catalogued: true,
       price_amount: price,
@@ -171,6 +170,7 @@ export async function getCatalogOverview(
         product_name: row.brand,
         product_type: 'tire',
         tire_condition: row.tire_condition,
+        vehicle_type: null,
         brand: row.brand,
         tire_size: row.measure,
         tire_position: null,
@@ -199,21 +199,24 @@ export async function getCatalogOverview(
       };
     });
   const measureRows = pendingCatalogMeasures(measures.rows, [...catalogRows, ...stockOnlyRows], applications);
-  const rows = [...catalogRows, ...stockOnlyRows, ...measureRows].sort((a, b) =>
+  const rows = [...catalogRows, ...stockOnlyRows, ...measureRows]
+    .filter(row => matchesTireVehicleType(row.vehicle_type, vehicleType)).sort((a, b) =>
     String(a.brand ?? '').localeCompare(String(b.brand ?? ''), 'pt-BR')
     || String(a.tire_size ?? '').localeCompare(String(b.tire_size ?? ''), 'pt-BR')
     || String(a.product_name).localeCompare(String(b.product_name), 'pt-BR'));
   const brands = [...new Set(rows.map((row) => row.brand).filter((brand): brand is string => Boolean(brand)))];
   return {
     summary: {
-      products: catalogRows.length,
-      incomplete_registrations: measureRows.length,
-      stock_only: stockOnlyRows.length,
+      products: catalogRows.filter(row => matchesTireVehicleType(row.vehicle_type, vehicleType)).length,
+      incomplete_registrations: measureRows.filter(row => matchesTireVehicleType(row.vehicle_type, vehicleType)).length,
+      stock_only: stockOnlyRows.filter(row => matchesTireVehicleType(row.vehicle_type, vehicleType)).length,
       brands: brands.length,
-      without_price: [...catalogRows, ...stockOnlyRows].filter((row) => row.price_amount === null
-        || !Number.isFinite(Number(row.price_amount)) || Number(row.price_amount) <= 0).length,
+      without_price: [...catalogRows, ...stockOnlyRows].filter(row => matchesTireVehicleType(row.vehicle_type, vehicleType))
+        .filter((row) => row.price_amount === null
+          || !Number.isFinite(Number(row.price_amount)) || Number(row.price_amount) <= 0).length,
       with_stock: rows.filter((row) => Number(row.total_stock_available ?? 0) > 0).length,
       without_position: catalogRows.filter((row) => row.product_type === 'tire'
+        && matchesTireVehicleType(row.vehicle_type, vehicleType)
         && row.tire_position === null).length,
     },
     brands,
@@ -221,96 +224,4 @@ export async function getCatalogOverview(
   };
 }
 
-export async function getCatalogPriceHistory(
-  productId: string,
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT pp.id,pp.price_amount,pp.currency,'matriz'::text AS price_type,
-            pp.valid_from,pp.valid_until,
-            ae.actor_label,ae.payload_after->>'reason' reason
-       FROM commerce.matriz_product_prices pp
-       LEFT JOIN LATERAL (
-         SELECT actor_label,payload_after FROM audit.events
-          WHERE environment=pp.environment::text AND entity_table='commerce.matriz_product_prices'
-            AND entity_id=pp.id AND event_type='catalog_price_changed'
-          ORDER BY created_at DESC LIMIT 1
-       ) ae ON true
-      WHERE pp.environment=$1 AND pp.product_id=$2
-      ORDER BY pp.valid_from DESC LIMIT 20`,
-    [environment, productId],
-  );
-  return result.rows;
-}
-
-export async function setCatalogPrice(
-  input: CatalogPriceInput,
-  dbPool: Pool = defaultPool,
-): Promise<{ changed: boolean; price_id: string | null; price_amount: number }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const reason = input.reason.trim();
-  if (!Number.isFinite(input.priceAmount) || input.priceAmount <= 0) throw new Error('catalog_price_invalid');
-  if (Math.abs(input.priceAmount * 100 - moneyCents(input.priceAmount)) >= 1e-7) {
-    throw new Error('catalog_price_cent_precision');
-  }
-  if (reason.length < 2) throw new Error('catalog_price_reason_required');
-  const normalizedPrice = moneyCents(input.priceAmount) / 100;
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    await lockCatalogProduct(client, environment, input.productId);
-    const current = await client.query<{ id: string; price_amount: string; price_type: string }>(
-      `SELECT id,price_amount,'matriz'::text price_type FROM commerce.matriz_product_prices
-        WHERE environment=$1 AND product_id=$2 AND valid_from<=now()
-          AND (valid_until IS NULL OR valid_until>now())
-        ORDER BY price_amount,id FOR UPDATE`,
-      [environment, input.productId],
-    );
-    const official = current.rows[0] ? Number(current.rows[0].price_amount) : null;
-    if (official !== null && moneyCents(official) === moneyCents(normalizedPrice)) {
-      await client.query('COMMIT');
-      return { changed: false, price_id: current.rows[0]!.id, price_amount: official };
-    }
-    await client.query(
-      `UPDATE commerce.matriz_product_prices SET valid_until=now()
-        WHERE environment=$1 AND product_id=$2 AND valid_from<=now()
-          AND (valid_until IS NULL OR valid_until>now())`,
-      [environment, input.productId],
-    );
-    const inserted = await client.query<{ id: string }>(
-      `INSERT INTO commerce.matriz_product_prices
-         (environment,product_id,price_amount,currency,valid_from)
-       VALUES ($1,$2,$3,'BRL',now()) RETURNING id`,
-      [environment, input.productId, normalizedPrice],
-    );
-    const priceId = inserted.rows[0]!.id;
-    await client.query(
-      `INSERT INTO audit.events
-         (environment,domain,entity_table,entity_id,event_type,actor_label,payload_before,payload_after)
-       VALUES ($1,'catalog','commerce.matriz_product_prices',$2,'catalog_price_changed',$3,$4::jsonb,$5::jsonb)`,
-      [environment, priceId, input.actorLabel, JSON.stringify({ active_prices: current.rows }),
-       JSON.stringify({ product_id: input.productId, price_amount: normalizedPrice, reason })],
-    );
-    await client.query('COMMIT');
-    return { changed: true, price_id: priceId, price_amount: normalizedPrice };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function lockCatalogProduct(
-  client: PoolClient,
-  environment: 'prod' | 'test',
-  productId: string,
-): Promise<void> {
-  const product = await client.query(
-    `SELECT id FROM commerce.products
-      WHERE environment=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE`,
-    [environment, productId],
-  );
-  if (!product.rows[0]) throw new Error('catalog_product_not_found');
-}
+export { getCatalogPriceHistory, setCatalogPrice, type CatalogPriceInput } from './queries-catalogo-prices.js';
