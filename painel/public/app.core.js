@@ -9,18 +9,15 @@ window.PAINEL_MODULES.core = function () {
         || !location.pathname.startsWith('/admin/painel')) return;
       this.loadApplications(); // Etapa 3: badge de candidaturas (não bloqueia o resto)
 
-      // Promise.allSettled: cada bloco é independente — um endpoint que falhe
-      // não derruba os outros pro mock. Resumo = bot/tráfego (matriz-resumo,
-      // analytics read-only) + cobrança (rede). Rede = operação dos parceiros.
-      const [pedidos, produtos, rede, resumo] = await Promise.allSettled([
+      // O Resumo possui carregamento próprio e respeita seu filtro de período.
+      const [pedidos, produtos, rede] = await Promise.allSettled([
         this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
         this.apiGet('/admin/api/dashboard/produtos?limit=100'),
         this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`),
-        this.apiGet('/admin/api/dashboard/matriz-resumo?period=7d'),
       ]);
 
       const val = (settled) => (settled.status === 'fulfilled' ? settled.value : null);
-      const settledList = [pedidos, produtos, rede, resumo];
+      const settledList = [pedidos, produtos, rede];
       const ok = settledList.map(val).filter(Boolean);
 
       this.serverEnvironment = ok.map((r) => r.environment).find(Boolean) || this.serverEnvironment;
@@ -35,7 +32,6 @@ window.PAINEL_MODULES.core = function () {
         this.applyRede(rede.value.rows);
         this.redeFunnelUnassigned = Number(rede.value.funnel_unassigned || 0);
       }
-      if (val(resumo)) this.applyMatrizResumo(resumo.value);
 
       // "real" se qualquer bloco respondeu; só cai pro mock se TUDO falhou.
       if (ok.length > 0) {
@@ -122,7 +118,7 @@ window.PAINEL_MODULES.core = function () {
     },
 
     renderCurrentPageCharts() {
-      if (this.currentPage === 'resumo') this.renderChart();
+      if (this.currentPage === 'resumo' && this.isMatrixPanel()) this.renderOverviewChart();
       const page = window.PAINEL_PAGES[this.currentPage];
       for (const method of page?.render || []) {
         if (typeof this[method] === 'function') this[method]();
@@ -172,23 +168,25 @@ window.PAINEL_MODULES.core = function () {
         finally { this.liveRefreshing = false; }
         return;
       }
-      if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
+      if (this.currentPage === 'resumo') {
+        await this.loadMatrizOverview({ silent: true });
+        return;
+      }
+      if (!['rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;
       try {
-        const [rede, resumo, pedidos] = await Promise.allSettled([
+        const [rede, pedidos] = await Promise.allSettled([
           this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`),
-          this.apiGet('/admin/api/dashboard/matriz-resumo?period=7d'),
           this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
         ]);
         if (rede.status === 'fulfilled') {
           this.applyRede(rede.value.rows);
           this.redeFunnelUnassigned = Number(rede.value.funnel_unassigned || 0);
         }
-        if (resumo.status === 'fulfilled') this.applyMatrizResumo(resumo.value);
         if (pedidos.status === 'fulfilled') this.applyPedidos(pedidos.value.rows);
         if (this.currentPage === 'vendas') await this.loadVendasData();
-        if ([rede, resumo, pedidos].some((r) => r.status === 'fulfilled')) {
+        if ([rede, pedidos].some((r) => r.status === 'fulfilled')) {
           this.apiStatus = 'real';
           this.apiError = null;
           this.$nextTick(() => { lucide.createIcons(); this.renderCurrentPageCharts(); });

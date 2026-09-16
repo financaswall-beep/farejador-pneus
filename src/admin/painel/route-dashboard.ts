@@ -2,6 +2,7 @@
 // VERBATIM das linhas 395-437 do route.ts pré-obra (corpo de registerPainelRoute).
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import { registerPartnerReportRoutes } from './route-partner-report.js';
+import { registerMatrizOverview } from './route-matriz-overview.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
@@ -12,6 +13,7 @@ import { dashboardPayload } from './route-helpers.js';
 import { limitQuerySchema, redeQuerySchema, resumoQuerySchema } from './route-schemas.js';
 
 export async function registerPainelDashboard(fastify: FastifyInstance): Promise<void> {
+  await registerMatrizOverview(fastify);
   await registerPartnerReportRoutes(fastify);
   fastify.get('/admin/api/dashboard/pedidos', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = limitQuerySchema.safeParse(request.query);

@@ -24,7 +24,7 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
 // seus handlers nos PRs próprios, sem criar outro watcher ou outro encanamento.
 window.PAINEL_PAGES = {
   relatorios: { scopes: ['matrix'], requires: ['vendas','compras','estoque','logistica','financeiro','rede','bot'], load: ['rpOpen'] },
-  resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', partnerLoad: ['loadPartnerResumo'] },
+  resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', matrixLoad: ['loadMatrizOverview'], partnerLoad: ['loadPartnerResumo'] },
   rede: { scopes: ['matrix'], requires: 'rede', load: ['loadComissoes'], render: [
     'renderRedeChart', 'renderRedeLucroChart', 'renderRedeComprasChart',
     'renderEstoqueParadoChart', 'renderMargemChart', 'renderVendaHojeChart',

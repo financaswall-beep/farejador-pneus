@@ -6,6 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
+<link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260916-vehicle-ui1" />
 <style>
   [x-cloak]{display:none!important}
@@ -101,7 +102,7 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260915-lotsale1"></script>
+<script src="/admin/painel/app.nav.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
@@ -238,11 +239,13 @@
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.core.js?v=20260907-ficha1"></script>
+<script src="/admin/painel/app.resumo.js?v=20260916-overview1"></script>
+<script src="/admin/painel/app.resumo.chart.js?v=20260916-overview1"></script>
+<script src="/admin/painel/app.core.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.js?v=20260916-vehicle-ui1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -692,154 +695,63 @@
     </section>
 
 
-    <div x-show="currentPage === 'resumo' && isMatrixPanel()" class="p-8">
-
-      <!-- Saudação + ações -->
-      <div class="flex items-start justify-between mb-6 flex-wrap gap-4">
-        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-semibold text-lg">
-            W
-          </div>
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight">
-              Olá Wallace, <span class="text-gray-400 font-normal">aqui está seu painel</span>
-            </h1>
-            <p class="text-sm text-gray-500 mt-0.5">Atualizado há poucos segundos</p>
-          </div>
+    <section x-show="currentPage === 'resumo' && isMatrixPanel()" class="overview-page" aria-labelledby="overview-heading">
+      <header class="overview-header">
+        <div><p class="overview-breadcrumb">Matriz / Gestão</p><h1 id="overview-heading">Resumo</h1><p>O que está acontecendo e o que precisa de você.</p></div>
+        <div class="overview-actions">
+          <button type="button" class="overview-button" x-show="panelPageEnabled('compras') && adminUser?.role === 'owner'" @click="overviewGo('compras','nova')"><i data-lucide="shopping-cart"></i> Registrar compra</button>
+          <button type="button" class="overview-button primary" x-show="panelPageEnabled('vendas')" @click="openWalkinModal()"><i data-lucide="plus"></i> Nova venda</button>
         </div>
-
-        <div class="flex items-center gap-2 text-xs">
-          <button class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300 transition-colors">
-            <i data-lucide="share-2" class="w-4 h-4 text-gray-600"></i>
-            <span>Compartilhar</span>
-          </button>
-          <button class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors">
-            <i data-lucide="file-down" class="w-4 h-4"></i>
-            <span>Gerar relatório</span>
-          </button>
+      </header>
+      <div class="overview-toolbar">
+        <div class="overview-segments" aria-label="Período das vendas e do custo do bot">
+          <button type="button" :class="{active:overviewPeriod==='today'}" :aria-pressed="overviewPeriod==='today'" @click="overviewSetPeriod('today')">Hoje</button>
+          <button type="button" :class="{active:overviewPeriod==='7d'}" :aria-pressed="overviewPeriod==='7d'" @click="overviewSetPeriod('7d')">7 dias</button>
+          <button type="button" :class="{active:overviewPeriod==='month'}" :aria-pressed="overviewPeriod==='month'" @click="overviewSetPeriod('month')">Mês</button>
         </div>
+        <label class="overview-month" x-show="overviewPeriod==='month'"><i data-lucide="calendar-days"></i><input aria-label="Mês do resumo" type="month" min="2000-01" :max="overviewMaxMonth" x-model="overviewMonth" @change="overviewFilterChanged()"></label>
+        <span class="overview-range" x-text="overviewRange()"></span>
+        <button type="button" class="overview-button overview-refresh" :disabled="overviewLoading" @click="loadMatrizOverview()"><i data-lucide="refresh-cw" :class="{'animate-spin':overviewLoading}"></i><span x-text="overviewLoading?'Atualizando…':'Atualizar'"></span></button>
       </div>
-
-      <!-- Filtros de tempo -->
-      <div class="flex gap-1 mb-6 border-b border-gray-200">
-        <template x-for="t in timeFilters">
-          <button @click="currentTime = t.id"
-                  :class="currentTime === t.id
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-900'"
-                  class="px-4 py-2.5 text-sm border-b-2 transition-colors"
-                  x-text="t.label"></button>
-        </template>
+      <div x-show="overviewError" class="overview-notice error" role="alert"><i data-lucide="triangle-alert"></i><span x-text="overviewError"></span><button type="button" @click="loadMatrizOverview()">Tentar novamente</button></div>
+      <div class="overview-kpis" :aria-busy="overviewLoading">
+        <article class="overview-kpi featured"><div><i data-lucide="chart-no-axes-combined"></i><span>Vendas concluídas</span></div><strong x-text="overviewMoney(overview?.sales.summary.revenue)"></strong><p><b x-text="overviewNumber(overview?.sales.summary.orders)"></b> vendas no período</p><small>Varejo e atacado, incluindo lotes</small></article>
+        <article class="overview-kpi"><div><i data-lucide="trending-up"></i><span>Resultado do mês</span></div><strong :class="{'negative':overview?.finance?.result_cents<0}" x-text="overviewResult()"></strong><p x-text="overviewResultDetail()"></p><small x-text="overviewMonthLabel(overview?.period.month)"></small></article>
+        <article class="overview-kpi"><div><i data-lucide="package"></i><span>Pneus vendidos</span></div><strong x-text="overviewNumber(overview?.sales.summary.tires)"></strong><p x-text="overviewTiresDetail()"></p><small>Unidades nas vendas concluídas</small></article>
+        <article class="overview-kpi"><div><i data-lucide="bot"></i><span>Custo do bot</span><span class="overview-tag" title="Estimativa interna: R$ 5,50 por milhão de tokens de entrada e saída registrados. Não é a fatura da OpenAI; não inclui Google, WhatsApp ou outras APIs.">Estimado</span></div><strong x-text="overviewMoney(overview?.bot.estimated_cents)"></strong><p>Estimativa de IA no período</p><small x-text="overview?.bot.missing_usage ? overview.bot.missing_usage+' respostas sem uso completo registrado' : overviewNumber(overview?.bot.tokens)+' tokens registrados'"></small></article>
       </div>
-
-      <!-- KPIs -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <template x-for="kpi in kpis">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-5 h-5 rounded-md flex items-center justify-center"
-                   :class="kpi.iconBg">
-                <i :data-lucide="kpi.icon" class="w-3 h-3" :class="kpi.iconColor"></i>
-              </div>
-              <span class="text-xs text-gray-500 font-medium" x-text="kpi.label"></span>
-            </div>
-            <div class="flex items-baseline gap-2">
-              <span class="text-2xl font-bold tracking-tight" x-text="kpi.value"></span>
-              <span x-show="kpi.delta" class="text-xs font-medium px-1.5 py-0.5 rounded"
-                    :class="kpi.deltaClass" x-text="kpi.delta"></span>
-            </div>
-          </div>
-        </template>
+      <div class="overview-grid">
+        <article class="overview-card overview-sales">
+          <header><div><h2>Vendas no período</h2><p>Acompanhe as vendas concluídas em cada canal.</p></div><button type="button" class="overview-link" x-show="panelPageEnabled('vendas')" @click="overviewGo('vendas')">Ver vendas <i data-lucide="arrow-right"></i></button></header>
+          <div class="overview-chart-legend"><span><b></b> Varejo</span><span><b class="teal"></b> Atacado</span></div>
+          <div class="overview-chart"><canvas id="chartOverviewSales" role="img" aria-label="Valores diários de vendas no varejo e no atacado"></canvas><p class="overview-chart-empty" x-show="!overview" x-text="overviewLoading?'Carregando vendas…':'Dados indisponíveis'"></p></div>
+          <div class="overview-sales-totals"><div><span><b class="overview-dot"></b> Varejo</span><strong x-text="overviewMoney(overview?.sales.summary.varejo)"></strong></div><div><span><b class="overview-dot teal"></b> Atacado <small>inclui lotes</small></span><strong x-text="overviewMoney(overview?.sales.summary.atacado)"></strong></div></div>
+          <p class="overview-footnote" x-show="overview && !overview.sales.summary.orders">Nenhuma venda concluída neste período.</p>
+        </article>
+        <article class="overview-card overview-attention">
+          <header><div><h2>Precisa da sua atenção</h2><p>Pendências atuais da operação.</p></div><span class="overview-tag">Agora</span></header>
+          <div class="overview-attention-rows"><template x-for="item in overviewAttention()" :key="item.key"><button type="button" class="overview-attention-row" :disabled="!panelPageEnabled(item.page)" @click="overviewGo(item.page)"><span class="overview-icon" :class="item.tone"><i :data-lucide="item.icon"></i></span><span x-text="item.label"></span><strong x-text="overviewNumber(item.value)"></strong><i data-lucide="chevron-right"></i></button></template></div>
+          <div class="overview-bot-status"><span><b class="overview-dot" :class="{muted:!overview?.agent_v2_worker_enabled}"></b><b x-text="!overview?'Consultando bot…':overview.agent_v2_worker_enabled?'Bot habilitado':'Bot desabilitado'"></b></span><small x-text="overview ? overview.attention.active_conversations+' conversas ativas nas últimas 24 h' : 'Aguardando dados'"></small></div>
+        </article>
+        <article class="overview-card overview-leads">
+          <header><div><h2>Clientes para retomar</h2><p>Com preço cotado e sem resposta há mais de 1 hora.</p></div><button type="button" class="overview-link" x-show="panelPageEnabled('clientes')" @click="overviewGo('clientes')">Ver clientes <i data-lucide="arrow-right"></i></button></header>
+          <template x-for="lead in (overview?.leads || [])" :key="lead.id"><div class="overview-lead"><span class="overview-avatar" x-text="overviewInitials(lead.name)"></span><div class="overview-lead-info"><strong x-text="lead.name || 'Cliente'"></strong><p x-text="lead.interest"></p><small x-text="lead.location || 'Local não informado'"></small></div><span class="overview-wait"><i data-lucide="clock-3"></i><span x-text="overviewWait(lead.hours)"></span></span><a class="overview-button" :href="overviewLeadUrl(lead) || null" :aria-disabled="!overviewLeadUrl(lead)" target="_blank" rel="noopener noreferrer">Abrir conversa <i data-lucide="arrow-up-right"></i></a></div></template>
+          <div class="overview-empty" x-show="!overview || !overview.leads.length"><i data-lucide="messages-square"></i><strong x-text="!overview?'Aguardando dados':'Nenhum cliente para retomar agora'"></strong><p x-show="overview">As conversas elegíveis aparecerão aqui.</p></div>
+          <p class="overview-footnote" x-show="overview?.leads.length">Até 5 conversas recentes, sem pedido registrado.</p>
+        </article>
+        <article class="overview-card overview-finance">
+          <header><div><h2>Dinheiro e compromissos</h2><p>Saldo atual e contas que vencem hoje.</p></div><i data-lucide="wallet"></i></header>
+          <div class="overview-cash"><span>Saldo em caixa agora</span><strong :class="{'negative':overview?.finance?.cash_cents<0}" x-text="overviewMoney(overview?.finance?.cash_cents)"></strong><small>Saldo registrado no sistema</small></div>
+          <div class="overview-due"><div><span><i data-lucide="arrow-down-left"></i> A receber hoje</span><strong x-text="overviewMoney(overview?.finance?.receivable_today_cents)"></strong></div><div class="payable"><span><i data-lucide="arrow-up-right"></i> A pagar hoje</span><strong x-text="overviewMoney(overview?.finance?.payable_today_cents)"></strong></div></div>
+          <div class="overview-network"><span><i data-lucide="network"></i><span><b>A receber da rede</b><small>Comissões e mensalidades em aberto</small></span></span><strong x-text="overviewMoney(overview?.finance?.network_cents)"></strong></div>
+          <p class="overview-footnote" x-show="overview?.finance?.overdue"><i data-lucide="circle-alert"></i><span x-text="overview?.finance?.overdue+' contas em atraso para revisar'"></span></p>
+          <p class="overview-footnote" x-show="overview && !overview.finance">Consulta financeira indisponível para este acesso ou configuração.</p>
+          <button type="button" class="overview-button overview-wide" x-show="panelPageEnabled('financeiro')" @click="overviewGo('financeiro')">Abrir financeiro <i data-lucide="arrow-right"></i></button>
+        </article>
       </div>
+      <footer class="overview-footer"><span><i data-lucide="info"></i>Vendas canceladas e entregas ainda não concluídas ficam fora das vendas.</span><span>Última consulta: <b x-text="overviewUpdated()"></b></span></footer>
+    </section>
 
-      <!-- Grid principal -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        <!-- COLUNA PRINCIPAL -->
-        <div class="lg:col-span-2 space-y-4">
-
-          <!-- Leads a recuperar (clientes que o bot atendeu e esfriaram) -->
-          <div class="bg-white border border-gray-200 rounded-xl">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <div>
-                <h3 class="font-semibold">Leads a recuperar</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Clientes do bot que esfriaram — vale uma mensagem</p>
-              </div>
-              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-50 text-amber-700" x-text="leadsRecuperar.length"></span>
-            </div>
-            <div class="divide-y divide-gray-100">
-              <template x-for="(lead, i) in leadsRecuperar" :key="i">
-                <div class="flex items-start gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-0.5">
-                      <span class="font-medium text-sm" x-text="lead.nome"></span>
-                      <span x-show="lead.reclamouPreco" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-50 text-rose-700">reclamou preço</span>
-                      <span x-show="lead.concorrente" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">citou concorrente</span>
-                    </div>
-                    <div class="text-xs text-gray-500 truncate">
-                      <span x-text="lead.moto"></span> · <span x-text="lead.bairro"></span>
-                      <span x-show="lead.preco"> · <span x-text="lead.preco"></span></span>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-0.5" x-text="lead.motivo"></div>
-                  </div>
-                  <div class="text-right flex-shrink-0">
-                    <div class="text-sm font-medium text-gray-700" x-text="lead.telefone"></div>
-                    <div class="text-[11px] text-gray-400" x-show="lead.horas !== null" x-text="'há ' + lead.horas + 'h'"></div>
-                  </div>
-                </div>
-              </template>
-              <div x-show="leadsRecuperar.length === 0" class="px-5 py-8 text-center text-sm text-gray-500">
-                Nenhum lead esfriou — bot em dia. 👏
-              </div>
-            </div>
-          </div>
-
-          <!-- Performance do bot (gráfico) -->
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="font-semibold">Faturamento via bot</h3>
-                <p class="text-xs text-gray-500 mt-0.5">O que o tráfego/bot fechou nos últimos 7 dias</p>
-              </div>
-              <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">7 dias</span>
-            </div>
-            <div class="h-56">
-              <canvas id="chartPerformance"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- COLUNA LATERAL -->
-        <div class="space-y-4">
-
-          <!-- Card: a receber da rede (cobrança) -->
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-1">
-              <h3 class="font-semibold">A receber da rede</h3>
-              <span class="text-sm font-bold text-emerald-700" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeAReceberTotal())"></span>
-            </div>
-            <p class="text-xs text-gray-500 mb-3" x-text="livroComissaoOn() ? 'Mensalidade do mês + comissões EM ABERTO no livro' : 'Mensalidade + comissão sobre vendas 2W · ' + redePeriodLabel()"></p>
-            <div class="space-y-1.5 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Mensalidades</span>
-                <span class="font-medium" x-text="formatCurrency(redeTotalMensalidade())"></span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500" x-text="livroComissaoOn() ? 'Comissão (em aberto)' : 'Comissão 2W'"></span>
-                <span class="font-medium" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeComissaoAReceber())"></span>
-              </div>
-            </div>
-            <a href="#" @click.prevent="currentPage = 'rede'" class="mt-4 flex items-center justify-between text-sm text-gray-900 hover:underline">
-              <span>Ver a rede</span>
-              <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </a>
-          </div>
-
-          <!-- (2026-07-06: card "insights diários da Organizadora" removido — a
-               Organizadora LLM foi desativada; promessa morta não fica na tela.) -->
-        </div>
-      </div>
-    </div>
 
     <!-- ═══ TELA: REDE / PARCEIROS ═══ -->
     <div x-show="currentPage === 'rede'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">

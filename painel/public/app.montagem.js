@@ -141,6 +141,8 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.partnerColaboradoresFinance, // remuneração, benefícios e comissões da própria unidade
     window.PAINEL_MODULES.partnerColaboradoresPermissions, // allowlist e sessões dos funcionários da unidade
     window.PAINEL_MODULES.partnerCatalogo, // catálogo técnico read-only sem custos
+    window.PAINEL_MODULES.resumo,
+    window.PAINEL_MODULES.resumoChart,
     window.PAINEL_MODULES.core, // app.core.js (linhas 2249-2419 pré-obra): encanamento: loadRealData/loadRedeData/init/live refresh
     window.PAINEL_MODULES.chartsRede, // app.charts.rede.js (linhas 2420-2617 pré-obra): gráficos da Rede: vendas, lucro, pneus
     window.PAINEL_MODULES.chartsSaude, // app.charts.saude.js (linhas 2618-2851 pré-obra): gráficos: origem, saúde, compras, estoque parado, margem
