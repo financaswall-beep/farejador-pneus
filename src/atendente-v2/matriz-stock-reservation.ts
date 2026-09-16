@@ -80,11 +80,56 @@ async function reservationMovements(
 ): Promise<ReservationMovement[]> {
   const result = await client.query<{ payload_after: { movements?: ReservationMovement[] } }>(
     `SELECT payload_after FROM audit.events
-      WHERE environment=$1 AND entity_id=$2 AND event_type='matriz_galpao_reserved'
-      ORDER BY created_at DESC LIMIT 1`,
+      WHERE environment=$1 AND entity_id=$2
+        AND event_type IN ('matriz_galpao_reserved','matriz_galpao_reservation_adjusted')
+      ORDER BY created_at DESC,id DESC LIMIT 1`,
     [environment, orderId],
   );
   return result.rows[0]?.payload_after?.movements ?? [];
+}
+
+/** Remove somente as reservas dos itens excluídos. O chamador trava o pedido e
+ * engloba itens, total e este ajuste na mesma transação. Mantém a trilha anterior. */
+export async function releaseRemovedMatrizItems(
+  client: PoolClient, environment: 'prod' | 'test', orderId: string, items: RequestedItem[],
+): Promise<void> {
+  if (await hasEvent(client, environment, orderId, 'matriz_galpao_decrement')
+    || await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) {
+    throw new Error('stock_reservation_not_editable');
+  }
+  const previous = await reservationMovements(client, environment, orderId);
+  if (!previous.length) throw new Error('stock_reservation_not_found');
+  const movements = previous.map(row => ({ ...row }));
+  const specs = await loadMatrizProductStockSpecs(client, environment, items.map(item => item.productId));
+  const released = new Map<number, number>();
+  for (const item of items) {
+    const spec = specs.find(row => row.product_id === item.productId);
+    const index = movements.findIndex(row => spec && tireSizeKey(row.measure) === tireSizeKey(spec.tire_size)
+      && stockBrandKey(row.brand) === stockBrandKey(spec.brand)
+      && row.tire_condition === spec.tire_condition);
+    if (index < 0 || !Number.isSafeInteger(item.quantity) || item.quantity <= 0
+      || movements[index]!.qty < item.quantity) throw new Error('stock_reservation_items_mismatch');
+    movements[index]!.qty -= item.quantity;
+    released.set(index, (released.get(index) ?? 0) + item.quantity);
+  }
+  for (const [index, quantity] of released) {
+    const row = previous[index]!;
+    const updated = await client.query(
+      `UPDATE commerce.wholesale_stock SET quantity_reserved=quantity_reserved-$5
+        WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
+          AND quantity_reserved >= $5 RETURNING quantity_reserved`,
+      [environment, row.measure, row.brand, row.tire_condition, quantity],
+    );
+    if (updated.rowCount !== 1) throw new Error('stock_reservation_insufficient');
+  }
+  await client.query(
+    `INSERT INTO audit.events
+       (environment,domain,entity_table,entity_id,event_type,actor_label,payload_before,payload_after,created_at)
+     VALUES ($1,'stock','commerce.wholesale_stock',$2,'matriz_galpao_reservation_adjusted',
+       'agent_v2_bot',$3::jsonb,$4::jsonb,clock_timestamp())`,
+    [environment, orderId, JSON.stringify({ movements: previous }),
+      JSON.stringify({ order_id: orderId, movements: movements.filter(row => row.qty > 0) })],
+  );
 }
 
 /** Reserva sem alterar o saldo fisico. Deve rodar na transacao que cria o pedido. */

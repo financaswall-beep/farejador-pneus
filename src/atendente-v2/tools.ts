@@ -58,6 +58,7 @@ import { observeSearchProducts, observeSearchMunicipality } from './stock-search
 import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './delivery-quote-routing.js';
 import { prepareToolLocation } from './tool-location.js';
 import { AmbiguousNeighborhoodError } from './neighborhood-resolution.js';
+import { removeOpenOrderItems } from './order-item-removal.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -149,12 +150,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'calcular_frete',
-      description: 'Calcula frete para um bairro. Exige bairro. Cidade é opcional se for a cidade da loja.',
+      description: 'Calcula frete para a localização informada. Passe o município quando o cliente informou e o endereço completo quando já disponível, para medir a entrega corretamente.',
       parameters: {
         type: 'object',
         properties: {
           bairro: { type: 'string', description: 'Nome do bairro. Ex: "Centro", "Vila Mariana"' },
           municipio: { type: 'string', description: 'Cidade (opcional)' },
+          endereco_entrega: { type: 'string', description: 'Endereço completo já informado (rua e número); não invente nem peça de novo se já está na conversa.' },
           produtos: {
             type: 'array',
             description: 'Os pneus já escolhidos pelo cliente (dos resultados de busca). Inclua o product_id de cada um — necessário para cotar o frete da loja certa.',
@@ -346,13 +348,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'editar_pedido',
-      description: 'Edita um pedido com status=open (recém criado) somente para mudar endereço ou forma de pagamento. Mudança de item, quantidade, produto, preço ou total deve escalar humano.',
+      description: 'Edita endereço/pagamento ou remove pneus de um pedido aberto da Matriz, ainda não pago ou em atendimento. Para remover, consulte o pedido e passe os product_ids em remover_itens; o sistema recalcula total e libera reservas. Não mistura remoção com outros campos. Adição, troca, quantidade parcial ou pedido de parceiro precisam de humano.',
       parameters: {
         type: 'object',
         properties: {
           order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
           novo_endereco: { type: 'string', description: 'Novo endereço completo (rua, número, bairro). Opcional.' },
           nova_forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'], description: 'Nova forma de pagamento. Opcional.' },
+          remover_itens: { type: 'array', items: { type: 'string', format: 'uuid' }, minItems: 1, maxItems: 30,
+            description: 'product_ids retornados por consultar_pedido. Remove todas as unidades destes produtos, mantendo os demais. Não use para cancelar o pedido inteiro.' },
           motivo: { type: 'string', description: 'Motivo livre da edição (ex: "cliente trocou bairro de entrega")' },
         },
         required: ['order_number'],
@@ -672,7 +676,9 @@ export async function executeTool(
         if(configured && produtos.length===0)return JSON.stringify({encontrado:false,disponivel:false,
           motivo:'precisa_produto',orientacao:'Consulte quais pneus e quantidades o cliente deseja antes de confirmar a entrega.'});
         if (((result.encontrado && result.geo_resolution_id) || configured) && produtos.length > 0) {
-          let municipio = result.geo_resolution_id?await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id):null;
+          let municipio = (result.geo_resolution_id
+            ? await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id) : null)
+            ?? ((args.municipio as string | undefined)?.trim() || null);
           // Pino-first: geo órfão e sem cidade → reverse-geocode do pino preenche. Aditivo.
           ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
           const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
@@ -680,11 +686,13 @@ export async function executeTool(
             items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
             bairro: args.bairro as string | undefined,
             modality: 'quote',
+            fullAddress: args.endereco_entrega as string | undefined,
           });
           if(decision.blockReason)return JSON.stringify(deliveryBlockResponse(decision.blockReason));
           if (decision.routing) {
             return JSON.stringify({
               ...result,
+              encontrado: true,
               disponivel: true,
               valor: FRETE_PADRAO_BRL.toFixed(2),
               motivo: undefined,
@@ -1572,6 +1580,7 @@ interface OrderRow {
 }
 
 interface OrderItemRow {
+  product_id: string;
   product_name: string;
   product_code: string;
   quantity: number;
@@ -1682,7 +1691,7 @@ async function consultarPedido(
   const pedidos = await Promise.all(
     orders.map(async (o) => {
       const itensResult = await client.query<OrderItemRow>(
-        `SELECT p.product_name, p.product_code,
+        `SELECT oi.product_id,p.product_name, p.product_code,
                 oi.quantity, oi.unit_price
          FROM commerce.order_items oi
          JOIN commerce.products p ON p.id = oi.product_id
@@ -1709,6 +1718,7 @@ async function consultarPedido(
         criado_em: o.created_at.toISOString(),
         fechado_em: o.closed_at?.toISOString() ?? null,
         itens: itensResult.rows.map((i) => ({
+          product_id: i.product_id,
           produto: i.product_name,
           codigo: i.product_code,
           quantidade: i.quantity,
@@ -1889,11 +1899,15 @@ async function editarPedido(
   const adicionarItens = (args.adicionar_itens as ItemAdicionar[] | undefined) ?? [];
   const motivo = (args.motivo as string | undefined) ?? 'cliente_solicitou';
 
-  if (removerItens.length > 0 || adicionarItens.length > 0) {
+  if (adicionarItens.length > 0) {
     return JSON.stringify({
-      erro: 'Mudanca de itens, quantidade, produto, preco ou total precisa de atendente humano.',
-      sugestao: 'Escalar humano. O bot so pode alterar endereco e forma de pagamento em pedido aberto.',
+      erro: 'Adicionar ou substituir pneus precisa de atendente humano.',
+      sugestao: 'A edição automática permite remover produtos inteiros de pedidos elegíveis. Não adicione itens nem altere preços.',
     });
+  }
+
+  if (args.remover_itens !== undefined) {
+    return JSON.stringify(await removeOpenOrderItems(client, environment, conversationId, args));
   }
 
   if (!novoEndereco && !novaFormaPagamento && removerItens.length === 0 && adicionarItens.length === 0) {

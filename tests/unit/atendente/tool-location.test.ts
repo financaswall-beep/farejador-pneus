@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({ pin: vi.fn(), config: {
 vi.mock('../../../src/shared/config/env.js', () => ({ env:mocks.config }));
 vi.mock('../../../src/atendente-v2/delivery-quote-routing.js', () => ({ fillCityFromPin:mocks.pin }));
 import { prepareToolLocation } from '../../../src/atendente-v2/tool-location.js';
-import { AmbiguousNeighborhoodError, chooseNeighborhoodCity, type NeighborhoodCandidate } from '../../../src/atendente-v2/neighborhood-resolution.js';
+import { AmbiguousNeighborhoodError, chooseNeighborhoodCity, resolveNeighborhoodCity, type NeighborhoodCandidate } from '../../../src/atendente-v2/neighborhood-resolution.js';
 import { executeTool } from '../../../src/atendente-v2/tools.js';
 
 const candidates:NeighborhoodCandidate[] = ['Rio de Janeiro','Maricá'].map(city_name => ({city_name,neighborhood_canonical:'flamengo',city_resolution_priority:0}));
@@ -24,6 +24,22 @@ function database(options: { rows?:NeighborhoodCandidate[]; memory?:Record<strin
 beforeEach(()=>{mocks.pin.mockReset().mockResolvedValue({municipio:null,neighborhoodCanonical:null});});
 
 describe('confirmação pontual da cidade do bairro',()=>{
+  it.each(['Itaboraí', 'Rio de Janeiro', 'Município ainda não cadastrado'])(
+    'preserva cidade explícita %s quando o bairro não está no dicionário',async city=>{
+      const {client,query}=database({rows:[]});
+      expect(await resolveNeighborhoodCity(client,'test','Centro',`  ${city}  `)).toBe(city);
+      expect(query.mock.calls).toHaveLength(2);
+    });
+
+  it('bairro desconhecido sem cidade continua sem localização, sem inventar município',async()=>{
+    const {client}=database({rows:[]});
+    expect(await resolveNeighborhoodCity(client,'test','Bairro desconhecido')).toBeNull();
+  });
+
+  it('mantém a cidade canônica quando o bairro já está cadastrado',async()=>{
+    const {client}=database({rows:[{city_name:'Niterói',neighborhood_canonical:'icarai',city_resolution_priority:0}]});
+    expect(await resolveNeighborhoodCity(client,'test','Icarai','niteroi')).toBe('Niterói');
+  });
   it.each(['buscar_produto','buscar_compatibilidade','calcular_frete','localizacao_loja','pedir_foto','criar_pedido'])(
     '%s interrompe antes das operações comerciais e retorna somente a dúvida geográfica',async tool=>{
       const {client,query}=database();

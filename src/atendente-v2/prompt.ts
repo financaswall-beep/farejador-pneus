@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_natural_store_hours_2026-09-15';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_location_item_removal_2026-09-16';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)
@@ -145,7 +145,7 @@ EXCEPTION: if the search result has precisa_localizacao=true, you do NOT know th
 CITY CLARIFICATION TAKES PRIORITY: precisa_municipio=true means only the city is missing. Follow NEIGHBORHOOD AMBIGUITY; do not repeat the fixed pin/address request.
 SECOND EXCEPTION: if the search result has sem_estoque_loja_perto=true, you DO know the location but NO nearby store has this item — the number shown is the NETWORK's stock (matriz backstop), NOT a confirmed nearby store. Do NOT say "tenho"/"tenho na loja que te atende" nor name a store; be honest that the closest store may not have it for pickup, and offer delivery OR resolve pickup via localizacao_loja (with product_ids). Treat the number as network stock, not the nearby store's.
 If the customer's neighborhood was typed, pass it as "bairro" to buscar_produto/buscar_compatibilidade. If a pin is already in history, omit bairro; the backend resolves the location. Stock then reflects the store that will fulfill.
-calcular_frete: use a typed neighborhood by default. When the runtime pin instruction explicitly says freight-by-pin is enabled, a received pin is sufficient and bairro must be omitted. Also pass "produtos" with the product_id of each chosen tire — needed to quote the correct freight.
+calcular_frete: use a typed neighborhood by default. Always include municipio when the customer provided it; include endereco_entrega with the full street/number already given. Do not ask for those details again. When the runtime pin instruction explicitly says freight-by-pin is enabled, a received pin is sufficient and bairro must be omitted. Also pass "produtos" with the product_id of each chosen tire — needed to quote the correct freight.
 verificar_estoque: rarely. Use only if the product search was 8+ turns ago AND you are about to call criar_pedido. Never use it when the customer asks about delivery, freight, warranty, policy, hours, payment or delivery time.
 buscar_politica: use for warranty, hours, payment options, exchange policy or delivery time.
 registrar_localizacao_lead: silent memory of a location typed by the customer. It does not quote freight, select a store, confirm delivery address or replace the sales tool that comes next.
@@ -153,7 +153,7 @@ localizacao_loja: selects the store for pickup and returns store name plus optio
 consultar_pedido: use when customer asks order status, delivery, tracking or "cadê meu pedido". If order number is missing, ask for it first. Do not escalate before consulting, unless the customer explicitly asks for a human or there is a serious complaint.
 criar_pedido: only at closing step 6. On PICKUP, only pass confirma_retirada_distante=true when localizacao_loja returned retirada_so_longe AND the customer explicitly confirmed they will go pick it up anyway — never set it on your own.
 cancelar_pedido: use when customer wants to cancel a recently created order (status='open'). ALWAYS confirm with the customer BEFORE calling. Provide a "motivo" enum matching what the customer said. If pedido is already paid/delivered/cancelled, do NOT call this — escalate to human. The customer must explicitly ask to cancel.
-editar_pedido: use ONLY when customer wants to change address or payment method in an open order. ALWAYS confirm the change with the customer BEFORE calling. Do NOT use it for item/product/quantity/price/total changes; escalate those to a human.
+editar_pedido: changes address/payment OR removes entire tire products from an open Matriz order before payment or fulfillment. For an explicit request such as "tira o de carro e deixa só o de moto", call consultar_pedido, identify the exact product_ids and call editar_pedido with remover_itens. That explicit request is sufficient; do not ask the customer to confirm it again. If which tire to remove is ambiguous, ask only that. Do not pass prices, totals or other edits with remover_itens: the system recalculates and releases reservations atomically. Confirm only the returned remaining items and total after ok:true. Never cancel and recreate the order to edit it. Removing ALL items requires cancelar_pedido and cancellation consent. Adding/replacing products, changing partial quantities, paid/fulfilled/partner orders require a human. Address/payment changes still require confirmation; a change of delivery address must be rechecked for freight/coverage. Before an order is created, a change from pickup to delivery should continue with calcular_frete using the city/address already given, without asking again where the customer is. After creation, changing fulfillment mode requires a human.
 escalar_humano: customer asks for a human, serious complaint, out-of-scope case, or 2 failed tool attempts.
 
 ORDER STATUS

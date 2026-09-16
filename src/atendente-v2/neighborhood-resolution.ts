@@ -76,5 +76,9 @@ export function chooseNeighborhoodCity(bairro: string, candidates: NeighborhoodC
 export async function resolveNeighborhoodCity(
   client: PoolClient, environment: Environment, bairro: string, municipio?: string | null,
 ): Promise<string | null> {
-  return chooseNeighborhoodCity(bairro, await findNeighborhoodCandidates(client, environment, bairro, municipio));
+  const explicitCity = municipio?.trim() || null;
+  // O dicionário de bairros é incompleto: ausência não invalida a cidade que
+  // o cliente informou. A cobertura e o endereço continuam validados no roteamento.
+  return chooseNeighborhoodCity(bairro, await findNeighborhoodCandidates(client, environment, bairro, explicitCity))
+    ?? explicitCity;
 }

@@ -55,7 +55,7 @@ describe('reserva do galpao da matriz', () => {
     const query = vi.fn(async (sql: string, params?: unknown[]) => {
       calls.push(sql);
       if (sql.includes('event_type=$3')) return { rows: [] };
-      if (sql.includes("event_type='matriz_galpao_reserved'")) {
+      if (sql.includes('SELECT payload_after FROM audit.events')) {
         return { rows: [{ payload_after: { movements: [movement] } }] };
       }
       if (sql.includes('SET quantity_on_hand=quantity_on_hand-$5')) {
@@ -76,7 +76,7 @@ describe('reserva do galpao da matriz', () => {
     const query = vi.fn(async (sql: string) => {
       calls.push(sql);
       if (sql.includes('event_type=$3')) return { rows: [] };
-      if (sql.includes("event_type='matriz_galpao_reserved'")) {
+      if (sql.includes('SELECT payload_after FROM audit.events')) {
         return { rows: [{ payload_after: { movements: [movement] } }] };
       }
       if (sql.includes('SET quantity_reserved=quantity_reserved-$5')) {
