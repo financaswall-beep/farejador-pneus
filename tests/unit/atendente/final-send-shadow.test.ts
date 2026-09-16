@@ -28,6 +28,7 @@ describe('Agent V2 shadow delivery', () => {
       inputTokens: 10,
       outputTokens: 5,
       durationMs: 100,
+      humanHandoff: true,
     });
 
     expect(result).toBe('shadowed');
@@ -35,5 +36,6 @@ describe('Agent V2 shadow delivery', () => {
     expect(allSql).toContain('INSERT INTO agent.turns');
     expect(allSql).toContain("'generated', 'shadow:no_external_send'");
     expect(allSql).not.toContain('INSERT INTO ops.outbound_messages');
+    expect(allSql).not.toContain('UPDATE ops.conversation_bot_control');
   });
 });

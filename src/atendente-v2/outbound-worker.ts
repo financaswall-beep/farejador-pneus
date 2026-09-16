@@ -135,6 +135,9 @@ export async function supersedeStaleAgentOutbound(
        FROM ops.outbound_messages o2
        WHERE o2.environment=$1 AND o2.kind='agent_text'
          AND o2.status IN ('pending','failed')
+         AND NOT EXISTS (SELECT 1 FROM ops.conversation_bot_control b
+           WHERE b.environment=o2.environment AND b.conversation_id=o2.conversation_id
+             AND b.mode='human' AND b.updated_by='agent:handoff:'||o2.id::text)
      )
      UPDATE ops.outbound_messages o
         SET status='superseded',superseded_by_message_id=newer.newer_id,

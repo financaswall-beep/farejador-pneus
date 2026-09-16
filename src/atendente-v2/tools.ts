@@ -9,6 +9,7 @@ import {
 import { logger } from '../shared/logger.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
 import type { ToolDefinition } from './types.js';
+import { requestHumanHandoff, type HumanHandoffContext } from './human-handoff.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import {
   resolveMatrizUnitId,
@@ -387,6 +388,7 @@ export async function executeTool(
   conversationId: string,
   name: string,
   args: Record<string, unknown>,
+  handoffContext?: HumanHandoffContext,
 ): Promise<string> {
   try {
     args = await prepareToolLocation(client, environment, conversationId, name, args);
@@ -1034,11 +1036,11 @@ export async function executeTool(
       }
 
       case 'escalar_humano': {
-        logger.info(
-          { environment, conversation_id: conversationId, motivo: args.motivo, resumo: args.resumo },
-          'agent_v2: escalar_humano chamado',
-        );
-        return JSON.stringify({ ok: true, mensagem: 'Escalada registrada. Atendente humano será notificado.' });
+        if (!handoffContext || handoffContext.input.environment !== environment
+            || handoffContext.input.conversationId !== conversationId) {
+          throw new Error('human_handoff_requires_turn_context');
+        }
+        return await requestHumanHandoff(client,args,handoffContext);
       }
 
       default:

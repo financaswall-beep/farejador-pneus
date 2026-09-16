@@ -8,7 +8,7 @@ vi.mock('../../../src/atendente-v2/conversation-control.js',() => ({ botMayProce
 vi.mock('../../../src/atendente-v2/history.js',() => ({
   loadHistory:mocks.history,lookupChatwootConversationId:async()=>12,
 }));
-vi.mock('../../../src/atendente-v2/tools.js',() => ({ activeToolDefinitions:()=>['criar_pedido','buscar_produto'].map(name => ({
+vi.mock('../../../src/atendente-v2/tools.js',() => ({ activeToolDefinitions:()=>['criar_pedido','buscar_produto','escalar_humano'].map(name => ({
   type:'function',function:{ name,description:'fixture',parameters:{ type:'object',properties:{} } },
 })),executeTool:mocks.tool }));
 vi.mock('../../../src/shared/clientes-kanban.notify.js',() => ({ notifyClientesKanban:vi.fn() }));
@@ -103,6 +103,31 @@ describe('continuidade enviada ao modelo depois de pedir foto', () => {
 });
 
 describe('intervenção enquanto o bot prepara resposta',() => {
+  it('encaminha ao humano e encerra sem executar ferramentas posteriores nem nova chamada ao modelo',async () => {
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(jsonResponse(responseBody([
+      functionItem('handoff','escalar_humano','{"motivo":"cliente_pediu","resumo":"Quer atendente"}'),
+      functionItem('order','criar_pedido'),
+    ]))));
+    mocks.tool.mockResolvedValue('{"ok":true,"status":"sent","bot_pausado":true}');
+    const { runAgentV2 }=await import('../../../src/atendente-v2/agent.js');
+    await runAgentV2(job);
+    expect(mocks.tool).toHaveBeenCalledTimes(1);
+    expect(mocks.tool.mock.calls[0]?.[5]).toMatchObject({ toolCallId:'handoff',input:{
+      ...job,chatwootConversationId:12,inputTokens:100,outputTokens:25,
+      actions:[{ role:'assistant',tool_calls:[expect.objectContaining({ id:'handoff' })] }],
+    } });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+  it('não anuncia encaminhamento quando a persistência falha',async () => {
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(jsonResponse(responseBody([
+      functionItem('handoff','escalar_humano','{"motivo":"cliente_pediu","resumo":"Quer atendente"}'),
+    ]))));
+    mocks.tool.mockResolvedValue('{"erro":"database_unavailable"}');
+    const { runAgentV2 }=await import('../../../src/atendente-v2/agent.js');
+    await expect(runAgentV2(job)).rejects.toThrow('database_unavailable');
+    expect(fetch).toHaveBeenCalledTimes(1);expect(mocks.send).not.toHaveBeenCalled();
+  });
   it('não chama LLM nem ferramentas se a conversa já está pausada',async () => {
     mocks.may.mockResolvedValue(false);
     const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);

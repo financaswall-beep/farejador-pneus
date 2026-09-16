@@ -68,6 +68,14 @@ describe('Leads da Matriz — comportamento', () => {
     expect(ui.clienteLeadAguardando(lead('a'))).toBe('Não informado');
     expect(ui.clienteLeadAguardando(lead('a','novo',{lead_waiting_on:'cliente'}))).toBe('Cliente');
   });
+  it('mostra o cancelamento no card e no detalhe sem apagar o interesse',() => {
+    const {ui}=setup(); const c=lead('cancelado','perdido',{lead_outcome:'cancelado',lead_waiting_on:'nenhum',
+      lead_interests:[{measure:'175/65-14',variants:[]},{measure:'90/90-12',variants:[]}]});
+    expect(ui.clienteLeadStatusCard(c)).toEqual({label:'Pedido cancelado',tone:'closed'});
+    expect(ui.clienteLeadEspera(c)).toBe('Pedido cancelado');
+    expect(ui.clienteLeadOrigemEtapa(c)).toBe('Cancelamento identificado');
+    expect(ui.clienteLeadInteressesCard(c)).toHaveLength(2);
+  });
   it('filtra os canais sem retirar pessoas que só existem no Facebook ou Instagram', () => {
     const { ui } = setup();
     ui.clientes = [lead('a','novo',{ origin:'Channel::Instagram',phone:null }),lead('b','novo',{ origin:'facebook' }),lead('c')];

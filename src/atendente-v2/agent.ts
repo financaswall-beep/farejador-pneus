@@ -202,6 +202,23 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           toolArgs = {};
         }
 
+        if (toolCall.function.name === 'escalar_humano') {
+          // Não executar ferramentas que o modelo colocou depois do encaminhamento.
+          assistantToolMsg.tool_calls = response.tool_calls.slice(0,toolIndex+1);
+          const result = JSON.parse(await executeTool(client,environment as Environment,
+            conversationId,toolCall.function.name,toolArgs,{
+              toolCallId:toolCall.id,
+              input:{ jobId,conversationId,triggerMessageId:job.triggerMessageId,
+                environment:environment as Environment,chatwootConversationId:chatwootConvId,
+                actions:turnActions,inputTokens,outputTokens,durationMs:Date.now()-start },
+            })) as { erro?: string; status?: string };
+          if (result.erro) throw new Error(result.erro);
+          if (!['sent','shadowed','superseded'].includes(result.status ?? '')) {
+            throw new Error('human_handoff_not_completed');
+          }
+          return;
+        }
+
         const isWrite = toolCall.function.name === 'criar_pedido';
 
         let result: string;

@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import type { OutboundRow } from './outbound-worker.js';
-import { syncHumanIntervention } from './conversation-control.js';
+import { humanHandoffActor, syncHumanIntervention } from './conversation-control.js';
 import { recordOutboundEvent } from './outbound-events.js';
 import { validateResolutionOutbound } from './auto-resolve.js';
 
@@ -20,7 +20,9 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
               AND p.id::text=CASE WHEN o.kind='photo_attachment' THEN (o.body::jsonb)->>'photo_request_id' END
               AND p.created_at>$4))))) AS allowed`,
     [row.environment,row.conversation_id,row.id,state.resumed_at]);
-    const baseAllowed = state.mode==='auto' && result.rows[0]?.allowed===true;
+    const handoffNotice = state.mode==='human' && row.kind==='agent_text'
+      && state.updated_by===humanHandoffActor(row.id);
+    const baseAllowed = (state.mode==='auto' || handoffNotice) && result.rows[0]?.allowed===true;
     const allowed = baseAllowed && (row.kind !== 'conversation_resolution'
       || await validateResolutionOutbound(
         client,row.environment,row.conversation_id,row.id,row.body,

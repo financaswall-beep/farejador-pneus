@@ -220,6 +220,7 @@ window.PAINEL_MODULES.clientes = function () {
       return `Há ${Math.floor(seconds / 86400)}d`;
     },
     clienteLeadEspera(c) {
+      if (this.clienteLeadLane(c) === 'perdido' && c?.lead_outcome === 'cancelado') return 'Pedido cancelado';
       if (c?.lead_waiting_on === 'equipe') return 'Aguardando equipe';
       if (c?.lead_waiting_on === 'cliente') return 'Aguardando cliente';
       return this.clienteLeadLane(c) === 'convertido' ? 'Pedido confirmado' : 'Conversa encerrada';

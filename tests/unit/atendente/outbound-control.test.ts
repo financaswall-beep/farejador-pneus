@@ -1,7 +1,10 @@
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 const syncHuman = vi.hoisted(() => vi.fn());
 const validateResolution = vi.hoisted(() => vi.fn());
-vi.mock('../../../src/atendente-v2/conversation-control.js',() => ({ syncHumanIntervention:syncHuman }));
+vi.mock('../../../src/atendente-v2/conversation-control.js',async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/atendente-v2/conversation-control.js')>(),
+  syncHumanIntervention:syncHuman,
+}));
 vi.mock('../../../src/atendente-v2/auto-resolve.js',() => ({ validateResolutionOutbound:validateResolution }));
 import { prepareControlledOutbound } from '../../../src/atendente-v2/outbound-control.js';
 const row={ id:'out',environment:'test' as const,conversation_id:'a',turn_id:null,
@@ -15,6 +18,14 @@ beforeEach(() => {
   validateResolution.mockReset().mockResolvedValue(true);
 });
 describe('última trava de envio',() => {
+  it('libera somente o aviso que criou a pausa e bloqueia outros textos ou fotos',async () => {
+    syncHuman.mockResolvedValue({ mode:'human',resumed_at:null,updated_by:'agent:handoff:out' });
+    expect(await prepareControlledOutbound(database() as never,row)).toBe(true);
+    expect(await prepareControlledOutbound(database() as never,{ ...row,id:'out-antigo' })).toBe(false);
+    expect(await prepareControlledOutbound(database() as never,{ ...row,kind:'photo_text' })).toBe(false);
+    syncHuman.mockResolvedValue({ mode:'human',resumed_at:null,updated_by:'chatwoot:human' });
+    expect(await prepareControlledOutbound(database() as never,row)).toBe(false);
+  });
   it.each(['agent_text','survey_text','photo_text','photo_attachment'])('barra %s durante atendimento humano',async kind => {
     syncHuman.mockResolvedValue({ mode:'human',resumed_at:null });
     const db=database();

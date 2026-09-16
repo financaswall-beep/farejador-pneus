@@ -132,6 +132,7 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     clienteLeadStatusCard(c) {
       const lane = this.clienteLeadLane(c);
       if (lane === 'convertido') return {label:'Pedido confirmado',tone:'confirmed'};
+      if (lane === 'perdido' && c?.lead_outcome === 'cancelado') return {label:'Pedido cancelado',tone:'closed'};
       if (lane === 'perdido') return {label:'Conversa encerrada',tone:'closed'};
       if (c?.lead_waiting_on === 'cliente') return {label:'Aguardando cliente',tone:'waiting'};
       if (c?.lead_waiting_on === 'equipe') return {label:'Aguardando equipe',tone:'team'};
@@ -147,6 +148,7 @@ window.PAINEL_MODULES.clientesLeadsUi = function () {
     clienteLeadOrigemEtapa(c) {
       if (this.clienteLeadLane(c) === 'convertido') return 'Venda confirmada';
       if (this.clienteLeadManual(c)) return 'Etapa definida pela equipe';
+      if (c?.lead_outcome === 'cancelado') return 'Cancelamento identificado';
       return ({ novo: 'Conversa recebida', atendimento: 'Atendimento em andamento',
         orcamento: 'Orçamento identificado', perdido: 'Encerramento identificado' })[this.clienteLeadLane(c)] || '';
     },

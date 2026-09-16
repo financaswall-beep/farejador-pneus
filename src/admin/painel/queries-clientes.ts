@@ -45,7 +45,7 @@ export async function getClientesPainel(
       `WITH latest_type AS (
          SELECT DISTINCT ON (cv.contact_id) cv.contact_id, ac.value AS customer_type
            FROM core.conversations cv
-           JOIN analytics.conversation_classifications ac
+           JOIN analytics.current_classifications ac
              ON ac.conversation_id = cv.id AND ac.environment = cv.environment
           WHERE cv.environment = $1 AND ac.dimension = 'customer_type'
           ORDER BY cv.contact_id, ac.created_at DESC
@@ -59,10 +59,10 @@ export async function getClientesPainel(
           ORDER BY cv.contact_id, COALESCE(cv.last_activity_at, cv.updated_at, cv.started_at) DESC, cv.id DESC
        ), latest_funnel AS (
          SELECT lc.contact_id,
-                (SELECT ac.value FROM analytics.conversation_classifications ac
+                (SELECT ac.value FROM analytics.current_classifications ac
                   WHERE ac.environment = $1 AND ac.conversation_id = lc.conversation_id AND ac.dimension = 'stage_reached'
                   ORDER BY ac.created_at DESC, ac.id DESC LIMIT 1) AS stage,
-                (SELECT ac.value FROM analytics.conversation_classifications ac
+                (SELECT ac.value FROM analytics.current_classifications ac
                   WHERE ac.environment = $1 AND ac.conversation_id = lc.conversation_id AND ac.dimension = 'final_outcome'
                   ORDER BY ac.created_at DESC, ac.id DESC LIMIT 1) AS outcome
            FROM latest_conversation lc
@@ -82,7 +82,7 @@ export async function getClientesPainel(
               lf.stage AS lead_stage, lf.outcome AS lead_outcome,
               CASE
                 WHEN lead_order.order_id IS NOT NULL THEN 'convertido'
-                WHEN lc.current_status = 'resolved' THEN 'perdido'
+                WHEN lc.current_status = 'resolved' OR lf.outcome = 'cancelado' THEN 'perdido'
                 WHEN lead_quote.amount IS NOT NULL OR lower(COALESCE(lf.stage, '')) ~ 'cot|orc|propost|offer|frete|bairro|pedido' THEN 'orcamento'
                 WHEN lead_message.has_reply OR COALESCE(lf.stage, '') NOT IN ('', 'abriu_conversa') THEN 'atendimento'
                 ELSE 'novo'
@@ -93,7 +93,7 @@ export async function getClientesPainel(
               lc.started_at::text AS lead_created_at,
               lead_message.sent_at::text AS lead_last_message_at,
               CASE
-                WHEN lead_order.order_id IS NOT NULL OR lc.current_status = 'resolved' THEN 'nenhum'
+                WHEN lead_order.order_id IS NOT NULL OR lc.current_status = 'resolved' OR lf.outcome = 'cancelado' THEN 'nenhum'
                 WHEN lead_message.sender_type = 'contact' THEN 'equipe'
                 WHEN lead_message.sender_type IS NOT NULL THEN 'cliente'
                 ELSE 'equipe'
@@ -146,8 +146,10 @@ export async function getClientesPainel(
          LEFT JOIN LATERAL (
            SELECT o.id AS order_id, o.total_amount
              FROM commerce.orders o
+             LEFT JOIN commerce.partner_orders po ON po.id=o.partner_order_id AND po.environment=o.environment
             WHERE o.environment = c.environment AND o.source_conversation_id = lc.conversation_id
               AND o.status IN ('confirmed','paid','delivered')
+              AND (o.partner_order_id IS NULL OR (po.id IS NOT NULL AND po.status<>'cancelled' AND po.deleted_at IS NULL))
             ORDER BY o.created_at DESC LIMIT 1
          ) lead_order ON true
          LEFT JOIN LATERAL (

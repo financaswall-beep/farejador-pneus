@@ -125,7 +125,7 @@ export async function getBotVisao(
     // realmente enviados pelo Bot V2, não do horário em que um backfill foi executado.
     const r = await dbPool.query<{ etapa: string; n: number }>(
       `SELECT cc.value AS etapa, count(DISTINCT cc.conversation_id)::int AS n
-       FROM analytics.conversation_classifications cc
+       FROM analytics.current_classifications cc
        WHERE cc.environment = $1 AND cc.dimension = 'stage_reached'
          AND EXISTS (
            SELECT 1 FROM agent.turns t
@@ -142,7 +142,7 @@ export async function getBotVisao(
   try {
     const r = await dbPool.query<{ motivo: string; n: number }>(
       `SELECT cc.value AS motivo, count(DISTINCT cc.conversation_id)::int AS n
-       FROM analytics.conversation_classifications cc
+       FROM analytics.current_classifications cc
        WHERE cc.environment = $1 AND cc.dimension = 'loss_reason'
          AND EXISTS (
            SELECT 1 FROM agent.turns t
@@ -177,20 +177,19 @@ export async function getBotVisao(
   } catch { /* bloco vazio */ }
 
   try {
-    // Município resolvido pelo pino OU pelo frete. Retirada também gera demanda.
+    // A procura permanece no histórico; pedidos e entregas usam pedidos válidos.
+    // pedido_criado é uma etapa passada, não comprova um pedido ainda vigente.
     const r = await dbPool.query<BotVisaoMapaRow>(
       `WITH conv AS (
          SELECT cf.conversation_id,
-                bool_or(cf.fact_key = 'faltou_estoque') AS faltou,
-                bool_or(cf.fact_key = 'pedido_criado') AS pediu_fact
+                bool_or(cf.fact_key = 'faltou_estoque') AS faltou
          FROM analytics.conversation_facts cf
          WHERE cf.environment = $1
            AND COALESCE(cf.observed_at, cf.created_at) >= ${sinceSql}
          GROUP BY cf.conversation_id
        ), demand AS (
          SELECT l.conversation_id, l.municipio,
-                COALESCE(c.faltou, false) AS faltou,
-                COALESCE(c.pediu_fact, false) AS pediu_fact
+                COALESCE(c.faltou, false) AS faltou
          FROM analytics.v_bot_demand_location l
          LEFT JOIN conv c ON c.conversation_id = l.conversation_id
          WHERE l.environment = $1 AND l.municipio IS NOT NULL
@@ -204,15 +203,16 @@ export async function getBotVisao(
        SELECT c.municipio,
               count(DISTINCT c.conversation_id)::int AS chamou,
               count(DISTINCT c.conversation_id)
-                FILTER (WHERE c.pediu_fact OR o.id IS NOT NULL)::int AS pediu,
+                FILTER (WHERE o.id IS NOT NULL AND (o.partner_order_id IS NULL OR po.id IS NOT NULL))::int AS pediu,
               count(DISTINCT c.conversation_id)
-                FILTER (WHERE po.delivery_status = 'delivered' OR o.delivery_status = 'delivered')::int AS efetivou,
+                FILTER (WHERE po.delivery_status = 'delivered' OR (o.partner_order_id IS NULL AND o.delivery_status = 'delivered'))::int AS efetivou,
               count(DISTINCT c.conversation_id) FILTER (WHERE c.faltou)::int AS faltou
        FROM demand c
        LEFT JOIN commerce.orders o
          ON o.source_conversation_id = c.conversation_id
         AND o.environment = $1 AND o.status <> 'cancelled'
        LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id AND po.environment = $1
+        AND po.status <> 'cancelled' AND po.deleted_at IS NULL
        GROUP BY c.municipio
        ORDER BY chamou DESC`,
       [environment],

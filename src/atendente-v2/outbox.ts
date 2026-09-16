@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { recordOutboundEvent } from './outbound-events.js';
-import { botMayProcessTrigger } from './conversation-control.js';
+import { botMayProcessTrigger, lockBotConversation, pauseForHumanHandoff, syncHumanIntervention } from './conversation-control.js';
 
 export interface AgentTextOutboxInput {
   environment: Environment;
@@ -15,6 +15,7 @@ export interface AgentTextOutboxInput {
   inputTokens: number;
   outputTokens: number;
   durationMs: number;
+  humanHandoff?: boolean;
 }
 
 export interface AgentTextOutboxResult {
@@ -61,7 +62,8 @@ export async function sendAgentTextWithOutbox(
   if (!await botMayProcessTrigger(client,input.environment,input.conversationId,input.triggerMessageId)) {
     return { status:'superseded' };
   }
-  const newerMessageId = await hasNewerCustomerMessageAfterTrigger(
+  // Uma nova mensagem não desfaz o pedido de atendimento humano.
+  const newerMessageId = input.humanHandoff ? null : await hasNewerCustomerMessageAfterTrigger(
     client, input.environment, input.conversationId, input.triggerMessageId,
   );
   if (newerMessageId) {
@@ -85,6 +87,19 @@ export async function sendAgentTextWithOutbox(
 
   await client.query('BEGIN');
   try {
+    if (input.humanHandoff) {
+      await lockBotConversation(client,input.environment,input.conversationId);
+      const state = await syncHumanIntervention(client,input.environment,input.conversationId);
+      const trigger = await client.query<{ allowed: boolean }>(`SELECT EXISTS (
+        SELECT 1 FROM core.messages WHERE environment=$1 AND conversation_id=$2 AND id=$3
+          AND sender_type='contact' AND is_private=false
+          AND ($4::timestamptz IS NULL OR sent_at>$4)) AS allowed`,
+      [input.environment,input.conversationId,input.triggerMessageId,state.resumed_at]);
+      if (state.mode !== 'auto' || trigger.rows[0]?.allowed !== true) {
+        await client.query('COMMIT');
+        return { status:'superseded' };
+      }
+    }
     const existing = await client.query<{
       id: string; status: string; chatwoot_message_id: string | number | null;
     }>(
@@ -140,6 +155,9 @@ export async function sendAgentTextWithOutbox(
         turnId, input.chatwootConversationId, echoId, input.body, sha256(input.body)],
     );
     const row = outbound.rows[0]!;
+    if (input.humanHandoff && row.status === 'pending') {
+      await pauseForHumanHandoff(client,input.environment,input.conversationId,row.id,input.jobId);
+    }
     if (row.status === 'pending') await recordOutboundEvent(client, {
       environment: input.environment, outboundId: row.id,
       toStatus: 'pending', reason: 'agent_draft_queued',

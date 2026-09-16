@@ -4,6 +4,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 export interface BotControl {
   mode: 'auto' | 'human'; version: number; resumed_at: string | null;
   last_human_at: string | null; last_human_message_id: string | null;
+  updated_by: string;
 }
 
 /** Lock TRANSACIONAL: compatível com o pooler Supabase em modo transaction.
@@ -22,22 +23,44 @@ export async function ensureBotControl(client: PoolClient, environment: Environm
   // Texto preserva os microssegundos do PostgreSQL. Date/pg reduziria para ms,
   // fazendo o mesmo evento parecer mais novo ao reprocessar e reabrindo a pausa.
   const result = await client.query<BotControl>(`SELECT mode,version,resumed_at::text AS resumed_at,
-    last_human_at::text AS last_human_at,last_human_message_id
+    last_human_at::text AS last_human_at,last_human_message_id,updated_by
     FROM ops.conversation_bot_control WHERE environment=$1 AND conversation_id=$2`, [environment,conversationId]);
   if (!result.rows[0]) throw new Error('bot_conversation_not_found');
   return result.rows[0];
 }
 
 export async function cancelConversationBotQueue(client: PoolClient, environment: Environment,
-  conversationId: string): Promise<void> {
+  conversationId: string, keep?: { outboundId: string; jobId: string }): Promise<void> {
   await client.query(`UPDATE ops.outbound_messages SET status='superseded',locked_at=NULL,locked_by=NULL,
       last_error_kind='superseded',last_error_summary='human_takeover',updated_at=now()
-    WHERE environment=$1 AND conversation_id=$2 AND status IN ('pending','failed','sending')`,
-  [environment,conversationId]);
+    WHERE environment=$1 AND conversation_id=$2 AND status IN ('pending','failed','sending')
+      AND ($3::uuid IS NULL OR id<>$3)`,
+  [environment,conversationId,keep?.outboundId ?? null]);
   await client.query(`UPDATE ops.atendente_jobs SET status='superseded',locked_at=NULL,locked_by=NULL,
       processed_at=now(),error_message='superseded:human_takeover'
-    WHERE environment=$1 AND conversation_id=$2 AND status IN ('pending','processing','failed')`,
-  [environment,conversationId]);
+    WHERE environment=$1 AND conversation_id=$2 AND status IN ('pending','processing','failed')
+      AND ($3::uuid IS NULL OR id<>$3)`,
+  [environment,conversationId,keep?.jobId ?? null]);
+}
+
+/** A única mensagem autorizada durante esta pausa é o aviso que a criou. */
+export function humanHandoffActor(outboundId: string): string {
+  return `agent:handoff:${outboundId}`;
+}
+
+/** Caller mantém a transação e o lock até gravar pausa + aviso juntos. */
+export async function pauseForHumanHandoff(client: PoolClient, environment: Environment,
+  conversationId: string, outboundId: string, jobId: string): Promise<void> {
+  const actor = humanHandoffActor(outboundId);
+  const changed = await client.query<{ version: number }>(`UPDATE ops.conversation_bot_control
+    SET mode='human',version=version+1,updated_by=$3,updated_at=now()
+    WHERE environment=$1 AND conversation_id=$2 AND mode='auto' RETURNING version`,
+  [environment,conversationId,actor]);
+  if (!changed.rows[0]) throw new Error('human_handoff_control_conflict');
+  await cancelConversationBotQueue(client,environment,conversationId,{ outboundId,jobId });
+  await client.query(`INSERT INTO ops.conversation_bot_control_events
+    (environment,conversation_id,version,action,actor) VALUES ($1,$2,$3,'takeover',$4)`,
+  [environment,conversationId,changed.rows[0].version,actor]);
 }
 
 /** Invocar com lock da conversa. Prova de autoria: id confirmado OU correlação
@@ -66,7 +89,7 @@ export async function syncHumanIntervention(client: PoolClient, environment: Env
     SET mode='human',version=version+1,last_human_at=$3,last_human_message_id=$4,
       updated_by='chatwoot:human',updated_at=now()
     WHERE environment=$1 AND conversation_id=$2
-    RETURNING mode,version,resumed_at::text AS resumed_at,last_human_at::text AS last_human_at,last_human_message_id`,
+    RETURNING mode,version,resumed_at::text AS resumed_at,last_human_at::text AS last_human_at,last_human_message_id,updated_by`,
   [environment,conversationId,message.sent_at,message.chatwoot_message_id]);
   state = updated.rows[0]!;
   await client.query(`INSERT INTO ops.conversation_bot_control_events
