@@ -217,8 +217,11 @@
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260903-finance-carry1"></script>
-<script src="/admin/painel/app.financeiro.baixas.js?v=20260903-finance-carry1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
+<script src="/admin/painel/app.financeiro.visao.js?v=20260915-finance1"></script>
+<script src="/admin/painel/app.financeiro.visao.chart.js?v=20260915-finance1"></script>
+<script src="/admin/painel/app.financeiro.retiradas.js?v=20260915-finance1"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
@@ -236,7 +239,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260915-lotsale1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.js?v=20260915-cost1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260826-permissions2" />
@@ -260,6 +263,7 @@
 <link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20260915-lotsale1">
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
+<link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20260915-finance1">
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
@@ -5670,74 +5674,21 @@
           <article class="min-w-0 rounded-xl border bg-white shadow-sm"><header class="border-b p-4"><h2 class="font-bold">Contas a pagar</h2><p class="text-xs text-gray-500">Fornecedores e compromissos</p></header><div class="divide-y"><template x-for="row in (partnerFinanceiro.payables??[]).slice(0,12)" :key="row.id"><div class="flex min-w-0 gap-3 p-4"><div class="min-w-0 flex-1"><b class="block truncate" x-text="row.counterparty_name||row.description||'Conta'"></b><small class="text-gray-500" x-text="row.due_date?'Vence '+row.due_date:'Sem vencimento'"></small><span x-show="row.managed_by_matrix" class="mt-1 block text-[10px] font-bold text-gray-400">GERENCIADA PELA MATRIZ</span></div><div class="text-right"><b class="block" x-text="formatCurrency(Number(row.open_amount??row.amount??0))"></b><button x-show="Number(row.open_amount??row.amount??0)>0&&!row.managed_by_matrix" @click="partnerFinanceiroPay(row,{payment_method:prompt('Forma de pagamento','Pix')||'Pix'})" class="mt-1 text-xs font-bold text-emerald-800">Pagar</button></div></div></template><p x-show="!(partnerFinanceiro.payables??[]).length" class="p-8 text-center text-sm text-gray-500">Nenhuma conta a pagar.</p></div></article></section><p x-show="partnerFinanceiro.actionError" class="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700" x-text="partnerFinanceiro.actionError"></p></div></template>
       <div x-show="open" class="fixed inset-0 z-[80] flex items-end justify-center bg-gray-950/60 p-0 sm:items-center sm:p-4" @click.self="open=false"><form @submit.prevent="Promise.resolve(partnerFinanceiroCreate(kind,{description,name,amount,due_date,date,payment_method})).then(ok=>{if(ok){open=false;description='';name='';amount='';due_date='';date=''}})" class="w-full max-w-lg rounded-t-2xl bg-white p-5 sm:rounded-2xl"><header class="flex items-center justify-between"><h2 class="text-xl font-bold" x-text="kind==='expense'?'Nova despesa':kind==='payable'?'Nova conta a pagar':'Nova conta a receber'"></h2><button type="button" @click="open=false" class="h-10 w-10 rounded-lg border">×</button></header><div class="mt-4 space-y-3"><input x-show="kind!=='expense'" x-model="name" :placeholder="kind==='payable'?'Fornecedor':'Cliente'" class="w-full rounded-lg border p-3"><input x-model="description" maxlength="240" placeholder="Descrição" required class="w-full rounded-lg border p-3"><input x-model="amount" inputmode="decimal" placeholder="Valor" required class="w-full rounded-lg border p-3"><input x-show="kind==='expense'" type="date" x-model="date" class="w-full rounded-lg border p-3"><input x-show="kind!=='expense'" type="date" x-model="due_date" class="w-full rounded-lg border p-3"><select x-show="kind==='expense'" x-model="payment_method" class="w-full rounded-lg border p-3"><option>Pix</option><option>Dinheiro</option><option>Cartão</option></select><button type="submit" :disabled="partnerFinanceiro.busy" class="w-full rounded-lg bg-emerald-800 p-3 font-bold text-white disabled:opacity-50">Salvar lançamento</button></div></form></div>
     </div>
-    <div x-show="currentPage === 'financeiro' && isMatrixPanel()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section aria-labelledby="financeiro-heading"
-               class="relative min-h-[164px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
-        <img src="/admin/painel/assets/financeiro-hero.webp?v=20260727-financeiro-visao1"
-             alt=""
-             class="absolute inset-0 h-full w-full object-cover object-center"
-             aria-hidden="true">
-        <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/90 to-emerald-950/10"></div>
-        <div class="relative z-10 flex min-h-[164px] flex-col justify-center px-8 py-7 xl:px-10">
-          <div class="max-w-xl">
-            <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">Livro financeiro central</p>
-            <h1 id="financeiro-heading" class="text-3xl font-bold tracking-tight text-white lg:text-[34px]">Financeiro</h1>
-            <p class="mt-3 max-w-lg text-sm text-emerald-50/90">Receitas, custos, despesas e compromissos reunidos numa única verdade financeira.</p>
-          </div>
-          <div class="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-900/85 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
-              <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
-              <span x-text="finMesLabel()"></span>
-            </span>
-            <span class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm"
-                  :class="financeiroVisao?.leitura?.integration_status === 'green' ? 'border-emerald-300/30 bg-emerald-800/90' : 'border-amber-300/40 bg-amber-700/90'">
-              <i :data-lucide="financeiroVisao?.leitura?.integration_status === 'green' ? 'badge-check' : 'triangle-alert'" class="h-3.5 w-3.5"></i>
-              <span x-text="financeiroVisao?.leitura?.integration_status === 'green' ? 'Integração conciliada' : 'Integração requer atenção'"></span>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <!-- As seis sub-abas continuam sendo a navegação principal do Financeiro. -->
-      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
-        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
-          <nav aria-label="Seções do Financeiro" class="flex items-center gap-1 overflow-x-auto">
-            <template x-for="t in [
-              { id: 'visao', label: 'Visão geral' },
-              { id: 'cobrancas', label: 'Cobranças' },
-              { id: 'pagar', label: 'Contas a pagar' },
-              { id: 'despesas', label: 'Despesas' },
-              { id: 'extrato', label: 'Lançamentos' },
-              { id: 'indicadores', label: 'Indicadores' }
-            ]" :key="t.id">
-              <button @click="finOpenTab(t.id)"
-                      :class="finTab === t.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-800'"
-                      class="border-b-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                      x-text="t.label"></button>
-            </template>
-          </nav>
-          <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
-            <div class="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white">
-              <button type="button" @click="finMoverMes(-1)" aria-label="Mês anterior"
-                      class="px-3 py-2 text-gray-600 hover:bg-gray-50"><i data-lucide="chevron-left" class="h-4 w-4"></i></button>
-              <span class="min-w-[132px] border-x border-gray-200 px-3 py-2 text-center text-xs font-semibold capitalize text-gray-700" x-text="finMesLabel()"></span>
-              <button type="button" @click="finMoverMes(1)" :disabled="!financeiroVisao?.periodo?.proximo" aria-label="Mês seguinte"
-                      class="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"><i data-lucide="chevron-right" class="h-4 w-4"></i></button>
-            </div>
-            <span class="inline-flex rounded-lg px-3 py-2 text-xs font-semibold"
-                  :class="financeiroVisao?.periodo?.status === 'em_andamento' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'"
-                  x-text="financeiroVisao?.periodo?.status === 'em_andamento' ? 'Em andamento' : 'Período anterior'"></span>
-            <button type="button" @click="loadFinanceiro()"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3.5 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
-              <i data-lucide="refresh-cw" class="h-4 w-4"></i> Atualizar
-            </button>
-            <button type="button" @click="finOpenTab('despesas')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-800">
-              <i data-lucide="plus" class="h-4 w-4"></i> Nova despesa
-            </button>
-          </div>
-        </div>
+    <div x-show="currentPage === 'financeiro' && isMatrixPanel()" class="finance-page min-h-screen">
+      <header class="fv-heading">
+        <div><small>Matriz / Gestão</small><h1 id="financeiro-heading">Financeiro</h1><p>Seu dinheiro, seus resultados e o que precisa de atenção.</p></div>
+        <div class="fv-actions"><button x-show="finTab === 'visao'" @click="finVisaoExportar()" :disabled="finVisaoLoading || finOverviewLoading || !finOverview || !!financeiroLoadError" class="fv-button"><i data-lucide="download"></i>Exportar CSV</button><button x-show="adminUser?.role === 'owner'" @click="finOpenTab('despesas')" class="fv-button fv-primary"><i data-lucide="plus"></i>Nova despesa</button></div>
+      </header>
+      <nav class="fv-nav" aria-label="Seções do Financeiro">
+        <template x-for="t in [{ id: 'visao', label: 'Visão geral' }, { id: 'cobrancas', label: 'Cobranças' }, { id: 'pagar', label: 'Contas a pagar' }, { id: 'despesas', label: 'Despesas' }, { id: 'extrato', label: 'Lançamentos' }, { id: 'indicadores', label: 'Indicadores' }]" :key="t.id">
+          <button type="button" @click="finOpenTab(t.id)" :class="{'active':finTab === t.id}" :aria-current="finTab === t.id ? 'page' : null" x-text="t.label"></button>
+        </template>
+      </nav>
+      <div class="fv-period">
+        <div class="fv-month"><button @click="finMoverMes(-1)" :disabled="finVisaoLoading" class="fv-button" aria-label="Mês anterior"><i data-lucide="chevron-left"></i></button><label class="fv-month-input"><i data-lucide="calendar-days"></i><input type="month" aria-label="Mês do financeiro" :value="finMes" :max="finMesAtual()" @change="finSelecionarMes($event.target.value)"></label><button @click="finMoverMes(1)" :disabled="finVisaoLoading || !financeiroVisao?.periodo?.proximo" class="fv-button" aria-label="Mês seguinte"><i data-lucide="chevron-right"></i></button><span class="fv-badge" x-text="finVisaoAtual() ? 'Mês em andamento' : 'Período anterior'"></span><small x-text="finVisaoPeriodo()"></small></div>
+        <button @click="loadFinanceiro()" :disabled="finVisaoLoading" class="fv-button"><i data-lucide="refresh-cw" :class="{'animate-spin':finVisaoLoading}"></i><span x-text="finVisaoLoading ? 'Atualizando…' : 'Atualizar'"></span></button>
       </div>
+
 
       <div x-show="financeiroLoadError" class="mb-5 flex items-start justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
         <div class="flex items-start gap-3">
@@ -5752,193 +5703,62 @@
         </button>
       </div>
 
+      <div x-show="finRetirada.open" x-cloak class="fv-dialog-backdrop" @click.self="finRetiradaFechar()" @keydown.escape.window="finRetiradaFechar()">
+        <section class="fv-dialog" role="dialog" aria-modal="true" aria-labelledby="fv-withdrawal-title" @keydown="finRetiradaTeclado($event)">
+          <div class="fv-card-head"><h2 id="fv-withdrawal-title" x-text="finRetirada.row ? 'Estornar retirada' : 'Retirada do dono'"></h2><button type="button" @click="finRetiradaFechar()" :disabled="finRetirada.saving" aria-label="Fechar"><i data-lucide="x"></i></button></div>
+          <p x-text="finRetirada.row ? 'Corrija um registro de retirada feito por engano. O estorno devolve o valor ao caixa e mantém o histórico.' : 'Registre o dinheiro retirado para uso pessoal. Diminui o caixa sem reduzir o resultado do mês.'"></p>
+          <div x-show="!finRetirada.row" class="fv-notice">Para salário do dono (pró-labore) ou contas da loja, use Despesas.</div>
+          <form @submit.prevent="finRetiradaSalvar()"><label x-show="!finRetirada.row">Valor retirado (R$)<input x-ref="finRetiradaFirst" x-model="finRetirada.amount" inputmode="decimal" placeholder="0,00" :required="!finRetirada.row" :disabled="finRetirada.saving"></label>
+            <p x-show="finRetirada.row" x-text="'Valor do estorno: '+formatCurrency(Number(finRetirada.row?.amount || 0))"></p>
+            <label>Data<input type="date" x-model="finRetirada.date" :max="finHoje()" :min="finRetirada.row?.cash_on || null" required :disabled="finRetirada.saving"></label>
+            <div x-show="!finRetirada.row"><label>Como retirou?<select x-model="finRetirada.payment_method" :disabled="finRetirada.saving"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="transferencia">Transferência</option></select></label><label>De onde saiu o dinheiro?<input x-model="finRetirada.cash_account" maxlength="80" :required="!finRetirada.row" :disabled="finRetirada.saving" placeholder="Ex.: Caixa principal ou conta da empresa"></label></div>
+            <label for="fv-withdrawal-reason" x-text="finRetirada.row ? 'Motivo do estorno' : 'Motivo da retirada'"></label><textarea id="fv-withdrawal-reason" x-ref="finRetiradaReason" x-model="finRetirada.reason" aria-label="Motivo" minlength="3" maxlength="400" rows="2" required :disabled="finRetirada.saving"></textarea>
+            <p x-show="finRetirada.error" x-text="finRetirada.error" class="fv-notice alert" role="alert"></p>
+            <div class="fv-actions"><button type="button" class="fv-button" @click="finRetiradaFechar()" :disabled="finRetirada.saving">Cancelar</button><button type="submit" class="fv-button fv-primary" :disabled="finRetirada.saving" x-text="finRetirada.saving ? 'Registrando…' : finRetirada.row ? 'Confirmar estorno' : 'Registrar retirada'"></button></div>
+          </form>
+        </section>
+      </div>
+
       <!-- ═══════ SUB-ABA: VISÃO GERAL ═══════ -->
+      <div x-show="!financeiroVisao && finVisaoLoading" class="fv-empty">Carregando o Financeiro…</div>
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'visao'" class="w-full space-y-5">
-          <!-- Fechamento executivo: uma única leitura do livro central. -->
-          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <section class="relative min-h-[300px] overflow-hidden rounded-xl border border-emerald-900 bg-emerald-950 text-white shadow-sm xl:col-span-8">
-              <img src="/admin/painel/assets/financeiro-fechamento.webp?v=20260727-financeiro-visao1"
-                   alt=""
-                   class="absolute inset-0 h-full w-full object-cover object-center opacity-70"
-                   aria-hidden="true">
-              <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/95 to-emerald-950/45"></div>
-              <div class="relative z-10 flex min-h-[300px] flex-col p-6 lg:p-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p class="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200/75">Fechamento do período</p>
-                    <h2 class="mt-1 text-xl font-semibold capitalize" x-text="finMesLabel()"></h2>
-                  </div>
-                  <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-900/70 px-3 py-1.5 text-[11px] font-medium text-emerald-50">
-                    <i data-lucide="book-check" class="h-3.5 w-3.5 text-emerald-200"></i> Competência
-                  </span>
-                </div>
-                <div class="mt-6">
-                  <p class="text-sm text-emerald-100/80">Resultado por competência</p>
-                  <p class="mt-1 text-xs text-emerald-100/70">Inclui vendas fiadas; não representa dinheiro no caixa.</p>
-                  <div class="mt-1 flex flex-wrap items-center gap-3">
-                    <p class="num text-4xl font-bold tracking-tight lg:text-5xl"
-                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.lucro_confirmado))"></p>
-                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                          :class="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'bg-emerald-400/15 text-emerald-100' : 'bg-rose-400/15 text-rose-200'">
-                      <i :data-lucide="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'arrow-up-right' : 'arrow-down-right'" class="h-3.5 w-3.5"></i>
-                      <span x-text="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'Positivo' : 'Negativo'"></span>
-                    </span>
-                  </div>
-                </div>
-                <div class="mt-6 grid grid-cols-1 divide-y divide-emerald-700/60 border-y border-emerald-700/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                  <div class="px-4 py-4 sm:pl-0 sm:pr-6"><p class="text-xs text-emerald-100/70">Receita</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_total))"></p></div>
-                  <div class="px-4 py-4 sm:px-6"><p class="text-xs text-emerald-100/70">Custo conhecido</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.custo_conhecido))"></p></div>
-                  <div class="px-4 py-4 sm:pl-6 sm:pr-0"><p class="text-xs text-emerald-100/70">Despesas</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.despesas))"></p></div>
-                </div>
-                <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div class="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-emerald-900/55 px-4 py-3">
-                    <div>
-                      <p class="text-xs text-emerald-100/70">Caixa do período</p>
-                      <p class="num mt-1 text-base font-semibold"
-                         :class="Number(financeiroVisao.verdade.caixa.movimento_liquido) >= 0 ? 'text-white' : 'text-rose-200'"
-                         x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.movimento_liquido))"></p>
-                    </div>
-                    <i data-lucide="wallet-cards" class="h-5 w-5 flex-shrink-0 text-emerald-200/70"></i>
-                  </div>
-                  <div class="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-emerald-900/55 px-4 py-3">
-                    <div>
-                      <p class="text-xs text-emerald-100/70">Margem líquida confirmada</p>
-                      <p class="num mt-1 text-base font-semibold"
-                         :class="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'text-white' : 'text-rose-200'"
-                         x-text="Number(financeiroVisao.verdade.competencia.receita_custo_conhecido || 0) > 0 ? (100 * Number(financeiroVisao.verdade.competencia.lucro_confirmado) / Number(financeiroVisao.verdade.competencia.receita_custo_conhecido)).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '—'"></p>
-                    </div>
-                    <i data-lucide="percent" class="h-5 w-5 flex-shrink-0 text-emerald-200/70"></i>
-                  </div>
-                </div>
-                <div class="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
-                  <div>
-                    <p class="text-xs text-emerald-100/65">Resultado consolidado no livro financeiro central.</p>
-                    <p x-show="Number(financeiroVisao.verdade.competencia.receita_custo_pendente || 0) > 0"
-                       class="mt-1 text-xs font-medium text-amber-200"
-                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente)) + ' com custo pendente ficou fora do lucro.'"></p>
-                    <p x-show="Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas || 0) > 0"
-                       class="mt-1 text-xs font-medium text-rose-200"
-                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque.perdas)) + ' de perdas/baixas do estoque já descontadas do lucro.'"></p>
-                  </div>
-                  <button type="button" @click="finIndicadorTab = 'analise'; finOpenTab('indicadores')"
-                          class="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-emerald-950/25 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10">
-                    Ver demonstrativo <i data-lucide="arrow-right" class="h-4 w-4"></i>
-                  </button>
-                </div>
-              </div>
+        <div x-show="finTab === 'visao'" class="fv-overview" :aria-busy="finVisaoLoading">
+          <div class="fv-kpis">
+            <article class="fv-kpi featured" :class="{'negative':finVisaoResumo().result < 0}"><span class="fv-icon"><i data-lucide="trending-up"></i></span><div><label x-text="finVisaoResumo().title"></label><strong x-text="(finVisaoResumo().result > 0 ? '+ ' : '') + formatCurrency(finVisaoResumo().result)"></strong><small x-text="finVisaoResumo().margin"></small><small>Após custos e despesas registrados</small></div></article>
+            <article class="fv-kpi"><span class="fv-icon"><i data-lucide="wallet"></i></span><div><label x-text="finVisaoAtual() ? 'Saldo em caixa' : 'Saldo no fim do mês'"></label><strong x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_atual))"></strong><small>Saldo registrado no sistema</small></div></article>
+            <article class="fv-kpi"><span class="fv-icon"><i data-lucide="arrow-down-left"></i></span><div><label>Total a receber</label><strong x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_receber))"></strong><small>Tudo que ainda falta receber</small><em x-show="finVisaoFluxo().overdueIncoming > 0" x-text="formatCurrency(finVisaoFluxo().overdueIncoming) + ' em atraso'"></em></div></article>
+            <article class="fv-kpi"><span class="fv-icon out"><i data-lucide="arrow-up-right"></i></span><div><label>Total a pagar</label><strong x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_pagar))"></strong><small>Tudo que ainda falta pagar</small><em x-show="finVisaoFluxo().overdueOutgoing > 0" x-text="formatCurrency(finVisaoFluxo().overdueOutgoing) + ' em atraso'"></em></div></article>
+          </div>
+          <p x-show="!finVisaoAtual()" class="text-xs text-gray-500">Resultado e caixa mostram o mês selecionado. A receber, a pagar e próximas contas mostram a posição de hoje.</p>
+          <div x-show="finVisaoResumo().missing" class="fv-notice warning"><i data-lucide="triangle-alert"></i><span><b>Resultado parcial.</b> Há vendas sem custo informado. Complete os custos para confirmar o resultado e a margem.</span></div>
+          <div x-show="financeiroVisao.verdade.conciliacao.status === 'divergente'" class="fv-notice warning"><i data-lucide="triangle-alert"></i>Há valores que precisam de revisão entre as operações e o financeiro. Consulte os indicadores antes de considerar o resultado conferido.</div>
+          <div class="fv-grid">
+            <section class="fv-card">
+              <div class="fv-card-head"><div><h2>Como fica o caixa</h2><p x-text="finVisaoAtual() ? 'O que já aconteceu e o que está previsto.' : 'Saldo registrado ao longo do mês selecionado.'"></p></div><div x-show="finVisaoAtual()" class="fv-toggle" aria-label="Período da previsão"><template x-for="days in [7,30]" :key="days"><button @click="finVisaoDias=days" :class="{'active':finVisaoDias===days}" :aria-pressed="finVisaoDias===days" x-text="days+' dias'"></button></template></div></div>
+              <div class="fv-legend"><span><i></i>Já aconteceu</span><span x-show="finVisaoAtual()"><i class="dashed"></i>Previsão</span></div>
+              <div x-show="finOverviewLoading" class="fv-empty">Carregando histórico completo…</div>
+              <div x-show="finOverviewError" class="fv-notice warning"><span x-text="finOverviewError"></span><button @click="loadFinOverview()" class="fv-link">Tentar novamente</button></div>
+              <div x-show="!finOverviewLoading && !finOverviewError" class="fv-chart" x-html="finVisaoChart()"></div>
+              <div x-show="finVisaoAtual()" class="fv-formula"><div><span>Saldo de hoje</span><strong x-text="formatCurrency(finVisaoFluxo().balance)"></strong></div><i>+</i><div><span x-text="'Receber em '+finVisaoDias+' dias'"></span><strong x-text="formatCurrency(finVisaoFluxo().incoming)"></strong></div><i>−</i><div><span x-text="'Pagar em '+finVisaoDias+' dias'"></span><strong x-text="formatCurrency(finVisaoFluxo().outgoing)"></strong></div><i>=</i><div><span>Saldo previsto</span><strong :class="finVisaoFluxo().projected < 0 ? 'fv-negative' : 'fv-positive'" x-text="formatCurrency(finVisaoFluxo().projected)"></strong></div></div>
+              <div x-show="!finVisaoAtual()" class="fv-formula"><div><span>Saldo anterior</span><strong x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_anterior))"></strong></div><i>+</i><div><span>Entradas</span><strong x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></strong></div><i>−</i><div><span>Saídas</span><strong x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></strong></div><i>=</i><div><span>Saldo final</span><strong x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_atual))"></strong></div></div>
+              <div class="fv-foot"><p x-show="finVisaoAtual()">Depende de receber e pagar nas datas previstas.<br>Valores atrasados e sem vencimento ficam fora desta previsão.</p><p x-show="!finVisaoAtual()">Este saldo passa para o mês seguinte.</p><button @click="finVisaoAtual() ? finVisaoVerFluxo() : finAbrirMovimentacoesCaixa()" class="fv-link">Ver fluxo completo <i data-lucide="arrow-right"></i></button></div>
             </section>
-
-            <section class="flex min-h-[300px] flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm xl:col-span-4">
-              <div><h2 class="text-lg font-semibold">Saldo em caixa</h2><p class="mt-1 text-xs text-gray-500">Saldo registrado no livro financeiro central</p></div>
-              <div class="mt-5 divide-y divide-gray-100">
-                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Saldo anterior</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_anterior))"></span></div>
-                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Entradas</span><span class="num font-semibold text-emerald-700" x-text="'+ ' + formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></span></div>
-                <div class="flex items-center justify-between gap-3 py-3"><span class="text-sm text-gray-600">Saídas</span><span class="num font-semibold text-rose-600" x-text="'− ' + formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></span></div>
-              </div>
-              <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                <div class="flex items-end justify-between gap-3"><span class="text-sm font-semibold text-emerald-900">Saldo atual</span><span class="num text-2xl font-bold text-emerald-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saldo_atual))"></span></div>
-                <p class="mt-1 text-[11px] text-emerald-700" x-text="financeiroVisao.periodo.status === 'em_andamento' ? 'Saldo acumulado até agora' : 'Este saldo passa para o mês seguinte'"></p>
-              </div>
-              <button type="button" @click="finAbrirMovimentacoesCaixa()"
-                      class="mt-auto w-full rounded-lg border border-emerald-700 px-4 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
-                Ver movimentações
-              </button>
+            <section class="fv-card"><div class="fv-card-head"><div><h2>Próximas contas</h2><p x-text="'Hoje e próximos '+finVisaoDias+' dias.'"></p></div></div>
+              <div class="fv-tabs" aria-label="Filtrar próximas contas"><button @click="finAgendaFiltro='todos'" :class="{'active':finAgendaFiltro==='todos'}">Todos</button><button @click="finAgendaFiltro='saida'" :class="{'active':finAgendaFiltro==='saida'}">A pagar</button><button @click="finAgendaFiltro='entrada'" :class="{'active':finAgendaFiltro==='entrada'}">A receber</button></div>
+              <div class="fv-agenda"><template x-for="item in finVisaoAgenda()" :key="'fv-agenda-'+item.direcao+':'+(item.obligation_id || item.tipo+':'+item.id)"><div class="fv-agenda-row" :class="{'out':item.direcao==='saida'}"><span class="fv-icon" :class="{'out':item.direcao==='saida'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path :d="item.direcao==='entrada' ? 'M18 6 6 18M6 7v11h11' : 'M6 18 18 6M7 6h11v11'"></path></svg></span><div><b x-text="item.nome"></b><small x-text="finVisaoVencimento(item)"></small></div><strong x-text="formatCurrency(Number(item.valor))"></strong><button x-show="adminUser?.role==='owner'" @click="item.direcao==='entrada' ? finReceber(item) : finPagar(item)" class="fv-button" x-text="item.direcao==='entrada' ? 'Receber' : 'Pagar'"></button></div></template><div x-show="!finVisaoAgenda().length" class="fv-empty">Nenhuma conta com vencimento neste intervalo.</div></div>
+              <div x-show="finVisaoFluxo().overdueCount" class="fv-notice alert"><i data-lucide="triangle-alert"></i><span>Também há contas em atraso</span><button @click="finVisaoVerAtrasos()" class="fv-link">Ver atrasadas <i data-lucide="arrow-right"></i></button></div><div x-show="finVisaoFluxo().undated" class="fv-foot"><p x-text="finVisaoFluxo().undated+' conta(s) sem vencimento ficam fora da previsão.'"></p></div>
             </section>
           </div>
-
-          <!-- Movimento realizado no caixa + compromissos ainda abertos. -->
-          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
-              <div class="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><h2 class="text-base font-semibold">Fluxo financeiro</h2><p class="mt-1 text-xs text-gray-500">Entradas e saídas efetivamente registradas no mês</p></div>
-                <span class="rounded-lg bg-gray-50 px-3 py-2 text-xs font-semibold capitalize text-gray-600" x-text="finMesLabel()"></span>
-              </div>
-              <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Entradas <strong class="num text-gray-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></strong></span>
-                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-rose-400"></span>Saídas <strong class="num text-gray-800" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></strong></span>
-              </div>
-              <div class="mt-5 flex h-[190px] items-end gap-0.5 border-b border-gray-200 px-1 sm:gap-1">
-                <template x-for="bucket in finCaixaHistoricoPainel()" :key="'visao-caixa-'+bucket.day">
-                  <div class="flex h-full min-w-0 flex-1 flex-col justify-end">
-                    <div class="flex h-[145px] items-end justify-center gap-px">
-                      <div class="w-1/2 max-w-2 rounded-t-sm bg-emerald-500 transition-all" :style="'height:' + bucket.entradaPct + '%'" :title="bucket.label + ': entradas ' + formatCurrency(bucket.entrada)"></div>
-                      <div class="w-1/2 max-w-2 rounded-t-sm bg-rose-400 transition-all" :style="'height:' + bucket.saidaPct + '%'" :title="bucket.label + ': saídas ' + formatCurrency(bucket.saida)"></div>
-                    </div>
-                    <p class="mt-2 truncate text-center text-[9px] text-gray-500" x-show="bucket.day === 1 || bucket.day % 5 === 0" x-text="bucket.label"></p>
-                  </div>
-                </template>
-              </div>
-              <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-xs text-gray-500">Movimento líquido: <strong class="num" :class="Number(financeiroVisao.verdade.caixa.movimento_liquido) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.movimento_liquido))"></strong></p>
-                <button type="button" @click="finAbrirMovimentacoesCaixa()" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Abrir movimentações →</button>
-              </div>
+          <div class="fv-grid">
+            <section class="fv-card"><div class="fv-card-head"><h2>Como chegou ao resultado</h2><button @click="finIndicadorTab='analise';finOpenTab('indicadores')" class="fv-link">Ver detalhes <i data-lucide="arrow-right"></i></button></div>
+              <div class="fv-result"><div><span>Receitas do mês</span><strong x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_total))"></strong></div><div><span>Custo dos pneus vendidos</span><strong x-text="'− '+formatCurrency(Number(financeiroVisao.verdade.competencia.custo_conhecido))"></strong></div><div><span>Despesas</span><strong x-text="'− '+formatCurrency(Number(financeiroVisao.verdade.competencia.despesas))"></strong></div><div><span x-text="finVisaoResumo().missing ? 'Resultado parcial' : 'Resultado'"></span><strong :class="finVisaoResumo().result < 0 ? 'fv-negative' : 'fv-positive'" x-text="(finVisaoResumo().result > 0 ? '+ ' : '')+formatCurrency(finVisaoResumo().result)"></strong></div></div>
+              <p x-show="finVisaoResumo().missing" class="fv-notice warning" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente))+' de receita com custo pendente ficam fora do resultado confirmado.'"></p>
+              <p x-show="Number(financeiroVisao.verdade.competencia.ajustes_estoque?.ganhos) || Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas)" class="fv-notice" x-text="'O resultado também inclui ajustes de estoque: ganhos de '+formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque?.ganhos || 0))+' e perdas de '+formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas || 0))+'.'"></p>
+              <div class="fv-expenses"><h3>Despesas do período</h3><div class="fv-expense-list"><template x-for="row in finVisaoDespesas()" :key="row.account"><div class="fv-expense"><span :title="row.label" x-text="row.label"></span><div><i :style="'width:'+row.width+'%'" :class="{'bg-rose-400':Number(row.amount)<0}"></i></div><b x-text="formatCurrency(Number(row.amount))"></b></div></template></div><p x-show="!finVisaoDespesas().length && !finOverviewLoading && !finOverviewError">Nenhuma despesa registrada no período.</p><p x-show="finOverviewLoading">Carregando despesas…</p><p x-show="finOverviewError">Despesas indisponíveis. Atualize para tentar novamente.</p></div>
+              <p class="fv-explanation">Vendas fiadas entram no resultado. O caixa muda quando você recebe ou paga. Retiradas do dono alteram o caixa.</p>
             </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
-              <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold">Próximos compromissos</h2><p class="mt-1 text-xs text-gray-500">Recebimentos e pagamentos em ordem de vencimento</p></div><i data-lucide="calendar-clock" class="h-5 w-5 text-emerald-700"></i></div>
-              <div class="relative mt-5">
-                <div class="absolute bottom-3 left-[7px] top-3 w-px bg-emerald-200"></div>
-                <div class="space-y-1">
-                  <template x-for="item in finFluxoPainel().movimentos.slice(0, 4)" :key="'visao-agenda-'+item.direcao+':'+item.tipo+':'+item.id">
-                    <button type="button" @click="finOpenTab(item.direcao === 'entrada' ? 'cobrancas' : 'pagar')"
-                            class="relative grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-0 py-3 text-left hover:bg-gray-50">
-                      <span class="relative z-10 h-3.5 w-3.5 rounded-full border-2 border-emerald-600 bg-white"></span>
-                      <span class="min-w-0"><span class="block truncate text-sm font-semibold text-gray-800" x-text="item.descricao"></span><span class="mt-0.5 block text-[11px] text-gray-500"><span x-text="item.due_date ? financeDate(item.due_date) : 'Sem vencimento'"></span> · <span x-text="item.origem"></span></span></span>
-                      <span class="text-right"><span class="num block text-sm font-semibold" :class="item.direcao === 'entrada' ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(item.valor))"></span><span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></span>
-                    </button>
-                  </template>
-                </div>
-                <div x-show="!finFluxoPainel().movimentos.length" class="py-10 text-center">
-                  <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="badge-check" class="h-5 w-5 text-emerald-700"></i></div>
-                  <p class="mt-3 text-sm font-medium text-gray-700">Agenda limpa</p><p class="mt-1 text-xs text-gray-400">Nenhum título previsto neste recorte.</p>
-                </div>
-              </div>
-              <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')" class="mt-4 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">Ver todos</button>
-            </section>
+            <section class="fv-card"><div class="fv-card-head"><h2>Últimas movimentações</h2><button @click="finAbrirMovimentacoesCaixa()" class="fv-link">Ver todas <i data-lucide="arrow-right"></i></button></div><div class="fv-movements"><template x-for="row in finVisaoMovimentos()" :key="row.id"><div class="fv-movement"><span class="fv-icon" :class="{'out':row.direction==='saida'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path :d="row.direction==='entrada' ? 'M12 4v16M5 13l7 7 7-7' : 'M12 20V4M5 11l7-7 7 7'"></path></svg></span><div><b :title="row.description" x-text="row.description"></b><small x-text="finVisaoDetalheMovimento(row)"></small></div><strong :class="row.direction==='entrada' ? 'fv-positive' : 'fv-negative'" x-text="(row.direction==='entrada' ? '+ ' : '− ')+formatCurrency(Number(row.amount))"></strong></div></template><div x-show="finCaixaExtratoLoading" class="fv-empty">Carregando movimentações…</div><div x-show="!finCaixaExtratoLoading && !finVisaoMovimentos().length" class="fv-empty" x-text="finCaixaExtrato ? 'Nenhuma movimentação neste mês.' : 'Não foi possível carregar as movimentações.'"></div></div><div class="fv-notice"><i data-lucide="info"></i>Entradas e saídas registradas no sistema.</div></section>
           </div>
-
-          <!-- Extrato recente e saúde da comunicação entre as origens. -->
-          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-8">
-              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-                <div><h2 class="text-base font-semibold">Movimentações recentes</h2><p class="mt-1 text-xs text-gray-500">Últimos registros do livro financeiro central</p></div>
-                <button type="button" @click="finOpenTab('extrato')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Ver lançamentos →</button>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full min-w-[720px] text-sm">
-                  <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500"><tr><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Origem</th><th class="px-4 py-3 font-medium">Descrição</th><th class="px-4 py-3 font-medium">Tipo</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 text-right font-medium">Valor</th></tr></thead>
-                  <tbody class="divide-y divide-gray-100">
-                    <template x-for="row in (finCaixaExtrato?.rows || []).slice(0, 4)" :key="'visao-extrato-'+row.id">
-                      <tr class="hover:bg-gray-50/60"><td class="px-5 py-3 whitespace-nowrap text-gray-600" x-text="financeDate(row.cash_on)"></td><td class="px-4 py-3 font-medium text-gray-700" x-text="row.origin"></td><td class="max-w-[260px] px-4 py-3"><p class="truncate font-medium text-gray-800" x-text="row.description"></p></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs text-gray-600"><span class="h-2 w-2 rounded-full" :class="row.direction === 'entrada' ? 'bg-emerald-500' : 'bg-rose-400'"></span><span x-text="row.direction === 'entrada' ? 'Entrada' : 'Saída'"></span></span></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span></td><td class="num px-5 py-3 text-right font-semibold" :class="row.direction === 'entrada' ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(row.amount))"></td></tr>
-                    </template>
-                    <tr x-show="finCaixaExtratoLoading"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Carregando movimentações…</td></tr>
-                    <tr x-show="!finCaixaExtratoLoading && !(finCaixaExtrato?.rows || []).length"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Nenhuma entrada ou saída no período.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
-              <div class="flex items-start justify-between gap-3">
-                <div><h2 class="text-base font-semibold">Conciliação por origem</h2><p class="mt-1 text-xs text-gray-500">Fonte operacional × livro central</p></div>
-                <div class="flex h-10 w-10 items-center justify-center rounded-full" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50' : 'bg-amber-50'"><i :data-lucide="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'badge-check' : 'triangle-alert'" class="h-5 w-5" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-700' : 'text-amber-600'"></i></div>
-              </div>
-              <div class="mt-5 divide-y divide-gray-100">
-                <template x-for="linha in (financeiroVisao.verdade.conciliacao.origens || [])" :key="'visao-conciliacao-'+linha.origem">
-                  <div class="flex items-center justify-between gap-3 py-2.5"><span class="inline-flex min-w-0 items-center gap-2 text-sm text-gray-700"><span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="Math.abs(Number(linha.diferenca || 0)) < 0.005 ? 'bg-emerald-500' : 'bg-amber-500'"></span><span class="truncate capitalize" x-text="linha.origem"></span></span><span class="num text-xs font-semibold" :class="Math.abs(Number(linha.diferenca || 0)) < 0.005 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(linha.diferenca))"></span></div>
-                </template>
-                <div x-show="!(financeiroVisao.verdade.conciliacao.origens || []).length" class="py-8 text-center text-xs text-gray-400">Nenhuma origem disponível.</div>
-              </div>
-              <div class="mt-5 rounded-xl p-4" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50' : 'bg-amber-50'">
-                <p class="text-sm font-semibold" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-800' : 'text-amber-800'"
-                   x-text="(financeiroVisao.verdade.conciliacao.origens || []).filter((linha) => Math.abs(Number(linha.diferenca || 0)) < 0.005).length + ' de ' + (financeiroVisao.verdade.conciliacao.origens || []).length + ' origens conciliadas'"></p>
-                <p class="mt-1 text-xs" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-700' : 'text-amber-700'"
-                   x-text="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'As fontes conferem centavo a centavo.' : ((financeiroVisao.verdade.conciliacao.origens || []).length - (financeiroVisao.verdade.conciliacao.origens || []).filter((linha) => Math.abs(Number(linha.diferenca || 0)) < 0.005).length) + ' origem(ns) precisam de revisão.'"></p>
-              </div>
-            </section>
-          </div>
-
         </div>
       </template>
 
@@ -6212,6 +6032,7 @@
       <template x-if="financeiroVisao">
         <!-- EXTRATO AUDITÁVEL DO LIVRO CENTRAL -->
         <div x-show="finTab === 'extrato'" class="w-full space-y-5">
+<div class="flex flex-wrap items-center justify-between gap-3"><p class="text-sm text-emerald-800" role="status" x-text="finRetiradaAviso"></p><button x-show="adminUser?.role==='owner'" @click="finRetiradaAbrir()" class="fv-button fv-primary"><i data-lucide="wallet"></i>Registrar retirada do dono</button></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
               <div>
@@ -6251,7 +6072,7 @@
                           <td class="px-5 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="financeDate(row.competence_on)"></p><p class="text-[11px] text-gray-400" x-text="row.cash_on ? 'Caixa ' + financeDate(row.cash_on) : 'Sem movimento de caixa'"></p></td>
                           <td class="px-4 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="row.origin"></p><p class="text-[10px] text-gray-400 font-mono" x-text="row.source_type"></p></td>
                           <td class="px-4 py-3 max-w-[360px]"><p class="font-medium text-gray-800 truncate" x-text="row.description"></p><p class="text-[11px] text-gray-400 truncate" x-text="row.created_by"></p></td>
-                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
+                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><button x-show="adminUser?.role==='owner' && row.source_type==='finance.owner_withdrawal' && !row.reversed" @click="finRetiradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar retirada</button><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
                           <td class="px-5 py-3 text-right font-semibold num" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td>
                         </tr>
                       </template>

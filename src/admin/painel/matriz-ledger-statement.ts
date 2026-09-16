@@ -70,6 +70,7 @@ const OBLIGATION_ACCOUNTS = [
 ];
 
 function originOf(sourceType: string): string {
+  if (sourceType.startsWith('finance.owner_withdrawal')) return 'Retirada do dono';
   if (sourceType.startsWith('commerce.wholesale_purchase')) return 'Compras';
   if (sourceType.startsWith('commerce.wholesale_order')) return 'Atacado';
   if (sourceType.startsWith('commerce.order')) return 'Varejo';

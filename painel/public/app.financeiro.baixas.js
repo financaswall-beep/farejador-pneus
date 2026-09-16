@@ -25,6 +25,8 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       this.despesaFiltro.mes = month;
       this.finExtrato = null;
       this.finCaixaExtrato = null;
+      this.finOverview = null;
+      this.financeiroVisao = null;
       await Promise.allSettled([this.loadFinanceiro(), this.loadFinExtrato()]);
     },
     async finMoverMes(direction) {

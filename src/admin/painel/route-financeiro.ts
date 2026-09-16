@@ -11,11 +11,13 @@ import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseC
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpenseRemoveSchema, matrizExpensesQuerySchema } from './route-schemas.js';
 import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
+import { registerFinanceiroOverview } from './route-financeiro-overview.js';
 import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   await registerFinancialReportRoutes(fastify);
   await registerPainelFinanceiroLedger(fastify);
+  await registerFinanceiroOverview(fastify);
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = z.object({
       mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
