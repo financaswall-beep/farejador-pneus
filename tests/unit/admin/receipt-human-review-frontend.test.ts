@@ -53,7 +53,7 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     const html = read('painel/public/index.html');
     const reviewSection = html.slice(
       html.indexOf('<details x-ref="receiptReviewDetails"'),
-      html.indexOf('<!-- Cada aba tem uma responsabilidade visual própria'),
+      html.indexOf('<!-- Entregas: consulta e agendamento.'),
     );
 
     expect(reviewSection).toContain("logisticaTab === 'visao'");

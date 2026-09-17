@@ -47,14 +47,14 @@ describe('getMatrizLogistica — resultado real por rota', () => {
     }
   });
 
-  it('abre o resultado dentro de Rotas e tira a digitação manual de combustível da tela ativa', () => {
+  it('abre o resultado dentro de Histórico e resultados e tira a digitação manual de combustível da tela ativa', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
     const telaAtiva = html.split('<!-- Legado preservado como referência inerte')[0]!;
     const actions = readFileSync(resolve('painel/public/app.logistica.acoes.js'), 'utf8');
 
     expect(telaAtiva).toContain('Ver resultado');
-    expect(telaAtiva).toContain("logisticaTab === 'rotas' && logisticaRotaSelecionada()");
-    expect(telaAtiva).toContain('enviarComprovante(logisticaRotaAtual(), $event)');
+    expect(telaAtiva).toContain("logisticaTab === 'historico' && logisticaRotaSelecionada()");
+    expect(telaAtiva).toContain('logOpEnviarComprovante($event)');
     expect(telaAtiva).toContain('Despesas da rota');
     expect(telaAtiva).not.toContain('x-model="fecharForm.fuel_spent"');
     expect(actions).toContain('fuel_spent: null');

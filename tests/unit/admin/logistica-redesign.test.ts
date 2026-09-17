@@ -12,35 +12,35 @@ function logisticsHtml(): string {
   return html.slice(start, end);
 }
 
-describe('Redesign das quatro abas da Logistica da Matriz', () => {
+describe('Redesign das três abas da Logistica da Matriz', () => {
   const screen = logisticsHtml();
 
   it('preserva a navegação e carrega a nova operação', () => {
     expect(html).toContain('/admin/painel/logistica-operacao.css');
     expect(html).toContain('/admin/painel/app.logistica.operacao.js');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260916-operacao1');
-    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260821-auditfix1');
-    expect(html).toContain('/admin/painel/app.montagem.js?v=20260916-logistica1');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260917-entregas1');
+    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260917-entregas1');
+    expect(html).toContain('/admin/painel/app.montagem.js?v=20260917-entregas1');
     expect(html).not.toContain('app.logistica.periodos.js');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
     expect(screen).toContain('aria-label="Seções de Logística"');
-    expect(screen).toContain("{ id: 'visao', label: 'Visão geral' }");
+    expect(screen).toContain("{ id: 'visao', label: 'Operação' }");
     expect(screen).toContain("{ id: 'entregas', label: 'Entregas' }");
-    expect(screen).toContain("{ id: 'rotas', label: 'Rotas' }");
-    expect(screen).toContain("{ id: 'historico', label: 'Histórico' }");
+    expect(screen).not.toContain("{ id: 'rotas', label: 'Rotas' }");
+    expect(screen).toContain("{ id: 'historico', label: 'Histórico e resultados' }");
   });
 
   it('separa a composicao de cada aba', () => {
     expect(screen).toContain('Próxima saída');
     expect(screen).toContain('Rotas abertas');
     expect(screen).toContain('Precisa de decisão');
-    expect(screen).toContain('Fila de entregas');
-    expect(screen).toContain('Rotas da Matriz');
+    expect(screen).toContain('Pedidos no período');
+    expect(screen).toContain('Rotas encerradas');
     expect(screen).toContain('Concluída');
     expect(screen).toContain('Histórico de entregas');
     expect(screen).toContain('Taxa de sucesso');
     expect(screen).toContain('Tempo médio');
-    expect(screen).toContain('Planejar próxima saída');
+    expect(screen).toContain('Gerencie a saída pela aba Operação.');
     expect(screen).toContain('Últimos 30 dias');
   });
 
@@ -57,22 +57,11 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
     expect(readModule).toContain("entregues: noPeriodo.filter((d) => d.delivery_status === 'delivered').length");
     expect(readModule).toContain('(this.logistica?.reportadas || []).filter((d) => this.logisticaDentroPeriodo(d)).length');
     expect(readModule).toContain('.filter((d) => this.logisticaDentroPeriodo(d) && this.logisticaBuscaMatch(d))');
-    expect(screen).toContain("logisticaTab = 'historico'; logisticaRotaSelecionadaId = null");
+    expect(screen).toContain("setLogisticaFiltro('entregues', true)");
   });
 
   it('mantem todas as acoes operacionais de entrega e rota', () => {
-    for (const action of [
-      'remarcarEntrega(d, $event.target.value)',
-      'pendurarNaRota(d)',
-      "logisticaStatus(d, 'dispatched')",
-      "logisticaStatus(d, 'delivered')",
-      'logisticaRecolocar(d)',
-      'logisticaConfirmarFalha(d)',
-      'enviarComprovante(logisticaRotaAtual(), $event)',
-      'fecharRota(logisticaRotaAtual())',
-      'abrirRota()',
-      'abrirResultadoRota(t)',
-    ]) expect(screen).toContain(action);
+    for (const action of ['logEntRemarcar()', 'logOpAdicionar(d)', "logisticaStatus(logOpDialogPedido(), 'delivered')", 'logOpRecolocar()', 'logOpConfirmarFalha()', 'logOpEnviarComprovante($event)', 'logOpFecharRota()', 'logOpAbrirRota()', 'abrirResultadoRota(t)']) expect(screen).toContain(action);
   });
 
   it('calcula o resumo do historico somente com dados reais do periodo', () => {

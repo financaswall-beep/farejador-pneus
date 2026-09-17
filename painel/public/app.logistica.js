@@ -18,6 +18,7 @@ window.PAINEL_MODULES.logistica = function () {
         }
         this.logOpAtualizado = new Date().toISOString(); this.logOpErro = false;
         this.logOpSincronizar?.();
+        if (this.logisticaTab === 'entregas') await this.logEntIniciar?.();
         void this.loadReceiptThumbs();
       } catch (err) {
         // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).

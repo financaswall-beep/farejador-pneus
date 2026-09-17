@@ -15,7 +15,7 @@ describe('correcoes confirmadas pela auditoria da Logistica', () => {
     expect(schema).toContain("courier_collaborator_id: z.string().uuid('courier_required')");
     expect(query).toContain('(environment,courier_name,courier_collaborator_id,km_start,created_by)');
     expect(query).toContain("mc.job='entregador'");
-    expect(ui).toContain('logisticaRotaAbertaId');
+    expect(ui).toContain('logOpEscolherRota(t.id)');
     expect(ui).toContain('logisticaCouriersDisponiveis()');
     expect(module).toContain("trips.find((trip) => trip.id === this.logisticaRotaAbertaId)");
   });

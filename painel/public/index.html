@@ -145,9 +145,10 @@
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
-<script src="/admin/painel/app.logistica.operacao.js?v=20260916-operacao1"></script>
-<script src="/admin/painel/app.logistica.js?v=20260916-operacao1"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260821-auditfix1"></script>
+<script src="/admin/painel/app.logistica.entregas.js?v=20260917-entregas1"></script>
+<script src="/admin/painel/app.logistica.operacao.js?v=20260917-entregas1"></script>
+<script src="/admin/painel/app.logistica.js?v=20260917-entregas1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260826-auditoria1"></script>
@@ -246,10 +247,11 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260916-logistica1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.js?v=20260916-vehicle-ui1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
+<link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-layout3" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
@@ -5006,24 +5008,23 @@
     </div>
     <div x-show="currentPage === 'logistica' && isMatrixPanel()" class="log-op-screen min-h-screen" x-cloak>
       <section aria-labelledby="logistica-heading" class="log-op-header">
-        <div><h1 id="logistica-heading">Logística</h1><p>Da separação à entrega, tudo sob controle.</p></div>
-        <div class="log-op-header-actions"><small x-text="logOpAtualizado ? 'Atualizado às ' + logOpHorario(logOpAtualizado) : 'Aguardando atualização'"></small><button class="log-op-icon-button" @click="logOpAtualizar()" :disabled="logOpAtualizando || logisticaSaving" aria-label="Atualizar logística"><i data-lucide="refresh-cw" :class="{ 'animate-spin': logOpAtualizando }"></i></button></div>
+        <div><h1 id="logistica-heading" x-text="logisticaTab === 'entregas' ? 'Entregas' : logisticaTab === 'historico' ? 'Histórico e resultados' : 'Logística'">Logística</h1><p x-text="logisticaTab === 'entregas' ? 'Encontre pedidos, acompanhe situações e ajuste agendamentos.' : logisticaTab === 'historico' ? 'Consulte entregas concluídas e resultados de rotas encerradas.' : 'Da separação à entrega, tudo sob controle.'"></p></div>
+        <div class="log-op-header-actions"><small x-text="(logisticaTab === 'entregas' ? logEntAtualizado : logOpAtualizado) ? 'Atualizado às ' + logOpHorario(logisticaTab === 'entregas' ? logEntAtualizado : logOpAtualizado) : 'Aguardando atualização'"></small><button class="log-op-icon-button" @click="logOpAtualizar()" :disabled="logOpAtualizando || logisticaSaving" aria-label="Atualizar logística"><i data-lucide="refresh-cw" :class="{ 'animate-spin': logOpAtualizando }"></i></button></div>
       </section>
       <div class="log-op-tabs">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
           <nav aria-label="Seções de Logística" class="flex items-center gap-1 overflow-x-auto">
             <template x-for="tab in [
-              { id: 'visao', label: 'Visão geral' },
+              { id: 'visao', label: 'Operação' },
               { id: 'entregas', label: 'Entregas' },
-              { id: 'rotas', label: 'Rotas' },
-              { id: 'historico', label: 'Histórico' }
+              { id: 'historico', label: 'Histórico e resultados' }
             ]" :key="tab.id">
               <button @click="setLogisticaTab(tab.id)" :aria-current="logisticaTab === tab.id ? 'page' : null"
                       :class="logisticaTab === tab.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-800'"
                       class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas'"
+          <div x-show="logisticaTab === 'visao'"
                class="mb-3 flex items-center xl:mb-0">
             <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
               <button @click="logOpPeriodo('hoje')"
@@ -5058,7 +5059,7 @@
         <div x-show="logisticaTab === 'visao'" class="log-op-kpis order-1" aria-label="Resumo das entregas no período">
           <button @click="setLogisticaFiltro('aguardando', true)" class="op-wait"><i data-lucide="package"></i><b x-text="logisticaResumoCards().aguardando"></b><span>Aguardando saída</span></button>
           <button @click="setLogisticaFiltro('rota', true)" class="op-road"><i data-lucide="truck"></i><b x-text="logisticaResumoCards().rota"></b><span>Em entrega</span></button>
-          <button @click="logisticaTab = 'historico'; logisticaRotaSelecionadaId = null; logisticaBusca = ''; $nextTick(() => window.lucide && window.lucide.createIcons())" class="op-done"><i data-lucide="circle-check"></i><b x-text="logisticaResumoCards().entregues"></b><span x-text="'Entregues · ' + logisticaPeriodoLabel()"></span></button>
+          <button @click="setLogisticaFiltro('entregues', true)" class="op-done"><i data-lucide="circle-check"></i><b x-text="logisticaResumoCards().entregues"></b><span x-text="'Entregues · ' + logisticaPeriodoLabel()"></span></button>
           <button @click="setLogisticaFiltro('problemas', true)" class="op-issue"><i data-lucide="triangle-alert"></i><b x-text="logisticaResumoCards().problemas"></b><span>Ocorrências</span></button>
         </div>
         <div x-show="logisticaTab === 'visao'" class="log-op-overview order-2">
@@ -5136,6 +5137,7 @@
             <h3 x-text="logisticaOrderLabel(logOpDialogPedido()) + ' · ' + (logOpDialogPedido().customer_name || 'Cliente')"></h3><p x-text="logOpDialogPedido().delivery_address || 'Endereço não informado'"></p><p x-text="logisticaItens(logOpDialogPedido())"></p><strong x-text="formatCurrency(Number(logOpDialogPedido().total_amount || 0))"></strong><p><span class="log-op-badge" :class="logOpDialogPedido().delivery_status" x-text="logisticaStatusLabel(logOpDialogPedido().delivery_status)"></span></p><p x-show="logOpDialogPedido().delivery_failure_reason" x-text="logOpDialogPedido().delivery_failure_reason"></p>
             <div class="log-op-actions"><a x-show="logOpDialogPedido().customer_phone" :href="waLink(logOpDialogPedido().customer_phone)" target="_blank" rel="noopener" class="log-op-button">WhatsApp</a><a x-show="logOpDialogPedido().delivery_address" :href="mapsNavUrl(logOpDialogPedido())" target="_blank" rel="noopener" class="log-op-button">Ver endereço</a></div>
             <div x-show="logOpDialogPedido().delivery_status === 'failed' && logOpDialogPedido().status !== 'cancelled'"><p class="log-op-note">Recoloque o pedido na fila para uma nova tentativa ou confirme a falha para cancelar o pedido e devolver os itens ao estoque.</p><div class="log-op-actions"><button class="log-op-button log-op-primary" @click="logOpRecolocar()" :disabled="logisticaSaving">Recolocar na fila</button><button class="log-op-button log-op-danger" @click="logOpConfirmarFalha()" :disabled="logisticaSaving">Confirmar falha...</button></div></div>
+            <button x-show="['pending','dispatched'].includes(logOpDialogPedido().delivery_status) && logOpDialogPedido().status !== 'cancelled'" class="log-op-button log-op-danger" @click="const d = logOpDialogPedido(); logOpFecharDialog(); logisticaFalhou(d)" :disabled="logisticaSaving">Marcar como não entregue...</button>
             <div x-show="logOpDialogPedido().delivery_status === 'dispatched'"><label class="log-op-field">Pagamento recebido<select x-model="logisticaPays[logOpDialog.id]"><option value="">Selecione</option><option>Pix</option><option>Dinheiro</option><option>Cartão</option></select></label><button class="log-op-button log-op-primary" @click="logisticaStatus(logOpDialogPedido(), 'delivered')" :disabled="logisticaSaving || !logisticaPays[logOpDialog.id]">Confirmar entrega</button></div>
           </div></template>
           <div x-show="logOpDialog.kind === 'adicionar'" class="log-op-dialog-body"><p x-text="logOpRotaLabel(logOpDialogRota()) + ' · ' + (logOpDialogRota()?.courier_name || 'Rota indisponível')"></p><p class="log-op-note">Pedidos sem rota de todos os períodos. Ao adicionar, o pedido passa para em entrega.</p><template x-for="d in logOpDialogRota() ? logOpDisponiveis() : []" :key="'op-add-' + d.order_id"><button class="log-op-button log-op-add-row" @click="logOpAdicionar(d)" :disabled="logisticaSaving"><span><strong x-text="logisticaOrderLabel(d) + ' · ' + (d.customer_name || 'Cliente')"></strong><small x-text="(d.delivery_address || 'Sem endereço') + ' · ' + (dataEntregaLabel(d) || 'Sem data')"></small></span><i data-lucide="circle-plus"></i></button></template><p x-show="!logOpDisponiveis().length || !logOpDialogRota()">Nenhum pedido disponível para esta rota.</p></div>
@@ -5288,108 +5290,60 @@
           </div>
         </details>
 
-        <!-- Cada aba tem uma responsabilidade visual própria. -->
-        <div x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><h2 class="text-xl font-semibold text-gray-950">Rotas da Matriz</h2><p class="mt-1 text-sm text-gray-500">Acompanhe a rota aberta e consulte o resultado das últimas saídas.</p></div>
-          <button x-show="logisticaCouriersDisponiveis().length && entregasSemRota().length" @click="$nextTick(() => $refs.novaRotaCard?.scrollIntoView({ behavior: 'smooth', block: 'center' }))" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"><i data-lucide="plus" class="h-4 w-4"></i>Nova rota</button>
-        </div>
-
-        <div x-show="logisticaTab === 'entregas'" class="order-2 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          <section x-show="logisticaTab === 'entregas'"
-                   class="lg:col-span-12 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div class="p-5 border-b border-gray-100">
-              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold text-gray-950">Fila de entregas</h2>
-                  <p class="text-sm text-gray-500 mt-1" x-text="logisticaEntregasView().length + ' pedido(s) no filtro de ' + logisticaPeriodoLabel().toLowerCase()"></p>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <select x-show="(logistica?.rotas_abertas || []).length > 1" x-model="logisticaRotaAbertaId" @change="selecionarLogisticaRotaAberta($event.target.value)" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs text-gray-700"><template x-for="t in (logistica?.rotas_abertas || [])" :key="'delivery-route-' + t.id"><option :value="t.id" x-text="'Pôr em ' + t.trip_number + ' · ' + (t.courier_name || 'Entregador')"></option></template></select>
-                  <button x-show="entregasSemRota().length && logisticaCouriersDisponiveis().length" @click="setLogisticaTab('rotas')"
-                          class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
-                    <i data-lucide="route" class="h-4 w-4"></i>Montar rota
-                  </button>
-                </div>
-              </div>
-              <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-                <label class="relative block flex-1">
-                  <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i>
-                  <input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido, cliente ou bairro"
-                         class="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50">
-                </label>
-                <div class="inline-flex overflow-x-auto rounded-lg border border-gray-200">
-                  <template x-for="f in [
-                    { id: 'todas', label: 'Todos' },
-                    { id: 'aguardando', label: 'Aguardando' },
-                    { id: 'rota', label: 'Em rota' },
-                    { id: 'problemas', label: 'Problemas' }
-                  ]" :key="f.id">
-                    <button @click="setLogisticaFiltro(f.id)"
-                            :class="logisticaFiltro === f.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
-                            class="whitespace-nowrap px-3 py-2.5 text-xs font-medium border-r border-gray-200 last:border-r-0 transition-colors" x-text="f.label"></button>
-                  </template>
-                </div>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-[1040px] text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide">
-                  <tr>
-                    <th class="px-5 py-3 font-medium">Pedido e cliente</th>
-                    <th class="px-4 py-3 font-medium">Destino</th>
-                    <th class="px-4 py-3 font-medium">Pagamento</th>
-                    <th class="px-4 py-3 font-medium">Previsão</th>
-                    <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-5 py-3 font-medium text-right">Ação</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <template x-for="d in logisticaEntregasView()" :key="d.order_id">
-                    <tr class="hover:bg-gray-50/70 transition-colors align-middle">
-                      <td class="px-5 py-4">
-                        <div class="flex items-center gap-3">
-                          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700"><i data-lucide="clipboard-list" class="h-4 w-4"></i></div>
-                          <div><div class="font-semibold text-gray-900 tabular-nums" x-text="logisticaOrderLabel(d)"></div><div class="text-xs text-gray-500 mt-0.5" x-text="d.customer_name || 'Cliente'"></div><div class="text-[11px] text-gray-400 mt-0.5 max-w-[210px] truncate" x-text="logisticaItens(d)"></div></div>
-                        </div>
-                      </td>
-                      <td class="px-4 py-4">
-                        <div class="flex items-start gap-2"><i data-lucide="map-pin" class="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400"></i><div><div class="max-w-[250px] truncate text-sm text-gray-800" x-text="d.delivery_address || 'Sem endereço'"></div><div class="mt-2 flex items-center gap-1.5"><a x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido.')" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-emerald-700 hover:bg-emerald-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></a><a x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-sky-700 hover:bg-sky-50" title="Waze"><i data-lucide="navigation" class="h-3.5 w-3.5"></i></a><a x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-gray-600 hover:bg-gray-50" title="Google Maps"><i data-lucide="map" class="h-3.5 w-3.5"></i></a></div></div></div>
-                      </td>
-                      <td class="px-4 py-4"><div class="text-sm text-gray-700" x-text="logisticaPagamentoLabel(d)"></div><div class="font-semibold text-gray-900 tabular-nums mt-1" x-text="formatCurrency(Number(d.total_amount || 0))"></div></td>
-                      <td class="px-4 py-4"><span class="inline-flex px-2 py-1 rounded-md text-[11px] font-medium" :class="dataEntregaClass(d)" x-text="dataEntregaLabel(d) || 'sem data'"></span><input x-show="d.delivery_status === 'pending'" type="date" :value="d.scheduled_date" @change="remarcarEntrega(d, $event.target.value)" :disabled="logisticaSaving" class="block mt-1.5 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-600 outline-none focus:border-emerald-600"></td>
-                      <td class="px-4 py-4"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span><div x-show="d.trip_id && rotaDoPedido(d)" class="text-[11px] text-gray-400 mt-1" x-text="rotaDoPedido(d) ? rotaDoPedido(d).trip_number : ''"></div><div x-show="d.delivery_failure_reason" class="text-[11px] text-rose-600 mt-1 max-w-[150px]" x-text="d.delivery_failure_reason"></div></td>
-                      <td class="px-5 py-4">
-                        <div class="flex flex-col items-end gap-1.5">
-                          <input x-show="d.delivery_status === 'pending' && !d.trip_id" x-model="logisticaCouriers[d.order_id]" placeholder="Entregador (opcional)" class="w-40 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] outline-none focus:border-emerald-600">
-                          <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                            <button x-show="d.delivery_status === 'pending' && !d.trip_id && logisticaRotaAtual()" @click="pendurarNaRota(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md border border-emerald-700 text-emerald-800 text-[11px] font-medium hover:bg-emerald-50 disabled:opacity-50">Pôr na rota</button>
-                            <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Saiu</button>
-                            <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]" class="border border-gray-200 rounded-md px-1.5 py-1.5 text-[11px] outline-none focus:border-emerald-600"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option></select>
-                            <button x-show="d.delivery_status === 'dispatched'" @click="logisticaStatus(d, 'delivered')" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Entregue</button>
-                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaRecolocar(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 text-[11px] font-medium hover:bg-gray-50 disabled:opacity-50">Recolocar</button>
-                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaConfirmarFalha(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium hover:bg-rose-100 disabled:opacity-50">Confirmar falha</button>
-                            <button x-show="d.delivery_status !== 'failed'" @click="logisticaFalhou(d)" :disabled="logisticaSaving" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50" title="Marcar como não entregue"><i data-lucide="circle-x" class="w-4 h-4"></i></button>
-                          </div>
-                        </div>
-                      </td>
+        <!-- Entregas: consulta e agendamento. Ações de saída ficam na Operação. -->
+        <section x-show="logisticaTab === 'entregas'" class="log-ent-screen order-2" aria-label="Consulta de entregas">
+          <div class="log-ent-filters">
+            <label class="log-ent-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar pedido, cliente ou bairro" placeholder="Buscar pedido, cliente ou bairro" maxlength="120" x-model="logEntFiltros.q" @input.debounce.300ms="logEntFiltrar()"></label>
+            <fieldset class="log-ent-dates"><legend>Agendamento</legend><label><span class="sr-only">Data inicial</span><input type="date" aria-label="Data inicial" x-model="logEntFiltros.from" @change="logEntFiltrar()"></label><span>—</span><label><span class="sr-only">Data final</span><input type="date" aria-label="Data final" x-model="logEntFiltros.to" @change="logEntFiltrar()"></label></fieldset>
+            <select aria-label="Filtrar por entregador" x-model="logEntFiltros.courier" @change="logEntFiltrar()"><option value="">Todos os entregadores</option><option value="unassigned">Sem entregador</option><template x-for="c in (logEntDados?.couriers || logEntResponsaveis)" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+            <button class="log-op-button" @click="logEntLimpar()">Limpar filtros</button>
+          </div>
+          <div class="log-ent-status-filters" aria-label="Filtrar por situação">
+            <template x-for="f in [{id:'all',label:'Todas'},{id:'pending',label:'Aguardando'},{id:'dispatched',label:'Em entrega'},{id:'delivered',label:'Entregues'},{id:'failed',label:'Não entregues'}]" :key="f.id">
+              <button @click="logEntSituacao(f.id)" :aria-pressed="logEntFiltros.status === f.id" :class="f.id + (logEntFiltros.status === f.id ? ' active' : '')"><span class="log-ent-dot" x-show="f.id !== 'all'"></span><span x-text="f.label"></span><b x-text="logEntDados?.counts?.[f.id] ?? '—'"></b></button>
+            </template>
+          </div>
+          <div x-show="logEntErro" class="log-ent-error" role="alert"><span x-text="logEntErro"></span><button class="log-op-link" @click="logEntCarregar()">Tentar novamente</button></div>
+          <div class="log-ent-grid" :class="{ 'without-detail': !logEntSelecionada() }" :aria-busy="logEntCarregando">
+            <section class="log-ent-list" aria-labelledby="log-ent-list-title">
+              <header><div><h2 id="log-ent-list-title">Pedidos no período</h2><p role="status" x-text="logEntCarregando ? 'Carregando entregas...' : (logEntDados?.total ?? 0) + ' entregas encontradas'"></p></div><select aria-label="Ordenar entregas" x-model="logEntFiltros.sort" @change="logEntFiltrar()"><option value="scheduled_asc">Agendamento ↑</option><option value="scheduled_desc">Agendamento ↓</option><option value="value_desc">Maior valor</option><option value="customer_asc">Cliente A–Z</option></select></header>
+              <div class="log-ent-table-wrap">
+                <table class="log-ent-table"><caption class="sr-only">Entregas por agendamento. Selecione um pedido para consultar os detalhes.</caption><thead><tr><th>Pedido / cliente</th><th>Destino</th><th>Agendamento</th><th>Situação</th><th>Valor</th></tr></thead><tbody>
+                  <template x-for="d in (logEntDados?.rows || [])" :key="d.order_id">
+                    <tr @click="logEntSelecionar(d)" :class="{ selected: logEntSelecionadaId === d.order_id }">
+                      <td><button class="log-ent-order" :id="'log-ent-row-' + d.order_id" @click.stop="logEntSelecionar(d)" :aria-pressed="logEntSelecionadaId === d.order_id" :aria-label="'Ver pedido ' + logisticaOrderLabel(d) + ' de ' + (d.customer_name || 'Cliente')"><span class="log-ent-avatar" x-text="logOpIniciais(d.customer_name || 'Cliente')"></span><span><strong x-text="logisticaOrderLabel(d)"></strong><small x-text="d.customer_name || 'Cliente não informado'"></small></span></button></td>
+                      <td><span class="log-ent-address" :title="d.delivery_address || ''" x-text="d.delivery_address || 'Endereço não informado'"></span></td>
+                      <td><span x-text="logEntData(d)"></span></td>
+                      <td><span class="log-ent-badge" :class="logEntStatus(d)"><span class="log-ent-dot"></span><span x-text="logEntStatusLabel(d)"></span></span></td>
+                      <td><strong x-text="formatCurrency(Number(d.total_amount || 0))"></strong></td>
                     </tr>
                   </template>
-                  <tr x-show="!logisticaEntregasView().length"><td colspan="6" class="px-5 py-14 text-center"><i data-lucide="package-check" class="w-9 h-9 text-gray-300 mx-auto mb-2"></i><p class="text-sm font-medium text-gray-600">Nenhuma entrega neste filtro</p><p class="text-xs text-gray-400 mt-1">Troque o período ou limpe a busca.</p></td></tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
+                </tbody></table>
+              </div>
+              <div x-show="!logEntDados?.rows?.length" class="log-ent-empty"><i :data-lucide="logEntCarregando ? 'loader-circle' : 'package-search'"></i><h3 x-text="logEntCarregando ? 'Buscando entregas' : logEntErro ? 'Consulta indisponível' : 'Nenhuma entrega encontrada'"></h3><p x-show="!logEntCarregando && !logEntErro">Ajuste o período, o entregador ou a busca.</p><button x-show="!logEntCarregando && !logEntErro" class="log-op-link" @click="logEntLimpar()">Limpar filtros</button></div>
+              <footer><span x-text="logEntDados?.total ? 'Exibindo ' + ((logEntPagina - 1) * 8 + 1) + '–' + Math.min(logEntPagina * 8, logEntDados.total) + ' de ' + logEntDados.total + ' entregas' : 'Nenhuma entrega para exibir'"></span><nav aria-label="Páginas de entregas"><button class="log-op-icon-button" aria-label="Página anterior" @click="logEntMudarPagina(-1)" :disabled="logEntCarregando || logEntPagina <= 1"><i data-lucide="chevron-left"></i></button><span x-text="'Página ' + logEntPagina + ' de ' + logEntPaginas()"></span><button class="log-op-icon-button" aria-label="Próxima página" @click="logEntMudarPagina(1)" :disabled="logEntCarregando || logEntPagina >= logEntPaginas()"><i data-lucide="chevron-right"></i></button></nav></footer>
+            </section>
+            <template x-if="logEntSelecionada()"><aside class="log-ent-detail" x-ref="logEntDetalhe" tabindex="-1" aria-labelledby="log-ent-detail-title" @keydown.escape.stop="logEntFechar()">
+              <div class="log-ent-detail-kicker"><span>ENTREGA SELECIONADA</span><button class="log-op-icon-button" aria-label="Fechar detalhes da entrega" @click="logEntFechar()"><i data-lucide="x"></i></button></div>
+              <h2 id="log-ent-detail-title" x-text="'Pedido ' + logisticaOrderLabel(logEntSelecionada())"></h2><div class="log-ent-detail-title"><p x-text="logEntSelecionada().customer_name || 'Cliente não informado'"></p><span class="log-ent-badge" :class="logEntStatus(logEntSelecionada())"><span class="log-ent-dot"></span><span x-text="logEntStatusLabel(logEntSelecionada())"></span></span></div>
+              <ol class="log-ent-progress" aria-label="Situação da entrega"><template x-for="step in [{id:'pending',label:'Aguardando',icon:'package'},{id:'dispatched',label:'Em entrega',icon:'truck'},{id:'delivered',label:logEntStatus(logEntSelecionada()) === 'failed' ? 'Não entregue' : 'Entregue',icon:logEntStatus(logEntSelecionada()) === 'failed' ? 'triangle-alert' : 'check'}]" :key="step.id"><li :class="step.id + ((logEntStatus(logEntSelecionada()) === step.id || (step.id === 'delivered' && logEntStatus(logEntSelecionada()) === 'failed')) ? ' current' : '') + (step.id === 'delivered' && logEntStatus(logEntSelecionada()) === 'failed' ? ' failed' : '')" :aria-current="logEntStatus(logEntSelecionada()) === step.id ? 'step' : null"><span><i :data-lucide="step.icon"></i></span><small x-text="step.label"></small></li></template></ol>
+              <p x-show="logEntSelecionada().delivery_failure_reason" class="log-ent-failure" x-text="logEntSelecionada().delivery_failure_reason"></p>
+              <section><h3>Destino</h3><p class="log-ent-destination"><i data-lucide="map-pin"></i><span x-text="logEntSelecionada().delivery_address || 'Endereço não informado'"></span></p><div class="log-ent-map-actions" x-show="logEntSelecionada().delivery_address"><a :href="mapsNavUrl(logEntSelecionada())" target="_blank" rel="noopener noreferrer" class="log-op-button">Maps <i data-lucide="arrow-up-right"></i></a><a :href="wazeNavUrl(logEntSelecionada())" target="_blank" rel="noopener noreferrer" class="log-op-button">Waze <i data-lucide="arrow-up-right"></i></a></div></section>
+              <section><h3>Itens do pedido</h3><template x-for="(it,index) in (logEntSelecionada().items || [])" :key="index"><div class="log-ent-item"><i data-lucide="circle-dot"></i><div><strong x-text="it.label"></strong><small x-text="it.quantity + ' unidade(s)' + (it.unit_price != null ? ' × ' + formatCurrency(Number(it.unit_price)) : '')"></small></div><strong x-show="it.total != null" x-text="formatCurrency(Number(it.total || 0))"></strong></div></template><p x-show="!logEntSelecionada().items?.length" class="log-op-note">Itens não informados.</p><div class="log-ent-total"><span>Total do pedido</span><strong x-text="formatCurrency(Number(logEntSelecionada().total_amount || 0))"></strong></div></section>
+              <section><h3>Agendamento</h3><form class="log-ent-reschedule" @submit.prevent="logEntRemarcar()"><input type="date" required aria-label="Nova data da entrega" x-model="logEntNovaData" :disabled="!logEntPodeRemarcar(logEntSelecionada()) || logisticaSaving || logEntCarregando || !!logEntErro"><button type="submit" class="log-op-button" :disabled="!logEntPodeRemarcar(logEntSelecionada()) || logisticaSaving || logEntCarregando || !!logEntErro || !logEntNovaData || logEntNovaData === logEntSelecionada().scheduled_date"><i data-lucide="calendar-days"></i><span x-text="logisticaSaving ? 'Salvando...' : 'Remarcar entrega'"></span></button></form><p x-show="!logEntPodeRemarcar(logEntSelecionada())" class="log-op-note">Esta entrega não pode ser remarcada.</p></section>
+              <section><h3>Rota e responsável</h3><div class="log-ent-item"><i data-lucide="user-round"></i><div><strong x-text="logEntSelecionada().trip_id ? logOpRotaLabel(logEntSelecionada()) : 'Ainda sem rota'"></strong><small x-text="logEntSelecionada().delivery_courier || 'Entregador não definido'"></small></div></div></section>
+              <div class="log-ent-detail-actions"><button x-show="logEntPodeRemarcar(logEntSelecionada()) || (logEntSelecionada().delivery_status === 'failed' && logEntSelecionada().status !== 'cancelled')" class="log-op-button log-op-primary" @click="logEntVerOperacao(logEntSelecionada())" :disabled="logEntCarregando || !!logEntErro">Ver na operação <i data-lucide="arrow-right"></i></button><a x-show="logEntSelecionada().customer_phone" :href="waLink(logEntSelecionada().customer_phone)" target="_blank" rel="noopener noreferrer" class="log-op-button"><i data-lucide="message-circle"></i>Falar com o cliente</a><p class="log-op-note">Gerencie a saída pela aba Operação.</p></div>
+            </aside></template>
+          </div>
+        </section>
 
-        </div>
-
-        <!-- Resultado de uma rota fechada: detalhe dentro da própria subaba Rotas. -->
-        <template x-if="logisticaTab === 'rotas' && logisticaRotaSelecionada()">
+        <!-- Resultado de uma rota fechada: detalhe em Histórico e resultados. -->
+        <template x-if="logisticaTab === 'historico' && logisticaRotaSelecionada()">
           <div class="order-2 space-y-5">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                 <button @click="voltarParaRotas()" class="inline-flex self-start items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                  <i data-lucide="arrow-left" class="w-4 h-4"></i>Voltar para rotas
+                  <i data-lucide="arrow-left" class="w-4 h-4"></i>Voltar para histórico
                 </button>
                 <div>
                   <div class="flex flex-wrap items-center gap-2">
@@ -5510,23 +5464,9 @@
         </template>
 
         <!-- Rotas recentes em cards: cada card abre o resultado completo já existente. -->
-        <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-2 space-y-4">
-          <label x-show="(logistica?.rotas_abertas || []).length > 1" class="block max-w-sm text-xs font-semibold text-gray-700">Rota em andamento
-            <select x-model="logisticaRotaAbertaId" @change="selecionarLogisticaRotaAberta($event.target.value)" class="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-normal text-gray-800">
-              <template x-for="t in (logistica?.rotas_abertas || [])" :key="'open-select-' + t.id"><option :value="t.id" x-text="t.trip_number + ' · ' + (t.courier_name || 'Entregador')"></option></template>
-            </select>
-          </label>
+        <section x-show="logisticaTab === 'historico' && !logisticaRotaSelecionada()" class="order-2 space-y-4">
+          <h2 class="text-xl font-semibold text-gray-950">Rotas encerradas</h2>
           <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <template x-if="logisticaRotaAtual()">
-              <article class="flex flex-col rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
-                <div class="flex items-start justify-between gap-3"><div><h3 class="text-lg font-semibold text-gray-950" x-text="logisticaRotaAtual().trip_number"></h3><p class="mt-1 text-sm text-gray-500"><span x-text="logisticaRotaAtual().courier_name || 'Entregador'"></span><span> · em andamento</span></p></div><span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Em andamento</span></div>
-                <div class="mt-5 grid grid-cols-3 gap-3"><div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Entregas</p><p class="mt-1 text-lg font-semibold tabular-nums" x-text="logisticaRotaProgresso(logisticaRotaAtual()).entregues + ' / ' + logisticaRotaProgresso(logisticaRotaAtual()).total"></p></div><div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">KM inicial</p><p class="mt-1 text-lg font-semibold tabular-nums" x-text="logisticaRotaAtual().km_start ?? '—'"></p></div><div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Comprovantes</p><p class="mt-1 text-sm font-semibold" x-text="(logisticaRotaAtual().receipts || []).length + ' arquivo(s)'"></p></div></div>
-                <div class="mt-4 h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-emerald-700" :style="'width:' + logisticaRotaProgresso(logisticaRotaAtual()).percentual + '%' "></div></div>
-                <div class="mt-4 flex items-center justify-between text-xs text-gray-500"><span x-text="logisticaRotaRestantes(logisticaRotaAtual()) + ' entrega(s) restante(s)'"></span><strong class="text-sm text-gray-900" x-text="formatCurrency(logisticaRotaTotal(logisticaRotaAtual()))"></strong></div>
-                <div class="mt-4 grid grid-cols-2 gap-2"><label class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"><i data-lucide="paperclip" class="h-4 w-4"></i><span x-text="uploadingReceipt ? 'Enviando...' : 'Comprovante'"></span><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="enviarComprovante(logisticaRotaAtual(), $event)" :disabled="uploadingReceipt"></label><button @click="$refs.rotaFechamento?.scrollIntoView({ behavior: 'smooth', block: 'center' })" class="rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800">Abrir rota</button></div>
-                <div x-ref="rotaFechamento" class="mt-4 border-t border-gray-100 pt-4"><p class="mb-2 text-xs font-semibold text-gray-700">Fechamento da rota</p><div class="grid grid-cols-2 gap-2"><input x-model="fecharForm.km_end" type="number" min="0" placeholder="KM final" class="rounded-lg border border-gray-200 px-3 py-2 text-xs"><input x-model="fecharForm.notes" type="text" placeholder="Observação" class="rounded-lg border border-gray-200 px-3 py-2 text-xs"></div><button @click="fecharRota(logisticaRotaAtual())" :disabled="logisticaSaving" class="mt-2.5 w-full rounded-lg bg-gray-900 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Fechar rota</button></div>
-              </article>
-            </template>
             <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
               <article class="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                 <div class="flex items-start justify-between gap-3">
@@ -5543,16 +5483,11 @@
                 <button @click="abrirResultadoRota(t)" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"><i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>Ver resultado</button>
               </article>
             </template>
-            <article x-ref="novaRotaCard" class="flex min-h-[260px] flex-col rounded-xl border border-dashed border-emerald-300 bg-emerald-50/30 p-5">
-              <div class="flex items-start justify-between gap-3"><div><div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><i data-lucide="route" class="h-5 w-5"></i></div><h3 class="mt-3 text-base font-semibold text-gray-900">Planejar próxima saída</h3><p class="mt-1 text-sm text-gray-500" x-text="entregasSemRota().length + ' pedido(s) aguardando rota'"></p></div></div>
-              <template x-if="logisticaCouriersDisponiveis().length && entregasSemRota().length"><div class="mt-4"><div class="grid grid-cols-2 gap-2"><select x-model="rotaForm.courier_collaborator_id" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"><option value="">Escolha o entregador</option><template x-for="courier in logisticaCouriersDisponiveis()" :key="courier.id"><option :value="courier.id" x-text="courier.display_name"></option></template></select><input x-model="rotaForm.km_start" type="number" min="0" placeholder="KM inicial" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs"></div><div class="mt-3 max-h-48 space-y-1.5 overflow-y-auto"><template x-for="d in entregasSemRota()" :key="'nova-' + d.order_id"><label class="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-white p-2.5"><input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="mt-0.5 rounded border-gray-300 text-emerald-700"><span class="min-w-0"><span class="block text-xs font-semibold text-gray-800" x-text="logisticaOrderLabel(d) + ' · ' + (d.customer_name || 'Cliente')"></span><span class="mt-0.5 block truncate text-[11px] text-gray-400" x-text="d.delivery_address || 'Sem endereço'"></span></span></label></template></div><button @click="abrirRota()" :disabled="logisticaSaving || !rotaForm.courier_collaborator_id || !Object.values(rotaForm.selecionadas).some(Boolean)" class="mt-3 w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50">Abrir nova rota</button></div></template>
-              <div x-show="!logisticaCouriersDisponiveis().length || !entregasSemRota().length" class="mt-auto rounded-lg bg-white p-4 text-center text-sm text-gray-500" x-text="!entregasSemRota().length ? 'Nenhum pedido está aguardando rota.' : 'Todos os entregadores ativos já possuem uma rota aberta.'"></div>
-            </article>
-          </div>
+         </div>
         </section>
 
         <!-- Histórico: indicadores do período e entregas finalizadas. -->
-        <section x-show="logisticaTab === 'historico'" class="order-1 space-y-4">
+        <section x-show="logisticaTab === 'historico' && !logisticaRotaSelecionada()" class="order-1 space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 class="text-xl font-semibold text-gray-950">Histórico de entregas</h2><p class="mt-1 text-sm text-gray-500">Concluídas, canceladas e não entregues</p></div><select x-model="logisticaPeriodo" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700"><option value="30dias">Últimos 30 dias</option><option value="7dias">Últimos 7 dias</option><option value="hoje">Hoje</option></select></div>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="circle-check" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Entregas concluídas</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().concluidas"></p></div></article>

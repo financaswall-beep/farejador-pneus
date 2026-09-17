@@ -4,6 +4,7 @@ window.PAINEL_MODULES.logisticaResultado = function () {
   return {
     logisticaDentroPeriodo(d) {
       const data = this.logisticaDataOperacional(d);
+      if (this.logisticaTab === 'visao' && this.logOpDiaFoco) return data === this.logOpDiaFoco;
       if (!data) return true;
       if (this.logisticaPeriodo === 'amanha') return data === this.amanhaISO();
       if (this.logisticaPeriodo === '7dias') {
@@ -19,6 +20,7 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       return data === this.hojeISO();
     },
     logisticaPeriodoLabel() {
+      if (this.logisticaTab === 'visao' && this.logOpDiaFoco) return this.logOpDiaFoco.split('-').reverse().join('/');
       if (this.logisticaPeriodo === 'amanha') return 'Amanhã';
       if (this.logisticaPeriodo === '7dias') {
         return this.logisticaTab === 'historico' ? 'Últimos 7 dias' : 'Próximos 7 dias';
@@ -34,12 +36,21 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       this.logisticaFiltro = filtro;
       if (abrirEntregas) {
         this.logisticaTab = 'entregas';
+        if (this.logEntFiltros) {
+          const from = this.logOpDiaFoco || (this.logisticaPeriodo === 'amanha' ? this.amanhaISO() : this.hojeISO());
+          this.logEntFiltros = { from, to: this.logisticaPeriodo === '7dias' && !this.logOpDiaFoco ? this.logisticaPeriodoFinalISO() : from,
+            q: '', courier: '', sort: 'scheduled_asc', status: { aguardando: 'pending', rota: 'dispatched', problemas: 'failed', entregues: 'delivered' }[filtro] || 'all' };
+          void this.logEntFiltrar();
+        }
         this.logisticaRotaSelecionadaId = null;
       }
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     setLogisticaTab(tab) {
+      tab = tab === 'rotas' ? 'historico' : tab;
       this.logisticaTab = tab;
+      this.logOpDiaFoco = '';
+      if (tab === 'entregas') void this.logEntIniciar?.();
       this.logisticaRotaSelecionadaId = null;
       if (tab === 'visao') {
         this.logisticaFiltro = 'todas';
@@ -89,7 +100,7 @@ window.PAINEL_MODULES.logisticaResultado = function () {
     },
     abrirResultadoRota(t) {
       if (!t?.id || t.status !== 'closed') return;
-      this.logisticaTab = 'rotas';
+      this.logisticaTab = 'historico';
       this.logisticaRotaSelecionadaId = t.id;
       this.$nextTick(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });

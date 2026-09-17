@@ -3,6 +3,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.logisticaOperacao = function () {
   return {
     logOpBusca: '',
+    logOpDiaFoco: '',
     logOpAtualizado: null,
     logOpErro: false,
     logOpAtualizando: false,
@@ -36,6 +37,7 @@ window.PAINEL_MODULES.logisticaOperacao = function () {
       }
     },
     logOpPeriodo(periodo) {
+      this.logOpDiaFoco = "";
       this.rotaForm.selecionadas = {};
       this.setLogisticaPeriodo(periodo);
     },
