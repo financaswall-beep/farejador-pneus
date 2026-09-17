@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { applyMigrationFile, startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 
 const migration = '0227_demand_location_from_stock_search.sql';
+const partialAddressMigration = '0236_demand_location_partial_address.sql';
 let db: IntegrationDb;
 let getBotVisao: typeof import('../../src/admin/painel/queries-bot-visao.js').getBotVisao;
 let serial = 982700;
@@ -46,6 +47,32 @@ async function lead(c: Conversation, msg: string, city?: string, bairro = 'Icara
       texto_informado:`Sou de ${bairro}`,tipo:'regiao_digitada',bairro,municipio:city,
     }) } },
     { id:randomUUID(),type:'function',function:{ name:'buscar_produto',arguments:JSON.stringify({ medida_pneu:'130/70-13' }) } },
+  ] }];
+  await db.pool.query(
+    `INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
+     VALUES ($1,$2,$3,'v2',$4,'delivered',$5::jsonb)`,
+    [c.environment,c.id,msg,randomUUID(),JSON.stringify(actions)],
+  );
+}
+
+async function partialAddress(c: Conversation, msg: string, street = 'Rua Dias da Cruz') {
+  const actions = [{ role:'assistant',tool_calls:[
+    { id:randomUUID(),type:'function',function:{ name:'registrar_localizacao_lead',arguments:JSON.stringify({
+      texto_informado:street,tipo:'endereco_digitado',rua:street,
+    }) } },
+  ] }];
+  await db.pool.query(
+    `INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
+     VALUES ($1,$2,$3,'v2',$4,'delivered',$5::jsonb)`,
+    [c.environment,c.id,msg,randomUUID(),JSON.stringify(actions)],
+  );
+}
+
+async function partialNumber(c: Conversation, msg: string, number = '170') {
+  const actions = [{ role:'assistant',tool_calls:[
+    { id:randomUUID(),type:'function',function:{ name:'registrar_localizacao_lead',arguments:JSON.stringify({
+      texto_informado:number,tipo:'endereco_digitado',numero:number,
+    }) } },
   ] }];
   await db.pool.query(
     `INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
@@ -100,6 +127,7 @@ describe('município já resolvido na busca do bot', () => {
     expect((await getBotVisao('today','test',db.pool)).sem_regiao).toBe(1);
 
     await applyMigrationFile(db.pool,migration);
+    await applyMigrationFile(db.pool,partialAddressMigration);
     expect(await location(c)).toEqual({ municipio:'Niterói',source:'stock_search_municipality',truth_type:'inferred' });
     const panel = await getBotVisao('today','test',db.pool);
     expect(panel.demanda_disponivel).toBe(true);
@@ -107,6 +135,7 @@ describe('município já resolvido na busca do bot', () => {
     expect(panel.mapa).toEqual([{ municipio:'Niterói',chamou:1,pediu:0,efetivou:0,faltou:0 }]);
     expect(panel.medidas_por_municipio).toEqual([{ municipio:'Niterói',medida:'130/70-13',consultas:1,galpao_qty:null }]);
     await applyMigrationFile(db.pool,migration);
+    await applyMigrationFile(db.pool,partialAddressMigration);
     expect(await history(c)).toEqual(before);
   });
 
@@ -119,6 +148,29 @@ describe('município já resolvido na busca do bot', () => {
     await search(c,next,'Rio de Janeiro');
     await lead(c,next,'Maricá','Centro');
     expect((await location(c)).municipio).toBe('Maricá');
+  });
+
+  it('mantém a cidade resolvida quando uma rua posterior apenas completa o endereço', async () => {
+    const c = await conversation(), regionMessage = await message(c);
+    await search(c,regionMessage,'Rio de Janeiro');
+    await lead(c,regionMessage,undefined,'Méier');
+    await partialAddress(c,await message(c));
+    await partialNumber(c,await message(c));
+    expect(await location(c)).toEqual({
+      municipio:'Rio de Janeiro',source:'stock_search_municipality',truth_type:'inferred',
+    });
+    const panel = await getBotVisao('today','test',db.pool);
+    expect(panel.mapa.find(row => row.municipio==='Rio de Janeiro')).toMatchObject({ chamou:1 });
+    expect(panel.sem_regiao).toBe(0);
+  });
+
+  it('não herda cidade antiga quando o cliente informa um bairro novo ainda desconhecido', async () => {
+    const c = await conversation(), known = await message(c);
+    await search(c,known,'Rio de Janeiro');
+    await lead(c,known,undefined,'Méier');
+    await lead(c,await message(c),undefined,'Bairro novo');
+    await partialAddress(c,await message(c),'Rua sem cidade confirmada');
+    expect((await location(c)).municipio).toBeNull();
   });
 
   it('não associa busca de outra mensagem ou conversa a uma região nova ainda desconhecida', async () => {
