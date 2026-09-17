@@ -250,7 +250,7 @@
 <script src="/admin/painel/app.js?v=20260916-vehicle-ui1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
-<link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260916-operacao1" />
+<link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-layout3" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
@@ -276,7 +276,7 @@
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
 
-<div class="flex h-screen overflow-hidden" :class="{ 'log-op-shell': currentPage === 'logistica' && isMatrixPanel() }" x-cloak>
+<div class="flex h-screen overflow-hidden" x-cloak>
 
   <!-- ═══════════════════════════════════════════════
        SIDEBAR
@@ -297,7 +297,7 @@
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-3 px-3" id="farejador-sidebar-nav">
       <template x-for="item in liveMenu">
-        <a href="#" :title="item.label" :aria-label="item.label"
+        <a href="#"
            @click.prevent="currentPage = item.id"
            :class="currentPage === item.id
              ? 'bg-emerald-500/30 text-white font-semibold ring-1 ring-inset ring-emerald-300/10'
@@ -378,7 +378,6 @@
                      : 'h-14 justify-end px-8 gap-2'"
            class="relative flex items-center" id="farejador-topbar-inner">
 
-      <div class="log-op-brand" x-show="currentPage === 'logistica' && isMatrixPanel()"><strong>farejador</strong><span x-text="panelWorkplace?.name || 'Matriz'"></span></div>
       <!-- Central de comando: padrão da matriz -->
       <div x-show="mockTopbar && isMatrixPanel()" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white" data-mobile-hide data-topbar-command>
         <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-900 text-emerald-300">
