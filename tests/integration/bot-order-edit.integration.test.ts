@@ -83,13 +83,112 @@ async function confirm(f:Fixture,quote:any) {
 }
 async function state(f:Fixture) {
   return {
-    order:(await db.pool.query('SELECT status,total_amount,delivery_address,payment_method FROM commerce.orders WHERE id=$1',[f.id])).rows[0],
+    order:(await db.pool.query(`SELECT status,total_amount,delivery_address,payment_method,fulfillment_mode,
+      geo_resolution_id,scheduled_delivery_date,unit_id FROM commerce.orders WHERE id=$1`,[f.id])).rows[0],
     items:(await db.pool.query('SELECT product_id,quantity,unit_price,matriz_unit_cost FROM commerce.order_items WHERE order_id=$1 ORDER BY product_id',[f.id])).rows,
     stock:(await db.pool.query(`SELECT measure,quantity_on_hand,quantity_reserved FROM commerce.wholesale_stock WHERE environment='test' ORDER BY measure`)).rows,
     ledger:(await db.pool.query(`SELECT source_type,amount FROM finance.matriz_ledger_transactions WHERE environment='test' AND source_id=$1 ORDER BY source_type`,[f.id])).rows,
   };
 }
 describe('edição de pedido com cotação e confirmação',()=>{
+  it('troca entrega por retirada só após confirmação, zera frete e mantém reserva própria inclusive da última unidade',async()=>{
+    const f=await fixture('delivery');
+    const location=(await db.pool.query(`INSERT INTO commerce.geo_resolutions(environment,neighborhood_name,neighborhood_canonical,city_name,state_code)
+      VALUES('test','Centro','centro-edit','Niterói','RJ') RETURNING id`)).rows[0].id;
+    await db.pool.query(`UPDATE commerce.orders SET scheduled_delivery_date='2026-09-21',geo_resolution_id=$2 WHERE id=$1`,[f.id,location]);
+    await db.pool.query(`UPDATE commerce.wholesale_stock SET quantity_on_hand=quantity_reserved WHERE environment='test'`);
+    const before=await state(f),quote=await edit(f,{nova_modalidade:'pickup'});
+    expect(quote).toMatchObject({previa:true,alterado:false,modalidade:'pickup',endereco_entrega:null,
+      total_anterior:'188.00',total:'178.00',valor_frete:'0.00',
+      retirada:{nome_loja:'Matriz',endereco:'Matriz, 1',maps_url:expect.stringContaining('-22.87,-42.99')}});
+    expect(await state(f)).toEqual(before);
+    expect((await edit(f,{confirmar_alteracao_id:quote.alteracao_id})).erro).toContain('aguarde');
+    expect(await confirm(f,quote)).toMatchObject({ok:true,modalidade:'pickup',total:'178.00',valor_frete:'0.00'});
+    const after=await state(f);
+    expect(after.order).toMatchObject({fulfillment_mode:'pickup',delivery_address:null,total_amount:'178.00',
+      geo_resolution_id:null,scheduled_delivery_date:null,unit_id:unit});
+    expect(after.items).toEqual(before.items);expect(after.stock).toEqual(before.stock);expect(after.ledger).toEqual([]);
+    expect(await edit(f,{confirmar_alteracao_id:quote.alteracao_id})).toMatchObject({ok:true,sem_alteracao:true});
+    expect(await state(f)).toEqual(after);
+    expect((await db.pool.query(`SELECT count(*)::int AS n FROM audit.events
+      WHERE entity_id=$1 AND event_type='bot_order_edit_applied'`,[f.id])).rows[0].n).toBe(1);
+    await cancel({environment:'test',order_id:f.id,actor_label:'test',reason:'teste'},db.pool);
+    expect((await state(f)).stock.every(s=>s.quantity_reserved===0)).toBe(true);
+  });
+  it('troca retirada por entrega com endereço preciso, frete calculado e a mesma unidade e reserva',async()=>{
+    const f=await fixture();
+    await db.pool.query(`UPDATE commerce.orders SET created_at=now()-interval '7 days' WHERE id=$1`,[f.id]);
+    const before=await state(f);
+    const quote=await edit(f,{nova_modalidade:'delivery',novo_endereco:'Rua Nova, 100, Centro, Niterói, RJ'});
+    expect(quote).toMatchObject({previa:true,modalidade:'delivery',valor_frete:'19.00',total:'197.00'});
+    expect(await state(f)).toEqual(before);
+    expect(await confirm(f,quote)).toMatchObject({ok:true,modalidade:'delivery',total:'197.00'});
+    const after=await state(f);
+    expect(after.order).toMatchObject({fulfillment_mode:'delivery',delivery_address:'Rua Nova, 100, Centro, Niterói, RJ',unit_id:unit});
+    expect((await db.pool.query(`SELECT scheduled_delivery_date=(clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date+1 AS current_default
+      FROM commerce.orders WHERE id=$1`,[f.id])).rows[0].current_default).toBe(true);
+    expect(after.items).toEqual(before.items);expect(after.stock).toEqual(before.stock);expect(after.ledger).toEqual([]);
+  });
+  it('permite ida e volta de modalidade sem ressuscitar endereço e agendamento da entrega anterior',async()=>{
+    const f=await fixture('delivery');
+    expect(await confirm(f,await edit(f,{nova_modalidade:'pickup'}))).toMatchObject({ok:true});
+    const before=await state(f);
+    expect((await edit(f,{nova_modalidade:'delivery'})).erro).toBeTruthy();
+    expect(await state(f)).toEqual(before);
+    expect(await confirm(f,await edit(f,{nova_modalidade:'delivery',novo_endereco:'Rua Atual, 42, Niterói, RJ'})))
+      .toMatchObject({ok:true,modalidade:'delivery',valor_frete:'19.00'});
+    expect((await state(f)).stock).toEqual(before.stock);
+  });
+  it.each(['missing_address','stale_address','no_number','unknown','outside','route_failed','delivery_paused','pickup_disabled'])
+  ('mantém pedido intacto quando a nova modalidade não é viável: %s',async kind=>{
+    const pickup=kind==='pickup_disabled',f=await fixture(pickup?'delivery':'pickup');
+    if(kind==='stale_address')await db.pool.query(`UPDATE commerce.orders SET delivery_address='Rua Antiga, 20, Niterói, RJ' WHERE id=$1`,[f.id]);
+    const before=await state(f);
+    if(kind==='unknown')geo.precise=false;
+    if(kind==='outside')geo.km=60;
+    if(kind==='route_failed')geo.road.mockResolvedValue(null);
+    if(kind==='delivery_paused'||pickup)await db.pool.query(`UPDATE commerce.matriz_delivery_settings
+      SET settings=jsonb_set(settings,$1::text[],'false') WHERE environment='test'`,[[pickup?'pickup_enabled':'delivery_enabled']]);
+    const args:Record<string,unknown>={nova_modalidade:pickup?'pickup':'delivery'};
+    if(!pickup&&!['missing_address','stale_address'].includes(kind))args.novo_endereco=kind==='no_number'?'Rua Nova, Centro, Niterói, RJ':'Rua Nova, 10, Niterói, RJ';
+    expect((await edit(f,args)).erro).toBeTruthy();expect(await state(f)).toEqual(before);
+  });
+  it.each(['freight','coverage','pickup_disabled'])('revalida modalidade na confirmação: %s',async kind=>{
+    const f=await fixture(kind==='pickup_disabled'?'delivery':'pickup');
+    const quote=await edit(f,kind==='pickup_disabled'?{nova_modalidade:'pickup'}:
+      {nova_modalidade:'delivery',novo_endereco:'Rua Nova, 10, Niterói, RJ'});
+    expect(quote.previa).toBe(true);
+    if(kind==='freight')geo.km=12;
+    if(kind==='coverage')geo.km=60;
+    if(kind==='pickup_disabled')await db.pool.query(`UPDATE commerce.matriz_delivery_settings
+      SET settings=jsonb_set(settings,'{pickup_enabled}','false') WHERE environment='test'`);
+    const before=await state(f);expect((await confirm(f,quote)).erro).toBeTruthy();expect(await state(f)).toEqual(before);
+  });
+  it.each(['paid','dispatched','arrived','service'])('bloqueia mudança se o atendimento avançar após a prévia: %s',async kind=>{
+    const f=await fixture('delivery'),quote=await edit(f,{nova_modalidade:'pickup'});
+    if(kind==='paid')await db.pool.query(`UPDATE commerce.orders SET status='paid' WHERE id=$1`,[f.id]);
+    if(kind==='dispatched')await db.pool.query(`UPDATE commerce.orders SET delivery_status='dispatched',dispatched_at=now() WHERE id=$1`,[f.id]);
+    if(kind==='arrived')await db.pool.query(`UPDATE commerce.orders SET pickup_arrived_at=now() WHERE id=$1`,[f.id]);
+    if(kind==='service')await db.pool.query(`UPDATE commerce.orders SET pickup_services='[{"code":"mounting","quantity":1}]'::jsonb WHERE id=$1`,[f.id]);
+    const before=await state(f);expect((await confirm(f,quote)).erro).toContain('humano');expect(await state(f)).toEqual(before);
+  });
+  it('rejeita modalidade inválida, endereço com retirada e combinação com remoção direta',async()=>{
+    const f=await fixture('delivery'),before=await state(f);
+    for(const args of [{nova_modalidade:'other'},{nova_modalidade:'pickup',novo_endereco:'Rua Nova, 2, Niterói, RJ'},
+      {nova_modalidade:'pickup',remover_itens:[car]}]) {
+      expect((await edit(f,args)).erro).toBeTruthy();expect(await state(f)).toEqual(before);
+    }
+  });
+  it('desfaz mudança de modalidade, frete e reservas se a auditoria final falhar',async()=>{
+    const f=await fixture('delivery'),quote=await edit(f,{nova_modalidade:'pickup',itens_finais:finalItems([moto,replacement])}),before=await state(f);
+    await message(f.conversation,'agent_bot');await message(f.conversation);
+    const c=await db.pool.connect(),wrapped={query:async(sql:string,args?:unknown[])=>{
+      if(sql.startsWith('INSERT INTO audit.events')&&sql.includes("'bot_order_edit_applied'"))throw Error('Falha na auditoria');return c.query(sql,args);
+    }} as PoolClient;
+    try{expect((await edit(f,{confirmar_alteracao_id:quote.alteracao_id},f.conversation,'test',wrapped)).erro).toContain('Falha na auditoria');}
+    finally{c.release();}
+    expect(await state(f)).toEqual(before);
+  });
   it('recota endereço pela estrada, sem alterar antes de confirmar e sem aceitar confirmação no mesmo turno',async()=>{
     const f=await fixture('delivery'),before=await state(f);
     const quote=await edit(f,{novo_endereco:'Praça Teste, 1, Centro, Itaboraí, RJ'});

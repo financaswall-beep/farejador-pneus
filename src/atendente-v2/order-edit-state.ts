@@ -7,6 +7,7 @@ export interface EditableOrder {
   fulfillment_mode:'pickup'|'delivery'; payment_method:string|null; delivery_address:string|null;
   partner_order_id:string|null; trip_id:string|null; delivery_status:string;
   pickup_arrived_at:Date|null; pickup_installation_started_at:Date|null; is_matrix:boolean; updated_at:Date;
+  dispatched_at:Date|null; delivered_at:Date|null; retrieved_at:Date|null; pickup_services:unknown[];
 }
 export interface EditableItem {
   id:string; product_id:string; product_name:string; product_type:string; quantity:number;
@@ -24,14 +25,15 @@ export async function loadEditableOrder(client:PoolClient,environment:Environmen
   const order=(await client.query<EditableOrder>(
     `SELECT o.id,o.order_number,o.total_amount,o.status,o.source,o.fulfillment_mode,o.payment_method,o.delivery_address,
        o.partner_order_id,o.trip_id,o.delivery_status,o.pickup_arrived_at,o.pickup_installation_started_at,o.updated_at,
+       o.dispatched_at,o.delivered_at,o.retrieved_at,o.pickup_services,
        EXISTS(SELECT 1 FROM core.units u WHERE u.environment=o.environment AND u.id=o.unit_id AND u.slug='main') is_matrix
      FROM commerce.orders o JOIN core.conversations c ON c.environment=o.environment AND c.id=$2 AND c.contact_id=o.contact_id
      WHERE o.environment=$1 AND o.order_number=$3 FOR UPDATE OF o`,[environment,conversationId,orderNumber])).rows[0];
   if(!order)throw Error('Pedido não encontrado para este contato.');
   if(order.status!=='open'||order.partner_order_id||!order.is_matrix||order.source!=='chatwoot_com_bot'
     ||!['pickup','delivery'].includes(order.fulfillment_mode)
-    ||order.trip_id||order.pickup_arrived_at||order.pickup_installation_started_at
-    ||(order.fulfillment_mode==='delivery'&&order.delivery_status!=='pending')) {
+    ||order.trip_id||order.pickup_arrived_at||order.pickup_installation_started_at||order.pickup_services.length
+    ||order.dispatched_at||order.delivered_at||order.retrieved_at||order.delivery_status!=='pending') {
     throw Error('Pedido pago, em atendimento, em rota ou de parceiro: alteração precisa de atendente humano.');
   }
   const financial=await client.query(`SELECT 1 FROM finance.matriz_ledger_transactions

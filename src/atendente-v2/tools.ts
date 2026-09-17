@@ -349,12 +349,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'editar_pedido',
-      description: 'Altera pedido aberto da Matriz antes de pagamento/atendimento. Consulte o pedido primeiro. Para incluir, trocar ou mudar quantidade, envie itens_finais com TODOS os pneus e suas quantidades finais. Endereço novo deve incluir rua, número e município: o sistema recota frete/cobertura. A primeira chamada devolve prévia sem alterar o pedido. Apresente o resultado e, só após nova confirmação do cliente, chame com order_number e confirmar_alteracao_id. Remover produtos inteiros explicitamente pedidos continua disponível via remover_itens, sem misturar outros campos. Pedido pago, em rota, atendimento ou de parceiro exige humano.',
+      description: 'Altera pedido aberto da Matriz antes de pagamento/atendimento. Consulte o pedido primeiro. Para incluir, trocar ou mudar quantidade, envie itens_finais com TODOS os pneus e suas quantidades finais. Para trocar entrega/retirada na mesma Matriz, use nova_modalidade; preserva a reserva própria, sem nova busca de loja ou estoque. Endereço novo deve incluir rua, número e município: o sistema recota frete/cobertura. A primeira chamada devolve prévia sem alterar o pedido. Apresente o resultado e, só após nova confirmação do cliente, chame com order_number e confirmar_alteracao_id. Remover produtos inteiros explicitamente pedidos continua disponível via remover_itens, sem misturar outros campos. Pedido pago, em rota, atendimento ou de parceiro exige humano.',
       parameters: {
         type: 'object',
         properties: {
           order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
           novo_endereco: { type: 'string', description: 'Novo endereço completo com rua, número, bairro, município e estado. Recalcula frete e cobertura da Matriz antes de confirmar.' },
+          nova_modalidade: { type: 'string', enum: ['pickup','delivery'], description: 'Troca entrega/retirada no mesmo pedido aberto da Matriz. Pickup zera frete; delivery exige novo_endereco completo e recota cobertura/frete. Gera prévia; só aplica após nova confirmação. Nunca troca a unidade responsável.' },
           nova_forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'], description: 'Nova forma de pagamento. Opcional.' },
           remover_itens: { type: 'array', items: { type: 'string', format: 'uuid' }, minItems: 1, maxItems: 30,
             description: 'product_ids retornados por consultar_pedido. Remove todas as unidades destes produtos, mantendo os demais. Não use para cancelar o pedido inteiro.' },

@@ -7,6 +7,20 @@ import { deliveryAddressHasNumber } from './previous-delivery-address.js';
 import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
 import { deliveryBlockResponse } from './matriz-delivery-settings.js';
 import { MATRIZ_MAX_DELIVERY_KM,matrizFreightForKm } from './matriz-freight.js';
+import { matrizStoreHoursText } from './matriz-store-hours.js';
+
+/** A reserva já pertence à Matriz. A retirada só depende de estar habilitada,
+ * não de haver outra unidade livre para reservar o mesmo pneu novamente. */
+export async function quoteOrderPickupChange(client:PoolClient,environment:Environment) {
+  const eligibility=await evaluateMatrizDelivery(client,environment,{
+    modalidade:'pickup',customerLocation:null,items:[],
+  });
+  if(eligibility.block)throw Error(deliveryBlockResponse(eligibility.block).mensagem);
+  const settings=eligibility.settings;
+  return {nome_loja:'Matriz',endereco:settings?.address??null,
+    maps_url:settings?`https://www.google.com/maps/search/?api=1&query=${settings.latitude},${settings.longitude}`:null,
+    horario:matrizStoreHoursText(settings?.store_hours)};
+}
 
 /** Reavalia a mesma Matriz que já reservou o pedido. Endereço novo nunca usa
  * pino antigo nem troca silenciosamente a loja responsável. */
