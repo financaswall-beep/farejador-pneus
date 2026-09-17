@@ -120,19 +120,13 @@ async function backfillRetailSales(
         AND o.status IN ('confirmed','paid','delivered','cancelled')
         AND (
           ((o.status<>'cancelled'
-              OR EXISTS (SELECT 1 FROM audit.events a
-                WHERE a.environment=o.environment AND a.entity_id=o.id
-                  AND a.event_type='matriz_galpao_decrement')
-              OR EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
-                WHERE t.environment=o.environment AND t.source_id=o.id::text
-                  AND t.source_type IN ('commerce.order.revenue','commerce.order.cogs'))
-              OR EXISTS (SELECT 1 FROM commerce.order_items i
-                WHERE i.environment=o.environment AND i.order_id=o.id
-                  AND i.matriz_unit_cost IS NOT NULL))
+              AND (o.fulfillment_mode<>'delivery' OR o.delivery_status='delivered'))
             AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
             WHERE t.environment=o.environment AND t.source_type='commerce.order.revenue'
               AND t.source_id=o.id::text))
-          OR (EXISTS (SELECT 1 FROM audit.events a
+          OR (o.status<>'cancelled'
+            AND (o.fulfillment_mode<>'delivery' OR o.delivery_status='delivered')
+            AND EXISTS (SELECT 1 FROM audit.events a
                 WHERE a.environment=o.environment AND a.entity_id=o.id
                   AND a.event_type='matriz_galpao_decrement')
             AND EXISTS (SELECT 1 FROM commerce.order_items i

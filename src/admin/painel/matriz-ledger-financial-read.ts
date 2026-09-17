@@ -34,8 +34,7 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
      ), retail AS (
        SELECT o.id,o.total_amount,o.created_at,o.updated_at,o.status,
               o.fulfillment_mode,o.closed_by,
-              CASE WHEN o.fulfillment_mode='delivery' THEN o.delivered_at
-                ELSE o.created_at END recognized_at,
+              realization.recognized_at,realization.cancelled_at,realization.was_realized,
               COALESCE(sum(i.quantity*i.unit_price-i.discount_amount),0) item_total,
               COALESCE(sum(i.quantity*i.unit_price-i.discount_amount)
                 FILTER (WHERE i.matriz_unit_cost IS NULL),0) pending_revenue,
@@ -43,9 +42,12 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
          FROM commerce.orders o
          JOIN core.units u ON u.environment=o.environment AND u.id=o.unit_id
           AND u.slug='main'
+         JOIN finance.v_matriz_retail_realization realization
+           ON realization.environment=o.environment AND realization.order_id=o.id
          JOIN commerce.order_items i
            ON i.environment=o.environment AND i.order_id=o.id
-        WHERE o.environment=$1 AND o.partner_order_id IS NULL GROUP BY o.id
+        WHERE o.environment=$1 AND o.partner_order_id IS NULL
+        GROUP BY o.id,realization.recognized_at,realization.cancelled_at,realization.was_realized
      )
      SELECT
        COALESCE((SELECT sum(CASE side WHEN 'credit' THEN amount ELSE -amount END)
@@ -92,12 +94,15 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
          FROM cash_month WHERE account_code='cash'
            AND source_type='network.commission_refund.payment'),0)
          cash_commission_refund,
-       COALESCE((SELECT sum(pending_revenue) FROM retail
-         WHERE status IN ('confirmed','paid','delivered')),0) pending_revenue,
-       COALESCE((SELECT sum(pending_items) FROM retail
-         WHERE status IN ('confirmed','paid','delivered')),0)::int pending_items,
-       (SELECT count(*)::int FROM retail
-         WHERE status IN ('confirmed','paid','delivered') AND pending_items>0) pending_orders,
+       COALESCE((SELECT sum(pending_revenue) FROM retail,bounds b
+         WHERE status<>'cancelled' AND was_realized
+           AND recognized_at>=b.month_ts AND recognized_at<b.month_end_ts),0) pending_revenue,
+       COALESCE((SELECT sum(pending_items) FROM retail,bounds b
+         WHERE status<>'cancelled' AND was_realized
+           AND recognized_at>=b.month_ts AND recognized_at<b.month_end_ts),0)::int pending_items,
+       (SELECT count(*)::int FROM retail,bounds b
+         WHERE status<>'cancelled' AND was_realized AND pending_items>0
+           AND recognized_at>=b.month_ts AND recognized_at<b.month_end_ts) pending_orders,
        COALESCE((SELECT sum(CASE
          WHEN account_class='asset' AND account_code LIKE '%receivable%'
            THEN CASE side WHEN 'debit' THEN amount ELSE -amount END ELSE 0 END)
@@ -143,11 +148,11 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
          FROM month_ledger WHERE account_class='revenue'
            AND source_type LIKE 'commerce.wholesale_order.%'),0) ledger_wholesale,
        COALESCE((SELECT sum(total_amount) FROM retail,bounds b
-         WHERE status IN ('confirmed','paid','delivered','cancelled')
+         WHERE was_realized
            AND recognized_at>=b.month_ts AND recognized_at<b.month_end_ts),0)
        -COALESCE((SELECT sum(total_amount) FROM retail,bounds b
-         WHERE status='cancelled' AND updated_at>=b.month_ts
-           AND updated_at<b.month_end_ts),0) source_retail,
+         WHERE status='cancelled' AND was_realized AND cancelled_at>=b.month_ts
+           AND cancelled_at<b.month_end_ts),0) source_retail,
        COALESCE((SELECT sum(CASE side WHEN 'credit' THEN amount ELSE -amount END)
          FROM month_ledger WHERE account_class='revenue'
            AND source_type LIKE 'commerce.order.%'),0) ledger_retail,

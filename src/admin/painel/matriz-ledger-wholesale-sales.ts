@@ -247,11 +247,24 @@ export async function postWholesaleSaleCancellation(
   if (!env.MATRIZ_CENTRAL_LEDGER) return;
   const revenueAmount = matrizLedgerAmount(sale.totalAmount, 'sale_ledger_amount_invalid');
   const revenueId = await ensureWholesaleSaleRevenue(client, sale);
-  if (revenueId && sale.paymentStatus === 'pending') {
+  const obligation = revenueId ? await client.query<{ transaction_kind: string; balance: string }>(
+    `SELECT transaction_kind,finance.matriz_ledger_obligation_balance($1::env_t,id)::text balance
+       FROM finance.matriz_ledger_transactions WHERE environment=$1 AND id=$2 FOR UPDATE`,
+    [sale.environment, revenueId],
+  ) : null;
+  const cancellation = await client.query(
+    `SELECT id FROM finance.matriz_ledger_transactions WHERE environment=$1
+      AND source_type='commerce.wholesale_order.revenue_cancel' AND source_id=$2`,
+    [sale.environment, sale.orderId],
+  );
+  const unpaid = obligation?.rows[0]?.transaction_kind === 'sale_receivable'
+    ? matrizLedgerAmount(obligation.rows[0].balance, 'sale_ledger_balance_invalid') : 0;
+  const refund = matrizLedgerAmount(revenueAmount - unpaid, 'sale_ledger_refund_invalid');
+  if (!cancellation.rows[0] && revenueId && unpaid === revenueAmount) {
     await reverseTransaction(client, sale, revenueId,
       'commerce.wholesale_order.revenue_cancel', cancelledAt, cancelledBy,
       'Cancelamento de venda nao recebida', reason);
-  } else if (revenueId && revenueAmount > 0) {
+  } else if (!cancellation.rows[0] && revenueId && revenueAmount > 0) {
     await postMatrizLedgerTransaction(client, {
       environment: sale.environment,
       sourceType: 'commerce.wholesale_order.revenue_cancel', sourceId: sale.orderId,
@@ -260,9 +273,13 @@ export async function postWholesaleSaleCancellation(
       createdBy: matrizLedgerActor(cancelledBy),
       lines: [
         { account_code: 'sales_returns', account_class: 'revenue', side: 'debit', amount: revenueAmount },
-        { account_code: 'customer_refund_payable', account_class: 'liability', side: 'credit', amount: revenueAmount },
+        ...(unpaid > 0 ? [{ account_code: 'accounts_receivable', account_class: 'asset' as const,
+          side: 'credit' as const, amount: unpaid }] : []),
+        ...(refund > 0 ? [{ account_code: 'customer_refund_payable', account_class: 'liability' as const,
+          side: 'credit' as const, amount: refund }] : []),
       ],
-      metadata: { order_id: sale.orderId, buyer_id: sale.buyerId, reason },
+      metadata: { order_id: sale.orderId, buyer_id: sale.buyerId, reason,
+        unpaid_amount: unpaid, refund_amount: refund },
     });
   }
 

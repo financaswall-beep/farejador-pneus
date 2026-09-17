@@ -292,6 +292,9 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
       [sale.order_id],
     );
     expect(before.rows).toHaveLength(0);
+    const { getMatrizStage3LedgerReconciliation } =
+      await import('../../src/admin/painel/matriz-ledger-stage3-report.js');
+    expect((await getMatrizStage3LedgerReconciliation('test', db.pool)).total_problems).toBe(0);
 
     await setDelivery({
       environment: 'test', order_id: sale.order_id,
@@ -321,5 +324,17 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
     expect(after.rows[0].revenue_kind).toBe('sale_cash');
     expect(after.rows[0].competence_on).toBe(after.rows[0].delivered_on);
     expect(after.rows[0].competence_on).not.toBe('2026-07-31');
+  });
+
+  it('cancelar entrega ainda pendente não exige receita nem custo de venda', async () => {
+    const f = await fixture(20);
+    const sale = await registerWalkin(input(f.productId, 'pix', 'delivery'), db.pool);
+    await cancelOrder({ environment: 'test', order_id: sale.order_id,
+      actor_label: 'test:cancel-before-delivery', reason: 'Desistiu antes da entrega' }, db.pool);
+    const result = await db.pool.query(`SELECT count(*)::int n FROM finance.matriz_ledger_transactions
+      WHERE environment='test' AND source_id=$1`, [sale.order_id]);
+    expect(result.rows[0].n).toBe(0);
+    const { getMatrizStage3LedgerReconciliation } = await import('../../src/admin/painel/matriz-ledger-stage3-report.js');
+    expect((await getMatrizStage3LedgerReconciliation('test', db.pool)).total_problems).toBe(0);
   });
 });

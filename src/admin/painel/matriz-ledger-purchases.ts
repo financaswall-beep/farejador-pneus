@@ -255,7 +255,26 @@ export async function postWholesalePurchaseCancellation(
   if (amount === 0) return null;
   const originalId = await ensureWholesalePurchaseAccrual(client, purchase);
   if (!originalId) return null;
-  if (purchase.paymentStatus === 'pending') {
+  const obligation = await client.query<{ transaction_kind: string; balance: string }>(
+    `SELECT transaction_kind,finance.matriz_ledger_obligation_balance($1::env_t,id)::text balance
+       FROM finance.matriz_ledger_transactions WHERE environment=$1 AND id=$2 FOR UPDATE`,
+    [purchase.environment, originalId],
+  );
+  const cancellation = await client.query<{ id: string; transaction_kind: string }>(
+    `SELECT id,transaction_kind FROM finance.matriz_ledger_transactions
+      WHERE environment=$1 AND source_type='commerce.wholesale_purchase.cancel' AND source_id=$2`,
+    [purchase.environment, purchase.purchaseId],
+  );
+  const prior = cancellation.rows[0];
+  if (prior && prior.transaction_kind !== 'reversal') return prior.id;
+  // Um estorno já existente zera obligation_balance; isso não significa pagamento.
+  // Preserva também o reparo de receipt_cancel/adjustment_cancel no backfill.
+  const unpaid = prior ? amount : obligation.rows[0]?.transaction_kind === 'purchase_payable'
+    ? matrizLedgerAmount(obligation.rows[0].balance, 'purchase_ledger_balance_invalid') : 0;
+  const refund = matrizLedgerAmount(amount - unpaid, 'purchase_ledger_refund_invalid');
+  // Pending também inclui pagamento parcial: estorno integral só é correto
+  // quando nada foi pago. O restante vira saldo a recuperar do fornecedor.
+  if (unpaid === amount) {
     // Se a compra nasceu em transito e depois foi recebida, ha duas operacoes
     // a desfazer: primeiro o recebimento (estoque -> transito), depois a
     // aquisicao (transito -> contas a pagar). Estornar apenas a aquisicao
@@ -328,14 +347,19 @@ export async function postWholesalePurchaseCancellation(
     description: 'Valor a recuperar por compra cancelada',
     createdBy: matrizLedgerActor(cancelledBy),
     lines: [
-      {
+      ...(unpaid > 0 ? [{
+        account_code: 'accounts_payable', account_class: 'liability' as const,
+        side: 'debit' as const, amount: unpaid,
+      }] : []),
+      ...(refund > 0 ? [{
         account_code: 'supplier_refund_receivable',
-        account_class: 'asset',
-        side: 'debit',
-        amount,
-      },
+        account_class: 'asset' as const,
+        side: 'debit' as const,
+        amount: refund,
+      }] : []),
       { account_code: assetAccount, account_class: 'asset', side: 'credit', amount },
     ],
-    metadata: { purchase_id: purchase.purchaseId, supplier_id: purchase.supplierId, reason },
+    metadata: { purchase_id: purchase.purchaseId, supplier_id: purchase.supplierId, reason,
+      unpaid_amount: unpaid, refund_amount: refund },
   });
 }

@@ -41,6 +41,7 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
   });
 
   it('alimenta os cards por ambiente sem contar pedido cancelado', async () => {
+    await applyMigrationFile(db.pool, '0238_bot_realized_sales_metrics.sql');
     const contacts = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment, chatwoot_contact_id, name)
        VALUES ('test', 977001, 'BOT DAILY TEST'),
@@ -141,11 +142,11 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
     );
     expect(view.rows[0]).toMatchObject({
       conversas_total: '4',
-      fecharam: '1',
+      fecharam: '2',
       escalaram: '1',
       abandonaram: '2',
-      faturamento: '350.00',
-      ticket_medio: '350.00',
+      faturamento: '425.00',
+      ticket_medio: '212.50',
       resposta_media_seg: '60',
       tokens_total: '1500',
       custo_bot_brl: '0.01',
@@ -155,11 +156,11 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
     const payload = await getBotVisao('today', 'test', db.pool);
     expect(payload.cards).toMatchObject({
       conversas: 4,
-      fecharam: 1,
+      fecharam: 2,
       escalaram: 1,
       abandonaram: 2,
-      faturamento: '350.00',
-      ticket_medio: '350.00',
+      faturamento: '425.00',
+      ticket_medio: '212.50',
       resposta_seg: 60,
       respondidas_bot_48h: 1,
     });

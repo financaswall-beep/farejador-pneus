@@ -91,6 +91,14 @@ export async function lockSettlementObligation(
         )
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
           WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
+        AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions cancelled
+          WHERE cancelled.environment=t.environment AND cancelled.source_id=t.source_id
+            AND ((t.source_type='commerce.order.revenue'
+              AND cancelled.source_type='commerce.order.revenue_cancel')
+              OR (t.source_type IN ('commerce.wholesale_order.revenue','commerce.wholesale_order.arrival_revenue')
+                AND cancelled.source_type='commerce.wholesale_order.revenue_cancel')
+              OR (t.source_type='commerce.wholesale_purchase.accrual'
+                AND cancelled.source_type='commerce.wholesale_purchase.cancel')))
       FOR UPDATE OF t`,
     [environment, obligationId],
   );

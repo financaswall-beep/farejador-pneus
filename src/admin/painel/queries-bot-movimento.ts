@@ -1,6 +1,6 @@
 // Movimento do Bot: recorte diário ou semanal, sempre no dia comercial de
-// São Paulo. Conversa usa started_at; pedido e faturamento usam created_at,
-// ambos nas tabelas canônicas. Nenhum total paralelo é persistido.
+// São Paulo. Conversa usa started_at; vendas e faturamento usam a realização,
+// com a mesma visão dos cards diários. Nenhum total paralelo é persistido.
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -94,13 +94,10 @@ export async function getBotMovement(
        ) conversations ON true
        LEFT JOIN LATERAL (
          SELECT count(*)::int AS total, COALESCE(sum(an_order.total_amount), 0)::numeric AS revenue
-           FROM commerce.orders an_order
+           FROM analytics.v_bot_realized_orders an_order
           WHERE an_order.environment = $1
-            AND an_order.source IN ('bot_promoted', 'chatwoot_com_bot')
-            AND an_order.source_conversation_id IS NOT NULL
-            AND an_order.status <> 'cancelled'
-            AND an_order.created_at >= (periods.from_date::timestamp AT TIME ZONE 'America/Sao_Paulo')
-            AND an_order.created_at < ((periods.to_date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND an_order.realized_at >= (periods.from_date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+            AND an_order.realized_at < ((periods.to_date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
        ) orders ON true`,
     [environment, from, to, previousFrom, previousTo],
   );

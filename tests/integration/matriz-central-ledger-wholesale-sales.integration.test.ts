@@ -175,6 +175,28 @@ describe('Etapa 3 — vendas de atacado no livro central', () => {
     expect(proof.rows.every((row) => row.id === row.reversal_of_transaction_id)).toBe(true);
   });
 
+  it('cancelar venda parcialmente recebida devolve só o recebido e elimina o saldo a receber', async () => {
+    const created = await sale({ paymentStatus: 'pending' });
+    const orderId = created.result.order_id;
+    const obligation = (await db.pool.query(`SELECT id FROM finance.matriz_ledger_transactions
+      WHERE environment='test' AND source_type='commerce.wholesale_order.revenue' AND source_id=$1`, [orderId])).rows[0].id;
+    const { settleMatrizLedgerOpenItem } = await import('../../src/admin/painel/matriz-ledger-settlement.js');
+    await settleMatrizLedgerOpenItem({ environment: 'test', obligation_id: obligation,
+      amount: 40, payment_method: 'pix', idempotency_key: randomUUID() }, db.pool);
+    await cancelSale({ environment: 'test', order_id: orderId, cancelled_by: 'test:partial-cancel',
+      reason: 'Cliente desistiu depois da entrada', idempotency_key: randomUUID() }, db.pool);
+    const row = (await db.pool.query(`SELECT
+      COALESCE(sum(e.amount) FILTER(WHERE e.account_code='customer_refund_payable'),0)::text refund,
+      COALESCE(sum(e.amount) FILTER(WHERE e.account_code='accounts_receivable'),0)::text unpaid
+      FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+      WHERE t.environment='test' AND t.source_type='commerce.wholesale_order.revenue_cancel' AND t.source_id=$1`, [orderId])).rows[0];
+    expect(Number(row.refund)).toBe(40);
+    expect(Number(row.unpaid)).toBe(60);
+    await expect(settleMatrizLedgerOpenItem({ environment: 'test', obligation_id: obligation,
+      amount: 1, payment_method: 'pix', idempotency_key: randomUUID() }, db.pool))
+      .rejects.toThrow('central_obligation_not_actionable');
+  });
+
   it('devolucao parcial recupera o custo da marca exata na mesma medida', async () => {
     sequence += 1;
     const measure = `${240 + sequence}/${35 + sequence}-${13 + sequence}`;

@@ -237,6 +237,35 @@ describe('Etapa 3 — compras formais no livro central', () => {
     expect(Number(proof.rows[0].balance)).toBe(0);
   });
 
+  it('cancelar compra parcialmente paga recupera só o valor pago e elimina o saldo a pagar', async () => {
+    const f = await fixture();
+    const purchase = await registerPurchase({ environment: 'test', supplier_id: f.supplierId,
+      items: [{ measure: f.measure, quantity: 2, unit_cost: 50 }],
+      purchased_at: '2026-07-06T15:00:00Z', payment_status: 'pending',
+      due_date: '2026-08-10', receipt_status: 'received',
+      created_by: 'test:partial-cancel', idempotency_key: randomUUID() }, db.pool);
+    const obligation = (await db.pool.query(`SELECT id FROM finance.matriz_ledger_transactions
+      WHERE environment='test' AND source_type='commerce.wholesale_purchase.accrual' AND source_id=$1`,
+      [purchase.purchase_id])).rows[0].id;
+    const { settleMatrizLedgerOpenItem } = await import('../../src/admin/painel/matriz-ledger-settlement.js');
+    await settleMatrizLedgerOpenItem({ environment: 'test', obligation_id: obligation,
+      amount: 40, payment_method: 'pix', idempotency_key: randomUUID() }, db.pool);
+    await cancelPurchase({ environment: 'test', purchase_id: purchase.purchase_id,
+      cancelled_by: 'test:partial-cancel', reason: 'Fornecedor recebeu devolução',
+      idempotency_key: randomUUID() }, db.pool);
+    const row = (await db.pool.query(`SELECT
+      COALESCE(sum(e.amount) FILTER(WHERE e.account_code='supplier_refund_receivable'),0)::text refund,
+      COALESCE(sum(e.amount) FILTER(WHERE e.account_code='accounts_payable'),0)::text unpaid
+      FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+      WHERE t.environment='test' AND t.source_type='commerce.wholesale_purchase.cancel' AND t.source_id=$1`,
+      [purchase.purchase_id])).rows[0];
+    expect(Number(row.refund)).toBe(40);
+    expect(Number(row.unpaid)).toBe(60);
+    await expect(settleMatrizLedgerOpenItem({ environment: 'test', obligation_id: obligation,
+      amount: 1, payment_method: 'pix', idempotency_key: randomUUID() }, db.pool))
+      .rejects.toThrow('central_obligation_not_actionable');
+  });
+
   it('cancela compra que nasceu em transito e zera estoque, transito e obrigacao', async () => {
     const f = await fixture();
     const purchase = await registerPurchase({

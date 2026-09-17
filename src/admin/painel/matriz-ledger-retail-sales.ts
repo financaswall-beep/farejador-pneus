@@ -38,8 +38,8 @@ async function getRetailSaleState(
             COALESCE(sum(i.quantity*i.matriz_unit_cost)
               FILTER (WHERE i.matriz_unit_cost IS NOT NULL),0)::numeric(14,2)::text cogs_amount,
             CASE WHEN o.fulfillment_mode='delivery'
-              THEN o.delivered_at ELSE o.created_at END occurred_at,
-            COALESCE(o.delivered_at,o.closed_at,o.created_at) cash_at,
+              THEN o.delivered_at ELSE COALESCE(o.retrieved_at,o.created_at) END occurred_at,
+            COALESCE(o.delivered_at,o.retrieved_at,o.closed_at,o.created_at) cash_at,
             o.payment_method,o.payment_due_on,o.fulfillment_mode,o.delivery_status,
             o.closed_by created_by,o.status,
             (o.payment_method IS NOT NULL
@@ -48,7 +48,7 @@ async function getRetailSaleState(
                 (o.fulfillment_mode='delivery' AND o.delivery_status='delivered')
                 OR
                 (o.fulfillment_mode<>'delivery'
-                  AND o.status IN ('confirmed','paid','delivered','cancelled'))
+                  AND o.status IN ('confirmed','paid','delivered'))
               )) cash_realized,
             EXISTS (
               SELECT 1 FROM audit.events a
@@ -63,7 +63,7 @@ async function getRetailSaleState(
          ON i.environment=o.environment AND i.order_id=o.id
       WHERE o.environment=$1 AND o.id=$2 AND o.partner_order_id IS NULL
       GROUP BY o.id,o.customer_id,o.contact_id,o.total_amount,o.created_at,
-               o.delivered_at,o.closed_at,o.payment_method,o.payment_due_on,o.fulfillment_mode,
+               o.delivered_at,o.retrieved_at,o.closed_at,o.payment_method,o.payment_due_on,o.fulfillment_mode,
                o.delivery_status,o.status,o.closed_by`,
     [environment, orderId],
   );
@@ -170,7 +170,10 @@ export async function postMatrizRetailPaymentIfRealized(
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   const sale = await getRetailSaleState(client, environment, orderId);
-  if (!sale || !sale.cashRealized) return null;
+  // Uma forma de pagamento escolhida na reserva não prova recebimento.
+  // Reprocessar um cancelamento nunca deve criar receita ou caixa retroativo.
+  if (!sale || !['confirmed', 'paid', 'delivered'].includes(sale.status)
+    || !sale.cashRealized) return null;
   if (!sale.occurredAt) throw new Error('retail_delivery_fact_date_missing');
   const amount = matrizLedgerAmount(sale.totalAmount, 'retail_ledger_amount_invalid');
   if (amount === 0) return null;

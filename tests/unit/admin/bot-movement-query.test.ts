@@ -45,8 +45,8 @@ describe('consulta do movimento do Bot', () => {
     expect(query.mock.calls[0]?.[1]).toEqual([
       'test', '2026-08-21', '2026-08-21', '2026-08-20', '2026-08-20',
     ]);
-    expect(String(query.mock.calls[0]?.[0])).toContain("an_order.source IN ('bot_promoted', 'chatwoot_com_bot')");
-    expect(String(query.mock.calls[0]?.[0])).toContain('an_order.created_at >=');
+    expect(String(query.mock.calls[0]?.[0])).toContain('analytics.v_bot_realized_orders');
+    expect(String(query.mock.calls[0]?.[0])).toContain('an_order.realized_at >=');
   });
 
   it('usa domingo a sábado e compara os mesmos dias da semana anterior', async () => {
