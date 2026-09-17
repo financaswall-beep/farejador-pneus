@@ -69,6 +69,11 @@ async function prepare(client:PoolClient,environment:Environment,state:State,inp
     const old=items.find(row=>row.product_id===i.product_id);
     const price=old?.unit_price??prices.get(i.product_id)?.price_amount;
     if(price==null||amountCents(price)<=0)throw Error('Pneu sem preço válido no catálogo; pedido mantido.');
+    const proposed={product_id:i.product_id,produto:products.find(p=>p.id===i.product_id)!.product_name,
+      quantidade:i.quantidade,preco_unitario:money(amountCents(price))};
+    // Modalidade, endereço ou pagamento não recalculam o custo de itens intactos.
+    // Pedidos sem snapshot continuam sem snapshot, sem inventar custo histórico.
+    if(old&&old.quantity===i.quantidade)return {...proposed,custo_unitario:old.matriz_unit_cost};
     const spec=specs.find(row=>row.product_id===i.product_id)!;
     const cost=matrizStockForMeasure(stocks,spec.tire_size,spec.brand,spec.tire_condition).unit_cost;
     if(cost==null||cost<=0)throw Error('Pneu sem custo registrado; encaminhe ao humano.');
@@ -76,8 +81,7 @@ async function prepare(client:PoolClient,environment:Environment,state:State,inp
     // Preserva custo das unidades já reservadas; novas unidades usam custo vigente.
     const newCost=old?i.quantidade<=old.quantity?Number(old.matriz_unit_cost)
       :(Number(old.matriz_unit_cost)*old.quantity+cost*(i.quantidade-old.quantity))/i.quantidade:cost;
-    return {product_id:i.product_id,produto:products.find(p=>p.id===i.product_id)!.product_name,
-      quantidade:i.quantidade,preco_unitario:money(amountCents(price)),custo_unitario:newCost.toFixed(6)};
+    return {...proposed,custo_unitario:newCost.toFixed(6)};
   }).sort((a,b)=>a.product_id.localeCompare(b.product_id));
   const subtotal=proposedItems.reduce((s,i)=>s+amountCents(i.preco_unitario)*i.quantidade,0);
   const proposal:Proposal={order_number:order.order_number,modalidade:mode,

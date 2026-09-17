@@ -91,6 +91,38 @@ async function state(f:Fixture) {
   };
 }
 describe('edição de pedido com cotação e confirmação',()=>{
+  it.each(['pickup','delivery'])('troca para %s sem custo congelado, preservando os itens e sem inventar custo',async mode=>{
+    const f=await fixture(mode==='pickup'?'delivery':'pickup');
+    await db.pool.query(`UPDATE commerce.order_items SET matriz_unit_cost=NULL WHERE order_id=$1`,[f.id]);
+    const before=await state(f);
+    const quote=await edit(f,{nova_modalidade:mode,
+      ...(mode==='delivery'?{novo_endereco:'Rua Atual, 100, Niterói, RJ',itens_finais:finalItems([car,moto])}:{})});
+    expect(quote).toMatchObject({previa:true,alterado:false,modalidade:mode});
+    expect(await state(f)).toEqual(before);
+    expect(await confirm(f,quote)).toMatchObject({ok:true,modalidade:mode,total:mode==='pickup'?'178.00':'197.00'});
+    const after=await state(f);
+    expect(after.items).toEqual(before.items);expect(after.stock).toEqual(before.stock);expect(after.ledger).toEqual([]);
+    expect(after.items.every(i=>i.matriz_unit_cost===null)).toBe(true);
+  });
+  it('mudar somente modalidade preserva o custo congelado mesmo que o custo atual do estoque mude',async()=>{
+    const f=await fixture('delivery'),before=await state(f);
+    await db.pool.query(`UPDATE commerce.wholesale_stock SET unit_cost=18 WHERE environment='test' AND measure='90/90-12' AND tire_condition='meia_vida'`);
+    try {
+      const quote=await edit(f,{nova_modalidade:'pickup'});
+      expect(quote).toMatchObject({previa:true,total:'178.00'});
+      expect(await confirm(f,quote)).toMatchObject({ok:true});
+      expect((await state(f)).items).toEqual(before.items);
+    } finally {
+      await db.pool.query(`UPDATE commerce.wholesale_stock SET unit_cost=12 WHERE environment='test' AND measure='90/90-12' AND tire_condition='meia_vida'`);
+    }
+  });
+  it('continua bloqueando aumento de quantidade se falta o custo congelado do item',async()=>{
+    const f=await fixture('delivery');
+    await db.pool.query(`UPDATE commerce.order_items SET matriz_unit_cost=NULL WHERE order_id=$1`,[f.id]);
+    const before=await state(f);
+    expect((await edit(f,{nova_modalidade:'pickup',itens_finais:finalItems([car,moto],2)})).erro).toContain('custo');
+    expect(await state(f)).toEqual(before);
+  });
   it('troca entrega por retirada só após confirmação, zera frete e mantém reserva própria inclusive da última unidade',async()=>{
     const f=await fixture('delivery');
     const location=(await db.pool.query(`INSERT INTO commerce.geo_resolutions(environment,neighborhood_name,neighborhood_canonical,city_name,state_code)
