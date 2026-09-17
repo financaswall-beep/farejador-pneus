@@ -39,6 +39,7 @@ export function buildApplicationImport(): ApplicationImportRow[] {
           : /YS150/.test(first.model) ? ['Fazer 150 YS 150']
             : /FLUO/.test(first.model) ? ['Fluo 125 ABS'] : ['NMAX 160'];
       const application: CatalogApplication = {
+        vehicle_type: 'motorcycle',
         application_id: idFor(`${key}:${first.year}:${last.year}`), make: first.make, model: first.model,
         aliases, position: first.position as 'front' | 'rear', tire_size: first.tire_size,
         display_measure: applicationMeasureKey(first.tire_size), index_spec: first.index_spec,
@@ -57,7 +58,7 @@ export function buildApplicationImport(): ApplicationImportRow[] {
   // Mantém a pesquisa anterior sem ampliar seus anos. Suprime só referências
   // cujo modelo/posição/período já está inteiramente coberto pelos manuais novos.
   for (const application of manufacturerApplicationSeed()) {
-    const seedApplication: CatalogApplication = { ...application,
+    const seedApplication: CatalogApplication = { ...application, vehicle_type: 'motorcycle',
       aliases: manuals.seed_aliases[application.application_id.split(':')[0] as keyof typeof manuals.seed_aliases] ?? [],
       year_optional: manuals.year_optional_seed_ids.includes(application.application_id.split(':')[0]!),
     };
@@ -113,11 +114,11 @@ export async function importVehicleApplications(client: PoolClient, environment:
   for (const { application: a, status, kind, reviewNote } of plan) {
     const result = await client.query(`INSERT INTO commerce.vehicle_measure_applications
       (environment,application_id,make,model,aliases,position,tire_size,display_measure,
-       year_start,year_end,status,application_kind,reference,review_note,import_batch)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15)
+       year_start,year_end,status,application_kind,reference,review_note,import_batch,vehicle_type)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16)
       ON CONFLICT (environment,application_id) DO NOTHING`,
     [environment,a.application_id,a.make,a.model,a.aliases??[],a.position,a.tire_size,a.display_measure,
-      a.year_start,a.year_end,status,kind,JSON.stringify(a),reviewNote,APPLICATION_BATCH]);
+      a.year_start,a.year_end,status,kind,JSON.stringify(a),reviewNote,APPLICATION_BATCH,a.vehicle_type ?? null]);
     inserted += result.rowCount ?? 0;
   }
   return {planned:plan.length, inserted, verified:plan.filter(r=>r.status==='verified').length,
