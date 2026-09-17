@@ -52,8 +52,8 @@ describe('getMatrizLogistica — resultado real por rota', () => {
     const telaAtiva = html.split('<!-- Legado preservado como referência inerte')[0]!;
     const actions = readFileSync(resolve('painel/public/app.logistica.acoes.js'), 'utf8');
 
-    expect(telaAtiva).toContain('Ver resultado');
-    expect(telaAtiva).toContain("logisticaTab === 'historico' && logisticaRotaSelecionada()");
+    expect(telaAtiva).toContain('Ver composição');
+    expect(telaAtiva).toContain("logisticaTab === 'historico' && logHistDetalhe && logisticaRotaSelecionada()");
     expect(telaAtiva).toContain('logOpEnviarComprovante($event)');
     expect(telaAtiva).toContain('Despesas da rota');
     expect(telaAtiva).not.toContain('x-model="fecharForm.fuel_spent"');

@@ -46,8 +46,9 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
       return receipt?.workflow_status === 'review_required';
     },
     receiptReviewQueue() {
-      const trips = [...(this.logistica?.rotas_abertas || []),
-        ...(this.logistica?.rotas_recentes || [])];
+      const unique = new Map([...(this.logistica?.rotas_abertas || []),
+        ...(this.logistica?.rotas_recentes || []), ...(this.logisticaTab === 'historico' ? this.logHistDados?.rows || [] : [])].map(t => [t.id, t]));
+      const trips = [...unique.values()].filter(t => this.logisticaTab !== 'historico' || !this.logHistRevisaoId || t.id === this.logHistRevisaoId);
       return trips.flatMap((trip) => (trip.receipts || [])
         .filter((receipt) => this.receiptNeedsReview(receipt))
         .map((receipt) => ({ trip, receipt })));

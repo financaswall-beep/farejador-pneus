@@ -19,6 +19,7 @@ window.PAINEL_MODULES.logistica = function () {
         this.logOpAtualizado = new Date().toISOString(); this.logOpErro = false;
         this.logOpSincronizar?.();
         if (this.logisticaTab === 'entregas') await this.logEntIniciar?.();
+        if (this.logisticaTab === 'historico') await this.logHistIniciar?.();
         void this.loadReceiptThumbs();
       } catch (err) {
         // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).
@@ -33,7 +34,7 @@ window.PAINEL_MODULES.logistica = function () {
     // Miniaturas dos comprovantes: o endpoint exige Bearer, e <img src> não manda
     // header (levaria 401 — achado da banca 07-03). Busca com o token e vira blob URL.
     async loadReceiptThumbs() {
-      const rotas = [...(this.logistica?.rotas_abertas || []), ...(this.logistica?.rotas_recentes || [])];
+      const rotas = [...(this.logistica?.rotas_abertas || []), ...(this.logistica?.rotas_recentes || []), ...(this.logHistDados?.rows || [])];
       const vivos = new Set();
       for (const t of rotas) for (const r of (t.receipts || [])) vivos.add(r.id);
       // revoga o que saiu de cena (rota antiga fora do top-10)

@@ -51,6 +51,8 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       this.logisticaTab = tab;
       this.logOpDiaFoco = '';
       if (tab === 'entregas') void this.logEntIniciar?.();
+      if (tab === 'historico') void this.logHistIniciar?.();
+      this.logHistDetalhe = false; this.logHistRevisaoId = null;
       this.logisticaRotaSelecionadaId = null;
       if (tab === 'visao') {
         this.logisticaFiltro = 'todas';
@@ -95,11 +97,12 @@ window.PAINEL_MODULES.logisticaResultado = function () {
     },
     logisticaRotaSelecionada() {
       if (!this.logisticaRotaSelecionadaId) return null;
-      return (this.logistica?.rotas_recentes || [])
+      return [...(this.logHistDados?.rows || []), ...(this.logistica?.rotas_recentes || [])]
         .find((t) => t.id === this.logisticaRotaSelecionadaId) || null;
     },
     abrirResultadoRota(t) {
       if (!t?.id || t.status !== 'closed') return;
+      if (this.logHistAbrirRota) return this.logHistAbrirRota(t);
       this.logisticaTab = 'historico';
       this.logisticaRotaSelecionadaId = t.id;
       this.$nextTick(() => {

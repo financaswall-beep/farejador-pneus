@@ -25,7 +25,7 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     const html = read('painel/public/index.html');
 
     expect(staticRoute).toContain("'app.logistica.comprovantes.js'");
-    expect(html).toMatch(/app\.logistica\.comprovantes\.js\?v=20260821-[a-z0-9-]+/);
+    expect(html).toMatch(/app\.logistica\.comprovantes\.js\?v=20260917-historico1/);
   });
 
   it('evita as tres armadilhas conhecidas do front da casa', () => {
@@ -49,7 +49,7 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     expect(html).toContain('Ampliar comprovante');
   });
 
-  it('mantem a revisao restrita a visao geral da logistica', () => {
+  it('restringe a revisão ao dono na operação ou na rota selecionada do histórico', () => {
     const html = read('painel/public/index.html');
     const reviewSection = html.slice(
       html.indexOf('<details x-ref="receiptReviewDetails"'),
@@ -59,7 +59,8 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     expect(reviewSection).toContain("logisticaTab === 'visao'");
     expect(reviewSection).not.toContain("logisticaTab === 'entregas'");
     expect(reviewSection).not.toContain("logisticaTab === 'rotas'");
-    expect(reviewSection).not.toContain("logisticaTab === 'historico'");
+    expect(reviewSection).toContain("logisticaTab === 'historico' && logHistRevisaoId");
+    expect(reviewSection).toContain("adminUser?.role === 'owner'");
   });
 
   it('reusa a mesma chave em retry e separa erro do admin e do entregador', () => {

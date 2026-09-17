@@ -18,9 +18,9 @@ describe('Redesign das três abas da Logistica da Matriz', () => {
   it('preserva a navegação e carrega a nova operação', () => {
     expect(html).toContain('/admin/painel/logistica-operacao.css');
     expect(html).toContain('/admin/painel/app.logistica.operacao.js');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260917-entregas1');
-    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260917-entregas1');
-    expect(html).toContain('/admin/painel/app.montagem.js?v=20260917-entregas1');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260917-historico1');
+    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260917-historico1');
+    expect(html).toContain('/admin/painel/app.montagem.js?v=20260917-historico1');
     expect(html).not.toContain('app.logistica.periodos.js');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
     expect(screen).toContain('aria-label="Seções de Logística"');
@@ -36,12 +36,12 @@ describe('Redesign das três abas da Logistica da Matriz', () => {
     expect(screen).toContain('Precisa de decisão');
     expect(screen).toContain('Pedidos no período');
     expect(screen).toContain('Rotas encerradas');
-    expect(screen).toContain('Concluída');
-    expect(screen).toContain('Histórico de entregas');
-    expect(screen).toContain('Taxa de sucesso');
-    expect(screen).toContain('Tempo médio');
+    expect(screen).toContain('Como o resultado foi formado');
+    expect(screen).toContain('Rotas do período');
+    expect(screen).toContain('Resultado conciliado');
+    expect(screen).toContain('Resultados parciais não entram no total conciliado.');
     expect(screen).toContain('Gerencie a saída pela aba Operação.');
-    expect(screen).toContain('Últimos 30 dias');
+    expect(screen).toContain('logHistFiltros.from');
   });
 
   it('ordena os indicadores pelo fluxo operacional e mantem os numeros no periodo', () => {
@@ -61,7 +61,7 @@ describe('Redesign das três abas da Logistica da Matriz', () => {
   });
 
   it('mantem todas as acoes operacionais de entrega e rota', () => {
-    for (const action of ['logEntRemarcar()', 'logOpAdicionar(d)', "logisticaStatus(logOpDialogPedido(), 'delivered')", 'logOpRecolocar()', 'logOpConfirmarFalha()', 'logOpEnviarComprovante($event)', 'logOpFecharRota()', 'logOpAbrirRota()', 'abrirResultadoRota(t)']) expect(screen).toContain(action);
+    for (const action of ['logEntRemarcar()', 'logOpAdicionar(d)', "logisticaStatus(logOpDialogPedido(), 'delivered')", 'logOpRecolocar()', 'logOpConfirmarFalha()', 'logOpEnviarComprovante($event)', 'logOpFecharRota()', 'logOpAbrirRota()', 'abrirResultadoRota(logOpUltimaRota())']) expect(screen).toContain(action);
   });
 
   it('calcula o resumo do historico somente com dados reais do periodo', () => {
@@ -73,7 +73,7 @@ describe('Redesign das três abas da Logistica da Matriz', () => {
     expect(resultModule).toContain("this.logisticaPeriodo === '30dias'");
   });
 
-  it('mantem a revisao detalhada recolhida e exclusiva da visao geral', () => {
+  it('mantem a revisão detalhada na operação ou na rota selecionada do histórico', () => {
     expect(screen).toContain('<details x-ref="receiptReviewDetails"');
     expect(screen).toContain("logisticaTab === 'visao'");
     expect(screen).toContain('$refs.receiptReviewDetails.open = true');

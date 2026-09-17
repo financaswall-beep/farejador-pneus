@@ -45,7 +45,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.bot.entrega.js', 'app.bot.entrega.mapa.js', 'app.bot.faltas.js',
     'app.nav.js', 'app.rede.kpis.js', 'app.rede.operacao.js', 'app.rede.canario.js', 'app.unidade.kpis.js', 'app.venda.modal.js', 'app.api.js', 'app.partner-api.js', 'app.partner-resumo.js', 'app.partner-retiradas.js', 'app.partner-estoque.js', 'app.partner-estoque.actions.js', 'app.partner-vendas.js', 'app.partner-vendas.dashboard.js', 'app.partner-compras.js', 'app.partner-compras.receipt.js', 'app.partner-logistica.js', 'app.partner-financeiro.js', 'app.partner-colaboradores.js', 'app.partner-colaboradores.finance.js', 'app.partner-colaboradores.permissions.js', 'app.partner-catalogo.js', 'app.municipios.js',
     'business-time.js', 'app.format.js', 'app.varejo.js', 'app.vendas.marcas.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.atacado.transfer.js', 'app.compras.js', 'app.compras.lotes.js', 'app.compras.relatorios.js', 'app.compras.precos.js', 'app.compras.reposicao.js', 'app.compras.reposicao.pdf.js', 'app.compras.historico.js', 'app.compras.acoes.js',
-    'app.logistica.entregas.js', 'app.logistica.operacao.js', 'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
+    'app.logistica.historico.js', 'app.logistica.entregas.js', 'app.logistica.operacao.js', 'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
     'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.payroll.js', 'app.colaboradores.gestao.js', 'app.colaboradores.finance.js', 'app.colaboradores.permissions.js', 'app.colaboradores.performance.js', 'app.sino.js', 'app.financeiro.js',
     'app.financeiro.baixas.js',
     'app.financeiro.visao.js', 'app.financeiro.visao.chart.js', 'app.financeiro.retiradas.js',
@@ -78,6 +78,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/estoque-custos.css', async (_request, reply) => sendStatic(reply, 'estoque-custos.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/estoque-lotes.css', async (_request, reply) => sendStatic(reply, 'estoque-lotes.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/resumo.css', async (_request, reply) => sendStatic(reply, 'resumo.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/logistica-historico.css', async (_request, reply) => sendStatic(reply, 'logistica-historico.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/logistica-entregas.css', async (_request, reply) => sendStatic(reply, 'logistica-entregas.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/logistica-operacao.css', async (_request, reply) => sendStatic(reply, 'logistica-operacao.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));

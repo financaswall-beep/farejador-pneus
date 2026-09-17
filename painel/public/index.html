@@ -145,11 +145,12 @@
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
+<script src="/admin/painel/app.logistica.historico.js?v=20260917-historico1"></script>
 <script src="/admin/painel/app.logistica.entregas.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.operacao.js?v=20260917-entregas1"></script>
-<script src="/admin/painel/app.logistica.js?v=20260917-entregas1"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260917-entregas1"></script>
-<script src="/admin/painel/app.logistica.comprovantes.js?v=20260821-auditfix1"></script>
+<script src="/admin/painel/app.logistica.js?v=20260917-historico1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20260917-historico1"></script>
+<script src="/admin/painel/app.logistica.comprovantes.js?v=20260917-historico1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260826-auditoria1"></script>
 <script src="/admin/painel/app.colaboradores.payroll.js?v=20260826-payroll2"></script>
@@ -247,10 +248,11 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260917-entregas1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260917-historico1"></script>
 <script src="/admin/painel/app.js?v=20260916-vehicle-ui1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
+<link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
 <link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-layout3" />
@@ -5008,8 +5010,8 @@
     </div>
     <div x-show="currentPage === 'logistica' && isMatrixPanel()" class="log-op-screen min-h-screen" x-cloak>
       <section aria-labelledby="logistica-heading" class="log-op-header">
-        <div><h1 id="logistica-heading" x-text="logisticaTab === 'entregas' ? 'Entregas' : logisticaTab === 'historico' ? 'Histórico e resultados' : 'Logística'">Logística</h1><p x-text="logisticaTab === 'entregas' ? 'Encontre pedidos, acompanhe situações e ajuste agendamentos.' : logisticaTab === 'historico' ? 'Consulte entregas concluídas e resultados de rotas encerradas.' : 'Da separação à entrega, tudo sob controle.'"></p></div>
-        <div class="log-op-header-actions"><small x-text="(logisticaTab === 'entregas' ? logEntAtualizado : logOpAtualizado) ? 'Atualizado às ' + logOpHorario(logisticaTab === 'entregas' ? logEntAtualizado : logOpAtualizado) : 'Aguardando atualização'"></small><button class="log-op-icon-button" @click="logOpAtualizar()" :disabled="logOpAtualizando || logisticaSaving" aria-label="Atualizar logística"><i data-lucide="refresh-cw" :class="{ 'animate-spin': logOpAtualizando }"></i></button></div>
+        <div><h1 id="logistica-heading" x-text="logisticaTab === 'entregas' ? 'Entregas' : logisticaTab === 'historico' ? 'Histórico e resultados' : 'Logística'">Logística</h1><p x-text="logisticaTab === 'entregas' ? 'Encontre pedidos, acompanhe situações e ajuste agendamentos.' : logisticaTab === 'historico' ? 'Consulte rotas encerradas e confira a composição dos resultados.' : 'Da separação à entrega, tudo sob controle.'"></p></div>
+        <div class="log-op-header-actions"><small x-text="(logisticaTab === 'entregas' ? logEntAtualizado : logisticaTab === 'historico' ? logHistAtualizado : logOpAtualizado) ? 'Atualizado às ' + logOpHorario(logisticaTab === 'entregas' ? logEntAtualizado : logisticaTab === 'historico' ? logHistAtualizado : logOpAtualizado) : 'Aguardando atualização'"></small><button class="log-op-icon-button" @click="logOpAtualizar()" :disabled="logOpAtualizando || logisticaSaving" aria-label="Atualizar logística"><i data-lucide="refresh-cw" :class="{ 'animate-spin': logOpAtualizando }"></i></button></div>
       </section>
       <div class="log-op-tabs">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
@@ -5042,7 +5044,7 @@
       </div>
 
       <div x-show="!logisticaLoaded" role="status" class="mb-4 p-4 text-sm text-gray-500">Carregando a operação...</div>
-      <div x-show="logOpErro" role="alert" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" x-text="logistica ? 'Não foi possível atualizar. Os dados anteriores foram mantidos. Tente atualizar novamente.' : 'Não foi possível carregar a operação. Tente atualizar novamente.'"></div>
+      <div x-show="logOpErro" role="alert" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" x-text="logistica ? 'Não foi possível atualizar. Os dados anteriores foram mantidos. Tente atualizar novamente.' : 'Não foi possível carregar a logística. Tente atualizar novamente.'"></div>
       <div x-show="logisticaMsg" role="status" class="mb-4 text-sm px-4 py-3 rounded-xl border flex items-center gap-2"
            :class="logisticaMsg && logisticaMsg.ok ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'">
         <i :data-lucide="logisticaMsg && logisticaMsg.ok ? 'circle-check' : 'circle-alert'" class="w-4 h-4 flex-shrink-0"></i>
@@ -5146,7 +5148,7 @@
         </dialog>
 
 
-        <details x-ref="receiptReviewDetails" x-show="adminUser?.role === 'owner' && logisticaTab === 'visao' && logistica?.receipt_approval && receiptReviewQueue().length"
+        <details x-ref="receiptReviewDetails" x-show="adminUser?.role === 'owner' && (logisticaTab === 'visao' || (logisticaTab === 'historico' && logHistRevisaoId)) && logistica?.receipt_approval && receiptReviewQueue().length"
                  aria-labelledby="receipt-review-heading"
                  class="order-3 mx-auto w-full max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <summary class="flex cursor-pointer list-none flex-col gap-4 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -5337,12 +5339,69 @@
           </div>
         </section>
 
+        <!-- Histórico e resultados: rotas encerradas e sua composição financeira. -->
+        <section x-show="logisticaTab === 'historico'" class="log-ent-screen log-hist-screen order-1" aria-label="Consulta de rotas encerradas">
+          <div class="log-hist-filters">
+            <label class="log-ent-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar rota ou entregador" placeholder="Buscar rota ou entregador" maxlength="120" x-model="logHistFiltros.q" @input.debounce.300ms="logHistFiltrar()"></label>
+            <fieldset class="log-ent-dates"><legend>Encerramento</legend><input type="date" aria-label="Encerramento desde" x-model="logHistFiltros.from" @change="logHistFiltrar()"><span>—</span><input type="date" aria-label="Encerramento até" x-model="logHistFiltros.to" @change="logHistFiltrar()"></fieldset>
+            <select aria-label="Entregador da rota" x-model="logHistFiltros.courier" @change="logHistFiltrar()"><option value="">Todos os entregadores</option><template x-for="c in logHistResponsaveis" :key="c.id"><option :value="c.id" x-text="c.name"></option></template></select>
+            <select aria-label="Conciliação da rota" x-model="logHistFiltros.financial" @change="logHistFiltrar()"><option value="all">Todas as conciliações</option><option value="reconciled">Conciliadas</option><option value="pending">Pendentes e divergentes</option><option value="divergent">Divergências</option></select>
+            <button class="log-op-icon-button" @click="logHistLimpar()" aria-label="Limpar filtros do histórico" title="Limpar filtros"><i data-lucide="filter-x"></i></button>
+          </div>
+          <div x-show="logHistErro" class="log-ent-error" role="alert"><span x-text="logHistErro"></span><button class="log-op-link" @click="logHistCarregar()">Tentar novamente</button></div>
+          <div class="log-hist-kpis" aria-label="Resultados do período" :aria-busy="logHistCarregando">
+            <article><strong x-text="logHistDados?.summary?.closed ?? '—'"></strong><span>Rotas encerradas</span></article>
+            <article><strong x-text="logHistDados?.summary?.reconciled ?? '—'"></strong><span>Conciliadas</span></article>
+            <article class="pending"><strong x-text="logHistDados?.summary?.pending ?? '—'"></strong><span>Pendentes</span></article>
+            <article :class="{ negative: Number(logHistDados?.summary?.result) < 0 }"><strong x-text="logHistDados ? formatCurrency(Number(logHistDados.summary.result)) : '—'"></strong><span>Resultado conciliado</span></article>
+          </div>
+          <div class="log-hist-grid" :class="{ 'without-detail': !logisticaRotaSelecionada() }" :aria-busy="logHistCarregando">
+            <section class="log-ent-list log-hist-list" aria-labelledby="log-hist-list-title">
+              <header><div><h2 id="log-hist-list-title">Rotas do período</h2><p x-text="logHistCarregando ? 'Carregando rotas...' : 'Selecione uma rota para conferir os detalhes.'"></p></div></header>
+              <div class="log-ent-table-wrap"><table class="log-ent-table log-hist-table"><caption class="sr-only">Rotas encerradas ordenadas pela data de encerramento, da mais recente para a mais antiga.</caption><thead><tr><th>Rota / entregador</th><th>Encerramento</th><th>Entregas</th><th>Conciliação</th><th>Resultado</th></tr></thead><tbody>
+                <template x-for="t in (logHistDados?.rows || [])" :key="t.id"><tr @click="logHistSelecionar(t)" :class="{ selected: logisticaRotaSelecionadaId === t.id }">
+                  <td><button class="log-ent-order" :id="'log-hist-row-' + t.id" @click.stop="logHistSelecionar(t)" :aria-pressed="logisticaRotaSelecionadaId === t.id" :aria-label="'Ver ' + logOpRotaLabel(t) + ' de ' + t.courier_name"><i data-lucide="package"></i><span><strong x-text="logOpRotaLabel(t)"></strong><small x-text="t.courier_name || 'Entregador não informado'"></small></span></button></td>
+                  <td x-text="logHistData(t)"></td><td x-text="Number(t.resumo?.entregues || 0) + ' de ' + Number(t.deliveries_count || 0)"></td>
+                  <td><span class="log-hist-badge" :class="logHistStatus(t)"><span class="log-ent-dot"></span><span x-text="logHistStatusLabel(t)"></span></span></td>
+                  <td><strong :class="{ negative: Number(rotaResultado(t)?.resultado) < 0, positive: logHistStatus(t) === 'reconciled' && Number(rotaResultado(t)?.resultado) >= 0 }" x-text="rotaResultado(t) ? formatCurrency(rotaResultado(t).resultado) : 'Sem resultado'"></strong><small x-show="logHistStatus(t) !== 'reconciled'" class="log-hist-partial">parcial</small></td>
+                </tr></template>
+              </tbody></table></div>
+              <div x-show="!logHistDados?.rows?.length" class="log-ent-empty"><i data-lucide="route"></i><h3 x-text="logHistCarregando ? 'Buscando rotas' : logHistErro ? 'Consulta indisponível' : 'Nenhuma rota encerrada neste período'"></h3><p x-show="!logHistCarregando && !logHistErro">Ajuste as datas ou limpe os filtros.</p></div>
+              <footer><span x-text="(logHistDados?.summary?.closed ?? 0) + ' rotas encontradas'"></span><nav aria-label="Páginas do histórico"><button class="log-op-icon-button" aria-label="Página anterior de rotas" @click="logHistMudarPagina(-1)" :disabled="logHistCarregando || logHistPagina <= 1"><i data-lucide="chevron-left"></i></button><span x-text="'Página ' + logHistPagina + ' de ' + logHistPaginas()"></span><button class="log-op-icon-button" aria-label="Próxima página de rotas" @click="logHistMudarPagina(1)" :disabled="logHistCarregando || logHistPagina >= logHistPaginas()"><i data-lucide="chevron-right"></i></button></nav></footer>
+              <p class="log-hist-footnote"><i data-lucide="info"></i>Resultados parciais não entram no total conciliado.</p>
+            </section>
+            <template x-if="logisticaRotaSelecionada()"><aside class="log-ent-detail log-hist-detail" x-ref="logHistPainel" tabindex="-1" aria-labelledby="log-hist-detail-title" @keydown.escape.stop="logHistFechar()">
+              <div class="log-ent-detail-kicker"><span>ROTA SELECIONADA</span><button class="log-op-icon-button" aria-label="Fechar detalhes da rota" @click="logHistFechar()"><i data-lucide="x"></i></button></div>
+              <h2 id="log-hist-detail-title" x-text="logOpRotaLabel(logisticaRotaSelecionada())"></h2><p class="log-hist-courier" x-text="(logisticaRotaSelecionada().courier_name || 'Entregador') + ' · Encerrada em ' + logHistData(logisticaRotaSelecionada())"></p>
+              <div class="log-hist-route-stats"><span><i data-lucide="package"></i><span x-text="Number(logisticaRotaSelecionada().resumo?.entregues || 0) + ' de ' + Number(logisticaRotaSelecionada().deliveries_count || 0) + ' entregues'"></span></span><span><i data-lucide="map-pin"></i><span x-text="rotaKm(logisticaRotaSelecionada()) == null ? 'KM não informado' : rotaKm(logisticaRotaSelecionada()) + ' km percorridos'"></span></span></div>
+              <div class="log-hist-result"><div><span x-text="rotaResultado(logisticaRotaSelecionada())?.completo ? 'Resultado conciliado' : 'Resultado parcial'"></span><strong :class="{ negative: Number(rotaResultado(logisticaRotaSelecionada())?.resultado) < 0 }" x-text="rotaResultado(logisticaRotaSelecionada()) ? formatCurrency(rotaResultado(logisticaRotaSelecionada()).resultado) : 'Sem resultado'"></strong></div><span class="log-hist-badge" :class="logHistStatus(logisticaRotaSelecionada())" x-text="logHistStatus(logisticaRotaSelecionada()) === 'reconciled' ? 'Conciliada' : logHistStatus(logisticaRotaSelecionada()) === 'divergent' ? 'Divergência financeira' : 'Conciliação pendente'"></span></div>
+              <section class="log-hist-composition"><h3>Como o resultado foi formado</h3>
+                <div><span>Vendas entregues</span><span class="log-hist-bar"><i :style="'width:' + rotaBarraPercentual(rotaResultado(logisticaRotaSelecionada())?.faturamento, rotaResultado(logisticaRotaSelecionada())?.faturamento) + '%'"></i></span><strong x-text="formatCurrency(rotaResultado(logisticaRotaSelecionada())?.faturamento || 0)"></strong></div>
+                <div><span>Custo dos pneus</span><span class="log-hist-bar cost"><i :style="'width:' + rotaBarraPercentual(rotaResultado(logisticaRotaSelecionada())?.custoPneus, rotaResultado(logisticaRotaSelecionada())?.faturamento) + '%'"></i></span><strong x-text="'− ' + formatCurrency(rotaResultado(logisticaRotaSelecionada())?.custoPneus || 0)"></strong></div>
+                <div><span>Despesas aprovadas</span><span class="log-hist-bar cost"><i :style="'width:' + rotaBarraPercentual(rotaResultado(logisticaRotaSelecionada())?.despesas, rotaResultado(logisticaRotaSelecionada())?.faturamento) + '%'"></i></span><strong x-text="'− ' + formatCurrency(rotaResultado(logisticaRotaSelecionada())?.despesas || 0)"></strong></div>
+                <div x-show="logHistMargemNaoApurada() > 0" class="log-hist-unpriced"><span>Vendas com margem não apurada</span><strong x-text="'− ' + formatCurrency(logHistMargemNaoApurada())"></strong></div>
+                <div class="log-hist-composition-total"><span x-text="rotaResultado(logisticaRotaSelecionada())?.completo ? 'Resultado conciliado' : 'Resultado parcial'"></span><strong :class="{ negative: Number(rotaResultado(logisticaRotaSelecionada())?.resultado) < 0 }" x-text="formatCurrency(rotaResultado(logisticaRotaSelecionada())?.resultado || 0)"></strong></div>
+              </section>
+              <p x-show="rotaResultado(logisticaRotaSelecionada())?.semCusto" class="log-hist-attention" x-text="rotaResultado(logisticaRotaSelecionada()).semCusto + ' item(ns) sem custo congelado. O resultado parcial considera apenas margens com custo conhecido.'"></p>
+              <p x-show="rotaResultado(logisticaRotaSelecionada())?.fuelPending" class="log-hist-attention">Gasolina anotada sem comprovante aprovado. O resultado continua parcial.</p>
+              <p x-show="logHistStatus(logisticaRotaSelecionada()) === 'divergent'" class="log-hist-attention">Há divergência entre a gasolina anotada e o valor aprovado. Confira os valores em Ver despesas.</p>
+              <div x-show="rotaResultado(logisticaRotaSelecionada())?.comprovantesPendentes.length" class="log-hist-receipt-alert"><i data-lucide="file-text"></i><div><strong x-text="(rotaResultado(logisticaRotaSelecionada())?.comprovantesPendentes.length || 0) + ' comprovante(s) para conferir'"></strong><p>Valores pendentes não incluídos nas despesas aprovadas.</p></div><button class="log-op-button" @click="logHistRevisar()" :disabled="logHistCarregando || !!logHistErro" x-text="adminUser?.role === 'owner' ? 'Revisar comprovante' : 'Ver comprovantes'"></button></div>
+              <div class="log-hist-detail-actions"><button class="log-op-button" @click="logHistVerEntregas()" :disabled="logHistCarregando || !!logHistErro"><i data-lucide="list"></i>Ver entregas da rota</button><button class="log-op-button" @click="logHistVerDespesas()"><i data-lucide="receipt-text"></i>Ver despesas</button></div>
+            </aside></template>
+          </div>
+          <dialog x-ref="logHistEntregasDialog" class="log-op-dialog log-hist-deliveries-dialog" aria-labelledby="log-hist-deliveries-title" @close="logHistEntregasId = null">
+            <div class="log-op-between"><h2 id="log-hist-deliveries-title">Entregas da rota</h2><button class="log-op-icon-button" aria-label="Fechar entregas da rota" @click="$refs.logHistEntregasDialog.close()"><i data-lucide="x"></i></button></div>
+            <p role="status" x-show="logHistEntregasCarregando">Carregando entregas...</p><p role="alert" x-show="logHistEntregasErro" x-text="logHistEntregasErro"></p><button x-show="logHistEntregasErro" class="log-op-link" @click="logHistVerEntregas()">Tentar novamente</button>
+            <div class="log-ent-table-wrap"><table class="log-ent-table"><thead><tr><th>Pedido / cliente</th><th>Situação</th><th>Valor</th></tr></thead><tbody><template x-for="d in logHistEntregas" :key="d.id"><tr><td><strong x-text="logisticaOrderLabel(d)"></strong><p x-text="d.customer_name || 'Cliente não informado'"></p><small x-show="d.reason" x-text="d.reason"></small></td><td x-text="logHistEntregaLabel(d)"></td><td x-text="d.historical ? '—' : formatCurrency(Number(d.total_amount || 0))"></td></tr></template></tbody></table></div><p x-show="!logHistEntregasCarregando && !logHistEntregasErro && !logHistEntregas.length">Nenhuma entrega vinculada a esta rota.</p><p class="log-op-note">Tentativas não entregues permanecem registradas na rota original.</p>
+          </dialog>
+        </section>
+
         <!-- Resultado de uma rota fechada: detalhe em Histórico e resultados. -->
-        <template x-if="logisticaTab === 'historico' && logisticaRotaSelecionada()">
-          <div class="order-2 space-y-5">
+        <template x-if="logisticaTab === 'historico' && logHistDetalhe && logisticaRotaSelecionada()">
+          <div class="log-hist-full-detail order-2 space-y-5">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                <button @click="voltarParaRotas()" class="inline-flex self-start items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                <button @click="logHistDetalhe = false" class="inline-flex self-start items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                   <i data-lucide="arrow-left" class="w-4 h-4"></i>Voltar para histórico
                 </button>
                 <div>
@@ -5463,52 +5522,6 @@
           </div>
         </template>
 
-        <!-- Rotas recentes em cards: cada card abre o resultado completo já existente. -->
-        <section x-show="logisticaTab === 'historico' && !logisticaRotaSelecionada()" class="order-2 space-y-4">
-          <h2 class="text-xl font-semibold text-gray-950">Rotas encerradas</h2>
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
-              <article class="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div class="flex items-start justify-between gap-3">
-                  <div><div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-white"><i data-lucide="check" class="h-5 w-5"></i></div><h4 class="mt-3 text-lg font-semibold text-gray-950" x-text="t.trip_number"></h4><p class="mt-1 text-sm text-gray-500"><span x-text="t.courier_name"></span><span x-text="' · ' + rotaDataFechamento(t)"></span></p></div>
-                  <span class="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Concluída</span>
-                </div>
-                <div class="mt-5 grid grid-cols-2 gap-3">
-                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Entregas</p><p class="mt-1 text-lg font-semibold tabular-nums"><span x-text="rotaResultado(t)?.entregues || 0"></span><span class="text-sm font-normal text-gray-400" x-text="' / ' + Number(t.deliveries_count || 0)"></span></p></div>
-                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">KM percorridos</p><p class="mt-1 text-lg font-semibold tabular-nums" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></p></div>
-                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Despesas</p><p class="mt-1 text-sm font-semibold tabular-nums" x-text="formatCurrency(rotaResultado(t)?.despesas || 0)"></p></div>
-                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Resultado</p><p class="mt-1 text-sm font-semibold tabular-nums" :class="rotaResultadoValorClass(t)" x-text="formatCurrency(rotaResultado(t)?.resultado || 0)"></p></div>
-                </div>
-                <div class="mt-4 flex items-center justify-between gap-3 text-xs"><span class="text-gray-500" x-text="(t.receipts || []).length + ' comprovante(s)'"></span><span x-show="rotaResultado(t)?.comprovantesPendentes.length" class="font-semibold text-amber-700" x-text="rotaResultado(t).comprovantesPendentes.length + ' pendente(s)'"></span><span x-show="!rotaResultado(t)?.comprovantesPendentes.length" class="font-medium" :class="rotaResultadoBadgeClass(t)" x-text="rotaResultadoLabel(t)"></span></div>
-                <button @click="abrirResultadoRota(t)" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"><i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>Ver resultado</button>
-              </article>
-            </template>
-         </div>
-        </section>
-
-        <!-- Histórico: indicadores do período e entregas finalizadas. -->
-        <section x-show="logisticaTab === 'historico' && !logisticaRotaSelecionada()" class="order-1 space-y-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 class="text-xl font-semibold text-gray-950">Histórico de entregas</h2><p class="mt-1 text-sm text-gray-500">Concluídas, canceladas e não entregues</p></div><select x-model="logisticaPeriodo" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700"><option value="30dias">Últimos 30 dias</option><option value="7dias">Últimos 7 dias</option><option value="hoje">Hoje</option></select></div>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="circle-check" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Entregas concluídas</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().concluidas"></p></div></article>
-            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="target" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Taxa de sucesso</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().taxaSucesso.toLocaleString('pt-BR') + '%' "></p></div></article>
-            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="clock-3" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Tempo médio</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().tempoMedio"></p></div></article>
-          </div>
-          <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h3 class="text-base font-semibold text-gray-900">Entregas finalizadas</h3><p class="mt-1 text-xs text-gray-500" x-text="logisticaFinalizadasView().length + ' resultado(s) no período'"></p></div><label class="relative block"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i><input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido, cliente ou rota" class="w-full sm:w-72 border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-emerald-600"></label></div>
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-[900px] text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide"><tr><th class="px-5 py-3 font-medium">Pedido</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Rota / entregador</th><th class="px-4 py-3 font-medium">Finalização</th><th class="px-4 py-3 font-medium">Valor</th><th class="px-5 py-3 font-medium text-right">Resultado</th></tr></thead>
-                <tbody class="divide-y divide-gray-100">
-                  <template x-for="d in logisticaFinalizadasView()" :key="d.order_id">
-                    <tr class="hover:bg-gray-50/70"><td class="px-5 py-4"><p class="font-semibold tabular-nums" x-text="logisticaOrderLabel(d)"></p><p class="mt-1 max-w-[210px] truncate text-[11px] text-gray-400" x-text="logisticaItens(d)"></p></td><td class="px-4 py-4"><p class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></p><p class="text-xs text-gray-400 truncate max-w-[240px]" x-text="d.delivery_address || 'Sem endereço'"></p></td><td class="px-4 py-4"><p class="text-sm font-medium text-gray-700" x-text="rotaDoPedido(d)?.trip_number || 'Sem rota'"></p><p class="mt-1 text-xs text-gray-400" x-text="d.delivery_courier || rotaDoPedido(d)?.courier_name || 'Não informado'"></p></td><td class="px-4 py-4 text-sm text-gray-600" x-text="formatDateTime(d.delivered_at || d.created_at)"></td><td class="px-4 py-4 font-semibold tabular-nums" x-text="formatCurrency(Number(d.total_amount || 0))"></td><td class="px-5 py-4 text-right"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span><p x-show="d.delivery_failure_reason" class="mt-1 max-w-[180px] text-right text-[11px] text-rose-600" x-text="d.delivery_failure_reason"></p></td></tr>
-                  </template>
-                  <tr x-show="!logisticaFinalizadasView().length"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma entrega finalizada neste período.</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
 
