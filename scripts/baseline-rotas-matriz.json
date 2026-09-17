@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-09-05T14:29:33.091Z",
-  "total": 370,
+  "total": 372,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -156,6 +156,7 @@
     "GET /admin/painel/app.logistica.acoes.js PUBLICA",
     "GET /admin/painel/app.logistica.comprovantes.js PUBLICA",
     "GET /admin/painel/app.logistica.js PUBLICA",
+    "GET /admin/painel/app.logistica.operacao.js PUBLICA",
     "GET /admin/painel/app.logistica.resultado.js PUBLICA",
     "GET /admin/painel/app.marketing.campaign-detail.js PUBLICA",
     "GET /admin/painel/app.marketing.campaigns.js PUBLICA",
@@ -246,6 +247,7 @@
     "GET /admin/painel/assets/vendas-hero.webp PUBLICA",
     "GET /admin/painel/bot-entrega.css PUBLICA",
     "GET /admin/painel/business-time.js PUBLICA",
+    "GET /admin/painel/logistica-operacao.css PUBLICA",
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",
     "GET /admin/painel/relatorios-compras.css PUBLICA",

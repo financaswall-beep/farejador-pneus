@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 let getMatrizLogistica: typeof import('../../../src/admin/painel/queries-logistica.js').getMatrizLogistica;
@@ -14,24 +14,14 @@ beforeAll(async () => {
 });
 
 describe('getMatrizLogistica — resultado real por rota', () => {
-  it('usa o fundo panorâmico no cabeçalho da Logística e o serve como WebP', () => {
+  it('usa cabeçalho compacto e serve os assets da operação', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
-    const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
-    const banner = statSync(resolve('painel/public/assets/logistica-hero-v2.webp'));
-
-    expect(html).toContain('/admin/painel/assets/logistica-hero-v2.webp');
-    expect(html).toContain('aria-labelledby="logistica-heading"');
-    expect(html).toContain('class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl');
-    expect(html).toContain('class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10"');
-    expect(html).toContain('class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl');
-    expect(html).toContain('id="logistica-heading"');
+    const routes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
+    expect(html).toContain('class="log-op-header"');
+    expect(html).toContain('Da separação à entrega, tudo sob controle.');
     expect(html).toContain('aria-label="Seções de Logística"');
-    expect(html).toContain('bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5');
-    expect(html).toContain('operação da matriz');
-    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/logistica-hero-v2.webp'");
-    expect(staticRoutes).toContain("'assets/logistica-hero-v2.webp'");
-    expect(banner.size).toBeGreaterThan(0);
-    expect(banner.size).toBeLessThan(100_000);
+    expect(routes).toContain("'app.logistica.operacao.js'");
+    expect(routes).toContain("fastify.get('/admin/painel/logistica-operacao.css'");
   });
 
   it('busca custo congelado por pedido e despesas vinculadas sem usar valor fixo de combustível', async () => {

@@ -15,11 +15,12 @@ function logisticsHtml(): string {
 describe('Redesign das quatro abas da Logistica da Matriz', () => {
   const screen = logisticsHtml();
 
-  it('preserva menu externo, banner e navegacao existentes', () => {
-    expect(screen).toContain('/admin/painel/assets/logistica-hero-v2.webp');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260821-auditfix1');
+  it('preserva a navegação e carrega a nova operação', () => {
+    expect(html).toContain('/admin/painel/logistica-operacao.css');
+    expect(html).toContain('/admin/painel/app.logistica.operacao.js');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260916-operacao1');
     expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260821-auditfix1');
-    expect(html).toContain('/admin/painel/app.montagem.js?v=20260911-demanda1');
+    expect(html).toContain('/admin/painel/app.montagem.js?v=20260916-logistica1');
     expect(html).not.toContain('app.logistica.periodos.js');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
     expect(screen).toContain('aria-label="Seções de Logística"');
@@ -30,7 +31,9 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
   });
 
   it('separa a composicao de cada aba', () => {
-    expect(screen).toContain('Operação de hoje');
+    expect(screen).toContain('Próxima saída');
+    expect(screen).toContain('Rotas abertas');
+    expect(screen).toContain('Precisa de decisão');
     expect(screen).toContain('Fila de entregas');
     expect(screen).toContain('Rotas da Matriz');
     expect(screen).toContain('Concluída');
@@ -43,9 +46,9 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
 
   it('ordena os indicadores pelo fluxo operacional e mantem os numeros no periodo', () => {
     const aguardando = screen.indexOf('Aguardando saída');
-    const emRota = screen.indexOf('>Em rota<');
+    const emRota = screen.indexOf('>Em entrega<');
     const entregues = screen.indexOf("'Entregues · '");
-    const problemas = screen.indexOf('Com problema');
+    const problemas = screen.indexOf('>Ocorrências<');
 
     expect(aguardando).toBeGreaterThan(-1);
     expect(aguardando).toBeLessThan(emRota);

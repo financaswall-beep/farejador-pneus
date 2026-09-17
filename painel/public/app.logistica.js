@@ -16,9 +16,12 @@ window.PAINEL_MODULES.logistica = function () {
         if (!openTrips.some((trip) => trip.id === this.logisticaRotaAbertaId)) {
           this.logisticaRotaAbertaId = openTrips[0]?.id || null;
         }
+        this.logOpAtualizado = new Date().toISOString(); this.logOpErro = false;
+        this.logOpSincronizar?.();
         void this.loadReceiptThumbs();
       } catch (err) {
         // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).
+        this.logOpErro = true;
         console.warn('logistica load falhou:', err.message);
         if (options.propagate) throw err;
       } finally {
