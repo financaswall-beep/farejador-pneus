@@ -53,7 +53,7 @@ import { decideConfiguredStore as decideStoreForItemsGeo } from './configured-ro
 import { readDeliverySettings,deliveryBlockResponse,applyMatrizDeliveryPolicies } from './matriz-delivery-settings.js';
 import { matrizStoreHoursText } from './matriz-store-hours.js';
 import { evaluateMatrizDelivery } from './matriz-delivery-eligibility.js';
-import { observeSearchProducts, observeSearchMunicipality } from './stock-search-trace.js';
+import { observeMissingCatalogMeasure, observeSearchProducts, observeSearchMunicipality } from './stock-search-trace.js';
 
 import { fillCityFromPin,decideStoreGeoOrFallback,quoteFreteFromPin } from './delivery-quote-routing.js';
 import { prepareToolLocation } from './tool-location.js';
@@ -555,7 +555,26 @@ export async function executeTool(
           : await buscarProduto(client, productInput);
         observeSearchProducts(result.map(p => ({ id: p.product_id, measure: p.tire_size ?? '',
           matrixAvailable: env.WHOLESALE_UNIFIED_STOCK ? p.total_stock_available : null })));
-        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        if (result.length === 0) {
+          const requestedMeasure = productInput.medida_pneu?.trim();
+          if (requestedMeasure) {
+            // A medida procurada também é demanda quando ainda não existe SKU.
+            // Registra Matriz e, quando resolvida, a unidade regional como indisponíveis,
+            // sem criar produto, saldo ou disponibilidade fictícios.
+            observeMissingCatalogMeasure(requestedMeasure);
+            const bairro = args.bairro as string | undefined;
+            let municipio = bairro
+              ? await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined)
+              : ((args.municipio as string | undefined) ?? null);
+            ({ municipio } = await fillCityFromPin(client, environment, conversationId, {
+              municipio,
+              neighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+            }));
+            observeSearchMunicipality(municipio);
+            if (municipio) await getPartnerStockMap(client, environment, municipio);
+          }
+          return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        }
         if (!env.WHOLESALE_UNIFIED_STOCK) {
           await applyMatrizPricesToProducts(client, environment, result);
         }

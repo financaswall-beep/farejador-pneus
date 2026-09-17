@@ -5,7 +5,12 @@ import { logger } from '../shared/logger.js';
 
 interface Product { id: string; measure: string; matrixAvailable: number | null }
 interface Store { id: string; name: string; quantities: ReadonlyMap<string, number> }
-interface Trace { products: Product[]; stores: Store[]; municipality: string | null }
+interface Trace {
+  products: Product[];
+  stores: Store[];
+  municipality: string | null;
+  catalogStatus: 'matched' | 'missing';
+}
 const context = new AsyncLocalStorage<Trace>();
 
 // Os observadores só copiam resultados já lidos. Nunca mudam o roteamento ou o retorno da tool.
@@ -14,6 +19,13 @@ export function observeSearchProducts(products: Product[]): void {
   if (trace) trace.products = products.filter(p => p.measure?.trim()).map(p => ({
     ...p, measure: p.measure.trim().toUpperCase(),
   }));
+}
+export function observeMissingCatalogMeasure(measure: string): void {
+  const trace = context.getStore();
+  const normalized = measure.trim().toUpperCase();
+  if (!trace || !normalized) return;
+  trace.catalogStatus = 'missing';
+  trace.products = [{ id: `catalog-missing:${normalized}`, measure: normalized, matrixAvailable: 0 }];
 }
 export function observeSearchMunicipality(municipality: string | null): void {
   const trace = context.getStore();
@@ -44,7 +56,7 @@ export async function withStockSearchTrace(
   input: { key: string; tool: string; args: Record<string, unknown>; messageId?: string }, execute: () => Promise<string>,
 ): Promise<string> {
   if (!['buscar_produto', 'buscar_compatibilidade'].includes(input.tool)) return execute();
-  const trace: Trace = { products: [], stores: [], municipality: null };
+  const trace: Trace = { products: [], stores: [], municipality: null, catalogStatus: 'matched' };
   return context.run(trace, async () => {
     const result = await execute();
     try {
@@ -53,7 +65,8 @@ export async function withStockSearchTrace(
       const rows = buildSearchObservations(trace);
       if (!rows.length) return result;
       const filters = Object.fromEntries(['marca','condicao_pneu','posicao_pneu']
-        .filter(key => typeof input.args[key] === 'string').map(key => [key, input.args[key]]));
+        .filter(key => typeof input.args[key] === 'string').map(key => [key, input.args[key]])) as Record<string,string>;
+      if (trace.catalogStatus === 'missing') filters.catalog_status = 'missing';
       await client.query(
         `INSERT INTO ops.bot_stock_searches
           (environment,conversation_id,search_key,tool_name,measure,municipality,filters,stores,trigger_message_id)

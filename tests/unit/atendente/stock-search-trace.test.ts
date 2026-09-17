@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
-import { withStockSearchTrace, observeSearchProducts, observeSearchStore, observeSearchMunicipality } from '../../../src/atendente-v2/stock-search-trace.js';
+import { withStockSearchTrace, observeMissingCatalogMeasure, observeSearchProducts, observeSearchStore, observeSearchMunicipality } from '../../../src/atendente-v2/stock-search-trace.js';
 
 describe('observação das buscas sem interferir no bot', () => {
   it('agrupa marcas pela medida; registra zero e preserva o resultado byte a byte', async () => {
@@ -45,5 +45,18 @@ describe('observação das buscas sem interferir no bot', () => {
     query.mockClear();
     await withStockSearchTrace(client,'test','c',{key:'x',tool:'criar_pedido',args:{}},async()=>'pedido');
     expect(query).not.toHaveBeenCalled();
+  });
+  it('registra procura fora do catálogo como falta da Matriz sem inventar SKU',async()=>{
+    const query=vi.fn().mockResolvedValue({rows:[]}),client={query} as unknown as PoolClient;
+    const result='{"encontrado":false,"mensagem":"Nenhum produto encontrado."}';
+    await expect(withStockSearchTrace(client,'test','c',
+      {key:'missing',tool:'buscar_produto',args:{medida_pneu:'80/100-14'}},async()=>{
+        observeMissingCatalogMeasure('80/100-14');return result;
+      })).resolves.toBe(result);
+    const values=query.mock.calls[0]![1];
+    expect(JSON.parse(values[5])).toEqual({catalog_status:'missing'});
+    expect(JSON.parse(values[6])).toEqual([{measure:'80/100-14',stores:[
+      {id:'matriz',name:'Matriz',kind:'matrix',available:false},
+    ]}]);
   });
 });

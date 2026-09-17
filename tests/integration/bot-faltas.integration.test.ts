@@ -85,4 +85,16 @@ describe('relatório de faltas real no Postgres',()=>{
       expect(row).toEqual({measure:'195/55-16',stores:[{id:'matriz',name:'Matriz',kind:'matrix',available:false}]});
     }finally{client.release();}
   });
+  it('registra a medida fora do catálogo como falta sem inventar SKU ou estoque',async()=>{
+    const {executeTool}=await import('../../src/atendente-v2/tools.js');
+    const client=await db.pool.connect(),args={medida_pneu:'80/100-14'},key=randomUUID();
+    try{
+      const traced=await withStockSearchTrace(client,'test',conversationId,
+        {key,tool:'buscar_produto',args},()=>executeTool(client,'test',conversationId,'buscar_produto',args));
+      expect(JSON.parse(traced)).toEqual({encontrado:false,mensagem:'Nenhum produto encontrado.'});
+      const row=(await client.query('SELECT measure,filters,stores FROM ops.bot_stock_searches WHERE search_key=$1',[key])).rows[0];
+      expect(row).toEqual({measure:'80/100-14',filters:{catalog_status:'missing'},
+        stores:[{id:'matriz',name:'Matriz',kind:'matrix',available:false}]});
+    }finally{client.release();}
+  });
 });
