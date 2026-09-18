@@ -99,7 +99,7 @@
     if (d.step === 1) {
       if (!(d.newSupplier ? d.supplierName.trim() : P.id('supplier').value)) { P.formError('Selecione um fornecedor ou informe o nome do novo.'); return false; }
     }
-    if (d.step === 2 && d.mode === 'items' && !d.items.length) { P.formError('Adicione pelo menos um pneu do catálogo.'); return false; }
+    if (d.step === 2 && d.mode === 'items' && !d.items.length) { P.formError('Adicione pelo menos um pneu à compra.'); return false; }
     const invalid = [...P.id('step-' + d.step).querySelectorAll('input,select,textarea')].find(function (input) { return input.offsetParent !== null && !input.checkValidity(); });
     if (invalid) { invalid.reportValidity(); return false; }
     return true;

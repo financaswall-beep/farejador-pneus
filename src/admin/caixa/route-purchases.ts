@@ -3,6 +3,7 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import type { CaixaAuth } from './queries.js';
 import { listWholesaleSuppliers } from '../painel/queries-fornecedores.js';
+import { listWholesaleMeasures } from '../painel/queries-galpao-medidas.js';
 import { getWholesalePurchaseReport } from '../painel/queries-compras-relatorios.js';
 import { getWholesalePriceReport } from '../painel/queries-compras-precos.js';
 import { priceReportQuerySchema } from '../painel/price-report-query.js';
@@ -47,6 +48,10 @@ export function registerCaixaPurchaseRoutes(
     }
   };
   const options = { preHandler: [flagGate, requireAuth, requireStock, owner] };
+
+  fastify.get(base + '/medidas', options, async () => ({
+    rows: await listWholesaleMeasures(env.FAREJADOR_ENV),
+  }));
 
   fastify.get(base + '/precos', options, async (request, reply) => {
     const parsed = priceReportQuerySchema.safeParse(request.query);

@@ -3,7 +3,7 @@
   const C = window.Caixa;
   const P = C.purchases = {};
   const s = P.state = { rows: [], page: 1, pages: 1, tab: 'pending', request: 0,
-    suppliers: [], credit: false, draft: null, pending: null, preview: null, busy: false, session: '' };
+    suppliers: [], measures: [], credit: false, draft: null, pending: null, preview: null, busy: false, session: '' };
   P.id = function (id) { return document.getElementById('purchase-' + id); };
   P.money = function (value) { return C.currency.format(Number(value || 0)); };
   P.today = function () { return window.FarejadorTime.dateKey(new Date()); };
@@ -38,6 +38,7 @@
     supplier_not_found: 'Fornecedor indisponível. Atualize a lista e escolha outro.',
     supplier_name_conflict: 'Esse fornecedor já existe. Selecione o cadastro existente.',
     supplier_duplicate: 'Esse fornecedor já existe. Selecione o cadastro existente.',
+    measure_not_in_catalog: 'Essa medida ainda não existe no catálogo. Cadastre a medida em Cadastrar pneu ou escolha uma existente.',
     wholesale_finance_disabled: 'Compras a prazo não estão habilitadas. Atualize os dados antes de continuar.',
     due_date_required: 'Informe o vencimento da compra.', due_date_before_purchase: 'O vencimento não pode ser anterior à compra.',
     installments_total_mismatch: 'A soma das parcelas deve ser igual ao total com frete e desconto.',
@@ -96,7 +97,7 @@
   };
   P.reset = function () {
     if (P.prices) P.prices.reset(); s.tab = 'pending';
-    s.request++; s.session = ''; s.rows = []; s.suppliers = []; s.draft = null; s.pending = null; s.preview = null; s.busy = false;
+    s.request++; s.session = ''; s.rows = []; s.suppliers = []; s.measures = []; s.draft = null; s.pending = null; s.preview = null; s.busy = false;
     P.id('dialog').close(); P.id('cards').replaceChildren(); P.id('items').replaceChildren(); P.id('catalog-results').replaceChildren();
     P.id('supplier').replaceChildren(); P.id('detail').replaceChildren(); P.id('form').reset(); P.notice('');
     P.id('wizard').hidden = true; P.id('home').hidden = false;

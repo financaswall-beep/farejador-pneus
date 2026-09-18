@@ -1,11 +1,12 @@
 import Fastify, { type FastifyRequest } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CaixaAuth } from '../../../src/admin/caixa/queries.js';
-const mocks = vi.hoisted(() => ({ suppliers: vi.fn(), report: vi.fn(), prices: vi.fn(), finance: vi.fn(), create: vi.fn(), confirm: vi.fn(), credit: true }));
+const mocks = vi.hoisted(() => ({ suppliers: vi.fn(), measures: vi.fn(), report: vi.fn(), prices: vi.fn(), finance: vi.fn(), create: vi.fn(), confirm: vi.fn(), credit: true }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test', get WHOLESALE_FINANCE() { return mocks.credit; } } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/shared/logger.js', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }));
 vi.mock('../../../src/admin/painel/queries-fornecedores.js', () => ({ listWholesaleSuppliers: mocks.suppliers }));
+vi.mock('../../../src/admin/painel/queries-galpao-medidas.js', () => ({ listWholesaleMeasures: mocks.measures }));
 vi.mock('../../../src/admin/painel/queries-compras-relatorios.js', () => ({ getWholesalePurchaseReport: mocks.report }));
 vi.mock('../../../src/admin/painel/queries-compras-precos.js', () => ({ getWholesalePriceReport: mocks.prices }));
 vi.mock('../../../src/admin/painel/queries-fiado-despesas.js', () => ({ getWholesaleFinance: mocks.finance }));
@@ -34,7 +35,7 @@ describe('Compras do app usa o motor central', () => {
   afterEach(async () => app.close());
   const post = (suffix: string, body: object) => app.inject({ method: 'POST', url: base + suffix, headers, payload: body });
   it('restringe leituras e escritas ao proprietário autenticado com estoque', async () => {
-    for (const suffix of ['', '/contexto', '/resumo', '/precos']) {
+    for (const suffix of ['', '/contexto', '/resumo', '/precos', '/medidas']) {
       expect((await app.inject({ url: base + suffix })).statusCode).toBe(401);
       expect((await app.inject({ url: base + suffix, headers: { authorization: 'owner' } })).statusCode).toBe(403);
       expect((await app.inject({ url: base + suffix, headers: { ...headers, authorization: 'admin' } })).statusCode).toBe(403);
@@ -70,6 +71,20 @@ describe('Compras do app usa o motor central', () => {
     const response = await post('', payload);
     expect(response.statusCode).toBe(409); expect(response.json().error).toBe('idempotency_conflict');
     expect(mocks.create.mock.calls[0]![0].idempotency_key).toBe(payload.idempotency_key);
+  });
+  it('oferece as medidas do web e permite outra marca/condição pelo serviço central', async () => {
+    mocks.measures.mockResolvedValue([{ measure: '90/90-18', brand: 'Pirelli', tire_condition: 'novo' }]);
+    const measures = await app.inject({ url: base + '/medidas', headers });
+    expect(measures.statusCode).toBe(200); expect(measures.headers['cache-control']).toBe('no-store');
+    expect(mocks.measures).toHaveBeenCalledWith('test');
+    const other = { ...payload, receipt_status: 'received', items: [{ ...item, brand: 'Marca nova', tire_condition: 'remold', vehicle_type: 'car' }] };
+    const blockers = [{ measure: item.measure, brand: 'Marca nova', tire_condition: 'remold', reason: 'catalog_product_missing', product_id: null }];
+    mocks.create.mockResolvedValue({ purchase_id: id, stock_applied: true, catalog_blockers: blockers });
+    const result = await post('', other);
+    expect(result.statusCode).toBe(201); expect(result.json().catalog_blockers).toEqual(blockers);
+    expect(mocks.create).toHaveBeenCalledWith({ ...other, environment: 'test', created_by: 'Caixa: Maria (maria)' });
+    mocks.create.mockRejectedValue(new Error('measure_not_in_catalog'));
+    expect((await post('', { ...other, items: [{ ...other.items[0], measure: '299/99-29' }] })).statusCode).toBe(400);
   });
   it('valida frete, desconto, datas e parcelas pelas mesmas regras da compra web', async () => {
     for (const invalid of [{ discount_amount: 501 }, { items: [{ ...item, unit_cost: 80.001 }] },

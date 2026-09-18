@@ -29,7 +29,8 @@
     const host = P.id('review-items'); host.replaceChildren(P.el('h3', '', P.supplierName()));
     if (s.draft.mode === 'lot') host.append(P.reviewLine(s.draft.lot.quantity + ' pneus · ' + s.draft.lot.description, P.money(s.draft.lot.total_cost)));
     else s.draft.items.forEach(function (item) {
-      host.append(P.reviewLine(item.quantity + ' × ' + item.measure + ' · ' + item.brand + ' · ' + P.condition(item.tire_condition), P.money(item.quantity * item.unit_cost)));
+      const vehicle = item.vehicle_type === 'car' ? 'Carro' : item.vehicle_type === 'motorcycle' ? 'Moto' : 'Tipo não identificado';
+      host.append(P.reviewLine(item.quantity + ' × ' + item.measure + ' · ' + item.brand + ' · ' + P.condition(item.tire_condition) + ' · ' + vehicle, P.money(item.quantity * item.unit_cost)));
     });
     P.renderInstallments(); P.renderPayment();
   };

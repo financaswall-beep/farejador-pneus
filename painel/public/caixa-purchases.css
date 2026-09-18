@@ -86,6 +86,12 @@
 .pc-catalog-option span { display: grid; gap: 3px; }
 .pc-catalog-option small { color: var(--pc-muted); }
 .pc-item-top { display: flex; align-items: start; gap: 14px; margin-bottom: 8px; }
+.pc-identity { margin: 12px 0; }
+.pc-measure-field { position: relative; }
+.pc-measure-options { position: absolute; top: 100%; left: 0; right: 0; z-index: 9; display: grid; max-height: 240px; overflow: auto; border: 1px solid #cddad5; border-radius: 8px; background: white; box-shadow: 0 6px 14px #12332418; }
+.pc-measure-options button { border: 0; border-bottom: 1px solid #edf0f2; background: white; padding: 12px; text-align: left; color: var(--pc-green); }
+.pc-measure-options button[aria-selected=true], .pc-measure-options button:hover { background: #e9f6ee; }
+.pc-purchase-help { margin: 0 0 14px !important; font-size: 12px; }
 .pc-item-top > div { flex: 1; }
 .pc-item-top h3 { font-size: 20px; }
 .pc-item-top .pc-button { min-width: 36px; min-height: 36px; padding: 6px; background: #f4f6f8; }

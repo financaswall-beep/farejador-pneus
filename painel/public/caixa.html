@@ -7,7 +7,7 @@
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
-  <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchases1" />
+  <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchasevariants1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260918-purchases1"></script>
@@ -34,11 +34,11 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-sales.js?v=20260918-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases-review.js?v=20260918-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases-wizard.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
+  <script defer src="/operacao/caixa-purchases-review.js?v=20260918-purchasevariants1"></script>
+  <script defer src="/operacao/caixa-purchases-wizard.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-detail.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/purchase-price-utils.js?v=20260918-prices1"></script>
   <script defer src="/operacao/caixa-purchase-prices.js?v=20260918-prices1"></script>
@@ -619,8 +619,10 @@
                     <input id="purchase-catalog-search" type="search" placeholder="Buscar pneu no Catálogo" aria-label="Buscar pneu no Catálogo" maxlength="80" />
                     <div id="purchase-catalog-results" class="pc-catalog-results" aria-live="polite"></div>
                     <button id="purchase-catalog-create" class="pc-link" type="button">＋ Cadastrar pneu</button>
+                    <p class="pc-muted pc-purchase-help">Use uma medida existente e informe a marca e a condição da compra. Uma combinação nova pode entrar no estoque; complete o catálogo antes da venda.</p>
+                    <p id="purchase-measures-note" class="pc-notice" hidden>Sugestões de medidas indisponíveis. Você pode digitar uma medida já cadastrada; ela será conferida ao registrar a compra.</p>
                     <div id="purchase-items" class="pc-cards"></div>
-                    <button id="purchase-add-item" class="pc-link" type="button">＋ Adicionar outro pneu</button>
+                    <button id="purchase-add-item" class="pc-link" type="button">＋ Adicionar pneu por medida</button>
                   </div>
                   <div id="purchase-by-lot" class="pc-card pc-stack" hidden>
                     <h3>Dados do lote</h3><p class="pc-muted">Compre pelo valor total. As medidas serão identificadas na triagem do lote após a chegada.</p>
