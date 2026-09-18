@@ -136,6 +136,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/marketing-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/catalog-tire.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/catalog-tire.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/catalog-tire-car.png', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/catalog-tire-car.png', 'image/png'));
   const catalogBrandAssets = new Set([
     'pirelli.webp', 'metzeler.webp', 'michelin.webp', 'bridgestone.webp', 'dunlop.webp', 'levorin.webp',
     'rinaldi.webp', 'maggion.webp', 'technic.webp', 'vipal.webp', 'mitas.webp', 'kenda.webp',

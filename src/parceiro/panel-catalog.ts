@@ -3,6 +3,7 @@ import { applicationMeasureKey } from '../shared/vehicle-tire-applications.js';
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { withPartnerContext } from './db.js';
 import { safeLocalStockEntries } from './panel-catalog-stock.js';
+import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
 import {
   CATALOG_STOCK_MATCH,
   CATALOG_WHERE,
@@ -30,6 +31,7 @@ type CatalogRow = {
   brand: string | null;
   tire_size: string | null;
   tire_position: string | null;
+  vehicle_type: TireVehicleType | null;
   tire_construction?: 'radial' | 'bias' | null;
   local_stock_rows: number | string;
   local_quantity_on_hand: number | string;
@@ -154,7 +156,7 @@ export async function getPartnerPanelCatalog(
     const rowsResult = await client.query<CatalogRow>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,ts.tire_size,ts.position tire_position,
-              ts.construction tire_construction,
+              ts.construction tire_construction,ts.vehicle_type,
               COALESCE(local.stock_rows,0)::int local_stock_rows,
               COALESCE(local.quantity_on_hand,0)::int local_quantity_on_hand,
               COALESCE(local.quantity_reserved,0)::int local_quantity_reserved,
@@ -220,6 +222,7 @@ export async function getPartnerPanelCatalog(
         brand: row.brand,
         tire_size: row.tire_size,
         tire_position: row.tire_position,
+        vehicle_type: row.vehicle_type ?? null,
         tire_construction: row.tire_construction ?? null,
         application_count: row.product_type === 'tire' ? applications.filter(a => a.display_measure === applicationMeasureKey(row.tire_size)).length : 0,
         has_local_stock: finiteNumber(row.local_stock_rows) > 0,
