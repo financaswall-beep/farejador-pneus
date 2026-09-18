@@ -24,6 +24,7 @@ const scriptFiles = [
   'caixa-deliveries-matrix.js',
   'caixa-deliveries.js',
   'caixa-finance.js',
+  'caixa-finance-month.js',
   'caixa-finance-entries.js',
   'caixa-finance-commissions.js',
   'caixa-finance-commission-detail.js',
@@ -40,6 +41,7 @@ const script = scriptFiles
   .join('\n');
 const route = [
   'src/admin/caixa/route.ts',
+  'src/admin/caixa/finance-query.ts',
   'src/admin/caixa/route-commissions.ts',
   'src/admin/caixa/route-team.ts',
   'src/admin/caixa/route-operation-login.ts',
@@ -220,7 +222,7 @@ describe('login mobile da Operação da Loja', () => {
   it('entrega o Financeiro simples somente por modulo autorizado', () => {
     expect(html).toContain('id="finance-panel"');
     expect(html).toContain('id="nav-finance"');
-    expect(html).toContain('Resumo do mês');
+    expect(html).toContain('id="finance-month-input"');
     expect(html).toContain('Pendências');
     expect(html).toContain('Comissões');
     expect(html).not.toContain('Ver financeiro completo');
@@ -230,7 +232,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('<option value="today">Hoje</option>');
     expect(html).toContain('<option value="7d">7 dias</option>');
     expect(html).toContain('<option value="15d">15 dias</option>');
-    expect(html).toContain('<option value="30d" selected>1 mês</option>');
+    expect(html).toContain('<option value="30d" selected>30 dias</option>');
     expect(css).toContain('.finance-hero');
     expect(css).toContain("url('/operacao/finance-hero.webp')");
     expect(css).toContain("url('/operacao/finance-shell-positive-v3.webp')");
@@ -248,7 +250,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(movements).toContain('Caixa.operationPath(mode.resource, mode.matrixPath)');
     expect(movements).toContain("hash: '#financeiro/saidas'");
     expect(css).toContain('.finance-entries-page.is-output');
-    expect(script).toContain("'?range=' + encodeURIComponent(range)");
+    expect(script).toContain("'?' + Caixa.financePeriodQuery()");
     expect(script).toContain("window.location.hash === '#financeiro'");
     expect(route).toContain("'/api/caixa/financeiro-simples'");
     expect(route).toContain("'/api/caixa/financeiro-entradas'");

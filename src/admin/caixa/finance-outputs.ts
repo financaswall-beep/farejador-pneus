@@ -38,13 +38,16 @@ function describe(sourceType: string): { kind: OperationFinanceEntryKind; origin
 export async function getMatrizFinanceOutputs(
   range: SimpleFinanceRange,
   dbPool: Pool = defaultPool,
+  period?: string,
 ): Promise<OperationFinanceEntriesPayload> {
   await ensureMatrizFinanceAvailable(dbPool);
   const days = simpleFinanceRangeDays(range);
   const result = await dbPool.query<MatrizFinanceOutputRow>(
     `WITH bounds AS (
-       SELECT ((now() AT TIME ZONE 'America/Sao_Paulo')::date-($2::int-1)) start_date,
-              ((now() AT TIME ZONE 'America/Sao_Paulo')::date+1) end_date
+       SELECT COALESCE(to_date($3,'YYYY-MM'),
+                (now() AT TIME ZONE 'America/Sao_Paulo')::date-($2::int-1)) start_date,
+              COALESCE((to_date($3,'YYYY-MM')+interval '1 month')::date,
+                (now() AT TIME ZONE 'America/Sao_Paulo')::date+1) end_date
      ), outputs AS (
        SELECT t.id::text,t.source_type,t.description,
               COALESCE(t.metadata->>'payment_method',t.metadata->>'paymentMethod') payment_method,
@@ -60,7 +63,7 @@ export async function getMatrizFinanceOutputs(
          FROM outputs
      )
      SELECT * FROM counted ORDER BY entry_date DESC,occurred_at DESC,id DESC LIMIT 200`,
-    [env.FAREJADOR_ENV, days],
+    [env.FAREJADOR_ENV, days, period ?? null],
   );
   const rows: OperationFinanceEntry[] = result.rows.map((row) => {
     const details = describe(row.source_type);
@@ -78,6 +81,7 @@ export async function getMatrizFinanceOutputs(
   });
   return {
     range,
+    ...(period ? { period } : {}),
     total: Number(result.rows[0]?.total_amount ?? 0),
     count: Number(result.rows[0]?.total_count ?? 0),
     visible_count: rows.length,

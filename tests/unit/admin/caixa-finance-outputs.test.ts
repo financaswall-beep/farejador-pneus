@@ -24,7 +24,7 @@ describe('Saídas do Financeiro operacional da Matriz', () => {
     expect(ensureReady).toHaveBeenCalledOnce();
     expect(payload).toMatchObject({ range: '7d', total: 540, count: 1, visible_count: 1 });
     expect(payload.rows[0]).toMatchObject({ kind: 'expense', origin: 'Despesa da Matriz' });
-    expect(query.mock.calls[0]?.[1]).toEqual(['test', 7]);
+    expect(query.mock.calls[0]?.[1]).toEqual(['test', 7, null]);
     expect(query.mock.calls[0]?.[0]).toContain("e.account_code='cash' AND e.side='credit'");
     expect(query.mock.calls[0]?.[0]).not.toContain('reversal_of_transaction_id=t.id');
   });

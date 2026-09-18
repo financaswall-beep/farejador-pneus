@@ -5,6 +5,9 @@ describe('visão financeira e retiradas no livro real',()=>{
   let withdraw:typeof import('../../src/admin/painel/matriz-owner-withdrawal.js');
   let truth:typeof import('../../src/admin/painel/matriz-ledger-financial-read.js').getMatrizCentralLedgerFinancialTruth;
   let statement:typeof import('../../src/admin/painel/matriz-ledger-statement.js').getMatrizLedgerStatement;
+  let app:typeof import('../../src/admin/caixa/monthly-finance.js').getMatrizMonthlyFinance;
+  let entries:typeof import('../../src/admin/caixa/finance-entries.js').getMatrizFinanceEntries;
+  let outputs:typeof import('../../src/admin/caixa/finance-outputs.js').getMatrizFinanceOutputs;
   let saleId:string;
   const input={amount:100,occurred_at:'2026-09-02T15:00:00Z',reason:'Uso pessoal',payment_method:'dinheiro',cash_account:'Caixa principal',idempotency_key:'owner-withdrawal-01'};
   beforeAll(async()=>{
@@ -14,6 +17,9 @@ describe('visão financeira e retiradas no livro real',()=>{
     withdraw=await import('../../src/admin/painel/matriz-owner-withdrawal.js');
     ({getMatrizCentralLedgerFinancialTruth:truth}=await import('../../src/admin/painel/matriz-ledger-financial-read.js'));
     ({getMatrizLedgerStatement:statement}=await import('../../src/admin/painel/matriz-ledger-statement.js'));
+    ({getMatrizMonthlyFinance:app}=await import('../../src/admin/caixa/monthly-finance.js'));
+    ({getMatrizFinanceEntries:entries}=await import('../../src/admin/caixa/finance-entries.js'));
+    ({getMatrizFinanceOutputs:outputs}=await import('../../src/admin/caixa/finance-outputs.js'));
     async function post(key:string,amount:number,debit:string,dc:string,credit:string,cc:string,date:string,cash:string|null=date,environment='test'){
       return (await db.pool.query(`SELECT finance.post_matriz_ledger_transaction($1::env_t,'finance.overview.test',$2,'recognition',$3,$4::date,$2,'owner:test',$5::jsonb,NULL,$6::date,'{}') id`,[environment,key,amount,date,JSON.stringify([{account_code:debit,account_class:dc,side:'debit',amount},{account_code:credit,account_class:cc,side:'credit',amount}]),cash])).rows[0]!.id;
     }
@@ -39,6 +45,9 @@ describe('visão financeira e retiradas no livro real',()=>{
     expect(await withdraw.createOwnerWithdrawal(input,'owner:test','test',db.pool)).toEqual(first);
     await expect(withdraw.createOwnerWithdrawal({...input,amount:110},'owner:test','test',db.pool)).rejects.toThrow('idempotency_conflict');
     const after=await truth('test',db.pool,'2026-09');expect(after.competencia).toEqual(before.competencia);
+    const appAfter=await app('2026-09',db.pool);
+    expect(appAfter.truth).toEqual(after);
+    expect(appAfter.truth.competencia.lucro_confirmado).toBe(before.competencia.lucro_confirmado);
     expect(Number(after.caixa.saldo_atual)).toBeCloseTo(Number(before.caixa.saldo_atual)-100,2);
     const rows=await statement({period:'2026-09',basis:'caixa',environment:'test'},db.pool);
     expect(rows.rows.find(r=>r.id===first.id)).toMatchObject({origin:'Retirada do dono',direction:'saida'});
@@ -50,5 +59,22 @@ describe('visão financeira e retiradas no livro real',()=>{
     const final=await truth('test',db.pool,'2026-09');expect(final.caixa.saldo_atual).toBe(before.caixa.saldo_atual);expect(final.competencia).toEqual(before.competencia);
     expect((await statement({period:'2026-09',basis:'caixa',environment:'test'},db.pool)).rows.find(r=>r.id===first.id)?.reversed).toBe(true);
     await expect(db.pool.query('UPDATE finance.matriz_ledger_transactions SET amount=1 WHERE id=$1',[first.id])).rejects.toThrow();
+  });
+  it('mantém mês, saldo anterior, estornos e totais completos iguais no app e web',async()=>{
+    const result=await app('2026-09',db.pool);
+    expect(result.truth).toEqual(await truth('test',db.pool,'2026-09'));
+    expect(result.expenses).toEqual((await read('2026-09','test',db.pool)).expenses);
+    expect(Number(result.truth.caixa.saldo_anterior)).toBe(1000);
+    const incoming=await entries('today',db.pool,'2026-09');
+    const outgoing=await outputs('7d',db.pool,'2026-09');
+    expect(incoming.period).toBe('2026-09');expect(outgoing.period).toBe('2026-09');
+    expect(incoming.total).toBe(Number(result.truth.caixa.entradas_registradas));
+    expect(outgoing.total).toBe(Number(result.truth.caixa.saidas_registradas));
+    expect(incoming.count).toBeGreaterThan(200);expect(incoming.visible_count).toBe(200);
+    const previous=await app('2026-08',db.pool);
+    expect(Number(previous.truth.caixa.saldo_anterior)).toBe(0);
+    expect(Number(previous.truth.caixa.entradas_registradas)).toBe(1000);
+    expect((await entries('30d',db.pool,'2026-08')).total).toBe(1000);
+    expect((await outputs('30d',db.pool,'2026-08')).total).toBe(0);
   });
 });

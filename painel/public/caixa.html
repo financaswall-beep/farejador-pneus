@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260824-operation-catalog1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-finance1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260824-operation-catalog1"></script>
@@ -31,8 +31,9 @@
   <script defer src="/operacao/caixa-sales.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
-  <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
+  <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
+  <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
+  <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
@@ -721,16 +722,18 @@
         <div id="finance-panel" class="app-panel finance-panel hidden">
           <div class="finance-period-wrap">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            <strong id="finance-period-label">1 mês</strong>
+            <strong id="finance-period-label">30 dias</strong>
             <svg class="finance-period-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
             <label class="sr-only" for="finance-period-input">Escolher período</label>
             <select id="finance-period-input" aria-label="Escolher período">
               <option value="today">Hoje</option>
               <option value="7d">7 dias</option>
               <option value="15d">15 dias</option>
-              <option value="30d" selected>1 mês</option>
+              <option value="30d" selected>30 dias</option>
             </select>
+            <input id="finance-month-input" class="hidden" type="month" min="2000-01" aria-label="Mês do financeiro" />
           </div>
+          <button id="finance-refresh" class="finance-refresh" type="button">Atualizar financeiro</button>
 
           <div id="finance-loading" class="finance-loading" role="status">
             <span></span><strong>Organizando o financeiro…</strong>
@@ -743,26 +746,39 @@
 
           <div id="finance-content" class="hidden">
             <section id="finance-hero" class="finance-hero finance-hero--positive" aria-labelledby="finance-result-label">
-              <small id="finance-result-label">Sobrou</small>
-              <strong id="finance-net">R$ 0,00</strong>
-              <span>antes das retiradas</span>
-              <p id="finance-status"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16 6-6 4 4 6-8M15 6h5v5"/></svg><b>Este mês está positivo</b></p>
+              <small id="finance-result-label">Resultado do período</small>
+              <strong id="finance-net">—</strong>
+              <span id="finance-hero-note"></span>
+              <p id="finance-status"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16 6-6 4 4 6-8M15 6h5v5"/></svg><b>Aguardando apuração</b></p>
             </section>
 
             <div class="finance-body">
-              <h3>Resumo do mês</h3>
+              <p id="finance-warning" class="finance-warning hidden" role="status"></p>
+              <details class="finance-composition hidden" data-finance-matrix>
+                <summary>Como o resultado foi formado</summary>
+                <dl id="finance-composition-values"></dl>
+                <details><summary>Detalhar despesas</summary><dl id="finance-expense-values"></dl></details>
+                <p>Considera os custos e despesas registrados. A estimativa de IA do bot não é descontada automaticamente.</p>
+              </details>
+              <section class="finance-balance hidden" data-finance-matrix aria-label="Saldo de caixa">
+                <span id="finance-balance-label">Saldo em caixa no mês</span><strong id="finance-balance">—</strong>
+                <dl><div><dt>Saldo anterior</dt><dd id="finance-opening">—</dd></div><div><dt>Movimentação do mês</dt><dd id="finance-movement">—</dd></div></dl>
+                <p>Inclui as retiradas pessoais registradas.</p>
+              </section>
+              <h3 id="finance-cash-heading">Movimentação de caixa</h3>
               <section class="finance-cash-summary" aria-label="Entradas e saídas">
                 <button type="button" data-finance-detail="in">
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 17 16 6m-7 0h7v7"/></svg>
-                  <span><small>Entrou</small><strong id="finance-in">R$ 0,00</strong><em>vendas e recebimentos</em></span>
+                  <span><small>Entrou</small><strong id="finance-in">R$ 0,00</strong><em>entradas registradas</em></span>
                 </button>
                 <button type="button" data-finance-detail="out">
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 7 11 11m0-7v7H9"/></svg>
-                  <span><small>Saiu</small><strong id="finance-out">R$ 0,00</strong><em>contas e despesas</em></span>
+                  <span><small>Saiu</small><strong id="finance-out">R$ 0,00</strong><em>saídas registradas</em></span>
                 </button>
               </section>
 
-              <h3>Pendências</h3>
+              <h3>Pendências atuais</h3>
+              <p class="finance-current-note hidden" data-finance-matrix>Posição de hoje, incluindo contas de outros meses.</p>
               <section class="finance-pending-list" aria-label="Pendências financeiras">
                 <button type="button" data-finance-detail="receivable">
                   <span class="finance-pending-icon finance-pending-icon--document"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6m-6 4h6"/></svg></span>
@@ -774,11 +790,13 @@
                   <strong id="finance-due">Nenhuma conta vence hoje</strong>
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
+                <button class="hidden" data-finance-matrix type="button" data-finance-detail="payable"><strong id="finance-payable">—</strong><span aria-hidden="true">›</span></button>
               </section>
+              <section id="finance-agenda" class="finance-agenda hidden" aria-live="polite"><h4 id="finance-agenda-title"></h4><div id="finance-agenda-list"></div></section>
 
               <button id="finance-commissions" class="finance-commissions" type="button" data-finance-detail="commissions">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="6" r="2"/><circle cx="15" cy="4" r="1.5"/><circle cx="18" cy="9" r="1.5"/><path d="M3 14h4l3 2h5a2 2 0 0 1 2 2H9l-3-1.5H3M17 18l3-3 1 1-4 5H9l-4-2H3"/></svg>
-                <span><small>Comissões do mês</small><strong id="finance-commission-total">R$ 0,00</strong><em id="finance-commission-count">Nenhum colaborador com comissão</em></span>
+                <span><small id="finance-commission-label">Comissões do mês</small><strong id="finance-commission-total">R$ 0,00</strong><em id="finance-commission-count">Nenhum colaborador com comissão</em></span>
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
               </button>
 
@@ -798,8 +816,9 @@
                 <option value="today">Hoje</option>
                 <option value="7d">7 dias</option>
                 <option value="15d">15 dias</option>
-                <option value="30d" selected>1 mês</option>
+                <option value="30d" selected>30 dias</option>
               </select>
+              <input id="finance-entries-month" class="hidden" type="month" min="2000-01" aria-label="Mês das movimentações" />
             </label>
           </header>
 
@@ -817,7 +836,8 @@
           <div id="finance-entries-empty" class="finance-entries-message hidden"><strong id="finance-entries-empty-copy">Nenhuma entrada neste período</strong><span id="finance-entries-empty-hint">Quando uma venda ou recebimento for confirmado, aparecerá aqui.</span></div>
 
           <div id="finance-entries-content" class="finance-entries-content hidden">
-            <section id="finance-entries-methods" class="finance-entries-methods" aria-label="Entradas por forma de pagamento"></section>
+            <p id="finance-methods-note" class="finance-current-note"></p>
+            <section id="finance-entries-methods" class="finance-entries-methods" aria-label="Movimentações por forma de pagamento"></section>
             <div class="finance-entries-list-heading"><h3>Movimentações</h3><span id="finance-entries-visible"></span></div>
             <div id="finance-entries-list" class="finance-entries-list"></div>
           </div>

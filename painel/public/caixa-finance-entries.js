@@ -147,6 +147,8 @@
       ? 'Mostrando ' + rows.length + ' de ' + count : count + (count === 1 ? ' registro' : ' registros');
     if (!rows.length) { setState('empty'); return; }
     renderMethods(rows);
+    byId('finance-methods-note').textContent = count > rows.length
+      ? 'Por forma de pagamento: apenas os ' + rows.length + ' registros exibidos.' : 'Por forma de pagamento';
     list.replaceChildren();
     const groups = new Map();
     rows.forEach(function (row) {
@@ -174,17 +176,22 @@
     if (request) request.abort();
     const controller = new AbortController(); request = controller; setState('loading');
     const mode = currentMode();
+    Caixa.configureFinancePeriod();
     try {
       const path = Caixa.operationPath(mode.resource, mode.matrixPath);
       const response = await Caixa.authenticatedFetch(
-        path + '?range=' + encodeURIComponent(range.value), { signal: controller.signal },
+        path + '?' + (Caixa.isPartner() ? 'range=' + encodeURIComponent(range.value) : Caixa.financePeriodQuery()),
+        { signal: controller.signal },
       );
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
+      if (request !== controller || controller.signal.aborted) return;
+      if (!Caixa.isPartner() && payload.period !== byId('finance-month-input').value) throw new Error('finance_period_mismatch');
       render(payload);
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
+      if (request !== controller) return;
       setState('error');
     } finally { if (request === controller) request = null; }
   }
@@ -205,6 +212,9 @@
   }
 
   range.addEventListener('change', loadFinanceEntries);
+  byId('finance-entries-month').addEventListener('change', function () {
+    Caixa.syncFinanceMonth(this.value); void loadFinanceEntries();
+  });
   byId('finance-entries-back').addEventListener('click', closeFinanceEntries);
   byId('finance-entries-retry').addEventListener('click', loadFinanceEntries);
   window.addEventListener('hashchange', function () {

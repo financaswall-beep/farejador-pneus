@@ -22,6 +22,7 @@ export interface OperationFinanceEntry {
 
 export interface OperationFinanceEntriesPayload {
   range: SimpleFinanceRange;
+  period?: string;
   total: number;
   count: number;
   visible_count: number;

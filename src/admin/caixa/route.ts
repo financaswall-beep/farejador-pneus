@@ -22,6 +22,8 @@ import { registerCaixaPhotoRoutes } from './route-photo.js';
 import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 import { getMatrizSimpleFinance } from './simple-finance.js';
+import { getMatrizMonthlyFinance } from './monthly-finance.js';
+import { simpleFinanceQuerySchema } from './finance-query.js';
 import { getMatrizFinanceEntries } from './finance-entries.js';
 import { getMatrizFinanceOutputs } from './finance-outputs.js';
 import { registerCaixaCommissionRoutes } from './route-commissions.js';
@@ -52,11 +54,6 @@ const changePasswordSchema = z.object({
 }).refine((data) => data.current_password !== data.new_password, {
   message: 'same_password',
   path: ['new_password'],
-});
-
-const simpleFinanceQuerySchema = z.object({
-  range: z.enum(['today', '7d', '15d', '30d']).default('30d'),
-  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 });
 
 type CaixaRequest = FastifyRequest & { caixa?: CaixaAuth };
@@ -156,7 +153,9 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     try {
-      return reply.status(200).send(await getMatrizSimpleFinance(parsed.data.range));
+      return reply.status(200).send(parsed.data.period
+        ? await getMatrizMonthlyFinance(parsed.data.period)
+        : await getMatrizSimpleFinance(parsed.data.range));
     } catch (error) {
       const code = error instanceof Error ? error.message : 'finance_unavailable';
       logger.error({ err: error }, 'simple matrix finance unavailable');
@@ -171,7 +170,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     try {
-      return reply.status(200).send(await getMatrizFinanceEntries(parsed.data.range));
+      return reply.status(200).send(await getMatrizFinanceEntries(parsed.data.range, undefined, parsed.data.period));
     } catch (error) {
       const code = error instanceof Error ? error.message : 'finance_unavailable';
       logger.error({ err: error }, 'matrix finance entries unavailable');
@@ -186,7 +185,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     try {
-      return reply.status(200).send(await getMatrizFinanceOutputs(parsed.data.range));
+      return reply.status(200).send(await getMatrizFinanceOutputs(parsed.data.range, undefined, parsed.data.period));
     } catch (error) {
       const code = error instanceof Error ? error.message : 'finance_unavailable';
       logger.error({ err: error }, 'matrix finance outputs unavailable');

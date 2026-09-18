@@ -23,7 +23,7 @@ describe('Entradas do Financeiro operacional da Matriz', () => {
     expect(ensureReady).toHaveBeenCalledOnce();
     expect(payload).toMatchObject({ range: '15d', total: 399.8, count: 1, visible_count: 1 });
     expect(payload.rows[0]).toMatchObject({ kind: 'sale', origin: 'Venda na Matriz' });
-    expect(query.mock.calls[0]?.[1]).toEqual(['test', 15]);
+    expect(query.mock.calls[0]?.[1]).toEqual(['test', 15, null]);
     expect(query.mock.calls[0]?.[0]).toContain("e.account_code='cash' AND e.side='debit'");
     expect(query.mock.calls[0]?.[0]).not.toContain('reversal_of_transaction_id=t.id');
   });

@@ -11,7 +11,7 @@
   const content = byId('finance-content');
   let request = null;
 
-  const rangeLabels = { today: 'Hoje', '7d': '7 dias', '15d': '15 dias', '30d': '1 mês' };
+  const rangeLabels = { today: 'Hoje', '7d': '7 dias', '15d': '15 dias', '30d': '30 dias' };
 
   function selectedRange() {
     return Object.prototype.hasOwnProperty.call(rangeLabels, periodInput.value)
@@ -22,7 +22,7 @@
     if (range === 'today') return positive ? 'Hoje está positivo' : 'Hoje está negativo';
     if (range === '7d') return positive ? 'Últimos 7 dias positivos' : 'Últimos 7 dias negativos';
     if (range === '15d') return positive ? 'Últimos 15 dias positivos' : 'Últimos 15 dias negativos';
-    return positive ? 'Último mês positivo' : 'Último mês negativo';
+    return positive ? 'Últimos 30 dias positivos' : 'Últimos 30 dias negativos';
   }
 
   function setState(name, message) {
@@ -38,13 +38,22 @@
   }
 
   function render(payload) {
+    if (!Caixa.isPartner()) {
+      Caixa.renderMonthlyFinance(payload); setState('ready'); return;
+    }
     const net = Number(payload.cash_net || 0);
     const positive = net >= 0;
     const hero = byId('finance-hero');
     byId('session-view').classList.toggle('finance-negative', !positive);
     hero.classList.toggle('finance-hero--positive', positive);
     hero.classList.toggle('finance-hero--negative', !positive);
-    byId('finance-result-label').textContent = positive ? 'Sobrou' : 'Prejuízo';
+    hero.classList.remove('finance-hero--uncertain', 'finance-hero--neutral');
+    byId('finance-warning').classList.add('hidden');
+    byId('finance-agenda').classList.add('hidden');
+    byId('finance-result-label').textContent = 'Movimentação de caixa';
+    byId('finance-hero-note').textContent = 'Entradas menos saídas do período';
+    byId('finance-cash-heading').textContent = 'Resumo do período';
+    byId('finance-commission-label').textContent = 'Comissões do mês';
     byId('finance-net').textContent = Caixa.currency.format(net);
     byId('finance-status').querySelector('b').textContent = statusText(
       payload.range || selectedRange(), positive,
@@ -83,24 +92,28 @@
     const controller = new AbortController();
     request = controller;
     setState('loading');
+    Caixa.configureFinancePeriod();
     const range = selectedRange();
     periodInput.value = range;
     periodLabel.textContent = rangeLabels[range];
     try {
       const path = Caixa.operationPath('financeiro-simples', '/api/caixa/financeiro-simples');
       const response = await Caixa.authenticatedFetch(
-        path + '?range=' + encodeURIComponent(range), { signal: controller.signal },
+        path + '?' + Caixa.financePeriodQuery(), { signal: controller.signal },
       );
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
+      if (request !== controller || controller.signal.aborted) return;
       render(payload);
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
+      if (request !== controller) return;
       const unavailable = failure instanceof Error && failure.message.includes('central_ledger');
       setState('error', unavailable
         ? 'O livro financeiro central está temporariamente indisponível.'
-        : 'Confira sua conexão e tente novamente.');
+        : failure instanceof Error && failure.message === 'invalid_month' ? 'Escolha um mês válido, até o mês atual.'
+          : 'Não foi possível conferir os dados. Atualize e tente novamente.');
     } finally {
       if (request === controller) request = null;
     }
@@ -109,9 +122,16 @@
   periodInput.value = '30d';
   periodLabel.textContent = rangeLabels['30d'];
   periodInput.addEventListener('change', function () { void loadFinance(); });
+  byId('finance-month-input').addEventListener('change', function () {
+    Caixa.syncFinanceMonth(this.value); void loadFinance();
+  });
+  byId('finance-refresh').addEventListener('click', function () { void loadFinance(); });
   byId('finance-retry').addEventListener('click', function () { void loadFinance(); });
   document.querySelectorAll('[data-finance-detail]').forEach(function (button) {
     button.addEventListener('click', function () {
+      if (['receivable', 'payable', 'due'].includes(button.dataset.financeDetail)) {
+        Caixa.toggleFinanceAgenda(button.dataset.financeDetail); return;
+      }
       if (button.dataset.financeDetail === 'in' && Caixa.openFinanceEntries) {
         Caixa.openFinanceEntries();
         return;
