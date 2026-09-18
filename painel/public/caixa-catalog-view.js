@@ -122,6 +122,7 @@
 
   function statusFor(row) {
     const helper = utils();
+    if (!Caixa.isPartner() && !row.catalogued) return 'Cadastro pendente';
     if (!row.has_local_stock) return 'Fora do estoque da unidade';
     if (!helper.priceRange(row)) return 'Preço pendente';
     if (helper.available(row) <= 0) return 'Sem saldo disponível';
@@ -146,13 +147,14 @@
     const price = node('div', 'operation-catalog-price');
     price.append(node('small', '', 'Preço da unidade'), node('strong', '', helper.priceLabel(row)));
     const actions = node('div', 'operation-catalog-actions');
-    if (Caixa.isPartner() && row.product_type === 'tire' && row.product_id) {
+    if (row.product_type === 'tire' && (row.product_id || !Caixa.isPartner())) {
       const fitment = node('button', 'operation-catalog-fitment-open',
-        helper.number(row.compatibility_count) > 0 ? 'Ver motos compatíveis' : 'Consultar compatibilidade');
+        'Consultar compatibilidade');
       fitment.type = 'button';
       fitment.addEventListener('click', function () { void Caixa.openOperationCatalogCompatibility(row); });
       actions.appendChild(fitment);
     }
+    Caixa.matrixCatalog?.appendAction(actions, row);
     const entries = helper.localEntries(row);
     if (helper.isOwner() && entries.length > 0 && typeof Caixa.openStockPrice === 'function') {
       const edit = node('button', 'operation-catalog-price-open',
@@ -173,7 +175,7 @@
         !== state().brand.toLocaleLowerCase('pt-BR')) return false;
       if (state().filter === 'stock' && helper.available(row) <= 0) return false;
       if (state().filter === 'no_price' && helper.priceRange(row)) return false;
-      return !query || [row.tire_size, row.product_name, row.product_code, row.brand]
+      return !query || [row.tire_size, row.product_name, row.product_code, row.brand, row.application_search]
         .filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(query);
     });
   }

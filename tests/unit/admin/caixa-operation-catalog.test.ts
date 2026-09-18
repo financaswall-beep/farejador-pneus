@@ -23,8 +23,8 @@ describe('Catálogo na Operação da Loja', () => {
   it('vive no mesmo casco do /operacao e segue a permissão de Estoque', () => {
     expect(html).toContain('id="operation-catalog-panel"');
     expect(html).toContain('id="nav-catalog"');
-    expect(html).toContain('/operacao/caixa-catalog.js?v=20260824-operation-catalog1');
-    expect(html).toContain('/operacao/caixa-catalog-view.js?v=20260824-operation-catalog1');
+    expect(html).toContain('/operacao/caixa-catalog.js?v=20260918-catalog2');
+    expect(html).toContain('/operacao/caixa-catalog-view.js?v=20260918-catalog2');
     expect(html.indexOf('/operacao/caixa-catalog.js')).toBeLessThan(
       html.indexOf('/operacao/caixa-catalog-view.js'),
     );
@@ -54,7 +54,7 @@ describe('Catálogo na Operação da Loja', () => {
 
   it('separa catálogo central de saldo e preço locais sem vazar custo da Matriz', () => {
     expect(core).toContain("Caixa.operationPath('painel/catalogo?' + params.toString())");
-    expect(core).toContain("Caixa.operationPath('operacao/estoque')");
+    expect(core).toContain("Caixa.operationPath('operacao/catalogo')");
     expect(core).toContain("'/compatibilidade'");
     expect(scripts).not.toMatch(/\/admin\/api|average_cost|unit_cost|gross_profit|margin|wholesale_stock/i);
     expect(html).toContain('O preço e o estoque exibidos são somente desta unidade.');
@@ -80,7 +80,7 @@ describe('Catálogo na Operação da Loja', () => {
     expect(css).toContain('@media (max-width: 320px)');
     expect(css).toContain('.operation-catalog-card {');
     expect(view).toContain('visible(list, true)');
-    expect(core.trimEnd().split(/\r?\n/)).toHaveLength(175);
+    expect(core.trimEnd().split(/\r?\n/).length).toBeLessThanOrEqual(300);
     expect(view.trimEnd().split(/\r?\n/).length).toBeLessThanOrEqual(300);
   });
 });

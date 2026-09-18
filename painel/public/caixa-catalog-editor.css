@@ -1,0 +1,30 @@
+.matrix-catalog-dialog { width: min(620px,calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #d4e4db; border-radius: 20px; color: #173e2b; background: #fff; font-family: inherit; box-shadow: 0 20px 80px #00291940; }
+.matrix-catalog-dialog::backdrop { background: #002419aa; }
+.matrix-catalog-dialog > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.matrix-catalog-dialog h2 { margin: 5px 0 0; font-size: 24px; }
+.matrix-catalog-dialog small { font-size: 11px; color: #63766b; }
+.matrix-catalog-dialog header > button { width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 50%; font-size: 27px; color: #194f35; background: #edf5f0; cursor: pointer; }
+.matrix-catalog-dialog fieldset { min-width: 0; margin: 16px 0; padding: 14px; border: 1px solid #d9e5dd; border-radius: 12px; }
+.matrix-catalog-dialog legend { padding-inline: 5px; font-size: 15px; font-weight: 700; }
+.matrix-catalog-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.matrix-catalog-dialog label { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
+.matrix-catalog-dialog input,.matrix-catalog-dialog select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #bccfc3; border-radius: 9px; background: #fff; color: #183f2c; font: inherit; font-size: 16px; }
+.matrix-catalog-dialog :disabled { opacity: .65; cursor: default; }
+.matrix-catalog-dialog input:disabled,.matrix-catalog-dialog select:disabled { background: #eff3f0; opacity: 1; color: #5e6a62; }
+.matrix-catalog-primary,.matrix-catalog-secondary { min-height: 44px; padding: 10px 16px; border: 1px solid #066342; border-radius: 10px; color: #fff; background: #066342; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.matrix-catalog-secondary { color: #066342; background: #fff; }
+.matrix-catalog-dialog form > .matrix-catalog-primary { width: 100%; }
+.matrix-catalog-dialog button:focus-visible,.matrix-catalog-dialog input:focus-visible,.matrix-catalog-dialog select:focus-visible { outline: 3px solid #93c6a7; outline-offset: 2px; }
+.matrix-catalog-message { white-space: pre-line; font-size: 14px; line-height: 1.5; color: #075e3b; }
+.matrix-catalog-note { color: #5d6e64; font-size: 12px; line-height: 1.5; }
+.matrix-catalog-dialog .matrix-catalog-check { display: flex; align-items: center; gap: 8px; }
+.matrix-catalog-check input { width: 20px; min-height: 20px; }
+#matrix-catalog-create { width: 100%; margin-bottom: 10px; }
+#matrix-fitments-list h3 { margin: 18px 0 8px; font-size: 16px; }
+#matrix-fitments-list article { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid #e1e9e4; }
+#matrix-fitments-list article p { margin: 0; font-size: 13px; line-height: 1.5; }
+#matrix-fitments-list article a { color: #07693e; font-size: 12px; }
+#matrix-fitments-list article div { display: flex; flex-wrap: wrap; gap: 8px; }
+#matrix-fitments-results { display: grid; gap: 8px; margin-block: 12px; }
+@media(max-width:430px) { .matrix-catalog-dialog { padding: 15px; } }
+@media(max-width:360px) { .matrix-catalog-grid { grid-template-columns: 1fr; gap: 0; } }

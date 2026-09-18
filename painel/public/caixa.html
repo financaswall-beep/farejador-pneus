@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-finance1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
+  <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260824-operation-catalog1"></script>
@@ -19,8 +20,10 @@
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-catalog.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-catalog-view.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-catalog.js?v=20260918-catalog2"></script>
+  <script defer src="/operacao/caixa-catalog-view.js?v=20260918-catalog2"></script>
+  <script defer src="/operacao/caixa-catalog-editor.js?v=20260918-catalog2"></script>
+  <script defer src="/operacao/caixa-catalog-fitments.js?v=20260918-catalog2"></script>
   <script defer src="/operacao/caixa-stock-edit.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
@@ -469,7 +472,7 @@
             <div class="operation-catalog-hero-copy">
               <small>CATÁLOGO DA REDE</small>
               <h2 id="operation-catalog-title">Encontre o pneu certo</h2>
-              <p>Consulte medidas, marcas e motos compatíveis. O preço e o estoque exibidos são somente desta unidade.</p>
+              <p>Consulte medidas, marcas e veículos compatíveis. O preço e o estoque exibidos são somente desta unidade.</p>
             </div>
             <div class="operation-catalog-hero-art" aria-hidden="true">
               <img src="/operacao/catalog-tire.webp" alt="" />
@@ -483,6 +486,7 @@
           </section>
 
           <section class="operation-catalog-toolbar" aria-label="Busca e filtros do catálogo">
+            <button id="matrix-catalog-create" class="matrix-catalog-primary hidden" type="button">+ Cadastrar pneu</button>
             <label class="operation-catalog-search" for="operation-catalog-search">
               <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
               <input id="operation-catalog-search" type="search" maxlength="100" autocomplete="off" placeholder="Buscar medida, marca ou produto" />
@@ -1445,5 +1449,59 @@
       <footer class="caixa-footer">2W Pneus</footer>
     </section>
   </main>
+  <dialog id="matrix-catalog-editor" class="matrix-catalog-dialog" aria-labelledby="matrix-catalog-title">
+    <header><div><small>CATÁLOGO · MATRIZ</small><h2 id="matrix-catalog-title">Cadastrar pneu</h2></div><button type="button" data-close-matrix-editor aria-label="Fechar cadastro">×</button></header>
+    <p id="matrix-catalog-message" class="matrix-catalog-message" role="status"></p>
+    <button id="matrix-catalog-existing" class="matrix-catalog-secondary hidden" type="button">Abrir cadastro existente</button>
+    <form id="matrix-catalog-form">
+      <fieldset id="matrix-catalog-identity"><legend>Identificação</legend><div class="matrix-catalog-grid">
+        <label>Medida<input id="matrix-catalog-measure" required maxlength="60" placeholder="90/90-18" /></label>
+        <label>Marca<select id="matrix-catalog-brand" required><option value="">Selecione</option></select></label>
+        <label>Condição<select id="matrix-catalog-condition" required><option value="">Selecione</option><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></label>
+        <label>Código do produto<input id="matrix-catalog-code" required minlength="2" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._\/\-]{1,79}" placeholder="Ex.: TEC-909018-N" /></label>
+      </div></fieldset>
+      <fieldset><legend>Ficha técnica</legend><div class="matrix-catalog-grid">
+        <label>Tipo de veículo<select id="matrix-catalog-vehicle"><option value="">Não identificado</option><option value="motorcycle">Moto</option><option value="car">Carro</option></select></label>
+        <label>Posição<select id="matrix-catalog-position"><option value="">Não informada</option><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Ambos</option></select></label>
+        <label>Desenho / modelo<input id="matrix-catalog-tread" maxlength="120" /></label>
+        <label>Índice de carga<input id="matrix-catalog-load" maxlength="20" placeholder="Ex.: 57" /></label>
+        <label>Índice de velocidade<input id="matrix-catalog-speed" maxlength="20" placeholder="Ex.: P" /></label>
+        <label id="matrix-catalog-initial-price-label">Preço de venda (opcional)<input id="matrix-catalog-initial-price" type="number" inputmode="decimal" min="0.01" max="9999999.99" step="0.01" /></label>
+      </div><label id="matrix-catalog-spec-reason-label">Motivo da alteração<input id="matrix-catalog-spec-reason" minlength="2" maxlength="500" /></label></fieldset>
+      <p class="matrix-catalog-note">Cadastro compartilhado com o web. Quantidade e custo são registrados na compra/entrada de estoque.</p>
+      <button id="matrix-catalog-save" class="matrix-catalog-primary" type="submit">Cadastrar pneu</button>
+    </form>
+    <form id="matrix-catalog-price-form" class="hidden"><fieldset><legend>Preço de venda</legend>
+      <label>Novo preço<input id="matrix-catalog-price" type="number" inputmode="decimal" required min="0.01" max="9999999.99" step="0.01" /></label>
+      <label>Motivo<input id="matrix-catalog-price-reason" required minlength="2" maxlength="500" /></label>
+      <button class="matrix-catalog-primary" type="submit">Salvar preço</button>
+    </fieldset></form>
+    <button id="matrix-catalog-fitments-open" class="matrix-catalog-secondary hidden" type="button">Consultar e ajustar compatibilidades</button>
+  </dialog>
+  <dialog id="matrix-fitments" class="matrix-catalog-dialog" aria-labelledby="matrix-fitments-title">
+    <header><div><small>COMPATIBILIDADE</small><h2 id="matrix-fitments-title">Aplicações do pneu</h2></div><button type="button" data-close-matrix-fitments aria-label="Fechar compatibilidades">×</button></header>
+    <p id="matrix-fitments-message" class="matrix-catalog-message" role="status"></p>
+    <button id="matrix-fitments-retry" class="matrix-catalog-secondary hidden" type="button">Tentar novamente</button>
+    <div id="matrix-fitments-list"></div>
+    <form id="matrix-fitments-form" class="hidden">
+      <fieldset><legend id="matrix-fitments-action">Vincular veículo</legend>
+        <p id="matrix-fitments-scope" class="matrix-catalog-note"></p>
+        <label>Buscar veículo<input id="matrix-fitments-search" type="search" maxlength="120" autocomplete="off" placeholder="Marca ou modelo" /></label>
+        <button id="matrix-fitments-search-button" class="matrix-catalog-secondary" type="button">Buscar veículos</button>
+        <div id="matrix-fitments-results" aria-live="polite"></div>
+        <p id="matrix-fitments-selected" class="matrix-catalog-note"></p>
+        <div class="matrix-catalog-grid">
+          <label>Posição<select id="matrix-fitments-position" required><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Ambos</option></select></label>
+          <label>Fonte<select id="matrix-fitments-source"><option value="manual">Conferência manual</option><option value="manufacturer">Fabricante</option></select></label>
+          <label>Ano inicial<input id="matrix-fitments-start" type="number" min="1900" max="2100" step="1" /></label>
+          <label>Ano final<input id="matrix-fitments-end" type="number" min="1900" max="2100" step="1" /></label>
+        </div>
+        <label class="matrix-catalog-check"><input id="matrix-fitments-oem" type="checkbox" /> Aplicação original de fábrica</label>
+        <label>Motivo / evidência<input id="matrix-fitments-reason" required minlength="2" maxlength="500" /></label>
+        <button id="matrix-fitments-save" class="matrix-catalog-primary" type="submit">Salvar vínculo</button>
+        <button id="matrix-fitments-reset" class="matrix-catalog-secondary" type="button">Limpar seleção</button>
+      </fieldset>
+    </form>
+  </dialog>
 </body>
 </html>

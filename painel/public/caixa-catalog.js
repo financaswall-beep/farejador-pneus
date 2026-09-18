@@ -56,28 +56,6 @@
     };
   }
 
-  function normalizeMatrixRow(row) {
-    const price = money(row.sale_price);
-    return {
-      product_id: row.product_id || null,
-      product_code: row.local_sku || '',
-      product_name: row.item_name || row.tire_size || 'Produto',
-      product_type: row.item_type === 'servico' ? 'service' : 'tire',
-      tire_condition: row.tire_condition || null,
-      tire_position: row.tire_position || null,
-      tire_size: row.tire_size || null,
-      brand: row.brand || null,
-      has_local_stock: true,
-      local_quantity_on_hand: number(row.quantity_on_hand),
-      local_quantity_reserved: number(row.quantity_reserved),
-      local_quantity_available: number(row.quantity_available),
-      local_sale_price_min: price,
-      local_sale_price_max: price,
-      compatibility_count: 0,
-      _matrixStock: row,
-    };
-  }
-
   function orderedBrands(rows, supplied) {
     const present = new Map();
     [...(supplied || []), ...rows.map(function (row) { return row.brand; })]
@@ -108,7 +86,9 @@
     if (!Caixa.canModule || !Caixa.canModule('estoque')) return;
     const requestedPage = Math.max(1, Number(page) || 1);
     const request = ++state.request;
+    const session = Caixa.sessionFingerprint();
     view()?.setLoading(Boolean(append));
+    document.getElementById('matrix-catalog-create')?.classList.toggle('hidden', Caixa.isPartner() || !isOwner());
     try {
       let payload;
       if (Caixa.isPartner()) {
@@ -123,13 +103,11 @@
         payload = await Caixa.json(response);
         if (!response.ok) throw new Error(payload.error || 'request_failed');
       } else {
-        const response = await Caixa.authenticatedFetch(Caixa.operationPath('operacao/estoque'));
-        const stock = await Caixa.json(response);
-        if (!response.ok) throw new Error(stock.error || 'request_failed');
-        const rows = (stock.rows || []).map(normalizeMatrixRow);
-        payload = { rows: rows, brands: [], page: 1, pages: 1, summary: matrixSummary(rows) };
+        const response = await Caixa.authenticatedFetch(Caixa.operationPath('operacao/catalogo'));
+        payload = await Caixa.json(response);
+        if (!response.ok) throw new Error(payload.error || 'request_failed');
       }
-      if (request !== state.request) return;
+      if (request !== state.request || session !== Caixa.sessionFingerprint()) return;
       const incoming = Array.isArray(payload.rows) ? payload.rows : [];
       state.rows = append ? state.rows.concat(incoming) : incoming;
       state.page = number(payload.page) || requestedPage;
@@ -138,6 +116,7 @@
       state.brands = orderedBrands(state.rows, payload.brands);
       view()?.renderSummary(state.summary);
       view()?.render();
+      return true;
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       if (request === state.request) view()?.showError();
@@ -145,6 +124,7 @@
   }
 
   async function openCompatibility(row) {
+    if (!Caixa.isPartner()) return Caixa.openMatrixCatalogFitments(row);
     if (!Caixa.isPartner() || !row.product_id || !view()) return;
     view().openCompatibility(row);
     try {

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { CaixaAuth } from './queries.js';
+import { registerCaixaOperationCatalogRoutes } from './route-operation-catalog.js';
 import {
   getMatrizOperationStock,
   MatrizOperationStockPriceError,
@@ -20,6 +21,7 @@ export function registerCaixaOperationStockRoutes(
       await reply.status(403).send({ error: 'owner_required' });
     }
   };
+  registerCaixaOperationCatalogRoutes(fastify, [flagGate, requireCaixaAuth, requireEstoque], requireOwner);
   fastify.get('/api/caixa/operacao/estoque', {
     preHandler: [flagGate, requireCaixaAuth, requireEstoque],
   }, async (_request, reply) => {
