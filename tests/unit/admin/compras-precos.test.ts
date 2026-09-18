@@ -7,6 +7,7 @@ function moduleFactory() {
   const context = { window: { PAINEL_MODULES: {}, FarejadorTime: {
     formatDate: (value: unknown) => new Date(value as string | Date).toISOString().slice(0, 10),
   } }, Date, Math, Number, String, Map };
+  runInNewContext(readFileSync('painel/public/purchase-price-utils.js', 'utf8'), context);
   runInNewContext(source, context);
   return context.window.PAINEL_MODULES.comprasPrecos();
 }

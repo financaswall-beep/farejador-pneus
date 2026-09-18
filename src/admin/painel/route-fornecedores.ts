@@ -12,21 +12,9 @@ import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmW
 import { registerPurchaseReportRoutes } from './route-purchase-report.js';
 import { registerLotPurchaseSchema } from './route-schemas-lot-purchases.js';
 
-const purchaseReportQuerySchema = z.object({
-  period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
-  status: z.enum(['all', 'pending', 'confirmed', 'cancelled']).default('all'),
-  payment: z.enum(['all', 'paid', 'pending']).default('all'),
-  supplier_id: z.string().uuid().optional(),
-  search: z.string().trim().max(80).optional(),
-  page: z.coerce.number().int().min(1).max(100000).default(1),
-  page_size: z.coerce.number().int().min(4).max(100).default(10),
-});
+import { purchaseReportQuerySchema } from './purchase-report-query.js';
 
-const priceReportQuerySchema = z.object({
-  period: z.enum(['30d', '90d', 'year', 'all']).default('90d'),
-  supplier_id: z.string().uuid().optional(),
-  search: z.string().trim().max(80).optional(),
-});
+import { priceReportQuerySchema } from './price-report-query.js';
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   await registerPurchaseReportRoutes(fastify);
@@ -90,6 +78,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     }
     const rows = await getWholesalePriceReport({
       period: parsed.data.period,
+      from: parsed.data.from, to: parsed.data.to,
       supplierId: parsed.data.supplier_id,
       search: parsed.data.search,
     });

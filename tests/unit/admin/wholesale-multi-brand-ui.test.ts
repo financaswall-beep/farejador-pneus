@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 function painelModule(file: string, name: string) {
   const sandbox: any = { window: { PAINEL_MODULES: {} }, console, URLSearchParams };
+  vm.runInNewContext(readFileSync(resolve('painel/public/purchase-price-utils.js'), 'utf8'), sandbox);
   vm.runInNewContext(readFileSync(resolve(`painel/public/${file}`), 'utf8'), sandbox);
   return sandbox.window.PAINEL_MODULES[name]();
 }

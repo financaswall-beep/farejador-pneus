@@ -98,3 +98,15 @@ export function calculateWholesalePurchaseMoney(
     allocatedItemCents: raw.sort((a, b) => a.index - b.index).map((row) => row.base),
   };
 }
+
+/** A missing line remains in the receipt audit with zero cost; allocate only to accepted tires. */
+export function calculateReceivedPurchaseMoney(
+  items: PurchaseMoneyItem[], freight = 0, discount = 0,
+): PurchaseMoneyTotals {
+  const accepted = items.filter((item) => item.quantity !== 0);
+  if (!accepted.length) throw new Error('purchase_receipt_empty');
+  const totals = calculateWholesalePurchaseMoney(accepted, freight, discount);
+  let index = 0;
+  return { ...totals, allocatedItemCents: items.map((item) =>
+    item.quantity === 0 ? 0 : totals.allocatedItemCents[index++]!) };
+}

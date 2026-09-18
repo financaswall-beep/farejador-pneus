@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { purchaseSearchClause } from './purchase-search.js';
 import type { PurchaseReportFilters, PurchaseReportPeriod } from './queries-compras-relatorios.js';
 
 export interface PurchaseHistoryAnalytics {
@@ -51,10 +52,7 @@ function analyticsWhere(environment: 'prod' | 'test', filters: PurchaseReportFil
   const search = filters.search?.trim().toLowerCase();
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(lower(s.name) LIKE $${params.length}
-      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_lines si
-        WHERE si.environment=p.environment AND si.purchase_id=p.id
-          AND lower(si.measure) LIKE $${params.length}))`);
+    where.push(purchaseSearchClause(params.length));
   }
   return { sql: where.join(' AND '), params };
 }

@@ -1,0 +1,65 @@
+.pc-tabs { grid-template-columns: .85fr .85fr 1.3fr; gap: 7px; }
+.pc-tabs button { padding-inline: 0; white-space: nowrap; font-size: 13px; }
+.pc-pricing #purchase-new, .pc-pricing #purchase-home > .pc-kpis, .pc-pricing #purchase-summary-note, .pc-pricing .pc-intro p { display: none; }
+.pc-pricing #purchase-home { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='760' fill='none' stroke='%23eef0f1' stroke-width='1'%3E%3Cpath d='M-100 170Q210-90 370 60T760 150M-100 195Q210-55 370 88T760 178M-100 640Q80 810 410 590T760 550M-100 670Q80 840 410 620T760 580'/%3E%3C/svg%3E"); background-size: 600px 730px; background-position: center top; }
+.pp > div > h3 { font-size: 22px; letter-spacing: -.5px; }
+.pp-period { display: flex; justify-content: space-between; width: 100%; margin: 15px 0 12px; color: #405369; font-weight: 400; background: #ffffffcc; }
+.pp-period > :nth-child(2) { flex: 1; text-align: left; }
+.pp-filters { margin: 10px 0; }
+#purchase-prices-count { margin: 12px 0; }
+.pp-variant-card { display: grid; grid-template-columns: 56px minmax(0,1fr) minmax(95px,.9fr) 10px; gap: 10px; align-items: center; border: 1px solid #d4dfe0; border-radius: 11px; padding: 12px 10px; background: #ffffffeb; text-align: left; color: var(--pc-ink); }
+.pp-variant-card:hover, .pp-variant-card:focus-visible { border-color: #228863; background: #f1faf4; }
+.pp-variant-card .pc-tire { width: 54px; height: 85px; }
+.pp-variant-description { display: grid; justify-items: start; gap: 3px; min-width: 0; }
+.pp-variant-description > strong { font-size: 20px; letter-spacing: -.5px; }
+.pp-variant-description .pc-muted { font-size: 12px; }
+.pp-variant-cost { display: grid; justify-items: end; text-align: right; gap: 5px; }
+.pp-variant-cost strong { font-size: 21px; letter-spacing: -.8px; color: var(--pc-green); white-space: nowrap; }
+.pp-variant-cost small { font-size: 11px; line-height: 1.3; }
+.pp-chevron { color: var(--pc-green); font-size: 25px; }
+.pp-footnote { margin: 16px 0 0 !important; font-size: 12px; color: #617083; line-height: 1.5; }
+.pp-heading { display: flex; align-items: center; gap: 10px; }
+#purchase-prices-variant { display: flex; align-items: center; gap: 12px; }
+#purchase-prices-variant .pc-tire { width: 48px; height: 67px; }
+#purchase-prices-variant h3 { font-size: 26px; letter-spacing: -.8px; }
+.pp-kpis { margin: 0; }
+.pp-kpis > div { background: #ffffffd9; }
+.pp-kpis > div:first-child { background: #f0f8f4d9; }
+.pp-kpis > div:first-child strong { color: var(--pc-green); font-size: 28px; }
+.pp-supplier-card { display: grid; grid-template-columns: minmax(0,1fr) auto 10px; align-items: center; gap: 9px; width: 100%; border: 1px solid #d9e2e4; border-radius: 9px; padding: 12px; background: #ffffffed; color: var(--pc-ink); text-align: left; }
+.pp-supplier-card.is-selected { border-color: #07874d; background: #edf8ef; }
+.pp-supplier-name, .pp-supplier-cost { display: grid; gap: 4px; justify-items: start; }
+.pp-supplier-cost { text-align: right; justify-items: end; }
+.pp-supplier-name small, .pp-supplier-cost small { font-size: 11px; }
+.pp-supplier-cost strong { white-space: nowrap; font-size: 15px; }
+.pp-chart-card { padding: 12px; }
+.pp-chart-card h3 { font-size: 16px; }
+.pp-chart-card .pc-between .pc-muted { font-size: 10px; }
+#purchase-prices-chart svg { display: block; width: 100%; height: auto; fill: initial; stroke: none; }
+#purchase-prices-chart circle[role=button] { cursor: pointer; }
+#purchase-prices-chart circle:focus { outline: none; stroke: #122a21; stroke-width: 2; }
+.pp-point { font-size: 11px; color: #536477; min-height: 32px; line-height: 1.4; }
+.pp-legend { display: flex; flex-wrap: wrap; gap: 9px 14px; font-size: 11px; color: #536477; margin-top: 9px; }
+.pp-legend span { display: flex; align-items: center; gap: 5px; }
+.pp-legend i { width: 10px; height: 10px; border-radius: 50%; }
+.pp-history summary { cursor: pointer; font-size: 13px; color: var(--pc-green); min-height: 22px; }
+.pp-history small { display: block; font-size: 11px; margin-top: 4px; }
+.pp-history .pc-review-line { font-size: 12px; }
+.pp-history > div { max-height: 300px; overflow: auto; }
+.pp-simulation { padding: 16px 0 8px; border-top: 1px solid #e0e7e6; background: #ffffffc9; }
+.pp-simulation-values { display: grid; grid-template-columns: 116px minmax(0,1fr) minmax(0,1fr); gap: 10px; align-items: center; margin: 12px 0; }
+.pp-simulation-values > div:not(:first-child) { padding-left: 8px; border-left: 1px solid #d9e1e4; display: grid; gap: 4px; }
+.pp-simulation-values small { font-size: 10px; color: #536477; }
+.pp-simulation-values strong { font-size: 15px; color: var(--pc-green); overflow-wrap: anywhere; }
+.pp-simulation .pp-footnote { text-align: center; margin-top: 9px !important; }
+@media (max-width: 370px) {
+  .pc-tabs button { font-size: 12px; }
+  .pp-variant-card { grid-template-columns: 42px minmax(0,1fr) 94px 8px; gap: 6px; }
+  .pp-variant-card .pc-tire { width: 40px; height: 73px; }
+  .pp-variant-description > strong { font-size: 17px; }
+  .pp-variant-cost strong { font-size: 18px; }
+  .pp-supplier-card { padding: 10px; grid-template-columns: minmax(0,1fr) 112px 8px; gap: 6px; }
+  .pp-supplier-cost strong { font-size: 13px; }
+  .pp-simulation-values { grid-template-columns: 100px minmax(0,1fr) minmax(0,1fr); gap: 6px; }
+  .pp-simulation-values .pc-stepper button { flex-basis: 28px; }
+}

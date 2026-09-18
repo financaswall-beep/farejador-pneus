@@ -1,6 +1,9 @@
+import { periodClause } from './purchase-period-clause.js';
+export { getWholesalePriceReport } from './queries-compras-precos.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { purchaseSearchClause } from './purchase-search.js';
 export { getWholesalePurchaseAnalytics } from './queries-compras-historico.js';
 export type { PurchaseHistoryAnalytics } from './queries-compras-historico.js';
 
@@ -33,36 +36,6 @@ export interface PurchaseReport {
   pagination: { page: number; page_size: number; total: number; pages: number };
 }
 
-interface WholesalePriceHistoryRow {
-  purchase_id: string;
-  purchased_at: string;
-  supplier_id: string;
-  supplier_name: string;
-  measure: string;
-  brand: string;
-  tire_condition: string;
-  quantity: number;
-  unit_cost: string;
-}
-
-interface WholesalePriceAggregateRow {
-  supplier_id: string;
-  measure: string;
-  brand: string;
-  tire_condition: string;
-  [key: string]: unknown;
-}
-
-function periodClause(period: PurchaseReportPeriod, column: string): string | null {
-  const local = `(${column} AT TIME ZONE 'America/Sao_Paulo')`;
-  if (period === '30d') return `${local} >= (now() AT TIME ZONE 'America/Sao_Paulo') - interval '30 days'`;
-  if (period === '90d') return `${local} >= (now() AT TIME ZONE 'America/Sao_Paulo') - interval '90 days'`;
-  if (period === 'year') {
-    return `${local} >= date_trunc('year', now() AT TIME ZONE 'America/Sao_Paulo')`;
-  }
-  return null;
-}
-
 function purchaseWhere(
   environment: 'prod' | 'test',
   filters: PurchaseReportFilters,
@@ -86,10 +59,7 @@ function purchaseWhere(
   const search = filters.search?.trim().toLowerCase();
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(lower(s.name) LIKE $${params.length}
-      OR EXISTS (SELECT 1 FROM commerce.wholesale_purchase_lines si
-        WHERE si.environment=p.environment AND si.purchase_id=p.id
-          AND lower(si.measure) LIKE $${params.length}))`);
+    where.push(purchaseSearchClause(params.length));
   }
   return { sql: where.join(' AND '), params };
 }
@@ -212,76 +182,4 @@ export async function getWholesaleSupplierInsights(
     [environment],
   );
   return result.rows;
-}
-
-export async function getWholesalePriceReport(
-  input: { period: PurchaseReportPeriod; supplierId?: string; search?: string },
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<unknown[]> {
-  const params: unknown[] = [environment];
-  const where = [`p.environment=$1`, `p.status='confirmed'`];
-  const period = periodClause(input.period, 'p.purchased_at');
-  if (period) where.push(period);
-  if (input.supplierId) {
-    params.push(input.supplierId);
-    where.push(`s.id=$${params.length}`);
-  }
-  const search = input.search?.trim().toLowerCase();
-  if (search) {
-    params.push(`%${search}%`);
-    where.push(`(lower(i.measure) LIKE $${params.length}
-      OR lower(i.brand) LIKE $${params.length})`);
-  }
-  const result = await dbPool.query<WholesalePriceAggregateRow>(
-    `SELECT s.id AS supplier_id,s.name AS supplier_name,
-            s.deleted_at IS NOT NULL AS supplier_archived,i.measure,i.brand,i.vehicle_type,
-            i.tire_condition,
-            sum(COALESCE(i.accepted_quantity,i.quantity))::int AS qty_total,
-            round(sum(COALESCE(i.accepted_quantity,i.quantity)*i.unit_cost)
-              /NULLIF(sum(COALESCE(i.accepted_quantity,i.quantity)),0),2) AS avg_cost,
-            max(p.purchased_at) AS last_purchased_at,
-            count(DISTINCT p.id)::int AS purchases_count
-       FROM commerce.wholesale_purchase_items i
-       JOIN commerce.wholesale_purchases p
-         ON p.id=i.purchase_id AND p.environment=i.environment
-       JOIN commerce.wholesale_suppliers s
-         ON s.id=p.supplier_id AND s.environment=p.environment
-      WHERE ${where.join(' AND ')}
-      GROUP BY s.id,i.measure,i.brand,i.tire_condition,i.vehicle_type
-      ORDER BY i.measure,i.brand,i.tire_condition,avg_cost,qty_total DESC
-      LIMIT 1000`,
-    params,
-  );
-  const history = await dbPool.query<WholesalePriceHistoryRow>(
-    `SELECT p.id AS purchase_id,p.purchased_at,
-            s.id AS supplier_id,s.name AS supplier_name,
-            i.measure,i.brand,i.tire_condition,
-            sum(COALESCE(i.accepted_quantity,i.quantity))::int AS quantity,
-            round(sum(COALESCE(i.accepted_quantity,i.quantity)*i.unit_cost)
-              /NULLIF(sum(COALESCE(i.accepted_quantity,i.quantity)),0),2) AS unit_cost
-       FROM commerce.wholesale_purchase_items i
-       JOIN commerce.wholesale_purchases p
-         ON p.id=i.purchase_id AND p.environment=i.environment
-       JOIN commerce.wholesale_suppliers s
-         ON s.id=p.supplier_id AND s.environment=p.environment
-      WHERE ${where.join(' AND ')}
-      GROUP BY p.id,p.purchased_at,s.id,s.name,i.measure,i.brand,i.tire_condition
-      ORDER BY p.purchased_at,p.id
-      LIMIT 5000`,
-    params,
-  );
-  const key = (row: Pick<WholesalePriceHistoryRow,
-    'supplier_id' | 'measure' | 'brand' | 'tire_condition'>) =>
-    [row.supplier_id, row.measure, row.brand, row.tire_condition].join('\u0000');
-  const historyByVariant = new Map<string, WholesalePriceHistoryRow[]>();
-  for (const row of history.rows) {
-    const rowKey = key(row);
-    if (!historyByVariant.has(rowKey)) historyByVariant.set(rowKey, []);
-    historyByVariant.get(rowKey)!.push(row);
-  }
-  return result.rows.map((row) => ({
-    ...row,
-    history: historyByVariant.get(key(row)) || [],
-  }));
 }

@@ -13,7 +13,7 @@ import {
 } from './stage5-integrity.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { canonicalPurchaseItems, type PurchaseItemInput } from './purchase-brand.js';
-import { calculateWholesalePurchaseMoney } from './purchase-money.js';
+import { calculateWholesalePurchaseMoney, calculateReceivedPurchaseMoney } from './purchase-money.js';
 import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 import {
   getPurchaseCatalogBlockers, type PurchaseCatalogBlocker,
@@ -73,7 +73,7 @@ export async function registerWholesalePurchase(
     ? calculateLotPurchaseMoney(input.lot, input.freight_amount ?? 0, input.discount_amount ?? 0)
     : null;
   if (input.lot && input.items.length) throw new Error('purchase_kind_items_mismatch');
-  if (input.lot && input.payment_status === 'pending' && !env.WHOLESALE_FINANCE) {
+  if (input.payment_status === 'pending' && !env.WHOLESALE_FINANCE) {
     throw new Error('wholesale_finance_disabled');
   }
   if (!lotTotals) calculateWholesalePurchaseMoney(
@@ -318,7 +318,7 @@ export async function confirmWholesalePurchase(
     if (!effective.some((item) => item.quantity > 0)) {
       throw new Error('purchase_receipt_empty');
     }
-    const adjusted = calculateWholesalePurchaseMoney(
+    const adjusted = calculateReceivedPurchaseMoney(
       effective, Number(purchase.rows[0].freight_amount), Number(purchase.rows[0].discount_amount),
     );
     for (const [index, item] of effective.entries()) {

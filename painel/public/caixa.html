@@ -7,9 +7,10 @@
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
+  <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchases1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
@@ -32,7 +33,17 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260824-operation-catalog1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-review.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-wizard.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-detail.js?v=20260918-purchases1"></script>
+  <script defer src="/operacao/purchase-price-utils.js?v=20260918-prices1"></script>
+  <script defer src="/operacao/caixa-purchase-prices.js?v=20260918-prices1"></script>
+  <script defer src="/operacao/caixa-purchase-prices-detail.js?v=20260918-prices1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-purchase-prices.css?v=20260918-prices1" />
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
@@ -532,6 +543,125 @@
           </div>
         </div>
 
+        <section id="purchases-panel" class="app-panel pc hidden" aria-label="Compras da matriz">
+          <p id="purchase-notice" class="pc-notice" role="status" hidden></p>
+          <div id="purchase-home">
+            <div class="pc-intro"><div><h2>Compras</h2><p>Organize suas compras e confira o que chegou.</p></div><button id="purchase-refresh" class="pc-button pc-icon-button" type="button" aria-label="Atualizar compras">↻</button></div>
+            <button id="purchase-new" class="pc-button pc-primary pc-full" type="button">＋ Nova compra</button>
+            <div class="pc-kpis" aria-label="Totais de todas as compras">
+              <div><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M1 3h14v14H1zM15 8h4l4 5v4h-8"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg><span><strong id="purchase-pending-count">—</strong><small>A receber</small></span></div>
+              <div><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M6 15h5"/></svg><span><strong id="purchase-payable">—</strong><small>A pagar · total</small></span></div>
+            </div>
+            <p id="purchase-summary-note" class="pc-muted" role="status" hidden></p>
+            <div class="pc-tabs" role="tablist" aria-label="Situação das compras">
+              <button id="purchase-tab-pending" type="button" role="tab" aria-selected="true">A receber <span id="purchase-tab-count"></span></button>
+              <button id="purchase-tab-history" type="button" role="tab" aria-selected="false">Histórico</button>
+              <button id="purchase-tab-prices" type="button" role="tab" aria-selected="false">Preços por medida</button>
+            </div>
+            <div id="purchase-orders-content">
+            <div class="pc-searchbar"><input id="purchase-search" type="search" maxlength="80" aria-label="Buscar fornecedor, medida ou compra" placeholder="Fornecedor, medida ou compra" /><button id="purchase-filter-toggle" type="button" class="pc-button pc-icon-button" aria-label="Filtrar compras" aria-expanded="false" aria-controls="purchase-filters">☷</button></div>
+            <div id="purchase-filters" class="pc-card pc-grid" hidden>
+              <label>Período<select id="purchase-period"><option value="all">Todo o período</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="year">Este ano</option></select></label>
+              <label>Pagamento<select id="purchase-payment-filter"><option value="all">Todos</option><option value="pending">A pagar</option><option value="paid">Pago</option></select></label>
+              <label id="purchase-status-label" hidden>Recebimento<select id="purchase-status-filter"><option value="all">Todos</option><option value="confirmed">Recebidas</option><option value="pending">A receber</option><option value="cancelled">Canceladas</option></select></label>
+              <button id="purchase-clear-filters" class="pc-link" type="button">Limpar filtros</button>
+            </div>
+            <div id="purchase-cards" class="pc-cards" aria-live="polite"></div>
+            <div class="pc-pagination"><button id="purchase-prev" class="pc-button" type="button" aria-label="Página anterior">‹</button><span id="purchase-pagination"></span><button id="purchase-next" class="pc-button" type="button" aria-label="Próxima página">›</button></div>
+            </div>
+            <section id="purchase-prices" class="pp" aria-label="Preços por medida" hidden>
+              <div id="purchase-prices-list-heading"><h3>Compare seus custos</h3><p class="pc-muted">Com base nas compras recebidas.</p></div>
+              <div id="purchase-prices-detail-heading" class="pp-heading" hidden><button id="purchase-prices-back" type="button" class="pc-button pc-icon-button" aria-label="Voltar às medidas">←</button><div id="purchase-prices-variant"></div></div>
+              <button id="purchase-prices-period-toggle" class="pc-button pp-period" type="button" aria-expanded="false" aria-controls="purchase-prices-period"><span aria-hidden="true">▦</span><span id="purchase-prices-period-label">Período das compras</span><span aria-hidden="true">›</span></button>
+              <form id="purchase-prices-period" class="pc-card pc-stack" hidden>
+                <p class="pc-muted">Datas das compras. Somente os pneus recebidos entram na comparação.</p>
+                <div class="pc-grid"><label>De<input id="purchase-prices-from" type="date" required /></label><label>Até<input id="purchase-prices-to" type="date" required /></label></div>
+                <p id="purchase-prices-period-error" class="pc-error" role="alert" hidden></p>
+                <button class="pc-button pc-primary" type="submit">Aplicar período</button>
+              </form>
+              <p id="purchase-prices-limit-note" class="pc-notice" hidden></p>
+              <div id="purchase-prices-list">
+                <input id="purchase-prices-search" type="search" maxlength="80" placeholder="Medida, marca ou condição" aria-label="Buscar preços por medida, marca ou condição" />
+                <div class="pc-grid pp-filters"><select id="purchase-prices-brand" aria-label="Marca"><option value="">Todas as marcas</option></select><select id="purchase-prices-condition" aria-label="Condição"><option value="">Todas as condições</option><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></div>
+                <p id="purchase-prices-count" class="pc-muted" role="status"></p>
+                <div id="purchase-prices-cards" class="pc-cards" aria-live="polite"></div>
+                <p class="pp-footnote">ⓘ Compare sempre a mesma medida, marca, condição e tipo de veículo.</p>
+              </div>
+              <div id="purchase-prices-detail" class="pc-stack" hidden>
+                <div class="pc-kpis pp-kpis"><div><span><small>Menor custo médio</small><strong id="purchase-prices-best">—</strong></span></div><div><span><strong id="purchase-prices-suppliers-count">—</strong><small>fornecedores comparados</small></span></div></div>
+                <h3>Custo por fornecedor</h3><div id="purchase-prices-suppliers" class="pc-cards"></div>
+                <div class="pc-card pp-chart-card"><div class="pc-between"><h3>Histórico do custo</h3><small class="pc-muted">Sem frete e desconto</small></div><div id="purchase-prices-chart"></div><p id="purchase-prices-point" class="pp-point" role="status">Toque em um ponto para ver a compra.</p><div id="purchase-prices-legend" class="pp-legend"></div></div>
+                <details class="pc-card pp-history"><summary>Ver compras do fornecedor selecionado</summary><div id="purchase-prices-history"></div></details>
+                <div class="pp-simulation"><h3>Simular compra</h3><p id="purchase-prices-supplier-label" class="pc-muted"></p><div class="pp-simulation-values"><div class="pc-stepper"><button id="purchase-prices-minus" type="button" aria-label="Diminuir quantidade">−</button><input id="purchase-prices-quantity" type="number" min="1" max="100000" step="1" value="10" inputmode="numeric" aria-label="Quantidade para simular" required /><button id="purchase-prices-plus" type="button" aria-label="Aumentar quantidade">+</button></div><div><small>Total estimado</small><strong id="purchase-prices-total">—</strong></div><div><small id="purchase-prices-difference-label">Diferença para a 2ª opção</small><strong id="purchase-prices-difference">—</strong></div></div><button id="purchase-prices-use" class="pc-button pc-primary pc-full" type="button">Usar na nova compra →</button><p id="purchase-prices-use-note" class="pp-footnote">Referência histórica. Confirme o preço com o fornecedor.</p></div>
+              </div>
+            </section>
+          </div>
+          <div id="purchase-wizard" hidden>
+            <header class="pc-wizard-header"><button id="purchase-back" class="pc-button pc-icon-button" type="button" aria-label="Voltar">←</button><div><h2>Nova compra</h2><p id="purchase-step-label">1 de 3 · Fornecedor</p></div><button id="purchase-pause" class="pc-link" type="button">Fechar</button></header>
+            <ol class="pc-steps" aria-label="Etapas da compra"><li data-pc-step="1"><b>1</b>Fornecedor</li><li data-pc-step="2"><b>2</b>Pneus</li><li data-pc-step="3"><b>3</b>Revisão</li></ol>
+            <form id="purchase-form">
+              <fieldset id="purchase-fields">
+                <section id="purchase-step-1">
+                  <div class="pc-card pc-stack"><h3>De quem você comprou?</h3>
+                    <label>Fornecedor<select id="purchase-supplier" required><option value="">Selecione um fornecedor</option></select></label>
+                    <button id="purchase-supplier-new-toggle" class="pc-link" type="button">＋ Novo fornecedor</button>
+                    <div id="purchase-new-supplier" class="pc-stack" hidden>
+                      <label>Nome do fornecedor<input id="purchase-supplier-name" maxlength="200" autocomplete="organization" /></label>
+                      <label>Telefone (opcional)<input id="purchase-supplier-phone" type="tel" maxlength="40" /></label>
+                      <label>CPF / CNPJ (opcional)<input id="purchase-supplier-document" maxlength="30" /></label>
+                    </div>
+                  </div>
+                </section>
+                <section id="purchase-step-2" hidden>
+                  <div class="pc-card pc-between"><strong id="purchase-chosen-supplier"></strong><button id="purchase-change-supplier" class="pc-link" type="button">Alterar</button></div>
+                  <div class="pc-segment" role="group" aria-label="Tipo da compra"><button id="purchase-mode-items" type="button" aria-pressed="true">Por medida</button><button id="purchase-mode-lot" type="button" aria-pressed="false">Lote fechado</button></div>
+                  <div id="purchase-by-items">
+                    <input id="purchase-catalog-search" type="search" placeholder="Buscar pneu no Catálogo" aria-label="Buscar pneu no Catálogo" maxlength="80" />
+                    <div id="purchase-catalog-results" class="pc-catalog-results" aria-live="polite"></div>
+                    <button id="purchase-catalog-create" class="pc-link" type="button">＋ Cadastrar pneu</button>
+                    <div id="purchase-items" class="pc-cards"></div>
+                    <button id="purchase-add-item" class="pc-link" type="button">＋ Adicionar outro pneu</button>
+                  </div>
+                  <div id="purchase-by-lot" class="pc-card pc-stack" hidden>
+                    <h3>Dados do lote</h3><p class="pc-muted">Compre pelo valor total. As medidas serão identificadas na triagem do lote após a chegada.</p>
+                    <label>Descrição<input id="purchase-lot-description" maxlength="200" placeholder="Ex.: lote de pneus meia-vida" /></label>
+                    <label>Tipo<select id="purchase-lot-vehicle"><option value="mixed">Misto</option><option value="motorcycle">Moto</option><option value="car">Carro</option></select></label>
+                    <div class="pc-grid"><label>Quantidade de pneus<input id="purchase-lot-quantity" type="number" inputmode="numeric" min="1" max="100000" step="1" value="1" /></label><label>Valor do lote (R$)<input id="purchase-lot-cost" type="number" inputmode="decimal" min="0.01" max="9999999.99" step="0.01" placeholder="0,00" /></label></div>
+                  </div>
+                </section>
+                <section id="purchase-step-3" class="pc-stack" hidden>
+                  <div id="purchase-review-items" class="pc-card"></div>
+                  <div class="pc-card pc-stack"><h3>Valores e referência</h3>
+                    <label>Data da compra<input id="purchase-purchased-date" type="date" required /></label>
+                    <div class="pc-grid"><label>Frete (R$)<input id="purchase-freight" type="number" inputmode="decimal" min="0" step="0.01" value="0" /></label><label>Desconto (R$)<input id="purchase-discount" type="number" inputmode="decimal" min="0" step="0.01" value="0" /></label></div>
+                    <label>Nota / referência do fornecedor (opcional)<input id="purchase-reference" maxlength="160" /></label>
+                  </div>
+                  <div class="pc-card pc-stack"><h3>Pagamento</h3>
+                    <label>Situação<select id="purchase-payment"><option value="paid">Já pago</option><option value="pending">A prazo</option></select></label>
+                    <p id="purchase-credit-note" class="pc-muted" hidden>Compras a prazo não estão habilitadas nesta matriz.</p>
+                    <div id="purchase-paid-fields" class="pc-grid"><label>Forma de pagamento<select id="purchase-payment-method"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="cartao">Cartão</option><option value="boleto">Boleto</option><option value="outro">Outro</option></select></label><label>Pago em<input id="purchase-paid-date" type="date" /></label></div>
+                    <div id="purchase-credit-fields" class="pc-stack" hidden>
+                      <label>Vencimento<input id="purchase-due-date" type="date" /></label>
+                      <button id="purchase-add-installment" class="pc-link" type="button">＋ Dividir em parcelas</button>
+                      <div id="purchase-installments" class="pc-stack"></div>
+                      <p id="purchase-lot-credit-note" class="pc-muted" hidden>Lote fechado usa um vencimento único.</p>
+                    </div>
+                  </div>
+                  <div class="pc-card pc-stack"><h3>Chegada</h3>
+                    <label>Recebimento<select id="purchase-receipt-status"><option value="pending">Ainda não chegou</option><option value="received">Já conferi e recebi</option></select></label>
+                    <label id="purchase-received-date-label" hidden>Recebido em<input id="purchase-received-date" type="date" /></label>
+                    <p id="purchase-receipt-note" class="pc-muted">A entrada no estoque acontece ao conferir a chegada.</p>
+                    <label>Observações (opcional)<textarea id="purchase-notes" maxlength="1000" rows="2"></textarea></label>
+                  </div>
+                  <div id="purchase-verified" class="pc-card pc-verified" hidden></div>
+                </section>
+              </fieldset>
+              <p id="purchase-form-error" class="pc-error" role="alert" hidden></p>
+              <footer class="pc-checkout"><div class="pc-between"><div><strong id="purchase-total-items">Escolha um fornecedor</strong><small id="purchase-total-label">Total dos produtos</small></div><strong id="purchase-total">R$ 0,00</strong></div><button id="purchase-continue" class="pc-button pc-primary pc-full" type="submit">Continuar para pneus →</button><small id="purchase-footer-note">Selecione ou cadastre o fornecedor.</small></footer>
+            </form>
+            <button id="purchase-discard" class="pc-link pc-discard" type="button">Descartar rascunho</button>
+          </div>
+        </section>
         <div id="stock-panel" class="app-panel stock-panel hidden">
           <section class="stock-actions" aria-label="Ações de estoque">
             <button id="stock-product-open" class="stock-action stock-action--primary stock-action--product" type="button">
@@ -1140,6 +1270,9 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>
             <span>Estoque</span>
           </button>
+          <button id="nav-purchases" class="hidden" type="button" data-tab="purchases">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 3h2l3 13h11l3-10H6M10 20h.01M18 20h.01M12 3v6m-3-3h6"/></svg><span>Compras</span>
+          </button>
           <button id="nav-deliveries" type="button" data-tab="deliveries">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 18H3v-5h8l2-5h4l2 5h2v5h-1M9 18h7M8 13l2-5H7M15 8l-1-3"/></svg>
             <span>Entregas</span>
@@ -1161,6 +1294,12 @@
         <div id="app-toast" class="app-toast hidden" role="status"></div>
       </section>
 
+      <dialog id="purchase-dialog" class="pc pc-dialog" aria-labelledby="purchase-detail-title">
+        <header class="pc-between"><h2 id="purchase-detail-title">Compra</h2><button id="purchase-detail-close" class="pc-button pc-icon-button" type="button" aria-label="Fechar detalhes">×</button></header>
+        <div id="purchase-detail" class="pc-stack"></div>
+        <p id="purchase-detail-error" class="pc-error" role="alert" hidden></p>
+        <button id="purchase-confirm-receipt" class="pc-button pc-primary pc-full" type="button" hidden>Confirmar recebimento</button>
+      </dialog>
       <div id="stock-register-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-register-title">
         <button class="account-modal-backdrop" type="button" data-close-stock-register aria-label="Fechar cadastro"></button>
         <article class="account-modal-sheet stock-modal-sheet">

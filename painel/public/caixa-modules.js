@@ -12,6 +12,7 @@
   }
 
   function canModule(name) {
+    if (name === 'purchases') return Caixa.scope() === 'matrix' && Caixa.stored(Caixa.keys.role) === 'owner' && modules().estoque === true;
     if (name === 'team') return Caixa.stored(Caixa.keys.role) === 'owner';
     if (name === 'profile') return true;
     return modules()[name] === true;
@@ -23,6 +24,7 @@
     pickups: 'retiradas',
     catalog: 'estoque',
     stock: 'estoque',
+    purchases: 'purchases',
     'stock-detail': 'estoque',
     'stock-receipts': 'estoque',
     deliveries: 'entregas',
@@ -81,6 +83,7 @@
     setNavigationVisibility('nav-pickups', canModule('retiradas'));
     setNavigationVisibility('nav-catalog', canModule('estoque'));
     setNavigationVisibility('nav-stock', canModule('estoque'));
+    setNavigationVisibility('nav-purchases', canModule('purchases'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
     setNavigationVisibility('nav-team', canModule('team'));
@@ -90,6 +93,7 @@
   }
 
   function initialOperationTab() {
+    if (canModule('purchases') && window.location.hash === '#compras') return 'purchases';
     if (window.location.hash === '#notificacoes') return 'notifications';
     if (canModule('financeiro') && window.location.hash === '#financeiro/entradas') return 'finance-in';
     if (canModule('financeiro') && window.location.hash === '#financeiro/saidas') return 'finance-out';

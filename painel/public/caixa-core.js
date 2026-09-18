@@ -118,6 +118,7 @@
   }
 
   function clearSession() {
+    if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();
     const partnerSlug = stored(keys.slug);
     if (partnerSlug) {
@@ -129,7 +130,6 @@
       localStorage.removeItem(key);
     });
   }
-
   function saveSession(payload) {
     clearSession();
     const storage = elements.remember.checked ? localStorage : sessionStorage;

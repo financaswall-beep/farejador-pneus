@@ -154,8 +154,8 @@ describe('seguranca de inicializacao do painel', () => {
 
     expect(html).toContain('app.atacado.js?v=20260822-continuity1');
     expect(html).toContain('app.atacado.transfer.js?v=20260915-lotsale1');
-    expect(html).toContain('app.compras.relatorios.js?v=20260825-price-compare1');
-    expect(html).toContain('app.compras.precos.js?v=20260825-price-history1');
+    expect(html).toContain('app.compras.relatorios.js?v=20260918-prices1');
+    expect(html).toContain('app.compras.precos.js?v=20260918-prices1');
     expect(html).toContain('app.compras.reposicao.js?v=20260916-vehicle-ui1');
     expect(html).toContain('app.compras.reposicao.pdf.js?v=20260825-replenishment3');
     expect(html).toContain('app.compras.acoes.js?v=20260915-lot1');

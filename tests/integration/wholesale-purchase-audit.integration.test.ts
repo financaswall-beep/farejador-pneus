@@ -62,6 +62,40 @@ describe('fechamento das auditorias funcional e matematica de Compras', () => {
     process.env.MATRIZ_CENTRAL_LEDGER = 'false';
   });
 
+  it('encerra conferência com uma medida ausente, sem custo ou estoque para o item zerado', async () => {
+    const pending = await registerPurchase({
+      environment: 'test', supplier_id: supplierId, created_by: 'owner:app',
+      purchased_at: '2026-08-20T12:00:00-03:00', payment_status: 'pending',
+      due_date: '2026-10-20', receipt_status: 'pending', idempotency_key: randomUUID(),
+      freight_amount: 5, discount_amount: 2,
+      items: [
+        { measure, brand: 'Technic', tire_condition: 'novo', quantity: 2, unit_cost: 10 },
+        { measure, brand: 'Levorin', tire_condition: 'novo', quantity: 1, unit_cost: 90 },
+      ],
+    }, db.pool);
+    const lines = await db.pool.query<{ id: string; brand: string }>(
+      `SELECT id,brand FROM commerce.wholesale_purchase_items WHERE environment='test' AND purchase_id=$1`,
+      [pending.purchase_id],
+    );
+    const confirmation = { environment: 'test' as const, purchase_id: pending.purchase_id,
+      confirmed_by: 'owner:app', idempotency_key: randomUUID(),
+      items: lines.rows.map(row => ({ item_id: row.id, accepted_quantity: row.brand === 'Levorin' ? 0 : 2 })) };
+    const first = await confirmPurchase(confirmation, db.pool);
+    expect(await confirmPurchase(confirmation, db.pool)).toEqual(first);
+    const proof = await db.pool.query(
+      `SELECT p.total_amount::text,p.status,
+         (SELECT i.allocated_cost::text FROM commerce.wholesale_purchase_items i
+           WHERE i.environment=p.environment AND i.purchase_id=p.id AND i.brand='Levorin') absent_cost,
+         (SELECT COALESCE(sum(m.qty_delta),0)::int FROM commerce.wholesale_stock_movements m
+           WHERE m.environment=p.environment AND m.ref=p.id::text) stock_delta,
+         (SELECT finance.matriz_ledger_obligation_balance('test',t.id)::text
+           FROM finance.matriz_ledger_transactions t WHERE t.environment=p.environment
+           AND t.source_type='commerce.wholesale_purchase.accrual' AND t.source_id=p.id::text) balance
+       FROM commerce.wholesale_purchases p WHERE p.environment='test' AND p.id=$1`, [pending.purchase_id],
+    );
+    expect(proof.rows[0]).toEqual({ total_amount: '23.00', status: 'confirmed', absent_cost: '0.00', stock_delta: 2, balance: '23.00' });
+  });
+
   function purchase(cost: number, purchaseBrand = brand) {
     return registerPurchase({
       environment: 'test', supplier_id: supplierId, created_by: 'owner:audit',

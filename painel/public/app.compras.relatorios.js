@@ -209,46 +209,14 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         .map((part) => part[0].toUpperCase()).join('');
     },
     comprasPriceGroups() {
-      const groups = new Map();
-      for (const row of this.comprasPriceRows) {
-        const key = this.stockVariantKey(row);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push({ ...row });
-      }
-      return [...groups.entries()].map(([variantKey, rows]) => {
-        rows.sort((a, b) => Number(a.avg_cost) - Number(b.avg_cost));
-        const best = Number(rows[0]?.avg_cost || 0);
-        rows.forEach((row, index) => {
-          row.cheapest = index === 0;
-          row.diff_pct = best > 0 ? ((Number(row.avg_cost) - best) / best) * 100 : 0;
-        });
-        return {
-          variant_key: variantKey, measure: rows[0]?.measure, brand: rows[0]?.brand, tire_condition: rows[0]?.tire_condition,
-          suppliers: rows, qty: rows.reduce((sum, row) => sum + Number(row.qty_total || 0), 0),
-        };
-      }).sort((a, b) => b.qty - a.qty || a.measure.localeCompare(b.measure));
+      return window.PurchasePriceUtils.groups(this.comprasPriceRows);
     },
     comprasPriceSelected() {
       return this.comprasPriceGroups().find((group) =>
         group.variant_key === this.comprasPriceSelectedMeasure) || null;
     },
     comprasPriceCards() {
-      const groups = this.comprasPriceGroups();
-      const suppliers = this.comprasPriceSelected()?.suppliers || [];
-      const best = suppliers[0] || null;
-      const alternative = suppliers[1] || null;
-      const bestCost = Number(best?.avg_cost || 0);
-      const alternativeCost = Number(alternative?.avg_cost || 0);
-      const quantity = Math.min(100000, Math.max(1,
-        Math.round(Number(this.comprasPriceQuantity) || 1)));
-      const difference = alternative ? Math.max(0, alternativeCost - bestCost) : 0;
-      return {
-        variants: groups.length,
-        compared: groups.filter((group) => group.suppliers.length > 1).length,
-        withoutCompetition: groups.filter((group) => group.suppliers.length < 2).length,
-        suppliers: suppliers.length, best, alternative, difference, quantity,
-        total: bestCost * quantity, savings: difference * quantity,
-      };
+      return window.PurchasePriceUtils.cards(this.comprasPriceGroups(), this.comprasPriceSelectedMeasure, this.comprasPriceQuantity);
     },
     comprasUsePrice(row) {
       if (!row.supplier_archived) this.compraForm.supplierKey = row.supplier_id;
