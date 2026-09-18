@@ -4,7 +4,7 @@
   const Caixa = window.Caixa;
   const state = Caixa.operationCatalogState = {
     rows: [], brands: [], summary: {}, page: 1, pages: 1,
-    query: '', brand: '', filter: 'all', request: 0,
+    query: '', brand: '', filter: 'all', request: 0, loaded: false, loading: false, error: false,
   };
 
   function number(value) {
@@ -87,6 +87,7 @@
     const requestedPage = Math.max(1, Number(page) || 1);
     const request = ++state.request;
     const session = Caixa.sessionFingerprint();
+    state.loading = true; state.error = false;
     view()?.setLoading(Boolean(append));
     document.getElementById('matrix-catalog-create')?.classList.toggle('hidden', Caixa.isPartner() || !isOwner());
     try {
@@ -110,6 +111,7 @@
       if (request !== state.request || session !== Caixa.sessionFingerprint()) return;
       const incoming = Array.isArray(payload.rows) ? payload.rows : [];
       state.rows = append ? state.rows.concat(incoming) : incoming;
+      state.loaded = true; state.loading = false;
       state.page = number(payload.page) || requestedPage;
       state.pages = Math.max(1, number(payload.pages) || 1);
       state.summary = payload.summary || matrixSummary(state.rows);
@@ -118,6 +120,7 @@
       view()?.render();
       return true;
     } catch (failure) {
+      if (request === state.request) { state.loading = false; state.error = true; }
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       if (request === state.request) view()?.showError();
     }

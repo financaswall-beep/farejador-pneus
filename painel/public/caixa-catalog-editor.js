@@ -3,6 +3,9 @@
   const C = window.Caixa, el = id => document.getElementById(id);
   const dialog = el('matrix-catalog-editor'), form = el('matrix-catalog-form');
   const state = { row: null, busy: false, existing: null };
+  const create = window.CatalogCreateUtils, measureInput = el('matrix-catalog-measure');
+  const measureList = el('matrix-catalog-measure-options');
+  let choices = [], choiceIndex = -1;
   const value = name => el('matrix-catalog-' + name).value.trim();
   const nullable = name => value(name) || null;
   const set = (name, value) => { el('matrix-catalog-' + name).value = value == null ? '' : String(value); };
@@ -47,16 +50,75 @@
   }
   function busy(value) {
     state.busy = value;
+    if (value) closeMeasures();
     dialog.querySelectorAll('button').forEach(button => { button.disabled = value; });
   }
+  function closeMeasures() {
+    measureList.classList.add('hidden');
+    measureInput.setAttribute('aria-expanded', 'false');
+    measureInput.removeAttribute('aria-activedescendant');
+    choiceIndex = -1;
+  }
+  function suggestCode() {
+    if (state.row?.product_id || state.busy) return;
+    if (state.row?.measure_draft && (!value('brand') || !value('condition'))) return;
+    set('code', create.productCode(value('measure'), value('brand'), value('condition')));
+  }
+  function pickMeasure(choice) {
+    if (!choice || state.busy) return;
+    set('measure', choice.measure); measureInput.setCustomValidity('');
+    suggestCode(); closeMeasures();
+  }
+  function renderMeasures() {
+    const catalog = C.operationCatalogState;
+    choices = measureInput.disabled || state.busy ? [] : create.measureChoices(value('measure'),
+      catalog.rows, catalog.loaded && !catalog.loading && !catalog.error);
+    measureList.replaceChildren();
+    choices.forEach((choice, index) => {
+      const option = document.createElement('button'); option.type = 'button'; option.tabIndex = -1;
+      option.id = 'matrix-catalog-measure-option-' + index; option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(index === choiceIndex));
+      const title = document.createElement('strong'), note = document.createElement('small');
+      title.textContent = choice.isNew ? '+ Usar nova medida ' + choice.measure : choice.measure;
+      note.textContent = choice.isNew ? 'Será cadastrada ao salvar o pneu' : 'Já cadastrada';
+      option.append(title, note);
+      option.addEventListener('pointerdown', event => event.preventDefault());
+      option.addEventListener('click', () => pickMeasure(choice)); measureList.append(option);
+    });
+    measureList.classList.toggle('hidden', !choices.length);
+    measureInput.setAttribute('aria-expanded', String(Boolean(choices.length)));
+    if (choices[choiceIndex]) {
+      measureInput.setAttribute('aria-activedescendant', 'matrix-catalog-measure-option-' + choiceIndex);
+      measureList.children[choiceIndex].scrollIntoView({ block: 'nearest' });
+    } else measureInput.removeAttribute('aria-activedescendant');
+  }
+  measureInput.addEventListener('input', () => {
+    measureInput.setCustomValidity(''); choiceIndex = -1; suggestCode(); renderMeasures();
+  });
+  measureInput.addEventListener('focus', () => { choiceIndex = -1; renderMeasures(); });
+  measureInput.addEventListener('blur', closeMeasures);
+  measureInput.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); renderMeasures();
+      choiceIndex = event.key === 'ArrowDown' ? Math.min(choiceIndex + 1, choices.length - 1) : Math.max(0, choiceIndex - 1);
+      renderMeasures();
+    } else if (event.key === 'Enter' && !measureList.classList.contains('hidden')) {
+      event.preventDefault(); pickMeasure(choices[choiceIndex]);
+    } else if (event.key === 'Escape' && !measureList.classList.contains('hidden')) {
+      event.preventDefault(); event.stopPropagation(); closeMeasures();
+    }
+  });
+  ['brand', 'condition'].forEach(name => el('matrix-catalog-' + name).addEventListener('change', suggestCode));
+  el('matrix-catalog-code').addEventListener('input', () => set('code', value('code').toUpperCase()));
   function populate(row) {
     state.row = row; state.existing = null;
     form.reset(); el('matrix-catalog-price-form').reset();
+    closeMeasures(); measureInput.setCustomValidity('');
     const editing = Boolean(row?.product_id), stock = !editing && row?.creation_mode === 'stock';
     el('matrix-catalog-title').textContent = editing ? 'Configurar pneu' : stock ? 'Completar cadastro' : 'Cadastrar pneu';
     el('matrix-catalog-identity').disabled = editing;
     set('measure', row?.tire_size); set('brand', C.canonicalCatalogBrand(row?.brand));
-    set('condition', row?.tire_condition); set('code', row?.product_code);
+    set('condition', row ? row.tire_condition : 'meia_vida'); set('code', row?.product_code);
     set('vehicle', row?.vehicle_type); set('position', row?.tire_position);
     set('tread', row?.tread_pattern); set('load', row?.load_index); set('speed', row?.speed_rating);
     set('price', row?.local_sale_price_min);
@@ -69,6 +131,7 @@
     el('matrix-catalog-fitments-open').classList.toggle('hidden', !editing);
     el('matrix-catalog-existing').classList.add('hidden');
     el('matrix-catalog-save').textContent = editing ? 'Salvar ficha técnica' : 'Cadastrar pneu';
+    if (!editing && row?.tire_size) suggestCode();
   }
   function open(row) {
     if (!allowed() || state.busy) return;
@@ -88,7 +151,12 @@
     if (C.loadStock) void C.loadStock();
   }
   form.addEventListener('submit', async event => {
-    event.preventDefault(); if (!allowed() || state.busy || !form.reportValidity()) return;
+    event.preventDefault(); if (!allowed() || state.busy) return;
+    if (!state.row?.product_id) {
+      const measure = create.measureValue(value('measure'));
+      measureInput.setCustomValidity(measure ? '' : 'Escolha uma medida ou informe uma completa, como 90/90-18 ou 3.00-18.');
+    }
+    if (!form.reportValidity()) return;
     busy(true); el('matrix-catalog-message').textContent = ''; let created = false;
     const details = spec(), editing = Boolean(state.row?.product_id);
     const measure = value('measure'), brand = value('brand'), condition = value('condition');

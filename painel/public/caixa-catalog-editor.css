@@ -17,6 +17,10 @@
 .matrix-catalog-dialog button:focus-visible,.matrix-catalog-dialog input:focus-visible,.matrix-catalog-dialog select:focus-visible { outline: 3px solid #93c6a7; outline-offset: 2px; }
 .matrix-catalog-message { white-space: pre-line; font-size: 14px; line-height: 1.5; color: #075e3b; }
 .matrix-catalog-note { color: #5d6e64; font-size: 12px; line-height: 1.5; }
+.matrix-catalog-measure-field { position: relative; align-self: start; }
+.matrix-catalog-measure-options { position: absolute; top: calc(100% - 12px); inset-inline: 0; z-index: 5; max-height: 240px; overflow-y: auto; padding: 4px; background: #fff; border: 1px solid #bccfc3; border-radius: 10px; box-shadow: 0 8px 24px #00291925; }
+.matrix-catalog-measure-options button { display: grid; gap: 4px; width: 100%; min-height: 48px; padding: 10px 8px; border: 0; border-radius: 6px; text-align: left; color: #183f2c; background: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.matrix-catalog-measure-options button:hover,.matrix-catalog-measure-options button[aria-selected="true"] { background: #e7f5ec; }
 .matrix-catalog-dialog .matrix-catalog-check { display: flex; align-items: center; gap: 8px; }
 .matrix-catalog-check input { width: 20px; min-height: 20px; }
 #matrix-catalog-create { width: 100%; margin-bottom: 10px; }

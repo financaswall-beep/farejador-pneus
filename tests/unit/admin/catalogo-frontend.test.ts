@@ -15,6 +15,7 @@ function loadCatalogModule() {
   vm.runInNewContext(readFileSync('painel/public/app.vehicle-types.js', 'utf8'), sandbox);
   for (const name of ['ficha', 'descobertas']) vm.runInNewContext(readFileSync('painel/public/app.catalogo.'+name+'.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
+  vm.runInNewContext(readFileSync('painel/public/catalog-create-utils.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.bootstrap.js', 'utf8'), sandbox);
   vm.runInNewContext(
     readFileSync('painel/public/app.catalogo.compatibilidade.js', 'utf8'),
@@ -34,6 +35,20 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('mantém o código automático do cadastro manual e do estoque com a regra compartilhada do app', () => {
+    const context = { ...loadCatalogModule(), adminUser: { role: 'owner' }, $nextTick: vi.fn(),
+      catalogoCadastro: { mode: 'manual', row: null, form: { measure: '90/90-18', brand: 'Téchnic', tire_condition: 'novo' } } };
+    context.catalogoCreateSuggestCode();
+    expect(context.catalogoCadastro.form.product_code).toBe('TEC-909018-NOV');
+    for (const [tire_condition, suffix] of [['meia_vida', 'MV'], ['remold', 'REM']]) {
+      context.catalogoCadastro.form.tire_condition = tire_condition;
+      context.catalogoCreateSuggestCode();
+      expect(context.catalogoCadastro.form.product_code).toBe('TEC-909018-' + suffix);
+    }
+    context.catalogoCreateOpen({ catalogued: false, tire_size: '100/80-16', brand: 'Levorin', tire_condition: 'meia_vida' });
+    expect(context.catalogoCadastro.form.product_code).toBe('LEV-1008016-MV');
+  });
+
   it('sugere medidas de produtos e pré-cadastros sem repetir por marca', () => {
     const context = { ...loadCatalogModule(), catalogoCadastro: { form: { measure: '130 70' } },
       catalogoRows: [

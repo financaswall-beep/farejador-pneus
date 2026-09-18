@@ -3,12 +3,6 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
   return {
     catalogoCreateOpen(row) {
       if (this.adminUser?.role !== 'owner' || !row || row.catalogued !== false) return;
-      const brandCode = String(row.brand || '').normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '')
-        .slice(0, 3).toUpperCase() || 'PNE';
-      const measureCode = String(row.tire_size || '').replace(/\D/g, '') || 'MEDIDA';
-      const conditionCode = row.tire_condition === 'novo' ? 'NOV'
-        : row.tire_condition === 'remold' ? 'REM' : 'MV';
       this.catalogoCadastro = {
         open: true,
         mode: 'stock',
@@ -18,7 +12,7 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
           measure: row.tire_size,
           brand: row.brand,
           tire_condition: row.tire_condition,
-          product_code: `${brandCode}-${measureCode}-${conditionCode}`,
+          product_code: window.CatalogCreateUtils.productCode(row.tire_size, row.brand, row.tire_condition),
           product_name: `Pneu ${row.brand} ${row.tire_size}`,
           price_amount: '',
           tread_pattern: '', load_index: '', speed_rating: '', position: '',
@@ -58,47 +52,18 @@ window.PAINEL_MODULES.catalogoBootstrap = function () {
       const form = this.catalogoCadastro.form;
       if (this.catalogoCadastro.row?.measure_draft
         && (!String(form.brand || '').trim() || !form.tire_condition)) return;
-      const brandCode = String(form.brand || '').normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '')
-        .slice(0, 3).toUpperCase() || 'PNE';
-      const measureCode = String(form.measure || '').replace(/\D/g, '') || 'MEDIDA';
-      const conditionCode = form.tire_condition === 'novo' ? 'NOV'
-        : form.tire_condition === 'remold' ? 'REM' : 'MV';
-      form.product_code = `${brandCode}-${measureCode}-${conditionCode}`;
+      form.product_code = window.CatalogCreateUtils.productCode(form.measure, form.brand, form.tire_condition);
       form.product_name = `Pneu ${String(form.brand || '').trim()} ${String(form.measure || '').trim()}`
         .trim().replace(/\s+/g, ' ');
     },
 
-    // A medida nominal segue o parser do cadastro; não preenche a ficha do pneu.
     catalogoCreateMeasureValue(value) {
-      const text = String(value || '').trim().replace(/\s+/g, '').replace(',', '.');
-      const metric = text.match(/^(\d{2,3})\/(\d{2,3})(?:-|R)(\d{2})$/i);
-      if (metric) {
-        const [, width, aspect, rim] = metric.map(Number);
-        return width >= 50 && width <= 400 && aspect >= 20 && aspect <= 100 && rim >= 8 && rim <= 30
-          ? `${width}/${aspect}-${metric[3]}` : '';
-      }
-      const inch = text.match(/^(\d\.\d{1,2})(?:-|R)(\d{2})$/i);
-      return inch && Number(inch[1]) >= 1.5 && Number(inch[1]) <= 8 && Number(inch[2]) >= 8 && Number(inch[2]) <= 30
-        ? `${Number(inch[1]).toFixed(2)}-${inch[2]}` : '';
+      return window.CatalogCreateUtils.measureValue(value);
     },
 
     catalogoCreateMeasureChoices() {
-      const raw = String(this.catalogoCadastro.form.measure || '').trim().toUpperCase();
-      if (!raw) return [];
-      const digits = raw.replace(/\D/g, '');
-      const exact = this.catalogoCreateMeasureValue(raw);
-      const measures = [...new Set((this.catalogoRows || [])
-        .filter(row => row.product_type === 'tire')
-        .map(row => this.catalogoCreateMeasureValue(row.tire_size)).filter(Boolean))];
-      const choices = measures.filter(measure => measure.includes(raw)
-        || (digits && measure.replace(/\D/g, '').includes(digits)) || measure === exact)
-        .sort((a, b) => Number(b === exact) - Number(a === exact) || a.localeCompare(b, 'pt-BR', { numeric: true }))
-        .slice(0, 8).map(measure => ({ measure, isNew: false }));
-      if (exact && !measures.includes(exact) && !this.catalogoLoading && !this.catalogoError) {
-        choices.push({ measure: exact, isNew: true });
-      }
-      return choices;
+      return window.CatalogCreateUtils.measureChoices(this.catalogoCadastro.form.measure,
+        this.catalogoRows, !this.catalogoLoading && !this.catalogoError);
     },
 
     catalogoCreateMeasurePick(choice) {

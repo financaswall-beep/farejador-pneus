@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
-  <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog2" />
+  <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260824-operation-catalog1"></script>
@@ -20,9 +20,10 @@
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-catalog.js?v=20260918-catalog2"></script>
+  <script defer src="/operacao/caixa-catalog.js?v=20260918-catalog3"></script>
   <script defer src="/operacao/caixa-catalog-view.js?v=20260918-catalog2"></script>
-  <script defer src="/operacao/caixa-catalog-editor.js?v=20260918-catalog2"></script>
+  <script defer src="/operacao/catalog-create-utils.js?v=20260918-catalog3"></script>
+  <script defer src="/operacao/caixa-catalog-editor.js?v=20260918-catalog3"></script>
   <script defer src="/operacao/caixa-catalog-fitments.js?v=20260918-catalog2"></script>
   <script defer src="/operacao/caixa-stock-edit.js?v=20260822-brand-select1"></script>
   <script defer src="/operacao/caixa-stock.js?v=20260822-brand-select1"></script>
@@ -1455,11 +1456,14 @@
     <button id="matrix-catalog-existing" class="matrix-catalog-secondary hidden" type="button">Abrir cadastro existente</button>
     <form id="matrix-catalog-form">
       <fieldset id="matrix-catalog-identity"><legend>Identificação</legend><div class="matrix-catalog-grid">
-        <label>Medida<input id="matrix-catalog-measure" required maxlength="60" placeholder="90/90-18" /></label>
+        <div class="matrix-catalog-measure-field">
+          <label>Medida<input id="matrix-catalog-measure" required maxlength="60" placeholder="Digite a medida..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="matrix-catalog-measure-options" aria-expanded="false" aria-describedby="matrix-catalog-measure-help" /></label>
+          <div id="matrix-catalog-measure-options" class="matrix-catalog-measure-options hidden" role="listbox" aria-label="Sugestões de medida"></div>
+        </div>
         <label>Marca<select id="matrix-catalog-brand" required><option value="">Selecione</option></select></label>
         <label>Condição<select id="matrix-catalog-condition" required><option value="">Selecione</option><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></label>
-        <label>Código do produto<input id="matrix-catalog-code" required minlength="2" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._\/\-]{1,79}" placeholder="Ex.: TEC-909018-N" /></label>
-      </div></fieldset>
+        <label>Código do produto<input id="matrix-catalog-code" required minlength="2" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._\/\-]{1,79}" placeholder="Gerado automaticamente" /><small>Pode ser ajustado antes de salvar.</small></label>
+      </div><p id="matrix-catalog-measure-help" class="matrix-catalog-note">Busque uma medida ou digite uma nova. Ex.: 90/90-18 ou 3.00-18.</p></fieldset>
       <fieldset><legend>Ficha técnica</legend><div class="matrix-catalog-grid">
         <label>Tipo de veículo<select id="matrix-catalog-vehicle"><option value="">Não identificado</option><option value="motorcycle">Moto</option><option value="car">Carro</option></select></label>
         <label>Posição<select id="matrix-catalog-position"><option value="">Não informada</option><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Ambos</option></select></label>
