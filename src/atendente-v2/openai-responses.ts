@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { env } from '../shared/config/env.js';
 import type { ChatMessage, ToolCall, ToolDefinition } from './types.js';
-import { requestOpenAIResponse } from './openai-responses-http.js';
+import { requestOpenAIResponse, type OpenAIUsageObserver } from './openai-responses-http.js';
 
 const outputSchema = z.array(z.discriminatedUnion('type', [
   z.object({ type: z.literal('reasoning') }).passthrough(),
@@ -61,7 +61,7 @@ export interface AgentModelResponse {
  * criptografado) entre ferramentas, sem gravá-los no banco ou nos logs.
  * agent.turns.actions continua no formato ChatMessage usado pelo histórico.
  */
-export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: ToolDefinition[]) {
+export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: ToolDefinition[], observer?: OpenAIUsageObserver) {
   const input = historyToInput(history);
   const tools = definitions.map(({ function: fn }) => ({ type: 'function', ...fn, strict: fn.strict ?? false }));
   const allowedNames = new Set(definitions.map((tool) => tool.function.name));
@@ -84,7 +84,7 @@ export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: T
         max_output_tokens: env.AGENT_V2_MAX_OUTPUT_TOKENS,
         ...(reasoningModel ? { reasoning: { effort: 'medium' }, include: ['reasoning.encrypted_content'] } : {}),
         // Cache implícito do provedor; não enviar prompt_cache_retention, legado no GPT-5.6.
-      }));
+      }), observer);
       const envelope = z.object({ status: z.string(), output: z.unknown(),
         incomplete_details: z.object({ reason: z.string() }).nullish(), usage: z.unknown().optional(),
       }).safeParse(raw);

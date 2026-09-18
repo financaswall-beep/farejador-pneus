@@ -52,16 +52,21 @@ export async function readOverviewSales(db: Pool, environment: string, from: str
   return { summary, daily };
 }
 
-/** Same internal estimate as v_daily_metrics, but attributed to the turn date.
- * This is NOT the provider's bill: no model, cache or exchange-rate pricing. */
+/** Provider usage by request date. Unknown pricing/usage must not appear as zero. */
 export async function readOverviewBotCost(db: Pool, environment: string, from: string, to: string) {
   const result = await db.query(`SELECT
-      COALESCE(sum(COALESCE(llm_input_tokens,0)+COALESCE(llm_output_tokens,0)),0)::text tokens,
-      count(*) FILTER(WHERE llm_input_tokens IS NULL OR llm_output_tokens IS NULL)::int missing_usage,
-      count(*)::int turns FROM agent.turns WHERE environment=$1 AND agent_version='v2'
-      AND created_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
-      AND created_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`, [environment,from,to]);
+      COALESCE(sum(input_tokens+output_tokens),0)::text tokens,
+      COALESCE(sum(missing_usage),0)::int missing_usage,COALESCE(sum(calls),0)::int calls,
+      COALESCE(sum(cost_usd),0)::text cost_usd,COALESCE(sum(known_cost_brl),0)::text known_cost_brl,
+      COALESCE(sum(cached_tokens),0)::text cached_tokens,COALESCE(sum(cache_write_tokens),0)::text cache_write_tokens,
+      min(usd_brl_min)::text usd_brl_min,max(usd_brl_max)::text usd_brl_max
+      FROM analytics.v_bot_usage_daily WHERE environment=$1 AND dia BETWEEN $2::date AND $3::date`, [environment,from,to]);
   const row=result.rows[0];
-  return { estimated_cents: Math.round(Number(row.tokens)*550/1_000_000), tokens:Number(row.tokens),
-    turns:row.turns, missing_usage:row.missing_usage, brl_per_million_tokens:5.5 };
+  const partial = Math.round(Number(row.known_cost_brl)*100);
+  return { estimated_cents:row.missing_usage ? null : partial, known_estimated_cents:partial,
+    estimated_usd:row.missing_usage ? null : Number(row.cost_usd), tokens:Number(row.tokens),
+    calls:row.calls, missing_usage:row.missing_usage, cached_tokens:Number(row.cached_tokens),
+    cache_write_tokens:Number(row.cache_write_tokens),
+    usd_brl_min:row.usd_brl_min === null ? null : Number(row.usd_brl_min),
+    usd_brl_max:row.usd_brl_max === null ? null : Number(row.usd_brl_max) };
 }

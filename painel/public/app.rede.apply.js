@@ -15,7 +15,7 @@ window.PAINEL_MODULES.redeApply = function () {
         { label: 'Conversas', value: String(m.conversas || 0), delta: `${m.fecharam || 0} fecharam`, deltaClass: 'bg-blue-50 text-blue-700', icon: 'message-circle', iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
         { label: 'Conversão', value: `${Number(m.taxa_conversao || 0)}%`, delta: `${m.abandonaram || 0} largaram`, deltaClass: 'bg-emerald-50 text-emerald-700', icon: 'trending-up', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
         { label: 'Faturamento via bot', value: this.formatCurrency(m.faturamento), delta: `ticket ${this.formatCurrency(m.ticket_medio)}`, deltaClass: 'bg-purple-50 text-purple-700', icon: 'wallet', iconBg: 'bg-purple-100', iconColor: 'text-purple-700' },
-        { label: 'Custo do bot', value: this.formatCurrency(m.custo_bot), delta: 'IA no período', deltaClass: 'bg-amber-50 text-amber-700', icon: 'bot', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
+        { label: 'Custo do bot', value: m.custo_bot == null ? '—' : this.formatCurrency(m.custo_bot), delta: Number(m.custo_bot_pendente)>0 ? 'Apuração incompleta' : 'Estimativa · câmbio de referência', deltaClass: 'bg-amber-50 text-amber-700', icon: 'bot', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
       ];
       this.leadsRecuperar = ((data && data.leads) || []).map((l) => ({
         nome: l.cliente_nome || 'Sem nome',

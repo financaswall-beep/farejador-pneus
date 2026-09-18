@@ -42,6 +42,7 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
 
   it('alimenta os cards por ambiente sem contar pedido cancelado', async () => {
     await applyMigrationFile(db.pool, '0238_bot_realized_sales_metrics.sql');
+    await applyMigrationFile(db.pool, '0239_bot_provider_usage_cost.sql');
     const contacts = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment, chatwoot_contact_id, name)
        VALUES ('test', 977001, 'BOT DAILY TEST'),
@@ -149,7 +150,7 @@ describe('0177 - metricas diarias do Bot no schema greenfield', () => {
       ticket_medio: '212.50',
       resposta_media_seg: '60',
       tokens_total: '1500',
-      custo_bot_brl: '0.01',
+      custo_bot_brl: null,
       bucket_total: '4',
     });
 

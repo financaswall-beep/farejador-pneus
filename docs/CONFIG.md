@@ -28,6 +28,7 @@ com validacao Zod, exceto overrides explicitamente documentados como
 | `ORGANIZADORA_ENABLED` | nao | Liga a Organizadora LLM em background. Default `false`. | `true` |
 | `OPENAI_API_KEY` | se Agent V2 ligado | Chave OpenAI do bot e dos consumidores existentes. Manter no gerenciador de segredos. | `<secret>` |
 | `OPENAI_MODEL` | nao | Modelo compartilhado pelo Agent V2 e leitores de comprovantes. Default `gpt-4o-mini`; prod pode sobrescrever. Agent V2 usa Responses API. | `gpt-5.6-sol` |
+| `OPENAI_USD_BRL` | nao | Câmbio de referência para estimar gastos do bot em reais. Default `5.50`; não é cotação automática, spread ou imposto. Gravado por chamada para preservar o histórico. | `5.50` |
 | `OPENAI_TIMEOUT_MS` | nao | Timeout por tentativa OpenAI, incluindo leitura do corpo no Agent V2. Default `30000`. | `30000` |
 | `AGENT_V2_MAX_OUTPUT_TOKENS` | nao | Teto por chamada do bot (reasoning + resposta/ferramentas). Default `8192`, intervalo `1024–32768`. Não altera leitores de comprovantes. | `8192` |
 | `ORGANIZADORA_DEBOUNCE_SECONDS` | nao | Espera apos a ultima mensagem antes de organizar. Default `90`. | `90` |

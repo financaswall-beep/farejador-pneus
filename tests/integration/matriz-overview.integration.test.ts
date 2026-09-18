@@ -28,7 +28,7 @@ it('consulta todos os blocos no schema migrado; zeros são reais e financeiro re
 it('custo acompanha a data do uso, mesmo em uma conversa antiga, e exclui outro período',async()=>{
   await db.pool.query(`INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,llm_input_tokens,llm_output_tokens,created_at)
     VALUES('test',$1,$2,'v2','qa',100000,100000,now()),('test',$1,$3,'v2','qa',9000000,0,now()-interval '90 days')`,[conversation,randomUUID(),randomUUID()]);
-  expect((await read(period,false,db.pool,'test')).bot).toMatchObject({estimated_cents:110,tokens:200000,turns:1});
+  expect((await read(period,false,db.pool,'test')).bot).toMatchObject({estimated_cents:null,tokens:200000,calls:1,missing_usage:1});
   expect((await read(period,false,db.pool,'prod')).bot.tokens).toBe(0);
 });
 it('inclui moto e carro, ignora cancelamento e entrega pendente e não conta serviço como pneu',async()=>{

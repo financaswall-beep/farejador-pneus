@@ -9,6 +9,13 @@ function fixture(){
 }
 const payload=(revenue=100)=>({period:{from:'2026-09-01',to:'2026-09-16',month:'2026-09'},sales:{summary:{revenue},daily:[]},updated_at:'2026-09-16T10:00:00Z'});
 describe('Resumo: filtros e falhas de consulta',()=>{
+  it('distingue custo desconhecido de zero e identifica o câmbio de referência',()=>{
+    const ui=fixture();ui.overview={bot:{missing_usage:1,estimated_cents:null,known_estimated_cents:22}};
+    expect(ui.overviewMoney(ui.overview.bot.estimated_cents)).toBe('—');
+    expect(ui.overviewBotDetail()).toContain('sem custo apurado');
+    ui.overview.bot={missing_usage:0,usd_brl_min:5.5,usd_brl_max:5.5};
+    expect(ui.overviewBotDetail()).toContain('R$ 5,50/US$');
+  });
   it('descarta resposta antiga quando o período muda durante a consulta',async()=>{
     const ui=fixture();let first:any,second:any;
     ui.apiGet.mockImplementationOnce(()=>new Promise(resolve=>{first=resolve;})).mockImplementationOnce(()=>new Promise(resolve=>{second=resolve;}));

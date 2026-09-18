@@ -119,6 +119,28 @@ describe('contrato Responses do Agent V2', () => {
 });
 
 describe('transporte Responses sem efeitos externos nos testes', () => {
+  it('registra consumo antes de rejeitar uma resposta incompleta ou vazia', async () => {
+    const observer=vi.fn().mockResolvedValue(undefined);
+    const raw={...responseBody([]),status:'incomplete',incomplete_details:{reason:'max_output_tokens'}};
+    fetcher.mockResolvedValue(jsonResponse(raw));
+    await expect(createOpenAIResponsesTurn(history,[definition],observer).next()).rejects.toThrow('output token limit');
+    expect(observer).toHaveBeenCalledWith(expect.objectContaining({response:raw}));
+    expect(observer).toHaveBeenCalledTimes(1);
+  });
+  it('registra cada tentativa, sem fingir que 5xx não consumiu tokens', async () => {
+    vi.useFakeTimers();const observer=vi.fn().mockResolvedValue(undefined);
+    fetcher.mockResolvedValueOnce(new Response('',{status:503})).mockResolvedValueOnce(jsonResponse(responseBody()));
+    const result=createOpenAIResponsesTurn(history,[definition],observer).next();await vi.runAllTimersAsync();await result;
+    expect(observer).toHaveBeenCalledTimes(2);
+    expect(observer.mock.calls[0]![0].failure).toBe('http_503');
+    expect(observer.mock.calls[0]![0].id).not.toBe(observer.mock.calls[1]![0].id);
+  });
+  it('falha da medição não repete a chamada já cobrada nem derruba o atendimento', async () => {
+    fetcher.mockResolvedValue(jsonResponse(responseBody()));
+    const observer=vi.fn().mockRejectedValue(Error('db unavailable'));
+    expect((await createOpenAIResponsesTurn(history,[definition],observer).next()).type).toBe('text');
+    expect(fetcher).toHaveBeenCalledTimes(1);expect(observer).toHaveBeenCalledTimes(1);
+  });
   it.each([400, 401, 403, 429])('não repete HTTP %s nem expõe corpo do erro', async (status) => {
     fetcher.mockResolvedValue(new Response('segredo-fixture: dados de cliente', { status }));
     await expect(turn().next()).rejects.toThrow(`OpenAI error ${status}`);

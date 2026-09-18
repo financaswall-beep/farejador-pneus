@@ -1,3 +1,4 @@
+import { BOT_COST_TOTALS_SQL } from './bot-cost-select.js';
 import type { VehicleReportFilter } from '../../shared/tire-vehicle-type.js';
 import { getBotVehicleDemand } from './bot-vehicle-demand.js';
 // Visão do Bot: agregadores somente leitura, exclusivos do painel da matriz.
@@ -9,7 +10,6 @@ import { env } from '../../shared/config/env.js';
 import type { PainelRedePeriod } from './queries-pedidos.js';
 import { getBotMedidasMunicipio, type BotMedidaMunicipio, type BotVisaoMapaRow, type BotVisaoRadarRow } from './queries-bot-demanda.js';
 export type { BotVisaoMapaRow, BotVisaoRadarRow } from './queries-bot-demanda.js';
-
 export interface BotVisaoHorarioRow {
   hora: number;
   conversas: number;
@@ -65,7 +65,7 @@ export async function getBotVisao(
          COALESCE(sum(fecharam), 0)::int AS fecharam,
          COALESCE(sum(escalaram), 0)::int AS escalaram,
          COALESCE(sum(abandonaram), 0)::int AS abandonaram,
-         COALESCE(sum(custo_bot_brl), 0)::numeric AS custo_bot,
+         ${BOT_COST_TOTALS_SQL},
          CASE WHEN sum(conversas_total) > 0
               THEN round(100.0 * sum(fecharam) / sum(conversas_total), 1) ELSE 0 END AS taxa_conversao,
          COALESCE(sum(faturamento), 0)::numeric AS faturamento,

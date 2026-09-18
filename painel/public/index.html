@@ -240,9 +240,9 @@
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
-<script src="/admin/painel/app.rede.apply.js?v=20260823-partner-canary1"></script>
+<script src="/admin/painel/app.rede.apply.js?v=20260917-bot-cost1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.resumo.js?v=20260916-overview1"></script>
+<script src="/admin/painel/app.resumo.js?v=20260917-bot-cost1"></script>
 <script src="/admin/painel/app.resumo.chart.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.core.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
@@ -724,7 +724,7 @@
         <article class="overview-kpi featured"><div><i data-lucide="chart-no-axes-combined"></i><span>Vendas concluídas</span></div><strong x-text="overviewMoney(overview?.sales.summary.revenue)"></strong><p><b x-text="overviewNumber(overview?.sales.summary.orders)"></b> vendas no período</p><small>Varejo e atacado, incluindo lotes</small></article>
         <article class="overview-kpi"><div><i data-lucide="trending-up"></i><span>Resultado do mês</span></div><strong :class="{'negative':overview?.finance?.result_cents<0}" x-text="overviewResult()"></strong><p x-text="overviewResultDetail()"></p><small x-text="overviewMonthLabel(overview?.period.month)"></small></article>
         <article class="overview-kpi"><div><i data-lucide="package"></i><span>Pneus vendidos</span></div><strong x-text="overviewNumber(overview?.sales.summary.tires)"></strong><p x-text="overviewTiresDetail()"></p><small>Unidades nas vendas concluídas</small></article>
-        <article class="overview-kpi"><div><i data-lucide="bot"></i><span>Custo do bot</span><span class="overview-tag" title="Estimativa interna: R$ 5,50 por milhão de tokens de entrada e saída registrados. Não é a fatura da OpenAI; não inclui Google, WhatsApp ou outras APIs.">Estimado</span></div><strong x-text="overviewMoney(overview?.bot.estimated_cents)"></strong><p>Estimativa de IA no período</p><small x-text="overview?.bot.missing_usage ? overview.bot.missing_usage+' respostas sem uso completo registrado' : overviewNumber(overview?.bot.tokens)+' tokens registrados'"></small></article>
+        <article class="overview-kpi"><div><i data-lucide="bot"></i><span>Custo do bot</span><span class="overview-tag" title="Estimativa pelos tokens da API, modelo, leitura e gravação de cache. Conversão pelo câmbio de referência registrado em cada chamada. Não inclui impostos, Google, WhatsApp ou outras APIs.">Estimado</span></div><strong x-text="overviewMoney(overview?.bot.estimated_cents)"></strong><p>Estimativa de IA no período</p><small x-text="overviewBotDetail()"></small></article>
       </div>
       <div class="overview-grid">
         <article class="overview-card overview-sales">
@@ -7443,7 +7443,8 @@
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500">Custo do bot</p>
-          <p class="text-2xl font-semibold mt-1" x-text="botCards ? formatCurrency(Number(botCards.custo_bot || 0)) : '—'"></p>
+          <p class="text-2xl font-semibold mt-1" x-text="botCards?.custo_bot != null ? formatCurrency(Number(botCards.custo_bot)) : '—'"></p>
+          <p class="text-[11px] text-gray-400" x-text="Number(botCards?.custo_bot_pendente)>0 ? 'Apuração incompleta · parcial '+formatCurrency(Number(botCards.custo_bot_parcial || 0)) : (botCards?.cambio_min == null ? 'Estimativa de IA no período' : Number(botCards.cambio_min) === Number(botCards.cambio_max) ? 'Estimado · câmbio de referência '+formatCurrency(Number(botCards.cambio_min))+'/US$' : 'Estimado · câmbio de referência de cada chamada')"></p>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500">Faturamento (bot)</p>

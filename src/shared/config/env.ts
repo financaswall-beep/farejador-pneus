@@ -44,6 +44,8 @@ const envSchema = z.object({
   // OpenAI (usado pelo Agent V2)
   OPENAI_API_KEY: optionalNonEmptyStringSchema,
   OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+  // Câmbio de referência para estimativas, não cotação ao vivo nem fatura do cartão.
+  OPENAI_USD_BRL: z.coerce.number().positive().max(100).default(5.5),
   OPENAI_TIMEOUT_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('30000'),
   SKIP_EVENT_TYPES: z
     .string()

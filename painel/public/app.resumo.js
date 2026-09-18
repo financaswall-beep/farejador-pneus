@@ -43,6 +43,14 @@ window.PAINEL_MODULES.resumo = function () {
       return cents == null ? '—' : new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
     },
     overviewNumber(value) { return value == null ? '—' : Number(value).toLocaleString('pt-BR'); },
+    overviewBotDetail() {
+      const bot=this.overview?.bot;
+      if (!bot) return 'Consultando consumo…';
+      if (bot.missing_usage) return bot.missing_usage+' chamadas sem custo apurado; parcial '+this.overviewMoney(bot.known_estimated_cents);
+      if (bot.usd_brl_min == null) return 'Nenhuma chamada no período';
+      const fx=Number(bot.usd_brl_min).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:4});
+      return bot.usd_brl_min===bot.usd_brl_max ? 'Câmbio de referência: R$ '+fx+'/US$' : 'Câmbio de referência registrado por chamada';
+    },
     overviewMonthLabel(month) {
       return new Date((month || this.overviewMonth)+'-01T12:00:00Z').toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'America/Sao_Paulo'});
     },

@@ -24,6 +24,7 @@ import { createOpenAIResponsesTurn } from './openai-responses.js';
 import { loadCustomerMemory } from './customer-memory.js';
 import { loadCustomerContext } from './customer-context.js';
 import { withStockSearchTrace } from './stock-search-trace.js';
+import { recordBotModelUsage } from './model-usage.js';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -163,7 +164,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     ];
 
     // 3. LLM loop with function calling
-    const modelTurn = createOpenAIResponsesTurn(messages, activeToolDefinitions());
+    const modelTurn = createOpenAIResponsesTurn(messages, activeToolDefinitions(),
+      event => recordBotModelUsage(client, job, event));
     let inputTokens = 0;
     let outputTokens = 0;
     let cachedTokens = 0;
