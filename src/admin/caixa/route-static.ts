@@ -74,6 +74,10 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-deliveries-matrix.js', 'caixa-deliveries-matrix.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-deliveries.js', 'caixa-deliveries.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance.js', 'caixa-finance.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-finance-matrix.css', 'caixa-finance-matrix.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-finance-view.js', 'caixa-finance-view.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-finance-matrix.js', 'caixa-finance-matrix.js', 'text/javascript; charset=utf-8');
+  text('/operacao/finance-waves.svg', 'assets/finance-waves.svg', 'image/svg+xml');
   text('/operacao/caixa-finance-month.js', 'caixa-finance-month.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-entries.js', 'caixa-finance-entries.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-commissions.js', 'caixa-finance-commissions.js', 'text/javascript; charset=utf-8');

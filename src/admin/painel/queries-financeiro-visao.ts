@@ -14,6 +14,7 @@ import { getWholesaleResumo, getVarejoResumo } from './queries-galpao.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
 import { getMatrizFinancialRead, type MatrizFinancialRead } from './queries-financeiro-read-switch.js';
 import { moneyCents } from './stage5-integrity.js';
+import { getMatrizStockCapital } from './matriz-stock-capital.js';
 import {
   getMatrizLedgerOpenItems,
   type FinanceiroPayableItem, type FinanceiroReceivableItem,
@@ -122,12 +123,7 @@ export async function getMatrizFinanceiroVisao(
             [environment, month],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),
-      dbPool.query<{ capital: string; pneus: number }>(
-        `SELECT COALESCE(SUM(quantity_on_hand * unit_cost), 0) AS capital,
-                COALESCE(SUM(quantity_on_hand), 0)::int AS pneus
-           FROM commerce.wholesale_stock WHERE environment = $1`,
-        [environment],
-      ).then((r) => r.rows[0]!),
+      getMatrizStockCapital(environment, dbPool),
       env.MATRIZ_EXPENSES
         ? dbPool.query<{ category: string; total: string }>(
             `SELECT category, SUM(amount) AS total

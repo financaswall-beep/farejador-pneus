@@ -87,6 +87,7 @@
   }
 
   async function loadFinance() {
+    if (!Caixa.isPartner() && Caixa.financeMatrix) return Caixa.financeMatrix.load();
     if (!Caixa.token() || !Caixa.canModule('financeiro')) return;
     if (request) request.abort();
     const controller = new AbortController();

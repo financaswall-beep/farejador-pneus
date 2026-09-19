@@ -31,6 +31,7 @@
     finance: 'financeiro',
     'finance-in': 'financeiro',
     'finance-out': 'financeiro',
+    'finance-statement': 'financeiro',
     'finance-commissions': 'financeiro',
     'finance-commission-detail': 'financeiro',
     team: 'team',
@@ -93,6 +94,7 @@
   }
 
   function initialOperationTab() {
+    if (!Caixa.isPartner() && canModule('financeiro') && window.location.hash === '#financeiro/extrato') return 'finance-statement';
     if (canModule('purchases') && window.location.hash === '#compras') return 'purchases';
     if (window.location.hash === '#notificacoes') return 'notifications';
     if (canModule('financeiro') && window.location.hash === '#financeiro/entradas') return 'finance-in';

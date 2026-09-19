@@ -110,7 +110,6 @@
   function stored(key) {
     return sessionStorage.getItem(key) || localStorage.getItem(key) || '';
   }
-
   function sessionFingerprint() {
     const currentToken = token();
     if (!currentToken) return '';
@@ -118,6 +117,7 @@
   }
 
   function clearSession() {
+    if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();
     const partnerSlug = stored(keys.slug);

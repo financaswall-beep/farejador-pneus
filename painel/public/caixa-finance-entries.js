@@ -197,6 +197,7 @@
   }
 
   function openFinanceMovement(value) {
+    if (!Caixa.isPartner() && Caixa.financeMatrix) { Caixa.financeMatrix.open('statement', value); return; }
     setDirection(value);
     range.value = byId('finance-period-input').value || '30d';
     const mode = currentMode();
@@ -218,6 +219,7 @@
   byId('finance-entries-back').addEventListener('click', closeFinanceEntries);
   byId('finance-entries-retry').addEventListener('click', loadFinanceEntries);
   window.addEventListener('hashchange', function () {
+    if (!Caixa.isPartner()) return;
     if (!Caixa.token() || !Caixa.canModule('financeiro')) return;
     const target = Object.keys(modes).find(function (key) { return modes[key].hash === window.location.hash; });
     if (target && panel.classList.contains('hidden')) {

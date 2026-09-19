@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
+  <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20260918-finance2" />
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
   <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchasevariants1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
@@ -49,6 +50,8 @@
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
+  <script defer src="/operacao/caixa-finance-view.js?v=20260918-finance2"></script>
+  <script defer src="/operacao/caixa-finance-matrix.js?v=20260918-finance2"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
@@ -940,6 +943,62 @@
             </div>
           </div>
         </div>
+
+        <section id="matrix-finance-panel" class="app-panel mf-page hidden" aria-labelledby="mf-title">
+          <header class="mf-heading">
+            <h2 id="mf-title">Financeiro</h2>
+            <label class="mf-period"><span data-mf-icon="calendar"></span><span id="mf-month-label"></span><span data-mf-icon="chevron-down"></span><input id="mf-month" type="month" min="2000-01" aria-label="Mês do financeiro" /></label>
+          </header>
+          <nav class="mf-tabs" aria-label="Seções do financeiro">
+            <button id="mf-tab-summary" type="button" aria-current="page">Resumo</button>
+            <button id="mf-tab-statement" type="button">Extrato</button>
+            <button id="mf-accounts" type="button">Contas</button>
+          </nav>
+          <div class="mf-toolbar"><span id="mf-updated"></span><button id="mf-refresh" type="button" aria-label="Atualizar financeiro"><span data-mf-icon="refresh"></span>Atualizar</button></div>
+          <div id="mf-loading" class="mf-message" role="status"><span class="mf-spinner"></span>Conferindo os lançamentos…</div>
+          <div id="mf-error" class="mf-message hidden" role="alert"><strong>Financeiro indisponível</strong><p id="mf-error-copy"></p><button id="mf-retry" class="mf-primary" type="button">Tentar novamente</button></div>
+          <div id="mf-summary" class="hidden">
+            <section class="mf-balance" aria-label="Saldo em caixa">
+              <span id="mf-balance-label">SALDO EM CAIXA</span>
+              <div><strong id="mf-balance" data-mf-money>—</strong><button id="mf-privacy" type="button" aria-label="Ocultar valores" aria-pressed="false"><span data-mf-icon="eye"></span></button></div>
+              <p>Conforme os lançamentos</p>
+            </section>
+            <div class="mf-cash-pair">
+              <button type="button" data-mf-direction="in"><span class="mf-icon-circle mf-in" data-mf-icon="in"></span><span>Entradas<strong id="mf-incoming" data-mf-money>—</strong></span></button>
+              <button type="button" data-mf-direction="out"><span class="mf-icon-circle mf-out" data-mf-icon="out"></span><span>Saídas<strong id="mf-outgoing" data-mf-money>—</strong></span></button>
+            </div>
+            <p id="mf-warning" class="mf-warning hidden" role="status"></p>
+            <button id="mf-result-card" class="mf-result" type="button" aria-label="Ver cálculo do resultado">
+              <span class="mf-result-main"><span class="mf-icon-circle" data-mf-icon="chart"></span><span><span id="mf-result-label">Lucro do mês</span><strong id="mf-result" data-mf-money>—</strong></span><span class="mf-result-link">Ver cálculo <span data-mf-icon="arrow"></span></span></span>
+              <span class="mf-result-note">Vendas menos custos e despesas.</span>
+            </button>
+            <button id="mf-stock" class="mf-stock" type="button"><span data-mf-icon="tire"></span><span><strong>Em estoque</strong><small id="mf-stock-note">Posição atual · valor de custo</small></span><b id="mf-stock-value" data-mf-money>—</b><span data-mf-icon="chevron"></span></button>
+            <div class="mf-shortcuts">
+              <button type="button" disabled title="Disponível em breve"><span data-mf-icon="expense"></span><span>Lançar despesa</span></button>
+              <button id="mf-commissions" type="button"><span data-mf-icon="team"></span><span>Comissões</span></button>
+              <button type="button" disabled title="Disponível em breve"><span data-mf-icon="chart"></span><span>Relatórios</span></button>
+            </div>
+            <div class="mf-section-heading"><h3>Movimentações</h3><button id="mf-see-all" type="button">Ver todas <span data-mf-icon="arrow"></span></button></div>
+            <div id="mf-recent" aria-live="polite"></div>
+            <p id="mf-recent-error" class="mf-inline-error hidden">Não foi possível carregar as movimentações. <button id="mf-recent-retry" type="button">Tentar novamente</button></p>
+          </div>
+          <section id="mf-statement" class="hidden" aria-labelledby="mf-statement-title">
+            <h3 id="mf-statement-title">Movimentações do caixa</h3>
+            <label class="mf-search"><span data-mf-icon="search"></span><input id="mf-search" type="search" maxlength="120" placeholder="Buscar lançamento" aria-label="Buscar lançamento" /><button id="mf-search-clear" class="hidden" type="button" aria-label="Limpar busca"><span data-mf-icon="close"></span></button></label>
+            <div class="mf-filters" role="group" aria-label="Filtrar movimentações"><button type="button" data-mf-filter="all" aria-pressed="true">Todas</button><button type="button" data-mf-filter="in" aria-pressed="false">Entradas</button><button type="button" data-mf-filter="out" aria-pressed="false">Saídas</button></div>
+            <div id="mf-statement-balances" class="mf-statement-balances"><div><span>Saldo anterior</span><strong id="mf-opening" data-mf-money>—</strong></div><div><span id="mf-closing-label">Saldo atual</span><strong id="mf-closing" data-mf-money>—</strong></div></div>
+            <p id="mf-statement-warning" class="mf-warning hidden" role="status">Há pendências de integração. Confira a conciliação no Financeiro web.</p>
+            <div id="mf-list-loading" class="mf-message hidden" role="status"><span class="mf-spinner"></span>Buscando movimentações…</div>
+            <div id="mf-list-error" class="mf-message hidden" role="alert"><p id="mf-list-error-copy">Não foi possível carregar o extrato.</p><button id="mf-list-retry" class="mf-primary" type="button">Tentar novamente</button></div>
+            <div id="mf-statement-results" aria-live="polite">
+              <div id="mf-list"></div>
+              <div id="mf-pagination" class="mf-pagination"><span id="mf-count"></span><button id="mf-prev" type="button" aria-label="Página anterior"><span data-mf-icon="back"></span></button><button id="mf-next" type="button" aria-label="Próxima página"><span data-mf-icon="chevron"></span></button></div>
+            </div>
+            <p class="mf-explanation"><span data-mf-icon="info"></span><span>Compras pagas aparecem como saída no caixa. No lucro, o custo é descontado quando o pneu é vendido.</span></p>
+            <button class="mf-primary mf-upcoming" type="button" disabled title="Disponível em breve"><span data-mf-icon="plus"></span>Lançar despesa</button>
+          </section>
+          <dialog id="mf-detail" class="mf-dialog" aria-labelledby="mf-detail-title"><header><h3 id="mf-detail-title"></h3><button id="mf-detail-close" type="button" aria-label="Fechar detalhes"><span data-mf-icon="close"></span></button></header><div id="mf-detail-body"></div><button id="mf-detail-done" class="mf-primary" type="button">Concluir</button></dialog>
+        </section>
 
         <div id="finance-entries-panel" class="app-panel finance-entries-page hidden" aria-labelledby="finance-entries-title">
           <header class="finance-entries-toolbar">
