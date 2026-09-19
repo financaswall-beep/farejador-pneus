@@ -3,6 +3,9 @@
   const C = window.Caixa, el = id => document.getElementById(id);
   let masked = false;
   const paths = {
+    filters: ['M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-8 0v6'],
+    settings: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z'],
+    wallet: ['M3 6h18v15H3zM3 6l14-4v4M15 11h6v6h-6zM17 14h1'],
     calendar: ['M4 5h16v16H4zM8 3v4m8-4v4M4 10h16'],
     'chevron-down': ['m7 10 5 5 5-5'], chevron: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'],
     arrow: ['M4 12h16m-6-6 6 6-6 6'], refresh: ['M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6'],
@@ -64,7 +67,8 @@
     const divergent = result.status === 'divergente';
     const partial = !divergent && (result.status === 'custo_pendente' || payload.integration_status === 'yellow');
     const card = el('mf-result-card');
-    card.classList.toggle('is-uncertain', divergent || partial);
+    card.classList.toggle('is-uncertain', divergent);
+    card.classList.toggle('is-partial', partial);
     card.classList.toggle('is-negative', value < 0 && !divergent && !partial);
     card.classList.toggle('is-neutral', value === 0 && !divergent && !partial);
     el('mf-result-label').textContent = divergent ? 'Resultado indisponível' : partial ? 'Resultado parcial'

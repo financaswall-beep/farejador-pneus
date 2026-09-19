@@ -2,7 +2,7 @@
   'use strict';
   const C = window.Caixa, V = C.financeView, el = id => document.getElementById(id);
   const state = { tab: 'summary', direction: 'all', search: '', offset: 0, limit: 25, payload: null, masked: false };
-  let request = null, recentRequest = null, accountsRequest = null, timer = 0;
+  let request = null, recentRequest = null, timer = 0;
   const currentMonth = () => window.FarejadorTime.dateKey(new Date()).slice(0, 7);
   const hidden = (id, value) => el(id).classList.toggle('hidden', value);
   function period() {
@@ -18,7 +18,8 @@
   }
   function cancel() {
     if (request) request.abort(); if (recentRequest) recentRequest.abort();
-    if (accountsRequest) accountsRequest.abort(); accountsRequest = null;
+    if (C.financeAccounts) C.financeAccounts.cancel();
+    if (C.financeCommissionMonth) C.financeCommissionMonth.cancel();
     request = null; recentRequest = null; clearTimeout(timer);
   }
   function valid(context) {
@@ -122,15 +123,28 @@
   }
   async function load() {
     if (!C.token() || C.isPartner() || !C.canModule('financeiro')) return;
+    try { period(); } catch (error) {
+      cancel(); ['mf-summary', 'mf-statement', 'mf-accounts-view', 'mf-commissions-view', 'mf-loading'].forEach(id => hidden(id, true));
+      hidden('mf-error', false); el('mf-error-copy').textContent = errorText(error); return;
+    }
+    hidden('mf-error', true);
+    hidden('mf-accounts-view', state.tab !== 'accounts'); hidden('mf-commissions-view', state.tab !== 'commissions');
+    if (state.tab === 'accounts') return C.financeAccounts.load();
+    if (state.tab === 'commissions') return C.financeCommissionMonth.load();
     return state.tab === 'statement' ? loadStatement() : loadSummary();
   }
   function setTab(tab) {
-    el('mf-detail').close();
-    state.tab = tab === 'finance' ? 'summary' : 'statement';
+    cancel(); el('mf-detail').close();
+    state.tab = tab === 'finance' ? 'summary' : tab === 'finance-accounts' ? 'accounts' : tab === 'finance-commissions' ? 'commissions' : 'statement';
+    hidden('mf-accounts-view', state.tab !== 'accounts'); hidden('mf-commissions-view', state.tab !== 'commissions');
+    hidden('mf-main-tabs', state.tab === 'commissions'); hidden('mf-back', state.tab !== 'commissions'); hidden('mf-commission-subtitle', state.tab !== 'commissions');
+    hidden('mf-error', true); hidden('mf-loading', true);
+    el('mf-title').textContent = state.tab === 'commissions' ? 'Comissões' : 'Financeiro';
+    el('mf-accounts').setAttribute('aria-current', state.tab === 'accounts' ? 'page' : 'false');
     if (tab === 'finance-in' || tab === 'finance-out') { state.direction = tab === 'finance-in' ? 'in' : 'out'; state.offset = 0; }
     el('mf-tab-summary').toggleAttribute('aria-current', state.tab === 'summary');
     el('mf-tab-statement').toggleAttribute('aria-current', state.tab === 'statement');
-    el(state.tab === 'summary' ? 'mf-tab-summary' : 'mf-tab-statement').setAttribute('aria-current', 'page');
+    if (state.tab === 'summary' || state.tab === 'statement') el(state.tab === 'summary' ? 'mf-tab-summary' : 'mf-tab-statement').setAttribute('aria-current', 'page');
     hidden('mf-statement', state.tab !== 'statement'); hidden('mf-summary', true);
     if (!el('mf-month').value) el('mf-month').value = currentMonth();
     try { period(); } catch { /* A tela de erro é preenchida pelo carregamento. */ }
@@ -139,46 +153,23 @@
     if (!C.canModule('financeiro') || C.isPartner()) return;
     state.offset = 0;
     if (tab === 'statement') { state.direction = direction || 'all'; state.search = ''; el('mf-search').value = ''; }
-    const hash = tab === 'statement' ? '#financeiro/extrato' : '#financeiro';
+    if (tab === 'commissions' && C.stored(C.keys.role) !== 'owner') return;
+    const hash = { statement: '#financeiro/extrato', accounts: '#financeiro/contas', commissions: '#financeiro/comissoes' }[tab] || '#financeiro';
     if (location.hash !== hash) history.pushState(null, '', hash);
-    C.showTab(tab === 'statement' ? 'finance-statement' : 'finance');
-    if (tab !== 'statement') void load();
+    C.showTab({ statement: 'finance-statement', accounts: 'finance-accounts', commissions: 'finance-commissions' }[tab] || 'finance');
+    if (tab === 'summary') void load();
   }
   function reset() {
-    cancel(); state.payload = null; state.masked = false; state.search = ''; state.direction = 'all'; state.offset = 0;
+    cancel(); if (C.financeAccounts) C.financeAccounts.reset(); if (C.financeCommissionMonth) C.financeCommissionMonth.reset(); state.payload = null; state.masked = false; state.search = ''; state.direction = 'all'; state.offset = 0;
     el('mf-month').value = ''; el('mf-search').value = ''; el('mf-detail').close();
     el('mf-detail-body').replaceChildren(); el('mf-list').replaceChildren(); el('mf-recent').replaceChildren();
     hidden('mf-summary', true); hidden('mf-statement-results', true); V.privacy(false);
   }
-  async function showAccounts() {
-    if (accountsRequest) accountsRequest.abort();
-    const controller = new AbortController(); accountsRequest = controller;
-    const body = V.dialog('Contas em aberto');
-    body.appendChild(V.node('p', 'Conferindo a posição atual…'));
-    let ctx;
-    try {
-      ctx = context(controller);
-      const payload = await fetchData('/api/caixa/financeiro-simples?period=' + ctx.month, ctx);
-      if (!valid(ctx) || !el('mf-detail').open) return;
-      body.replaceChildren(V.node('p', 'Posição atual, incluindo vencimentos de outros meses.'));
-      for (const [key, title] of [['a_pagar', 'A pagar'], ['a_receber', 'A receber']]) {
-        const group = payload.agenda[key]; body.appendChild(V.node('h4', title));
-        V.lines(body, [['Total em aberto', V.money(group.total)]], true);
-        if (!group.itens.length) body.appendChild(V.node('p', 'Nenhuma conta em aberto.'));
-        group.itens.forEach(row => {
-          V.lines(body, [[row.nome, V.money(row.valor)]], true);
-          body.appendChild(V.node('p', row.due_date ? (row.overdue ? 'Vencida · ' : 'Vencimento · ') + window.FarejadorTime.formatDate(row.due_date) : 'Sem vencimento informado'));
-        });
-      }
-    } catch (error) {
-      if (ctx && ignored(error, ctx)) return;
-      body.replaceChildren(V.node('p', errorText(error)));
-    } finally { if (accountsRequest === controller) accountsRequest = null; }
-  }
   el('mf-month').addEventListener('change', () => { state.offset = 0; el('mf-detail').close(); void load(); });
   el('mf-tab-summary').addEventListener('click', () => open('summary'));
   el('mf-tab-statement').addEventListener('click', () => open('statement'));
-  el('mf-accounts').addEventListener('click', showAccounts);
+  el('mf-accounts').addEventListener('click', () => open('accounts'));
+  el('mf-back').addEventListener('click', () => open('summary'));
   el('mf-see-all').addEventListener('click', () => open('statement'));
   ['mf-refresh', 'mf-retry', 'mf-list-retry'].forEach(id => el(id).addEventListener('click', load));
   el('mf-recent-retry').addEventListener('click', loadRecent);
@@ -211,9 +202,9 @@
   el('mf-detail').addEventListener('click', event => { if (event.target === el('mf-detail')) { const box = el('mf-detail').getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) el('mf-detail').close(); } });
   window.addEventListener('hashchange', () => {
     if (!C.token() || C.isPartner() || !C.canModule('financeiro')) return;
-    const tabs = { '#financeiro': 'finance', '#financeiro/extrato': 'finance-statement', '#financeiro/entradas': 'finance-in', '#financeiro/saidas': 'finance-out' };
+    const tabs = { '#financeiro/contas': 'finance-accounts', '#financeiro/comissoes': 'finance-commissions', '#financeiro': 'finance', '#financeiro/extrato': 'finance-statement', '#financeiro/entradas': 'finance-in', '#financeiro/saidas': 'finance-out' };
     const tab = tabs[location.hash]; if (!tab) return;
     C.showTab(tab); if (tab === 'finance') void load();
   });
-  C.financeMatrix = { load, open, setTab, reset, cancel };
+  C.financeMatrix = { load, open, setTab, reset, cancel, period, updated, currentTab: () => state.tab };
 }());

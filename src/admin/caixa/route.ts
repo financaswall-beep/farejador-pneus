@@ -34,6 +34,8 @@ import { registerCaixaPickupRoutes } from './route-pickups.js';
 import { createCaixaSaleSchema } from './sale-schema.js';
 import { registerCaixaPurchaseRoutes } from './route-purchases.js';
 import { registerCaixaFinanceStatementRoutes } from './route-finance-statement.js';
+import { registerCaixaFinanceAccountsRoutes } from './route-finance-accounts.js';
+import { registerCaixaFinanceCommissionMonthRoutes } from './route-finance-commission-month.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -133,6 +135,8 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   registerCaixaOperationLoginRoutes(fastify, flagGate);
   registerCaixaCommissionRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaFinanceStatementRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
+  registerCaixaFinanceAccountsRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
+  registerCaixaFinanceCommissionMonthRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaTeamRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaNotificationRoutes(fastify, flagGate, requireCaixaAuth);
   registerCaixaOperationStockRoutes(fastify, flagGate, requireCaixaAuth, requireEstoque);

@@ -1,4 +1,4 @@
-/* As superfícies novas ficam restritas ao Resumo e Extrato da Matriz. */
+/* Superfícies do Financeiro da Matriz, preservando os demais módulos. */
 .sales-app.is-finance.is-matrix-finance { color: #102e37; background: #fbfcfc url('/operacao/finance-waves.svg') center top / 100% 1000px repeat-y; }
 .is-matrix-finance .sales-header { min-height: 94px; padding: 22px 20px 14px; align-items: center; background: transparent; color: #123c35; box-shadow: none; }
 .is-matrix-finance .sales-heading h2 { display: none; }

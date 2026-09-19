@@ -113,6 +113,7 @@
   }
 
   function openList() {
+    if (!Caixa.isPartner() && Caixa.financeMatrix) { Caixa.financeMatrix.open('commissions'); return; }
     range = byId('finance-period-input').value || range;
     window.location.hash = '#financeiro/comissoes';
     Caixa.showTab('finance-commissions');

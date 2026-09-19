@@ -32,6 +32,7 @@
     'finance-in': 'financeiro',
     'finance-out': 'financeiro',
     'finance-statement': 'financeiro',
+    'finance-accounts': 'financeiro',
     'finance-commissions': 'financeiro',
     'finance-commission-detail': 'financeiro',
     team: 'team',
@@ -52,6 +53,8 @@
 
   function authorizedOperationTab(tab) {
     if (tab === 'profile' || tab === 'notifications') return tab;
+    if (tab === 'finance-accounts' && Caixa.isPartner()) return firstAllowedTab();
+    if (tab.startsWith('finance-commission') && Caixa.stored(Caixa.keys.role) !== 'owner') return firstAllowedTab();
     const requiredModule = tabModules[tab];
     return requiredModule && canModule(requiredModule) ? tab : firstAllowedTab();
   }
@@ -94,6 +97,7 @@
   }
 
   function initialOperationTab() {
+    if (!Caixa.isPartner() && canModule('financeiro') && location.hash === '#financeiro/contas') return 'finance-accounts';
     if (!Caixa.isPartner() && canModule('financeiro') && window.location.hash === '#financeiro/extrato') return 'finance-statement';
     if (canModule('purchases') && window.location.hash === '#compras') return 'purchases';
     if (window.location.hash === '#notificacoes') return 'notifications';

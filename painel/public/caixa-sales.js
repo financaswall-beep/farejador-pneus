@@ -87,8 +87,8 @@
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
     const finance = tab === 'finance';
-    const financeEntries = tab === 'finance-in' || tab === 'finance-out' || tab === 'finance-statement';
-    const matrixFinance = !Caixa.isPartner() && (finance || financeEntries);
+    const financeEntries = tab === 'finance-in' || tab === 'finance-out' || tab === 'finance-statement' || tab === 'finance-accounts';
+    const matrixFinance = !Caixa.isPartner() && (finance || financeEntries || tab === 'finance-commissions');
     if (!matrixFinance && Caixa.financeMatrix) Caixa.financeMatrix.cancel();
     const financeCommissions = tab === 'finance-commissions';
     const financeCommissionDetail = tab === 'finance-commission-detail';
@@ -113,7 +113,7 @@
     document.getElementById('finance-entries-panel').classList.toggle('hidden', !financeEntries || matrixFinance);
     document.getElementById('matrix-finance-panel').classList.toggle('hidden', !matrixFinance);
     elements.sessionView.classList.toggle('is-matrix-finance', matrixFinance);
-    document.getElementById('finance-commissions-panel').classList.toggle('hidden', !financeCommissions);
+    document.getElementById('finance-commissions-panel').classList.toggle('hidden', !financeCommissions || matrixFinance);
     document.getElementById('finance-commission-detail-panel').classList.toggle('hidden', !financeCommissionDetail);
     document.getElementById('team-panel').classList.toggle('hidden', !team);
     document.getElementById('team-remuneration-panel').classList.toggle('hidden', !teamRemuneration);
@@ -164,7 +164,7 @@
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     document.getElementById('notifications-button').classList.toggle('active', notifications);
     if (!(financeEntries || financeCommissions || financeCommissionDetail)
-      && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/extrato', '#financeiro/comissoes'].includes(window.location.hash)
+      && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/extrato', '#financeiro/contas', '#financeiro/comissoes'].includes(window.location.hash)
         || window.location.hash.startsWith('#financeiro/comissoes/'))) {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
@@ -189,7 +189,8 @@
     if (matrixFinance && Caixa.financeMatrix) Caixa.financeMatrix.setTab(tab);
     if (financeEntries && matrixFinance && Caixa.financeMatrix) void Caixa.financeMatrix.load();
     else if (financeEntries && Caixa.loadFinanceEntries) void Caixa.loadFinanceEntries();
-    if (financeCommissions && Caixa.loadFinanceCommissions) void Caixa.loadFinanceCommissions();
+    if (financeCommissions && matrixFinance && Caixa.financeMatrix) void Caixa.financeMatrix.load();
+    else if (financeCommissions && Caixa.loadFinanceCommissions) void Caixa.loadFinanceCommissions();
     if (financeCommissionDetail && Caixa.loadFinanceCommissionDetail) void Caixa.loadFinanceCommissionDetail();
     if (team && Caixa.loadTeam) void Caixa.loadTeam();
     if (teamRemuneration && Caixa.loadTeamRemuneration) void Caixa.loadTeamRemuneration();
