@@ -9,9 +9,10 @@ function app(){
   const C:any={authenticatedFetch:vi.fn(),json:async(r:any)=>r.json(),showToast:vi.fn(),sessionFingerprint:()=> 'fixture',token:()=> 'fixture',elements:{sessionView:element('view'),appHeadingTitle:element('title')}};
   const context={window:{Caixa:C},document:{getElementById:element,addEventListener:vi.fn(),body:element('body')},
     location:{hash:''},history:{replaceState:vi.fn()},URL:{revokeObjectURL:vi.fn()},URLSearchParams,AbortController,AbortSignal,TextDecoder,
-    crypto:{randomUUID:()=> 'client-token'},setTimeout,clearTimeout,setInterval,clearInterval};
+    crypto:{randomUUID:()=> 'client-token'},Date,setTimeout,clearTimeout,setInterval,clearInterval};
   runInNewContext(readFileSync('painel/public/caixa-chat.js','utf8'),context);
   const chat=C.chat;chat.renderConnection=vi.fn();chat.renderMedia=vi.fn();chat.resetMedia=vi.fn();chat.photoNotice=vi.fn();
+  chat.safeUrl=(value:string)=>{try{return new URL(value).href;}catch{return '';}};chat.updateAvatars=vi.fn();
   Object.assign(chat.state,{active:true,session:'fixture',id:'one',detail:{id:'one',mode:'human',version:1}});
   return {chat,C,element,context};
 }
@@ -58,5 +59,30 @@ describe('estado assíncrono do chat da operação',()=>{
     const rows=chat.state.rows;chat.api=vi.fn().mockResolvedValueOnce({rows:rows.slice(0,30),has_more:true,total:60,needs_total:60})
       .mockResolvedValueOnce({rows:rows.slice(30),has_more:false});
     await chat.loadList();expect(chat.state.rows).toHaveLength(60);expect(chat.state.hasMore).toBe(false);
+  });
+  it('recupera a foto após falha transitória sem exigir sair da sessão',async()=>{
+    const {chat}=app();chat.api=vi.fn().mockRejectedValueOnce(Error('offline')).mockResolvedValue({url:'https://example.test/avatar.jpg'});
+    await chat.loadAvatar('one');expect(chat.state.avatars.has('one')).toBe(false);
+    await chat.loadAvatar('one');expect(chat.api).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30000);await chat.loadAvatar('one');
+    expect(chat.state.avatars.get('one')).toBe('https://example.test/avatar.jpg');expect(chat.api).toHaveBeenCalledTimes(2);
+  });
+  it('carrega também contatos depois do oitavo, com no máximo quatro buscas simultâneas',async()=>{
+    const {chat}=app();chat.state.id=null;chat.state.rows=Array.from({length:12},(_,i)=>({id:String(i)}));
+    let active=0,max=0;chat.api=vi.fn(async()=>{active++;max=Math.max(active,max);await new Promise(r=>setTimeout(r,10));active--;return {url:'https://example.test/avatar.jpg'};});
+    chat.loadQueueAvatars();expect(chat.api).toHaveBeenCalledTimes(4);await vi.advanceTimersByTimeAsync(100);
+    expect(chat.api).toHaveBeenCalledTimes(12);expect(max).toBe(4);expect(chat.state.avatars.size).toBe(12);
+  });
+  it('atualiza só a foto ao receber a URL, preservando o chat e a fila',async()=>{
+    const {chat}=app();chat.renderQueue=vi.fn();chat.renderThread=vi.fn();chat.api=vi.fn().mockResolvedValue({url:'https://example.test/photo.jpg'});
+    await chat.loadAvatar('one');expect(chat.updateAvatars).toHaveBeenCalledWith('one');
+    expect(chat.renderQueue).not.toHaveBeenCalled();expect(chat.renderThread).not.toHaveBeenCalled();
+    chat.avatarFailed('one','https://example.test/photo.jpg');expect(chat.state.avatars.get('one')).toBeNull();
+    chat.refreshAvatars();await Promise.resolve();await Promise.resolve();expect(chat.api).toHaveBeenCalledTimes(2);
+  });
+  it('descarta a foto que chegou depois do logout',async()=>{
+    const {chat}=app(),photo=deferred();chat.api=vi.fn().mockReturnValue(photo.promise);
+    const pending=chat.loadAvatar('one');chat.reset();chat.state.session='new';photo.resolve({url:'https://example.test/private.jpg'});await pending;
+    expect(chat.state.avatars.size).toBe(0);expect(chat.updateAvatars).not.toHaveBeenCalled();
   });
 });

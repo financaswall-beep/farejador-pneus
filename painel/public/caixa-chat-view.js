@@ -10,13 +10,27 @@
     refresh:'M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 14 0M5 17a8 8 0 0 0 14 0',
     filter:'M3 5h18M6 12h12M9 19h6',chat:'M4 3h16v14H9l-5 4V3Zm4 5h8m-8 4h5',close:'m6 6 12 12M6 18 18 6',photo:'M3 3h18v18H3V3Zm0 13 6-6 12 10M16 7h.01'};
   ch.icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]||paths.chat}"/></svg>`;
-  ch.escape=esc;ch.safeUrl=value=>{try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:'';}catch(_){return '';}};
+  ch.escape=esc;ch.safeUrl=value=>{try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password?u.href:'';}catch(_){return '';}};
   const time=value=>value?new Date(value).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
   ch.currency=value=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   function wait(value){const m=Math.max(0,Math.floor((Date.now()-new Date(value))/60000));return m<1?'Agora':m<60?m+' min':m<1440?Math.floor(m/60)+' h':Math.floor(m/1440)+' d';}
-  function channel(row){return ({whatsapp:'WhatsApp',instagram:'Instagram',facebook:'Facebook',web:'Chatwoot'})[row.channel_type]||'Chatwoot';}
-  function avatar(row){const url=ch.safeUrl(s.avatars.get(row.id));return `<span class="chat-avatar">${url?`<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:esc((row.name||'Cliente').split(/\s+/).slice(0,2).map(v=>v[0]).join(''))}</span>`;}
+  function channelKey(row){const raw=String(row.channel_type||'').toLowerCase();return ['whatsapp','instagram','facebook'].find(key=>raw.includes(key))||'web';}
+  function channel(row){return ({whatsapp:'WhatsApp',instagram:'Instagram',facebook:'Facebook',web:'Chatwoot'})[channelKey(row)];}
+  const channelPaths={
+    whatsapp:'<path d="M20.5 11.8a8.4 8.4 0 0 1-12.4 7.4L3 20.5l1.4-5A8.4 8.4 0 1 1 20.5 11.8Z"/><path d="M8.3 7.7c.4-.3 1.1 1.4 1.2 1.7s-.6.9-.6 1.1c.5 1.3 1.6 2.4 3 3 .3.1.8-.9 1.1-.9s2 .8 2.1 1.1c.2.8-.8 1.6-1.5 1.7-2.5.4-6.7-3.6-6.8-6.2 0-.6.7-1.5 1.5-1.5Z"/>',
+    instagram:'<rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".8" fill="currentColor" stroke="none"/>',
+    facebook:'<path d="M14 21v-8h3l.5-4H14V7c0-1 .4-1.5 1.7-1.5H18V2.2A25 25 0 0 0 15 2c-3 0-5 1.8-5 5v2H7v4h3v8" fill="currentColor" stroke="none"/>',
+    web:'<path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3V6a2 2 0 0 1 1-2Z"/><path d="M8 9h8m-8 4h5"/>'};
+  function channelBadge(row){return `<span class="chat-channel-badge ${channelKey(row)}" role="img" aria-label="${channel(row)}" title="${channel(row)}"><svg viewBox="0 0 24 24" aria-hidden="true">${channelPaths[channelKey(row)]}</svg></span>`;}
+  function avatar(row){const url=ch.safeUrl(s.avatars.get(row.id));return `<span class="chat-avatar" data-avatar="${esc(row.id)}"><span class="chat-avatar-initials">${esc((row.name||'Cliente').trim().split(/\s+/).slice(0,2).map(v=>v[0]||'').join('').toUpperCase())}</span>${url?`<img src="${esc(url)}" alt="" decoding="async" referrerpolicy="no-referrer">`:''}${channelBadge(row)}</span>`;}
   ch.avatar=avatar;
+  ch.updateAvatars=function(id){
+    document.querySelectorAll('[data-avatar]').forEach(node=>{
+      if(id&&node.dataset.avatar!==id)return;const url=ch.safeUrl(s.avatars.get(node.dataset.avatar));let img=node.querySelector('img');
+      if(!url){img?.remove();return;}if(!img){img=document.createElement('img');img.alt='';img.decoding='async';img.referrerPolicy='no-referrer';node.append(img);}
+      img.onerror=()=>ch.avatarFailed(node.dataset.avatar,url);if(img.getAttribute('src')!==url)img.src=url;
+    });
+  };
   function controls(row){return ['human','bot'].map(mode=>`<button type="button" data-control="${mode==='human'?'takeover':'resume'}" data-id="${esc(row.id)}"
     class="chat-mode ${mode} ${row.mode===(mode==='human'?'human':'auto')?'selected':''}" aria-label="${mode==='human'?'Assumir atendimento':'Ativar bot'}"
     title="${mode==='human'?'Assumir atendimento':'Ativar bot'}" aria-pressed="${row.mode===(mode==='human'?'human':'auto')}">${ch.icon(mode)}</button>`).join('');}
@@ -54,8 +68,7 @@
       const label=row.photo_request_id?(row.photo_status==='answered'?'Foto em envio':'Pediu foto'):row.send_failed?'Falha no envio':row.mode==='human'?'Atendimento humano':row.waiting?'Resposta pendente':'Aguardando cliente';
       return `<article class="chat-row ${row.id===s.id?'selected':''}"><button class="chat-open-row" data-open="${esc(row.id)}">${avatar(row)}<span class="chat-row-text"><strong>${esc(row.name||'Cliente')}</strong><span>${esc(row.last_message||'Anexo recebido')}</span><small>${esc([measures,location].filter(Boolean).join(' · ')||channel(row))}</small><em class="${row.photo_request_id?'photo':''}">${row.photo_request_id?ch.icon('camera'):''}${esc(label)}</em></span></button><div class="chat-row-actions"><small>${row.last_customer_at?wait(row.last_customer_at):''}</small><div>${controls(row)}</div></div></article>`;
     }).join('')||`<div class="chat-empty">${s.error?'':'Nenhuma conversa neste filtro.'}</div>`;
-    ch.el('list').querySelectorAll('img').forEach(img=>img.onerror=()=>{img.hidden=true;});
-    s.rows.slice(0,8).forEach(row=>{if(!s.avatars.has(row.id))void ch.loadAvatar(row.id);});
+    ch.updateAvatars();ch.loadQueueAvatars();
   };
   function messageHtml(m){
     const inbound=m.sender_type==='contact',system=m.message_type===2,bot=m.outbound_kind&&!m.outbound_kind.startsWith('operator_')||m.sender_type==='agent_bot';
@@ -78,6 +91,7 @@
     panel.classList.toggle('has-conversation',!!s.id);if(!s.id)return;
     const row=s.detail||s.rows.find(r=>r.id===s.id)||{id:s.id,name:'Carregando…',mode:'auto'};
     ch.el('contact').innerHTML=`<button id="chat-back" class="chat-icon" aria-label="Voltar às conversas">${ch.icon('back')}</button>${avatar(row)}<div><h3>${esc(row.name||'Cliente')}</h3><small>${esc(channel(row))}${row.location?.label?' · '+esc(row.location.label):''}</small></div><div class="chat-top-controls">${controls(row)}</div>`;
+    ch.updateAvatars(s.id);
     ch.el('owner').textContent=row.mode==='human'?'Atendimento humano · bot pausado':'Bot atendendo';
     const measures=(row.interests||[]).flatMap(i=>[i.measure,...i.variants.map(v=>v.condition==='meia_vida'?'Meia-vida':v.condition==='novo'?'Novo':v.condition).filter(Boolean)]);
     const order=row.orders?.[0];
@@ -111,7 +125,7 @@
     if(target.dataset.retryFailed)void ch.retryFailed(target.dataset.retryFailed);
     if(target.hasAttribute('data-dismiss-photo'))ch.el('photo-notice').classList.add('hidden');
     if(target.id==='chat-back')ch.back();if(target.id==='chat-customer')void ch.openCustomer();
-    if(target.id==='chat-refresh'){void ch.loadList();void ch.loadThread();}
+    if(target.id==='chat-refresh'){ch.refreshAvatars();void ch.loadList();void ch.loadThread();}
     if(target.id==='chat-more')void ch.loadList(true);if(target.id==='chat-older')void ch.loadThread(true);
   });
   let searchTimer;ch.el('search').addEventListener('input',event=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{s.search=event.target.value;ch.changeFilter();},300);});

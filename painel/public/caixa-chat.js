@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const C=window.Caixa, chat=C.chat={};
-  const s=chat.state={active:false,id:null,rows:[],detail:null,messages:new Map(),pending:new Map(),drafts:new Map(),avatars:new Map(),
+  const s=chat.state={active:false,id:null,rows:[],detail:null,messages:new Map(),pending:new Map(),drafts:new Map(),avatars:new Map(),avatarExpiry:new Map(),avatarJobs:new Map(),
     filter:'needs',channel:'',search:'',closed:false,offset:0,hasMore:false,next:null,generation:0,listSeq:0,threadSeq:0,
     session:'',loading:false,error:'',threadError:'',connected:false,sending:false,stream:null,poll:0,retry:0,controls:new Map()};
   chat.el=id=>document.getElementById('chat-'+id);
@@ -25,7 +25,7 @@
   chat.reset=function(){
     chat.stop();if(chat.resetMedia)chat.resetMedia();s.session='';s.id=null;s.detail=null;s.rows=[];
     s.pending.forEach(m=>{if(m.preview)URL.revokeObjectURL(m.preview);});
-    s.drafts.clear();s.pending.clear();s.messages.clear();s.avatars.clear();s.controls.clear();
+    s.drafts.clear();s.pending.clear();s.messages.clear();s.avatars.clear();s.avatarExpiry.clear();s.avatarJobs.clear();s.controls.clear();
     s.sending=false;s.listBusy=false;s.threadBusy=false;s.listSeq++;s.threadSeq++;s.filter='needs';s.search='';s.channel='';s.closed=false;
     chat.el('panel')?.classList.add('hidden');chat.el('sheet')?.close();document.body.classList.remove('chat-open');
     if(chat.el('input'))chat.el('input').value='';
@@ -99,11 +99,21 @@
     }catch(error){if(id===s.id&&generation===s.generation){s.threadError=chat.errorText(error);chat.renderThread();}}
     finally{if(seq===s.threadSeq)s.threadBusy=false;}
   };
-  chat.loadAvatar=async function(id){
-    if(s.avatars.has(id))return;s.avatars.set(id,null);const session=s.session;
-    try{const data=await chat.api(chat.path(id)+'/avatar');if(session!==s.session)return;s.avatars.set(id,data.url);
-      chat.renderQueue();if(id===s.id)chat.renderThread();}catch(_){/* iniciais são o fallback */}
+  chat.loadQueueAvatars=function(){if(s.active)[...new Set([s.id,...s.rows.map(row=>row.id)].filter(Boolean))].forEach(id=>void chat.loadAvatar(id));};
+  chat.loadAvatar=function(id){
+    if(s.avatarJobs.has(id))return s.avatarJobs.get(id);
+    if((s.avatarExpiry.get(id)||0)>Date.now()||s.avatarJobs.size>=4)return;
+    const session=s.session,task=(async()=>{
+      try{const data=await chat.api(chat.path(id)+'/avatar');if(session!==s.session)return;
+        const url=chat.safeUrl(data.url);s.avatars.set(id,url||null);s.avatarExpiry.set(id,Date.now()+(url?300000:60000));
+      }catch(_){if(session===s.session)s.avatarExpiry.set(id,Date.now()+30000);}
+      finally{if(s.avatarJobs.get(id)===task){s.avatarJobs.delete(id);chat.updateAvatars?.(id);chat.loadQueueAvatars();}}
+    })();s.avatarJobs.set(id,task);return task;
   };
+  chat.avatarFailed=function(id,url){
+    if(s.avatars.get(id)!==url)return;s.avatars.set(id,null);s.avatarExpiry.set(id,Date.now()+60000);chat.updateAvatars?.(id);
+  };
+  chat.refreshAvatars=function(){s.avatarExpiry.clear();chat.loadQueueAvatars();};
   chat.setControl=async function(id,action){
     if(s.controls.has(id)){await s.controls.get(id);return chat.setControl(id,action);}
     const row=id===s.id?s.detail:s.rows.find(r=>r.id===id);if(!row)return;
