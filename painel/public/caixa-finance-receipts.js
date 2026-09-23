@@ -4,17 +4,21 @@
   const base = '/api/caixa/financeiro-despesas', storage = 'farejador.expense-receipt-draft.v1';
   const fields = ['me-amount', 'me-category', 'me-description', 'me-occurred', 'me-competence', 'me-document', 'me-paid', 'me-due'];
   let receipt = null, busy = false, locked = false, enabled = false, ai = false, request, preview, timer, applied;
+  let filename = 'comprovante.jpg';
   const identity = () => [C.scope(), C.stored(C.keys.user), C.stored(C.keys.name)].join('|');
   const hide = (id, value) => el(id).classList.toggle('hidden', value);
-  const message = text => { el('mer-status').textContent = text; };
+  const message = (text, quiet = false) => { el('mer-status').textContent = text; el('mer-status').classList.toggle('mer-quiet', quiet); };
   function persist() {
     if (!receipt || locked) return;
     sessionStorage.setItem(storage, JSON.stringify({ identity: identity(), id: receipt.id, fields: Object.fromEntries(fields.map(id => [id, el(id).value])),
-      status: C.financeExpense.status(), confirmed: el('mer-confirm').checked, applied }));
+      status: C.financeExpense.status(), confirmed: el('mer-confirm').checked, applied, filename }));
   }
-  function cancel() { request?.abort(); request = null; clearTimeout(timer); busy = false; }
+  function cancel(closeSummary = true) {
+    request?.abort(); request = null; clearTimeout(timer); busy = false;
+    if (closeSummary) { el('mer-summary').close(); window.ExpenseReceiptViewer.close(); }
+  }
   function reset(clear = false) {
-    cancel(); if (preview) URL.revokeObjectURL(preview); preview = null; receipt = null; applied = null;
+    cancel(); if (preview) URL.revokeObjectURL(preview); preview = null; receipt = null; applied = null; filename = 'comprovante.jpg';
     el('mer-preview').removeAttribute('src'); el('mer-confirm').checked = false; message('');
     if (clear) sessionStorage.removeItem(storage);
     window.ExpenseReceiptViewer.close(); render();
@@ -23,8 +27,34 @@
     hide('mer-card', !enabled); hide('mer-photo', !receipt); hide('mer-confirm-field', !receipt || Boolean(receipt.expense_id));
     hide('mer-read', !receipt || !ai || Boolean(receipt.expense_id));
     hide('mer-remove', !receipt); hide('mer-preview', !preview);
+    hide('mer-hint', Boolean(receipt));
+    el('mer-file-name').textContent = filename; el('mer-file-name').title = filename;
     ['mer-camera', 'mer-gallery', 'mer-read', 'mer-remove'].forEach(id => { el(id).disabled = busy || locked; });
+    if (el('mer-summary').open && receipt) summaryContents();
     C.financeExpense?.refresh();
+  }
+  function summaryContents() {
+    const parsed = receipt.status === 'parsed', amount = parsed ? Number(receipt.amount) : NaN;
+    const foundAmount = Number.isFinite(amount) && amount > 0;
+    el('mer-summary-name').textContent = filename; el('mer-summary-name').title = filename;
+    hide('mer-summary-preview', !preview);
+    if (preview) el('mer-summary-preview').src = preview; else el('mer-summary-preview').removeAttribute('src');
+    el('mer-summary-amount').textContent = foundAmount ? C.currency.format(amount) : 'Não identificado';
+    el('mer-summary-amount').classList.toggle('is-missing', !foundAmount);
+    el('mer-summary-merchant').textContent = parsed && receipt.merchant ? receipt.merchant : 'Não identificado';
+    el('mer-summary-date').textContent = parsed && receipt.document_date ? T.formatDate(receipt.document_date) : 'Não identificada';
+    const category = Array.from(el('me-category').options).find(option => option.value === receipt.category);
+    el('mer-summary-category').textContent = parsed && receipt.category ? category?.textContent || receipt.category.replaceAll('_', ' ') : 'Não identificada';
+    el('mer-summary-subtitle').textContent = parsed ? 'Dados extraídos da foto.' : 'Comprovante anexado ao lançamento.';
+    el('mer-summary-note').textContent = receipt.expense_id ? 'Este comprovante já pertence a uma despesa. Consulte o lançamento no Financeiro.'
+      : busy || receipt.processing ? 'Carregando a leitura do comprovante…'
+        : !parsed ? 'Os dados não foram identificados. Você pode conferir a foto e preencher o lançamento.'
+          : receipt.confidence == null || Number(receipt.confidence) < .7 ? 'Leitura com baixa confiança. Confira os dados na foto antes de salvar a despesa.'
+            : 'Confira os dados antes de salvar a despesa.';
+  }
+  function openSummary() {
+    if (!receipt) return;
+    summaryContents(); if (!el('mer-summary').open) el('mer-summary').showModal();
   }
   function apply(row) {
     if (row.status !== 'parsed' || applied === row.reading_id || locked) return;
@@ -41,7 +71,8 @@
       : receipt.processing ? 'A leitura está em andamento. Aguarde…'
         : receipt.status === 'parsed' ? 'Sugestão preenchida. Confira valor, categoria, datas e escolha se já foi paga.' + (receipt.confidence == null || Number(receipt.confidence) < 0.7 ? ' Leitura com baixa confiança.' : '')
           : receipt.status ? 'Não foi possível preencher com segurança. A foto foi salva; complete os campos ou tente ler novamente.'
-            : ai ? 'Foto salva. Pronta para leitura.' : 'Foto salva. Preencha os campos para lançar a despesa.');
+            : ai ? 'Foto salva. Pronta para leitura.' : 'Foto salva. Preencha os campos para lançar a despesa.',
+      !receipt.expense_id && !receipt.processing && receipt.status === 'parsed' && receipt.confidence != null && Number(receipt.confidence) >= .7);
   }
   async function json(path, options, controller) {
     const response = await C.authenticatedFetch(base + path, { ...options, signal: controller.signal });
@@ -55,7 +86,7 @@
     const blob = await response.blob(); if (controller.signal.aborted) return;
     if (preview) URL.revokeObjectURL(preview); preview = URL.createObjectURL(blob); el('mer-preview').src = preview;
   }
-  function context() { cancel(); request = new AbortController(); busy = true; render(); return request; }
+  function context() { cancel(false); request = new AbortController(); busy = true; render(); return request; }
   function poll(controller) {
     if (!receipt?.processing || controller.signal.aborted) return;
     timer = setTimeout(async () => {
@@ -82,7 +113,9 @@
     try {
       const data = await json('/comprovantes', { method: 'POST', headers: { 'Content-Type': file.type }, body: file }, controller);
       if (controller.signal.aborted) return;
-      receipt = data.receipt; applied = null; C.financeExpense.setStatus(''); el('mer-confirm').checked = false; persist();
+      receipt = data.receipt; applied = null; filename = String(file.name || 'comprovante.jpg').slice(0, 180);
+      if (preview) URL.revokeObjectURL(preview); preview = null; el('mer-preview').removeAttribute('src');
+      C.financeExpense.setStatus(''); el('mer-confirm').checked = false; persist();
       await picture(controller); if (controller.signal.aborted) return;
       if (ai && !receipt.status && !receipt.expense_id) await read(false, controller);
       else { apply(receipt); persist(); describe(); poll(controller); }
@@ -98,6 +131,7 @@
     try { draft = JSON.parse(sessionStorage.getItem(storage) || 'null'); if (draft?.identity !== identity()) draft = null; } catch { draft = null; }
     const id = attempt?.receipt_id || receipt?.id || draft?.id;
     if (!id) { render(); return; }
+    if (draft?.id === id && typeof draft.filename === 'string') filename = draft.filename.slice(0, 180) || 'comprovante.jpg';
     receipt = receipt || { id, processing: true };
     const controller = context();
     try {
@@ -143,8 +177,14 @@
   });
   el('mer-read').addEventListener('click', () => { if (!busy && !locked) void read(true); });
   el('mer-remove').addEventListener('click', () => { reset(true); C.financeExpense.setStatus('paid'); });
-  el('mer-open').addEventListener('click', () => { if (receipt) void window.ExpenseReceiptViewer.show(base + '/comprovantes/' + receipt.id + '/previa', C.authenticatedFetch); });
-  el('me-fields').addEventListener('input', event => { if (receipt && !busy && !locked) { if (event.target !== el('mer-confirm')) el('mer-confirm').checked = false; persist(); } });
+  el('mer-open').addEventListener('click', openSummary);
+  el('mer-summary-close').addEventListener('click', () => el('mer-summary').close());
+  el('mer-summary-done').addEventListener('click', () => el('mer-summary').close());
+  el('mer-original').addEventListener('click', () => { if (receipt) void window.ExpenseReceiptViewer.show(base + '/comprovantes/' + receipt.id + '/previa', C.authenticatedFetch); });
+  el('me-form').addEventListener('input', event => {
+    if (!fields.includes(event.target.id) && event.target !== el('mer-confirm')) return;
+    if (receipt && !busy && !locked) { if (event.target !== el('mer-confirm')) el('mer-confirm').checked = false; persist(); }
+  });
   document.querySelectorAll('[data-me-status]').forEach(button => button.addEventListener('click', () => { if (receipt) persist(); }));
   C.financeReceipts = { load, reset, cancel, payload, setLocked, attachment, blocked: () => busy || Boolean(receipt?.processing || receipt?.expense_id),
     saved: () => sessionStorage.removeItem(storage) };

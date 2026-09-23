@@ -3,6 +3,9 @@
   const C = window.Caixa, el = id => document.getElementById(id);
   let masked = false;
   const paths = {
+    camera: ['M8 5l2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z', 'M8 13a4 4 0 1 0 8 0 4 4 0 0 0-8 0'],
+    paperclip: ['m21 11-8 8a6 6 0 0 1-8.5-8.5L13 2a4 4 0 0 1 5.7 5.7l-8.5 8.5a2 2 0 0 1-2.8-2.8l8-8'],
+    external: ['M14 3h7v7M10 14 21 3M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5'],
     filters: ['M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-8 0v6'],
     settings: ['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z'],
     wallet: ['M3 6h18v15H3zM3 6l14-4v4M15 11h6v6h-6zM17 14h1'],

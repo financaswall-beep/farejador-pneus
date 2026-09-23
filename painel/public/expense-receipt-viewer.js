@@ -4,7 +4,7 @@
   function close() {
     controller?.abort(); controller = null;
     if (url) URL.revokeObjectURL(url); url = null;
-    dialog?.remove(); dialog = null;
+    dialog?.close(); dialog?.remove(); dialog = null;
   }
   async function show(path, authenticatedFetch) {
     close(); const current = new AbortController(); controller = current;

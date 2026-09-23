@@ -4,6 +4,12 @@ O proprietário acessa **Financeiro → Lançar despesa**, pelo Resumo ou Extrat
 Pode fotografar ou escolher JPG/PNG/WebP de até 8 MB. A imagem é validada,
 reencodada sem metadados e armazenada privadamente, antes da leitura.
 
+O card **Comprovante** fica abaixo de **Descrição**, com ícones de câmera e
+clipe. Depois de anexar, tocar na miniatura abre o resumo da leitura; **Ver foto
+original** amplia a imagem. Fechar a foto retorna ao resumo, e **Voltar ao
+lançamento** preserva o formulário. Remover o anexo mantém os campos preenchidos.
+Dados não identificados são indicados no resumo, permitindo preenchimento manual.
+
 A IA sugere total, categoria, estabelecimento e data. O usuário confere os
 campos, escolhe Já paga/A pagar e confirma. Nota fiscal não comprova pagamento.
 Erros de leitura permitem nova tentativa ou preenchimento manual com a foto.

@@ -1,12 +1,47 @@
 /* Formulário e relatórios compartilham a textura e os componentes do Financeiro. */
-.mer-open { display: block; padding: 0; border: 0; margin: 12px auto; background: transparent; cursor: zoom-in; }
-#mer-preview { display: block; max-height: 180px; max-width: 100%; border: 1px solid #dae4e8; border-radius: 8px; }
-#mer-card .mf-primary,#mer-card .mf-outline { font-size: 12px; padding: 12px 7px; min-width: 0; }
-#mer-status { color: #516575; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.mer-card { position: relative; padding: 13px; margin: 0 0 18px; border: 1px solid #d8e2e8; border-radius: 13px; background: #ffffffd9; }
+.mer-heading,.mer-actions,.mer-photo,.mer-open,.mer-original { display: flex; align-items: center; }
+.mer-heading { justify-content: space-between; gap: 10px; }
+.mer-heading > div:first-child { min-width: 0; }
+.mer-heading h3 { margin: 0; font-size: 16px; color: #112d37; letter-spacing: -.025em; }
+.mer-heading p { margin: 4px 0 0; font-size: 11px; color: #61717f; }
+.mer-actions { gap: 8px; flex-shrink: 0; }
+.mer-icon-button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; color: #005343; background: #f0f3f5; cursor: pointer; flex-shrink: 0; }
+.mer-icon-button svg { width: 23px; height: 23px; }
+.mer-camera { background: #e4f3ed; }
+.mer-icon-button:disabled { opacity: .45; cursor: default; }
+.mer-photo { gap: 4px; border-top: 1px solid #e4eaee; padding-top: 11px; margin-top: 11px; }
+.mer-open { gap: 10px; flex: 1; min-width: 0; padding: 0; border: 0; color: #173b43; background: transparent; cursor: pointer; text-align: left; }
+.mer-open > span:last-child svg { width: 17px; height: 17px; }
+.mer-thumb { position: relative; display: grid; place-items: center; width: 42px; height: 52px; flex: 0 0 42px; border: 1px solid #e0e7eb; border-radius: 7px; background: #f2f5f6; overflow: hidden; }
+.mer-thumb > span svg { width: 23px; height: 23px; color: #788b95; }
+.mer-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #f7f9fa; padding: 3px; box-sizing: border-box; }
+.mer-file-copy { flex: 1; min-width: 0; }
+.mer-file-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.mer-file-copy small { display: block; color: #61717f; font-size: 10px; line-height: 1.4; margin-top: 5px; }
+.mer-remove { background: transparent; color: #566e79; border-left: 1px solid #e8edf0; border-radius: 0; width: 38px; }
+#mer-status { margin: 10px 0 0; color: #516575; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+#mer-status:empty { display: none; }
+#mer-status.mer-quiet { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+.mer-summary { background: #fff; padding: 20px; max-height: 90svh; }
+.mer-summary h3 { margin: 0 0 5px; font-size: 20px; }
+.mer-summary header p { margin: 0 0 18px; }
+.mer-original { width: 100%; gap: 12px; padding: 12px; border: 0; border-radius: 12px; text-align: left; color: #15343d; background: #f4f6f7; cursor: pointer; }
+.mer-original .mer-file-copy small { display: flex; align-items: center; gap: 5px; color: #00604b; font-size: 12px; }
+.mer-original svg { width: 15px; height: 15px; }
+.mer-summary-total { margin: 20px 0 10px; color: #61717f; font-size: 13px; }
+.mer-summary-total strong { display: block; margin-top: 5px; color: #005343; font-size: 32px; letter-spacing: -.035em; }
+.mer-summary-total strong.is-missing { font-size: 20px; color: #61717f; }
+.mer-summary dl > div { align-items: flex-start; }
+.mer-summary dt { flex: 0 0 42%; }
+.mer-summary-note { display: flex; gap: 9px; }
+.mer-summary-note svg { width: 19px; height: 19px; flex-shrink: 0; color: #005343; }
+.mer-retry { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; border: 0; background: transparent; padding: 9px; margin: 0 0 10px; color: #005343; font-size: 12px; cursor: pointer; }
+.mer-retry svg { width: 15px; height: 15px; }
+.mer-summary button:focus-visible { outline: 3px solid #63b99d; outline-offset: 3px; }
 .mer-confirm { display: flex; align-items: flex-start; gap: 9px; padding: 14px 0; font-size: 13px; line-height: 1.5; }
 #mer-confirm { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #006348; }
-#mer-preview.hidden,.mer-confirm.hidden { display: none; }
-#mer-preview.hidden,.mer-confirm.hidden { display: none; }
+.mer-photo.hidden,.mer-thumb img.hidden,.mer-confirm.hidden,.mer-retry.hidden { display: none; }
 .mt-subtitle { margin: 0 0 18px; color: #516575; line-height: 1.5; }
 #mf-tool-subtitle { margin: 5px 0 8px; }
 .me-money { display: flex; align-items: center; gap: 7px; color: #102e37; font-size: 32px; font-weight: 700; }
@@ -19,9 +54,9 @@
 .mt-card dl > div:last-child { border-bottom: 0; }
 .mt-card dd { margin: 0; text-align: right; font-weight: 650; }
 .mt-card dt { min-width: 0; overflow-wrap: anywhere; }
-#me-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
-#me-fields .mf-field { margin-bottom: 15px; }
-#me-fields input,#me-fields select,.mr-toolbar select,#mr-filters input { width: 100%; min-width: 0; box-sizing: border-box; }
+#me-fields,#me-payment-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+#me-fields .mf-field,#me-payment-fields .mf-field { margin-bottom: 15px; }
+#me-fields input,#me-fields select,#me-payment-fields input,.mr-toolbar select,#mr-filters input { width: 100%; min-width: 0; box-sizing: border-box; }
 .mf-page input[type="date"],.mf-page input[type="month"] { min-width: 0; }
 .me-amount { display: block; padding: 13px; border: 1px solid #d8e2e8; border-radius: 13px; background: #ffffffce; margin-bottom: 17px; font-size: 12px; }
 .me-amount input { display: block; border: 0; padding: 6px 0 0; background: transparent; color: #102e37; font-size: 34px; font-weight: 700; letter-spacing: -.035em; }

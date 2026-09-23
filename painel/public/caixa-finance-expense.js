@@ -14,6 +14,7 @@
     el('me-paid').required = status === 'paid'; el('me-due').required = status === 'pending';
     C.financeReceipts?.setLocked(Boolean(attempt) || sending);
     el('me-fields').disabled = Boolean(attempt) || sending || Boolean(C.financeReceipts?.blocked());
+    el('me-payment-fields').disabled = el('me-fields').disabled;
     el('me-save').disabled = sending || (!attempt && Boolean(C.financeReceipts?.blocked()));
     el('me-save-label').textContent = sending ? 'Salvando…' : attempt ? 'Confirmar a mesma tentativa' : 'Salvar despesa';
     el('me-note').textContent = status === 'paid' ? 'A despesa entra no resultado da competência. O pagamento registra a saída do caixa.'
