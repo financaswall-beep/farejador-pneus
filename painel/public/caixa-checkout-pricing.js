@@ -44,6 +44,16 @@
       const official = document.createElement('small'); official.className = 'checkout-reference-price';
       official.textContent = 'Preço oficial: ' + Caixa.currency.format(Number(line.referencePrice));
       copy.append(name, description, official);
+      const editor = priceEditor(line, function () {
+        amount.textContent = line.negotiatedPrice == null ? 'Preço inválido' : Caixa.currency.format(Number(line.negotiatedPrice) * line.quantity);
+      });
+      const amount = document.createElement('strong'); amount.className = 'checkout-negotiated-total';
+      amount.textContent = Caixa.currency.format(Number(line.negotiatedPrice) * line.quantity);
+      row.append(copy, editor, amount);
+      return row;
+    }
+
+    function priceEditor(line, changed = function () {}) {
       const editor = document.createElement('label'); editor.className = 'checkout-negotiated-price';
       const label = document.createElement('span'); label.className = 'checkout-negotiated-label'; label.textContent = 'Preço nesta venda';
       const field = document.createElement('span'); field.className = 'checkout-negotiated-field';
@@ -51,25 +61,23 @@
       const input = document.createElement('input');
       input.type = 'text'; input.inputMode = 'decimal'; input.autocomplete = 'off';
       input.maxLength = 12; input.size = 8;
-      input.value = Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
+      input.value = line.negotiatedPrice == null ? '' : Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
       input.setAttribute('aria-label', 'Preço negociado de ' + productTitle(line.product));
       field.append(currency, input); editor.append(label, field);
-      const amount = document.createElement('strong'); amount.className = 'checkout-negotiated-total';
-      amount.textContent = Caixa.currency.format(Number(line.negotiatedPrice) * line.quantity);
       input.addEventListener('input', function () {
+        if (checkout.busy) return;
         const price = parseNegotiatedPrice(input.value);
         line.negotiatedPrice = price; checkout.idempotencyKey = null;
         input.classList.toggle('invalid', price == null);
-        amount.textContent = price == null ? 'Preço inválido' : Caixa.currency.format(price * line.quantity);
+        changed();
         updateReviewSummary(); renderCart();
       });
       input.addEventListener('blur', function () {
         if (line.negotiatedPrice != null) input.value = Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
       });
-      row.append(copy, editor, amount);
-      return row;
+      return editor;
     }
 
-    return { cartTotals: cartTotals, reviewRow: reviewRow, updateReviewSummary: updateReviewSummary };
+    return { cartTotals: cartTotals, reviewRow: reviewRow, priceEditor: priceEditor, updateReviewSummary: updateReviewSummary };
   };
 }());

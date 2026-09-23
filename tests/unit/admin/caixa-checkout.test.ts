@@ -33,7 +33,7 @@ describe('checkout integrado do Frente de Caixa', () => {
         {
           product_id: tireId, product_code: 'P-90', product_name: 'Technic City',
           product_type: 'tire', brand: 'Technic', tire_condition: 'novo',
-          tire_size: '90/90-18', price_amount: '89.00', currency: 'BRL', image_url: null,
+          tire_size: '90/90-18', vehicle_type: 'motorcycle', price_amount: '89.00', currency: 'BRL', image_url: null,
         },
         {
           product_id: serviceId, product_code: 'S-MONT', product_name: 'Montagem',
@@ -52,11 +52,12 @@ describe('checkout integrado do Frente de Caixa', () => {
     const result = await getCaixaCatalog('test', '', 'all', pool);
 
     expect(result.products).toEqual(expect.arrayContaining([
-      expect.objectContaining({ product_id: tireId, price_amount: 89, stock_quantity: 4, sellable: true }),
+      expect.objectContaining({ product_id: tireId, vehicle_type: 'motorcycle', price_amount: 89, stock_quantity: 4, sellable: true }),
       expect.objectContaining({ product_id: serviceId, price_amount: 35, stock_quantity: null, sellable: true }),
     ]));
     expect(String(query.mock.calls[0]?.[0])).toContain('commerce.matriz_current_prices');
     expect(String(query.mock.calls[0]?.[0])).toContain('commerce.product_media');
+    expect(String(query.mock.calls[0]?.[0])).toContain('ts.vehicle_type');
   });
 
   it('resolve preço, vendedor e origem no servidor antes de chamar a venda atômica', async () => {

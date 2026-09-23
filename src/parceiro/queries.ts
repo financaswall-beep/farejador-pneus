@@ -695,7 +695,10 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
               item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
               brand, sale_price, quantity_on_hand, quantity_reserved,
-              is_tracked, stock_status, local_sku
+              is_tracked, stock_status, local_sku, tire_condition,
+              (SELECT ts.vehicle_type FROM commerce.tire_specs ts
+                WHERE ts.product_id=commerce.partner_stock_levels.product_id
+                  AND ts.environment=commerce.partner_stock_levels.environment) AS vehicle_type
        FROM commerce.partner_stock_levels
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
        ORDER BY

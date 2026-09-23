@@ -32,6 +32,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
       reply.header('Cache-Control', 'no-store').redirect('/operacao#entregas'));
   }
   text('/operacao/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
+  text('/operacao/caixa-checkout.css', 'caixa-checkout.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-checkout-view.js', 'caixa-checkout-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-chat.css', 'caixa-chat.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-chat-customer.css', 'caixa-chat-customer.css', 'text/css; charset=utf-8');
   text('/operacao/chat-channel-alerts.css', 'chat-channel-alerts.css', 'text/css; charset=utf-8');

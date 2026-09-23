@@ -44,12 +44,13 @@
         return visual;
       }
       const image = document.createElement('img');
-      image.src = product.image_url || '/operacao/catalog-tire.webp';
+      const fallback = product.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp';
+      image.src = product.vehicle_type ? fallback : product.image_url || fallback;
       image.alt = '';
       image.loading = 'lazy';
       image.decoding = 'async';
       image.addEventListener('error', function () {
-        if (!image.src.endsWith('/operacao/catalog-tire.webp')) image.src = '/operacao/catalog-tire.webp';
+        if (!image.src.endsWith(fallback)) image.src = fallback;
       });
       visual.appendChild(image);
       return visual;
@@ -118,15 +119,20 @@
       return stepper;
     }
 
+    function productDetails(product) {
+      if (product.product_type !== 'tire') return product.product_type === 'service' ? 'Serviço' : 'Produto';
+      return [product.brand, { novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' }[product.tire_condition],
+        { car: 'Carro', motorcycle: 'Moto' }[product.vehicle_type]].filter(Boolean).join(' · ');
+    }
+
     function productCard(product) {
       const article = document.createElement('article');
       article.className = 'catalog-product' + (product.sellable ? '' : ' catalog-product--blocked');
+      article.dataset.productId = product.product_id;
       const content = document.createElement('div');
       content.className = 'catalog-product-content';
       const name = document.createElement('small');
-      name.textContent = product.product_type === 'tire'
-        ? product.product_name
-        : product.product_type === 'service' ? 'Serviço da unidade' : product.product_name;
+      name.textContent = productDetails(product);
       const badge = document.createElement('span');
       badge.className = 'catalog-stock' + (product.sellable ? '' : ' catalog-stock--blocked');
       badge.appendChild(icon(product.product_type === 'service'
@@ -135,13 +141,18 @@
       badge.appendChild(document.createTextNode(product.product_type === 'service'
         ? 'Disponível'
         : product.stock_tracked === false ? 'Sem controle de estoque'
-        : product.sellable ? String(product.stock_quantity) + ' em estoque' : blockLabel(product.block_reason)));
+        : product.sellable ? String(product.stock_quantity) + ' disponíveis' : blockLabel(product.block_reason)));
       const footer = document.createElement('div');
       footer.className = 'catalog-product-footer';
       const price = document.createElement('b');
       price.textContent = product.price_amount === null ? '—' : Caixa.currency.format(product.price_amount);
       footer.append(price, quantityControl(product));
       content.append(productHeading(product), name, badge, footer);
+      const selected = checkout.cart.get(product.product_id)?.quantity || 0;
+      if (selected) {
+        const count = document.createElement('span'); count.className = 'co-in-cart'; count.textContent = selected + ' na venda';
+        content.appendChild(count);
+      }
       article.append(productImage(product), content);
       return article;
     }
@@ -155,6 +166,8 @@
 
     return {
       productTitle: productTitle,
+      productImage: productImage,
+      productDetails: productDetails,
       renderCatalog: renderCatalog,
       setCatalogState: setCatalogState,
     };
@@ -178,6 +191,8 @@
         product_type: productType,
         brand: row.brand || null,
         tire_size: row.tire_size || null,
+        tire_condition: row.tire_condition || null,
+        vehicle_type: row.vehicle_type || null,
         price_amount: price,
         currency: 'BRL',
         stock_quantity: available,

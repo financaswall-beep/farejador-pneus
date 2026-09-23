@@ -18,6 +18,7 @@ export interface CaixaCatalogProduct {
   brand: string | null;
   tire_condition: TireCondition | null;
   tire_size: string | null;
+  vehicle_type: 'motorcycle' | 'car' | null;
   price_amount: number | null;
   currency: string;
   stock_quantity: number | null;
@@ -47,6 +48,7 @@ interface CatalogRow {
   brand: string | null;
   tire_condition: TireCondition | null;
   tire_size: string | null;
+  vehicle_type: 'motorcycle' | 'car' | null;
   price_amount: string | null;
   currency: string | null;
   image_url: string | null;
@@ -70,7 +72,7 @@ export async function getCaixaCatalog(
   const searchPattern = normalizedSearch ? `%${escapeLike(normalizedSearch)}%` : null;
   const catalog = await dbPool.query<CatalogRow>(
     `SELECT p.id AS product_id,p.product_code,p.product_name,p.product_type,
-            p.brand,p.tire_condition,ts.tire_size,cp.price_amount::text,
+            p.brand,p.tire_condition,ts.tire_size,ts.vehicle_type,cp.price_amount::text,
             cp.currency,media.media_url AS image_url
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts

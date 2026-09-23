@@ -16,6 +16,7 @@
   }
 
   function resetCheckout() {
+    runtime.close();
     if (checkout.request) checkout.request.abort();
     window.clearTimeout(checkout.searchTimer);
     checkout.type = 'tire';

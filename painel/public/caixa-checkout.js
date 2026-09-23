@@ -43,6 +43,7 @@
   const productTitle = catalogView.productTitle, renderCatalog = catalogView.renderCatalog, setCatalogState = catalogView.setCatalogState;
   const pricing = Caixa.createCheckoutPricing(checkout, ui, productTitle, renderCart);
   const cartTotals = pricing.cartTotals, reviewRow = pricing.reviewRow, updateReviewSummary = pricing.updateReviewSummary;
+  const saleView = Caixa.createCheckoutView(checkout, catalogView, pricing, changeQuantity);
 
   async function loadCatalog() {
     if (!Caixa.token()) return;
@@ -77,6 +78,7 @@
   }
 
   function changeQuantity(product, delta) {
+    if (checkout.busy || (delta > 0 && product.sellable === false)) return;
     const current = checkout.cart.get(product.product_id)?.quantity || 0;
     const maximum = product.product_type === 'service' || product.stock_tracked === false ? 50 : Number(product.stock_quantity || 0);
     const next = Math.max(0, Math.min(maximum, current + delta));
@@ -108,7 +110,9 @@
       ? 'Carrinho vazio'
       : totals.quantity + (totals.quantity === 1 ? ' item' : ' itens');
     ui.total.textContent = Caixa.currency.format(totals.total);
+    if (!totals.valid) ui.total.textContent = 'Revise os preços';
     ui.reviewButton.disabled = totals.quantity === 0 || !totals.valid || checkout.busy;
+    saleView.render();
   }
 
   function paymentLabel(value) {
@@ -230,7 +234,7 @@
     }
   }
 
-  Caixa.checkoutRuntime = { state: checkout, ui: ui, renderCatalog: renderCatalog, renderCart: renderCart };
+  Caixa.checkoutRuntime = { state: checkout, ui: ui, renderCatalog: renderCatalog, renderCart: renderCart, close: saleView.close };
   Caixa.loadCatalog = loadCatalog;
 
   ui.search.addEventListener('input', function () {

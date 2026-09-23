@@ -69,10 +69,10 @@
   function closeReceipt() {
     elements.receiptModal.classList.add('hidden');
   }
-
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     const cash = tab === 'cash';
+    if (!cash) Caixa.checkoutRuntime?.close();
     const profile = tab === 'profile';
     const sales = tab === 'sales';
     const pickups = tab === 'pickups';

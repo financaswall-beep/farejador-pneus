@@ -188,7 +188,7 @@ describe('login mobile da Operação da Loja', () => {
 
   it('entrega nova venda com catálogo, carrinho e fechamento pela API própria', () => {
     expect(html).toContain('Buscar produto, medida ou marca');
-    expect(html).toContain('FINALIZAR VENDA');
+    expect(html).toContain('Revisar venda');
     expect(html).toContain('data-payment="pix"');
     expect(html).toContain('data-catalog-type="other"');
     expect(html).toContain('id="operation-unit-label"');

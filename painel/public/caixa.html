@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
+  <link rel="stylesheet" href="/operacao/caixa-checkout.css?v=20260923-caixa2" />
   <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-accounts.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-tools.css?v=20260923-receipt2" />
@@ -18,10 +19,11 @@
   <script defer src="/operacao/caixa-core.js?v=20260923-chat1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260923-chat1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
-  <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
-  <script defer src="/operacao/caixa-checkout.js?v=20260820-negociacao1"></script>
-  <script defer src="/operacao/caixa-checkout-session.js?v=20260820-negociacao1"></script>
+  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260923-caixa2"></script>
+  <script defer src="/operacao/caixa-checkout-pricing.js?v=20260923-caixa2"></script>
+  <script defer src="/operacao/caixa-checkout-view.js?v=20260923-caixa2"></script>
+  <script defer src="/operacao/caixa-checkout.js?v=20260923-caixa2"></script>
+  <script defer src="/operacao/caixa-checkout-session.js?v=20260923-caixa2"></script>
   <script defer src="/operacao/caixa-sales-weekly.js?v=20260816-sales-day1"></script>
   <script defer src="/operacao/caixa-sales-view.js?v=20260816-sales-day1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
@@ -39,7 +41,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260923-chat1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260923-caixa2"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -217,10 +219,42 @@
         </button>
 
         <div id="cash-panel" class="app-panel checkout-panel">
+          <header class="co-heading"><h2>Caixa</h2><p>Venda em andamento</p></header>
+          <button id="checkout-customer-button" class="co-customer" type="button">
+            <span class="co-person" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span>
+            <span><strong id="checkout-cart-title">Cliente: Balcão</strong><small id="checkout-customer-caption">Identifique se desejar</small></span><em>Alterar <span aria-hidden="true">›</span></em>
+          </button>
+          <section class="co-items" aria-labelledby="checkout-lines-title">
+            <header><h3 id="checkout-lines-title">Itens da venda</h3><span id="checkout-items-label">Carrinho vazio</span><span id="checkout-cart-count" class="sr-only">0</span></header>
+            <div id="checkout-empty-cart" class="co-empty"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l3 12h10l3-9H6M9 20h.01M18 20h.01"/></svg><strong>Comece uma nova venda</strong><p>Adicione pneus ou serviços para montar o pedido.</p></div>
+            <div id="checkout-lines" class="co-lines"></div>
+            <button id="checkout-add-item" class="co-add" type="button" aria-haspopup="dialog" aria-controls="checkout-picker"><span aria-hidden="true">＋</span> Adicionar item</button>
+            <p class="co-helper">Pneus e serviços na mesma venda.</p>
+          </section>
+          <section class="co-payment" aria-labelledby="checkout-payment-title"><h3 id="checkout-payment-title">Pagamento</h3>
+            <div class="payment-methods" role="radiogroup" aria-label="Forma de pagamento">
+              <button class="active" type="button" data-payment="pix" role="radio" aria-checked="true">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 4 4-4 4-4-4 4-4Zm0 10 4 4-4 4-4-4 4-4ZM3 12l4-4 4 4-4 4-4-4Zm10 0 4-4 4 4-4 4-4-4Z"/></svg>Pix
+              </button>
+              <button type="button" data-payment="cartao" role="radio" aria-checked="false">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Cartão
+              </button>
+              <button type="button" data-payment="dinheiro" role="radio" aria-checked="false">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 9a3 3 0 0 0 3-3m12 0a3 3 0 0 0 3 3m0 6a3 3 0 0 0-3 3M6 18a3 3 0 0 0-3-3"/><circle cx="12" cy="12" r="2.5"/></svg>Dinheiro
+              </button>
+            </div>
+
+          </section>
+          <footer class="co-checkout-bar">
+            <div><small>Total da venda</small><strong id="checkout-total">R$ 0,00</strong></div>
+            <div><button id="checkout-review-button" class="checkout-finish" type="button" disabled>Revisar venda <span aria-hidden="true">→</span></button><small>Confira antes de registrar.</small></div>
+          </footer>
+          <dialog id="checkout-picker" class="co-picker" aria-labelledby="checkout-picker-title">
+            <div class="co-picker-inner"><header class="co-picker-heading"><span class="co-handle" aria-hidden="true"></span><h2 id="checkout-picker-title">Adicionar item</h2><button id="checkout-picker-close" type="button" aria-label="Fechar produtos" autofocus>×</button></header>
           <div class="checkout-search">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
             <label class="sr-only" for="checkout-search-input">Buscar produto, medida ou marca</label>
-            <input id="checkout-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar produto, medida ou marca" />
+            <input id="checkout-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar medida, marca ou serviço" />
             <button id="checkout-search-clear" class="search-clear hidden" type="button" aria-label="Limpar busca">×</button>
           </div>
 
@@ -250,36 +284,15 @@
           </div>
           <div id="catalog-list" class="catalog-list hidden" aria-live="polite"></div>
 
-          <section class="checkout-cart" aria-labelledby="checkout-cart-title">
-            <div class="checkout-cart-summary">
-              <button id="checkout-customer-button" class="checkout-customer" type="button">
-                <span class="checkout-cart-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
-                  <b id="checkout-cart-count">0</b>
-                </span>
-                <span><strong id="checkout-cart-title">Cliente: Balcão</strong><small id="checkout-items-label">Carrinho vazio</small></span>
-                <em>Alterar</em>
-              </button>
-              <div class="checkout-total"><small>Subtotal</small><strong id="checkout-total">R$ 0,00</strong></div>
-            </div>
 
-            <div class="payment-methods" role="radiogroup" aria-label="Forma de pagamento">
-              <button class="active" type="button" data-payment="pix" role="radio" aria-checked="true">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 4 4-4 4-4-4 4-4Zm0 10 4 4-4 4-4-4 4-4ZM3 12l4-4 4 4-4 4-4-4Zm10 0 4-4 4 4-4 4-4-4Z"/></svg>Pix
-              </button>
-              <button type="button" data-payment="cartao" role="radio" aria-checked="false">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Cartão
-              </button>
-              <button type="button" data-payment="dinheiro" role="radio" aria-checked="false">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 9a3 3 0 0 0 3-3m12 0a3 3 0 0 0 3 3m0 6a3 3 0 0 0-3 3M6 18a3 3 0 0 0-3-3"/><circle cx="12" cy="12" r="2.5"/></svg>Dinheiro
-              </button>
+              <footer class="co-picker-footer"><div><span id="checkout-picker-count">0 itens na venda</span><strong id="checkout-picker-total">R$ 0,00</strong></div><button id="checkout-picker-done" type="button">Voltar à venda</button></footer>
             </div>
-
-            <button id="checkout-review-button" class="checkout-finish" type="button" disabled>
-              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
-              FINALIZAR VENDA
-            </button>
-          </section>
+          </dialog>
+          <dialog id="checkout-price-dialog" class="co-price-dialog" aria-labelledby="checkout-price-title">
+            <header><h2 id="checkout-price-title">Preço nesta venda</h2><button id="checkout-price-close" type="button" aria-label="Fechar edição de preço">×</button></header>
+            <p id="checkout-price-name"></p><small id="checkout-price-reference"></small><div id="checkout-price-field"></div>
+            <p id="checkout-price-error" role="alert" hidden>Informe um preço válido maior que zero, com até duas casas decimais.</p><button id="checkout-price-done" type="button">Concluir</button>
+          </dialog>
         </div>
 
         <div id="sales-panel" class="app-panel my-sales-panel hidden">
