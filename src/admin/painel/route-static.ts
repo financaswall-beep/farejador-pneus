@@ -28,6 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'app.marketing.comments.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',

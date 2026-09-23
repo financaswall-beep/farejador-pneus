@@ -7,7 +7,7 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260916-vehicle-ui1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -216,7 +216,8 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260914-geo1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260923-comments1"></script>
+<script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -254,8 +255,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260917-historico1"></script>
-<script src="/admin/painel/app.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260923-comments1"></script>
+<script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
@@ -8144,7 +8145,7 @@
                       x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="marketingTab !== 'criativos' && marketingTab !== 'geografia'" class="mb-3 flex items-center gap-2 lg:mb-0">
+          <div x-show="marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'" class="mb-3 flex items-center gap-2 lg:mb-0">
             <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
@@ -8154,6 +8155,64 @@
           </div>
         </div>
       </div>
+
+      <section x-show="marketingTab === 'comentarios'" class="space-y-4" aria-label="Comentários das redes sociais">
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white p-5">
+          <div class="flex items-center gap-3">
+            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800"><i data-lucide="messages-square" class="h-6 w-6"></i></span>
+            <div><h2 class="text-xl font-bold text-slate-900">Comentários</h2><p class="mt-1 text-sm text-slate-500">Respostas automáticas e exclusão de comentários negativos.</p><p class="mt-1 text-sm font-medium text-emerald-800">Somente Facebook 2W Pneus e Instagram @2wp.pneus.</p></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="mcoPause()" :disabled="mcoBusy || !mcoData?.ready" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-40" x-text="mcoData?.paused ? 'Retomar automação' : 'Pausar automação'"></button>
+            <button @click="loadMarketingComments()" :disabled="mcoLoading" class="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-40"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Atualizar</button>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <span class="font-medium text-slate-700" x-text="mcoLabel()"></span>
+          <button @click="mcoConnection()" :disabled="mcoBusy || !mcoData?.configuration?.token_configured" class="font-medium text-emerald-800 underline disabled:opacity-40">Verificar conexão com a Meta</button>
+        </div>
+        <p x-show="mcoConnectionMessage" class="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900" x-text="mcoConnectionMessage" role="status"></p>
+        <p x-show="mcoError" class="rounded-lg bg-rose-50 p-4 text-sm text-rose-800" x-text="mcoError" role="alert"></p>
+        <p x-show="mcoData && !mcoData.ready" class="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">A estrutura de comentários ainda precisa ser instalada no banco. As demais áreas continuam funcionando.</p>
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm text-slate-500">Recebidos</p><p class="mt-2 text-3xl font-bold text-slate-900" x-text="mcoData?.summary?.total ?? 0"></p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm text-slate-500">Respondidos</p><p class="mt-2 text-3xl font-bold text-emerald-800" x-text="mcoData?.summary?.replied ?? 0"></p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm text-slate-500">Negativos apagados</p><p class="mt-2 text-3xl font-bold text-slate-900" x-text="mcoData?.summary?.deleted ?? 0"></p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm text-slate-500">Falhas ou sem confirmação</p><p class="mt-2 text-3xl font-bold text-rose-700" x-text="mcoData?.summary?.failed ?? 0"></p></div>
+        </div>
+        <p x-show="mcoData?.failed_events" class="text-sm text-rose-700">Há eventos da Meta que não foram processados. Confira a integração antes de retomar.</p>
+        <div class="grid items-start gap-4 xl:grid-cols-2">
+          <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="flex items-center justify-between border-b border-slate-100 p-4"><h3 class="font-semibold text-slate-900">Atividade recente</h3><span class="text-xs text-slate-500" x-text="(mcoData?.summary?.pending ?? 0) + ' na fila'"></span></div>
+            <p x-show="mcoLoading" class="p-6 text-center text-sm text-slate-500">Carregando comentários…</p>
+            <div x-show="!mcoLoading && !mcoData?.rows?.length" class="p-10 text-center"><i data-lucide="message-circle" class="mx-auto h-9 w-9 text-slate-300"></i><p class="mt-3 font-medium text-slate-700">Nenhum comentário recebido</p><p class="mt-1 text-sm text-slate-500">Novos comentários aparecerão aqui após conectar os webhooks da Meta.</p></div>
+            <template x-for="comment in mcoData?.rows || []" :key="comment.id">
+              <button @click="mcoSelected = comment" class="block w-full border-b border-slate-100 p-4 text-left transition-colors hover:bg-slate-50" :class="mcoSelected?.id === comment.id && 'bg-emerald-50'" :aria-pressed="mcoSelected?.id === comment.id">
+                <div class="flex items-center gap-3"><img :src="'/assets/brands/' + comment.platform + '.svg'" :alt="comment.platform === 'facebook' ? 'Facebook' : 'Instagram'" class="h-6 w-6"><span class="min-w-0 flex-1 truncate font-semibold text-slate-900" x-text="comment.author_label"></span><span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700" x-text="mcoStatus(comment.status)"></span></div>
+                <p class="mt-3 line-clamp-2 whitespace-pre-wrap text-sm text-slate-700" x-text="comment.body || 'Comentário sem texto'"></p>
+                <p class="mt-2 text-xs text-slate-400" x-text="new Date(comment.occurred_at).toLocaleString('pt-BR')"></p>
+              </button>
+            </template>
+            <div class="flex items-center justify-between p-4 text-sm text-slate-600"><span x-text="'Página ' + mcoPage"></span><div class="flex gap-3"><button @click="mcoPageChange(-1)" :disabled="mcoPage <= 1 || mcoLoading" class="disabled:opacity-30">Anterior</button><button @click="mcoPageChange(1)" :disabled="mcoPage * 30 >= (mcoData?.total || 0) || mcoLoading" class="disabled:opacity-30">Próxima</button></div></div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5">
+            <h3 class="text-lg font-bold text-slate-900">Detalhes do atendimento</h3>
+            <p x-show="!mcoSelected" class="mt-5 text-sm text-slate-500">Selecione um comentário para ver a resposta ou o motivo da exclusão.</p>
+            <template x-if="mcoSelected"><div class="mt-4 space-y-4">
+              <div class="rounded-lg bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Comentário analisado</p><p class="mt-2 whitespace-pre-wrap text-sm text-slate-800" x-text="mcoSelected.comment_snapshot || mcoSelected.body || 'Sem texto'"></p></div>
+              <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Situação</span><span class="text-sm font-semibold text-slate-900" x-text="mcoStatus(mcoSelected.status)"></span></div>
+              <p x-show="mcoSelected.completion_source === 'page'" class="rounded-lg bg-blue-50 p-4 text-sm text-blue-900">Uma resposta da própria página foi identificada. A automação não envia outra resposta a este comentário.</p>
+              <div x-show="mcoSelected.action === 'reply' && mcoSelected.completion_source !== 'page'" class="rounded-lg border border-emerald-100 bg-emerald-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-800" x-text="mcoSelected.status === 'replied' ? 'Resposta publicada' : 'Resposta preparada'"></p><p class="mt-2 whitespace-pre-wrap text-sm text-emerald-950" x-text="mcoSelected.reply_text"></p></div>
+              <div x-show="mcoSelected.action === 'delete' && mcoSelected.completion_source !== 'page'" class="rounded-lg bg-slate-900 p-4 text-white"><p class="font-semibold" x-text="mcoSelected.status === 'deleted' ? 'Comentário apagado na rede social' : 'Exclusão de comentário negativo preparada'"></p><p class="mt-2 text-sm text-slate-300">O registro original fica no histórico do Farejador.</p></div>
+              <div x-show="mcoSelected.reason"><p class="text-sm font-semibold text-slate-800">Motivo identificado pela IA</p><p class="mt-1 text-sm text-slate-600" x-text="mcoSelected.reason"></p></div>
+              <p x-show="mcoSelected.status === 'uncertain'" class="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">A Meta não confirmou a operação. Confira o comentário na rede social; o sistema não repete uma resposta sem confirmação.</p>
+              <p x-show="mcoSelected.status === 'failed'" class="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">A operação não foi concluída. Verifique a conexão e as permissões da Meta.</p>
+              <p x-show="mcoSelected.error_code" class="text-xs text-slate-400" x-text="'Referência: ' + mcoSelected.error_code"></p>
+              <a x-show="mcoSelected.post_url" :href="mcoSelected.post_url" target="_blank" rel="noopener noreferrer" class="inline-block text-sm font-medium text-emerald-800 underline">Ver publicação na rede social</a>
+            </div></template>
+          </div>
+        </div>
+      </section>
 
       <div x-show="marketingTab === 'visao'" class="space-y-4">
         <div x-show="marketingLoading" class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">

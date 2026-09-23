@@ -10,6 +10,7 @@ const baseEnv = {
   CHATWOOT_HMAC_SECRET: 'chatwoot-test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
   META_MESSAGING_WEBHOOK_ENABLED: 'true',
+  META_COMMENTS_ENABLED: 'false',
   META_MESSAGING_WEBHOOK_VERIFY_TOKEN: 'verify-meta-123',
   META_APP_SECRET: 'meta-app-secret-123',
 };
@@ -113,5 +114,24 @@ describe('webhook Meta messaging', () => {
 
     expect(reply.statusCode).toBe(401);
     expect(connect).not.toHaveBeenCalled();
+  });
+
+  it.each([false,true])('captura comentário com messaging desligado e respeita duplicação: %s',async(duplicate)=>{
+    Object.assign(process.env,{META_MESSAGING_WEBHOOK_ENABLED:'false',META_COMMENTS_ENABLED:'true',META_COMMENTS_PAGE_ID:'386020731963435',META_COMMENTS_INSTAGRAM_ID:'17841465774227389'});
+    const query=vi.fn(async(sql:string)=>({rows:sql.includes('INSERT INTO raw.meta_messaging_events')&&!duplicate?[{id:92}]:[],rowCount:1}));
+    vi.doMock('pg',()=>({Pool:vi.fn(function Pool(){return {connect:async()=>({query,release:vi.fn()}),on:vi.fn(),end:vi.fn()};})}));
+    const {metaMessagingWebhookHandler,metaMessagingVerifyHandler}=await import('../../../src/webhooks/meta-messaging.handler.js');
+    const verify=replyMock();
+    await metaMessagingVerifyHandler({query:{'hub.mode':'subscribe','hub.verify_token':baseEnv.META_MESSAGING_WEBHOOK_VERIFY_TOKEN,'hub.challenge':'42'}} as any,verify);
+    expect(verify.statusCode).toBe(200);
+    const payload={object:'page',entry:[{id:'386020731963435',time:1770000000,changes:[{field:'feed',value:{item:'comment',verb:'add',post_id:'386020731963435_80',comment_id:'386020731963435_1',message:'Oi',from:{id:'300'}}}]}]};
+    const rawBody=Buffer.from(JSON.stringify(payload));
+    const signature=createHmac('sha256',baseEnv.META_APP_SECRET).update(rawBody).digest('hex');
+    const reply=replyMock();
+    await metaMessagingWebhookHandler({body:payload,raw:{rawBody},headers:{'x-hub-signature-256':`sha256=${signature}`}} as any,reply);
+    expect(reply.statusCode).toBe(200);
+    const writes=query.mock.calls.map(([sql])=>sql);
+    expect(writes.some(sql=>sql.includes('INSERT INTO ops.meta_comment_events'))).toBe(!duplicate);
+    expect(writes.at(-1)).toBe('COMMIT');
   });
 });

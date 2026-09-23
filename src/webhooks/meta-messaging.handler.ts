@@ -4,6 +4,7 @@ import { insertRawMetaMessagingEvent } from '../persistence/meta-messaging-event
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { validateMetaMessagingSignature, verifyTokenMatches } from './meta-messaging.hmac.js';
+import { enqueueCommentEvent } from '../social-comments/ingest.js';
 
 interface VerifyQuery {
   'hub.mode'?: unknown;
@@ -15,7 +16,7 @@ export async function metaMessagingVerifyHandler(
   request: FastifyRequest<{ Querystring: VerifyQuery }>,
   reply: FastifyReply,
 ): Promise<void> {
-  if (!env.META_MESSAGING_WEBHOOK_ENABLED) {
+  if (!env.META_MESSAGING_WEBHOOK_ENABLED && !env.META_COMMENTS_ENABLED) {
     return reply.status(404).send({ error: 'Not found' });
   }
   const mode = request.query['hub.mode'];
@@ -37,7 +38,7 @@ export async function metaMessagingWebhookHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  if (!env.META_MESSAGING_WEBHOOK_ENABLED) {
+  if (!env.META_MESSAGING_WEBHOOK_ENABLED && !env.META_COMMENTS_ENABLED) {
     return reply.status(404).send({ error: 'Not found' });
   }
   const rawBody = (request.raw as typeof request.raw & { rawBody?: unknown }).rawBody;
@@ -69,6 +70,7 @@ export async function metaMessagingWebhookHandler(
       payload: body,
     });
     if (rawEventId != null) {
+      await enqueueCommentEvent(client,rawEventId,body);
       await client.query("SELECT pg_notify('meta_messaging_events_new','')");
     }
     await client.query('COMMIT');

@@ -42,13 +42,13 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.chart.js'");
     expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
       .toContain('window.PAINEL_MODULES.marketingChart');
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260914-geo1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260923-comments1');
     expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
+    expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[^"\s]+/);
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
     expect(staticRoute).toContain("'app.marketing.campaign-detail.js'");

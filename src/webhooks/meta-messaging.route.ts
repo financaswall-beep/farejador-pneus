@@ -9,4 +9,7 @@ export async function registerMetaMessagingWebhookRoutes(
 ): Promise<void> {
   fastify.get('/webhooks/meta/messaging', metaMessagingVerifyHandler);
   fastify.post('/webhooks/meta/messaging', metaMessagingWebhookHandler);
+  // Alias: o callback existente também aceita feed/comments; não substitui o Chatwoot.
+  fastify.get('/webhooks/meta/comments', metaMessagingVerifyHandler);
+  fastify.post('/webhooks/meta/comments', metaMessagingWebhookHandler);
 }
