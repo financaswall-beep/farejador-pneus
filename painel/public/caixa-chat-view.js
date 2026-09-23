@@ -35,7 +35,8 @@
     class="chat-mode ${mode} ${row.mode===(mode==='human'?'human':'auto')?'selected':''}" aria-label="${mode==='human'?'Assumir atendimento':'Ativar bot'}"
     title="${mode==='human'?'Assumir atendimento':'Ativar bot'}" aria-pressed="${row.mode===(mode==='human'?'human':'auto')}">${ch.icon(mode)}</button>`).join('');}
   const panel=document.createElement('section');panel.id='chat-panel';panel.className='chat-panel hidden';
-  panel.innerHTML=`<section class="chat-queue"><header class="chat-title"><div><h2>Conversas</h2><small id="chat-connection">Conectando…</small></div><button id="chat-refresh" class="chat-icon" aria-label="Atualizar conversas">${ch.icon('refresh')}</button></header>
+  panel.innerHTML=`<section class="chat-queue" aria-label="Fila de conversas"><header class="chat-title"><small id="chat-connection">Conectando…</small><button id="chat-refresh" class="chat-icon" aria-label="Atualizar conversas">${ch.icon('refresh')}</button></header>
+    <div id="chat-channel-alerts" class="channel-alerts" role="status" aria-live="polite" hidden></div>
     <div class="chat-search"><input id="chat-search" type="search" placeholder="Buscar cliente ou medida" aria-label="Buscar cliente ou medida" maxlength="100"><button id="chat-filters-button" class="chat-icon" aria-label="Filtrar conversas" aria-expanded="false">${ch.icon('filter')}</button></div>
     <div id="chat-filters" class="chat-filters hidden"><label>Canal<select id="chat-channel"><option value="">Todos os canais</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="web">Chatwoot</option></select></label><label><input id="chat-closed" type="checkbox"> Incluir encerradas</label></div>
     <nav class="chat-tabs" aria-label="Filtrar fila"><button data-filter="needs" class="selected">Precisam de você <b id="chat-needs-count">0</b></button><button data-filter="all">Todas</button><button data-filter="bot">Com o bot</button></nav>
@@ -43,6 +44,7 @@
     <section class="chat-thread" id="chat-thread"><div id="chat-no-selection">${ch.icon('chat')}<h3>Seu atendimento, em um só lugar</h3><p>Selecione uma conversa para começar.</p></div>
     <div id="chat-conversation" class="hidden"><header class="chat-contact" id="chat-contact"></header>
     <div id="chat-owner" class="chat-owner"></div><div id="chat-context" class="chat-context"></div>
+    <div id="chat-channel-warning" class="channel-alerts" role="status" aria-live="polite" hidden></div>
     <div id="chat-thread-error" role="alert"></div><div id="chat-photo-notice" class="chat-photo-notice hidden" role="status"></div>
     <div id="chat-timeline" class="chat-timeline" role="log" aria-label="Mensagens da conversa"><button id="chat-older" class="chat-more hidden">Carregar mensagens anteriores</button><div id="chat-messages"></div><div id="chat-photo-card"></div></div>
     <div id="chat-media-preview" class="chat-media-preview hidden"></div>
@@ -60,6 +62,7 @@
   sheet.addEventListener('click',event=>{const button=event.target.closest('[data-shortcut]');if(button){sheet.close();document.getElementById(button.dataset.shortcut)?.click();}});
   ch.renderConnection=()=>{ch.el('connection').textContent=s.connected?'Atualização ao vivo':'Atualização automática • reconectando';};
   ch.renderQueue=function(){
+    ch.channels?.render();
     ch.el('error').textContent=s.error;ch.el('needs-count').textContent=s.needsTotal||0;
     ch.el('more').classList.toggle('hidden',!s.hasMore);
     panel.querySelectorAll('[data-filter]').forEach(el=>{el.classList.toggle('selected',el.dataset.filter===s.filter);el.setAttribute('aria-pressed',String(el.dataset.filter===s.filter));});
@@ -87,6 +90,7 @@
     return `<div class="chat-bubble ${inbound?'incoming':bot?'bot':'outgoing'} ${system?'system':''}">${bot?'<small class="chat-sender">Bot</small>':''}${attachments}${m.mime&&!attachments?`<small>${m.mime.startsWith('audio/')?'Áudio':m.mime.startsWith('image/')?'Foto':'Anexo'} • ${esc(m.filename||'aguardando confirmação')}</small>`:''}<p>${esc(m.content)}</p><footer><time>${time(m.sent_at)}</time>${!inbound?`<span>${esc(status)}</span>`:''}</footer>${retry}</div>`;
   }
   ch.renderThread=function(){
+    ch.channels?.render();
     ch.el('no-selection').classList.toggle('hidden',!!s.id);ch.el('conversation').classList.toggle('hidden',!s.id);
     panel.classList.toggle('has-conversation',!!s.id);if(!s.id)return;
     const row=s.detail||s.rows.find(r=>r.id===s.id)||{id:s.id,name:'Carregando…',mode:'auto'};
@@ -125,7 +129,7 @@
     if(target.dataset.retryFailed)void ch.retryFailed(target.dataset.retryFailed);
     if(target.hasAttribute('data-dismiss-photo'))ch.el('photo-notice').classList.add('hidden');
     if(target.id==='chat-back')ch.back();if(target.id==='chat-customer')void ch.openCustomer();
-    if(target.id==='chat-refresh'){ch.refreshAvatars();void ch.loadList();void ch.loadThread();}
+    if(target.id==='chat-refresh'){ch.refreshAvatars();void ch.loadList();void ch.loadThread();void ch.channels?.refresh(true);}
     if(target.id==='chat-more')void ch.loadList(true);if(target.id==='chat-older')void ch.loadThread(true);
   });
   let searchTimer;ch.el('search').addEventListener('input',event=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{s.search=event.target.value;ch.changeFilter();},300);});

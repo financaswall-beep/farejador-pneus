@@ -13,6 +13,7 @@ import { queueOperatorMessage, retryOperatorMessage } from './chat-send.js';
 import { parseOperatorMedia,CHAT_MEDIA_MAX } from './chat-media.js';
 import type { CaixaAuth } from './queries.js';
 import { pollBotOutbox } from '../../atendente-v2/outbound-worker.js';
+import { getChatwootChannelHealth } from '../chatwoot-channel-health.js';
 
 type Guard=(request:FastifyRequest,reply:FastifyReply)=>Promise<void>;
 type Request=FastifyRequest & {caixa?:CaixaAuth};
@@ -37,6 +38,10 @@ export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guar
     if(!result.rows[0]?.ready) await reply.code(503).send({error:'chat_migration_required'});
   };
   const guards=[flag,auth,access,ready];
+  app.get('/api/caixa/chat/channels',{preHandler:[flag,auth,access]},async(_req,reply)=>{
+    reply.header('Cache-Control','private, no-store');
+    return getChatwootChannelHealth();
+  });
   const respond=async(reply:FastifyReply,work:()=>Promise<unknown>)=>{
     try{return await work();}catch(error){
       const message=error instanceof Error?error.message:'';

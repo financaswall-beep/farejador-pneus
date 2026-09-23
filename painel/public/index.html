@@ -160,7 +160,10 @@
 <script src="/admin/painel/app.colaboradores.finance.js?v=20260826-matriz-pay1"></script>
 <script src="/admin/painel/app.sino.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260910-continente1"></script>
-<script src="/admin/painel/app.bot.js?v=20260916-vehicle-ui1"></script>
+<link rel="stylesheet" href="/admin/painel/chat-channel-alerts.css?v=20260923-2">
+<script src="/admin/painel/chat-channel-alerts.js?v=20260923-2"></script>
+<script src="/admin/painel/app.bot.channels.js?v=20260923-1"></script>
+<script src="/admin/painel/app.bot.js?v=20260923-channels1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.view.js?v=20260911-demanda3"></script>
@@ -6920,6 +6923,7 @@
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda' }">
+      <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
       <section aria-labelledby="bot-heading" x-show="!['entrega','demanda','faltas'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
           <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>

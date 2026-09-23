@@ -33,7 +33,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   }
   text('/operacao/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
   text('/operacao/caixa-chat.css', 'caixa-chat.css', 'text/css; charset=utf-8');
-  for (const file of ['caixa-chat','caixa-chat-view','caixa-chat-media','caixa-chat-customer']) {
+  text('/operacao/chat-channel-alerts.css', 'chat-channel-alerts.css', 'text/css; charset=utf-8');
+  for (const file of ['chat-channel-alerts','caixa-chat','caixa-chat-view','caixa-chat-media','caixa-chat-customer','caixa-chat-channels']) {
     text(`/operacao/${file}.js`, `${file}.js`, 'text/javascript; charset=utf-8');
   }
   text('/operacao/business-time.js', 'business-time.js', 'text/javascript; charset=utf-8');

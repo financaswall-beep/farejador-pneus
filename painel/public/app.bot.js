@@ -26,6 +26,7 @@ window.PAINEL_MODULES.bot = function () {
       catch (err) { this.botFilaErro = true; } // Mantém a última fila confirmada em falha de rede.
       // A lista técnica completa só é consultada enquanto o dono está na tela do Bot.
       if (this.currentPage === 'bot') {
+        window.FarejadorBotChannels?.refresh(this);
         await this.carregarBotControles();
         try { this.botResilience = await this.apiGet('/admin/api/bot/resiliencia'); }
         catch (err) { this.botResilience = null; }
@@ -37,6 +38,7 @@ window.PAINEL_MODULES.bot = function () {
     async loadBotVisao({ silent = false } = {}) {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      window.FarejadorBotChannels?.refresh(this);
       if (silent && this.botLoading) return;
       const requestId = ++latestVisaoRequestId;
       const period = this.botPeriodo;

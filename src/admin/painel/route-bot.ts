@@ -16,6 +16,7 @@ import { registerBotDeliveryRoutes } from './route-bot-delivery.js';
 import { registerBotShortageRoutes } from './route-bot-faltas.js';
 import { registerDemandReportRoutes } from './route-demand-report.js';
 import { registerShortageReportRoutes } from './route-shortage-report.js';
+import { getChatwootChannelHealth } from '../chatwoot-channel-health.js';
 
 const PERIODOS: PainelRedePeriod[] = ['today', '7d', '30d', 'month'];
 const botMovementQuerySchema = z.object({
@@ -30,6 +31,10 @@ const deadLetterActionSchema = z.object({ id: z.string().uuid(), reason: z.strin
   risk_confirmed: z.boolean().optional() }).strict();
 
 export async function registerPainelBot(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/admin/api/bot/channels',{preHandler:requireAdminAuth},async(_request,reply)=>{
+    reply.header('Cache-Control','private, no-store');
+    return getChatwootChannelHealth();
+  });
   await registerBotControlRoutes(fastify);
   await registerBotDeliveryRoutes(fastify);
   await registerBotShortageRoutes(fastify);

@@ -5,7 +5,7 @@ import { loadCustomerLeadLocations } from '../painel/customer-lead-location.js';
 import { loadCustomerLeadInterests } from '../painel/customer-lead-interests.js';
 
 export async function requireChatConversation(id: string, db: Pool = pool) {
-  const row = (await db.query(`SELECT c.id,c.contact_id,c.chatwoot_conversation_id,c.channel_type,
+  const row = (await db.query(`SELECT c.id,c.contact_id,c.chatwoot_conversation_id,c.chatwoot_inbox_id,c.channel_type,
     c.current_status,ct.name,ct.phone_e164,ct.email,COALESCE(b.mode,'auto') AS mode,COALESCE(b.version,0) AS version
     FROM core.conversations c LEFT JOIN core.contacts ct ON ct.environment=c.environment AND ct.id=c.contact_id AND ct.deleted_at IS NULL
     LEFT JOIN ops.conversation_bot_control b ON b.environment=c.environment AND b.conversation_id=c.id
@@ -15,7 +15,7 @@ export async function requireChatConversation(id: string, db: Pool = pool) {
   return row;
 }
 
-const baseSql = `SELECT c.id,c.contact_id,c.channel_type,c.current_status,ct.name,
+const baseSql = `SELECT c.id,c.contact_id,c.chatwoot_inbox_id,c.channel_type,c.current_status,ct.name,
   COALESCE(b.mode,'auto') AS mode,COALESCE(b.version,0) AS version,
   last_msg.content AS last_message,last_msg.sender_type,last_msg.sent_at,
   incoming.sent_at AS last_customer_at,

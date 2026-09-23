@@ -23,7 +23,7 @@
   chat.renderThread=()=>{};
   chat.renderQueue=()=>{};
   chat.reset=function(){
-    chat.stop();if(chat.resetMedia)chat.resetMedia();s.session='';s.id=null;s.detail=null;s.rows=[];
+    chat.stop();if(chat.resetMedia)chat.resetMedia();s.session='';s.id=null;s.detail=null;s.rows=[];chat.channels?.reset();
     s.pending.forEach(m=>{if(m.preview)URL.revokeObjectURL(m.preview);});
     s.drafts.clear();s.pending.clear();s.messages.clear();s.avatars.clear();s.avatarExpiry.clear();s.avatarJobs.clear();s.controls.clear();
     s.sending=false;s.listBusy=false;s.threadBusy=false;s.listSeq++;s.threadSeq++;s.filter='needs';s.search='';s.channel='';s.closed=false;
@@ -33,10 +33,10 @@
   chat.start=function(){
     const session=C.sessionFingerprint();if(s.session!==session){chat.reset();s.session=session;}
     if(s.active)return;s.active=true;s.generation++;
-    void chat.loadList();if(s.id)void chat.loadThread();void chat.connect(s.generation);
-    s.poll=setInterval(()=>{if(document.hidden)return;void chat.loadList();if(s.id)void chat.loadThread();},5000);
+    void chat.loadList();if(s.id)void chat.loadThread();void chat.connect(s.generation);void chat.channels?.refresh(true);
+    s.poll=setInterval(()=>{if(document.hidden)return;void chat.loadList();if(s.id)void chat.loadThread();void chat.channels?.refresh();},5000);
   };
-  chat.stop=function(){s.active=false;s.generation++;clearInterval(s.poll);clearTimeout(s.retry);
+  chat.stop=function(){s.active=false;s.generation++;clearInterval(s.poll);clearTimeout(s.retry);chat.channels?.stop();
     if(s.stream)s.stream.abort();s.stream=null;s.connected=false;s.listBusy=false;s.threadBusy=false;s.listSeq++;s.threadSeq++;};
   chat.syncTab=function(tab){
     const active=tab==='conversations';chat.el('panel').classList.toggle('hidden',!active);
@@ -178,5 +178,5 @@
     finally{clearTimeout(watchdog);controller.abort();if(generation===s.generation){s.connected=false;chat.renderConnection();
       if(s.active)s.retry=setTimeout(()=>void chat.connect(generation),1500);}}
   };
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&s.active){void chat.loadList();void chat.loadThread();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&s.active){void chat.loadList();void chat.loadThread();void chat.channels?.refresh(true);}});
 }());

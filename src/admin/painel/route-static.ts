@@ -28,6 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
     'app.estoque.custos.js', 'app.vendas.lotes.js',
@@ -73,6 +74,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
         'text/javascript; charset=utf-8',
       ));
   }
+  fastify.get('/admin/painel/chat-channel-alerts.css', async (_request, reply) => sendStatic(reply, 'chat-channel-alerts.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/compras-lotes.css', async (_request, reply) => sendStatic(reply, 'compras-lotes.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/financeiro-visao.css', async (_request, reply) => sendStatic(reply, 'financeiro-visao.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/vendas-lotes.css', async (_request, reply) => sendStatic(reply, 'vendas-lotes.css', 'text/css; charset=utf-8'));

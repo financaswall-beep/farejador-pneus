@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 async function buildRoute() {
   vi.resetModules();
+  vi.doMock('../../../src/admin/chatwoot-channel-health.js',()=>({getChatwootChannelHealth:vi.fn()}));
   vi.doMock('../../../src/admin/painel/route-bot-faltas.js', () => ({ registerBotShortageRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-shortage-report.js', () => ({ registerShortageReportRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-demand-report.js', () => ({ registerDemandReportRoutes:vi.fn() }));
