@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { lockExpenseReceipt, linkExpenseReceipt } from './expense-receipts.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState, postMatrizExpensePayment } from './matriz-ledger-expenses.js';
@@ -10,6 +11,8 @@ import {
 } from '../../shared/business-time.js';
 
 export interface CreateMatrizExpenseInput {
+  receipt_id?: string;
+  receipt_confirmed?: boolean;
   category: string;
   description?: string | null;
   amount: number;
@@ -91,7 +94,7 @@ export async function createMatrizExpense(
   dbPool: Pool = defaultPool,
 ): Promise<MatrizExpenseRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const client = await dbPool.connect();
+  if (input.receipt_id && (input.receipt_confirmed !== true || !input.payment_status)) throw Error('expense_receipt_confirmation_required');
   const paymentStatus = input.payment_status ?? 'paid';
   const operation = { environment, domain: 'matriz_expense.create',
     idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
@@ -102,7 +105,9 @@ export async function createMatrizExpense(
       occurred_at: input.occurred_at ?? null,
       document_date: input.document_date ?? null,
       competence_month: input.competence_month ?? null,
+      ...(input.receipt_id ? { receipt_id: input.receipt_id } : {}),
     }) };
+  const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
     const started = await beginIntegrityOperation<MatrizExpenseRow>(client, operation);
@@ -110,6 +115,7 @@ export async function createMatrizExpense(
       await client.query('COMMIT');
       return started.result;
     }
+    if (input.receipt_id) await lockExpenseReceipt(client, environment, input.receipt_id);
     const created = await insertMatrizExpenseInTransaction(client, {
       environment, category: input.category, description: input.description,
       amount: input.amount, payment_status: paymentStatus,
@@ -117,6 +123,7 @@ export async function createMatrizExpense(
       occurred_at: input.occurred_at, document_date: input.document_date,
       competence_month: input.competence_month, created_by: input.created_by,
     });
+    if (input.receipt_id) await linkExpenseReceipt(client, environment, input.receipt_id, created.id);
     const result = integrityResult(created);
     await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
       entityTable: 'commerce.matriz_expenses', entityId: result.id,

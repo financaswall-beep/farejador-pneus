@@ -59,7 +59,9 @@
   <script defer src="/operacao/caixa-finance-commission-month.js?v=20260918-finance3"></script>
   <script defer src="/operacao/app.relatorios.pdf.core.js?v=20260922-finance1"></script>
   <script defer src="/operacao/app.relatorios.financeiro.pdf.js?v=20260922-finance1"></script>
-  <script defer src="/operacao/caixa-finance-expense.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/expense-receipt-viewer.js?v=20260923"></script>
+  <script defer src="/operacao/caixa-finance-expense.js?v=20260923"></script>
+  <script defer src="/operacao/caixa-finance-receipts.js?v=20260923"></script>
   <script defer src="/operacao/caixa-finance-report-view.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-reports.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260918-finance3"></script>
@@ -1014,6 +1016,13 @@
             <p id="me-loading" role="status">Carregando categorias…</p>
             <p id="me-load-error" class="mf-inline-error hidden" role="alert"></p>
             <form id="me-form" class="hidden">
+              <section id="mer-card" class="mt-card hidden" aria-label="Comprovante da despesa">
+                <h3>Tem uma nota ou recibo?</h3><p class="mt-subtitle">Fotografe para preencher os dados. Confira antes de salvar.</p>
+                <div class="mt-fields"><button id="mer-camera" class="mf-primary" type="button">Fotografar comprovante</button><button id="mer-gallery" class="mf-outline" type="button">Escolher foto</button></div>
+                <input id="mer-camera-file" class="hidden" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /><input id="mer-gallery-file" class="hidden" type="file" accept="image/jpeg,image/png,image/webp" />
+                <div id="mer-photo" class="hidden"><button id="mer-open" class="mer-open" type="button" aria-label="Ampliar comprovante"><img id="mer-preview" class="hidden" alt="Prévia do comprovante" /></button><div class="mt-fields"><button id="mer-read" class="mf-outline" type="button">Ler novamente</button><button id="mer-remove" class="mf-outline" type="button">Desvincular foto</button></div></div>
+                <p id="mer-status" role="status" aria-live="polite"></p>
+              </section>
               <fieldset id="me-fields">
                 <label class="me-amount">Valor da despesa (R$)<span class="me-money"><span aria-hidden="true">R$</span><input id="me-amount" name="amount" inputmode="decimal" placeholder="0,00" maxlength="16" required autocomplete="off" /></span></label>
                 <label class="mf-field">Categoria<select id="me-category" name="category" required><option value="">Selecione</option></select></label>
@@ -1023,12 +1032,13 @@
                 <label id="me-paid-field" class="mf-field">Data do pagamento<input id="me-paid" type="date" required /></label>
                 <label id="me-due-field" class="mf-field hidden">Vencimento<input id="me-due" type="date" /></label>
                 <details class="me-document"><summary>Data do documento <span id="me-document-label"></span></summary><label class="mf-field">Data do documento<input id="me-document" type="date" required /></label></details>
+                <label id="mer-confirm-field" class="mer-confirm hidden"><input id="mer-confirm" type="checkbox" />Conferi os dados da foto e a situação do pagamento.</label>
               </fieldset>
               <p id="me-note" class="mf-explanation"></p>
               <p id="me-error" class="mf-inline-error hidden" role="alert"></p>
               <button id="me-save" class="mf-primary" type="submit"><span data-mf-icon="expense"></span><span id="me-save-label">Salvar despesa</span></button>
             </form>
-            <div id="me-success" class="mt-card hidden" role="status"><h3>Despesa salva</h3><p id="me-success-copy"></p><button id="me-view" class="mf-primary" type="button">Conferir lançamento</button><button id="me-new" class="mf-outline" type="button">Lançar outra despesa</button></div>
+            <div id="me-success" class="mt-card hidden" role="status"><h3>Despesa salva</h3><p id="me-success-copy"></p><div id="me-saved-receipt"></div><button id="me-view" class="mf-primary" type="button">Conferir lançamento</button><button id="me-new" class="mf-outline" type="button">Lançar outra despesa</button></div>
           </section>
           <section id="mf-reports-view" class="hidden" aria-label="Relatórios financeiros">
             <div class="mr-toolbar"><button id="mr-period" class="mf-outline" type="button" aria-expanded="false" aria-controls="mr-filters"><span data-mf-icon="calendar"></span><span id="mr-period-label">Período</span></button><select id="mr-origin" aria-label="Origem financeira"><option value="all">Todas as origens</option><option value="varejo">Varejo</option><option value="atacado">Atacado</option><option value="compras">Compras</option><option value="despesas">Despesas</option><option value="marketing">Marketing</option><option value="comissao">Comissões da rede</option><option value="mensalidades">Mensalidades</option><option value="estoque">Estoque</option><option value="financeiro">Financeiro</option><option value="outros">Outras origens</option></select><button id="mr-filter-toggle" class="mf-outline" type="button" aria-label="Filtros do relatório" aria-expanded="false" aria-controls="mr-filters"><span data-mf-icon="filters"></span></button></div>

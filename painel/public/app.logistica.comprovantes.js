@@ -82,6 +82,7 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
         || !draft.reject_confirmed || String(draft.reject_reason || '').trim().length < 2;
     },
     receiptUploadErrorMessage(payload) {
+      if (payload?.error === 'receipt_belongs_to_expense') return 'Esta foto já foi anexada no Financeiro. Confira o lançamento por lá.';
       if (payload?.error === 'receipt_exact_duplicate' && payload.duplicate_trip_number) {
         return `Este comprovante já está na ${payload.duplicate_trip_number}.`;
       }

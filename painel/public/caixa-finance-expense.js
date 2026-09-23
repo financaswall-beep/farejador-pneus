@@ -6,18 +6,20 @@
   const hide = (id, value) => el(id).classList.toggle('hidden', value);
   const identity = () => [C.scope(), C.stored(C.keys.user), C.stored(C.keys.name)].join('|');
   const allowed = () => C.token() && !C.isPartner() && C.canModule('financeiro') && C.stored(C.keys.role) === 'owner';
-  function cancel() { if (request) request.abort(); request = null; }
-  function reset() { cancel(); attempt = null; sending = false; initialized = false; saved = null; el('me-form').reset(); hide('me-form', true); hide('me-success', true); }
+  function cancel() { if (request) request.abort(); request = null; C.financeReceipts?.cancel(); }
+  function reset() { cancel(); C.financeReceipts?.reset(); attempt = null; sending = false; initialized = false; saved = null; el('me-form').reset(); hide('me-form', true); hide('me-success', true); }
   function controls() {
     document.querySelectorAll('[data-me-status]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.meStatus === status)));
     hide('me-paid-field', status !== 'paid'); hide('me-due-field', status !== 'pending');
     el('me-paid').required = status === 'paid'; el('me-due').required = status === 'pending';
-    el('me-fields').disabled = Boolean(attempt) || sending;
-    el('me-save').disabled = sending;
+    C.financeReceipts?.setLocked(Boolean(attempt) || sending);
+    el('me-fields').disabled = Boolean(attempt) || sending || Boolean(C.financeReceipts?.blocked());
+    el('me-save').disabled = sending || (!attempt && Boolean(C.financeReceipts?.blocked()));
     el('me-save-label').textContent = sending ? 'Salvando…' : attempt ? 'Confirmar a mesma tentativa' : 'Salvar despesa';
     el('me-note').textContent = status === 'paid' ? 'A despesa entra no resultado da competência. O pagamento registra a saída do caixa.'
       : 'A despesa entra no resultado da competência e em Contas a pagar. O caixa muda quando o pagamento for registrado.';
-    el('me-document-label').textContent = T.formatDate(el('me-document').value);
+    if (!status) el('me-note').textContent = 'Selecione Já paga ou A pagar. A foto não confirma o pagamento.';
+    el('me-document-label').textContent = el('me-document').value ? T.formatDate(el('me-document').value) : 'Confira a data';
   }
   function restoreFields(data) {
     status = data.payment_status;
@@ -61,6 +63,7 @@
         restoreFields(attempt); el('me-error').textContent = 'Há uma tentativa sem confirmação. Confira o envio usando o mesmo lançamento para evitar duplicidade.'; hide('me-error', false);
       }
       controls(); hide('me-form', false); C.financeMatrix.updated();
+      await C.financeReceipts?.load(body, attempt);
     } catch (error) {
       if (controller.signal.aborted || session !== C.sessionFingerprint() || error.message === 'invalid_session') return;
       el('me-load-error').textContent = error.message === 'expenses_disabled' ? 'O lançamento de despesas está desativado para esta operação.' : 'Não foi possível carregar as categorias. Toque em Atualizar para tentar novamente.';
@@ -80,6 +83,7 @@
     return value;
   }
   function payload() {
+    if (!['paid', 'pending'].includes(status)) throw Error('Selecione se a despesa já foi paga ou está a pagar.');
     const today = T.dateKey(new Date()), instant = day => day === today ? new Date().toISOString() : new Date(day + 'T12:00:00-03:00').toISOString();
     const occurred = civil(el('me-occurred').value), document = civil(el('me-document').value), competence = civil(el('me-competence').value + '-01');
     if (occurred > today || document > today || competence > today) throw Error('A despesa, o documento e a competência não podem estar no futuro.');
@@ -89,7 +93,7 @@
     if (status === 'paid') {
       const paid = civil(el('me-paid').value); if (paid > today) throw Error('O pagamento não pode estar no futuro.'); data.paid_at = instant(paid);
     } else data.due_date = civil(el('me-due').value);
-    return data;
+    return { ...data, ...C.financeReceipts?.payload() };
   }
   el('me-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!allowed() || sending || saved || (!attempt && !el('me-form').reportValidity())) return;
@@ -108,6 +112,10 @@
       const result = await C.json(response);
       if (session !== C.sessionFingerprint()) return;
       if (!response.ok) {
+        if (['expense_receipt_already_linked', 'expense_receipt_processing'].includes(result.error)) {
+          sessionStorage.removeItem(storageKey); attempt = null;
+          throw Error(result.error === 'expense_receipt_already_linked' ? 'Este comprovante já pertence a uma despesa. Atualize para consultar.' : 'A leitura ainda está em andamento. Atualize e aguarde antes de salvar.');
+        }
         if (response.status === 400 || response.status === 403 || response.status === 404) {
           sessionStorage.removeItem(storageKey); attempt = null;
           throw Error(result.error === 'category_invalid' ? 'A categoria foi arquivada. Atualize e selecione outra categoria.'
@@ -117,6 +125,8 @@
       }
       if (result.created !== true || !result.expense?.id) throw Error('O servidor não confirmou o lançamento. Confirme novamente com a mesma tentativa.');
       saved = submitted; attempt = null; sessionStorage.removeItem(storageKey);
+      C.financeReceipts?.saved(); el('me-saved-receipt').replaceChildren();
+      if (submitted.receipt_id) C.financeReceipts.attachment(el('me-saved-receipt'), result.expense.id);
       el('me-success-copy').textContent = C.currency.format(submitted.amount) + (submitted.payment_status === 'paid' ? ' registrados. A despesa e o pagamento estão no financeiro.' : ' registrados em Contas a pagar. Nenhuma saída de caixa foi registrada.');
       el('me-view').textContent = submitted.payment_status === 'paid' ? 'Ver no extrato' : 'Ver contas a pagar';
       hide('me-form', true); hide('me-success', false);
@@ -130,11 +140,12 @@
   document.querySelectorAll('[data-me-status]').forEach(b => b.addEventListener('click', () => { status = b.dataset.meStatus; controls(); }));
   el('me-document').addEventListener('change', controls);
   el('me-document').addEventListener('invalid', () => { el('me-document').closest('details').open = true; });
-  el('me-new').addEventListener('click', () => { initialized = false; saved = null; hide('me-error', true); void load(); });
+  el('me-new').addEventListener('click', () => { C.financeReceipts?.reset(true); initialized = false; saved = null; hide('me-error', true); void load(); });
   el('me-view').addEventListener('click', () => {
     if (!saved) return;
     if (saved.payment_status === 'paid') el('mf-month').value = T.dateKey(saved.paid_at).slice(0, 7);
     C.financeMatrix.open(saved.payment_status === 'paid' ? 'statement' : 'accounts');
   });
-  C.financeExpense = { load, cancel, reset, setReturnTab: tab => { back = tab; }, returnTab: () => back };
+  C.financeExpense = { load, cancel, reset, refresh: controls, status: () => status,
+    setStatus: value => { status = value; controls(); }, setReturnTab: tab => { back = tab; }, returnTab: () => back };
 }());

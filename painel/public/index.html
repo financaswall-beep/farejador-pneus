@@ -228,7 +228,8 @@
 <script src="/admin/painel/app.financeiro.retiradas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260903-finance-carry1"></script>
-<script src="/admin/painel/app.financeiro.despesas.js?v=20260818-business-time1"></script>
+<script src="/admin/painel/expense-receipt-viewer.js?v=20260923"></script>
+<script src="/admin/painel/app.financeiro.despesas.js?v=20260923"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
@@ -6243,6 +6244,7 @@
                       <span x-show="d.payment_status === 'pending' && !d.overdue" class="inline-block text-xs bg-amber-50 text-amber-700 rounded-full px-2.5 py-0.5" x-text="d.due_date ? ('vence ' + financeDate(d.due_date)) : 'a pagar'"></span>
                     </td>
                     <td class="py-2.5 text-right whitespace-nowrap">
+                      <button @click="despesaComprovante(d)" class="text-xs px-2.5 py-1 rounded-lg bg-gray-50 text-brand-700">Comprovante</button>
                       <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)" :disabled="finQuitando"
                               class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
                       <button x-show="!d.payroll_item_id" @click="despesaRemove(d)" title="Remover (lançado errado)"

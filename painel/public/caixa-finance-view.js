@@ -119,6 +119,7 @@
     article.append(visual, copy, value, icon('chevron'));
     article.addEventListener('click', () => {
       const body = dialog('Detalhes do lançamento');
+      if (row.origin === 'despesas') C.financeReceipts?.attachment(body, row.source_id);
       body.appendChild(node('p', row.description || 'Movimentação financeira'));
       const values = [];
       if (incoming) values.push(['Entrada no caixa', money(incoming)]);

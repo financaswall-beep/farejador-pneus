@@ -13,8 +13,10 @@ import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizEx
 import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
 import { registerFinanceiroOverview } from './route-financeiro-overview.js';
 import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
+import { registerExpenseReceiptRoutes } from './route-expense-receipts.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
+  registerExpenseReceiptRoutes(fastify, { prefix: '/admin/api/matriz/despesas', read: [requireAdminAuth], write: [requireAdminOwner], actor: operatorLabel });
   await registerFinancialReportRoutes(fastify);
   await registerPainelFinanceiroLedger(fastify);
   await registerFinanceiroOverview(fastify);

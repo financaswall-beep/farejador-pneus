@@ -132,6 +132,17 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         this.despesaSaving = false;
       }
     },
+    async despesaComprovante(row) {
+      try {
+        const data = await this.apiGet('/admin/api/matriz/despesas/' + row.id + '/comprovante');
+        if (!data.receipt) { this.despesaMsg = { ok: false, text: 'Esta despesa não tem comprovante anexado.' }; return; }
+        await window.ExpenseReceiptViewer.show('/admin/api/matriz/despesas/comprovantes/' + data.receipt.id + '/imagem', async (path, options) => {
+          const response = await fetch(path, { ...options, credentials: 'same-origin' });
+          if (response.status === 401) this.adminUnauthorized();
+          return response;
+        });
+      } catch { this.despesaMsg = { ok: false, text: 'Não foi possível abrir o comprovante. Tente novamente.' }; }
+    },
     despesaSettle(row) {
       this.finPagar({
         tipo: row.payroll_item_id ? 'folha' : 'despesa',

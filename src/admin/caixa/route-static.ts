@@ -83,6 +83,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-finance-commission-month.js', 'caixa-finance-commission-month.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-tools.css', 'caixa-finance-tools.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-expense.js', 'caixa-finance-expense.js', 'text/javascript; charset=utf-8');
+  text('/operacao/expense-receipt-viewer.js', 'expense-receipt-viewer.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-finance-receipts.js', 'caixa-finance-receipts.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-reports.js', 'caixa-finance-reports.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-report-view.js', 'caixa-finance-report-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/app.relatorios.pdf.core.js', 'app.relatorios.pdf.core.js', 'text/javascript; charset=utf-8');

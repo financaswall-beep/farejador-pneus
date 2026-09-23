@@ -168,6 +168,9 @@ export function registerCaixaDeliveryRoutes(
       if (error instanceof Error && error.message === 'trip_not_found') {
         return reply.status(404).send({ error: error.message });
       }
+      if (error instanceof Error && error.message === 'receipt_belongs_to_expense') {
+        return reply.status(409).send({ error: error.message });
+      }
       if (error instanceof Error && error.message === 'receipt_limit') {
         return reply.status(400).send({ error: 'receipt_limit' });
       }

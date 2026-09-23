@@ -193,7 +193,7 @@
       const payload = await Caixa.json(response); if (!response.ok) throw new Error(payload.error || 'upload');
       els.receiptStatus.textContent = payload.duplicate ? 'Comprovante já anexado.' : 'Comprovante enviado.';
     } catch (error) {
-      els.receiptStatus.textContent = error.message === 'receipt_exact_duplicate'
+      els.receiptStatus.textContent = error.message === 'receipt_belongs_to_expense' ? 'Esta foto já está no Financeiro. Confira o lançamento por lá.' : error.message === 'receipt_exact_duplicate'
         ? 'Este arquivo já foi usado em outro comprovante.' : 'Não foi possível enviar a foto.';
     }
     finally { els.receipt.value = ''; }

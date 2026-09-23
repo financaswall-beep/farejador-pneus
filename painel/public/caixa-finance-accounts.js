@@ -11,6 +11,7 @@
   function reset() { cancel(); state.payload = null; state.search = ''; state.offset = 0; state.direction = 'out'; state.status = 'open'; state.category = 'all'; el('ma-search').value = ''; el('ma-category').value = 'all'; el('ma-list').replaceChildren(); el('ma-content').classList.add('hidden'); }
   function detail(row) {
     const body = V.dialog(row.nome);
+    if (row.tipo === 'despesa') C.financeReceipts?.attachment(body, row.id);
     V.lines(body, [['Saldo em aberto', V.money(row.valor)]], true);
     V.lines(body, [['Tipo', categories[row.tipo] || 'Conta'], ['Vencimento', dateLabel(row.due_date)], ['Situação', row.overdue ? 'Vencida' : 'Em aberto']], false);
     if (row.tipo === 'folha') body.appendChild(V.node('p', 'Este valor pode incluir salário, benefícios, comissões e ajustes. A baixa paga o total desta remuneração.'));

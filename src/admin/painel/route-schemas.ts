@@ -1,6 +1,4 @@
 // Obra 300 (2026-07-05): mezanino da portaria da matriz — schemas zod + publicDir.
-// VERBATIM das linhas 76-325 do route.ts pré-obra + prefixo 'export ' nas declarações
-// de topo (transformação mecânica; o gerador prova a reversa). Porta: ./route.js.
 import path from 'node:path';
 import { z } from 'zod';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
@@ -195,8 +193,9 @@ export const settleWholesaleFinanceSchema = z.object({
 
 // DESPESAS da matriz (0120): lançar (à vista × a pagar), quitar e remover (soft).
 export const createMatrizExpenseSchema = z.object({
-  // 0130: modalidade virou lista viva — o formato valida aqui; existir E estar
-  // ativa valida no banco (guard + FK). z.enum fixo barraria as do dono.
+  receipt_id: z.string().uuid().optional(),
+  receipt_confirmed: z.boolean().optional(),
+  // Categoria ativa é validada na transação; aqui validamos o formato.
   category: z.string().regex(/^[a-z0-9_]{2,40}$/),
   description: z.string().max(300).nullable().optional(),
   amount: z.number().positive(),
@@ -208,6 +207,9 @@ export const createMatrizExpenseSchema = z.object({
   competence_month: z.string().regex(/^\d{4}-\d{2}-01$/).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
 }).superRefine((body, ctx) => {
+  if (body.receipt_id && (body.receipt_confirmed !== true || !body.payment_status)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['receipt_confirmed'], message: 'expense_receipt_confirmation_required' });
+  }
   if (body.payment_status === 'pending' && !body.due_date) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['due_date'], message: 'due_date_required' });
   }

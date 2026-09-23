@@ -50,6 +50,7 @@
   }
   function detail(row, tab) {
     const body = V.dialog(tab === 'titles' ? 'Detalhes da conta' : 'Lançamento do resultado');
+    if (row.origin === 'despesas') C.financeReceipts?.attachment(body, row.source_id);
     body.appendChild(V.node('p', row.name || row.description));
     if (tab === 'titles') {
       V.lines(body, [['Saldo em aberto', V.money(row.amount)]], true);

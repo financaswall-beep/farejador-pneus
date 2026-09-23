@@ -1,4 +1,12 @@
 /* Formulário e relatórios compartilham a textura e os componentes do Financeiro. */
+.mer-open { display: block; padding: 0; border: 0; margin: 12px auto; background: transparent; cursor: zoom-in; }
+#mer-preview { display: block; max-height: 180px; max-width: 100%; border: 1px solid #dae4e8; border-radius: 8px; }
+#mer-card .mf-primary,#mer-card .mf-outline { font-size: 12px; padding: 12px 7px; min-width: 0; }
+#mer-status { color: #516575; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.mer-confirm { display: flex; align-items: flex-start; gap: 9px; padding: 14px 0; font-size: 13px; line-height: 1.5; }
+#mer-confirm { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #006348; }
+#mer-preview.hidden,.mer-confirm.hidden { display: none; }
+#mer-preview.hidden,.mer-confirm.hidden { display: none; }
 .mt-subtitle { margin: 0 0 18px; color: #516575; line-height: 1.5; }
 #mf-tool-subtitle { margin: 5px 0 8px; }
 .me-money { display: flex; align-items: center; gap: 7px; color: #102e37; font-size: 32px; font-weight: 700; }

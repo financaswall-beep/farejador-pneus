@@ -7,6 +7,8 @@ import { reportDate } from '../painel/report-period.js';
 import { createMatrizExpense } from '../painel/queries-financeiro-despesas-integridade.js';
 import { listMatrizExpenseCategories } from '../painel/queries-despesas-categorias.js';
 import { mapWriteError } from '../painel/route-helpers.js';
+import { registerExpenseReceiptRoutes } from '../painel/route-expense-receipts.js';
+import { expenseReceiptsReady } from '../painel/expense-receipts.js';
 
 type Gate = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 // O contrato e a transação são os mesmos do web; validação civil evita datas normalizadas pelo Postgres.
@@ -26,9 +28,12 @@ export function registerCaixaFinanceExpenseRoutes(app: FastifyInstance, flag: Ga
     }
     if (!env.MATRIZ_EXPENSES) await reply.code(404).send({ error: 'expenses_disabled' });
   }];
+  registerExpenseReceiptRoutes(app, { prefix: '/api/caixa/financeiro-despesas', read: [flag, auth, finance], write: guards,
+    actor: request => { const actor = (request as FastifyRequest & { caixa: CaixaAuth }).caixa; return `${actor.displayName} (${actor.username})`.slice(0, 120); } });
   app.get('/api/caixa/financeiro-despesas/categorias', { preHandler: guards }, async (_, reply) => {
     reply.header('Cache-Control', 'no-store');
-    try { return { categories: (await listMatrizExpenseCategories()).filter(row => !row.archived) }; }
+    try { return { categories: (await listMatrizExpenseCategories()).filter(row => !row.archived),
+      receipts_enabled: await expenseReceiptsReady().catch(() => false), receipt_ai_enabled: env.MATRIZ_RECEIPT_AI }; }
     catch (error) {
       logger.error({ err: error }, 'app expense categories unavailable');
       return reply.code(503).send({ error: 'expense_categories_unavailable' });

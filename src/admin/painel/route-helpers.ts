@@ -31,6 +31,11 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   }
 
   const dbError = err as Error & { code?: string; constraint?: string };
+  if (err.message === 'expense_receipt_not_found') return { status: 404, error: err.message };
+  if (err.message === 'expense_receipt_confirmation_required') return { status: 400, error: err.message };
+  if (['expense_receipt_already_linked', 'expense_receipt_processing', 'receipt_belongs_to_trip', 'receipt_belongs_to_expense'].includes(err.message)) {
+    return { status: 409, error: err.message };
+  }
   if (dbError.code === '23505' && dbError.constraint?.startsWith('wholesale_suppliers_normalized_')) {
     return { status: 409, error: 'supplier_duplicate' };
   }
