@@ -14,6 +14,7 @@ import { parseOperatorMedia,CHAT_MEDIA_MAX } from './chat-media.js';
 import type { CaixaAuth } from './queries.js';
 import { pollBotOutbox } from '../../atendente-v2/outbound-worker.js';
 import { getChatwootChannelHealth } from '../chatwoot-channel-health.js';
+import { getOperationCustomerInterests } from './chat-customer-interests.js';
 
 type Guard=(request:FastifyRequest,reply:FastifyReply)=>Promise<void>;
 type Request=FastifyRequest & {caixa?:CaixaAuth};
@@ -96,8 +97,15 @@ export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guar
   });
   app.get('/api/caixa/chat/conversations/:id/customer',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params);if(!p.success)return reply.code(400).send({error:'invalid_id'});
+    const q=z.object({offset:z.coerce.number().int().min(0).max(10000).default(0)}).safeParse(req.query);
+    if(!q.success)return reply.code(400).send({error:'invalid_query'});
     return respond(reply,async()=>{const c=await requireChatConversation(p.data.id);
-      return c.contact_id?getCustomerDetail(env.FAREJADOR_ENV,'chatwoot',c.contact_id):null;});
+      const [data,interests]=await Promise.all([
+        c.contact_id?getCustomerDetail(env.FAREJADOR_ENV,'chatwoot',c.contact_id,{offset:q.data.offset}):null,
+        q.data.offset===0?getOperationCustomerInterests(env.FAREJADOR_ENV,p.data.id):undefined,
+      ]);
+      reply.header('Cache-Control','private, no-store');
+      return {...data,...(interests?{interests}:{})};});
   });
   app.get('/api/caixa/chat/conversations/:id/avatar',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params);if(!p.success)return reply.code(400).send({error:'invalid_id'});
