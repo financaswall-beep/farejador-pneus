@@ -102,7 +102,6 @@
     timeStyle: 'short',
     timeZone: 'America/Sao_Paulo',
   });
-
   function token() {
     return sessionStorage.getItem(keys.token) || localStorage.getItem(keys.token) || '';
   }
@@ -117,6 +116,7 @@
   }
 
   function clearSession() {
+    if (Caixa.chat) Caixa.chat.reset();
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();

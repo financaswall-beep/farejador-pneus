@@ -1,21 +1,17 @@
 (function () {
   'use strict';
-
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
   const state = Caixa.state;
-
   function salesPath() {
     return Caixa.operationPath('minhas-vendas', '/api/caixa/vendas');
   }
-
   function detailPath(orderId) {
     if (Caixa.isPartner()) {
       return Caixa.operationPath('minhas-vendas/' + encodeURIComponent(orderId));
     }
     return '/api/caixa/vendas/' + encodeURIComponent(orderId) + '/recibo';
   }
-
   async function loadProfileSummary() {
     if (!Caixa.canModule('vendas')) return;
     try {
@@ -29,7 +25,6 @@
       elements.profileMetricRevenue.textContent = '—';
     }
   }
-
   async function loadSales() {
     if (!Caixa.token()) return;
     if (state.salesRequest) state.salesRequest.abort();
@@ -200,6 +195,7 @@
     if (pickups && Caixa.loadPickups) void Caixa.loadPickups();
 
     if (Caixa.purchases) Caixa.purchases.syncTab(tab);
+    if (Caixa.chat) Caixa.chat.syncTab(tab);
     const activeNavigation = document.querySelector('.bottom-nav button.active');
     if (activeNavigation) requestAnimationFrame(function () {
       activeNavigation.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -234,6 +230,10 @@
   document.getElementById('sales-retry').addEventListener('click', function () { void loadSales(); });
   document.getElementById('operator-button').addEventListener('click', function () { showTab('profile'); });
   document.getElementById('nav-profile').addEventListener('click', function () { showTab('profile'); });
+  document.getElementById('nav-conversations').addEventListener('click', function () {
+    history.replaceState(null, '', location.pathname + location.search + '#conversas');
+    showTab('conversations');
+  });
   document.getElementById('nav-sales').addEventListener('click', function () {
     if (!Caixa.canModule('vendas')) return;
     showTab('sales');

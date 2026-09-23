@@ -6,6 +6,16 @@ export async function deliverOutboundRow(
   client: PoolClient,
   row: OutboundRow,
 ): Promise<SendMessageResult> {
+  if (row.kind === 'operator_attachment') {
+    const result = await client.query<{ bytes: Buffer; mime: string; filename: string }>(
+      `SELECT bytes,mime,filename FROM ops.operator_messages WHERE environment=$1 AND outbound_id=$2`,
+      [row.environment, row.id]);
+    const file = result.rows[0];
+    if (!file?.bytes) throw Error('operator_attachment_missing');
+    return sendAttachmentOnce(Number(row.chatwoot_conversation_id), {
+      buffer: file.bytes, filename: file.filename, contentType: file.mime,
+    }, row.body, row.echo_id ?? undefined);
+  }
   if (row.kind === 'conversation_resolution') {
     await resolveConversationOnce(Number(row.chatwoot_conversation_id));
     return { chatwootMessageId: null };
@@ -35,6 +45,13 @@ export async function markPhotoRequestSent(
   client: PoolClient,
   row: OutboundRow,
 ): Promise<void> {
+  if (row.kind === 'operator_attachment') {
+    await client.query(`UPDATE commerce.photo_requests p SET status='sent',sent_to_customer_at=now()
+      FROM ops.operator_messages m WHERE m.environment=$1 AND m.outbound_id=$2
+      AND p.environment=m.environment AND p.id=m.photo_request_id AND p.status='answered'`,
+    [row.environment,row.id]);
+    return;
+  }
   if (row.kind !== 'photo_attachment') return;
   const parsed = JSON.parse(row.body) as { photo_request_id?: unknown };
   if (typeof parsed.photo_request_id !== 'string') {

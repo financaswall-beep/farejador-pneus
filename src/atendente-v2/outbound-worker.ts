@@ -7,18 +7,17 @@ import { logger } from '../shared/logger.js';
 import { classifyAtendenteError, MAX_ATENDENTE_RETRY_ATTEMPTS,
   retryBackoffSeconds } from '../shared/repositories/ops-atendente-retry.js';
 import type { Environment } from '../shared/types/chatwoot.js';
-import { reconcileAckAlreadyInCore, reconcilePendingAcksFromCore } from './outbound-reconcile.js';
+import { reconcilePendingAcksFromCore } from './outbound-reconcile.js';
 import { recordOutboundEvent } from './outbound-events.js';
 import { deliverOutboundRow, markPhotoRequestSent } from './outbound-delivery.js';
 import { hasAgentV2Wildcard } from './conversation-scope.js';
 import { lockBotConversation } from './conversation-control.js';
 import { prepareControlledOutbound } from './outbound-control.js';
-
+import { markOutboundAck, markResolutionDelivered } from './outbound-status.js';
 const WORKER_ID = `bot-outbox-${randomUUID().slice(0, 8)}`;
 const POLL_MS = 2_000;
 const UNKNOWN_SENDING_MINUTES = 10;
 const DELIVERY_SUSPECT_MINUTES = 10;
-
 export interface OutboundRow {
   id: string;
   environment: Environment;
@@ -30,7 +29,6 @@ export interface OutboundRow {
   body: string;
   attempts: number;
 }
-
 async function openOutboundDeadLetter(
   client: PoolClient, row: Pick<OutboundRow, 'id' | 'environment' | 'conversation_id'>,
   reason: string, code: string, kind: string, summary: string,
@@ -45,7 +43,6 @@ async function openOutboundDeadLetter(
     [row.environment, row.id, row.conversation_id, reason, code, kind, summary],
   );
 }
-
 export async function reclaimAmbiguousOutbound(
   client: PoolClient, environment: Environment,
 ): Promise<number> {
@@ -93,7 +90,6 @@ export async function reclaimAmbiguousOutbound(
   }
   return (safeRetry.rowCount ?? 0) + (stuck.rowCount ?? 0);
 }
-
 export async function markDeliverySuspects(
   client: PoolClient, environment: Environment,
 ): Promise<number> {
@@ -115,7 +111,6 @@ export async function markDeliverySuspects(
   }
   return result.rowCount ?? 0;
 }
-
 /** Descarta rascunhos de resposta que perderam o contexto enquanto aguardavam retry. */
 export async function supersedeStaleAgentOutbound(
   client: PoolClient,
@@ -160,7 +155,6 @@ export async function supersedeStaleAgentOutbound(
   }
   return stale.rowCount ?? 0;
 }
-
 export async function pickOutboundMessage(
   client: PoolClient,
   environment: Environment,
@@ -169,10 +163,14 @@ export async function pickOutboundMessage(
 ): Promise<OutboundRow | null> {
   const picked = await client.query<OutboundRow>(
     `WITH candidate AS (
-       SELECT id FROM ops.outbound_messages
-        WHERE environment=$1 AND status IN ('pending','failed') AND not_before<=now()
-          AND ($3::boolean OR conversation_id::text = ANY($4::text[]))
-        ORDER BY not_before,created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+       SELECT candidate.id FROM ops.outbound_messages candidate
+        WHERE candidate.environment=$1 AND candidate.status IN ('pending','failed') AND candidate.not_before<=now()
+          AND (candidate.kind IN ('operator_text','operator_attachment') OR $3::boolean OR candidate.conversation_id::text = ANY($4::text[]))
+          AND (candidate.kind NOT IN ('operator_text','operator_attachment') OR NOT EXISTS (
+            SELECT 1 FROM ops.outbound_messages earlier WHERE earlier.environment=candidate.environment
+              AND earlier.conversation_id=candidate.conversation_id AND earlier.kind IN ('operator_text','operator_attachment')
+              AND earlier.status IN ('pending','failed','sending') AND (earlier.created_at,earlier.id)<(candidate.created_at,candidate.id)))
+        ORDER BY candidate.not_before,candidate.created_at,candidate.id LIMIT 1 FOR UPDATE SKIP LOCKED
      )
      UPDATE ops.outbound_messages o
         SET status='sending',attempts=attempts+1,locked_at=now(),locked_by=$2,updated_at=now()
@@ -188,37 +186,6 @@ export async function pickOutboundMessage(
     toStatus: 'sending', reason: 'picked' });
   return row;
 }
-
-async function markOutboundAck(client: PoolClient, row: OutboundRow, providerId: number | null): Promise<void> {
-  await client.query(
-    `UPDATE ops.outbound_messages SET status='sent_api_ack',provider_message_id=$2,
-       sent_at=now(),locked_at=NULL,locked_by=NULL,last_error_code=NULL,
-       last_error_kind=NULL,last_error_summary=NULL,updated_at=now() WHERE id=$1`,
-    [row.id, providerId],
-  );
-  if (row.turn_id) await client.query(
-    `UPDATE agent.turns SET status='sent_api_ack',chatwoot_message_id=$2,
-       sent_at=now(),error_message=NULL WHERE id=$1`, [row.turn_id, providerId]);
-  await recordOutboundEvent(client, { environment: row.environment, outboundId: row.id,
-    attempt: row.attempts, fromStatus: 'sending', toStatus: 'sent_api_ack',
-    reason: providerId == null ? 'provider_accepted_without_id' : 'provider_accepted' });
-  if (providerId != null) {
-    await reconcileAckAlreadyInCore(client, row.environment, row.id, providerId);
-  }
-}
-
-async function markResolutionDelivered(client: PoolClient, row: OutboundRow): Promise<void> {
-  await client.query(
-    `UPDATE ops.outbound_messages SET status='delivered',sent_at=now(),delivered_at=now(),
-       locked_at=NULL,locked_by=NULL,last_error_code=NULL,last_error_kind=NULL,
-       last_error_summary=NULL,updated_at=now() WHERE id=$1 AND status='sending'`,
-    [row.id],
-  );
-  await recordOutboundEvent(client, { environment: row.environment, outboundId: row.id,
-    attempt: row.attempts, fromStatus: 'sending', toStatus: 'delivered',
-    reason: 'conversation_resolved' });
-}
-
 export async function markOutboundFailure(
   client: PoolClient,
   row: OutboundRow,
@@ -282,7 +249,7 @@ export async function pollBotOutbox(): Promise<void> {
     if (!await prepareControlledOutbound(client,row)) { await client.query('COMMIT'); return; }
     readyToSend = true;
     if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment',
-      'conversation_resolution'].includes(row.kind)) {
+      'conversation_resolution','operator_text','operator_attachment'].includes(row.kind)) {
       throw new Error(`unsupported outbound kind: ${row.kind}`);
     }
     const sent = await deliverOutboundRow(client, row);

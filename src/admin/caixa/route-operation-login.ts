@@ -57,7 +57,7 @@ async function issueOperationSession(
       workplace_id: workplace.id,
       store_name: workplace.name,
       role: workplace.role,
-      modules: workplace.modules,
+      modules: {...workplace.modules,conversas:workplace.modules.vendas && (!env.MATRIZ_CUSTOMER_IDENTITY || workplace.role==='owner')},
       ...session,
     };
   }

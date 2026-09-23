@@ -12,6 +12,7 @@
   }
 
   function canModule(name) {
+    if (name === 'conversas') return !Caixa.isPartner() && (modules().conversas === true || (modules().conversas == null && Caixa.stored(Caixa.keys.role) === 'owner'));
     if (name === 'purchases') return Caixa.scope() === 'matrix' && Caixa.stored(Caixa.keys.role) === 'owner' && modules().estoque === true;
     if (name === 'team') return Caixa.stored(Caixa.keys.role) === 'owner';
     if (name === 'profile') return true;
@@ -19,6 +20,7 @@
   }
 
   const tabModules = Object.freeze({
+    conversations: 'conversas',
     cash: 'vendas',
     sales: 'vendas',
     pickups: 'retiradas',
@@ -86,6 +88,7 @@
   }
 
   function applyModuleNavigation() {
+    setNavigationVisibility('nav-conversations', canModule('conversas'));
     setNavigationVisibility('nav-cash', canModule('vendas'));
     setNavigationVisibility('nav-sales', canModule('vendas'));
     setNavigationVisibility('nav-pickups', canModule('retiradas'));
@@ -101,6 +104,7 @@
   }
 
   function initialOperationTab() {
+    if (window.location.hash === '#conversas') return authorizedOperationTab('conversations');
     if (location.hash === '#financeiro/despesa') return authorizedOperationTab('finance-expense');
     if (location.hash === '#financeiro/relatorios') return authorizedOperationTab('finance-reports');
     if (!Caixa.isPartner() && canModule('financeiro') && location.hash === '#financeiro/contas') return 'finance-accounts';

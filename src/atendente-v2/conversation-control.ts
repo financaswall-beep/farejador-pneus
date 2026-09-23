@@ -34,6 +34,7 @@ export async function cancelConversationBotQueue(client: PoolClient, environment
   await client.query(`UPDATE ops.outbound_messages SET status='superseded',locked_at=NULL,locked_by=NULL,
       last_error_kind='superseded',last_error_summary='human_takeover',updated_at=now()
     WHERE environment=$1 AND conversation_id=$2 AND status IN ('pending','failed','sending')
+      AND kind NOT IN ('operator_text','operator_attachment')
       AND ($3::uuid IS NULL OR id<>$3)`,
   [environment,conversationId,keep?.outboundId ?? null]);
   await client.query(`UPDATE ops.atendente_jobs SET status='superseded',locked_at=NULL,locked_by=NULL,

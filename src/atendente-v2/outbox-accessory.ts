@@ -19,7 +19,7 @@ export async function enqueueAccessoryText(
     `INSERT INTO ops.outbound_messages (
        environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
      )
-     SELECT $1,c.id,$2,$3,$4,$5,$6,'pending'
+     SELECT c.environment,c.id,c.chatwoot_conversation_id,$3,$4,$5,$6,'pending'
       FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
         AND NOT EXISTS (SELECT 1 FROM ops.conversation_bot_control bc
@@ -44,7 +44,7 @@ export async function enqueuePhotoAttachment(
     `INSERT INTO ops.outbound_messages (
        environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
      )
-     SELECT $1,c.id,$2,$3,'photo_attachment',$4,$5,'pending'
+     SELECT c.environment,c.id,c.chatwoot_conversation_id,$3,'photo_attachment',$4,$5,'pending'
       FROM core.conversations c
       WHERE c.environment=$1 AND c.chatwoot_conversation_id=$2
         AND NOT EXISTS (SELECT 1 FROM ops.conversation_bot_control bc

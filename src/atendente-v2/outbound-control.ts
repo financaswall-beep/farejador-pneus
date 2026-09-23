@@ -7,6 +7,21 @@ import { validateResolutionOutbound } from './auto-resolve.js';
 /** Última trava antes do HTTP, dentro da transação do caller, com lock até o ACK.
  * Mesmo após retomar, respostas antigas e fotos pedidas antes da retomada não saem. */
 export async function prepareControlledOutbound(client: PoolClient, row: OutboundRow): Promise<boolean> {
+    // Já autorizado pelo operador e gravado com a pausa, não é uma resposta do bot.
+    if (row.kind === 'operator_text' || row.kind === 'operator_attachment') {
+      const result = await client.query(`SELECT o.id FROM ops.outbound_messages o
+        JOIN ops.operator_messages m ON m.environment=o.environment AND m.outbound_id=o.id
+        JOIN core.conversations c ON c.environment=o.environment AND c.id=o.conversation_id
+        WHERE o.environment=$1 AND o.id=$2 AND o.status='sending' AND c.deleted_at IS NULL`,
+      [row.environment,row.id]);
+      if (result.rows.length === 1) return true;
+      await client.query(`UPDATE ops.outbound_messages SET status='superseded',locked_at=NULL,locked_by=NULL,
+        last_error_kind='superseded',last_error_summary='operator_conversation_unavailable',updated_at=now()
+        WHERE environment=$1 AND id=$2 AND status='sending'`, [row.environment,row.id]);
+      await recordOutboundEvent(client,{environment:row.environment,outboundId:row.id,
+        fromStatus:'sending',toStatus:'superseded',reason:'operator_conversation_unavailable'});
+      return false;
+    }
     const state = await syncHumanIntervention(client,row.environment,row.conversation_id);
     const result = await client.query<{ allowed: boolean }>(`SELECT EXISTS (
       SELECT 1 FROM ops.outbound_messages o
