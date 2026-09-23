@@ -10,6 +10,7 @@ vi.mock('../../../src/social-comments/dashboard.js',()=>({commentsDashboard:mock
 vi.mock('../../../src/social-comments/graph.js',()=>({CommentsGraph:class{health=mocks.health;},MetaCommentError:class extends Error{}}));
 vi.mock('../../../src/admin/painel/marketing-audit.js',()=>({recordMarketingAudit:mocks.audit}));
 import { registerMarketingComments } from '../../../src/admin/painel/route-marketing-comments.js';
+import { MetaCommentError } from '../../../src/social-comments/graph.js';
 describe('Comentários — APIs somente owner',()=>{
   beforeEach(()=>vi.clearAllMocks());
   async function app(){const a=Fastify();await registerMarketingComments(a);return a;}
@@ -19,6 +20,17 @@ describe('Comentários — APIs somente owner',()=>{
   it('retorna estado de instalação sem tentar publicar',async()=>{
     mocks.dashboard.mockResolvedValue({ready:false,rows:[],total:0});const a=await app();
     try{const r=await a.inject({url:'/admin/api/marketing/comments',headers:{'x-owner':'yes'}});expect(r.statusCode).toBe(200);expect(r.json().ready).toBe(false);expect(mocks.health).not.toHaveBeenCalled();}finally{await a.close();}
+  });
+  it('retorna somente código seguro e etapa quando a Meta recusa a conexão',async()=>{
+    mocks.health.mockRejectedValue(Object.assign(new MetaCommentError('meta_app_secret_mismatch'),{
+      code:'meta_app_secret_mismatch',stage:'page',details:'secret-token',
+    }));
+    const a=await app();
+    try{
+      const r=await a.inject({method:'POST',url:'/admin/api/marketing/comments/connection',headers:{'x-owner':'yes'},payload:{}});
+      expect(r.statusCode).toBe(502);
+      expect(r.json()).toEqual({error:'meta_app_secret_mismatch',stage:'page'});
+    }finally{await a.close();}
   });
   it('valida paginação e pausa e audita quem pausou',async()=>{
     mocks.query.mockResolvedValue({rows:[]});const a=await app();

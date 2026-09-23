@@ -18,7 +18,10 @@ export async function registerMarketingComments(fastify: FastifyInstance): Promi
   });
   fastify.post('/admin/api/marketing/comments/connection',options,async(_request,reply)=>{
     try { return await new CommentsGraph(commentsConfig()).health(); }
-    catch(error) { return reply.code(502).send({error:error instanceof MetaCommentError ? error.code : 'connection_check_failed'}); }
+    catch(error) {
+      return reply.code(502).send(error instanceof MetaCommentError
+        ? {error:error.code,stage:error.stage} : {error:'connection_check_failed'});
+    }
   });
   fastify.post('/admin/api/marketing/comments/pause',options,async(request,reply)=>{
     const body = z.object({paused:z.boolean()}).strict().safeParse(request.body);

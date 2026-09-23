@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { ownsAccount, type CommentsConfig, type Platform } from './config.js';
 
 export class MetaCommentError extends Error {
+  stage?: 'page' | 'token_permissions';
   constructor(public readonly code: string, public readonly uncertain = false) { super(code); }
 }
 type Json = Record<string, any>;
@@ -28,6 +29,10 @@ export class CommentsGraph {
     catch { throw new MetaCommentError('meta_response_unknown',method !== 'GET'); }
     if (!response.ok || body.error) {
       const code = Number(body.error?.code);
+      // Classify locally; never return the provider message, which may contain credentials.
+      if (response.status === 400 && code === 100 && /appsecret_proof/i.test(String(body.error?.message ?? ''))) {
+        throw new MetaCommentError('meta_app_secret_mismatch');
+      }
       throw new MetaCommentError(`meta_http_${response.status}_code_${Number.isFinite(code) ? code : 0}`,
         method !== 'GET' && response.status >= 500);
     }
@@ -64,13 +69,21 @@ export class CommentsGraph {
     if (data.success !== true) throw new MetaCommentError('meta_delete_ack_unknown',true);
   }
   async health(): Promise<Record<string,unknown>> {
-    const page = await this.call('me','GET',{fields:'id,name,instagram_business_account'});
+    const diagnosticCall = async (stage: 'page' | 'token_permissions', path: string,
+      params: Record<string,string>, token = this.config.token): Promise<Json> => {
+      try { return await this.call(path,'GET',params,token); }
+      catch (error) {
+        if (error instanceof MetaCommentError) error.stage = stage;
+        throw error;
+      }
+    };
+    const page = await diagnosticCall('page','me',{fields:'id,name,instagram_business_account'});
     const pageMatches = String(page.id) === this.config.pageId;
     let scopes: string[] | null = null;
     let tokenValid: boolean | null = null;
     let appMatches: boolean | null = null;
     if (this.config.appId && this.config.appSecret && this.config.token) {
-      const debug = await this.call('debug_token','GET',{input_token:this.config.token},`${this.config.appId}|${this.config.appSecret}`);
+      const debug = await diagnosticCall('token_permissions','debug_token',{input_token:this.config.token},`${this.config.appId}|${this.config.appSecret}`);
       scopes = Array.isArray(debug.data?.scopes) ? debug.data.scopes.filter((x: unknown) => typeof x === 'string') : [];
       tokenValid = debug.data?.is_valid === true;
       appMatches = String(debug.data?.app_id) === this.config.appId;

@@ -66,6 +66,20 @@ describe('transporte oficial Meta',()=>{
     const health=await new CommentsGraph(config,vi.fn().mockResolvedValue(Response.json({id:'100',instagram_business_account:{id:'200'}}))).health();
     expect(health).toMatchObject({page_matches:true,instagram_matches:true,permissions_checked:false,facebook_missing:null});
   });
+  it('identifica a assinatura inválida sem expor a mensagem da Meta',async()=>{
+    const fetcher=vi.fn().mockResolvedValue(Response.json({error:{code:100,message:'Invalid appsecret_proof: secret-token'}},{status:400}));
+    await expect(new CommentsGraph(config,fetcher).health()).rejects.toMatchObject({
+      code:'meta_app_secret_mismatch',message:'meta_app_secret_mismatch',stage:'page',uncertain:false,
+    });
+  });
+  it('distingue falha nas permissões de falha ao consultar a página',async()=>{
+    const fetcher=vi.fn().mockResolvedValueOnce(Response.json({id:'100'}))
+      .mockResolvedValueOnce(Response.json({error:{code:190,message:'secret-app'}},{status:400}));
+    await expect(new CommentsGraph({...config,appId:'123'},fetcher).health()).rejects.toMatchObject({
+      code:'meta_http_400_code_190',stage:'token_permissions',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });
 describe('decisões de IA',()=>{
   const decision={action:'delete',sentiment:'negative',reply_text:'',reason:'Reclamação sobre o atendimento.',confidence_level:'high'};
