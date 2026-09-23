@@ -20,6 +20,8 @@
     if (request) request.abort(); if (recentRequest) recentRequest.abort();
     if (C.financeAccounts) C.financeAccounts.cancel();
     if (C.financeCommissionMonth) C.financeCommissionMonth.cancel();
+    if (C.financeExpense) C.financeExpense.cancel();
+    if (C.financeReports) C.financeReports.cancel();
     request = null; recentRequest = null; clearTimeout(timer);
   }
   function valid(context) {
@@ -123,6 +125,8 @@
   }
   async function load() {
     if (!C.token() || C.isPartner() || !C.canModule('financeiro')) return;
+    if (state.tab === 'expense') return C.financeExpense.load();
+    if (state.tab === 'reports') return C.financeReports.load();
     try { period(); } catch (error) {
       cancel(); ['mf-summary', 'mf-statement', 'mf-accounts-view', 'mf-commissions-view', 'mf-loading'].forEach(id => hidden(id, true));
       hidden('mf-error', false); el('mf-error-copy').textContent = errorText(error); return;
@@ -135,11 +139,18 @@
   }
   function setTab(tab) {
     cancel(); el('mf-detail').close();
-    state.tab = tab === 'finance' ? 'summary' : tab === 'finance-accounts' ? 'accounts' : tab === 'finance-commissions' ? 'commissions' : 'statement';
+    document.querySelectorAll('[data-mf-expense]').forEach(button => { button.disabled = C.stored(C.keys.role) !== 'owner'; });
+    state.tab = { finance: 'summary', 'finance-accounts': 'accounts', 'finance-commissions': 'commissions', 'finance-expense': 'expense', 'finance-reports': 'reports' }[tab] || 'statement';
+    const tool = state.tab === 'expense' || state.tab === 'reports';
+    hidden('mf-tool-subtitle', !tool);
+    el('mf-tool-subtitle').textContent = state.tab === 'expense' ? 'Organize os gastos da Matriz.' : 'Confira de onde vem o resultado.';
+    hidden('mf-expense-view', state.tab !== 'expense'); hidden('mf-reports-view', state.tab !== 'reports');
     hidden('mf-accounts-view', state.tab !== 'accounts'); hidden('mf-commissions-view', state.tab !== 'commissions');
-    hidden('mf-main-tabs', state.tab === 'commissions'); hidden('mf-back', state.tab !== 'commissions'); hidden('mf-commission-subtitle', state.tab !== 'commissions');
+    hidden('mf-main-tabs', state.tab === 'commissions' || tool); hidden('mf-back', state.tab !== 'commissions' && !tool); hidden('mf-commission-subtitle', state.tab !== 'commissions');
+    el('mf-month').closest('label').classList.toggle('hidden', tool);
+    el('mf-back').setAttribute('aria-label', state.tab === 'expense' ? 'Voltar ao financeiro' : 'Voltar ao resumo');
     hidden('mf-error', true); hidden('mf-loading', true);
-    el('mf-title').textContent = state.tab === 'commissions' ? 'Comissões' : 'Financeiro';
+    el('mf-title').textContent = { commissions: 'Comissões', expense: 'Lançar despesa', reports: 'Relatórios' }[state.tab] || 'Financeiro';
     el('mf-accounts').setAttribute('aria-current', state.tab === 'accounts' ? 'page' : 'false');
     if (tab === 'finance-in' || tab === 'finance-out') { state.direction = tab === 'finance-in' ? 'in' : 'out'; state.offset = 0; }
     el('mf-tab-summary').toggleAttribute('aria-current', state.tab === 'summary');
@@ -153,13 +164,15 @@
     if (!C.canModule('financeiro') || C.isPartner()) return;
     state.offset = 0;
     if (tab === 'statement') { state.direction = direction || 'all'; state.search = ''; el('mf-search').value = ''; }
-    if (tab === 'commissions' && C.stored(C.keys.role) !== 'owner') return;
-    const hash = { statement: '#financeiro/extrato', accounts: '#financeiro/contas', commissions: '#financeiro/comissoes' }[tab] || '#financeiro';
+    if (['commissions', 'expense'].includes(tab) && C.stored(C.keys.role) !== 'owner') return;
+    if (tab === 'expense') C.financeExpense.setReturnTab(state.tab === 'statement' ? 'statement' : 'summary');
+    const hash = { statement: '#financeiro/extrato', accounts: '#financeiro/contas', commissions: '#financeiro/comissoes', expense: '#financeiro/despesa', reports: '#financeiro/relatorios' }[tab] || '#financeiro';
     if (location.hash !== hash) history.pushState(null, '', hash);
-    C.showTab({ statement: 'finance-statement', accounts: 'finance-accounts', commissions: 'finance-commissions' }[tab] || 'finance');
+    C.showTab({ statement: 'finance-statement', accounts: 'finance-accounts', commissions: 'finance-commissions', expense: 'finance-expense', reports: 'finance-reports' }[tab] || 'finance');
     if (tab === 'summary') void load();
   }
   function reset() {
+    if (C.financeExpense) C.financeExpense.reset(); if (C.financeReports) C.financeReports.reset();
     cancel(); if (C.financeAccounts) C.financeAccounts.reset(); if (C.financeCommissionMonth) C.financeCommissionMonth.reset(); state.payload = null; state.masked = false; state.search = ''; state.direction = 'all'; state.offset = 0;
     el('mf-month').value = ''; el('mf-search').value = ''; el('mf-detail').close();
     el('mf-detail-body').replaceChildren(); el('mf-list').replaceChildren(); el('mf-recent').replaceChildren();
@@ -169,7 +182,9 @@
   el('mf-tab-summary').addEventListener('click', () => open('summary'));
   el('mf-tab-statement').addEventListener('click', () => open('statement'));
   el('mf-accounts').addEventListener('click', () => open('accounts'));
-  el('mf-back').addEventListener('click', () => open('summary'));
+  el('mf-back').addEventListener('click', () => open(state.tab === 'expense' ? C.financeExpense.returnTab() : 'summary'));
+  document.querySelectorAll('[data-mf-expense]').forEach(button => button.addEventListener('click', () => open('expense')));
+  el('mf-reports').addEventListener('click', () => open('reports'));
   el('mf-see-all').addEventListener('click', () => open('statement'));
   ['mf-refresh', 'mf-retry', 'mf-list-retry'].forEach(id => el(id).addEventListener('click', load));
   el('mf-recent-retry').addEventListener('click', loadRecent);
@@ -202,7 +217,7 @@
   el('mf-detail').addEventListener('click', event => { if (event.target === el('mf-detail')) { const box = el('mf-detail').getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) el('mf-detail').close(); } });
   window.addEventListener('hashchange', () => {
     if (!C.token() || C.isPartner() || !C.canModule('financeiro')) return;
-    const tabs = { '#financeiro/contas': 'finance-accounts', '#financeiro/comissoes': 'finance-commissions', '#financeiro': 'finance', '#financeiro/extrato': 'finance-statement', '#financeiro/entradas': 'finance-in', '#financeiro/saidas': 'finance-out' };
+    const tabs = { '#financeiro/despesa': 'finance-expense', '#financeiro/relatorios': 'finance-reports', '#financeiro/contas': 'finance-accounts', '#financeiro/comissoes': 'finance-commissions', '#financeiro': 'finance', '#financeiro/extrato': 'finance-statement', '#financeiro/entradas': 'finance-in', '#financeiro/saidas': 'finance-out' };
     const tab = tabs[location.hash]; if (!tab) return;
     C.showTab(tab); if (tab === 'finance') void load();
   });

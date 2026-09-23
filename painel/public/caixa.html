@@ -8,11 +8,12 @@
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
   <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-accounts.css?v=20260918-finance3" />
+  <link rel="stylesheet" href="/operacao/caixa-finance-tools.css?v=20260922-finance1" />
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
   <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchasevariants1" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260918-finance3"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260918-finance3"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260822-caixa-brand-select1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao2"></script>
@@ -35,7 +36,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260918-finance3"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -51,11 +52,16 @@
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
-  <script defer src="/operacao/caixa-finance-view.js?v=20260918-finance3"></script>
-  <script defer src="/operacao/caixa-finance-matrix.js?v=20260918-finance3"></script>
+  <script defer src="/operacao/caixa-finance-view.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/caixa-finance-matrix.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-payment.js?v=20260918-finance3"></script>
   <script defer src="/operacao/caixa-finance-accounts.js?v=20260918-finance3"></script>
   <script defer src="/operacao/caixa-finance-commission-month.js?v=20260918-finance3"></script>
+  <script defer src="/operacao/app.relatorios.pdf.core.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/app.relatorios.financeiro.pdf.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/caixa-finance-expense.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/caixa-finance-report-view.js?v=20260922-finance1"></script>
+  <script defer src="/operacao/caixa-finance-reports.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260918-finance3"></script>
   <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
@@ -955,6 +961,7 @@
             <label class="mf-period"><span data-mf-icon="calendar"></span><span id="mf-month-label"></span><span data-mf-icon="chevron-down"></span><input id="mf-month" type="month" min="2000-01" aria-label="Mês do financeiro" /></label>
           </header>
           <p id="mf-commission-subtitle" class="mc-subtitle hidden">Apuração e pagamentos</p>
+          <p id="mf-tool-subtitle" class="mt-subtitle hidden"></p>
           <nav id="mf-main-tabs" class="mf-tabs" aria-label="Seções do financeiro">
             <button id="mf-tab-summary" type="button" aria-current="page">Resumo</button>
             <button id="mf-tab-statement" type="button">Extrato</button>
@@ -980,9 +987,9 @@
             </button>
             <button id="mf-stock" class="mf-stock" type="button"><span data-mf-icon="tire"></span><span><strong>Em estoque</strong><small id="mf-stock-note">Posição atual · valor de custo</small></span><b id="mf-stock-value" data-mf-money>—</b><span data-mf-icon="chevron"></span></button>
             <div class="mf-shortcuts">
-              <button type="button" disabled title="Disponível em breve"><span data-mf-icon="expense"></span><span>Lançar despesa</span></button>
+              <button id="mf-expense" type="button" data-mf-expense><span data-mf-icon="expense"></span><span>Lançar despesa</span></button>
               <button id="mf-commissions" type="button"><span data-mf-icon="team"></span><span>Comissões</span></button>
-              <button type="button" disabled title="Disponível em breve"><span data-mf-icon="chart"></span><span>Relatórios</span></button>
+              <button id="mf-reports" type="button"><span data-mf-icon="chart"></span><span>Relatórios</span></button>
             </div>
             <div class="mf-section-heading"><h3>Movimentações</h3><button id="mf-see-all" type="button">Ver todas <span data-mf-icon="arrow"></span></button></div>
             <div id="mf-recent" aria-live="polite"></div>
@@ -1001,7 +1008,39 @@
               <div id="mf-pagination" class="mf-pagination"><span id="mf-count"></span><button id="mf-prev" type="button" aria-label="Página anterior"><span data-mf-icon="back"></span></button><button id="mf-next" type="button" aria-label="Próxima página"><span data-mf-icon="chevron"></span></button></div>
             </div>
             <p class="mf-explanation"><span data-mf-icon="info"></span><span>Compras pagas aparecem como saída no caixa. No lucro, o custo é descontado quando o pneu é vendido.</span></p>
-            <button class="mf-primary mf-upcoming" type="button" disabled title="Disponível em breve"><span data-mf-icon="plus"></span>Lançar despesa</button>
+            <button id="mf-statement-expense" class="mf-primary" type="button" data-mf-expense><span data-mf-icon="plus"></span>Lançar despesa</button>
+          </section>
+          <section id="mf-expense-view" class="hidden" aria-label="Lançar despesa">
+            <p id="me-loading" role="status">Carregando categorias…</p>
+            <p id="me-load-error" class="mf-inline-error hidden" role="alert"></p>
+            <form id="me-form" class="hidden">
+              <fieldset id="me-fields">
+                <label class="me-amount">Valor da despesa (R$)<span class="me-money"><span aria-hidden="true">R$</span><input id="me-amount" name="amount" inputmode="decimal" placeholder="0,00" maxlength="16" required autocomplete="off" /></span></label>
+                <label class="mf-field">Categoria<select id="me-category" name="category" required><option value="">Selecione</option></select></label>
+                <label class="mf-field">Descrição<input id="me-description" name="description" maxlength="300" placeholder="Ex.: aluguel da loja" /></label>
+                <div class="mf-field"><span id="me-status-label">Situação</span><div class="ma-segment" role="group" aria-labelledby="me-status-label"><button type="button" data-me-status="paid" aria-pressed="true">Já paga</button><button type="button" data-me-status="pending" aria-pressed="false">A pagar</button></div></div>
+                <div class="mt-fields"><label class="mf-field">Data da despesa<input id="me-occurred" type="date" required /></label><label class="mf-field">Competência<input id="me-competence" type="month" required /></label></div>
+                <label id="me-paid-field" class="mf-field">Data do pagamento<input id="me-paid" type="date" required /></label>
+                <label id="me-due-field" class="mf-field hidden">Vencimento<input id="me-due" type="date" /></label>
+                <details class="me-document"><summary>Data do documento <span id="me-document-label"></span></summary><label class="mf-field">Data do documento<input id="me-document" type="date" required /></label></details>
+              </fieldset>
+              <p id="me-note" class="mf-explanation"></p>
+              <p id="me-error" class="mf-inline-error hidden" role="alert"></p>
+              <button id="me-save" class="mf-primary" type="submit"><span data-mf-icon="expense"></span><span id="me-save-label">Salvar despesa</span></button>
+            </form>
+            <div id="me-success" class="mt-card hidden" role="status"><h3>Despesa salva</h3><p id="me-success-copy"></p><button id="me-view" class="mf-primary" type="button">Conferir lançamento</button><button id="me-new" class="mf-outline" type="button">Lançar outra despesa</button></div>
+          </section>
+          <section id="mf-reports-view" class="hidden" aria-label="Relatórios financeiros">
+            <div class="mr-toolbar"><button id="mr-period" class="mf-outline" type="button" aria-expanded="false" aria-controls="mr-filters"><span data-mf-icon="calendar"></span><span id="mr-period-label">Período</span></button><select id="mr-origin" aria-label="Origem financeira"><option value="all">Todas as origens</option><option value="varejo">Varejo</option><option value="atacado">Atacado</option><option value="compras">Compras</option><option value="despesas">Despesas</option><option value="marketing">Marketing</option><option value="comissao">Comissões da rede</option><option value="mensalidades">Mensalidades</option><option value="estoque">Estoque</option><option value="financeiro">Financeiro</option><option value="outros">Outras origens</option></select><button id="mr-filter-toggle" class="mf-outline" type="button" aria-label="Filtros do relatório" aria-expanded="false" aria-controls="mr-filters"><span data-mf-icon="filters"></span></button></div>
+            <form id="mr-filters" class="mt-card hidden"><div class="mt-fields"><label class="mf-field">De<input id="mr-from" type="date" required /></label><label class="mf-field">Até<input id="mr-to" type="date" required /></label></div><label class="mf-field">Buscar lançamento ou conta<input id="mr-search" maxlength="120" type="search" placeholder="Descrição, referência ou nome" /></label><button class="mf-primary" type="submit">Aplicar filtros</button><button id="mr-clear" class="mf-outline" type="button">Limpar filtros</button></form>
+            <nav class="mf-tabs mr-tabs" aria-label="Seção do relatório"><button type="button" data-mr-tab="overview">Visão geral</button><button type="button" data-mr-tab="result" aria-current="page">Resultado</button><button type="button" data-mr-tab="cash">Caixa</button><button type="button" data-mr-tab="titles">Contas</button></nav>
+            <div id="mr-cash-controls" class="mf-filters hidden" role="group" aria-label="Direção do caixa"><button type="button" data-mr-direction="all" aria-pressed="true">Todas</button><button type="button" data-mr-direction="in">Entradas</button><button type="button" data-mr-direction="out">Saídas</button></div>
+            <div id="mr-title-controls" class="mt-fields hidden"><label class="mf-field">Tipo de conta<select id="mr-side"><option value="all">A pagar e a receber</option><option value="payable">A pagar</option><option value="receivable">A receber</option></select></label><label class="mf-field">Vencimento<select id="mr-due"><option value="all">Todos</option><option value="overdue">Vencidas</option><option value="today">Hoje</option><option value="next7">Próximos 7 dias</option><option value="next30">Próximos 30 dias</option><option value="undated">Sem vencimento</option></select></label></div>
+            <p id="mr-loading" class="mf-message hidden" role="status">Conferindo o relatório…</p><p id="mr-error" class="mf-inline-error hidden" role="alert"></p>
+            <div id="mr-content" class="hidden"><p id="mr-warning" class="mf-warning hidden" role="status"></p><div id="mr-summary"></div><div id="mr-breakdown"></div><div id="mr-expenses"></div><p id="mr-note" class="mf-explanation"></p>
+              <div class="mt-fields mr-exports"><button id="mr-pdf" type="button" class="mf-primary">Baixar PDF</button><button id="mr-csv" type="button" class="mf-outline">Exportar CSV</button></div><p id="mr-export-error" class="mf-inline-error hidden" role="alert"></p>
+              <details id="mr-records"><summary id="mr-records-label">Lançamentos do período</summary><div id="mr-list"></div><div id="mr-pagination" class="mf-pagination"><span id="mr-count"></span><button id="mr-prev" type="button" aria-label="Página anterior"><span data-mf-icon="back"></span></button><button id="mr-next" type="button" aria-label="Próxima página"><span data-mf-icon="chevron"></span></button></div></details>
+            </div>
           </section>
           <section id="mf-accounts-view" class="hidden" aria-labelledby="ma-title">
             <div id="ma-loading" class="mf-message" role="status"><span class="mf-spinner"></span>Conferindo as contas…</div>

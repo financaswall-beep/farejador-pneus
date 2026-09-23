@@ -87,7 +87,7 @@
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
     const finance = tab === 'finance';
-    const financeEntries = tab === 'finance-in' || tab === 'finance-out' || tab === 'finance-statement' || tab === 'finance-accounts';
+    const financeEntries = ['finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-expense', 'finance-reports'].includes(tab);
     const matrixFinance = !Caixa.isPartner() && (finance || financeEntries || tab === 'finance-commissions');
     if (!matrixFinance && Caixa.financeMatrix) Caixa.financeMatrix.cancel();
     const financeCommissions = tab === 'finance-commissions';
@@ -164,7 +164,7 @@
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     document.getElementById('notifications-button').classList.toggle('active', notifications);
     if (!(financeEntries || financeCommissions || financeCommissionDetail)
-      && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/extrato', '#financeiro/contas', '#financeiro/comissoes'].includes(window.location.hash)
+      && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/extrato', '#financeiro/contas', '#financeiro/comissoes', '#financeiro/despesa', '#financeiro/relatorios'].includes(window.location.hash)
         || window.location.hash.startsWith('#financeiro/comissoes/'))) {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);

@@ -87,6 +87,7 @@
       ? stock.sem_custo + ' pneus sem custo · valor parcial' : number(stock.pneus) + ' pneus · custo atual';
     el('mf-stock').disabled = !stock;
     el('mf-commissions').disabled = C.stored(C.keys.role) !== 'owner';
+    document.querySelectorAll('[data-mf-expense]').forEach(button => { button.disabled = C.stored(C.keys.role) !== 'owner'; });
   }
   function resultDetail(payload) {
     const r = payload.truth.competencia, body = dialog('Como o resultado foi formado');
