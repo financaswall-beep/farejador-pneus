@@ -4,6 +4,17 @@
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
 
+  function matrixSales() {
+    return !Caixa.isPartner() && ['owner', 'admin'].includes(Caixa.stored(Caixa.keys.role));
+  }
+
+  function saleOrigin(sale) {
+    const origin = ['chatwoot_com_bot', 'bot_promoted'].includes(sale.source) ? 'Bot'
+      : sale.source === 'chatwoot_sem_bot' ? 'Atendimento'
+        : sale.source === 'walkin_balcao' ? 'Balcão' : 'Venda da Matriz';
+    return sale.seller_name ? origin + ' · ' + sale.seller_name : origin;
+  }
+
   function statusInfo(status) {
     if (status === 'cancelled') return { label: 'Cancelada', className: 'cancelled' };
     if (status === 'open' || status === 'pending') return { label: 'Em andamento', className: 'pending' };
@@ -66,7 +77,7 @@
     return icon;
   }
 
-  function saleCard(sale) {
+  function saleCard(sale, matrix) {
     const article = document.createElement('article');
     const status = statusInfo(sale.status);
     article.className = 'sale-card' + (status.className === 'cancelled' ? ' sale-card--cancelled' : '');
@@ -91,6 +102,7 @@
     const meta = document.createElement('span');
     meta.className = 'sale-payment';
     meta.textContent = paymentLabel(sale.payment_method);
+    if (matrix) meta.textContent += ' · ' + saleOrigin(sale);
     const amount = document.createElement('strong');
     amount.className = 'sale-amount';
     amount.textContent = Caixa.currency.format(Number(sale.total_amount || 0));
@@ -102,7 +114,7 @@
       ? ' (' + commissionRate(sale.commission_value) + '%)' : '';
     commissionText.textContent = status.className === 'cancelled'
       ? 'Comissão cancelada'
-      : 'Sua comissão: ' + Caixa.currency.format(Number(sale.commission_amount || 0)) + rate;
+      : (matrix ? 'Comissão da venda: ' : 'Sua comissão: ') + Caixa.currency.format(Number(sale.commission_amount || 0)) + rate;
     const detailsButton = document.createElement('button');
     detailsButton.type = 'button';
     detailsButton.className = 'receipt-button';
@@ -125,7 +137,13 @@
     Caixa.renderWeeklySummary(payload);
     elements.salesList.replaceChildren();
     const sales = Caixa.selectedSales(payload);
-    sales.forEach(function (sale) { elements.salesList.appendChild(saleCard(sale)); });
+    const matrix = payload.sales_scope === 'matrix';
+    if (!elements.salesPanel.classList.contains('hidden')) {
+      elements.appHeadingTitle.textContent = matrix ? 'Vendas da Matriz' : 'Minhas vendas';
+    }
+    elements.salesEmpty.querySelector('span').textContent = matrix
+      ? 'As vendas da Matriz desta semana aparecerão aqui.' : 'Suas vendas desta semana aparecerão aqui.';
+    sales.forEach(function (sale) { elements.salesList.appendChild(saleCard(sale, matrix)); });
     const selected = Caixa.selectedSalesDay(payload);
     elements.salesResultCount.textContent = sales.length
       ? `${sales.length} ${selected ? 'no dia' : 'na semana'}` : '';
@@ -156,6 +174,7 @@
   }
 
   function renderReceipt(receipt) {
+    const matrix = receipt.sales_scope === 'matrix';
     elements.receiptContent.replaceChildren();
     const meta = document.createElement('div');
     meta.className = 'receipt-meta';
@@ -174,7 +193,7 @@
     (receipt.items || []).forEach(function (item) {
       const row = document.createElement('div');
       const image = document.createElement('img');
-      image.src = item.image_url || '/operacao/catalog-tire.webp';
+      image.src = item.image_url || (item.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp');
       image.alt = '';
       const copy = document.createElement('span');
       const name = document.createElement('b');
@@ -203,9 +222,9 @@
     const commission = document.createElement('section');
     commission.className = 'receipt-commission';
     const kicker = document.createElement('small');
-    kicker.textContent = 'MINHA COMISSÃO';
+    kicker.textContent = matrix ? 'COMISSÃO DA VENDA' : 'MINHA COMISSÃO';
     const amount = document.createElement('strong');
-    amount.textContent = 'Você ganhou ' + Caixa.currency.format(Number(receipt.commission_amount || 0));
+    amount.textContent = (matrix ? 'Comissão: ' : 'Você ganhou ') + Caixa.currency.format(Number(receipt.commission_amount || 0));
     const rule = document.createElement('span');
     rule.textContent = commissionRule(receipt);
     const status = document.createElement('em');
@@ -214,11 +233,12 @@
     elements.receiptContent.appendChild(commission);
     const seller = document.createElement('p');
     seller.className = 'receipt-seller';
-    seller.textContent = 'Venda registrada para ' + receipt.seller_name;
+    seller.textContent = matrix ? 'Origem: ' + saleOrigin(receipt) : 'Venda registrada para ' + receipt.seller_name;
     elements.receiptContent.appendChild(seller);
   }
 
   Object.assign(Caixa, {
+    matrixSales: matrixSales,
     statusInfo: statusInfo,
     setSalesState: setSalesState,
     renderProfileSummary: renderProfileSummary,

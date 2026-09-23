@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20260923-chat1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20260923-sales-scope1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260923-chat1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260923-caixa2"></script>
@@ -24,8 +24,8 @@
   <script defer src="/operacao/caixa-checkout-view.js?v=20260923-caixa2"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260923-caixa2"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260923-caixa2"></script>
-  <script defer src="/operacao/caixa-sales-weekly.js?v=20260816-sales-day1"></script>
-  <script defer src="/operacao/caixa-sales-view.js?v=20260816-sales-day1"></script>
+  <script defer src="/operacao/caixa-sales-weekly.js?v=20260923-sales-scope1"></script>
+  <script defer src="/operacao/caixa-sales-view.js?v=20260923-sales-scope1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
@@ -41,7 +41,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260923-caixa2"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260923-sales-scope1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -316,7 +316,7 @@
               <strong id="weekly-total">—</strong>
               <small class="weekly-own-label">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-                Somente suas vendas
+                <span id="weekly-scope-label">Somente suas vendas</span>
               </small>
             </div>
 
@@ -349,7 +349,7 @@
                 </div>
                 <div class="weekly-commission">
                   <span class="weekly-stat-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="6" r="2"/><circle cx="15" cy="4" r="1.5"/><circle cx="18" cy="9" r="1.5"/><path d="M3 14h4l3 2h5a2 2 0 0 1 2 2H9l-3-1.5H3M17 18l3-3 1 1-4 5H9l-4-2H3"/></svg></span>
-                  <span><small>Minha comissão</small><strong id="weekly-commission">—</strong></span>
+                  <span><small id="weekly-commission-label">Minha comissão</small><strong id="weekly-commission">—</strong></span>
                 </div>
               </div>
             </section>

@@ -6,6 +6,7 @@ import {
   type OperationSaleDetail,
   type OperationSaleListItem,
   type OperationSalesDay,
+  type OperationSalesScope,
 } from '../../operation/my-sales-types.js';
 
 type Environment = 'prod' | 'test';
@@ -58,6 +59,8 @@ function listRow(row: any): OperationSaleListItem {
     items_quantity: Number(row.items_quantity),
     item_kind: row.item_kind ?? 'item',
     item_summary: itemSummary(row.first_name ?? 'Item', Number(row.item_lines ?? 0)),
+    seller_name: row.seller_name ?? null,
+    source: row.source ?? null,
     commission_kind: row.commission_kind,
     commission_basis: row.commission_basis,
     commission_value: Number(row.commission_value ?? 0),
@@ -72,6 +75,7 @@ export async function getCaixaMySales(
   collaboratorId: string,
   weekOffset: number,
   db: Pool = defaultPool,
+  scope: OperationSalesScope = 'own',
 ): Promise<OperationMySalesPayload> {
   const [daysResult, salesResult] = await Promise.all([
     db.query<any>(
@@ -88,7 +92,7 @@ export async function getCaixaMySales(
            CROSS JOIN bounds
            ${itemLateralSql}
            ${ruleLateralSql}
-          WHERE o.environment=$1 AND o.seller_collaborator_id=$2
+          WHERE o.environment=$1 AND ($4::boolean OR o.seller_collaborator_id=$2)
             AND o.status IN ('confirmed','paid','delivered')
             AND o.created_at>=(week_start::timestamp AT TIME ZONE 'America/Sao_Paulo')
             AND o.created_at<((week_start+7)::timestamp AT TIME ZONE 'America/Sao_Paulo')
@@ -99,7 +103,7 @@ export async function getCaixaMySales(
               COALESCE(sum(own_sales.commission_amount),0)::text commission_amount
          FROM days LEFT JOIN own_sales ON own_sales.sale_day=days.sale_date
         GROUP BY days.sale_date ORDER BY days.sale_date`,
-      [environment, collaboratorId, weekOffset],
+      [environment, collaboratorId, weekOffset, scope === 'matrix'],
     ),
     db.query<any>(
       `WITH bounds AS (
@@ -107,11 +111,14 @@ export async function getCaixaMySales(
            + ($3::int*interval '7 days'))::date AS week_start
        )
        SELECT o.id order_id,o.order_number,o.payment_method,o.total_amount::text,o.status,o.created_at,
+              mc.display_name seller_name,o.source,
               items.quantity items_quantity,items.item_kind,items.first_name,items.lines item_lines,
               cr.kind commission_kind,cr.basis commission_basis,COALESCE(cr.value,0)::text commission_value,
               (${commissionSql})::text commission_amount,pi.payment_status payroll_status
          FROM commerce.orders o
          JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
+         LEFT JOIN network.matriz_collaborators mc
+           ON mc.id=o.seller_collaborator_id AND mc.environment=o.environment
          CROSS JOIN bounds
          ${itemLateralSql}
          ${ruleLateralSql}
@@ -120,12 +127,12 @@ export async function getCaixaMySales(
           AND pp.competence=date_trunc('month',o.created_at AT TIME ZONE 'America/Sao_Paulo')::date
          LEFT JOIN finance.matriz_payroll_items pi
            ON pi.payroll_period_id=pp.id AND pi.collaborator_id=o.seller_collaborator_id
-        WHERE o.environment=$1 AND o.seller_collaborator_id=$2
+        WHERE o.environment=$1 AND ($4::boolean OR o.seller_collaborator_id=$2)
           AND o.status IN ('confirmed','paid','delivered','cancelled')
           AND o.created_at>=(week_start::timestamp AT TIME ZONE 'America/Sao_Paulo')
           AND o.created_at<((week_start+7)::timestamp AT TIME ZONE 'America/Sao_Paulo')
         ORDER BY o.created_at DESC,o.id DESC LIMIT 40`,
-      [environment, collaboratorId, weekOffset],
+      [environment, collaboratorId, weekOffset, scope === 'matrix'],
     ),
   ]);
   const daily_series: OperationSalesDay[] = daysResult.rows.map((row: any) => {
@@ -141,6 +148,7 @@ export async function getCaixaMySales(
     };
   });
   return {
+    sales_scope: scope,
     week_offset: weekOffset,
     summary: summarizeOperationDays(daily_series),
     daily_series,
@@ -153,15 +161,17 @@ export async function getCaixaMySaleDetail(
   collaboratorId: string,
   orderId: string,
   db: Pool = defaultPool,
+  scope: OperationSalesScope = 'own',
 ): Promise<OperationSaleDetail | null> {
   const result = await db.query<any>(
     `SELECT o.id order_id,o.order_number,o.payment_method,o.total_amount::text,o.status,o.created_at,
-            mc.display_name seller_name,items.quantity items_quantity,items.item_kind,
+            mc.display_name seller_name,o.source,items.quantity items_quantity,items.item_kind,
             items.first_name,items.lines item_lines,cr.kind commission_kind,cr.basis commission_basis,
             COALESCE(cr.value,0)::text commission_value,(${commissionSql})::text commission_amount,
             pi.payment_status payroll_status,
             COALESCE((SELECT jsonb_agg(jsonb_build_object(
               'product_name',COALESCE(p.product_name,'Item'),'quantity',oi.quantity,
+              'vehicle_type',oi.vehicle_type,
               'reference_unit_price',oi.reference_unit_price,
               'unit_price',oi.unit_price,'discount_amount',oi.discount_amount,
               'line_total',oi.quantity*oi.unit_price-oi.discount_amount,
@@ -173,7 +183,7 @@ export async function getCaixaMySaleDetail(
              WHERE oi.order_id=o.id AND oi.environment=o.environment),'[]'::jsonb) items_json
        FROM commerce.orders o
        JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
-       JOIN network.matriz_collaborators mc
+       LEFT JOIN network.matriz_collaborators mc
          ON mc.id=o.seller_collaborator_id AND mc.environment=o.environment
        ${itemLateralSql}
        ${ruleLateralSql}
@@ -181,14 +191,15 @@ export async function getCaixaMySaleDetail(
         AND pp.competence=date_trunc('month',o.created_at AT TIME ZONE 'America/Sao_Paulo')::date
        LEFT JOIN finance.matriz_payroll_items pi
          ON pi.payroll_period_id=pp.id AND pi.collaborator_id=o.seller_collaborator_id
-      WHERE o.environment=$1 AND o.seller_collaborator_id=$2 AND o.id=$3 LIMIT 1`,
-    [environment, collaboratorId, orderId],
+      WHERE o.environment=$1 AND ($4::boolean OR o.seller_collaborator_id=$2) AND o.id=$3 LIMIT 1`,
+    [environment, collaboratorId, orderId, scope === 'matrix'],
   );
   const row = result.rows[0];
   if (!row) return null;
   return {
     ...listRow(row),
-    seller_name: row.seller_name,
+    sales_scope: scope,
+    seller_name: row.seller_name ?? 'Sem vendedor vinculado',
     items: (row.items_json ?? []).map((item: any) => ({
       product_name: item.product_name,
       quantity: Number(item.quantity),
@@ -197,6 +208,7 @@ export async function getCaixaMySaleDetail(
       discount_amount: Number(item.discount_amount),
       line_total: Number(item.line_total),
       image_url: item.image_url ?? null,
+      vehicle_type: item.vehicle_type ?? null,
     })),
   };
 }

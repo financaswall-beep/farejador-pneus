@@ -14,12 +14,15 @@
   }
   async function loadProfileSummary() {
     if (!Caixa.canModule('vendas')) return;
+    const session = Caixa.sessionFingerprint();
     try {
-      const response = await Caixa.authenticatedFetch(salesPath() + '?week=0');
+      const response = await Caixa.authenticatedFetch(salesPath() + '?week=0&scope=own');
       const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint()) return;
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       Caixa.renderProfileSummary(payload.summary || {});
     } catch (failure) {
+      if (session !== Caixa.sessionFingerprint()) return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       elements.profileMetricSales.textContent = '—';
       elements.profileMetricRevenue.textContent = '—';
@@ -27,6 +30,7 @@
   }
   async function loadSales() {
     if (!Caixa.token()) return;
+    const session = Caixa.sessionFingerprint();
     if (state.salesRequest) state.salesRequest.abort();
     const controller = new AbortController();
     state.salesRequest = controller;
@@ -37,9 +41,11 @@
         signal: controller.signal,
       });
       const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint() || state.salesRequest !== controller) return;
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       Caixa.renderSales(payload);
     } catch (failure) {
+      if (session !== Caixa.sessionFingerprint() || state.salesRequest !== controller) return;
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       Caixa.setSalesState('error');
@@ -49,6 +55,7 @@
   }
 
   async function openReceipt(orderId) {
+    const session = Caixa.sessionFingerprint();
     elements.receiptModal.classList.remove('hidden');
     elements.receiptContent.replaceChildren();
     const loading = document.createElement('p');
@@ -58,9 +65,11 @@
     try {
       const response = await Caixa.authenticatedFetch(detailPath(orderId));
       const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint() || !loading.isConnected) return;
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       Caixa.renderReceipt(payload);
     } catch (failure) {
+      if (session !== Caixa.sessionFingerprint() || !loading.isConnected) return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       loading.textContent = 'Não foi possível abrir esta venda.';
     }
@@ -68,6 +77,19 @@
 
   function closeReceipt() {
     elements.receiptModal.classList.add('hidden');
+    elements.receiptContent.replaceChildren();
+  }
+  function resetSales() {
+    if (state.salesRequest) state.salesRequest.abort();
+    state.salesRequest = null;
+    state.salesPayload = null;
+    state.selectedSalesDay = null;
+    state.weekOffset = 0;
+    elements.weeklySummary.classList.add('hidden');
+    elements.salesList.replaceChildren();
+    elements.profileMetricSales.textContent = '—';
+    elements.profileMetricRevenue.textContent = '—';
+    closeReceipt();
   }
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
@@ -138,7 +160,7 @@
           : stock ? 'Estoque' : catalog ? 'Catálogo' : pickups ? 'Retiradas' : deliveries ? 'Entregas'
             : (team || teamRemuneration || teamCommission || teamPermissions) ? 'Equipe'
               : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro'
-                : notifications ? 'Notificações' : cash ? 'Caixa' : 'Minhas vendas';
+                : notifications ? 'Notificações' : cash ? 'Caixa' : Caixa.matrixSales() ? 'Vendas da Matriz' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-pickups').classList.toggle('active', pickups);
@@ -203,6 +225,7 @@
   }
 
   Object.assign(Caixa, {
+    resetSales: resetSales,
     loadProfileSummary: loadProfileSummary,
     loadSales: loadSales,
     openReceipt: openReceipt,

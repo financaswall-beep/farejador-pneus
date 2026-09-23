@@ -120,6 +120,7 @@
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();
+    if (Caixa.resetSales) Caixa.resetSales();
     const partnerSlug = stored(keys.slug);
     if (partnerSlug) {
       sessionStorage.removeItem('farejador_partner_token_' + partnerSlug);

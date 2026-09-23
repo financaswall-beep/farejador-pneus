@@ -1,4 +1,5 @@
 export type OperationCommissionStatus = 'receivable' | 'paid' | 'reversed';
+export type OperationSalesScope = 'own' | 'matrix';
 
 export interface OperationSalesSummary {
   sales_count: number;
@@ -22,6 +23,8 @@ export interface OperationSaleListItem {
   items_quantity: number;
   item_kind: 'pneu' | 'servico' | 'item';
   item_summary: string;
+  seller_name?: string | null;
+  source?: string | null;
   commission_kind: 'percent' | 'fixed' | null;
   commission_basis: string | null;
   commission_value: number;
@@ -30,6 +33,7 @@ export interface OperationSaleListItem {
 }
 
 export interface OperationMySalesPayload {
+  sales_scope?: OperationSalesScope;
   week_offset: number;
   summary: OperationSalesSummary;
   daily_series: OperationSalesDay[];
@@ -37,6 +41,7 @@ export interface OperationMySalesPayload {
 }
 
 export interface OperationSaleDetail extends OperationSaleListItem {
+  sales_scope?: OperationSalesScope;
   seller_name: string;
   items: Array<{
     product_name: string;
@@ -46,6 +51,7 @@ export interface OperationSaleDetail extends OperationSaleListItem {
     discount_amount: number;
     line_total: number;
     image_url: string | null;
+    vehicle_type?: 'car' | 'motorcycle' | null;
   }>;
 }
 

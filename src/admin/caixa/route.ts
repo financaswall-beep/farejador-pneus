@@ -17,6 +17,7 @@ import {
   type CaixaAuth,
 } from './queries.js';
 import { getCaixaMySaleDetail, getCaixaMySales } from './my-sales.js';
+import { caixaSalesScope } from './sales-access.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
 import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
@@ -43,6 +44,7 @@ const salesQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d']).default('today'),
   search: z.string().trim().max(80).default(''),
   week: z.coerce.number().int().min(-52).max(0).default(0),
+  scope: z.enum(['own', 'matrix']).optional(),
 });
 
 const catalogQuerySchema = z.object({
@@ -209,7 +211,8 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     const auth = (request as CaixaRequest).caixa!;
     const payload = await getCaixaMySales(
-      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.week,
+      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.week, undefined,
+      caixaSalesScope(auth, parsed.data.scope),
     );
     return reply.status(200).send({ ...payload, operator_name: auth.displayName });
   });
@@ -235,7 +238,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     try {
       const result = await createCaixaSale(env.FAREJADOR_ENV, auth, parsed.data);
       const receipt = await getCaixaMySaleDetail(
-        env.FAREJADOR_ENV, auth.collaboratorId, result.order_id,
+        env.FAREJADOR_ENV, auth.collaboratorId, result.order_id, undefined, caixaSalesScope(auth),
       )
         .catch((error: unknown) => {
           // A venda já foi confirmada atomicamente. Uma falha de leitura do
@@ -259,7 +262,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_order_id' });
     const auth = (request as CaixaRequest).caixa!;
     const receipt = await getCaixaMySaleDetail(
-      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.orderId,
+      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.orderId, undefined, caixaSalesScope(auth),
     );
     if (!receipt) return reply.status(404).send({ error: 'sale_not_found' });
     return reply.status(200).send(receipt);

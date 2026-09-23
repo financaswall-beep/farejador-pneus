@@ -145,7 +145,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('class="sales-metrics"');
     expect(html).not.toContain('Buscar venda ou cliente');
     expect(script).toContain("document.createTextNode('Ver detalhes')");
-    expect(script).toContain("item.image_url || '/operacao/catalog-tire.webp'");
+    expect(script).toContain("item.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp'");
     expect(script).toContain("Caixa.operationPath('minhas-vendas', '/api/caixa/vendas')");
     expect(script).toContain("'/recibo'");
     expect(script).not.toContain('/admin/api/');
