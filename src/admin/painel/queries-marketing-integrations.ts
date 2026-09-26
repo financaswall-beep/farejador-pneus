@@ -121,6 +121,7 @@ export async function getMarketingIntegrations(
   const capiEnabled = overview.connection.capi === 'enabled';
   const capiHealthy = capiEnabled
     && health.available
+    && health.capi.sent > 0
     && health.capi.failed === 0
     && health.capi.dead_letter === 0;
 
@@ -133,7 +134,8 @@ export async function getMarketingIntegrations(
         ? 'error'
         : 'pending'),
     check('ctwa', 'Atribuição por mensagem', hasReferral ? 'ok' : 'pending'),
-    check('capi', 'Retorno CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
+    check('capi', 'Retorno CAPI', capiHealthy ? 'ok'
+      : capiEnabled && (health.capi.failed > 0 || health.capi.dead_letter > 0) ? 'error' : 'pending'),
   ];
   const ready = quality.filter((row) => row.status === 'ok').length;
   const criticalPending = Number(!metaConnected)
@@ -193,7 +195,8 @@ export async function getMarketingIntegrations(
           ? `${overview.attribution.tracked} referência(s): ${overview.attribution.ctwa} WhatsApp, ${overview.attribution.messenger} Messenger, ${overview.attribution.instagram} Instagram`
           : 'ausente; exige campanha de Mensagens com referral entregue ao Farejador' },
       {
-        ...check('capi', 'CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
+        ...check('capi', 'CAPI', capiHealthy ? 'ok'
+          : capiEnabled && (health.capi.failed > 0 || health.capi.dead_letter > 0) ? 'error' : 'pending'),
         detail: capiEnabled
           ? `${health.capi.sent} enviado(s), ${health.capi.failed} com falha, ${health.capi.dead_letter} em dead-letter`
           : 'implementada e desligada até passar no Test Events',
@@ -212,6 +215,8 @@ export async function getMarketingIntegrations(
             ? 'Revisar eventos CAPI em dead-letter'
             : health.capi.failed > 0
               ? 'Revisar eventos CAPI com falha de envio'
+              : health.capi.sent === 0
+                ? 'Confirmar a primeira compra atribuída enviada à Meta'
               : !syncHealthy
                 ? 'Concluir uma sincronização Meta com sucesso'
               : 'Pipeline Meta e CAPI operacionais',

@@ -10,7 +10,7 @@ describe('referrals diretos da Meta', () => {
     const result = extractMetaMessagingReferrals({
       object: 'page',
       entry: [{
-        id: 'page-123',
+        id: '1434857906367394',
         messaging: [
           {
             sender: { id: 'psid-456' },
@@ -34,7 +34,7 @@ describe('referrals diretos da Meta', () => {
       channel: 'messenger',
       providerMessageId: 'mid.messenger.1',
       userScopedId: 'psid-456',
-      businessAccountId: 'page-123',
+      businessAccountId: '1434857906367394',
       adId: 'ad-789',
       headline: 'Pneu aro 15',
     });
@@ -45,7 +45,7 @@ describe('referrals diretos da Meta', () => {
     const result = extractMetaMessagingReferrals({
       object: 'instagram',
       entry: [{
-        id: 'ig-business-1',
+        id: '17841465774227389',
         messaging: [{
           sender: { id: 'igsid-2' },
           timestamp: 1785600000000,
@@ -59,16 +59,33 @@ describe('referrals diretos da Meta', () => {
       channel: 'instagram',
       providerMessageId: 'mid.instagram.1',
       userScopedId: 'igsid-2',
-      businessAccountId: 'ig-business-1',
+      businessAccountId: '17841465774227389',
       adId: 'ad-ig-3',
     });
+  });
+
+  it('ignora anúncios de outras páginas ou perfis sem os vincular a vendas da 2W', () => {
+    expect(extractMetaMessagingReferrals({
+      object: 'page',
+      entry: [{ id: '386020731963435', messaging: [{
+        sender: { id: 'psid-outro' },
+        message: { mid: 'mid.outro', referral: { ad_id: 'ad-outro' } },
+      }] }],
+    })).toEqual([]);
+    expect(extractMetaMessagingReferrals({
+      object: 'instagram',
+      entry: [{ id: '17841400000000000', messaging: [{
+        sender: { id: 'igsid-outro' },
+        message: { mid: 'mid.ig.outro', referral: { ad_id: 'ad-ig-outro' } },
+      }] }],
+    })).toEqual([]);
   });
 
   it('só casa quando existe exatamente uma mensagem com o mesmo ID nativo', async () => {
     const pending = {
       id: 'pending-1', provider_event_key: 'event-1', channel: 'messenger',
       provider_message_id: 'mid.same', user_scoped_id: 'psid-1',
-      business_account_id: 'page-1', ad_id: 'ad-1', referral_ref: null,
+      business_account_id: '1434857906367394', ad_id: 'ad-1', referral_ref: null,
       source_type: 'ADS', headline: null, occurred_at: new Date('2026-08-01T12:00:00Z'),
     };
     const query = vi.fn(async (sql: string) => {
@@ -114,7 +131,7 @@ describe('referrals diretos da Meta', () => {
         return { rows: [{
           id: 'pending-2', provider_event_key: 'event-2', channel: 'messenger',
           provider_message_id: 'mid.conflict', user_scoped_id: 'psid-2',
-          business_account_id: 'page-2', ad_id: 'ad-2', referral_ref: null,
+          business_account_id: '1434857906367394', ad_id: 'ad-2', referral_ref: null,
           source_type: 'ADS', headline: null, occurred_at: new Date('2026-08-21T12:00:00Z'),
         }], rowCount: 1 };
       }

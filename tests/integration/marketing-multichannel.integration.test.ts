@@ -93,7 +93,7 @@ describe('Marketing multicanal — migration aditiva', () => {
          environment,raw_event_id,provider_event_key,channel,provider_message_id,
          user_scoped_id,business_account_id,ad_id,source_type,occurred_at
        ) VALUES ('test',$1,'event.integration.1','messenger','mid.integration.1',
-                 'psid.integration.1','page.integration.1','ad.integration.1','ADS',
+                 'psid.integration.1','1434857906367394','ad.integration.1','ADS',
                  '2026-06-15T12:00:01Z')`,
       [rawEvent.rows[0]!.id],
     );
@@ -150,7 +150,7 @@ describe('Marketing multicanal — migration aditiva', () => {
          channel,referral_key,user_scoped_id,business_account_id,native_message_id,
          source_id,captured_at
        ) VALUES ('test',$1,$2,$3,'messenger','messenger:integration-attribution',
-                 'psid.integration.attribution','page.integration.attribution',
+                 'psid.integration.attribution','1434857906367394',
                  'mid.integration.attribution','ad.integration.attribution',$3)`,
       [conversation.rows[0]!.id, message.rows[0]!.id, message.rows[0]!.sent_at],
     );

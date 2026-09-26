@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
+import { META_BUSINESS_ACCOUNTS } from '../shared/meta-business-accounts.js';
 
 const ATTRIBUTION_MODEL = 'last_click_7d_one_sale';
 const RULE_VERSION = 2;
@@ -174,10 +175,14 @@ async function findReferral(
     `SELECT r.id,r.captured_at::text,r.channel
        FROM marketing.ad_referrals r
       WHERE r.environment=$1 AND r.conversation_id=$2
+        AND (r.channel='whatsapp'
+          OR (r.channel='messenger' AND r.business_account_id=$4)
+          OR (r.channel='instagram' AND r.business_account_id=$5))
         AND r.captured_at<=$3::timestamptz
         AND r.captured_at>$3::timestamptz-interval '7 days'
       ORDER BY r.captured_at DESC,r.id DESC`,
-    [env.FAREJADOR_ENV, order.conversation_id, order.realized_at],
+    [env.FAREJADOR_ENV, order.conversation_id, order.realized_at,
+      META_BUSINESS_ACCOUNTS.facebook.id, META_BUSINESS_ACCOUNTS.instagram.id],
   );
   return result.rows.find((row) => !used.has(row.id)) ?? null;
 }

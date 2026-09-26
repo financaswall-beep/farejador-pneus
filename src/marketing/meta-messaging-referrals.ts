@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { logger } from '../shared/logger.js';
+import { isAuthorizedMetaMessagingAccount } from '../shared/meta-business-accounts.js';
 import type {
   DirectMetaChannel,
   ObservedMetaMessagingReferral,
@@ -68,6 +69,7 @@ async function matchPendingReferral(
   referral: PendingReferralRow,
   knownMessage?: { messageId: string; conversationId: string; channelType: string | null },
 ): Promise<boolean> {
+  if (!isAuthorizedMetaMessagingAccount(referral.channel, referral.business_account_id)) return false;
   if (!referral.provider_message_id) return false;
   let match = knownMessage;
   if (!match) {

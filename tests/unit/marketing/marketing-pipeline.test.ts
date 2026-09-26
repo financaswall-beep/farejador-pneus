@@ -200,6 +200,7 @@ describe('pipeline determinístico de Marketing', () => {
     })).resolves.toBe(1);
 
     expect(query.mock.calls[0]?.[0]).toContain("interval '6 days 23 hours'");
+    expect(query.mock.calls[0]?.[0]).toContain("o.status<>'cancelled'");
     expect(query.mock.calls[0]?.[0]).toContain('NOT EXISTS');
     const persistedPayload = JSON.parse(String(query.mock.calls[1]?.[1]?.[4])) as {
       test_event_code?: string;
@@ -237,6 +238,23 @@ describe('pipeline determinístico de Marketing', () => {
       instagramEnabled: false,
     })).resolves.toBe(0);
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('não enfileira uma compra de outra página do Facebook', async () => {
+    const query = vi.fn(async () => ({ rows: [{
+      attribution_id: 'attr-outra-pagina', order_number: 'PED-OUTRA',
+      total_amount: '89.00', realized_at: '2026-07-26T12:00:00Z',
+      phone_e164: null, channel: 'messenger', ctwa_clid: null,
+      user_scoped_id: 'psid-outra', business_account_id: '386020731963435',
+      campaign_scope_id: null, city_name: null, state_code: null,
+      postal_code_prefix: null,
+    }], rowCount: 1 }));
+
+    await expect(enqueueCapiPurchases({
+      dbPool: { query } as unknown as Pool,
+      enabled: true, whatsappEnabled: false, messengerEnabled: true,
+    })).resolves.toBe(0);
+    expect(query).toHaveBeenCalledOnce();
   });
 
   it('envia Test Events diretamente sem inserir nem consumir a outbox', async () => {
@@ -414,6 +432,7 @@ describe('pipeline determinístico de Marketing', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ scope: 'matrix' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'attr-old' }] })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [] });
     const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
@@ -487,6 +506,7 @@ describe('pipeline determinístico de Marketing', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'attr-legacy' }] })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [] });
     const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
@@ -507,6 +527,41 @@ describe('pipeline determinístico de Marketing', () => {
     expect(clientQuery.mock.calls.some(([sql]) => (
       String(sql).includes('FROM marketing.campaign_scopes')
     ))).toBe(false);
+  });
+
+  it('suprime compra cancelada depois de entrar na fila, antes de enviar à Meta', async () => {
+    const eventTime = Math.floor(new Date('2026-07-31T19:00:00Z').getTime() / 1000);
+    const clientQuery = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{
+        id: 'outbox-cancelled', environment: 'test', attempts: 1,
+        attribution_id: 'attr-cancelled', campaign_scope_id: null,
+        payload: { data: [{ event_time: eventTime }] },
+      }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
+    const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
+    const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+    const fetcher = vi.fn();
+
+    await expect(pollCapiOutbox({
+      dbPool, fetcher: fetcher as typeof fetch,
+      now: new Date('2026-07-31T20:00:00Z'), scopeEnforcement: false,
+    })).resolves.toBe(true);
+
+    expect(fetcher).not.toHaveBeenCalled();
+    const eligibility = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM marketing.order_attributions a'));
+    expect(eligibility?.[0]).toContain("o.status<>'cancelled'");
+    expect(eligibility?.[1]).toEqual([
+      'test', 'attr-cancelled', '1434857906367394', '17841465774227389',
+    ]);
+    expect(clientQuery.mock.calls.find(([sql]) => String(sql).includes("status='suppressed'"))?.[0])
+      .toContain("suppression_reason='sale_or_account_invalid'");
   });
 
   it('persiste campanha e anúncio por dia, substituindo a recoleta', async () => {

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { MarketingMessagingChannel } from './referrals.js';
+import { isAuthorizedMetaMessagingAccount } from '../shared/meta-business-accounts.js';
 
 export type DirectMetaChannel = Exclude<MarketingMessagingChannel, 'whatsapp'>;
 
@@ -62,7 +63,8 @@ export function extractMetaMessagingReferrals(
   for (const rawEntry of array(root.entry)) {
     const entry = object(rawEntry);
     const businessAccountId = text(entry?.id);
-    if (!entry || !businessAccountId) continue;
+    if (!entry || !businessAccountId
+      || !isAuthorizedMetaMessagingAccount(channel, businessAccountId)) continue;
     for (const rawMessaging of array(entry.messaging)) {
       const messaging = object(rawMessaging);
       if (!messaging) continue;

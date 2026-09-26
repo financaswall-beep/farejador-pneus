@@ -4,6 +4,10 @@ import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import {
+  META_BUSINESS_ACCOUNTS,
+  isAuthorizedMetaMessagingAccount,
+} from '../shared/meta-business-accounts.js';
+import {
   loadProductionCapiSources,
   type CapiSourceRow,
 } from './capi-source.js';
@@ -120,6 +124,8 @@ export async function enqueueCapiPurchases(options: {
     if (row.channel === 'whatsapp' && !whatsappEnabled) continue;
     if (row.channel === 'messenger' && !messengerEnabled) continue;
     if (row.channel === 'instagram' && !instagramEnabled) continue;
+    if (row.channel !== 'whatsapp'
+      && !isAuthorizedMetaMessagingAccount(row.channel, row.business_account_id)) continue;
     const payload = buildCapiPayload(row, {
       whatsappBusinessAccountId: env.META_WHATSAPP_BUSINESS_ACCOUNT_ID,
       pageId: env.META_CAPI_PAGE_ID,
@@ -191,6 +197,37 @@ async function lockCapiCampaignScope(
   return result.rows[0]?.scope ?? 'unresolved';
 }
 
+// Uma venda pode ser cancelada entre o ciclo de atribuição e o envio da fila.
+// Confere a fonte novamente e segura pedido/atribuição durante o POST externo.
+async function purchaseIsStillEligible(client: PoolClient, row: CapiOutboxRow): Promise<boolean> {
+  const result = await client.query<{ id: string }>(
+    `SELECT a.id
+       FROM marketing.order_attributions a
+       JOIN marketing.ad_referrals r
+         ON r.environment=a.environment AND r.id=a.referral_id
+       JOIN commerce.orders o
+         ON o.environment=a.environment AND o.id=a.order_id
+       LEFT JOIN commerce.partner_orders po
+         ON po.environment=o.environment AND po.id=o.partner_order_id
+      WHERE a.environment=$1 AND a.id=$2 AND a.status='active'
+        AND a.superseded_by IS NULL AND o.status<>'cancelled'
+        AND (r.channel='whatsapp'
+          OR (r.channel='messenger' AND r.business_account_id=$3)
+          OR (r.channel='instagram' AND r.business_account_id=$4))
+        AND (
+          (po.id IS NOT NULL AND po.status<>'cancelled' AND po.deleted_at IS NULL
+            AND NOT (po.fulfillment_mode='delivery' AND po.delivery_status<>'delivered')
+            AND NOT po.awaiting_pickup)
+          OR (po.id IS NULL AND o.status IN ('confirmed','paid','delivered')
+            AND NOT (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered'))
+        )
+      FOR SHARE OF a,o`,
+    [row.environment, row.attribution_id,
+      META_BUSINESS_ACCOUNTS.facebook.id, META_BUSINESS_ACCOUNTS.instagram.id],
+  );
+  return result.rows.length > 0;
+}
+
 function capiPayloadExpired(payload: Record<string, unknown>, now: Date): boolean {
   const data = Array.isArray(payload.data) ? payload.data : [];
   const event = data[0];
@@ -227,6 +264,17 @@ export async function pollCapiOutbox(options: {
                 suppressed_at=now(),suppression_reason=$3,updated_at=now()
           WHERE environment=$1 AND id=$2`,
         [row.environment, row.id, `campaign_scope_${campaignScope}`],
+      );
+      await client.query('COMMIT');
+      return true;
+    }
+    if (!await purchaseIsStillEligible(client, row)) {
+      await client.query(
+        `UPDATE marketing.capi_outbox
+            SET status='suppressed',locked_at=NULL,locked_by=NULL,
+                suppressed_at=now(),suppression_reason='sale_or_account_invalid',updated_at=now()
+          WHERE environment=$1 AND id=$2`,
+        [row.environment, row.id],
       );
       await client.query('COMMIT');
       return true;
