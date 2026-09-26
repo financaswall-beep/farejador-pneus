@@ -7,6 +7,8 @@ import { CommentsGraph, MetaCommentError } from './graph.js';
 import { commentRevision } from './extract.js';
 import { normalizeCommentEvent } from './ingest.js';
 import { decideComment } from './ai.js';
+import { createCommentLookup } from './commerce.js';
+import { COMMENT_PROMPT_VERSION } from './prompt.js';
 import { claimComment, commentsPaused, finishComment, recoverCommentLeases, saveDecision } from './store.js';
 
 interface WorkerDeps { pool?:Pool; config?:CommentsConfig; graph?:CommentsGraph; decide?:typeof decideComment }
@@ -23,7 +25,8 @@ export async function processComment(deps: WorkerDeps = {}): Promise<boolean> {
       return true;
     }
     const post = await graph.post(task.platform,task.account_id,task.post_id);
-    const ai = await (deps.decide ?? decideComment)(task.body,post.caption);
+    const ai = await (deps.decide ?? decideComment)(task.body,post.caption,undefined,
+      { platform:task.platform,lookup:createCommentLookup(pool,env.FAREJADOR_ENV) });
     await saveDecision(pool,task,ai,post.url);
   } catch(error) {
     await finishComment(pool,task,'generating',task.attempts>=3 ? 'failed' : 'pending',
@@ -45,6 +48,12 @@ export async function publishComment(deps: WorkerDeps = {}): Promise<boolean> {
     }
     if (task.decision_revision !== task.revision) {
       await finishComment(pool,task,'sending','pending','comment_changed'); return true;
+    }
+    // Reconsulta fatos comerciais após pausa/fila longa. Preserva a decisão anterior no histórico.
+    const decisionTime = task.decision_created_at ? new Date(task.decision_created_at).getTime() : NaN;
+    if (task.decision_version !== COMMENT_PROMPT_VERSION || (task.action === 'reply'
+      && (!Number.isFinite(decisionTime) || Date.now() - decisionTime > 5 * 60_000))) {
+      await finishComment(pool,task,'sending','pending','commercial_data_expired'); return true;
     }
     await graph.assertAccount(task.platform,task.account_id);
     await graph.post(task.platform,task.account_id,task.post_id);

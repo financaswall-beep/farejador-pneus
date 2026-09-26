@@ -40,6 +40,8 @@ function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitmen
     if (sql.includes('vehicle_measure_applications')) return { rows: manufacturerApplicationSeed().map(a => ({ ...a, reference:a })) };
     if (sql.includes('FROM commerce.products') || sql.includes('search_products') || sql.includes('commerce.product_full')) return { rows: [] };
     if (sql.includes('wholesale_stock')) return { rows: stock };
+    // O cenário não tem parceiro atendendo o município; a busca atual também consulta a rede.
+    if (sql.includes('FROM network.unit_coverage')) return { rows: [] };
     throw new Error(`Consulta inesperada: ${sql}`);
   });
   return { client: { query } as unknown as PoolClient, query };

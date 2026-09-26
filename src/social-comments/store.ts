@@ -8,6 +8,7 @@ export interface CommentTask {
   id:string; platform:Platform; account_id:string; comment_id:string; post_id:string;
   author_id:string|null; body:string; revision:string; decision_id:string|null;
   action:'reply'|'delete'|'ignore'; reply_text:string; decision_revision:string; attempts:number; lease_id:string;
+  decision_version:string|null; decision_created_at:Date|string|null;
 }
 export async function commentsPaused(pool: Pool): Promise<boolean> {
   const result = await pool.query(`SELECT paused FROM ops.meta_comment_controls WHERE environment=$1`,[env.FAREJADOR_ENV]);
@@ -25,7 +26,8 @@ export async function claimComment(pool: Pool, phase:'generation'|'publication')
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query<CommentTask>(`SELECT c.*,a.attempts,a.decision_id,d.action,d.reply_text,d.revision AS decision_revision
+    const result = await client.query<CommentTask>(`SELECT c.*,a.attempts,a.decision_id,d.action,d.reply_text,d.revision AS decision_revision,
+      d.extractor_version AS decision_version,d.created_at AS decision_created_at
       FROM ops.meta_comment_actions a JOIN core.meta_comments c ON c.environment=a.environment AND c.id=a.comment_id
       LEFT JOIN analytics.meta_comment_decisions d ON d.environment=a.environment AND d.id=a.decision_id
       WHERE a.environment=$1 AND a.status=$2 AND a.next_attempt_at<=now() AND NOT c.removed

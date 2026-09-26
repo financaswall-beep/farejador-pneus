@@ -2,6 +2,7 @@ import type { BuscarCompatibilidadeInput } from '../atendente/tools/commerce-too
 import { buscarCompatibilidadeInputSchema } from '../atendente/tools/commerce-tools.js';
 import { applicationsForMotorcycle, VEHICLE_APPLICATION_VERSION } from '../shared/vehicle-tire-applications.js';
 import { matchCatalogApplications, type CatalogApplication } from '../shared/vehicle-application-catalog.js';
+import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
 
 export function compatibilityInput(environment: 'prod' | 'test', args: Record<string, unknown>) {
   return buscarCompatibilidadeInputSchema.parse({
@@ -10,11 +11,11 @@ export function compatibilityInput(environment: 'prod' | 'test', args: Record<st
   });
 }
 
-export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, catalog?: CatalogApplication[]) {
+export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, catalog?: CatalogApplication[], vehicleType: TireVehicleType = 'motorcycle') {
   const parsed = buscarCompatibilidadeInputSchema.parse(input);
   const lookup = (year?: number) => catalog
-    ? matchCatalogApplications(catalog, parsed.moto_modelo, year, parsed.posicao_pneu)
-    : applicationsForMotorcycle(parsed.moto_modelo, year, parsed.posicao_pneu);
+    ? matchCatalogApplications(catalog, parsed.moto_modelo, year, parsed.posicao_pneu, vehicleType)
+    : vehicleType === 'motorcycle' ? applicationsForMotorcycle(parsed.moto_modelo, year, parsed.posicao_pneu) : [];
   const rows = lookup(parsed.moto_ano);
   if (!rows.length) {
     const knownModelRows = parsed.moto_ano
