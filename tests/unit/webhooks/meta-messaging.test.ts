@@ -117,14 +117,14 @@ describe('webhook Meta messaging', () => {
   });
 
   it.each([false,true])('captura comentário com messaging desligado e respeita duplicação: %s',async(duplicate)=>{
-    Object.assign(process.env,{META_MESSAGING_WEBHOOK_ENABLED:'false',META_COMMENTS_ENABLED:'true',META_COMMENTS_PAGE_ID:'386020731963435',META_COMMENTS_INSTAGRAM_ID:'17841465774227389'});
+    Object.assign(process.env,{META_MESSAGING_WEBHOOK_ENABLED:'false',META_COMMENTS_ENABLED:'true',META_COMMENTS_PAGE_ID:'1434857906367394',META_COMMENTS_INSTAGRAM_ID:'17841465774227389'});
     const query=vi.fn(async(sql:string)=>({rows:sql.includes('INSERT INTO raw.meta_messaging_events')&&!duplicate?[{id:92}]:[],rowCount:1}));
     vi.doMock('pg',()=>({Pool:vi.fn(function Pool(){return {connect:async()=>({query,release:vi.fn()}),on:vi.fn(),end:vi.fn()};})}));
     const {metaMessagingWebhookHandler,metaMessagingVerifyHandler}=await import('../../../src/webhooks/meta-messaging.handler.js');
     const verify=replyMock();
     await metaMessagingVerifyHandler({query:{'hub.mode':'subscribe','hub.verify_token':baseEnv.META_MESSAGING_WEBHOOK_VERIFY_TOKEN,'hub.challenge':'42'}} as any,verify);
     expect(verify.statusCode).toBe(200);
-    const payload={object:'page',entry:[{id:'386020731963435',time:1770000000,changes:[{field:'feed',value:{item:'comment',verb:'add',post_id:'386020731963435_80',comment_id:'386020731963435_1',message:'Oi',from:{id:'300'}}}]}]};
+    const payload={object:'page',entry:[{id:'1434857906367394',time:1770000000,changes:[{field:'feed',value:{item:'comment',verb:'add',post_id:'1434857906367394_80',comment_id:'1434857906367394_1',message:'Oi',from:{id:'300'}}}]}]};
     const rawBody=Buffer.from(JSON.stringify(payload));
     const signature=createHmac('sha256',baseEnv.META_APP_SECRET).update(rawBody).digest('hex');
     const reply=replyMock();

@@ -1,10 +1,10 @@
 import { env } from '../shared/config/env.js';
 
 export type Platform = 'facebook' | 'instagram';
-// Escopo autorizado pelo dono. IDs conferidos nas caixas 34 e 40 do Chatwoot em 23/09/2026.
-// Não herdar o Instagram vinculado à caixa Facebook: ele pertence a outro escopo.
+// Escopo autorizado pelo dono. A nova Página 2W Pneus foi vinculada ao @2wp.pneus.
+// Não aceitar IDs arbitrários do ambiente: um erro de configuração não pode responder em outra conta.
 export const COMMENT_ACCOUNTS = Object.freeze({
-  facebook: Object.freeze({id:'386020731963435',label:'2W Pneus'}),
+  facebook: Object.freeze({id:'1434857906367394',label:'2W Pneus'}),
   instagram: Object.freeze({id:'17841465774227389',label:'@2wp.pneus'}),
 });
 export interface CommentsConfig {

@@ -9,7 +9,7 @@ import {CommentsGraph} from '../../../src/social-comments/graph.js';
 describe('escopo exclusivo 2W Pneus e @2wp.pneus',()=>{
   beforeEach(()=>Object.assign(settings,{META_COMMENTS_ENABLED:true,META_COMMENTS_PUBLISH_ENABLED:true,META_COMMENTS_PAGE_ID:undefined,META_COMMENTS_INSTAGRAM_ID:undefined}));
   it('fixa as duas contas mesmo sem variáveis de ID',()=>{
-    expect(commentsConfig()).toMatchObject({pageId:'386020731963435',instagramId:'17841465774227389',enabled:true,publish:true,scopeValid:true});
+    expect(commentsConfig()).toMatchObject({pageId:'1434857906367394',instagramId:'17841465774227389',enabled:true,publish:true,scopeValid:true});
   });
   it.each(['META_COMMENTS_PAGE_ID','META_COMMENTS_INSTAGRAM_ID'] as const)('outro ID em %s bloqueia toda a automação',key=>{
     settings[key]='999';const config=commentsConfig();
