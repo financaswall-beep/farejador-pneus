@@ -35,11 +35,18 @@ Migration aplicada em produção em 27/09/2026, com ensaio por rollback, commit 
    ORGANIC_INSTAGRAM_PRIVATE_ENABLED=true
    ORGANIC_FACEBOOK_PRIVATE_ENABLED=false
    BOT_AUDIO_ENABLED=true
-   BOT_AUDIO_MODEL=gpt-4o-mini-transcribe
+   OPENAI_MODEL=gpt-6-sol
+   BOT_AUDIO_MODEL=gpt-transcribe
    BOT_AUDIO_ALLOWED_HOSTS=
    ```
 
    O host configurado do Chatwoot já é permitido para áudio. Se os anexos redirecionarem para storage/CDN, acrescentar apenas os hosts HTTPS exatos observados (separados por vírgula), sem curingas. A chave OpenAI existente é usada para transcrever. Uso de tokens é registrado; custo permanece desconhecido até haver precificação de áudio, sem usar tarifa de texto.
+
+   Publicar primeiro o código que aceita `gpt-transcribe`: versões anteriores rejeitam esse valor na inicialização. O modelo de atendimento também atende comentários e leitura de comprovantes. Esta atualização de modelos não requer nova migration; a 0243 continua sendo necessária para o fluxo orgânico e áudio.
+
+   GPT-6 Sol usa raciocínio médio na Responses API, mantendo os itens de raciocínio criptografados entre ferramentas somente em memória. A estimativa de custo reconhece GPT-6 Sol e GPT-5.6 Sol no serviço padrão. GPT-Transcribe recebe `languages[]=pt`, contexto genérico da loja e vocabulário sem medidas/valores sugeridos. Não enviamos `logprobs` nem `language` a ele.
+
+   A API de GPT-Transcribe não fornece nota de certeza: o registro mantém `confidence_level=low` como dado não validado e `extractor_version=audio-v2`. No histórico, isso aparece como **certeza não informada**, permitindo conversar normalmente; mudanças de pedido ainda exigem resumo e confirmação escrita. Não inventamos uma porcentagem de confiança. O custo de áudio fica sem estimativa na tabela atual, que exige medição em tokens; não convertemos segundos em tokens fictícios.
 
 3. Confirmar dependências já existentes: `META_COMMENTS_ENABLED`, `META_COMMENTS_PUBLISH_ENABLED`, `META_MESSAGING_WEBHOOK_ENABLED`, `BOT_OUTBOX` e `AGENT_V2_WORKER_ENABLED` ativos; `AGENT_V2_CONVERSATION_IDS=*`; conta/credenciais de produção do Chatwoot e OpenAI. Manter os secrets fora do Git. A verificação exige permissões de mensagens da Meta, além das de comentários.
 4. Em **Marketing → Conteúdo orgânico → Atendimento → Mensagens privadas e interessados em reposição**, escolher a caixa correta. Enviar um Direct de teste. “Verificar recebimento” exige o mesmo ID nativo recebido pela Meta e pelo Chatwoot nos últimos 30 dias, na conta/inbox escolhida.

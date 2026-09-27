@@ -20,15 +20,22 @@ beforeAll(async () => {
 });
 
 describe('environment security validation', () => {
-  it('limita o orçamento de saída do bot sem mudar o modelo default ou ativar o worker', () => {
+  it('usa GPT-6 Sol e GPT-Transcribe sem ativar os workers automaticamente', () => {
     expect(parseEnv(baseEnv)).toMatchObject({ AGENT_V2_MAX_OUTPUT_TOKENS: 8192,
-      OPENAI_MODEL: 'gpt-4o-mini', AGENT_V2_WORKER_ENABLED: false,
+      OPENAI_MODEL: 'gpt-6-sol', AGENT_V2_WORKER_ENABLED: false,
+      BOT_AUDIO_MODEL: 'gpt-transcribe', BOT_AUDIO_ENABLED: false,
       AGENT_V2_MEMORY_DAYS: 11, BOT_AUTO_RESOLVE_ENABLED: false,
       BOT_AUTO_RESOLVE_IDLE_BUSINESS_HOURS: 8 });
     expect(parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: '4096' }).AGENT_V2_MAX_OUTPUT_TOKENS).toBe(4096);
     for (const value of ['0', 'abc', '32769', '2048.5']) {
       expect(() => parseEnv({ ...baseEnv, AGENT_V2_MAX_OUTPUT_TOKENS: value })).toThrow();
     }
+  });
+
+  it('aceita modelos legados para rollback e recusa modelo de atendimento no transcritor', () => {
+    expect(parseEnv({...baseEnv,OPENAI_MODEL:'gpt-5.6-sol',BOT_AUDIO_MODEL:'gpt-4o-transcribe'}))
+      .toMatchObject({OPENAI_MODEL:'gpt-5.6-sol',BOT_AUDIO_MODEL:'gpt-4o-transcribe'});
+    expect(() => parseEnv({...baseEnv,BOT_AUDIO_MODEL:'gpt-6-sol'})).toThrow();
   });
 
   it('não permite encerramento automático sem a outbox em produção', () => {

@@ -21,6 +21,7 @@
  */
 
 import { env } from '../../shared/config/env.js';
+import { isReasoningModel } from '../../shared/openai-model.js';
 import { MATRIZ_EXPENSE_CATEGORIES, type MatrizExpenseCategory } from './queries-fiado-despesas.js';
 import { listActiveExpenseCategorySlugs } from './queries-despesas-categorias.js';
 
@@ -126,6 +127,8 @@ export async function readReceiptWithAI(bytes: Buffer, mime: string, scope: 'tri
         ],
       },
     ],
+    // Leitura curta sem ferramentas: não consumir o limite em reasoning.
+    ...(isReasoningModel(env.OPENAI_MODEL) ? { reasoning_effort: 'none' } : {}),
     max_completion_tokens: 300,
     response_format: { type: 'json_object' },
   });

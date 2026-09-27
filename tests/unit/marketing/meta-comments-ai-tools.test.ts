@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-vi.mock('../../../src/shared/config/env.js', () => ({env:{FAREJADOR_ENV:'test',OPENAI_MODEL:'test-model'}}));
+vi.mock('../../../src/shared/config/env.js', () => ({env:{FAREJADOR_ENV:'test',OPENAI_MODEL:'gpt-6-sol'}}));
 import { decideComment, decisionSchema } from '../../../src/social-comments/ai.js';
 import { COMMENTS_WHATSAPP, publicReply } from '../../../src/social-comments/public-reply.js';
 import { COMMENT_TOOLS } from '../../../src/social-comments/commerce.js';
@@ -27,7 +27,8 @@ describe('comentários com ferramentas comerciais', () => {
     expect(result.decision.reply_text).toContain(COMMENTS_WHATSAPP);
     expect(result.decision.reply_text).toContain('Direct');
     const initial = JSON.parse(request.mock.calls[0]![0]);
-    expect(initial).toMatchObject({model:'test-model',store:false,tools:COMMENT_TOOLS,include:['reasoning.encrypted_content']});
+    expect(initial).toMatchObject({model:'gpt-6-sol',store:false,tools:COMMENT_TOOLS,include:['reasoning.encrypted_content'],
+      reasoning:{effort:'medium'},max_output_tokens:8192});
     const next = JSON.parse(request.mock.calls[1]![0]);
     expect(next.input.slice(2,4)).toEqual([reasoning,tool]);
     expect(next.input[4]).toMatchObject({type:'function_call_output',call_id:'call_1'});

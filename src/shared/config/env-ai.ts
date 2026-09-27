@@ -5,9 +5,9 @@ export const aiEnvShape = {
     value => typeof value === 'string' && value.trim() === '' ? undefined : value,
     z.string().min(1).optional(),
   ),
-  OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+  OPENAI_MODEL: z.string().min(1).default('gpt-6-sol'),
   BOT_AUDIO_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
-  BOT_AUDIO_MODEL: z.enum(['gpt-4o-mini-transcribe', 'gpt-4o-transcribe']).default('gpt-4o-mini-transcribe'),
+  BOT_AUDIO_MODEL: z.enum(['gpt-transcribe', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe']).default('gpt-transcribe'),
   BOT_AUDIO_ALLOWED_HOSTS: z.string().default('').transform(value =>
     value.split(',').map(host => host.trim().toLowerCase()).filter(Boolean)),
   // Câmbio de referência para estimativas, não cotação ao vivo nem fatura do cartão.

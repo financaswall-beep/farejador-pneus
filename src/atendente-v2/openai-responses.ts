@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { env } from '../shared/config/env.js';
+import { isReasoningModel } from '../shared/openai-model.js';
 import type { ChatMessage, ToolCall, ToolDefinition } from './types.js';
 import { requestOpenAIResponse, type OpenAIUsageObserver } from './openai-responses-http.js';
 
@@ -76,7 +77,7 @@ export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: T
 
     async next(): Promise<AgentModelResponse> {
       if (pendingCalls.size > 0) invalid('tool results still pending');
-      const reasoningModel = /^gpt-5(?:[.-]|$)/.test(env.OPENAI_MODEL);
+      const reasoningModel = isReasoningModel(env.OPENAI_MODEL);
       const raw = await requestOpenAIResponse(JSON.stringify({
         model: env.OPENAI_MODEL,
         input, tools, tool_choice: 'auto',

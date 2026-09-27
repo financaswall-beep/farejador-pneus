@@ -20,7 +20,7 @@ it('novas tabelas ficam com RLS e sem acesso do portal parceiro',async()=>{
   for(const row of result.rows)expect(row).toMatchObject({relrowsecurity:true,readable:false});
 });
 it('vincula por identidade nativa, mantém pedido antigo fora e recalcula ao cancelar',async()=>{
-  Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://unused',CHATWOOT_HMAC_SECRET:'fake',ADMIN_AUTH_TOKEN:'fake',ORGANIC_ATTRIBUTION_ENABLED:'true',CHATWOOT_ACCOUNT_ID:'2',BOT_AUDIO_ENABLED:'true',OPENAI_API_KEY:'fake',BOT_AUDIO_ALLOWED_HOSTS:'media.example'});
+  Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://unused',CHATWOOT_HMAC_SECRET:'fake',ADMIN_AUTH_TOKEN:'fake',ORGANIC_ATTRIBUTION_ENABLED:'true',CHATWOOT_ACCOUNT_ID:'2',BOT_AUDIO_ENABLED:'true',BOT_AUDIO_MODEL:'gpt-transcribe',OPENAI_API_KEY:'fake',BOT_AUDIO_ALLOWED_HOSTS:'media.example'});
   const {bindOrganicSource}=await import('../../src/marketing/organic/inbound.js');
   const q=db.pool;
   const contact=(await q.query(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name) VALUES('test',90001,'Teste') RETURNING id`)).rows[0].id;
@@ -95,18 +95,29 @@ it('transcreve uma vez fora de core, respeita confiança e registra consentiment
     VALUES('test',99003,$1,90001,'contact',0,NULL,now()) RETURNING id`,[conv])).rows[0].id;
   const attachment=(await q.query(`INSERT INTO core.message_attachments(environment,chatwoot_attachment_id,message_id,conversation_id,file_type,data_url)
     VALUES('test',99003,$1,$2,'audio','https://media.example/test.ogg') RETURNING id`,[msg,conv])).rows[0].id;
-  const fetcher=vi.fn(async(input:any)=>String(input).startsWith('https://media.example')
-    ? new Response(Buffer.from('OggS'+'a'.repeat(32))) : Response.json({text:'Quero dois pneus.'}));
+  const fetcher=vi.fn(async(input:any,options:any)=>{
+    if(String(input).startsWith('https://media.example'))return new Response(Buffer.from('OggS'+'a'.repeat(32)));
+    expect(options.body.get('model')).toBe('gpt-transcribe');
+    expect(options.body.getAll('languages[]')).toEqual(['pt']);
+    expect(options.body.has('include[]')).toBe(false);
+    return Response.json({text:'Quero dois pneus.',usage:{type:'duration',seconds:4}});
+  });
   vi.stubGlobal('fetch',fetcher);
   try {
-    await prepareConversationAudio(q as any,'test',conv);
+    await prepareConversationAudio(q as any,'test',conv,{jobId:randomUUID(),triggerMessageId:msg} as any);
     await prepareConversationAudio(q as any,'test',conv);
     expect(fetcher).toHaveBeenCalledTimes(2); // um download e uma transcrição, nenhum reenvio
     expect((await q.query(`SELECT content FROM core.messages WHERE id=$1`,[msg])).rows[0].content).toBeNull();
     const transcript=(await q.query(`SELECT * FROM analytics.audio_transcriptions WHERE attachment_id=$1`,[attachment])).rows[0];
-    expect(transcript).toMatchObject({transcript:'Quero dois pneus.',source:'llm',truth_type:'inferred',confidence_level:'low'});
+    expect(transcript).toMatchObject({transcript:'Quero dois pneus.',source:'llm',truth_type:'inferred',confidence_level:'low',
+      model:'gpt-transcribe',extractor_version:'audio-v2'});
+    expect((await q.query(`SELECT model,estimated_usd,input_tokens FROM ops.bot_model_usage WHERE trigger_message_id=$1`,[msg])).rows)
+      .toEqual([{model:'gpt-transcribe',estimated_usd:null,input_tokens:null}]);
     expect(await audioNeedsConfirmation(q as any,'test',conv)).toBe(true);
-    expect((await loadHistory(q as any,conv,{includeAudio:true})).some(m=>m.content?.includes('Quero dois pneus.'))).toBe(true);
+    const history=await loadHistory(q as any,conv,{includeAudio:true});
+    expect(history.some(m=>m.content?.includes('Quero dois pneus.'))).toBe(true);
+    expect(history.some(m=>m.content?.includes('certeza não informada pelo transcritor'))).toBe(true);
+    expect(history.some(m=>m.content?.includes('confiança low'))).toBe(false);
     await expect(q.query(`UPDATE analytics.audio_transcriptions SET transcript='Outro' WHERE id=$1`,[transcript.id])).rejects.toThrow(/imutavel/);
   } finally {vi.unstubAllGlobals();}
   const args={acao:'registrar',medida:'90/90-12',condicao:'meia_vida',telefone:'21988887777',consentimento:'Pode me avisar no WhatsApp 21 98888-7777'};

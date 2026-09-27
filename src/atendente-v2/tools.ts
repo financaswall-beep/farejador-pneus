@@ -405,7 +405,7 @@ export async function executeTool(
   try {
     if(['criar_pedido','editar_pedido','cancelar_pedido'].includes(name)
       && await audioNeedsConfirmation(client,environment,conversationId)) return JSON.stringify({
-        erro:'audio_precisa_confirmacao',orientacao:'O áudio ficou incerto. Apresente o resumo e peça confirmação por texto antes de alterar o pedido. Se não for possível, ofereça atendente.' });
+        erro:'audio_precisa_confirmacao',orientacao:'Os dados do áudio ainda precisam de confirmação para mudar o pedido. Apresente o resumo e peça confirmação por texto. Se não for possível, ofereça atendente.' });
     args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
       case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));

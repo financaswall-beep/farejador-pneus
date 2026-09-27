@@ -33,8 +33,13 @@ services:
       ORGANIC_ATTRIBUTION_ENABLED: ${ORGANIC_ATTRIBUTION_ENABLED:-false}
       ORGANIC_INSTAGRAM_PRIVATE_ENABLED: ${ORGANIC_INSTAGRAM_PRIVATE_ENABLED:-false}
       ORGANIC_FACEBOOK_PRIVATE_ENABLED: ${ORGANIC_FACEBOOK_PRIVATE_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-sol}
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-30000}
+      OPENAI_USD_BRL: ${OPENAI_USD_BRL:-5.5}
+      AGENT_V2_MAX_OUTPUT_TOKENS: ${AGENT_V2_MAX_OUTPUT_TOKENS:-8192}
       BOT_AUDIO_ENABLED: ${BOT_AUDIO_ENABLED:-false}
-      BOT_AUDIO_MODEL: ${BOT_AUDIO_MODEL:-gpt-4o-mini-transcribe}
+      BOT_AUDIO_MODEL: ${BOT_AUDIO_MODEL:-gpt-transcribe}
       BOT_AUDIO_ALLOWED_HOSTS: ${BOT_AUDIO_ALLOWED_HOSTS:-}
       # A foto toca no Caixa somente quando o motor comprova estoque da Matriz.
       # Estas flags já governam o roteamento em produção e precisam atravessar o Compose.

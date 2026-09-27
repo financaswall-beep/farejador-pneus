@@ -1,8 +1,8 @@
-/** Standard text pricing checked 2026-09-17:
- * https://developers.openai.com/api/docs/models/gpt-5.6-sol
+/** Standard text pricing checked 2026-09-27:
+ * https://developers.openai.com/api/docs/pricing
  * https://developers.openai.com/api/docs/guides/prompt-caching
  * USD estimates exclude taxes, currency spread and other services. */
-export const BOT_PRICING_VERSION = 'gpt-5.6-sol:standard:2026-09-17';
+export const BOT_PRICING_VERSION = 'sol:standard:2026-09-27';
 export interface ModelUsage {
   input: number; output: number; cached: number; cacheWrite: number;
 }
@@ -21,10 +21,11 @@ export function parseModelUsage(raw: unknown): ModelUsage | null {
 }
 
 export function estimateSolUsd(model: string, tier: string, usage: ModelUsage | null): number | null {
-  if (!usage || !/^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)
-    || tier !== 'default') return null;
+  const sol6 = /^gpt-6-sol(?:-\d{4}-\d{2}-\d{2})?$/.test(model);
+  const sol56 = /^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model);
+  if (!usage || (!sol6 && !sol56) || tier !== 'default') return null;
   const long = usage.input > 272_000;
-  const inputRate = long ? 8 : 4, outputRate = long ? 30 : 20;
+  const inputRate = (long ? 8 : 4) / (sol6 ? 2 : 1), outputRate = (long ? 30 : 20) / (sol6 ? 2 : 1);
   const ordinary = usage.input - usage.cached - usage.cacheWrite;
   return Number(((ordinary * inputRate + usage.cached * inputRate * 0.1
     + usage.cacheWrite * inputRate * 1.25 + usage.output * outputRate) / 1_000_000).toFixed(10));

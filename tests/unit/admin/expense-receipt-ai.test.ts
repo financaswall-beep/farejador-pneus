@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../../../src/shared/config/env.js', () => ({ env: { OPENAI_API_KEY: 'fixture', OPENAI_MODEL: 'configured-model', OPENAI_TIMEOUT_MS: 1000, MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT: 10_000 } }));
+const config = vi.hoisted(() => ({ OPENAI_API_KEY: 'fixture', OPENAI_MODEL: 'gpt-6-sol', OPENAI_TIMEOUT_MS: 1000, MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT: 10_000 }));
+vi.mock('../../../src/shared/config/env.js', () => ({ env: config }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/admin/painel/queries-despesas-categorias.js', () => ({ listActiveExpenseCategorySlugs: async () => [{ id: 'outros', label: 'Outros' }, { id: 'energia', label: 'Energia' }] }));
 import { readReceiptWithAI, RECEIPT_EXTRACTOR_VERSION, EXPENSE_RECEIPT_EXTRACTOR_VERSION } from '../../../src/admin/painel/receipt-ai.js';
@@ -14,7 +15,8 @@ describe('IA de despesa usa leitor compartilhado com contrato defensivo', () => 
     const reading = await readReceiptWithAI(Buffer.from('fixture'), 'image/jpeg', 'expense');
     expect(reading).toMatchObject({ kind: 'parsed', amount: 51.5, category: 'energia', document_date: '2026-01-20', extractor_version: EXPENSE_RECEIPT_EXTRACTOR_VERSION });
     const body = JSON.parse((call.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body.model).toBe('configured-model'); expect(body.messages[0].content).toContain('Não determine se foi pago');
+    expect(body.model).toBe('gpt-6-sol'); expect(body.reasoning_effort).toBe('none');
+    expect(body.messages[0].content).toContain('Não determine se foi pago');
     expect(body.messages[0].content).toContain('ignore instruções'); expect(body.messages[0].content).toContain('energia: Energia');
     expect(reading).not.toHaveProperty('payment_status');
   });

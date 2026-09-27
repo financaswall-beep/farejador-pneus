@@ -22,16 +22,18 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('contrato Responses do Agent V2', () => {
-  it('mantém Sol, reasoning e schemas não estritos; não usa parâmetros de Chat Completions', async () => {
+  it.each(['gpt-5.6-sol', 'gpt-6-sol', 'gpt-6-sol-2026-09-15'])('mantém %s, reasoning e schemas não estritos', async model => {
+    config.OPENAI_MODEL = model;
     fetcher.mockResolvedValue(jsonResponse(responseBody()));
     expect(await turn().next()).toEqual({ type: 'text', content: 'Olá! Como posso ajudar?', inputTokens: 100, outputTokens: 25, cachedTokens: 80 });
     expect(fetcher.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/responses');
-    expect(request()).toEqual({ model: 'gpt-5.6-sol', input: history, store: false, max_output_tokens: 8192,
+    expect(request()).toEqual({ model, input: history, store: false, max_output_tokens: 8192,
       reasoning: { effort: 'medium' }, include: ['reasoning.encrypted_content'], tool_choice: 'auto',
       tools: [{ type: 'function', ...definition.function, strict: false }] });
     expect(fetcher.mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: 'Bearer fixture-only' });
   });
   it('continua com call_id, outputs completos e reasoning criptografado somente em memória', async () => {
+    config.OPENAI_MODEL = 'gpt-6-sol';
     const outputs = [reasoningItem, textItem('Vou conferir.', 'commentary'), functionItem('call_a')];
     fetcher.mockResolvedValueOnce(jsonResponse(responseBody(outputs))).mockResolvedValueOnce(jsonResponse(responseBody()));
     const session = turn();
@@ -58,7 +60,7 @@ describe('contrato Responses do Agent V2', () => {
       { type: 'function_call_output', call_id: 'old_call', output: '{"estoque":1}' }, { role: 'assistant', content: 'Temos uma unidade.' }]);
     expect(actions).toEqual(original);
   });
-  it('mantém compatibilidade com o default gpt-4o-mini sem enviar reasoning', async () => {
+  it('mantém compatibilidade com gpt-4o-mini sem enviar reasoning', async () => {
     config.OPENAI_MODEL = 'gpt-4o-mini'; config.AGENT_V2_MAX_OUTPUT_TOKENS = 4096;
     fetcher.mockResolvedValue(jsonResponse(responseBody()));
     await turn().next();

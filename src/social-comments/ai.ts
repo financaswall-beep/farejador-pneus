@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { env } from '../shared/config/env.js';
+import { isReasoningModel } from '../shared/openai-model.js';
 import { requestOpenAIResponse } from '../atendente-v2/openai-responses-http.js';
 import { COMMENT_PROMPT } from './prompt.js';
 import { COMMENT_TOOLS, isCommentTool, parseCommentToolArgs, type CommentLookup } from './commerce.js';
@@ -48,7 +49,9 @@ export async function decideComment(comment: string, post: string,
   const seenIds = new Set<string>();
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const toolsAllowed = Boolean(options.lookup) && round < MAX_TOOL_ROUNDS && calls < MAX_TOOL_CALLS;
-    const raw = await request(JSON.stringify({model:env.OPENAI_MODEL,store:false,max_output_tokens:2048,
+    const reasoningModel = isReasoningModel(env.OPENAI_MODEL);
+    const raw = await request(JSON.stringify({model:env.OPENAI_MODEL,store:false,max_output_tokens:reasoningModel ? 8192 : 2048,
+    ...(reasoningModel ? {reasoning:{effort:'medium'}} : {}),
     input, include: ['reasoning.encrypted_content'],
     ...(options.lookup ? {tools:COMMENT_TOOLS,tool_choice:toolsAllowed ? 'auto' : 'none'} : {}),
     text:{format:{type:'json_schema',name:'comment_decision',strict:true,schema:{

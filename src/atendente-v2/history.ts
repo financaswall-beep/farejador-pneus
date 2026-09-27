@@ -126,7 +126,9 @@ export async function loadHistory(
   }
   if(opts.includeAudio) {
     const audio=await client.query<{id:string;sent_at:Date;content:string}>(`SELECT m.id,m.sent_at,
-      string_agg(CASE WHEN t.transcript IS NOT NULL THEN '[Áudio transcrito; confiança '||t.confidence_level||'] '||t.transcript
+      string_agg(CASE WHEN t.transcript IS NOT NULL THEN
+        CASE WHEN t.model='gpt-transcribe' THEN '[Áudio transcrito; certeza não informada pelo transcritor. Confirme dados antes de mudar pedido.] '
+          ELSE '[Áudio transcrito; confiança '||t.confidence_level||'] ' END||t.transcript
         ELSE '[O cliente enviou áudio, mas não foi possível transcrever. Peça texto ou ofereça um atendente.]' END,E'\n' ORDER BY a.chatwoot_attachment_id) content
       FROM core.messages m JOIN core.message_attachments a ON a.environment=m.environment AND a.message_id=m.id AND a.file_type='audio'
       LEFT JOIN analytics.audio_transcriptions t ON t.environment=a.environment AND t.attachment_id=a.id AND t.superseded_by IS NULL

@@ -4,6 +4,15 @@ import { estimateSolUsd, parseModelUsage, responseMetering } from '../../../src/
 const raw = { model:'gpt-5.6-sol',service_tier:'default',usage:{ input_tokens:10_000,output_tokens:1_000,
   input_tokens_details:{ cached_tokens:6_000,cache_write_tokens:2_000 },output_tokens_details:{ reasoning_tokens:800 } } };
 describe('custo GPT-5.6 Sol', () => {
+  it('aplica preço GPT-6 Sol, inclusive cache e contexto longo, preservando 5.6', () => {
+    expect(estimateSolUsd('gpt-6-sol','default',parseModelUsage(raw))).toBe(0.0202);
+    expect(estimateSolUsd('gpt-6-sol-2026-09-15','default',parseModelUsage(raw))).toBe(0.0202);
+    const usage={input:272_000,output:1_000,cached:0,cacheWrite:0};
+    expect(estimateSolUsd('gpt-6-sol','default',usage)).toBe(0.554);
+    expect(estimateSolUsd('gpt-6-sol','default',{...usage,input:300_000})).toBe(1.215);
+    expect(estimateSolUsd('gpt-6-sol','priority',usage)).toBeNull();
+    expect(estimateSolUsd('gpt-6-sol-pro','default',usage)).toBeNull();
+  });
   it('separa entrada comum, cache lido/escrito e saída sem somar reasoning duas vezes', () => {
     expect(estimateSolUsd('gpt-5.6-sol','default',parseModelUsage(raw))).toBe(0.0404);
     expect(estimateSolUsd('gpt-5.6','default',parseModelUsage(raw))).toBe(0.0404);
