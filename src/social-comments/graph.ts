@@ -70,7 +70,9 @@ export class CommentsGraph {
   }
   async privateReply(platform: Platform, account: string, comment: string, message: string) {
     await this.assertAccount(platform,account);
-    const data=await this.call(`${account}/messages`,'POST',{
+    // Facebook Login: o token é da Página, inclusive para responder a comentário do Instagram.
+    // O account continua sendo validado acima e preservado como origem do Instagram.
+    const data=await this.call(`${this.config.pageId}/messages`,'POST',{
       recipient:JSON.stringify({comment_id:comment}),message:JSON.stringify({text:message}),
     });
     if(typeof data.message_id!=='string' || typeof data.recipient_id!=='string'
@@ -114,7 +116,7 @@ export class CommentsGraph {
       instagram_missing:scopes ? needed.instagram.filter(x=>!scopes.includes(x)) : null,
       private_missing: scopes ? {
         facebook:['pages_messaging'].filter(x=>!scopes.includes(x)),
-        instagram:['instagram_manage_messages'].filter(x=>!scopes.includes(x)),
+        instagram:['pages_messaging','instagram_manage_messages'].filter(x=>!scopes.includes(x)),
       } : null,
       note:'Esta verificação lê a conta e as permissões. O recebimento depende da assinatura dos webhooks na Meta.' };
   }

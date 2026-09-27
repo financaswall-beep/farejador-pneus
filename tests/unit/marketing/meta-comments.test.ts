@@ -34,11 +34,27 @@ describe('transporte oficial Meta',()=>{
     const account=platform==='facebook'?'100':'200';
     expect(await new CommentsGraph(config,fetcher).privateReply(platform,account,'123','Teste')).toEqual({messageId:'mid.private',recipientId:'300'});
     const [url,options]=fetcher.mock.calls[1]!;
-    expect(url.pathname).toBe(`/v21.0/${account}/messages`);
+    expect(url.pathname).toBe('/v21.0/100/messages');
+    if(platform==='instagram')expect(url.pathname).not.toContain('/200/');
     const body=new URLSearchParams(options.body);
     expect(JSON.parse(body.get('recipient')!)).toEqual({comment_id:'123'});
     expect(JSON.parse(body.get('message')!)).toEqual({text:'Teste'});
     expect(url.toString()).not.toContain('secret-token');
+  });
+  it('não envia privado se o Instagram não pertencer à página do token',async()=>{
+    const fetcher=vi.fn().mockResolvedValue(Response.json({id:'100',instagram_business_account:{id:'999'}}));
+    await expect(new CommentsGraph(config,fetcher).privateReply('instagram','200','123','Teste'))
+      .rejects.toMatchObject({code:'meta_token_instagram_mismatch'});
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('exige pages_messaging para o privado do Instagram mesmo com instagram_manage_messages',async()=>{
+    const fetcher=vi.fn().mockResolvedValueOnce(Response.json({id:'100',instagram_business_account:{id:'200'}}))
+      .mockResolvedValueOnce(Response.json({data:{is_valid:true,app_id:'123',scopes:[
+        'instagram_basic','instagram_manage_comments','pages_read_engagement','instagram_manage_messages',
+      ]}}));
+    expect(await new CommentsGraph({...config,appId:'123'},fetcher).health()).toMatchObject({
+      instagram_missing:[],private_missing:{instagram:['pages_messaging']},
+    });
   });
   it.each([['facebook','comments'],['instagram','replies']] as const)('responde no endpoint de %s',async(platform,edge)=>{
     const fetcher=vi.fn().mockResolvedValue(Response.json({id:'123_456'}));

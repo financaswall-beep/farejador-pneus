@@ -68,3 +68,11 @@ Validação real após deploy (não substituída por mocks):
 5. Repetir comentário, testar item sem estoque com/sem autorização e conferir métricas indisponíveis.
 
 Não criar conversões pagas fictícias, não publicar comentários de teste automaticamente e não prometer êxito na Meta antes dessa validação real.
+
+## Correção do envio privado pelo Facebook Login — 27/09/2026
+
+O cliente usa token de Página e `graph.facebook.com`. A resposta privada a comentário do Instagram deve usar `POST /<PAGE_ID>/messages` com `recipient.comment_id`, mantendo o ID do Instagram na validação de propriedade, nos registros de origem e na atribuição. O diagnóstico exige `pages_messaging` para esse envio e `instagram_manage_messages` para consultar conversas existentes.
+
+No teste isolado autorizado com o mesmo token e comentário, `/17841465774227389/messages` retornou erro 3 (`Application does not have the capability to make this API call`). A chamada por `/1434857906367394/messages` foi aceita e retornou `message_id` e `recipient_id`. O reteste e seu resultado foram registrados em `audit.events`, e o registro original em `ops.organic_outreach` foi conciliado como enviado para impedir duplicação. Nenhum evento bruto ou mensagem foi fabricado. Essa evidência confirma o envio inicial com a configuração atual; a resposta do destinatário e a continuidade do atendimento ainda precisam de validação real.
+
+Referência: https://developers.facebook.com/documentation/business-messaging/instagram-messaging/features/private-replies
