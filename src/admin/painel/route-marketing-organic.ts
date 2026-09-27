@@ -8,8 +8,10 @@ import { PublicationsGraph, readPublications } from '../../social-comments/publi
 import { MetaCommentError } from '../../social-comments/graph.js';
 import { marketingDateWindow } from './marketing-meta.js';
 import { organicPublicationSummary } from './queries-marketing-organic.js';
+import { organicPublicationWindow } from './marketing-organic-period.js';
 
 const listQuery = z.object({ period: z.enum(['7d', '30d']).default('30d') }).strict();
+const detailQuery = z.object({ window: z.enum(['7d', '30d']).default('7d') }).strict();
 const postParams = z.object({ platform: z.enum(['facebook', 'instagram']),
   postId: z.string().regex(/^\d{1,40}(?:_\d{1,40})?$/) }).strict();
 
@@ -27,7 +29,8 @@ export async function registerMarketingOrganic(fastify: FastifyInstance): Promis
   });
   fastify.get('/admin/api/marketing/organic/publications/:platform/:postId', options, async (request, reply) => {
     const params = postParams.safeParse(request.params);
-    if (!params.success) return reply.code(400).send({ error: 'invalid_params' });
+    const query = detailQuery.safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: 'invalid_params' });
     const config = commentsConfig();
     const { platform, postId } = params.data;
     const account = platform === 'facebook' ? config.pageId : config.instagramId;
@@ -38,7 +41,8 @@ export async function registerMarketingOrganic(fastify: FastifyInstance): Promis
       try { summary = await organicPublicationSummary(pool, env.FAREJADOR_ENV, platform, account, postId); }
       catch { summary = { available: false, comments: null, series: [] }; }
       return reply.header('Cache-Control', 'no-store').send({ publication, summary,
-        attribution: { status: 'not_implemented', private_messages: null, conversations: null, sales: null, revenue: null },
+        attribution: { status: 'not_implemented', period: organicPublicationWindow(publication.published_at, query.data.window),
+          private_messages: null, conversations: null, converted_conversations: null, sales: null, revenue: null, sales_series: null },
         fetched_at: new Date().toISOString() });
     } catch (error) {
       if (error instanceof MetaCommentError && ['meta_post_owner_mismatch', 'meta_account_not_allowed'].includes(error.code)) {

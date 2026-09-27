@@ -5,7 +5,8 @@ function front() {
   const context = vm.createContext({ window: { PAINEL_MODULES: {} }, document: { activeElement: { focus: vi.fn() } },
     lucide: { createIcons: vi.fn() }, console, Date });
   vm.runInContext(readFileSync('painel/public/app.marketing.organic.js', 'utf8'), context);
-  return Object.assign(context.window.PAINEL_MODULES.marketingOrganic(), {
+  vm.runInContext(readFileSync('painel/public/app.marketing.organic.summary.js', 'utf8'), context);
+  return Object.assign(context.window.PAINEL_MODULES.marketingOrganic(), context.window.PAINEL_MODULES.marketingOrganicSummary(), {
     $nextTick: (fn: () => void) => fn(), marketingIsMock: () => false,
     $refs: { moDialog: { open: false, showModal: vi.fn(), close: vi.fn() }, moClose: { focus: vi.fn() } },
   });
@@ -41,8 +42,15 @@ describe('Publicações — lista e abertura do resumo', () => {
     const a = front(); a.moData = { rows: [], sources: [{ platform: 'instagram', status: 'unavailable' }, { platform: 'facebook', status: 'ready' }] };
     a.moNetwork = 'instagram'; expect(a.moListAvailable()).toBe(false); expect(a.moWarnings()).toHaveLength(1);
     a.moNetwork = 'facebook'; expect(a.moListAvailable()).toBe(true); expect(a.moWarnings()).toHaveLength(0);
-    expect(a.moCommentCards().every((k: any) => k.value === null)).toBe(true);
-    a.moDetail = { summary: { available: true, comments: { received: 0 } } };
-    expect(a.moCommentCards()[0].value).toBe(0);
+    expect(a.moSummaryCards().every((k: any) => k.value === null)).toBe(true);
+    a.moDetail = { attribution: { status: 'ready', period: {id:'7d'}, private_messages: 0 } };
+    expect(a.moSummaryCards()[0].value).toBe(0);
+  });
+  it('respeita a janela escolhida e volta aos primeiros sete dias ao trocar de post', async () => {
+    const a = front(); a.apiGet = vi.fn().mockResolvedValue({publication:post('12')});
+    a.moSummaryPeriod = '30d'; await a.moOpen(post('12'), true);
+    expect(a.apiGet).toHaveBeenLastCalledWith(expect.stringContaining('?window=30d'));
+    await a.moOpen(post('13'));
+    expect(a.apiGet).toHaveBeenLastCalledWith(expect.stringContaining('?window=7d'));
   });
 });

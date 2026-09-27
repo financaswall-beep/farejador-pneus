@@ -7,7 +7,7 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic1" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic2" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -217,10 +217,11 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260927-organic1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260927-organic2"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
-<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic1"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic1"></script>
+<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic2"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic2"></script>
+<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic2"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -258,7 +259,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-organic1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-organic2"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8199,22 +8200,62 @@
           <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Posts do feed e Reels das contas conectadas. <span x-show="moData?.fetched_at" x-text="'Consulta à Meta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
         </div>
         <dialog x-ref="moDialog" class="mo-dialog" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
-          <div class="mo-dialog-heading"><div><div class="mo-eyebrow">Conteúdo orgânico / Publicações</div><h2 id="mo-dialog-title">Análise da publicação</h2><p>Acompanhe o post e o atendimento registrado.</p></div><div class="mo-dialog-actions"><span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button type="button" class="mo-button" x-ref="moClose" @click="moClose()" aria-label="Fechar análise"><i data-lucide="x"></i></button></div></div>
-          <nav class="mo-dialog-tabs" aria-label="Análise da publicação"><button type="button" aria-selected="true">Resumo</button><button type="button" disabled title="Será habilitado na próxima etapa">Comparar posts</button><button type="button" disabled title="Será habilitado após conectar a origem das vendas">Vendas vinculadas</button><button type="button" disabled title="Será habilitado na próxima etapa">Métricas</button></nav>
-          <div class="mo-dialog-body">
+          <header class="mo-dialog-heading">
+            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p>Acompanhe as conversas e as vendas que começaram neste post.</p></div>
+            <div class="mo-dialog-actions">
+              <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span>
+              <button type="button" class="mo-button" @click="moExportSummary()" :disabled="!moDetail || moDetailLoading"><i data-lucide="download"></i>Exportar</button>
+              <button type="button" class="mo-dialog-close" x-ref="moClose" @click="moClose()" aria-label="Fechar análise"><i data-lucide="x"></i></button>
+            </div>
+          </header>
+          <div class="mo-dialog-navigation">
+            <nav class="mo-dialog-tabs" aria-label="Análise da publicação" role="tablist">
+              <button type="button" role="tab" id="mo-summary-tab" aria-controls="mo-summary-panel" aria-selected="true">Resumo</button>
+              <button type="button" role="tab" aria-selected="false" disabled title="Comparação de posts: próxima etapa">Comparar posts</button>
+              <button type="button" role="tab" aria-selected="false" disabled title="Disponível após conectar a origem das vendas">Vendas vinculadas</button>
+              <button type="button" role="tab" aria-selected="false" disabled title="Métricas orgânicas: próxima etapa">Métricas</button>
+            </nav>
+            <div class="mo-period-controls">
+              <label class="mo-period-select"><i data-lucide="calendar-days" aria-hidden="true"></i><select aria-label="Período da análise da publicação" x-model="moSummaryPeriod" @change="moChangeSummaryPeriod()" :disabled="moDetailLoading"><option value="7d">Primeiros 7 dias do post</option><option value="30d">Primeiros 30 dias do post</option></select></label>
+              <span class="mo-period-range"><i data-lucide="info" aria-hidden="true"></i><span x-text="moSummaryRange()"></span></span>
+            </div>
+          </div>
+          <div class="mo-dialog-body" role="tabpanel" id="mo-summary-panel" aria-labelledby="mo-summary-tab" :aria-busy="moDetailLoading">
             <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando resumo…</strong></div>
-            <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected)">Tentar novamente</button></div>
-            <template x-if="moSelected && !moDetailLoading && !moDetailError"><div>
+            <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected, true)">Tentar novamente</button></div>
+            <template x-if="moSelected && !moDetailLoading && !moDetailError">
               <div class="mo-overview">
-                <article class="mo-post-preview"><div class="mo-post-image"><template x-if="moSelected.image_url"><img :src="moSelected.image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moSelected)"></template><template x-if="!moSelected.image_url"><i data-lucide="image" aria-label="Prévia indisponível"></i></template></div><div class="mo-post-copy"><span class="mo-network"><img :src="'/assets/brands/' + moSelected.platform + '.svg'" alt=""><span x-text="moNetworkLabel(moSelected.platform)"></span><span class="mo-badge" x-text="moFormat(moSelected.format)"></span></span><h3 x-text="moSelected.title"></h3><p x-text="'Publicado em ' + moDate(moSelected.published_at)"></p><p class="mo-full-caption" x-text="moSelected.caption || 'Publicação sem legenda.'"></p><a x-show="moSelected.url" :href="moSelected.url" target="_blank" rel="noopener noreferrer" class="mo-link">Abrir publicação <i data-lucide="external-link"></i></a></div></article>
-                <div class="mo-overview-main"><h3>Atendimento desta publicação</h3><p class="mo-subtext">Comentários capturados desde o início do acompanhamento, incluindo os já encerrados.</p><p class="mo-notice" x-show="moDetail && !moDetail.summary?.available">O histórico de atendimento está indisponível. Os números não foram substituídos por zero.</p><div class="mo-kpis"><template x-for="metric in moCommentCards()" :key="metric.label"><div class="mo-kpi"><div class="mo-kpi-top"><i :data-lucide="metric.icon"></i><span x-text="metric.label"></span></div><strong x-text="metric.value == null ? '—' : Number(metric.value).toLocaleString('pt-BR')"></strong><p x-text="metric.note"></p></div></template></div>
-                  <div class="mo-chart"><h3>Quando os comentários chegaram</h3><p>Até 30 dias com atividade registrada. Não representa o alcance total da publicação.</p><div x-show="moSeries().length"><div class="mo-bars" role="img" :aria-label="moSeries().map(day => day.label + ': ' + day.received + ' comentários').join('; ')"><template x-for="day in moSeries()" :key="day.date"><div class="mo-bar" :title="day.label + ': ' + day.received + ' comentários'"><div class="mo-bar-fill" :style="'height:' + day.height + '%' "><span x-text="day.received"></span></div></div></template></div><div class="mo-chart-range"><span x-text="moSeries()[0]?.label"></span><span x-text="moSeries().at(-1)?.label"></span></div></div><p x-show="!moSeries().length" style="padding:28px 0;text-align:center" x-text="moDetail?.summary?.available ? 'Ainda não há comentários capturados neste post.' : 'Histórico indisponível.'"></p></div>
+                <aside class="mo-overview-aside">
+                  <article class="mo-post-preview">
+                    <div class="mo-post-image"><template x-if="moSelected.image_url"><img :src="moSelected.image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moSelected)"></template><template x-if="!moSelected.image_url"><span><i data-lucide="image"></i>Prévia indisponível</span></template></div>
+                    <div class="mo-post-copy">
+                      <img class="mo-post-platform" :src="'/assets/brands/' + moSelected.platform + '.svg'" :alt="moNetworkLabel(moSelected.platform)">
+                      <h3 x-text="moSelected.title"></h3><p x-text="moPostContext()"></p>
+                      <p class="mo-post-published" x-text="'Publicado em ' + moDate(moSelected.published_at)"></p>
+                      <p class="mo-full-caption" x-text="moSelected.caption || 'Publicação sem legenda.'"></p>
+                      <a x-show="moSelected.url" :href="moSelected.url" target="_blank" rel="noopener noreferrer" class="mo-post-link">Abrir publicação <i data-lucide="external-link"></i></a>
+                    </div>
+                  </article>
+                  <div class="mo-origin"><span class="mo-origin-icon"><i data-lucide="info"></i></span><div><strong x-text="moSummaryReady() ? 'Origem registrada' : 'Vínculo pendente'"></strong><p x-text="moSummaryReady() ? 'Vendas ligadas aos comentários deste post.' : 'As conversas e vendas deste post ainda não têm origem confirmada.'"></p></div></div>
+                </aside>
+                <div class="mo-overview-main">
+                  <div class="mo-summary-kpis"><template x-for="metric in moSummaryCards()" :key="metric.key"><article class="mo-summary-kpi" :class="{'is-featured':metric.featured,'is-money':metric.money}"><span class="mo-metric-icon"><i :data-lucide="metric.icon"></i></span><strong x-text="moSummaryNumber(metric.value, metric.money)"></strong><span class="mo-metric-label" x-text="metric.label"></span></article></template></div>
+                  <section class="mo-sales-chart">
+                    <header><div><h3>Evolução das vendas</h3><p>Vendas concluídas acumuladas</p></div><span class="mo-sales-total" x-show="moSummaryValue('sales') != null" x-text="moSummaryNumber(moSummaryValue('sales')) + ' vendas'"></span></header>
+                    <div class="mo-sales-plot">
+                      <canvas x-ref="moSalesChart" x-show="moSalesSeries().length" role="img" :aria-label="'Vendas concluídas acumuladas: ' + moSalesSeries().map(day => day.date + ': ' + day.sales).join('; ')"></canvas>
+                      <div class="mo-sales-empty" x-show="!moSalesSeries().length"><span><i data-lucide="chart-no-axes-combined"></i></span><strong x-text="moSummaryReady() ? 'Histórico de vendas indisponível' : 'Aguardando vínculo com as vendas'"></strong><p x-text="moSummaryReady() ? 'Não foi possível montar a evolução deste período.' : 'O gráfico aparecerá quando houver dados de origem confirmados para este post.'"></p></div>
+                    </div>
+                  </section>
+                  <div class="mo-conversion"><span class="mo-conversion-icon"><i data-lucide="trending-up"></i></span><div><strong x-text="moConversionText()"></strong><p x-text="moConversion() == null ? 'Os dados pendentes não são contabilizados como zero.' : 'Conversão observada neste período.'"></p></div><b x-text="moConversionPercent()"></b></div>
                 </div>
               </div>
-              <section class="mo-commercial"><div class="mo-commercial-head"><i data-lucide="route"></i>Da publicação à venda</div><div class="mo-commercial-grid"><div><strong>—</strong><span>Mensagens privadas enviadas</span></div><div><strong>—</strong><span>Conversas identificadas</span></div><div><strong>—</strong><span>Vendas vinculadas</span></div><div><strong>—</strong><span>Receita vinculada</span></div></div><p>O vínculo entre este post, as conversas e as vendas ainda não está disponível. Isso não significa que o post não gerou vendas.</p></section>
-            </div></template>
+            </template>
           </div>
-          <footer class="mo-dialog-footer"><span>Este resumo considera somente o histórico registrado no Farejador.</span><button type="button" class="mo-button" @click="moGoAttendance()">Ver atendimento <i data-lucide="arrow-right"></i></button></footer>
+          <footer class="mo-dialog-footer">
+            <span>Somente vendas concluídas com origem confirmada. Valor vendido não representa lucro.</span>
+            <div class="mo-footer-actions"><button type="button" class="mo-button" disabled title="Comparação de posts: próxima etapa">Comparar com outro post</button><button type="button" class="mo-button mo-primary" disabled title="Disponível após conectar a origem das vendas">Ver vendas vinculadas<i data-lucide="arrow-right"></i></button></div>
+          </footer>
         </dialog>
       </section>
 

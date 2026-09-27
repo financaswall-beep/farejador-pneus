@@ -62,9 +62,11 @@ window.PAINEL_MODULES.marketingOrganic = function () {
         ...(time ? {hour:'2-digit',minute:'2-digit'} : {year:'numeric'})});
     },
     moImageFailed(row) { row.image_url = null; this.$nextTick(() => lucide.createIcons()); },
-    async moOpen(row) {
+    async moOpen(row, keepPeriod = false) {
       const wasOpen = this.$refs.moDialog?.open;
       if (!wasOpen) this._moReturnFocus = document.activeElement;
+      if (!keepPeriod) this.moSummaryPeriod = '7d';
+      this.moDestroyChart();
       this.moSelected = row; this.moDetail = null; this.moDetailError = ''; this.moDetailLoading = true;
       const seq = ++this.moDetailSeq;
       this.$nextTick(() => {
@@ -73,31 +75,17 @@ window.PAINEL_MODULES.marketingOrganic = function () {
         this.$refs.moClose?.focus(); lucide.createIcons();
       });
       try {
-        const detail = this.marketingIsMock() ? marketingOrganicMockDetail(row)
-          : await this.apiGet('/admin/api/marketing/organic/publications/' + row.platform + '/' + encodeURIComponent(row.id));
+        const detail = this.marketingIsMock() ? marketingOrganicMockDetail(row, this.moSummaryPeriod)
+          : await this.apiGet('/admin/api/marketing/organic/publications/' + row.platform + '/' + encodeURIComponent(row.id) + '?window=' + this.moSummaryPeriod);
         if (seq !== this.moDetailSeq) return;
         this.moDetail = detail; this.moSelected = detail.publication;
       } catch { if (seq === this.moDetailSeq) this.moDetailError = 'Não foi possível abrir o resumo. O post pode ter sido removido ou estar temporariamente indisponível.'; }
-      finally { if (seq === this.moDetailSeq) { this.moDetailLoading = false; this.$nextTick(() => lucide.createIcons()); } }
+      finally { if (seq === this.moDetailSeq) { this.moDetailLoading = false; this.$nextTick(() => { lucide.createIcons(); this.moRenderChart(); }); } }
     },
     moClose() {
       ++this.moDetailSeq; this.moDetailLoading = false; this.moSelected = null; this.moDetail = null;
+      this.moDestroyChart();
       this.$refs.moDialog?.close(); this._moReturnFocus?.focus(); this._moReturnFocus = null;
-    },
-    moCommentCards() {
-      const comments = this.moDetail?.summary?.available ? this.moDetail.summary.comments : null;
-      return [
-        {label:'Comentários recebidos',value:comments?.received ?? null,icon:'messages-square',note:'Capturados pelo Farejador'},
-        {label:'Comentários respondidos',value:comments?.replied ?? null,icon:'message-circle-check',note:'Resposta confirmada na rede'},
-        {label:'Em atendimento',value:comments?.pending ?? null,icon:'clock-3',note:'Aguardando análise ou envio'},
-        {label:'Precisam de atenção',value:comments?.failed ?? null,icon:'circle-alert',note:'Falha ou envio sem confirmação'},
-      ];
-    },
-    moSeries() {
-      const rows = this.moDetail?.summary?.series || [];
-      const max = Math.max(1, ...rows.map(row => row.received));
-      return rows.map(row => ({...row, height:Math.max(4, row.received / max * 100),
-        label:this.moDate(row.date + 'T12:00:00-03:00').replace(/ de \d{4}$/, '')}));
     },
     moGoAttendance() { this.moClose(); this.moSetView('attendance'); },
   };

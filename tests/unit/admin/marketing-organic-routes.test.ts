@@ -24,19 +24,19 @@ describe('Conteúdo orgânico — autorização e resumo', () => {
   });
   it('recusa período desconhecido, canal inválido e parâmetros extras', async () => {
     const a = await app(); try {
-      for (const url of [base + '?period=all', base + '?account_id=999', base + '/tiktok/301', base + '/instagram/me']) {
+      for (const url of [base + '?period=all', base + '?account_id=999', base + '/tiktok/301', base + '/instagram/me', base + '/instagram/301?window=all', base + '/instagram/301?account_id=999']) {
         expect((await a.inject({ url, headers: { 'x-owner': 'yes' } })).statusCode).toBe(400);
       }
       expect(mocks.list).not.toHaveBeenCalled(); expect(mocks.detail).not.toHaveBeenCalled();
     } finally { await a.close(); }
   });
   it('uma falha de histórico mantém o post e não inventa zero vendas', async () => {
-    mocks.detail.mockResolvedValue({ id: '301', platform: 'instagram' }); mocks.query.mockRejectedValue(Error('DB offline'));
+    mocks.detail.mockResolvedValue({ id: '301', platform: 'instagram', published_at:'2026-09-12T12:00:00Z' }); mocks.query.mockRejectedValue(Error('DB offline'));
     const a = await app(); try {
       const r = await a.inject({ url: base + '/instagram/301', headers: { 'x-owner': 'yes' } });
       expect(r.statusCode).toBe(200); expect(r.headers['cache-control']).toBe('no-store');
       expect(r.json()).toMatchObject({ publication: { id: '301' }, summary: { available: false, comments: null },
-        attribution: { sales: null, revenue: null, conversations: null, private_messages: null } });
+        attribution: { status:'not_implemented', period:{id:'7d',since:'2026-09-12',until:'2026-09-18'}, sales: null, revenue: null, conversations: null, private_messages: null } });
       expect(mocks.detail).toHaveBeenCalledWith('instagram', '200', '301');
     } finally { await a.close(); }
   });

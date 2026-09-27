@@ -30,6 +30,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   const painelModulos = [
     'app.marketing.comments.js',
     'app.marketing.organic.js', 'app.marketing.organic.mock.js',
+    'app.marketing.organic.summary.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
