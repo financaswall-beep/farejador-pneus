@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_order_edit_mode_2026-09-17';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_organic_audio_2026-09-27';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)

@@ -30,7 +30,7 @@ export async function handleBotMessageEvent(client: PoolClient, eventType: strin
   await client.query('SAVEPOINT bot_message_control');
   try {
     await lockBotConversation(client,environment,upserted.conversationId);
-    const state = await syncHumanIntervention(client,environment,upserted.conversationId);
+    const state = await syncHumanIntervention(client,environment,upserted.conversationId,env.ORGANIC_ATTRIBUTION_ENABLED);
     if (customerTrigger && state.mode==='auto'
       && (!state.resumed_at || message.sentAt>new Date(state.resumed_at))) {
       const sessionId = await ensureAtendenteSession(client,environment,upserted.conversationId,upserted.messageId);

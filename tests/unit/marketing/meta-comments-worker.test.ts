@@ -60,7 +60,7 @@ describe('worker de comentários com consultas comerciais',()=>{
     expect(graph.comment).toHaveBeenCalledWith('instagram','c1');
     expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("a.status='sending'"),['test','uuid',base.revision,'lease']);
     expect(graph.reply).toHaveBeenCalledExactlyOnceWith('instagram','c1','Resposta atual');
-    expect(finishComment).toHaveBeenCalledWith(pool,expect.anything(),'sending','replied',null,'reply1');
+    expect(finishComment).toHaveBeenCalledWith(pool,expect.anything(),'sending','replied',null,'reply1','Resposta atual');
   });
   it('não publica se humano encerrou pendência nem responde a outra conta',async()=>{
     pool.query.mockResolvedValue({rowCount:0,rows:[]});

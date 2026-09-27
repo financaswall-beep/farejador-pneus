@@ -10,10 +10,11 @@ export const decisionSchema = z.object({
   action:z.enum(['reply','delete','ignore']), sentiment:z.enum(['positive','neutral','negative']),
   reply_text:z.string().max(1000), reason:z.string().min(1).max(400),
   confidence_level:z.enum(['low','medium','high']),
+  commercial_intent:z.boolean().default(false), private_body:z.string().max(600).default(''),
 }).strict().refine(d=>d.action === 'delete' ? d.sentiment === 'negative' && d.reply_text === '' && d.confidence_level === 'high'
   : d.action === 'reply' ? d.sentiment !== 'negative' && d.reply_text.trim().length > 0 : d.reply_text === '');
 export type Decision = z.infer<typeof decisionSchema>;
-export interface AiDecision { decision: Decision; model: string; inputTokens: number; outputTokens: number }
+export interface AiDecision { decision: Decision; model: string; inputTokens: number; outputTokens: number; commercialSnapshot?: unknown[] }
 
 export function minimizePublicText(value: string): string {
   return value.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[e-mail]')
@@ -43,6 +44,7 @@ export async function decideComment(comment: string, post: string,
     {role:'user',content:JSON.stringify({platform, consultas_disponiveis:Boolean(options.lookup),
       publication:minimizePublicText(post.slice(0,6000)),comment:minimizePublicText(comment.slice(0,8000))})}];
   let inputTokens = 0, outputTokens = 0, calls = 0;
+  const commercialSnapshot: unknown[] = [];
   const seenIds = new Set<string>();
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const toolsAllowed = Boolean(options.lookup) && round < MAX_TOOL_ROUNDS && calls < MAX_TOOL_CALLS;
@@ -51,9 +53,10 @@ export async function decideComment(comment: string, post: string,
     ...(options.lookup ? {tools:COMMENT_TOOLS,tool_choice:toolsAllowed ? 'auto' : 'none'} : {}),
     text:{format:{type:'json_schema',name:'comment_decision',strict:true,schema:{
       type:'object',additionalProperties:false,
-      required:['action','sentiment','reply_text','reason','confidence_level'],
+      required:['action','sentiment','reply_text','reason','confidence_level','commercial_intent','private_body'],
       properties:{action:{type:'string',enum:['reply','delete','ignore']},sentiment:{type:'string',enum:['positive','neutral','negative']},
-        reply_text:{type:'string'},reason:{type:'string'},confidence_level:{type:'string',enum:['low','medium','high']}}}}},
+        reply_text:{type:'string'},reason:{type:'string'},confidence_level:{type:'string',enum:['low','medium','high']},
+        commercial_intent:{type:'boolean'},private_body:{type:'string'}}}}},
     }));
     const envelope = envelopeSchema.parse(raw);
     inputTokens += envelope.usage?.input_tokens ?? 0;
@@ -78,6 +81,7 @@ export async function decideComment(comment: string, post: string,
         let result: unknown;
         try { result = await options.lookup!(call.name, call.args); }
         catch { result = { erro:'consulta_indisponivel', orientacao:'Não confirme dados comerciais sem consulta; encaminhe ao atendimento privado.' }; }
+        commercialSnapshot.push({ tool:call.name,args:call.args,result,queried_at:new Date().toISOString() });
         input.push({type:'function_call_output',call_id:call.call_id,output:JSON.stringify(result ?? {erro:'consulta_indisponivel'})});
       }
       continue;
@@ -85,7 +89,7 @@ export async function decideComment(comment: string, post: string,
     let decision = decisionSchema.parse(JSON.parse(messages.filter(x=>x.type === 'output_text').map(x=>x.text ?? '').join('')));
     if (decision.action === 'reply') decision = decisionSchema.parse({ ...decision,
       reply_text:publicReply(decision.reply_text, platform, comment) });
-    return {decision,model:envelope.model ?? env.OPENAI_MODEL,inputTokens,outputTokens};
+    return {decision,model:envelope.model ?? env.OPENAI_MODEL,inputTokens,outputTokens,commercialSnapshot};
   }
   throw new Error('comment_tool_limit');
 }

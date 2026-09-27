@@ -68,6 +68,23 @@ export class CommentsGraph {
     const data = await this.call(comment,'DELETE');
     if (data.success !== true) throw new MetaCommentError('meta_delete_ack_unknown',true);
   }
+  async privateReply(platform: Platform, account: string, comment: string, message: string) {
+    await this.assertAccount(platform,account);
+    const data=await this.call(`${account}/messages`,'POST',{
+      recipient:JSON.stringify({comment_id:comment}),message:JSON.stringify({text:message}),
+    });
+    if(typeof data.message_id!=='string' || typeof data.recipient_id!=='string'
+      || !data.message_id || !/^\d+$/.test(data.recipient_id)) throw new MetaCommentError('meta_private_ack_unknown',true);
+    return {messageId:data.message_id,recipientId:data.recipient_id};
+  }
+  async hasConversation(platform: Platform, account: string, recipient: string): Promise<boolean> {
+    await this.assertAccount(platform,account);
+    const data=await this.call(`${this.config.pageId}/conversations`,'GET',{
+      platform:platform==='instagram'?'instagram':'messenger',user_id:recipient,fields:'id',limit:'1',
+    });
+    if(!Array.isArray(data.data)) throw new MetaCommentError('meta_conversation_check_unavailable');
+    return data.data.length>0;
+  }
   async health(): Promise<Record<string,unknown>> {
     const diagnosticCall = async (stage: 'page' | 'token_permissions', path: string,
       params: Record<string,string>, token = this.config.token): Promise<Json> => {
@@ -95,6 +112,10 @@ export class CommentsGraph {
       permissions_checked:scopes !== null,
       facebook_missing:scopes ? needed.facebook.filter(x=>!scopes.includes(x)) : null,
       instagram_missing:scopes ? needed.instagram.filter(x=>!scopes.includes(x)) : null,
+      private_missing: scopes ? {
+        facebook:['pages_messaging'].filter(x=>!scopes.includes(x)),
+        instagram:['instagram_manage_messages'].filter(x=>!scopes.includes(x)),
+      } : null,
       note:'Esta verificação lê a conta e as permissões. O recebimento depende da assinatura dos webhooks na Meta.' };
   }
 }

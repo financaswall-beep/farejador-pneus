@@ -30,6 +30,12 @@ services:
       # o Coolify deve definir ambas como true para publicar esta entrega.
       MATRIZ_CAIXA_PORTAL: ${MATRIZ_CAIXA_PORTAL:-false}
       PHOTO_REQUESTS: ${PHOTO_REQUESTS:-false}
+      ORGANIC_ATTRIBUTION_ENABLED: ${ORGANIC_ATTRIBUTION_ENABLED:-false}
+      ORGANIC_INSTAGRAM_PRIVATE_ENABLED: ${ORGANIC_INSTAGRAM_PRIVATE_ENABLED:-false}
+      ORGANIC_FACEBOOK_PRIVATE_ENABLED: ${ORGANIC_FACEBOOK_PRIVATE_ENABLED:-false}
+      BOT_AUDIO_ENABLED: ${BOT_AUDIO_ENABLED:-false}
+      BOT_AUDIO_MODEL: ${BOT_AUDIO_MODEL:-gpt-4o-mini-transcribe}
+      BOT_AUDIO_ALLOWED_HOSTS: ${BOT_AUDIO_ALLOWED_HOSTS:-}
       # A foto toca no Caixa somente quando o motor comprova estoque da Matriz.
       # Estas flags já governam o roteamento em produção e precisam atravessar o Compose.
       ROUTING_GEO: ${ROUTING_GEO:-false}

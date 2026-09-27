@@ -7,13 +7,29 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
   let journeyFocus = null;
   return {
     moSalesSearch:'', moSalesStatus:'completed', moSalesPage:1, moJourneySale:null, moShowFailures:false,
+    moInsights:null, moInsightsLoading:false, moInsightsError:'', moInsightsKey:'', moInsightsSeq:0,
+    async moLoadInsights(force=false) {
+      const post=this.moSelected;
+      if(!post || this.marketingIsMock()) {
+        if(this.moInsightsKey){this.moInsightsSeq++;this.moInsightsKey='';this.moInsights=null;this.moInsightsLoading=false;this.moInsightsError='';}
+        return;
+      }
+      const key=post.platform+':'+post.id;
+      if(!force && this.moInsightsKey===key)return;
+      const seq=++this.moInsightsSeq;
+      this.moInsightsKey=key;this.moInsights=null;this.moInsightsLoading=true;this.moInsightsError='';
+      try{const data=await this.apiGet('/admin/api/marketing/organic/publications/'+post.platform+'/'+encodeURIComponent(post.id)+'/insights');
+        if(this.moInsightsKey===key && this.moInsightsSeq===seq && !this.marketingIsMock())this.moInsights=data;}
+      catch{if(this.moInsightsKey===key && this.moInsightsSeq===seq)this.moInsightsError='Não foi possível consultar as métricas da Meta.';}
+      finally{if(this.moInsightsSeq===seq)this.moInsightsLoading=false;}
+    },
     moResetResults() {
       this.moSalesSearch='';this.moSalesStatus='completed';this.moSalesPage=1;this.moShowFailures=false;
       this.moJourneySale=null;this.$refs.moJourneyDialog?.close();journeyFocus=null;
     },
     moAnalysisSubtitle() {
       return ({summary:'Acompanhe as conversas e as vendas que começaram neste post.',compare:'Compare os posts e acompanhe as vendas que vieram deles.',
-        sales:'Consulte as vendas e confira a origem de cada atendimento.',metrics:'Entenda as respostas, a conversão e o tempo até a venda.'})[this.moAnalysisTab];
+        sales:'Consulte as vendas e confira a origem de cada atendimento.',metrics:'Entenda as respostas, a conversão e o tempo até confirmar o pedido.'})[this.moAnalysisTab];
     },
     moMoveAnalysisTab(event, direction) {
       const tabs=['summary','compare','sales','metrics'], index=tabs.indexOf(this.moAnalysisTab);
@@ -82,14 +98,14 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
     },
     moMetricPercent(value) { return number(value)==null?'—':value.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'; },
     moTimeBuckets() {
-      const values=this.moSummaryReady()?this.moDetail?.attribution?.sale_time_buckets:null, sales=this.moResultCount('sales');
+      const values=this.moSummaryReady()?this.moDetail?.attribution?.confirmation_time_buckets:null, sales=this.moResultCount('confirmed_orders');
       if(!Array.isArray(values) || values.length!==4 || values.some(v=>count(v)==null) || sales==null || values.reduce((s,v)=>s+v,0)>sales)return null;
       return values.map((value,i)=>({label:['Até 1 hora','De 1 a 12 horas','De 12 a 24 horas','Mais de 24 horas'][i],value}));
     },
     moTimedSales() { const rows=this.moTimeBuckets();return rows?rows.reduce((s,r)=>s+r.value,0):null; },
     moTimeBarWidth(value) { const rows=this.moTimeBuckets();return rows && Math.max(...rows.map(r=>r.value))>0 ? value/Math.max(...rows.map(r=>r.value))*100 : 0; },
     moMedianTime() {
-      const minutes=this.moResultValue('median_sale_minutes');if(minutes==null || !this.moTimedSales())return '—';
+      const minutes=this.moResultValue('median_confirmation_minutes');if(minutes==null || !this.moTimedSales())return '—';
       const total=Math.round(minutes), hours=Math.floor(total/60), rest=total%60;
       return total===0?'< 1 min':hours?hours+'h'+(rest?' '+rest+'min':''):rest+' min';
     },
@@ -98,7 +114,7 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
       return [
         {icon:'message-square',value:this.moMetricPercent(response?.rate),label:'Responderam no privado',detail:response?response.replied+' de '+response.sent+' mensagens enviadas':'Aguardando registro das respostas'},
         {icon:'shopping-cart',value:this.moMetricPercent(conversion?.rate),label:'Conversas que viraram vendas',detail:conversion?conversion.converted+' de '+conversion.total+' conversas':'Aguardando origem das vendas',green:true},
-        {icon:'clock-3',value:this.moMedianTime(),label:'Tempo mediano até a venda',detail:'Da primeira resposta à conclusão'},
+        {icon:'clock-3',value:this.moMedianTime(),label:'Tempo até confirmar o pedido',detail:'Mediana da primeira resposta ao aceite; não inclui entrega'},
         {icon:'coins',value:this.moSummaryNumber(this.moAverageSale(),true),label:'Valor médio por venda',detail:sales!=null && revenue!=null?this.moSummaryNumber(revenue,true)+' em '+sales+' vendas':'Aguardando vendas confirmadas'},
       ];
     },
@@ -109,8 +125,11 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
       if(this.moAnalysisTab==='sales')return [...head,['Lista de vendas',this.moSalesReady()?'Completa':'Indisponível'],['Filtro',this.moSalesStatus],['Busca',this.moSalesSearch],[],['Data','Cliente','Venda','Valor','Situação'],
         ...this.moSalesFiltered().map(r=>[r.completed_at || r.cancelled_at,r.customer_name,r.order_number,r.amount,r.status==='completed'?'Concluída':'Cancelada']),
         ['Total concluído no filtro',this.moSalesReady()?this.moSalesTotal().count:'Indisponível',this.moSalesReady()?this.moSalesTotal().amount:'Indisponível'],['Observação','Cancelamentos fora dos totais. Valor vendido não representa lucro.']];
-      return [...head,...this.moMetricCards().map(c=>[c.label,c.value,c.detail]),[],['Envios com falha',this.moResultCount('private_failed') ?? 'Indisponível'],['Vendas com tempo registrado',this.moTimedSales() ?? 'Indisponível'],
-        ...(this.moTimeBuckets() || []).map(r=>[r.label,r.value]),['Observação','Mensagem enviada não significa lida. Sem resposta não significa venda perdida.']];
+      return [...head,...this.moMetricCards().map(c=>[c.label,c.value,c.detail]),[],['Envios com falha',this.moResultCount('private_failed') ?? 'Indisponível'],['Pedidos com tempo registrado',this.moTimedSales() ?? 'Indisponível'],
+        ...(this.moTimeBuckets() || []).map(r=>[r.label,r.value]),
+        [],['Métricas da Meta','Acumulado da publicação; pode incluir impulsionamento'],['Consultado em',this.moInsights?.fetched_at || 'Não consultado'],
+        ...(this.moInsights?.rows || []).map(r=>[r.label,r.value ?? 'Indisponível']),
+        ['Observação','Mensagem enviada não significa lida. Sem resposta não significa venda perdida.']];
     },
     moExportResults() { if(!this.moDetail || this.moDetailLoading || this.moDetailError)return;this.moDownloadCsv(this.moResultsExportRows(),'publicacao-'+this.moSelected.id+'-'+this.moAnalysisTab+'-'+this.moSummaryPeriod+'.csv'); },
   };

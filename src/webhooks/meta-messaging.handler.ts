@@ -71,6 +71,8 @@ export async function metaMessagingWebhookHandler(
     });
     if (rawEventId != null) {
       await enqueueCommentEvent(client,rawEventId,body);
+      if(env.ORGANIC_ATTRIBUTION_ENABLED) await client.query(`INSERT INTO ops.organic_meta_events(environment,raw_event_id)
+        VALUES($1,$2) ON CONFLICT DO NOTHING`,[env.FAREJADOR_ENV,rawEventId]);
       await client.query("SELECT pg_notify('meta_messaging_events_new','')");
     }
     await client.query('COMMIT');

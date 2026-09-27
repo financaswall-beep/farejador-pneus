@@ -1,3 +1,4 @@
+import { env } from '../shared/config/env.js';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
@@ -59,7 +60,7 @@ export async function sendAgentTextWithOutbox(
   client: PoolClient,
   input: AgentTextOutboxInput,
 ): Promise<AgentTextOutboxResult> {
-  if (!await botMayProcessTrigger(client,input.environment,input.conversationId,input.triggerMessageId)) {
+  if (!await botMayProcessTrigger(client,input.environment,input.conversationId,input.triggerMessageId,env.ORGANIC_ATTRIBUTION_ENABLED)) {
     return { status:'superseded' };
   }
   // Uma nova mensagem não desfaz o pedido de atendimento humano.
@@ -89,7 +90,7 @@ export async function sendAgentTextWithOutbox(
   try {
     if (input.humanHandoff) {
       await lockBotConversation(client,input.environment,input.conversationId);
-      const state = await syncHumanIntervention(client,input.environment,input.conversationId);
+      const state = await syncHumanIntervention(client,input.environment,input.conversationId,env.ORGANIC_ATTRIBUTION_ENABLED);
       const trigger = await client.query<{ allowed: boolean }>(`SELECT EXISTS (
         SELECT 1 FROM core.messages WHERE environment=$1 AND conversation_id=$2 AND id=$3
           AND sender_type='contact' AND is_private=false

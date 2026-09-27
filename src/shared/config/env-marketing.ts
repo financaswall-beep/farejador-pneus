@@ -7,6 +7,9 @@ const booleanStringSchema = z.enum(['true', 'false']).default('false')
 export const marketingEnvShape = {
   META_COMMENTS_ENABLED: booleanStringSchema,
   META_COMMENTS_PUBLISH_ENABLED: booleanStringSchema,
+  ORGANIC_ATTRIBUTION_ENABLED: booleanStringSchema,
+  ORGANIC_INSTAGRAM_PRIVATE_ENABLED: booleanStringSchema,
+  ORGANIC_FACEBOOK_PRIVATE_ENABLED: booleanStringSchema,
   META_COMMENTS_PAGE_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_COMMENTS_INSTAGRAM_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_COMMENTS_APP_ID: z.string().regex(/^[0-9]+$/).optional(),

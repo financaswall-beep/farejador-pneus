@@ -256,7 +256,7 @@ export async function enqueueConversationResolution(
   await client.query('BEGIN');
   try {
     await lockBotConversation(client, env.FAREJADOR_ENV, candidate.conversation_id);
-    const control = await syncHumanIntervention(client, env.FAREJADOR_ENV, candidate.conversation_id);
+    const control = await syncHumanIntervention(client, env.FAREJADOR_ENV, candidate.conversation_id,env.ORGANIC_ATTRIBUTION_ENABLED);
     const guard = await assessResolutionGuard(
       client, env.FAREJADOR_ENV, candidate.conversation_id, candidate.latest_message_id,
     );

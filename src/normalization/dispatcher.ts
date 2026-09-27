@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { bindOrganicChatwootMessage } from '../marketing/organic/inbound.js';
 import type { ChatwootEventType, Environment } from '../shared/types/chatwoot.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
@@ -230,6 +231,7 @@ export async function dispatch(
         await fanOutMessageToPartnerChat(client, message, payload);
       }
 
+      await bindOrganicChatwootMessage(client,environment,payload,message,upsertedMessage);
       await handleBotMessageEvent(client,eventType,message,upsertedMessage,rawEventId);
 
       const attachments = (payload.attachments ?? []) as Array<Record<string, unknown>>;

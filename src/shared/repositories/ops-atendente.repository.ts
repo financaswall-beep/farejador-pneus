@@ -253,6 +253,8 @@ export async function markAtendenteJobFailed(
   const environment = current.rows[0]?.environment;
   const failure = classifyAtendenteError(error);
   if (attempts < MAX_ATENDENTE_RETRY_ATTEMPTS && failure.retryable) {
+    const delay=['organic_private_ack_pending','organic_context_pending','audio_processing_pending'].includes(failure.code)
+      ? 15 : retryBackoffSeconds(attempts + 1);
     await client.query(
       `UPDATE ops.atendente_jobs
        SET status        = 'pending',
@@ -263,8 +265,8 @@ export async function markAtendenteJobFailed(
            error_message = $2${resilienceEnabled ? ', last_error_code = $4, last_error_kind = $5' : ''}
        WHERE id = $1`,
       resilienceEnabled
-        ? [jobId, failure.summary, String(retryBackoffSeconds(attempts + 1)), failure.code, failure.kind]
-        : [jobId, failure.summary, String(retryBackoffSeconds(attempts + 1))],
+        ? [jobId, failure.summary, String(delay), failure.code, failure.kind]
+        : [jobId, failure.summary, String(delay)],
     );
     if (resilienceEnabled && environment) await recordAtendenteJobEvent(client, {
       environment, jobId, attempt: attempts, fromStatus: 'processing', toStatus: 'pending',

@@ -36,7 +36,7 @@ interface TurnActionsRow {
 export async function loadHistory(
   client: PoolClient,
   conversationId: string,
-  opts: { includeLocationMarkers?: boolean } = {},
+  opts: { includeLocationMarkers?: boolean; includeAudio?: boolean; includeOrganic?: boolean } = {},
 ): Promise<ChatMessage[]> {
   const [msgResult, turnsResult] = await Promise.all([
     client.query<MessageRow>(
@@ -113,6 +113,31 @@ export async function loadHistory(
   }
 
   const history: ChatMessage[] = [];
+  if(opts.includeOrganic) {
+    const privateReplies=await client.query<MessageRow>(`SELECT o.id,'user' sender_type,o.body content,COALESCE(o.submitted_at,o.sent_at) sent_at
+      FROM analytics.organic_conversation_sources s JOIN ops.organic_outreach o
+        ON o.environment=s.environment AND o.id=s.outreach_id
+      WHERE s.conversation_id=$1 AND s.superseded_by IS NULL
+        AND NOT EXISTS(SELECT 1 FROM core.messages m WHERE m.environment=s.environment
+          AND m.conversation_id=s.conversation_id AND m.native_message_id=o.provider_message_id)
+      ORDER BY o.sent_at DESC LIMIT 3`,[conversationId]);
+    messages.push(...privateReplies.rows);
+    messages.sort((a,b)=>a.sent_at.getTime()-b.sent_at.getTime() || a.id.localeCompare(b.id));
+  }
+  if(opts.includeAudio) {
+    const audio=await client.query<{id:string;sent_at:Date;content:string}>(`SELECT m.id,m.sent_at,
+      string_agg(CASE WHEN t.transcript IS NOT NULL THEN '[Áudio transcrito; confiança '||t.confidence_level||'] '||t.transcript
+        ELSE '[O cliente enviou áudio, mas não foi possível transcrever. Peça texto ou ofereça um atendente.]' END,E'\n' ORDER BY a.chatwoot_attachment_id) content
+      FROM core.messages m JOIN core.message_attachments a ON a.environment=m.environment AND a.message_id=m.id AND a.file_type='audio'
+      LEFT JOIN analytics.audio_transcriptions t ON t.environment=a.environment AND t.attachment_id=a.id AND t.superseded_by IS NULL
+      WHERE m.conversation_id=$1 AND m.sender_type='contact' AND NOT m.is_private AND m.deleted_at IS NULL
+      GROUP BY m.id,m.sent_at ORDER BY m.sent_at DESC LIMIT 30`,[conversationId]);
+    for(const row of audio.rows){const found=messages.find(m=>m.id===row.id);
+      if(found)found.content=[found.content,row.content].filter(Boolean).join('\n');
+      else messages.push({...row,sender_type:'contact'});}
+    messages.sort((a,b)=>a.sent_at.getTime()-b.sent_at.getTime() || a.id.localeCompare(b.id));
+    if(messages.length>HISTORY_LIMIT)messages.splice(0,messages.length-HISTORY_LIMIT);
+  }
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i]!;

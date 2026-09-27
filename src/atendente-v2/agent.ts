@@ -1,4 +1,7 @@
 import type { PoolClient } from 'pg';
+import { prepareConversationAudio, AUDIO_RULES } from './audio-transcription.js';
+import { ensureOrganicContext, loadOrganicContext } from '../marketing/organic/context.js';
+import { pollOrganicEvents } from '../marketing/organic/inbound.js';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
@@ -67,12 +70,16 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const logCtx = { job_id: jobId, conversation_id: conversationId, agent: 'v2', extractor_version: PROMPT_EXTRACTOR_VERSION };
 
   const client = await pool.connect();
-  const mayContinue = () => botMayProcessTrigger(client,environment as Environment,conversationId,job.triggerMessageId);
+  const mayContinue = () => botMayProcessTrigger(client,environment as Environment,conversationId,job.triggerMessageId,env.ORGANIC_ATTRIBUTION_ENABLED);
   try {
     if (!await mayContinue()) return;
+    await prepareConversationAudio(client,environment,conversationId,job);
+    if(env.ORGANIC_ATTRIBUTION_ENABLED)await pollOrganicEvents(pool);
+    await ensureOrganicContext(client,environment,conversationId,job.triggerMessageId);
+    const organicContext=await loadOrganicContext(client,environment,conversationId);
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
     const [history, chatwootConvId, customerContext, customerMemory, customerPin] = await Promise.all([
-      loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO }),
+      loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO, includeAudio:env.BOT_AUDIO_ENABLED,includeOrganic:env.ORGANIC_ATTRIBUTION_ENABLED }),
       lookupChatwootConversationId(client, conversationId),
       loadCustomerContext(client, conversationId),
       loadCustomerMemory(client, conversationId, env.AGENT_V2_MEMORY_DAYS),
@@ -154,7 +161,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       ? buildDeliveryQuoteFirstNudge(latestCustomerText, customerPin != null)
       : '';
     const systemPromptWithContext =
-      basePrompt + (customerContext ?? '') + (customerMemory ?? '')
+      basePrompt + (customerContext ?? '') + (customerMemory ?? '') + organicContext + (env.BOT_AUDIO_ENABLED?AUDIO_RULES:'')
       + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge
       + buildPurchaseContext(history) + cityClarificationNudge;
 

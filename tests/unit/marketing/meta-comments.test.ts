@@ -28,6 +28,18 @@ describe('comentários Meta — entrada e escopo',()=>{
   });
 });
 describe('transporte oficial Meta',()=>{
+  it.each(['facebook','instagram'] as const)('envio privado em %s exige aceite com mensagem e destinatário',async platform=>{
+    const fetcher=vi.fn().mockResolvedValueOnce(Response.json({id:'100',instagram_business_account:{id:'200'}}))
+      .mockResolvedValueOnce(Response.json({message_id:'mid.private',recipient_id:'300'}));
+    const account=platform==='facebook'?'100':'200';
+    expect(await new CommentsGraph(config,fetcher).privateReply(platform,account,'123','Teste')).toEqual({messageId:'mid.private',recipientId:'300'});
+    const [url,options]=fetcher.mock.calls[1]!;
+    expect(url.pathname).toBe(`/v21.0/${account}/messages`);
+    const body=new URLSearchParams(options.body);
+    expect(JSON.parse(body.get('recipient')!)).toEqual({comment_id:'123'});
+    expect(JSON.parse(body.get('message')!)).toEqual({text:'Teste'});
+    expect(url.toString()).not.toContain('secret-token');
+  });
   it.each([['facebook','comments'],['instagram','replies']] as const)('responde no endpoint de %s',async(platform,edge)=>{
     const fetcher=vi.fn().mockResolvedValue(Response.json({id:'123_456'}));
     const result=await new CommentsGraph(config,fetcher).reply(platform,'123','Obrigado!');

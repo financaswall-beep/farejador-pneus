@@ -56,11 +56,15 @@ export async function saveDecision(pool: Pool, task: CommentTask, ai: AiDecision
     if (!current.rowCount) { await client.query('COMMIT'); return; }
     const d = ai.decision;
     const inserted = await client.query<{id:string}>(`INSERT INTO analytics.meta_comment_decisions
-      (environment,comment_id,revision,action,sentiment,reply_text,reason,extractor_version,confidence_level,source_reference,model,input_tokens,output_tokens,comment_snapshot)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+      (environment,comment_id,revision,action,sentiment,reply_text,reason,extractor_version,confidence_level,source_reference,model,input_tokens,output_tokens,comment_snapshot
+        ${env.ORGANIC_ATTRIBUTION_ENABLED ? ',commercial_intent,private_body,commercial_snapshot' : ''})
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+        ${env.ORGANIC_ATTRIBUTION_ENABLED ? ',$15,$16,$17' : ''}) RETURNING id`,
     [env.FAREJADOR_ENV,task.id,task.revision,d.action,d.sentiment,d.reply_text,d.reason,COMMENT_PROMPT_VERSION,
-      d.confidence_level,`core.meta_comments:${task.id}:${task.revision}`,ai.model,ai.inputTokens,ai.outputTokens,task.body]);
+      d.confidence_level,`core.meta_comments:${task.id}:${task.revision}`,ai.model,ai.inputTokens,ai.outputTokens,task.body,
+      ...(env.ORGANIC_ATTRIBUTION_ENABLED ? [d.commercial_intent,d.private_body,JSON.stringify(ai.commercialSnapshot ?? [])] : [])]);
     const decisionId = inserted.rows[0]!.id;
+    // O ledger é imutável: os dados adicionais nascem no INSERT, nunca por UPDATE.
     if (current.rows[0].decision_id) await client.query(`UPDATE analytics.meta_comment_decisions SET superseded_by=$3
       WHERE environment=$1 AND id=$2 AND superseded_by IS NULL`,[env.FAREJADOR_ENV,current.rows[0].decision_id,decisionId]);
     await client.query(`UPDATE ops.meta_comment_actions SET decision_id=$3,status=$4,attempts=0,error_code=NULL,updated_at=now(),post_url=$5
@@ -69,10 +73,12 @@ export async function saveDecision(pool: Pool, task: CommentTask, ai: AiDecision
   } catch(error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }
-export async function finishComment(pool: Pool, task: CommentTask, expected: string, status: string, error: string|null = null, providerId:string|null = null): Promise<void> {
+export async function finishComment(pool: Pool, task: CommentTask, expected: string, status: string, error: string|null = null, providerId:string|null = null, publishedBody:string|null = null): Promise<void> {
   await pool.query(`UPDATE ops.meta_comment_actions SET status=$4,error_code=$5,
     provider_reply_id=COALESCE($6,provider_reply_id),updated_at=now(),next_attempt_at=now()+interval '1 minute',
     completion_source=CASE WHEN $4 IN ('replied','deleted') THEN 'automation' ELSE completion_source END
+    ${env.ORGANIC_ATTRIBUTION_ENABLED ? ',published_body=COALESCE($8,published_body)' : ''}
     WHERE environment=$1 AND comment_id=$2 AND lease_id=$7 AND (status=$3
-      OR ($4='replied' AND status='replied' AND provider_reply_id=$6))`,[env.FAREJADOR_ENV,task.id,expected,status,error,providerId,task.lease_id]);
+      OR ($4='replied' AND status='replied' AND provider_reply_id=$6))`,[env.FAREJADOR_ENV,task.id,expected,status,error,providerId,task.lease_id,
+        ...(env.ORGANIC_ATTRIBUTION_ENABLED ? [publishedBody] : [])]);
 }

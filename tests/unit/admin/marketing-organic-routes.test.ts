@@ -36,7 +36,7 @@ describe('Conteúdo orgânico — autorização e resumo', () => {
       const r = await a.inject({ url: base + '/instagram/301', headers: { 'x-owner': 'yes' } });
       expect(r.statusCode).toBe(200); expect(r.headers['cache-control']).toBe('no-store');
       expect(r.json()).toMatchObject({ publication: { id: '301' }, summary: { available: false, comments: null },
-        attribution: { status:'not_implemented', period:{id:'7d',since:'2026-09-12',until:'2026-09-18'}, sales: null, revenue: null, conversations: null, private_messages: null } });
+        attribution: { status:'disabled', period:{id:'7d',since:'2026-09-12',until:'2026-09-18'}, sales: null, revenue: null, conversations: null, private_messages: null } });
       expect(mocks.detail).toHaveBeenCalledWith('instagram', '200', '301');
     } finally { await a.close(); }
   });

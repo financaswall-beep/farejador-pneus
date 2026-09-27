@@ -5,13 +5,41 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     moView: 'publications', moPeriod: '30d', moNetwork: 'all', moSearch: '', moSort: 'recent', moPage: 1,
     moData: null, moLoading: false, moError: '', moSeq: 0,
     moSelected: null, moDetail: null, moDetailLoading: false, moDetailError: '', moDetailSeq: 0,
+    moControls:null, moControlBusy:false, moControlError:'', moInboxSelection:{},
+    async moLoadControls() {
+      this.moControlError='';
+      if(this.marketingIsMock()){this.moControls=null;return;}
+      try {const data=await this.apiGet('/admin/api/marketing/organic/controls');
+        this.moControls=this.marketingIsMock()?null:data;}
+      catch {this.moControlError='Não foi possível consultar a automação privada.';}
+    },
+    async moControlAction(channel,action) {
+      if(this.moControlBusy || this.marketingIsMock())return;
+      this.moControlBusy=true;this.moControlError='';
+      try {
+        await this.apiPost('/admin/api/marketing/organic/controls',{platform:channel.platform,action,
+          ...(action==='verify'?{inbox_id:Number(this.moInboxSelection[channel.platform])}: {})});
+        await this.moLoadControls();
+      }catch(error){this.moControlError=({organic_inbound_test_required:'Envie uma mensagem de teste para esta conta e confira a chegada no Chatwoot antes de verificar.',
+        organic_inbox_mismatch:'A caixa escolhida não corresponde ao canal ou precisa ser reconectada.',
+        organic_messaging_permissions_missing:'O token ainda precisa das permissões de mensagens privadas.',
+        organic_runtime_not_ready:'A configuração de áudio, atendimento ou mensagens privadas ainda está pendente no servidor.'})[error?.message] || 'Não foi possível concluir. Confira a conexão e tente novamente.';}
+      finally{this.moControlBusy=false;}
+    },
+    async moFinishInterest(id,status) {
+      if(this.moControlBusy || this.marketingIsMock())return;
+      this.moControlBusy=true;this.moControlError='';
+      try{await this.apiPost('/admin/api/marketing/organic/interests/'+id,{status});await this.moLoadControls();}
+      catch{this.moControlError='Não foi possível atualizar o interesse.';}
+      finally{this.moControlBusy=false;}
+    },
     async loadMarketingOrganic() {
-      if (this.moView === 'attendance') return this.loadMarketingComments();
+      if (this.moView === 'attendance') {void this.moLoadControls();return this.loadMarketingComments();}
       return this.moLoad();
     },
     moSetView(view) {
       this.moView = view;
-      if (view === 'attendance') void this.loadMarketingComments();
+      if (view === 'attendance') {void this.loadMarketingComments();void this.moLoadControls();}
       else if (!this.moData) void this.moLoad();
       this.$nextTick(() => lucide.createIcons());
     },

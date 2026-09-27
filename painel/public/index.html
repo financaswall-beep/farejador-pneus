@@ -7,8 +7,8 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic4" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic4" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic-flow1" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic-flow1" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -218,14 +218,14 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
-<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic4"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic4"></script>
-<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic4"></script>
-<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic4"></script>
-<script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic4"></script>
-<script src="/admin/painel/app.marketing.organic.results.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.results.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -263,7 +263,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8294,6 +8294,7 @@
                 <template x-if="moSafeSocialUrl(moSelected?.url)"><a :href="moSafeSocialUrl(moSelected.url)" target="_blank" rel="noopener noreferrer" class="mor-link">Abrir publicação<i data-lucide="arrow-up-right"></i></a></template>
               </article>
               <p class="mor-pending" x-show="!moSummaryReady()"><i data-lucide="info"></i>O vínculo entre publicação, conversa e venda ainda está pendente. Os indicadores aparecem como —.</p>
+              <p class="mor-card-subtitle" x-show="moSummaryReady() &amp;&amp; !marketingIsMock()">Somente origens registradas pela automação. Vendas anteriores à ativação não são reconstruídas.</p>
               <section x-show="moAnalysisTab === 'sales'" role="tabpanel" id="mo-sales-panel" aria-labelledby="mo-sales-tab">
                 <div class="mor-sales-kpis">
                   <article><span class="mor-icon is-green"><i data-lucide="shopping-cart"></i></span><div><strong class="mor-green" x-text="moSummaryNumber(moResultCount('sales'))"></strong><p>Vendas concluídas</p></div></article>
@@ -8313,15 +8314,22 @@
                 <p class="mor-info"><i data-lucide="route"></i><span><b>Ver jornada</b> mostra o comentário de origem, a conversa e a venda registrada.</span></p>
               </section>
               <section x-show="moAnalysisTab === 'metrics'" role="tabpanel" id="mo-metrics-panel" aria-labelledby="mo-metrics-tab">
-                <div class="mor-metric-kpis"><template x-for="card in moMetricCards()" :key="card.label"><article><span class="mor-icon" :class="{'is-green':card.green}"><i :data-lucide="card.icon"></i></span><div><strong x-text="card.value"></strong><h3 x-text="card.label"></h3><p x-text="card.detail"></p></div></article></template></div>
+                <section class="mor-card" x-effect="if(moAnalysisTab==='metrics' &amp;&amp; moSelected) moLoadInsights()">
+<div class="flex items-center justify-between"><h3>Métricas da publicação na Meta</h3><button type="button" class="mor-link" @click="moLoadInsights(true)" :disabled="moInsightsLoading">Atualizar</button></div>
+<p class="mor-card-subtitle">Acumulado da publicação até a consulta. Pode incluir impulsionamento; não acompanha o filtro das vendas.</p>
+<p x-show="moInsightsLoading">Consultando a Meta…</p><p x-show="moInsightsError" x-text="moInsightsError" role="status"></p>
+<div class="grid grid-cols-2 gap-3 py-3 md:grid-cols-4"><template x-for="metric in moInsights?.rows || []" :key="metric.metric"><article class="rounded-lg border p-3"><strong class="text-xl" x-text="metric.value==null?'—':moSummaryNumber(metric.value)"></strong><p class="text-sm" x-text="metric.label"></p><small x-show="metric.value==null" class="text-slate-500">Indisponível nesta consulta</small></article></template></div>
+<small x-show="moInsights" x-text="'Fonte: Meta · consultado em '+moDate(moInsights?.fetched_at,true)"></small>
+<p x-show="marketingIsMock()" class="text-sm text-slate-500">As métricas da Meta são consultadas somente na tela com dados reais.</p></section>
+<div class="mor-metric-kpis"><template x-for="card in moMetricCards()" :key="card.label"><article><span class="mor-icon" :class="{'is-green':card.green}"><i :data-lucide="card.icon"></i></span><div><strong x-text="card.value"></strong><h3 x-text="card.label"></h3><p x-text="card.detail"></p></div></article></template></div>
                 <div class="mor-metric-grid">
                   <section class="mor-card"><h3>Resposta às mensagens privadas</h3><div class="mor-response" x-show="moResponseSplit()">
                     <div class="mor-donut" role="img" :aria-label="moResponseSplit() ? moResponseSplit().replied+' responderam; '+moResponseSplit().pending+' ainda sem resposta' : 'Sem dados de respostas'" :style="'--mor-rate:'+(moResponseSplit()?.rate ?? 0)+'%' "><div><strong x-text="moSummaryNumber(moResponseSplit()?.sent)"></strong><span>enviadas</span></div></div>
                     <div class="mor-response-legend"><p><i class="mor-dot"></i><span>Responderam<b x-text="moSummaryNumber(moResponseSplit()?.replied)+' · '+moMetricPercent(moResponseSplit()?.rate)"></b></span></p><p><i class="mor-dot is-gray"></i><span>Ainda sem resposta<b x-text="moSummaryNumber(moResponseSplit()?.pending)+' · '+moMetricPercent(moResponseSplit()?.rate != null ? 100-moResponseSplit().rate : null)"></b></span></p><small>Respostas recebidas no período.</small></div>
                   </div><div class="mor-chart-empty" x-show="!moResponseSplit()"><i data-lucide="message-square"></i><strong>Respostas ainda sem dados</strong><p>É necessário registrar o envio privado e a resposta vinculada.</p></div></section>
-                  <section class="mor-card"><h3>Quanto tempo levou para vender?</h3><p class="mor-card-subtitle" x-text="moTimedSales() != null ? moTimedSales()+' de '+moSummaryNumber(moResultCount('sales'))+' vendas com tempo registrado' : 'Da primeira resposta à venda concluída'"></p>
-                    <div class="mor-time-chart" x-show="moTimeBuckets() && moTimedSales() > 0" role="img" :aria-label="(moTimeBuckets() || []).map(row=>row.label+': '+row.value+' vendas').join('; ')"><template x-for="bucket in moTimeBuckets() || []" :key="bucket.label"><div class="mor-time-row"><span x-text="bucket.label"></span><div><i :style="'width:'+moTimeBarWidth(bucket.value)+'%'"></i><b x-text="bucket.value"></b></div></div></template></div>
-                    <div class="mor-chart-empty" x-show="!moTimeBuckets() || !moTimedSales()"><i data-lucide="clock-3"></i><strong x-text="moTimeBuckets() ? 'Nenhuma venda com tempo registrado' : 'Tempo até a venda indisponível'"></strong><p>O cálculo usa a primeira resposta e a conclusão da venda.</p></div><small class="mor-chart-note" x-show="moTimedSales() > 0">Intervalo entre a primeira resposta e a venda concluída.</small>
+                  <section class="mor-card"><h3>Quanto tempo levou para confirmar?</h3><p class="mor-card-subtitle" x-text="moTimedSales() != null ? moTimedSales()+' de '+moSummaryNumber(moResultCount('confirmed_orders'))+' pedidos com tempo registrado' : 'Da primeira resposta ao pedido confirmado'"></p>
+                    <div class="mor-time-chart" x-show="moTimeBuckets() && moTimedSales() > 0" role="img" :aria-label="(moTimeBuckets() || []).map(row=>row.label+': '+row.value+' pedidos').join('; ')"><template x-for="bucket in moTimeBuckets() || []" :key="bucket.label"><div class="mor-time-row"><span x-text="bucket.label"></span><div><i :style="'width:'+moTimeBarWidth(bucket.value)+'%'"></i><b x-text="bucket.value"></b></div></div></template></div>
+                    <div class="mor-chart-empty" x-show="!moTimeBuckets() || !moTimedSales()"><i data-lucide="clock-3"></i><strong x-text="moTimeBuckets() ? 'Nenhum pedido com tempo registrado' : 'Tempo até confirmar indisponível'"></strong><p>O cálculo usa a primeira resposta e o aceite do pedido.</p></div><small class="mor-chart-note" x-show="moTimedSales() > 0">Intervalo até confirmar o pedido. Entrega não entra nesse tempo.</small>
                   </section>
                   <section class="mor-card mor-bottom-card"><h3>Envio das mensagens</h3><div class="mor-two-values"><div><strong class="mor-green" x-text="moSummaryNumber(moSendingSplit()?.sent)"></strong><span>enviadas</span></div><div><strong x-text="moSummaryNumber(moSendingSplit()?.failed)"></strong><span>falhas</span></div></div><div class="mor-progress-line"><div class="mor-progress" role="img" :aria-label="'Envios confirmados: '+moMetricPercent(moSendingSplit()?.rate)"><i :style="'width:'+(moSendingSplit()?.rate ?? 0)+'%'"></i></div><span x-text="moMetricPercent(moSendingSplit()?.rate)"></span></div><div class="mor-card-bottom"><small x-text="moSendingSplit() ? moSendingSplit().total+' tentativas de envio registradas.' : 'Aguardando registros de envio privado.'"></small><button type="button" class="mor-link" @click="moShowFailures = !moShowFailures" :aria-expanded="moShowFailures" :disabled="!moSendingSplit()?.failed">Ver falhas de envio<i data-lucide="arrow-right"></i></button></div>
                     <div class="mor-failures" x-show="moShowFailures"><p x-show="!moFailures().length">Detalhes das falhas ainda indisponíveis.</p><template x-for="failure in moFailures()" :key="failure.id"><article><span x-text="moDate(failure.occurred_at,true)"></span><p x-text="failure.message"></p></article></template></div>
@@ -8351,6 +8359,25 @@
       </section>
 
       <section x-show="marketingTab === 'comentarios' && moView === 'attendance'" class="space-y-4" aria-label="Comentários das redes sociais">
+        <details class="rounded-xl border border-slate-200 bg-white p-4">
+          <summary class="cursor-pointer font-semibold text-slate-900">Mensagens privadas e interessados em reposição</summary>
+          <p class="my-3 text-sm text-slate-500">Verifique a caixa recebendo uma mensagem de teste antes de ativar cada canal. Só novos comentários comerciais entram na automação.</p>
+          <p x-show="!moControls?.available" class="text-sm text-slate-500">Aguardando instalação e configuração do fluxo privado.</p>
+          <div class="grid gap-3 md:grid-cols-2"><template x-for="channel in moControls?.channels || []" :key="channel.platform">
+            <article class="rounded-xl border border-slate-200 p-4">
+              <div class="flex items-center justify-between"><h3 class="font-semibold" x-text="moNetworkLabel(channel.platform)"></h3><span class="text-sm" x-text="channel.enabled?'Ativado':'Desativado'"></span></div>
+              <p class="my-2 text-sm text-slate-500" x-text="channel.verified_at?'Recebimento confirmado na caixa '+channel.verified_inbox_id:'Recebimento ainda não verificado'"></p>
+              <label class="block text-sm">Caixa do Chatwoot<select class="mt-1 w-full rounded-lg border p-2" x-model="moInboxSelection[channel.platform]" :disabled="moControlBusy"><option value="">Escolha a caixa da 2W</option><template x-for="inbox in (moControls?.inboxes || []).filter(i=>i.platform===channel.platform)" :key="inbox.id"><option :value="inbox.id" x-text="inbox.name+' · #'+inbox.id"></option></template></select></label>
+              <div class="mt-3 flex gap-2"><button type="button" class="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" @click="moControlAction(channel,'verify')" :disabled="moControlBusy || !moInboxSelection[channel.platform]">Verificar recebimento</button>
+                <button type="button" class="rounded-lg bg-emerald-800 px-3 py-2 text-sm text-white disabled:opacity-40" @click="moControlAction(channel,channel.enabled?'disable':'enable')" :disabled="moControlBusy || !channel.enabled && (!channel.runtime_ready || !channel.verified_at)" x-text="channel.enabled?'Desligar':'Ativar'"></button></div>
+            </article>
+          </template></div>
+          <p x-show="moControlError" x-text="moControlError" role="alert" class="mt-3 text-sm text-rose-700"></p>
+          <div class="mt-4" x-show="moControls?.available"><h3 class="font-semibold">Pedidos de aviso de reposição</h3><p class="mt-1 text-sm text-slate-500">Acompanhamento da equipe. Nenhuma mensagem é enviada por estes botões. Exibe até 100 pendências.</p>
+            <p x-show="!moControls?.interests?.length" class="py-3 text-sm text-slate-500">Nenhum interesse pendente.</p>
+            <template x-for="interest in moControls?.interests || []" :key="interest.id"><article class="flex flex-wrap items-center gap-3 border-b py-3 text-sm"><strong x-text="interest.tire_size"></strong><span x-text="interest.tire_condition.replace('_','-')"></span><span x-text="interest.phone_e164"></span><span class="flex-1 text-slate-500" x-text="'Autorizado em '+moDate(interest.consent_at,true)"></span><button type="button" @click="moFinishInterest(interest.id,'contacted')" :disabled="moControlBusy" class="text-emerald-800 underline">Marcar como contatado</button><button type="button" @click="moFinishInterest(interest.id,'cancelled')" :disabled="moControlBusy" class="text-slate-600 underline">Encerrar</button></article></template>
+          </div>
+        </details>
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white p-5">
           <div class="flex items-center gap-3">
             <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800"><i data-lucide="messages-square" class="h-6 w-6"></i></span>

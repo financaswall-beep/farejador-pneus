@@ -9,6 +9,7 @@ import { normalizeCommentEvent } from './ingest.js';
 import { decideComment } from './ai.js';
 import { createCommentLookup } from './commerce.js';
 import { COMMENT_PROMPT_VERSION } from './prompt.js';
+import { sendOrganicPrivate } from '../marketing/organic/outreach.js';
 import { claimComment, commentsPaused, finishComment, recoverCommentLeases, saveDecision } from './store.js';
 
 interface WorkerDeps { pool?:Pool; config?:CommentsConfig; graph?:CommentsGraph; decide?:typeof decideComment }
@@ -76,9 +77,21 @@ export async function publishComment(deps: WorkerDeps = {}): Promise<boolean> {
       await graph.remove(task.comment_id);
       await finishComment(pool,task,'sending','deleted');
     } else if (task.action === 'reply') {
+      const privateSent=await sendOrganicPrivate(pool,task,graph);
+      if(env.ORGANIC_ATTRIBUTION_ENABLED) {
+        const stillPending=await pool.query(`SELECT 1 FROM ops.meta_comment_actions a JOIN core.meta_comments c
+          ON c.environment=a.environment AND c.id=a.comment_id WHERE a.environment=$1 AND a.comment_id=$2
+          AND a.status='sending' AND a.lease_id=$3 AND c.revision=$4 AND NOT c.removed
+          AND NOT EXISTS(SELECT 1 FROM ops.meta_comment_controls control WHERE control.environment=a.environment AND control.paused)`,
+          [env.FAREJADOR_ENV,task.id,task.lease_id,task.revision]);
+        if(!stillPending.rowCount){await finishComment(pool,task,'sending','ignored','comment_no_longer_pending');return true;}
+      }
+      const message=privateSent
+        ? `Te mandei os detalhes no ${task.platform==='instagram'?'Direct':'Messenger'} 😊 Confere nas solicitações também.`
+        : task.reply_text;
       writeStarted = true;
-      const replyId = await graph.reply(task.platform,task.comment_id,task.reply_text);
-      await finishComment(pool,task,'sending','replied',null,replyId);
+      const replyId = await graph.reply(task.platform,task.comment_id,message);
+      await finishComment(pool,task,'sending','replied',null,replyId,message);
     } else await finishComment(pool,task,'sending','ignored');
   } catch(error) {
     // Inclui falha do banco APÓS aceite da Meta. A próxima execução não repete a escrita.

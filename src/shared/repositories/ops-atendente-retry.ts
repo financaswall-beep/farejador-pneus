@@ -20,6 +20,7 @@ export function sanitizeOperationalError(error: unknown): string {
 
 export function isRetryableAtendenteError(message: string): boolean {
   const normalized = message.toLowerCase();
+  if (['organic_private_ack_pending','organic_context_pending','audio_processing_pending'].includes(normalized)) return true;
   if (
     normalized.includes('configuration is missing') ||
     normalized.includes('openai_api_key not set') ||
@@ -50,6 +51,9 @@ export function classifyAtendenteError(error: unknown): AtendenteFailure {
   const normalized = (error instanceof Error ? error.message : String(error)).toLowerCase();
   const technicalCode = typeof error === 'object' && error !== null && 'code' in error
     ? String((error as { code?: unknown }).code ?? '') : '';
+  if (['organic_private_ack_pending','organic_context_pending','audio_processing_pending'].includes(normalized)) {
+    return { retryable:true, code:normalized, kind:'transient', summary:normalized };
+  }
   if (normalized.includes('configuration is missing') || normalized.includes('openai_api_key not set')
       || normalized.includes('invalid environment variables')) {
     return { retryable: false, code: 'configuration_missing', kind: 'configuration', summary };

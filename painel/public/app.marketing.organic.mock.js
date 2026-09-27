@@ -37,6 +37,6 @@ function marketingOrganicMockDetail(publication, window = '7d') {
       sales_series:sales.map((sales,i)=>({date:day(i),sales})),
       conversation_series:conversations.map((conversations,i)=>({date:day(i),conversations})),
       sales_rows:rows,sales_rows_complete:true,private_replied:conversations.at(-1),private_failed:2,
-      median_sale_minutes:median,sale_time_buckets:[durations.filter(m=>m<=60).length,durations.filter(m=>m>60&&m<=720).length,durations.filter(m=>m>720&&m<=1440).length,durations.filter(m=>m>1440).length],
+      confirmed_orders:total,median_confirmation_minutes:median,confirmation_time_buckets:[durations.filter(m=>m<=60).length,durations.filter(m=>m>60&&m<=720).length,durations.filter(m=>m>720&&m<=1440).length,durations.filter(m=>m>1440).length],
       private_failures:[{id:'demo-1',occurred_at:day(1)+'T14:10:00Z',message:'O envio não foi aceito pelo canal.'},{id:'demo-2',occurred_at:day(3)+'T16:20:00Z',message:'Não foi possível confirmar a entrega da mensagem.'}]}};
 }

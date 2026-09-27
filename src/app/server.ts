@@ -18,6 +18,7 @@ import { startMarketingScheduler } from '../marketing/scheduler.js';
 import { startMarketingCapiWorker } from '../marketing/capi.js';
 import { startMetaMessagingWorker } from '../marketing/meta-messaging-worker.js';
 import { startCommentsWorker } from '../social-comments/worker.js';
+import { startOrganicWorker } from '../marketing/organic/worker.js';
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
 import { assertRequiredSchema } from '../persistence/required-schema.js';
 import { startConversationAutoResolveWorker } from '../atendente-v2/auto-resolve.js';
@@ -41,6 +42,7 @@ let stopMarketingScheduler: (() => void) | null = null;
 let stopMarketingCapi: (() => void) | null = null;
 let stopMetaMessaging: (() => void) | null = null;
 let stopComments: (() => void) | null = null;
+let stopOrganic: (() => void) | null = null;
 let stopMonthlyContinuity: (() => void) | null = null;
 let stopConversationAutoResolve: (() => void) | null = null;
 
@@ -79,6 +81,7 @@ async function start(): Promise<void> {
   stopMarketingCapi = startMarketingCapiWorker();
   stopMetaMessaging = startMetaMessagingWorker();
   stopComments = startCommentsWorker();
+  stopOrganic = startOrganicWorker();
   stopMonthlyContinuity = startMonthlyContinuityScheduler();
 
   const port = env.PORT;
@@ -114,6 +117,7 @@ async function shutdown(signal: string): Promise<void> {
   stopMarketingCapi?.();
   stopMetaMessaging?.();
   stopComments?.();
+  stopOrganic?.();
   stopMonthlyContinuity?.();
   await fastify.close();
   await pool.end();

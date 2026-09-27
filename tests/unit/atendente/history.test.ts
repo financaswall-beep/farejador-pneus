@@ -20,6 +20,19 @@ function clientWithRows(rowSets: unknown[][]): PoolClient & { calls: QueryCall[]
 
 const at = (iso: string) => new Date(iso);
 
+it('mantém a oferta antes da localização e inclui áudio sem alterar a mensagem original',async()=>{
+  const client=clientWithRows([
+    [{id:'m1',sender_type:'contact',content:'Sou de Caxias',sent_at:at('2026-09-27T12:01:00Z')}],[],
+    [{id:'out',sender_type:'user',content:'Temos 90/90-12. De onde você está falando, meu amigo?',sent_at:at('2026-09-27T12:00:00Z')}],
+    [{id:'m2',content:'[Áudio transcrito; confiança medium] Quero dois.',sent_at:at('2026-09-27T12:02:00Z')}],
+  ]);
+  expect(await loadHistory(client,'conv',{includeOrganic:true,includeAudio:true})).toEqual([
+    {role:'assistant',content:'Temos 90/90-12. De onde você está falando, meu amigo?'},
+    {role:'user',content:'Sou de Caxias'},{role:'user',content:'[Áudio transcrito; confiança medium] Quero dois.'},
+  ]);
+  expect(client.calls.every(c=>!c.text.includes('UPDATE'))).toBe(true);
+});
+
 describe('loadHistory — flag GEO OFF (comportamento de hoje)', () => {
   it('NÃO consulta localização e não injeta marcador', async () => {
     const client = clientWithRows([

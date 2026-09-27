@@ -60,6 +60,8 @@ import { prepareToolLocation } from './tool-location.js';
 import { AmbiguousNeighborhoodError } from './neighborhood-resolution.js';
 import { removeOpenOrderItems } from './order-item-removal.js';
 import { editOpenOrder } from './order-edit.js';
+import { STOCK_INTEREST_TOOL, registerStockInterest } from './stock-interest.js';
+import { audioNeedsConfirmation } from './audio-transcription.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -74,7 +76,7 @@ export function activeToolDefinitions(): ToolDefinition[] {
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
-  return defs;
+  return env.ORGANIC_ATTRIBUTION_ENABLED ? [...defs,STOCK_INTEREST_TOOL] : defs;
 }
 
 // Variante do calcular_frete com bairro OPCIONAL (frete pelo pino). Derivada do schema
@@ -401,8 +403,12 @@ export async function executeTool(
   handoffContext?: HumanHandoffContext,
 ): Promise<string> {
   try {
+    if(['criar_pedido','editar_pedido','cancelar_pedido'].includes(name)
+      && await audioNeedsConfirmation(client,environment,conversationId)) return JSON.stringify({
+        erro:'audio_precisa_confirmacao',orientacao:'O áudio ficou incerto. Apresente o resumo e peça confirmação por texto antes de alterar o pedido. Se não for possível, ofereça atendente.' });
     args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
+      case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));
       case 'buscar_compatibilidade': {
         const compatInput = compatibilityInput(environment, args);
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);

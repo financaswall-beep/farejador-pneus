@@ -6,7 +6,7 @@ import { validateResolutionOutbound } from './auto-resolve.js';
 
 /** Última trava antes do HTTP, dentro da transação do caller, com lock até o ACK.
  * Mesmo após retomar, respostas antigas e fotos pedidas antes da retomada não saem. */
-export async function prepareControlledOutbound(client: PoolClient, row: OutboundRow): Promise<boolean> {
+export async function prepareControlledOutbound(client: PoolClient, row: OutboundRow, includeOrganic = false): Promise<boolean> {
     // Já autorizado pelo operador e gravado com a pausa, não é uma resposta do bot.
     if (row.kind === 'operator_text' || row.kind === 'operator_attachment') {
       const result = await client.query(`SELECT o.id FROM ops.outbound_messages o
@@ -22,7 +22,7 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
         fromStatus:'sending',toStatus:'superseded',reason:'operator_conversation_unavailable'});
       return false;
     }
-    const state = await syncHumanIntervention(client,row.environment,row.conversation_id);
+    const state = await syncHumanIntervention(client,row.environment,row.conversation_id,includeOrganic);
     const result = await client.query<{ allowed: boolean }>(`SELECT EXISTS (
       SELECT 1 FROM ops.outbound_messages o
       LEFT JOIN core.messages m ON m.environment=o.environment AND m.id=o.trigger_message_id

@@ -80,7 +80,7 @@ describe('comentários com ferramentas comerciais', () => {
     expect(decisionSchema.safeParse(ambiguous).success).toBe(false);
     const ignored = {...ambiguous,action:'ignore'};
     const result = await decideComment('sei não','post',async()=>response([message(ignored)]));
-    expect(result.decision).toEqual(ignored);
+    expect(result.decision).toEqual({...ignored,commercial_intent:false,private_body:''});
   });
 
   it('não deixa texto intermediário de ferramenta virar resposta pública', async () => {

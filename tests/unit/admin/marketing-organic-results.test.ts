@@ -16,6 +16,15 @@ function screen() {
 }
 
 describe('Vendas vinculadas e métricas da publicação',()=>{
+  it('não mistura resposta antiga de insights nem dados reais no modo ilustrativo',async()=>{
+    const {s}=screen();s.marketingIsMock=()=>false;
+    const pending:Array<(v:any)=>void>=[];s.apiGet=()=>new Promise(resolve=>pending.push(resolve));
+    const first=s.moLoadInsights(),second=s.moLoadInsights(true);
+    pending[1]!({rows:[{metric:'views',value:2}]});await second;
+    pending[0]!({rows:[{metric:'views',value:1}]});await first;
+    expect(s.moInsights.rows[0].value).toBe(2);
+    s.marketingIsMock=()=>true;await s.moLoadInsights();expect(s.moInsights).toBeNull();
+  });
   it('apresenta os oito pedidos concluídos e exclui cancelamentos dos totais',()=>{
     const {s}=screen();expect(s.moSalesRows()).toHaveLength(8);expect(s.moSalesTotal()).toEqual({count:8,amount:1424});
     s.moSalesStatus='all';expect(s.moSalesFiltered()).toHaveLength(9);expect(s.moSalesTotal()).toEqual({count:8,amount:1424});
@@ -55,10 +64,10 @@ describe('Vendas vinculadas e métricas da publicação',()=>{
   });
   it('não divide por zero e recusa respostas maiores que os envios ou tempos inconsistentes',()=>{
     const {s}=screen(),a=s.moDetail.attribution;
-    a.private_messages=0;a.private_replied=0;a.private_failed=0;a.conversations=0;a.converted_conversations=0;a.sales=0;a.revenue=0;a.sale_time_buckets=[0,0,0,0];
+    a.private_messages=0;a.private_replied=0;a.private_failed=0;a.conversations=0;a.converted_conversations=0;a.sales=0;a.confirmed_orders=0;a.revenue=0;a.confirmation_time_buckets=[0,0,0,0];
     expect(s.moResponseSplit().rate).toBeNull();expect(s.moSendingSplit().rate).toBeNull();expect(s.moAverageSale()).toBeNull();expect(s.moMedianTime()).toBe('—');
     a.private_replied=1;expect(s.moResponseSplit()).toBeNull();a.converted_conversations=1;expect(s.moConversationSplit()).toBeNull();
-    a.sale_time_buckets=[1,0,0,0];expect(s.moTimeBuckets()).toBeNull();
+    a.confirmation_time_buckets=[1,0,0,0];expect(s.moTimeBuckets()).toBeNull();
   });
   it('abre a jornada registrada, preserva lacunas e bloqueia links de outras origens',()=>{
     const {s}=screen(),row=s.moSalesRows()[0];row.origin.comment_url='javascript:alert(1)';

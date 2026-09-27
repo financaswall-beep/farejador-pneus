@@ -246,7 +246,7 @@ export async function pollBotOutbox(): Promise<void> {
     if (!row) return;
     await client.query('BEGIN');
     await lockBotConversation(client,row.environment,row.conversation_id);
-    if (!await prepareControlledOutbound(client,row)) { await client.query('COMMIT'); return; }
+    if (!await prepareControlledOutbound(client,row,env.ORGANIC_ATTRIBUTION_ENABLED)) { await client.query('COMMIT'); return; }
     readyToSend = true;
     if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment',
       'conversation_resolution','operator_text','operator_attachment'].includes(row.kind)) {

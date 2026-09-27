@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { validateProductionEnv } from './env-production-validation.js';
 import { marketingEnvShape } from './env-marketing.js';
+import { aiEnvShape } from './env-ai.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 const optionalNonEmptyStringSchema = z.preprocess(
   (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -41,12 +42,7 @@ const envSchema = z.object({
   ADMIN_BEARER_FALLBACK_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
-  // OpenAI (usado pelo Agent V2)
-  OPENAI_API_KEY: optionalNonEmptyStringSchema,
-  OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
-  // Câmbio de referência para estimativas, não cotação ao vivo nem fatura do cartão.
-  OPENAI_USD_BRL: z.coerce.number().positive().max(100).default(5.5),
-  OPENAI_TIMEOUT_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('30000'),
+  ...aiEnvShape,
   SKIP_EVENT_TYPES: z
     .string()
     .default('')

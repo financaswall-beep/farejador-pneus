@@ -13,7 +13,8 @@ export async function commentsDashboard(pool: Pool, page = 1) {
   if (!available.rows[0]?.ready) return { ready:false,configuration,paused:false,rows:[],total:0,page,summary:{} };
   const [rows,summary,control,jobs] = await Promise.all([
     pool.query(`SELECT c.id,c.platform,c.author_label,c.body,c.occurred_at,c.removed,a.status,a.error_code,
-      a.provider_reply_id,a.completion_source,a.post_url,a.updated_at,d.action,d.sentiment,d.reply_text,d.reason,d.comment_snapshot
+      a.provider_reply_id,a.completion_source,a.post_url,a.updated_at,d.action,d.sentiment,
+      ${env.ORGANIC_ATTRIBUTION_ENABLED ? 'COALESCE(a.published_body,d.reply_text)' : 'd.reply_text'} AS reply_text,d.reason,d.comment_snapshot
       FROM core.meta_comments c JOIN ops.meta_comment_actions a ON a.environment=c.environment AND a.comment_id=c.id
       LEFT JOIN analytics.meta_comment_decisions d ON d.environment=a.environment AND d.id=a.decision_id
       WHERE c.environment=$1 ORDER BY c.occurred_at DESC,c.id DESC LIMIT 30 OFFSET $2`,[env.FAREJADOR_ENV,(page-1)*30]),

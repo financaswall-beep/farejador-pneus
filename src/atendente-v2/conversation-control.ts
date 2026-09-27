@@ -67,8 +67,15 @@ export async function pauseForHumanHandoff(client: PoolClient, environment: Envi
 /** Invocar com lock da conversa. Prova de autoria: id confirmado OU correlação
  * da própria outbox em envio. Nunca usa texto, nome, ou id do usuário da API. */
 export async function syncHumanIntervention(client: PoolClient, environment: Environment,
-  conversationId: string): Promise<BotControl> {
+  conversationId: string, includeOrganic = false): Promise<BotControl> {
   let state = await ensureBotControl(client,environment,conversationId);
+  if(includeOrganic) {
+    const sending=await client.query(`SELECT 1 FROM ops.organic_outreach o
+      JOIN ops.organic_controls s ON s.environment=o.environment AND s.platform=o.platform
+      JOIN core.conversations c ON c.environment=s.environment AND c.chatwoot_inbox_id=s.verified_inbox_id
+      WHERE c.environment=$1 AND c.id=$2 AND o.status='sending' AND o.updated_at>now()-interval '3 minutes' LIMIT 1`,[environment,conversationId]);
+    if(sending.rowCount)throw new Error('organic_private_ack_pending');
+  }
   const human = await client.query<{ chatwoot_message_id: string; sent_at: string }>(
     `SELECT m.chatwoot_message_id,m.sent_at::text AS sent_at FROM core.messages m
       WHERE m.environment=$1 AND m.conversation_id=$2 AND m.sender_type='user'
@@ -82,6 +89,9 @@ export async function syncHumanIntervention(client: PoolClient, environment: Env
                 (o.echo_id=m.echo_id OR o.echo_id=m.content_attributes->>'farejador_echo_id'))))
         AND NOT EXISTS (SELECT 1 FROM agent.turns t WHERE t.environment=m.environment
           AND t.conversation_id=m.conversation_id AND t.chatwoot_message_id=m.chatwoot_message_id)
+        ${includeOrganic ? `AND NOT EXISTS (SELECT 1 FROM ops.organic_outreach organic
+          WHERE organic.environment=m.environment AND organic.provider_message_id=m.native_message_id
+            AND organic.status='sent')` : ''}
       ORDER BY m.sent_at DESC,m.chatwoot_message_id DESC LIMIT 1`,
     [environment,conversationId,state.resumed_at,state.last_human_at,state.last_human_message_id]);
   const message = human.rows[0];
@@ -103,11 +113,11 @@ export async function syncHumanIntervention(client: PoolClient, environment: Env
 
 /** Falha de banco interrompe o agente: nunca interpretar indisponibilidade como autorização. */
 export async function botMayProcessTrigger(client: PoolClient, environment: Environment,
-  conversationId: string, triggerMessageId: string): Promise<boolean> {
+  conversationId: string, triggerMessageId: string, includeOrganic = false): Promise<boolean> {
   await client.query('BEGIN');
   try {
     await lockBotConversation(client,environment,conversationId);
-    const state = await syncHumanIntervention(client,environment,conversationId);
+    const state = await syncHumanIntervention(client,environment,conversationId,includeOrganic);
     const trigger = await client.query<{ allowed: boolean }>(`SELECT EXISTS (
       SELECT 1 FROM core.messages WHERE environment=$1 AND conversation_id=$2 AND id=$3
         AND sender_type='contact' AND is_private=false
