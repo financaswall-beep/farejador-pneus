@@ -15,10 +15,14 @@ function marketingOrganicMock() {
 function marketingOrganicMockDetail(publication, window = '7d') {
   const since = new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date(publication.published_at));
   const day = offset => {const d=new Date(since+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
-  const sales = window === '30d' ? [1,1,2,3,4,6,8,8,9,9] : [1,1,2,3,4,6,8];
+  const car=publication.title.includes('carro');
+  const sales=car?[0,1,1,2,3,4,5]:[1,1,2,3,4,6,8];
+  const conversations=car?[2,4,7,10,14,17,20]:[3,7,12,16,21,25,30];
+  if(window==='30d'){sales.push(...(car?[5,6,6]:[8,9,9]));conversations.push(...(car?[21,22,22]:[31,32,33]));}
   return {publication,summary:{available:true,comments:{received:24,replied:18,pending:3,failed:1,deleted:2},
     series:[2,3,4,1,5,9].map((received,i) => ({received,date:new Date(Date.now()-(5-i)*86400000).toISOString().slice(0,10)}))},
     attribution:{status:'ready',period:{id:window,since,until:day(window==='30d'?29:6)},
-      private_messages:48,conversations:30,converted_conversations:sales.at(-1),sales:sales.at(-1),revenue:sales.at(-1)*178,
-      sales_series:sales.map((sales,i)=>({date:day(i),sales}))}};
+      private_messages:car?38:48,conversations:conversations.at(-1),converted_conversations:sales.at(-1),sales:sales.at(-1),revenue:sales.at(-1)*(car?299:178),
+      sales_series:sales.map((sales,i)=>({date:day(i),sales})),
+      conversation_series:conversations.map((conversations,i)=>({date:day(i),conversations}))}};
 }

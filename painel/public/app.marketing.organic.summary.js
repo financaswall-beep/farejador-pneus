@@ -55,7 +55,10 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
       const measure = (post.title + ' ' + post.caption).match(/\b\d{2,3}\/\d{2,3}\s*[-R]\s*\d{2}\b/i)?.[0];
       return (measure || this.moFormat(post.format)) + ' · ' + this.moNetworkLabel(post.platform);
     },
-    moChangeSummaryPeriod() { if (this.moSelected) void this.moOpen(this.moSelected, true); },
+    moChangeSummaryPeriod() {
+      if (this.moAnalysisTab==='compare') return this.moLoadCompare();
+      if (this.moSelected) return this.moOpen(this.moSelected, true);
+    },
     moSalesSeries() {
       const data = this.moDetail?.attribution;
       if (!this.moSummaryReady() || !Array.isArray(data.sales_series)) return [];
@@ -70,7 +73,7 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
     moRenderChart() {
       this.moDestroyChart();
       const canvas = this.$refs.moSalesChart, rows = this.moSalesSeries();
-      if (!this.moSelected || this.moDetailLoading || !canvas || !rows.length || typeof Chart === 'undefined') return;
+      if (this.moAnalysisTab==='compare' || !this.moSelected || this.moDetailLoading || !canvas || !rows.length || typeof Chart === 'undefined') return;
       const labels = rows.map(row => new Date(row.date+'T12:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',timeZone:'America/Sao_Paulo'}));
       chart = new Chart(canvas, {
         type:'line', data:{labels,datasets:[{label:'Vendas concluídas acumuladas',data:rows.map(row => row.sales),
@@ -101,14 +104,17 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
         ['Observação','Somente vendas concluídas com origem confirmada. Valor vendido não representa lucro.'],
         [],['Data','Vendas concluídas acumuladas'],...this.moSalesSeries().map(row=>[row.date,row.sales])];
     },
-    moSummaryCsv() {
+    moSummaryCsv(rows = this.moSummaryExportRows()) {
       const cell = value => { let text=String(value ?? '');if(/^[\s]*[=+\-@]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"'; };
-      return '\uFEFF'+this.moSummaryExportRows().map(row=>row.map(cell).join(';')).join('\r\n');
+      return '\uFEFF'+rows.map(row=>row.map(cell).join(';')).join('\r\n');
     },
     moExportSummary() {
       if (!this.moDetail || this.moDetailLoading) return;
-      const url=URL.createObjectURL(new Blob([this.moSummaryCsv()],{type:'text/csv;charset=utf-8'}));
-      const link=document.createElement('a');link.href=url;link.download='publicacao-'+this.moSelected.platform+'-'+this.moSelected.id+'-'+this.moSummaryPeriod+'.csv';link.click();
+      this.moDownloadCsv(this.moSummaryExportRows(),'publicacao-'+this.moSelected.platform+'-'+this.moSelected.id+'-'+this.moSummaryPeriod+'.csv');
+    },
+    moDownloadCsv(rows, filename) {
+      const url=URL.createObjectURL(new Blob([this.moSummaryCsv(rows)],{type:'text/csv;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download=filename;link.click();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
     },
   };

@@ -7,7 +7,7 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic2" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic3" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -217,11 +217,13 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260927-organic2"></script>
+<script src="/admin/painel/app.marketing.js?v=20260927-organic3"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
-<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic2"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic2"></script>
-<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic2"></script>
+<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic3"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -259,7 +261,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-organic2"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-organic3"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8199,28 +8201,28 @@
           </div>
           <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Posts do feed e Reels das contas conectadas. <span x-show="moData?.fetched_at" x-text="'Consulta à Meta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
         </div>
-        <dialog x-ref="moDialog" class="mo-dialog" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
+        <dialog x-ref="moDialog" class="mo-dialog" :class="{'is-comparing':moAnalysisTab === 'compare'}" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
           <header class="mo-dialog-heading">
-            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p>Acompanhe as conversas e as vendas que começaram neste post.</p></div>
+            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p x-text="moAnalysisTab === 'compare' ? 'Compare os posts e acompanhe as vendas que vieram deles.' : 'Acompanhe as conversas e as vendas que começaram neste post.'"></p></div>
             <div class="mo-dialog-actions">
               <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span>
-              <button type="button" class="mo-button" @click="moExportSummary()" :disabled="!moDetail || moDetailLoading"><i data-lucide="download"></i>Exportar</button>
+              <button type="button" class="mo-button" @click="moExportAnalysis()" :disabled="moAnalysisTab === 'compare' ? moCompareLoading || !moCompareDetails.every(Boolean) : !moDetail || moDetailLoading"><i data-lucide="download"></i>Exportar</button>
               <button type="button" class="mo-dialog-close" x-ref="moClose" @click="moClose()" aria-label="Fechar análise"><i data-lucide="x"></i></button>
             </div>
           </header>
           <div class="mo-dialog-navigation">
             <nav class="mo-dialog-tabs" aria-label="Análise da publicação" role="tablist">
-              <button type="button" role="tab" id="mo-summary-tab" aria-controls="mo-summary-panel" aria-selected="true">Resumo</button>
-              <button type="button" role="tab" aria-selected="false" disabled title="Comparação de posts: próxima etapa">Comparar posts</button>
+              <button type="button" role="tab" id="mo-summary-tab" x-ref="moSummaryTab" aria-controls="mo-summary-panel" :aria-selected="moAnalysisTab === 'summary'" @click="moSwitchAnalysis('summary')" @keydown.arrow-right.prevent="moSwitchAnalysis('compare'); $refs.moCompareTab.focus()">Resumo</button>
+              <button type="button" role="tab" id="mo-compare-tab" x-ref="moCompareTab" aria-controls="mo-compare-panel" :aria-selected="moAnalysisTab === 'compare'" @click="moSwitchAnalysis('compare')" @keydown.arrow-left.prevent="moSwitchAnalysis('summary'); $refs.moSummaryTab.focus()">Comparar posts</button>
               <button type="button" role="tab" aria-selected="false" disabled title="Disponível após conectar a origem das vendas">Vendas vinculadas</button>
               <button type="button" role="tab" aria-selected="false" disabled title="Métricas orgânicas: próxima etapa">Métricas</button>
             </nav>
             <div class="mo-period-controls">
-              <label class="mo-period-select"><i data-lucide="calendar-days" aria-hidden="true"></i><select aria-label="Período da análise da publicação" x-model="moSummaryPeriod" @change="moChangeSummaryPeriod()" :disabled="moDetailLoading"><option value="7d">Primeiros 7 dias do post</option><option value="30d">Primeiros 30 dias do post</option></select></label>
-              <span class="mo-period-range"><i data-lucide="info" aria-hidden="true"></i><span x-text="moSummaryRange()"></span></span>
+              <label class="mo-period-select"><i data-lucide="calendar-days" aria-hidden="true"></i><select aria-label="Período da análise da publicação" x-model="moSummaryPeriod" @change="moChangeSummaryPeriod()" :disabled="moAnalysisTab === 'compare' ? moCompareLoading : moDetailLoading"><option value="7d" x-text="moAnalysisTab === 'compare' ? 'Primeiros 7 dias de cada post' : 'Primeiros 7 dias do post'"></option><option value="30d" x-text="moAnalysisTab === 'compare' ? 'Primeiros 30 dias de cada post' : 'Primeiros 30 dias do post'"></option></select></label>
+              <span class="mo-period-range"><i data-lucide="info" aria-hidden="true"></i><span x-text="moAnalysisTab === 'compare' ? 'Mesmo tempo de acompanhamento.' : moSummaryRange()"></span></span>
             </div>
           </div>
-          <div class="mo-dialog-body" role="tabpanel" id="mo-summary-panel" aria-labelledby="mo-summary-tab" :aria-busy="moDetailLoading">
+          <div x-show="moAnalysisTab === 'summary'" class="mo-dialog-body" role="tabpanel" id="mo-summary-panel" aria-labelledby="mo-summary-tab" :aria-busy="moDetailLoading">
             <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando resumo…</strong></div>
             <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected, true)">Tentar novamente</button></div>
             <template x-if="moSelected && !moDetailLoading && !moDetailError">
@@ -8252,9 +8254,42 @@
               </div>
             </template>
           </div>
+          <section x-show="moAnalysisTab === 'compare'" x-cloak class="moc-panel" role="tabpanel" id="mo-compare-panel" aria-labelledby="mo-compare-tab" :aria-busy="moCompareLoading">
+            <div class="moc-posts">
+              <template x-for="side in [0,1]" :key="side">
+                <article class="moc-post" :class="'moc-side-'+side">
+                  <span class="moc-letter" x-text="side === 0 ? 'A' : 'B'"></span>
+                  <div class="moc-thumb"><template x-if="moComparePosts[side]?.image_url"><img :src="moComparePosts[side].image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moComparePosts[side])"></template><template x-if="!moComparePosts[side]?.image_url"><span><i data-lucide="image"></i></span></template></div>
+                  <div class="moc-post-info"><template x-if="moComparePosts[side]"><img class="moc-brand" :src="'/assets/brands/'+moComparePosts[side].platform+'.svg'" :alt="moNetworkLabel(moComparePosts[side].platform)"></template><h3 x-text="moComparePosts[side]?.title || 'Escolha uma publicação'" :title="moComparePosts[side]?.title"></h3><p x-text="moCompareContext(moComparePosts[side])"></p></div>
+                  <button type="button" class="mo-button moc-change" @click="moOpenPostPicker(side)" :aria-label="'Trocar post '+(side === 0 ? 'A' : 'B')"><i data-lucide="repeat-2"></i><span x-text="moComparePosts[side] ? 'Trocar post' : 'Escolher post'"></span></button>
+                </article>
+              </template>
+              <button type="button" class="moc-swap" @click="moSwapCompare()" :disabled="moCompareLoading || !moComparePosts.every(Boolean)" aria-label="Inverter posts A e B"><i data-lucide="arrow-right-left"></i></button>
+            </div>
+            <div class="moc-status" x-show="moCompareLoading" role="status"><i data-lucide="loader-circle"></i>Consultando os resultados das publicações…</div>
+            <div class="moc-status" x-show="moCompareErrors.some(Boolean)" role="alert"><i data-lucide="circle-alert"></i><span x-text="moCompareErrors.filter(Boolean).join(' ')"></span><button type="button" class="mo-button" @click="moLoadCompare()">Tentar novamente</button></div>
+            <p class="moc-notice" x-show="moCompareNotice()"><i data-lucide="info"></i><span x-text="moCompareNotice()"></span></p>
+            <h3 class="moc-section-title">Resultados lado a lado</h3>
+            <div class="moc-table-wrap"><table class="moc-table"><caption class="sr-only">Comparação dos resultados no mesmo período desde a publicação de cada post.</caption><thead><tr><th scope="col">Indicador</th><template x-for="side in [0,1]" :key="side"><th scope="col"><span class="moc-table-post" :class="'moc-side-'+side"><i class="moc-dot"></i><span x-text="moCompareLabel(side)"></span></span></th></template></tr></thead><tbody><template x-for="row in moCompareRows()" :key="row.key"><tr :class="{'moc-emphasis':row.key === 'revenue'}"><th scope="row" x-text="row.label"></th><template x-for="side in [0,1]" :key="side"><td :class="{'moc-winner-a':side===0 && moCompareWinner(row,side),'moc-winner-b':side===1 && moCompareWinner(row,side),'moc-number-strong':['sales','revenue'].includes(row.key)}" x-text="moCompareFormat(row.values[side],row.key)"></td></template></tr></template></tbody></table></div>
+            <div class="moc-charts">
+              <section class="moc-chart"><header><div><h3>Evolução das conversas</h3><p x-text="'Acumulado nos primeiros '+(moSummaryPeriod === '7d' ? '7' : '30')+' dias'"></p></div><div class="moc-legend"><template x-for="side in [0,1]" :key="side"><span :class="'moc-side-'+side" :title="moCompareLabel(side)"><i class="moc-dot"></i><span x-text="moCompareLabel(side)"></span></span></template></div></header>
+                <div class="moc-chart-canvas"><canvas x-ref="moCompareLine" x-show="moCompareTimeline()" role="img" :aria-label="'Conversas acumuladas por dia desde a publicação. '+(moCompareTimeline() ? moCompareTimeline().labels.map((day,i)=>day+': post A '+moCompareTimeline().a[i]+', post B '+moCompareTimeline().b[i]).join('; ') : 'Sem dados confirmados.')"></canvas><div class="moc-chart-empty" x-show="!moCompareTimeline()"><i data-lucide="chart-no-axes-combined"></i><strong>Histórico ainda indisponível</strong><p>Os dois posts precisam de conversas com origem confirmada.</p></div></div>
+              </section>
+              <section class="moc-chart"><header><div><h3>Da mensagem à venda</h3></div><div class="moc-legend"><template x-for="side in [0,1]" :key="side"><span :class="'moc-side-'+side" :title="moCompareLabel(side)"><i class="moc-dot"></i><span x-text="moCompareLabel(side)"></span></span></template></div></header>
+                <div class="moc-chart-canvas"><canvas x-ref="moCompareBars" x-show="moCompareFunnel()" role="img" :aria-label="'Da mensagem à venda. '+(moCompareFunnel() ? moCompareFunnel().map(row=>row.label+': post A '+row.values[0]+', post B '+row.values[1]).join('; ') : 'Sem dados confirmados.')"></canvas><div class="moc-chart-empty" x-show="!moCompareFunnel()"><i data-lucide="route"></i><strong>Aguardando vínculo com as vendas</strong><p>Mensagens, conversas e vendas aparecerão após a confirmação da origem.</p></div></div>
+              </section>
+            </div>
+            <section class="moc-insights"><h3 class="moc-section-title">O que mudou entre os posts</h3><div class="moc-insight-grid" x-show="moCompareInsights().length"><template x-for="insight in moCompareInsights()" :key="insight.icon"><article :class="'moc-side-'+insight.side"><span class="moc-insight-icon"><i :data-lucide="insight.icon"></i></span><div><h4 x-text="insight.title"></h4><p x-text="insight.text"></p></div></article></template></div><p class="moc-insight-pending" x-show="!moCompareInsights().length">As diferenças serão calculadas com dados confirmados e o mesmo período completo para os dois posts.</p></section>
+          </section>
+          <dialog x-ref="moPickerDialog" class="moc-picker-dialog" aria-labelledby="moc-picker-title" @cancel.prevent="moClosePostPicker()" @close="if (moPickerSide !== null) moClosePostPicker()" @click="if ($event.target === $refs.moPickerDialog) moClosePostPicker()">
+            <header><div><h3 id="moc-picker-title" x-text="'Escolher post '+(moPickerSide === 0 ? 'A' : 'B')"></h3><p>Publicações do período selecionado na lista.</p></div><button type="button" class="mo-dialog-close" @click="moClosePostPicker()" aria-label="Fechar seleção de post"><i data-lucide="x"></i></button></header>
+            <label class="mo-search"><i data-lucide="search"></i><input x-ref="moPickerSearch" type="search" placeholder="Buscar título ou medida" aria-label="Buscar post para comparar" x-model="moPickerSearch"></label>
+            <div class="moc-picker-list"><template x-for="post in moPostChoices()" :key="post.platform+':'+post.id"><button type="button" class="moc-choice" @click="moChooseComparePost(post)" :aria-label="'Selecionar '+post.title+' no '+moNetworkLabel(post.platform)"><span class="moc-thumb"><template x-if="post.image_url"><img :src="post.image_url" alt="" referrerpolicy="no-referrer" @error="moImageFailed(post)"></template><template x-if="!post.image_url"><span><i data-lucide="image"></i></span></template></span><span><strong x-text="post.title"></strong><small x-text="moNetworkLabel(post.platform)+' · '+moDate(post.published_at)"></small></span><i data-lucide="chevron-right"></i></button></template><p x-show="!moPostChoices().length" class="mo-empty">Nenhuma outra publicação encontrada neste período.</p></div>
+          </dialog>
+
           <footer class="mo-dialog-footer">
             <span>Somente vendas concluídas com origem confirmada. Valor vendido não representa lucro.</span>
-            <div class="mo-footer-actions"><button type="button" class="mo-button" disabled title="Comparação de posts: próxima etapa">Comparar com outro post</button><button type="button" class="mo-button mo-primary" disabled title="Disponível após conectar a origem das vendas">Ver vendas vinculadas<i data-lucide="arrow-right"></i></button></div>
+            <div class="mo-footer-actions"><button type="button" class="mo-button" @click="moAnalysisTab === 'compare' ? moClose() : moSwitchAnalysis('compare')" x-text="moAnalysisTab === 'compare' ? 'Fechar' : 'Comparar com outro post'"></button><button type="button" class="mo-button mo-primary" disabled title="Disponível após conectar a origem das vendas">Ver vendas vinculadas<i data-lucide="arrow-right"></i></button></div>
           </footer>
         </dialog>
       </section>

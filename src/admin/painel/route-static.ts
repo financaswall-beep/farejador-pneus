@@ -31,6 +31,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.marketing.comments.js',
     'app.marketing.organic.js', 'app.marketing.organic.mock.js',
     'app.marketing.organic.summary.js',
+    'app.marketing.organic.compare.js', 'app.marketing.organic.compare-charts.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',

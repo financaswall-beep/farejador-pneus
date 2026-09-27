@@ -65,7 +65,7 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     async moOpen(row, keepPeriod = false) {
       const wasOpen = this.$refs.moDialog?.open;
       if (!wasOpen) this._moReturnFocus = document.activeElement;
-      if (!keepPeriod) this.moSummaryPeriod = '7d';
+      if (!keepPeriod) { this.moSummaryPeriod = '7d'; this.moResetCompare?.(); }
       this.moDestroyChart();
       this.moSelected = row; this.moDetail = null; this.moDetailError = ''; this.moDetailLoading = true;
       const seq = ++this.moDetailSeq;
@@ -85,6 +85,7 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     moClose() {
       ++this.moDetailSeq; this.moDetailLoading = false; this.moSelected = null; this.moDetail = null;
       this.moDestroyChart();
+      this.moResetCompare?.();
       this.$refs.moDialog?.close(); this._moReturnFocus?.focus(); this._moReturnFocus = null;
     },
     moGoAttendance() { this.moClose(); this.moSetView('attendance'); },

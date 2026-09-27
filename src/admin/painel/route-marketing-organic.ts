@@ -42,7 +42,8 @@ export async function registerMarketingOrganic(fastify: FastifyInstance): Promis
       catch { summary = { available: false, comments: null, series: [] }; }
       return reply.header('Cache-Control', 'no-store').send({ publication, summary,
         attribution: { status: 'not_implemented', period: organicPublicationWindow(publication.published_at, query.data.window),
-          private_messages: null, conversations: null, converted_conversations: null, sales: null, revenue: null, sales_series: null },
+          private_messages: null, conversations: null, converted_conversations: null, sales: null, revenue: null,
+          sales_series: null, conversation_series: null },
         fetched_at: new Date().toISOString() });
     } catch (error) {
       if (error instanceof MetaCommentError && ['meta_post_owner_mismatch', 'meta_account_not_allowed'].includes(error.code)) {
