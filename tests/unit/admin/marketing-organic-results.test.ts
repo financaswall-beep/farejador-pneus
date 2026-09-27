@@ -18,8 +18,10 @@ function screen() {
 describe('Vendas vinculadas e métricas da publicação',()=>{
   it('não mistura resposta antiga de insights nem dados reais no modo ilustrativo',async()=>{
     const {s}=screen();s.marketingIsMock=()=>false;
-    const pending:Array<(v:any)=>void>=[];s.apiGet=()=>new Promise(resolve=>pending.push(resolve));
+    const pending:Array<(v:any)=>void>=[];s.apiGet=vi.fn(()=>new Promise(resolve=>pending.push(resolve)));
     const first=s.moLoadInsights(),second=s.moLoadInsights(true);
+    expect(s.apiGet.mock.calls[0][0]).toBe('/admin/api/marketing/organic/publications/instagram/6/insights');
+    expect(s.apiGet.mock.calls[1][0]).toBe('/admin/api/marketing/organic/publications/instagram/6/insights?refresh=true');
     pending[1]!({rows:[{metric:'views',value:2}]});await second;
     pending[0]!({rows:[{metric:'views',value:1}]});await first;
     expect(s.moInsights.rows[0].value).toBe(2);

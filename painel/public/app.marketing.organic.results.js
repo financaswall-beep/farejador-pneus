@@ -18,7 +18,7 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
       if(!force && this.moInsightsKey===key)return;
       const seq=++this.moInsightsSeq;
       this.moInsightsKey=key;this.moInsights=null;this.moInsightsLoading=true;this.moInsightsError='';
-      try{const data=await this.apiGet('/admin/api/marketing/organic/publications/'+post.platform+'/'+encodeURIComponent(post.id)+'/insights');
+      try{const data=await this.apiGet('/admin/api/marketing/organic/publications/'+post.platform+'/'+encodeURIComponent(post.id)+'/insights'+(force?'?refresh=true':''));
         if(this.moInsightsKey===key && this.moInsightsSeq===seq && !this.marketingIsMock())this.moInsights=data;}
       catch{if(this.moInsightsKey===key && this.moInsightsSeq===seq)this.moInsightsError='Não foi possível consultar as métricas da Meta.';}
       finally{if(this.moInsightsSeq===seq)this.moInsightsLoading=false;}

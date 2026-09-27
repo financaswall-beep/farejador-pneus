@@ -15,6 +15,7 @@ import { registerOrganicControls } from './route-marketing-organic-controls.js';
 
 const listQuery = z.object({ period: z.enum(['7d', '30d']).default('30d') }).strict();
 const detailQuery = z.object({ window: z.enum(['7d', '30d']).default('7d') }).strict();
+const insightsQuery = z.object({ refresh: z.enum(['true', 'false']).default('false') }).strict();
 const postParams = z.object({ platform: z.enum(['facebook', 'instagram']),
   postId: z.string().regex(/^\d{1,40}(?:_\d{1,40})?$/) }).strict();
 
@@ -24,9 +25,11 @@ export async function registerMarketingOrganic(fastify: FastifyInstance): Promis
   fastify.get('/admin/api/marketing/organic/publications/:platform/:postId/insights',options,async(request,reply)=>{
     const parsed=postParams.safeParse(request.params);
     if(!parsed.success)return reply.code(400).send({error:'invalid_params'});
+    const query=insightsQuery.safeParse(request.query);
+    if(!query.success)return reply.code(400).send({error:'invalid_query'});
     const {platform,postId}=parsed.data,config=commentsConfig(),account=platform==='instagram'?config.instagramId:config.pageId;
     if(!account)return reply.code(409).send({error:'organic_not_configured'});
-    try{return reply.header('Cache-Control','no-store').send(await organicInsights(config,platform,account,postId));}
+    try{return reply.header('Cache-Control','no-store').send(await organicInsights(config,platform,account,postId,query.data.refresh==='true'));}
     catch{return reply.code(503).send({error:'organic_insights_unavailable'});}
   });
   fastify.get('/admin/api/marketing/organic/publications', options, async (request, reply) => {
