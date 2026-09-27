@@ -18,9 +18,9 @@ describe('contexto permanente do cadastro do cliente',() => {
     expect(text).not.toContain('Rua');
   });
 
-  it('não chama placeholder de nome e avisa quando telefone ainda precisa ser coletado',() => {
+  it.each(['John Doe','lively-bush-319'])('não chama %s de nome e avisa quando telefone ainda precisa ser coletado',(name) => {
     const text = formatCustomerContext({
-      name:'John Doe',has_phone:false,purchase_count:0,partial_ltv_brl:null,
+      name,has_phone:false,purchase_count:0,partial_ltv_brl:null,
       last_purchase_at:null,last_purchase_item:null,has_previous_delivery_address:false,
     });
     expect(text).toContain('Nome não confirmado');

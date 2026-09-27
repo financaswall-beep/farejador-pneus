@@ -45,7 +45,7 @@ async function close(f: Fixture, args: Record<string, unknown> = {}, environment
     await client.query('BEGIN');
     const result = JSON.parse(await execute(client, environment, f.conversation, 'criar_pedido', {
       itens: [{ product_id: product, quantidade: 1, preco_unitario: 89 }],
-      modalidade: 'pickup', nome_cliente: 'Cliente teste', forma_pagamento: 'pix', ...args,
+      modalidade: 'pickup', nome_cliente: 'Maria Teste', forma_pagamento: 'pix', ...args,
     }));
     await client.query('COMMIT');
     return result;
@@ -61,6 +61,13 @@ async function state() {
 }
 
 describe('fechamento nas redes sociais: telefone e fotos', () => {
+  it('não cria pedido quando o nome é um apelido automático do Chatwoot', async () => {
+    const f = await fixture('+5521999991111');
+    const before = await state();
+    expect(await close(f, { nome_cliente: 'lively-bush-319' })).toMatchObject({ erro: 'nome_cliente_obrigatorio' });
+    expect(await state()).toEqual(before);
+    expect(await close(f, { nome_cliente: '2W Log' })).toMatchObject({ ok: true });
+  });
   it.each([undefined, '2198765565', '21998765565'])('não cria pedido/reserva/financeiro com telefone %s', async phone => {
     const f = await fixture();
     await message(f, 'Rua Exemplo 38 2198765565 vou pagar no pix');

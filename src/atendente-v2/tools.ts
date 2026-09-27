@@ -7,6 +7,7 @@ import {
   buscarPoliticaComercial,
 } from '../atendente/tools/commerce-tools.js';
 import { logger } from '../shared/logger.js';
+import { normalizeCustomerNameForOrder } from '../shared/customer-name.js';
 import { resolveOrderPhone } from './order-phone.js';
 import { loadConversationPhotoStatus } from './photo-status.js';
 import type { ToolDefinition } from './types.js';
@@ -1291,7 +1292,13 @@ async function criarPedido(
   }
 
   // Dados comuns aos dois caminhos.
-  const customerName = (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null;
+  const customerName = normalizeCustomerNameForOrder(args.nome_cliente);
+  if (!customerName) {
+    return JSON.stringify({
+      erro: 'nome_cliente_obrigatorio',
+      mensagem: 'O nome disponível é automático ou não foi confirmado. Pergunte ao cliente como devemos chamá-lo e aguarde a resposta antes de criar o pedido. Não use o identificador do Instagram/Facebook como nome.',
+    });
+  }
   const deliveryAddress = modalidade === 'delivery' && deliveryAddressResolution?.ok
     ? deliveryAddressResolution.address
     : null;
