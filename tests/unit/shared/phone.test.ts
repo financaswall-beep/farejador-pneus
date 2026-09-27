@@ -3,7 +3,23 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { normalizeBrazilianPhone } from '../../../src/shared/phone.js';
+import { normalizeBrazilianPhone, normalizeCheckoutPhone, containsCheckoutPhone } from '../../../src/shared/phone.js';
+
+describe('telefone completo para checkout', () => {
+  it.each(['2198765565', '+552198765565', '98765565', '(21) 9876-5565', '219876556', '21abc999991111'])('recusa %s sem completar dígitos', value => {
+    expect(normalizeCheckoutPhone(value)).toBeNull();
+  });
+  it.each([
+    ['(21) 99999-1111', '+5521999991111'], ['21999991111', '+5521999991111'],
+    ['+55 (21) 99999-1111', '+5521999991111'], ['5521999991111', '+5521999991111'],
+    ['(21) 2222-3333', '+552122223333'], ['+14155552671', '+14155552671'],
+  ])('aceita formato completo %s', (value, expected) => expect(normalizeCheckoutPhone(value)).toBe(expected));
+  it('localiza o número em uma resposta junto do endereço e pagamento', () => {
+    expect(containsCheckoutPhone('Rua Exemplo 38 (21) 99999-1111 vou pagar no pix', '+5521999991111')).toBe(true);
+    expect(containsCheckoutPhone('Rua Exemplo 38 2198765565 pix', '+5521998765565')).toBe(false);
+    expect(containsCheckoutPhone('Pedido 1219999911117', '+5521999991111')).toBe(false);
+  });
+});
 
 describe('normalizeBrazilianPhone', () => {
   it('aceita mascara brasileira com parenteses e hifen', () => {

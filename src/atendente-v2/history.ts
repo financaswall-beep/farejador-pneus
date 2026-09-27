@@ -18,6 +18,8 @@ interface MessageRow {
   sender_type: string;
   content: string | null;
   sent_at: Date;
+  has_image?: boolean;
+  status?: string | null;
 }
 
 interface TurnActionsRow {
@@ -44,14 +46,17 @@ export async function loadHistory(
       // deterministica quando 2+ msgs do cliente vem com o mesmo timestamp
       // (acontece em rajada coalesced). Sem isso, o prefix do prompt pode
       // mudar entre turns e quebrar o prompt caching da OpenAI.
-      `SELECT id, sender_type, content, sent_at
-       FROM core.messages
-       WHERE conversation_id = $1
-         AND is_private = false
-         AND deleted_at IS NULL
-         AND content IS NOT NULL
-         AND content <> ''
-       ORDER BY sent_at DESC, id DESC
+      `SELECT m.id, m.sender_type, m.content, m.sent_at, m.status, media.has_image
+       FROM core.messages m
+       CROSS JOIN LATERAL (SELECT EXISTS (
+         SELECT 1 FROM core.message_attachments a
+          WHERE a.environment=m.environment AND a.message_id=m.id AND a.file_type='image'
+       ) AS has_image) media
+       WHERE m.conversation_id = $1
+         AND m.is_private = false
+         AND m.deleted_at IS NULL
+         AND (NULLIF(trim(m.content),'') IS NOT NULL OR media.has_image)
+       ORDER BY m.sent_at DESC, m.id DESC
        LIMIT $2`,
       [conversationId, HISTORY_LIMIT],
     ),
@@ -144,7 +149,12 @@ export async function loadHistory(
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i]!;
     const role = msg.sender_type === 'contact' ? ('user' as const) : ('assistant' as const);
-    history.push({ role, content: msg.content ?? '' });
+    const imageMarker = msg.has_image
+      ? role === 'user' ? '[O cliente enviou uma imagem.]'
+        : msg.status === 'failed' ? '[O envio de uma imagem pela loja falhou. Não confirme o envio.]'
+          : '[A loja enviou uma imagem ao cliente, mesmo sem legenda. Isso não confirma leitura nem reserva do pneu.]'
+      : null;
+    history.push({ role, content: [msg.content, imageMarker].filter(Boolean).join('\n') });
 
     // Se foi mensagem do cliente, e existem actions disparadas por ela,
     // injeta antes da próxima mensagem (que deve ser a resposta do bot).

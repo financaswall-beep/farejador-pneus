@@ -36,7 +36,7 @@ export async function listMatrizDeliveries(
     WITH deliveries AS (
       SELECT o.id AS order_id, o.order_number, o.status, o.delivery_status,
         COALESCE(c.name,cu.name) AS customer_name,
-        COALESCE(c.phone_e164,cu.phone_e164) AS customer_phone,
+        COALESCE(o.customer_phone,c.phone_e164,cu.phone_e164) AS customer_phone,
         o.delivery_address, o.total_amount::text, o.payment_method, o.created_at,
         o.dispatched_at, o.delivered_at, o.delivery_failure_reason,
         o.trip_id, t.trip_number, t.status AS trip_status,

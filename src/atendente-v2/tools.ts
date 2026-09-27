@@ -7,7 +7,8 @@ import {
   buscarPoliticaComercial,
 } from '../atendente/tools/commerce-tools.js';
 import { logger } from '../shared/logger.js';
-import { normalizeBrazilianPhone } from '../shared/phone.js';
+import { resolveOrderPhone } from './order-phone.js';
+import { loadConversationPhotoStatus } from './photo-status.js';
 import type { ToolDefinition } from './types.js';
 import { requestHumanHandoff, type HumanHandoffContext } from './human-handoff.js';
 import type { Environment } from '../shared/types/chatwoot.js';
@@ -303,7 +304,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           municipio: { type: 'string', description: 'Cidade já informada pelo cliente ou resolvida pela localização. Reutilize a cidade confirmada na busca/cotação, especialmente para bairros que existem em mais de um município.' },
           bairro: { type: 'string', description: 'Passe somente quando o cliente digitou o bairro. Na entrega, reutilize o mesmo bairro de calcular_frete; se o frete foi calculado apenas pelo pino, omita. Na retirada, omita quando já houver pino — o sistema resolve a loja por ele.' },
           confirma_retirada_distante: { type: 'boolean', description: 'Use SOMENTE na RETIRADA e SOMENTE depois que o cliente, avisado de que a loja mais perto que tem o pneu fica longe, disser EXPLICITAMENTE que vai buscar mesmo assim ("não tem problema, eu passo aí", "eu vou aí pegar"). true = reserva o pneu na loja mais perto que tem, mesmo fora do raio normal de retirada. NUNCA marque sozinho: só com a confirmação do cliente.' },
-          telefone_cliente: { type: 'string', description: 'Telefone/WhatsApp do cliente (com DDD). Passe SÓ quando o contato não tem número — Instagram e Facebook não trazem telefone. Sem ele, o pedido é recusado (entrega E retirada — todo pedido precisa de número). Em conversa de WhatsApp, OMITA: o número já vem do contato.' },
+          telefone_cliente: { type: 'string', description: 'Número completo com DDD, escrito pelo cliente. Obrigatório se o cadastro não tem telefone válido (Instagram/Facebook). Celular brasileiro: DDD + 9 dígitos; nunca complete dígitos. Em WhatsApp, omita se o contato já tem número válido. Não copie número da loja ou de respostas do bot.' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
@@ -1119,6 +1120,7 @@ async function insertCommerceOrderMirror(
     deliveryAddress: string | null;
     geoResolutionId: string | null;
     customerName: string | null;
+    customerPhone: string;
     unitId: string | null;
     partnerOrderId?: string | null;
     idempotencyKey?: string | null;
@@ -1132,8 +1134,8 @@ async function insertCommerceOrderMirror(
     `INSERT INTO commerce.orders (
        environment, contact_id, source_conversation_id, total_amount, status,
        fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source, customer_name, unit_id,
-       partner_order_id, idempotency_key
-     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9, $10, $11, $12)
+       partner_order_id, idempotency_key, customer_phone
+     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9, $10, $11, $12, $13)
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
      RETURNING id, order_number`,
     [
@@ -1149,6 +1151,7 @@ async function insertCommerceOrderMirror(
       input.unitId,
       input.partnerOrderId ?? null,
       input.idempotencyKey ?? null,
+      input.customerPhone,
     ],
   );
 
@@ -1211,6 +1214,12 @@ async function criarPedido(
   let itens = quotedItems;
   let subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
+  if (!['delivery', 'pickup'].includes(modalidade)) {
+    return JSON.stringify({ erro: 'modalidade_obrigatoria', mensagem: 'Confirme se o cliente quer entrega ou retirada antes de fechar.' });
+  }
+  if (!['pix', 'cartao', 'dinheiro'].includes(String(args.forma_pagamento ?? ''))) {
+    return JSON.stringify({ erro: 'pagamento_obrigatorio', mensagem: 'Pergunte somente a forma de pagamento que falta e aguarde a resposta. Não escolha pelo cliente.' });
+  }
   // let: o frete da MATRIZ por distância é reescrito por CÓDIGO no roteamento abaixo
   // (não confiar no valor_frete do LLM). Parceiro/retirada não tocam aqui.
   let valorFrete = Number(args.valor_frete ?? 0) || 0;
@@ -1232,9 +1241,9 @@ async function criarPedido(
   const convResult = await client.query<{ contact_id: string | null; phone_e164: string | null }>(
     `SELECT cv.contact_id, ct.phone_e164
        FROM core.conversations cv
-       LEFT JOIN core.contacts ct ON ct.id = cv.contact_id
-      WHERE cv.id = $1 LIMIT 1`,
-    [conversationId],
+       LEFT JOIN core.contacts ct ON ct.id = cv.contact_id AND ct.environment=cv.environment
+      WHERE cv.id = $1 AND cv.environment=$2 LIMIT 1`,
+    [conversationId, environment],
   );
   const contactId = convResult.rows[0]?.contact_id ?? null;
   // Número do WhatsApp do cliente → grava no pedido pra habilitar Ligar/WhatsApp
@@ -1264,12 +1273,9 @@ async function criarPedido(
     });
   }
 
-  // Telefone efetivo do pedido: o que o BOT coletou (contato sem número — Insta/FB)
-  // tem prioridade; senão usa o do contato (WhatsApp). Reusa o normalizador E164
-  // compartilhado e testado (normalizeBrazilianPhone).
-  const telefoneInformado =
-    typeof args.telefone_cliente === 'string' ? normalizeBrazilianPhone(args.telefone_cliente) : null;
-  const effectivePhone = telefoneInformado ?? contactPhone;
+  // Valida também o cadastro. Um telefone coletado precisa existir em mensagem do
+  // cliente; o modelo não pode completar um celular incompleto por conta própria.
+  const effectivePhone = await resolveOrderPhone(client, environment, conversationId, contactPhone, args.telefone_cliente);
 
   // Guard: TODO pedido precisa de telefone — entrega (entregador alcança o cliente)
   // e retirada (loja avisa "seu pneu chegou"). Contato de Instagram/Facebook não traz
@@ -1280,7 +1286,7 @@ async function criarPedido(
       erro: 'telefone_obrigatorio',
       telefone_obrigatorio: true,
       mensagem:
-        'Este contato não tem telefone (provavelmente Instagram/Facebook). Peça o WhatsApp/telefone do cliente e rechame criar_pedido com telefone_cliente — todo pedido precisa do número (entrega ou retirada).',
+        'Falta um telefone válido confirmado pelo cliente. Peça por escrito o número completo com DDD (celular brasileiro: DDD + 9 dígitos). Não complete dígitos, não use o telefone da loja e não diga que o pedido está fechado. Aproveite os outros dados já informados e pergunte somente o que falta.',
     });
   }
 
@@ -1458,6 +1464,7 @@ async function criarPedido(
       deliveryAddress,
       geoResolutionId,
       customerName,
+      customerPhone: effectivePhone,
       unitId: partner.unitId,
       partnerOrderId: mat.partner_order_id,
       idempotencyKey,
@@ -1544,6 +1551,7 @@ async function criarPedido(
       geoResolutionId,
       // customer_name: nome dado NA conversa (pode diferir de core.contacts.name).
       customerName,
+      customerPhone: effectivePhone,
       unitId,
       partnerOrderId: null,
       idempotencyKey,
@@ -1585,6 +1593,7 @@ async function criarPedido(
     valor_frete: respFrete.toFixed(2),
     total: respTotal.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
+    ...(env.PHOTO_REQUESTS ? { fotos: await loadConversationPhotoStatus(client, environment, conversationId) } : {}),
     // Retirada: cartão da loja pro resumo "como chegar" (só no caminho parceiro+pickup).
     ...(retirada ? { retirada } : {}),
   });

@@ -24,9 +24,17 @@ describe('contexto permanente do cadastro do cliente',() => {
       last_purchase_at:null,last_purchase_item:null,has_previous_delivery_address:false,
     });
     expect(text).toContain('Nome não confirmado');
-    expect(text).toContain('Telefone ainda não cadastrado');
+    expect(text).toContain('Telefone válido ainda não cadastrado');
     expect(text).toContain('Nenhuma compra concluída');
     expect(text).not.toContain('ENDEREÇO ANTERIOR');
+  });
+
+  it('não considera um celular incompleto como telefone conhecido', () => {
+    const text = formatCustomerContext({ name: 'Ana', has_phone: true, phone_e164: '+552198765565',
+      purchase_count: 0, partial_ltv_brl: null, last_purchase_at: null, last_purchase_item: null,
+      has_previous_delivery_address: false });
+    expect(text).toContain('Telefone válido ainda não cadastrado');
+    expect(text).not.toContain('NÃO peça telefone');
   });
 
   it('consulta cadastro e pedidos pelo contact_id exato da conversa',async () => {

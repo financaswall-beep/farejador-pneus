@@ -1,10 +1,12 @@
 import type { PoolClient } from 'pg';
 import { isPlaceholderCustomerName } from '../shared/customer-name.js';
 import { logger } from '../shared/logger.js';
+import { normalizeCheckoutPhone } from '../shared/phone.js';
 
 export interface CustomerContextRow {
   name: string | null;
   has_phone: boolean;
+  phone_e164?: string | null;
   purchase_count: number;
   partial_ltv_brl: string | number | null;
   last_purchase_at: Date | string | null;
@@ -42,9 +44,10 @@ export function formatCustomerContext(row: CustomerContextRow): string {
     parts.push('Nome não confirmado no Chatwoot. Pergunte o nome durante a conversa, sem interromper a cotação.');
   }
 
-  parts.push(row.has_phone
+  const hasPhone = row.phone_e164 !== undefined ? normalizeCheckoutPhone(row.phone_e164) !== null : row.has_phone;
+  parts.push(hasPhone
     ? 'Telefone já cadastrado neste contato. NÃO peça telefone ou WhatsApp novamente.'
-    : 'Telefone ainda não cadastrado. Antes de criar qualquer pedido, peça telefone/WhatsApp com DDD.');
+    : 'Telefone válido ainda não cadastrado. Se o cliente já informou um número completo nesta conversa, passe-o em telefone_cliente; caso contrário, peça telefone/WhatsApp com DDD antes de criar o pedido.');
 
   if (purchases > 0) {
     parts.push(`Cliente recorrente: ${purchases} compra(s) concluída(s); total histórico R$ ${formatMoney(row.partial_ltv_brl)}.`);
@@ -91,7 +94,7 @@ export async function loadCustomerContext(
            FROM completed_orders o
           ORDER BY COALESCE(o.delivered_at,o.retrieved_at,o.created_at) DESC,o.id DESC LIMIT 1
        )
-       SELECT cc.name,(NULLIF(trim(cc.phone_e164),'') IS NOT NULL) AS has_phone,
+       SELECT cc.name,cc.phone_e164,(NULLIF(trim(cc.phone_e164),'') IS NOT NULL) AS has_phone,
               history.purchase_count,history.partial_ltv_brl,
               lp.occurred_at AS last_purchase_at,
               (SELECT COALESCE(ts.tire_size,p.product_name)

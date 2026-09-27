@@ -62,3 +62,23 @@ export function normalizeBrazilianPhone(input: string | null | undefined): strin
 
   return null;
 }
+
+/** Validação de checkout: não completa dígitos nem aceita celular brasileiro sem o nono dígito. */
+export function normalizeCheckoutPhone(input: string | null | undefined): string | null {
+  if (!input || !/^[+\d\s().-]+$/.test(input)) return null;
+  const phone = normalizeBrazilianPhone(input);
+  if (!phone) return null;
+  if (!phone.startsWith('+55')) return phone;
+  const national = phone.slice(3);
+  // DDD de dois dígitos; celular 9 + oito dígitos, fixo 2–5 + sete dígitos.
+  return /^[1-9]\d(?:9\d{8}|[2-5]\d{7})$/.test(national) ? phone : null;
+}
+
+/** Confere o número completo no texto do cliente, sem aproveitar números de respostas do bot. */
+export function containsCheckoutPhone(text: string, phone: string): boolean {
+  const variants = [phone.slice(1)];
+  if (phone.startsWith('+55')) variants.push(phone.slice(3));
+  return variants.some(digits => new RegExp(
+    `(?<!\\d)${digits.split('').join('[\\s().-]*')}(?!\\d)`,
+  ).test(text));
+}

@@ -166,7 +166,7 @@ export interface EntregadorRota {
 // SELECT do card — só campo operacional. NADA de custo/lucro/despesa/frete.
 const CARD_SELECT = `
   SELECT o.id AS order_id, COALESCE(c.name,cu.name) AS customer_name,
-         COALESCE(c.phone_e164,cu.phone_e164) AS customer_phone,
+         COALESCE(o.customer_phone,c.phone_e164,cu.phone_e164) AS customer_phone,
          o.delivery_address, o.total_amount::text AS cobrar, o.payment_method, o.delivery_status,
          o.scheduled_delivery_date::text AS scheduled_raw,
          COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
