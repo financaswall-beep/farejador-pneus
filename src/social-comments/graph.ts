@@ -9,7 +9,7 @@ type Json = Record<string, any>;
 /** Fixed Graph host, no provider paging URLs, no tokens/payloads in errors. Facebook Login. */
 export class CommentsGraph {
   constructor(private config: CommentsConfig, private fetcher: typeof fetch = fetch) {}
-  private async call(path: string, method = 'GET', params: Record<string,string> = {}, token = this.config.token): Promise<Json> {
+  protected async call(path: string, method = 'GET', params: Record<string,string> = {}, token = this.config.token): Promise<Json> {
     if (!token) throw new MetaCommentError('meta_token_missing');
     if (!/^[a-z0-9_/]+$/i.test(path) || !/^v\d+\.\d+$/.test(this.config.apiVersion)) {
       throw new MetaCommentError('meta_invalid_path');

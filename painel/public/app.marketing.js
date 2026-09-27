@@ -106,7 +106,7 @@ window.PAINEL_MODULES.marketing = function () {
         { id: 'visao', label: 'Visão geral' },
         { id: 'campanhas', label: 'Campanhas' },
         { id: 'criativos', label: 'Criativos' },
-        { id: 'comentarios', label: 'Comentários' },
+        { id: 'comentarios', label: 'Conteúdo orgânico' },
         { id: 'jornadas', label: 'Jornadas' },
         { id: 'geografia', label: 'Geografia e demanda' },
         { id: 'integracoes', label: 'Integrações' },
@@ -114,12 +114,13 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
+      if (tab !== 'comentarios') this.moClose();
       if (tab !== 'criativos') { this.destroyMarketingCreativeChart(); this.closeMarketingCreativeJourneys(); }
       if (tab === 'campanhas' && this.marketingCampaignDetailId) {
         this.closeMarketingCampaignDetail();
       }
       this.marketingTab = tab;
-      if (tab === 'comentarios') void this.loadMarketingComments();
+      if (tab === 'comentarios') void this.loadMarketingOrganic();
       if (tab === 'geografia') void this.loadMarketingGeography();
       if (tab === 'criativos') void this.loadMarketingCreatives();
       if (tab === 'campanhas') void this.loadMarketingCampaigns();

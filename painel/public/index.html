@@ -7,6 +7,7 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic1" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -216,8 +217,10 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260923-comments1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260927-organic1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
+<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic1"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -255,7 +258,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260923-comments1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-organic1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8105,7 +8108,11 @@
         <div><div class="mg-eyebrow">Matriz / Marketing</div><h1>Geografia e demanda</h1><p>Transforme resultados em decisões de investimento.</p></div>
         <div class="mg-header-actions"><span class="mg-badge" :class="marketingIsMock() && 'mg-demo'" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button class="mg-button" @click="mgExport()" :disabled="mgLoading || !mgFiltered().length"><i data-lucide="download"></i> Exportar CSV</button></div>
       </header>
-      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia'"
+      <header x-show="marketingTab === 'comentarios'" class="mo-screen mo-header">
+        <div><div class="mo-eyebrow">Matriz / Marketing</div><h1>Conteúdo orgânico</h1><p>Escolha uma publicação para acompanhar seus resultados.</p></div>
+        <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : '2W Pneus · @2wp.pneus'"></span>
+      </header>
+      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
                aria-labelledby="marketing-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
@@ -8134,7 +8141,7 @@
         </div>
       </section>
 
-      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos' || marketingTab === 'geografia'"
+      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos' || marketingTab === 'geografia' || marketingTab === 'comentarios'"
            class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções de Marketing" class="flex items-center gap-1 overflow-x-auto">
@@ -8156,7 +8163,62 @@
         </div>
       </div>
 
-      <section x-show="marketingTab === 'comentarios'" class="space-y-4" aria-label="Comentários das redes sociais">
+      <section x-show="marketingTab === 'comentarios'" class="mo-screen" aria-label="Conteúdo orgânico"
+               x-init="$watch('currentPage', page => { if (page !== 'marketing') moClose() })">
+        <nav class="mo-subnav" aria-label="Seções de conteúdo orgânico">
+          <button type="button" @click="moSetView('attendance')" :aria-pressed="moView === 'attendance'">Atendimento</button>
+          <button type="button" @click="moSetView('publications')" :aria-pressed="moView === 'publications'">Resultados por publicação</button>
+        </nav>
+        <div x-show="moView === 'publications'" data-organic-publications>
+          <div class="mo-toolbar">
+            <select class="mo-input" aria-label="Período das publicações" x-model="moPeriod" @change="moLoad()"><option value="30d">Últimos 30 dias</option><option value="7d">Últimos 7 dias</option></select>
+            <select class="mo-input" aria-label="Rede social das publicações" x-model="moNetwork" @change="moFiltersChanged()"><option value="all">Todas as redes</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select>
+            <label class="mo-search"><i data-lucide="search" aria-hidden="true"></i><input type="search" aria-label="Buscar publicação" placeholder="Buscar publicação" x-model.debounce.200ms="moSearch" @input.debounce.200ms="moFiltersChanged()"></label>
+            <button class="mo-button mo-refresh" type="button" @click="moLoad()" :disabled="moLoading" aria-label="Atualizar publicações" title="Atualizar publicações"><i data-lucide="refresh-cw"></i></button>
+          </div>
+          <div x-show="moError" class="mo-notice" role="alert"><span x-text="moError"></span><button type="button" class="mo-button" @click="moLoad()">Tentar novamente</button></div>
+          <template x-for="warning in moWarnings()" :key="warning"><p class="mo-notice" role="status" x-text="warning"></p></template>
+          <div class="mo-card" :aria-busy="moLoading">
+            <div class="mo-list-head"><div><h2>Publicações</h2><span class="mo-list-count" x-show="!moLoading && moListAvailable()" x-text="moFiltered().length + ' publicações' "></span><p>Clique em um post para abrir a análise completa.</p></div><select class="mo-input" aria-label="Ordenar publicações" x-model="moSort" @change="moFiltersChanged()"><option value="recent">Mais recentes</option><option value="oldest">Mais antigas</option></select></div>
+            <div class="mo-columns" aria-hidden="true"><span>Publicação</span><span>Rede</span><span>Formato</span><span>Publicado em</span><span></span></div>
+            <div x-show="moLoading" class="mo-empty" role="status"><i data-lucide="loader-circle"></i><strong>Consultando publicações…</strong><p>Buscando os posts das contas conectadas.</p></div>
+            <div x-show="!moLoading && !moError && moListAvailable() && !moFiltered().length" class="mo-empty"><i data-lucide="images"></i><strong>Nenhuma publicação neste filtro</strong><p>Experimente outro período, rede ou termo de busca.</p></div>
+            <div x-show="!moLoading && !moError && moData && !moListAvailable()" class="mo-empty"><i data-lucide="cloud-off"></i><strong>Publicações indisponíveis</strong><p>Confira a conexão com a Meta em Atendimento e tente atualizar.</p><button type="button" class="mo-button" @click="moSetView('attendance')" style="margin-top:16px">Ver conexão</button></div>
+            <div role="list" aria-label="Lista de publicações">
+              <template x-for="post in moRows()" :key="post.platform + ':' + post.id">
+                <div role="listitem"><button type="button" class="mo-row" @click="moOpen(post)" :aria-label="'Ver análise de ' + post.title + ' no ' + moNetworkLabel(post.platform)">
+                  <div class="mo-identity"><div class="mo-thumb"><template x-if="post.image_url"><img :src="post.image_url" alt="" loading="lazy" referrerpolicy="no-referrer" @error="moImageFailed(post)"></template><template x-if="!post.image_url"><i data-lucide="image" aria-hidden="true"></i></template><span class="mo-play" x-show="post.image_url && ['video','reel'].includes(post.format)"><i data-lucide="play" aria-hidden="true"></i></span></div><div><div class="mo-title" x-text="post.title"></div><p class="mo-caption" x-text="post.caption || 'Sem legenda'"></p></div></div>
+                  <span class="mo-network"><img :src="'/assets/brands/' + post.platform + '.svg'" alt=""><span x-text="moNetworkLabel(post.platform)"></span></span>
+                  <span class="mo-format-cell"><span class="mo-badge" x-text="moFormat(post.format)"></span></span>
+                  <span class="mo-date" x-text="moDate(post.published_at)"></span><span class="mo-link">Ver análise <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+                </button></div>
+              </template>
+            </div>
+            <div class="mo-footer" x-show="!moLoading && moListAvailable() && moFiltered().length"><span x-text="'Mostrando ' + moRows().length + ' de ' + moFiltered().length + ' publicações'"></span><div class="mo-pager"><button type="button" class="mo-button" @click="moChangePage(-1)" :disabled="moPage <= 1" aria-label="Publicações anteriores"><i data-lucide="chevron-left"></i></button><span class="mo-page" x-text="moPage + ' / ' + moPageCount()"></span><button type="button" class="mo-button" @click="moChangePage(1)" :disabled="moPage >= moPageCount()" aria-label="Próximas publicações"><i data-lucide="chevron-right"></i></button></div></div>
+          </div>
+          <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Posts do feed e Reels das contas conectadas. <span x-show="moData?.fetched_at" x-text="'Consulta à Meta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
+        </div>
+        <dialog x-ref="moDialog" class="mo-dialog" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
+          <div class="mo-dialog-heading"><div><div class="mo-eyebrow">Conteúdo orgânico / Publicações</div><h2 id="mo-dialog-title">Análise da publicação</h2><p>Acompanhe o post e o atendimento registrado.</p></div><div class="mo-dialog-actions"><span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button type="button" class="mo-button" x-ref="moClose" @click="moClose()" aria-label="Fechar análise"><i data-lucide="x"></i></button></div></div>
+          <nav class="mo-dialog-tabs" aria-label="Análise da publicação"><button type="button" aria-selected="true">Resumo</button><button type="button" disabled title="Será habilitado na próxima etapa">Comparar posts</button><button type="button" disabled title="Será habilitado após conectar a origem das vendas">Vendas vinculadas</button><button type="button" disabled title="Será habilitado na próxima etapa">Métricas</button></nav>
+          <div class="mo-dialog-body">
+            <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando resumo…</strong></div>
+            <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected)">Tentar novamente</button></div>
+            <template x-if="moSelected && !moDetailLoading && !moDetailError"><div>
+              <div class="mo-overview">
+                <article class="mo-post-preview"><div class="mo-post-image"><template x-if="moSelected.image_url"><img :src="moSelected.image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moSelected)"></template><template x-if="!moSelected.image_url"><i data-lucide="image" aria-label="Prévia indisponível"></i></template></div><div class="mo-post-copy"><span class="mo-network"><img :src="'/assets/brands/' + moSelected.platform + '.svg'" alt=""><span x-text="moNetworkLabel(moSelected.platform)"></span><span class="mo-badge" x-text="moFormat(moSelected.format)"></span></span><h3 x-text="moSelected.title"></h3><p x-text="'Publicado em ' + moDate(moSelected.published_at)"></p><p class="mo-full-caption" x-text="moSelected.caption || 'Publicação sem legenda.'"></p><a x-show="moSelected.url" :href="moSelected.url" target="_blank" rel="noopener noreferrer" class="mo-link">Abrir publicação <i data-lucide="external-link"></i></a></div></article>
+                <div class="mo-overview-main"><h3>Atendimento desta publicação</h3><p class="mo-subtext">Comentários capturados desde o início do acompanhamento, incluindo os já encerrados.</p><p class="mo-notice" x-show="moDetail && !moDetail.summary?.available">O histórico de atendimento está indisponível. Os números não foram substituídos por zero.</p><div class="mo-kpis"><template x-for="metric in moCommentCards()" :key="metric.label"><div class="mo-kpi"><div class="mo-kpi-top"><i :data-lucide="metric.icon"></i><span x-text="metric.label"></span></div><strong x-text="metric.value == null ? '—' : Number(metric.value).toLocaleString('pt-BR')"></strong><p x-text="metric.note"></p></div></template></div>
+                  <div class="mo-chart"><h3>Quando os comentários chegaram</h3><p>Até 30 dias com atividade registrada. Não representa o alcance total da publicação.</p><div x-show="moSeries().length"><div class="mo-bars" role="img" :aria-label="moSeries().map(day => day.label + ': ' + day.received + ' comentários').join('; ')"><template x-for="day in moSeries()" :key="day.date"><div class="mo-bar" :title="day.label + ': ' + day.received + ' comentários'"><div class="mo-bar-fill" :style="'height:' + day.height + '%' "><span x-text="day.received"></span></div></div></template></div><div class="mo-chart-range"><span x-text="moSeries()[0]?.label"></span><span x-text="moSeries().at(-1)?.label"></span></div></div><p x-show="!moSeries().length" style="padding:28px 0;text-align:center" x-text="moDetail?.summary?.available ? 'Ainda não há comentários capturados neste post.' : 'Histórico indisponível.'"></p></div>
+                </div>
+              </div>
+              <section class="mo-commercial"><div class="mo-commercial-head"><i data-lucide="route"></i>Da publicação à venda</div><div class="mo-commercial-grid"><div><strong>—</strong><span>Mensagens privadas enviadas</span></div><div><strong>—</strong><span>Conversas identificadas</span></div><div><strong>—</strong><span>Vendas vinculadas</span></div><div><strong>—</strong><span>Receita vinculada</span></div></div><p>O vínculo entre este post, as conversas e as vendas ainda não está disponível. Isso não significa que o post não gerou vendas.</p></section>
+            </div></template>
+          </div>
+          <footer class="mo-dialog-footer"><span>Este resumo considera somente o histórico registrado no Farejador.</span><button type="button" class="mo-button" @click="moGoAttendance()">Ver atendimento <i data-lucide="arrow-right"></i></button></footer>
+        </dialog>
+      </section>
+
+      <section x-show="marketingTab === 'comentarios' && moView === 'attendance'" class="space-y-4" aria-label="Comentários das redes sociais">
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white p-5">
           <div class="flex items-center gap-3">
             <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800"><i data-lucide="messages-square" class="h-6 w-6"></i></span>
@@ -9793,7 +9855,7 @@
           <li>Esta análise inclui campanhas classificadas como Matriz e vendas da Matriz efetivamente confirmadas. Cancelamentos e entregas ainda não realizadas ficam fora.</li><li>Margem: receita das vendas atribuídas menos o custo registrado dos pneus e o investimento. Custo ausente bloqueia a margem; zero não substitui um dado desconhecido.</li><li>A verba só recebe recorte regional com vínculo dedicado válido durante os dias analisados, moeda BRL e origem das conversas/vendas compatível. Não há divisão proporcional de campanha compartilhada.</li><li>A conversão acompanha conversas iniciadas no período e os pedidos atribuídos a essas mesmas entradas. Uma conversa conta uma vez, inclusive quando compra mais de um pneu. A cidade é a localização atualmente identificada no Farejador.</li><li>As recomendações aguardam pelo menos 10 conversas com janela de 7 dias encerrada e 5 vendas. Testar aumento exige 10 vendas, custo até 80% da meta, margem positiva nos dois períodos e estoque/cobertura confirmados. São critérios de triagem, não significância estatística.</li><li>Dados desatualizados, aprendizado pendente, custo ausente ou oferta não vinculada impedem sugerir aumento. Frequência +20% com CTR do link −20% pede revisão do criativo.</li><li>O comparativo de orçamento depende de mudança observada, com sete dias completos antes e depois. A hora exata da edição e seu efeito causal não são inferidos. Frequência e CTR vêm dos agregados Meta de cada período, sem somar alcance diário.</li><li>Vínculos, observações e planos mantêm histórico. Planos são rascunhos; esta tela não publica anúncios, pausa campanhas nem muda orçamento.</li>
         </ul></section></div>
       </section>
-      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes' && marketingTab !== 'criativos' && marketingTab !== 'geografia'"
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
