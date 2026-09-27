@@ -56,6 +56,7 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
       return (measure || this.moFormat(post.format)) + ' · ' + this.moNetworkLabel(post.platform);
     },
     moChangeSummaryPeriod() {
+      this.moSalesPage=1;this.moShowFailures=false;
       if (this.moAnalysisTab==='compare') return this.moLoadCompare();
       if (this.moSelected) return this.moOpen(this.moSelected, true);
     },
@@ -73,7 +74,7 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
     moRenderChart() {
       this.moDestroyChart();
       const canvas = this.$refs.moSalesChart, rows = this.moSalesSeries();
-      if (this.moAnalysisTab==='compare' || !this.moSelected || this.moDetailLoading || !canvas || !rows.length || typeof Chart === 'undefined') return;
+      if (this.moAnalysisTab && this.moAnalysisTab!=='summary' || !this.moSelected || this.moDetailLoading || !canvas || !rows.length || typeof Chart === 'undefined') return;
       const labels = rows.map(row => new Date(row.date+'T12:00:00Z').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',timeZone:'America/Sao_Paulo'}));
       chart = new Chart(canvas, {
         type:'line', data:{labels,datasets:[{label:'Vendas concluídas acumuladas',data:rows.map(row => row.sales),

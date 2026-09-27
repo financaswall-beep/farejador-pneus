@@ -7,7 +7,8 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic3" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic4" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic4" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -217,13 +218,14 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.js?v=20260927-organic4"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
-<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic3"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic3"></script>
-<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic3"></script>
-<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic3"></script>
-<script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic4"></script>
+<script src="/admin/painel/app.marketing.organic.results.js?v=20260927-organic4"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -261,7 +263,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-organic3"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-organic4"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8201,9 +8203,9 @@
           </div>
           <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Posts do feed e Reels das contas conectadas. <span x-show="moData?.fetched_at" x-text="'Consulta à Meta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
         </div>
-        <dialog x-ref="moDialog" class="mo-dialog" :class="{'is-comparing':moAnalysisTab === 'compare'}" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
+        <dialog x-ref="moDialog" class="mo-dialog" :class="{'is-comparing':moAnalysisTab === 'compare','is-results':['sales','metrics'].includes(moAnalysisTab)}" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
           <header class="mo-dialog-heading">
-            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p x-text="moAnalysisTab === 'compare' ? 'Compare os posts e acompanhe as vendas que vieram deles.' : 'Acompanhe as conversas e as vendas que começaram neste post.'"></p></div>
+            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p x-text="moAnalysisSubtitle()"></p></div>
             <div class="mo-dialog-actions">
               <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span>
               <button type="button" class="mo-button" @click="moExportAnalysis()" :disabled="moAnalysisTab === 'compare' ? moCompareLoading || !moCompareDetails.every(Boolean) : !moDetail || moDetailLoading"><i data-lucide="download"></i>Exportar</button>
@@ -8211,11 +8213,11 @@
             </div>
           </header>
           <div class="mo-dialog-navigation">
-            <nav class="mo-dialog-tabs" aria-label="Análise da publicação" role="tablist">
-              <button type="button" role="tab" id="mo-summary-tab" x-ref="moSummaryTab" aria-controls="mo-summary-panel" :aria-selected="moAnalysisTab === 'summary'" @click="moSwitchAnalysis('summary')" @keydown.arrow-right.prevent="moSwitchAnalysis('compare'); $refs.moCompareTab.focus()">Resumo</button>
-              <button type="button" role="tab" id="mo-compare-tab" x-ref="moCompareTab" aria-controls="mo-compare-panel" :aria-selected="moAnalysisTab === 'compare'" @click="moSwitchAnalysis('compare')" @keydown.arrow-left.prevent="moSwitchAnalysis('summary'); $refs.moSummaryTab.focus()">Comparar posts</button>
-              <button type="button" role="tab" aria-selected="false" disabled title="Disponível após conectar a origem das vendas">Vendas vinculadas</button>
-              <button type="button" role="tab" aria-selected="false" disabled title="Métricas orgânicas: próxima etapa">Métricas</button>
+            <nav class="mo-dialog-tabs" x-ref="moTabs" aria-label="Análise da publicação" role="tablist" @keydown.arrow-right.prevent="moMoveAnalysisTab($event,1)" @keydown.arrow-left.prevent="moMoveAnalysisTab($event,-1)" @keydown.home.prevent="moMoveAnalysisTab($event,'first')" @keydown.end.prevent="moMoveAnalysisTab($event,'last')">
+              <button type="button" role="tab" id="mo-summary-tab" x-ref="moSummaryTab" aria-controls="mo-summary-panel" :aria-selected="moAnalysisTab === 'summary'" :tabindex="moAnalysisTab === 'summary' ? 0 : -1" @click="moSwitchAnalysis('summary')">Resumo</button>
+              <button type="button" role="tab" id="mo-compare-tab" x-ref="moCompareTab" aria-controls="mo-compare-panel" :aria-selected="moAnalysisTab === 'compare'" :tabindex="moAnalysisTab === 'compare' ? 0 : -1" @click="moSwitchAnalysis('compare')">Comparar posts</button>
+              <button type="button" role="tab" id="mo-sales-tab" aria-controls="mo-sales-panel" :aria-selected="moAnalysisTab === 'sales'" :tabindex="moAnalysisTab === 'sales' ? 0 : -1" @click="moSwitchAnalysis('sales')">Vendas vinculadas</button>
+              <button type="button" role="tab" id="mo-metrics-tab" aria-controls="mo-metrics-panel" :aria-selected="moAnalysisTab === 'metrics'" :tabindex="moAnalysisTab === 'metrics' ? 0 : -1" @click="moSwitchAnalysis('metrics')">Métricas</button>
             </nav>
             <div class="mo-period-controls">
               <label class="mo-period-select"><i data-lucide="calendar-days" aria-hidden="true"></i><select aria-label="Período da análise da publicação" x-model="moSummaryPeriod" @change="moChangeSummaryPeriod()" :disabled="moAnalysisTab === 'compare' ? moCompareLoading : moDetailLoading"><option value="7d" x-text="moAnalysisTab === 'compare' ? 'Primeiros 7 dias de cada post' : 'Primeiros 7 dias do post'"></option><option value="30d" x-text="moAnalysisTab === 'compare' ? 'Primeiros 30 dias de cada post' : 'Primeiros 30 dias do post'"></option></select></label>
@@ -8281,6 +8283,60 @@
             </div>
             <section class="moc-insights"><h3 class="moc-section-title">O que mudou entre os posts</h3><div class="moc-insight-grid" x-show="moCompareInsights().length"><template x-for="insight in moCompareInsights()" :key="insight.icon"><article :class="'moc-side-'+insight.side"><span class="moc-insight-icon"><i :data-lucide="insight.icon"></i></span><div><h4 x-text="insight.title"></h4><p x-text="insight.text"></p></div></article></template></div><p class="moc-insight-pending" x-show="!moCompareInsights().length">As diferenças serão calculadas com dados confirmados e o mesmo período completo para os dois posts.</p></section>
           </section>
+          <div x-show="['sales','metrics'].includes(moAnalysisTab)" x-cloak class="mor-panel" :aria-busy="moDetailLoading">
+            <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando dados da publicação…</strong></div>
+            <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected,true)">Tentar novamente</button></div>
+            <div x-show="!moDetailLoading && !moDetailError">
+              <article class="mor-post">
+                <span class="mor-post-thumb"><template x-if="moSelected?.image_url"><img :src="moSelected.image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moSelected)"></template><template x-if="!moSelected?.image_url"><span><i data-lucide="image"></i></span></template></span>
+                <template x-if="moSelected"><img class="mor-brand" :src="'/assets/brands/'+moSelected.platform+'.svg'" :alt="moNetworkLabel(moSelected.platform)"></template>
+                <div><h3 x-text="moSelected?.title"></h3><p x-text="moCompareContext(moSelected)"></p></div>
+                <template x-if="moSafeSocialUrl(moSelected?.url)"><a :href="moSafeSocialUrl(moSelected.url)" target="_blank" rel="noopener noreferrer" class="mor-link">Abrir publicação<i data-lucide="arrow-up-right"></i></a></template>
+              </article>
+              <p class="mor-pending" x-show="!moSummaryReady()"><i data-lucide="info"></i>O vínculo entre publicação, conversa e venda ainda está pendente. Os indicadores aparecem como —.</p>
+              <section x-show="moAnalysisTab === 'sales'" role="tabpanel" id="mo-sales-panel" aria-labelledby="mo-sales-tab">
+                <div class="mor-sales-kpis">
+                  <article><span class="mor-icon is-green"><i data-lucide="shopping-cart"></i></span><div><strong class="mor-green" x-text="moSummaryNumber(moResultCount('sales'))"></strong><p>Vendas concluídas</p></div></article>
+                  <article><span class="mor-icon"><i data-lucide="coins"></i></span><div><strong x-text="moSummaryNumber(moResultValue('revenue'),true)"></strong><p>Valor vendido</p></div></article>
+                  <article><span class="mor-icon"><i data-lucide="chart-no-axes-column-increasing"></i></span><div><strong x-text="moSummaryNumber(moAverageSale(),true)"></strong><p>Valor médio por venda</p></div></article>
+                  <p class="mor-kpi-note">Valores das vendas concluídas vinculadas a este post, no período selecionado.</p>
+                </div>
+                <section class="mor-sales-box" :class="{'is-empty':!moSalesRows().length}">
+                  <header><h3>Vendas deste post</h3><div class="mor-sales-filters"><label class="mo-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar cliente ou venda" placeholder="Buscar cliente ou venda" x-model="moSalesSearch" @input="moSalesFilterChanged()"></label><select aria-label="Situação das vendas vinculadas" x-model="moSalesStatus" @change="moSalesFilterChanged()"><option value="completed">Concluídas</option><option value="cancelled">Canceladas</option><option value="all">Todas</option></select></div></header>
+                  <div class="mor-table-scroll"><table class="mor-sales-table"><caption class="sr-only">Vendas com origem confirmada nesta publicação.</caption><thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Venda</th><th scope="col">Valor</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead><tbody>
+                    <template x-for="sale in moSalesRows()" :key="sale.order_id"><tr :class="{'is-current':moJourneySale?.order_id === sale.order_id}"><td x-text="moSaleDate(sale)"></td><td><span class="mor-customer"><span class="mor-avatar" aria-hidden="true" x-text="moInitials(sale.customer_name)"></span><span x-text="sale.customer_name || 'Cliente não informado'"></span></span></td><td x-text="'#'+sale.order_number"></td><td x-text="moSummaryNumber(sale.amount,true)"></td><td><span class="mor-status" :class="{'is-cancelled':sale.status === 'cancelled'}"><i></i><span x-text="sale.status === 'completed' ? 'Concluída' : 'Cancelada'"></span></span></td><td><button type="button" class="mor-link" @click="moOpenSaleJourney(sale)" :aria-label="'Ver jornada da venda '+sale.order_number">Ver jornada<i data-lucide="arrow-right"></i></button></td></tr></template>
+                    <tr x-show="!moSalesReady()"><td colspan="6" class="mor-table-empty"><i data-lucide="link-2"></i><strong>Aguardando vínculo com as vendas</strong><p>A lista aparecerá quando a origem de cada venda estiver confirmada.</p></td></tr>
+                    <tr x-show="moSalesReady() && !moSalesFiltered().length"><td colspan="6" class="mor-table-empty"><i data-lucide="search"></i><strong>Nenhuma venda neste filtro</strong><p x-text="moSalesSearch || moSalesStatus !== 'completed' ? 'Tente outro nome, número ou situação.' : 'Nenhuma venda concluída está vinculada a este post neste período.'"></p></td></tr>
+                  </tbody><tfoot x-show="moSalesReady()"><tr><th colspan="3" scope="row" x-text="'Total no filtro · '+moSalesTotal().count+(moSalesTotal().count === 1 ? ' venda concluída' : ' vendas concluídas')"></th><td x-text="moSummaryNumber(moSalesTotal().amount,true)"></td><td colspan="2"></td></tr></tfoot></table></div>
+                  <div class="mor-pagination" x-show="moSalesFiltered().length > 8"><span x-text="moSalesFiltered().length+' registros no filtro'"></span><button type="button" @click="moSalesPageChange(-1)" :disabled="moSalesPage <= 1" aria-label="Vendas anteriores"><i data-lucide="chevron-left"></i></button><span x-text="moSalesPage+' / '+moSalesPages()"></span><button type="button" @click="moSalesPageChange(1)" :disabled="moSalesPage >= moSalesPages()" aria-label="Próximas vendas"><i data-lucide="chevron-right"></i></button></div>
+                </section>
+                <p class="mor-info"><i data-lucide="route"></i><span><b>Ver jornada</b> mostra o comentário de origem, a conversa e a venda registrada.</span></p>
+              </section>
+              <section x-show="moAnalysisTab === 'metrics'" role="tabpanel" id="mo-metrics-panel" aria-labelledby="mo-metrics-tab">
+                <div class="mor-metric-kpis"><template x-for="card in moMetricCards()" :key="card.label"><article><span class="mor-icon" :class="{'is-green':card.green}"><i :data-lucide="card.icon"></i></span><div><strong x-text="card.value"></strong><h3 x-text="card.label"></h3><p x-text="card.detail"></p></div></article></template></div>
+                <div class="mor-metric-grid">
+                  <section class="mor-card"><h3>Resposta às mensagens privadas</h3><div class="mor-response" x-show="moResponseSplit()">
+                    <div class="mor-donut" role="img" :aria-label="moResponseSplit() ? moResponseSplit().replied+' responderam; '+moResponseSplit().pending+' ainda sem resposta' : 'Sem dados de respostas'" :style="'--mor-rate:'+(moResponseSplit()?.rate ?? 0)+'%' "><div><strong x-text="moSummaryNumber(moResponseSplit()?.sent)"></strong><span>enviadas</span></div></div>
+                    <div class="mor-response-legend"><p><i class="mor-dot"></i><span>Responderam<b x-text="moSummaryNumber(moResponseSplit()?.replied)+' · '+moMetricPercent(moResponseSplit()?.rate)"></b></span></p><p><i class="mor-dot is-gray"></i><span>Ainda sem resposta<b x-text="moSummaryNumber(moResponseSplit()?.pending)+' · '+moMetricPercent(moResponseSplit()?.rate != null ? 100-moResponseSplit().rate : null)"></b></span></p><small>Respostas recebidas no período.</small></div>
+                  </div><div class="mor-chart-empty" x-show="!moResponseSplit()"><i data-lucide="message-square"></i><strong>Respostas ainda sem dados</strong><p>É necessário registrar o envio privado e a resposta vinculada.</p></div></section>
+                  <section class="mor-card"><h3>Quanto tempo levou para vender?</h3><p class="mor-card-subtitle" x-text="moTimedSales() != null ? moTimedSales()+' de '+moSummaryNumber(moResultCount('sales'))+' vendas com tempo registrado' : 'Da primeira resposta à venda concluída'"></p>
+                    <div class="mor-time-chart" x-show="moTimeBuckets() && moTimedSales() > 0" role="img" :aria-label="(moTimeBuckets() || []).map(row=>row.label+': '+row.value+' vendas').join('; ')"><template x-for="bucket in moTimeBuckets() || []" :key="bucket.label"><div class="mor-time-row"><span x-text="bucket.label"></span><div><i :style="'width:'+moTimeBarWidth(bucket.value)+'%'"></i><b x-text="bucket.value"></b></div></div></template></div>
+                    <div class="mor-chart-empty" x-show="!moTimeBuckets() || !moTimedSales()"><i data-lucide="clock-3"></i><strong x-text="moTimeBuckets() ? 'Nenhuma venda com tempo registrado' : 'Tempo até a venda indisponível'"></strong><p>O cálculo usa a primeira resposta e a conclusão da venda.</p></div><small class="mor-chart-note" x-show="moTimedSales() > 0">Intervalo entre a primeira resposta e a venda concluída.</small>
+                  </section>
+                  <section class="mor-card mor-bottom-card"><h3>Envio das mensagens</h3><div class="mor-two-values"><div><strong class="mor-green" x-text="moSummaryNumber(moSendingSplit()?.sent)"></strong><span>enviadas</span></div><div><strong x-text="moSummaryNumber(moSendingSplit()?.failed)"></strong><span>falhas</span></div></div><div class="mor-progress-line"><div class="mor-progress" role="img" :aria-label="'Envios confirmados: '+moMetricPercent(moSendingSplit()?.rate)"><i :style="'width:'+(moSendingSplit()?.rate ?? 0)+'%'"></i></div><span x-text="moMetricPercent(moSendingSplit()?.rate)"></span></div><div class="mor-card-bottom"><small x-text="moSendingSplit() ? moSendingSplit().total+' tentativas de envio registradas.' : 'Aguardando registros de envio privado.'"></small><button type="button" class="mor-link" @click="moShowFailures = !moShowFailures" :aria-expanded="moShowFailures" :disabled="!moSendingSplit()?.failed">Ver falhas de envio<i data-lucide="arrow-right"></i></button></div>
+                    <div class="mor-failures" x-show="moShowFailures"><p x-show="!moFailures().length">Detalhes das falhas ainda indisponíveis.</p><template x-for="failure in moFailures()" :key="failure.id"><article><span x-text="moDate(failure.occurred_at,true)"></span><p x-text="failure.message"></p></article></template></div>
+                  </section>
+                  <section class="mor-card mor-bottom-card"><h3>Situação das conversas</h3><div class="mor-two-values"><div><strong class="mor-green" x-text="moSummaryNumber(moConversationSplit()?.converted)"></strong><span>com venda</span></div><div><strong x-text="moSummaryNumber(moConversationSplit()?.pending)"></strong><span>sem venda concluída</span></div></div><div class="mor-progress-line"><div class="mor-progress" role="img" :aria-label="'Conversas convertidas: '+moMetricPercent(moConversationSplit()?.rate)"><i :style="'width:'+(moConversationSplit()?.rate ?? 0)+'%'"></i></div><span x-text="moMetricPercent(moConversationSplit()?.rate)"></span></div><div class="mor-card-bottom"><small x-text="moConversationSplit() ? 'Conversas sem venda concluída ainda podem converter.' : 'Aguardando a origem das conversas.'"></small><button type="button" class="mor-link" @click="moOpenGeneralJourneys()">Ver visão geral em Jornadas<i data-lucide="arrow-right"></i></button></div></section>
+                </div>
+              </section>
+            </div>
+          </div>
+          <dialog x-ref="moJourneyDialog" class="mor-journey-dialog" aria-labelledby="mor-journey-title" @cancel.prevent.stop="moCloseSaleJourney()" @close.stop="if (moJourneySale) moCloseSaleJourney()" @click="if ($event.target === $refs.moJourneyDialog) moCloseSaleJourney()">
+            <header><div><span class="mo-eyebrow">Origem da venda <span x-show="marketingIsMock()">· Dados ilustrativos</span></span><h3 id="mor-journey-title" x-text="'Jornada da venda #'+(moJourneySale?.order_number || '')"></h3><p x-text="moJourneySale?.customer_name"></p></div><button type="button" class="mo-dialog-close" @click="moCloseSaleJourney()" aria-label="Fechar jornada"><i data-lucide="x"></i></button></header>
+            <ol><template x-for="step in moSaleJourneySteps()" :key="step.label"><li><span class="mor-icon"><i :data-lucide="step.icon"></i></span><div><h4 x-text="step.label"></h4><time x-text="step.time ? moDate(step.time,true) : 'Data não registrada'"></time><p x-text="step.text"></p><template x-if="step.url"><a class="mor-link" :href="step.url" target="_blank" rel="noopener noreferrer">Abrir comentário<i data-lucide="arrow-up-right"></i></a></template></div></li></template></ol>
+            <p class="mor-info">Somente referências registradas. Etapas sem dados permanecem identificadas.</p><button type="button" class="mo-button" @click="moCloseSaleJourney()">Voltar às vendas</button>
+          </dialog>
+
           <dialog x-ref="moPickerDialog" class="moc-picker-dialog" aria-labelledby="moc-picker-title" @cancel.prevent="moClosePostPicker()" @close="if (moPickerSide !== null) moClosePostPicker()" @click="if ($event.target === $refs.moPickerDialog) moClosePostPicker()">
             <header><div><h3 id="moc-picker-title" x-text="'Escolher post '+(moPickerSide === 0 ? 'A' : 'B')"></h3><p>Publicações do período selecionado na lista.</p></div><button type="button" class="mo-dialog-close" @click="moClosePostPicker()" aria-label="Fechar seleção de post"><i data-lucide="x"></i></button></header>
             <label class="mo-search"><i data-lucide="search"></i><input x-ref="moPickerSearch" type="search" placeholder="Buscar título ou medida" aria-label="Buscar post para comparar" x-model="moPickerSearch"></label>
@@ -8288,8 +8344,8 @@
           </dialog>
 
           <footer class="mo-dialog-footer">
-            <span>Somente vendas concluídas com origem confirmada. Valor vendido não representa lucro.</span>
-            <div class="mo-footer-actions"><button type="button" class="mo-button" @click="moAnalysisTab === 'compare' ? moClose() : moSwitchAnalysis('compare')" x-text="moAnalysisTab === 'compare' ? 'Fechar' : 'Comparar com outro post'"></button><button type="button" class="mo-button mo-primary" disabled title="Disponível após conectar a origem das vendas">Ver vendas vinculadas<i data-lucide="arrow-right"></i></button></div>
+            <span x-text="moAnalysisTab === 'sales' ? 'Uma venda é contada uma vez. Cancelamentos ficam fora dos totais.' : moAnalysisTab === 'metrics' ? 'Mensagem enviada não significa lida. Sem resposta não significa venda perdida.' : 'Somente vendas concluídas com origem confirmada. Valor vendido não representa lucro.'"></span>
+            <div class="mo-footer-actions"><button type="button" class="mo-button" @click="moAnalysisTab === 'summary' ? moSwitchAnalysis('compare') : moClose()" x-text="moAnalysisTab === 'summary' ? 'Comparar com outro post' : 'Fechar'"></button><button type="button" class="mo-button mo-primary" x-show="['summary','compare'].includes(moAnalysisTab)" @click="moSwitchAnalysis('sales')">Ver vendas vinculadas<i data-lucide="arrow-right"></i></button></div>
           </footer>
         </dialog>
       </section>

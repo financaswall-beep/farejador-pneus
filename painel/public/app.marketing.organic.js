@@ -65,14 +65,14 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     async moOpen(row, keepPeriod = false) {
       const wasOpen = this.$refs.moDialog?.open;
       if (!wasOpen) this._moReturnFocus = document.activeElement;
-      if (!keepPeriod) { this.moSummaryPeriod = '7d'; this.moResetCompare?.(); }
+      if (!keepPeriod) { this.moSummaryPeriod = '7d'; this.moResetCompare?.(); this.moResetResults?.(); }
       this.moDestroyChart();
       this.moSelected = row; this.moDetail = null; this.moDetailError = ''; this.moDetailLoading = true;
       const seq = ++this.moDetailSeq;
       this.$nextTick(() => {
         if (!this.moSelected) return;
         if (!this.$refs.moDialog.open) this.$refs.moDialog.showModal();
-        this.$refs.moClose?.focus(); lucide.createIcons();
+        if (!wasOpen) this.$refs.moClose?.focus(); lucide.createIcons();
       });
       try {
         const detail = this.marketingIsMock() ? marketingOrganicMockDetail(row, this.moSummaryPeriod)
@@ -86,6 +86,7 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       ++this.moDetailSeq; this.moDetailLoading = false; this.moSelected = null; this.moDetail = null;
       this.moDestroyChart();
       this.moResetCompare?.();
+      this.moResetResults?.();
       this.$refs.moDialog?.close(); this._moReturnFocus?.focus(); this._moReturnFocus = null;
     },
     moGoAttendance() { this.moClose(); this.moSetView('attendance'); },

@@ -15,10 +15,18 @@ window.PAINEL_MODULES.marketingOrganicCompare = function () {
       this.$refs.moPickerDialog?.close(); pickerFocus=null;
     },
     async moSwitchAnalysis(tab) {
-      if (!this.moSelected || !['summary','compare'].includes(tab)) return;
+      if (!this.moSelected || !['summary','compare','sales','metrics'].includes(tab)) return;
       if (tab===this.moAnalysisTab) return;
       this.moDestroyChart(); this.moDestroyCompareCharts(); this.moAnalysisTab=tab;
-      if (tab==='summary') { ++this.moCompareSeq; this.moCompareLoading=false; return this.moOpen(this.moComparePosts[0] || this.moSelected,true); }
+      if (tab!=='compare') {
+        ++this.moCompareSeq; this.moCompareLoading=false;
+        const post=this.moComparePosts[0] || this.moSelected;
+        if(key(this.moDetail?.publication)===key(post) && this.moDetail?.attribution?.period?.id===this.moSummaryPeriod && !this.moDetailLoading) {
+          this.moSelected=post;this.$nextTick(()=>{lucide.createIcons();this.moRenderChart();});return;
+        }
+        return this.moOpen(post,true);
+      }
+      ++this.moDetailSeq;this.moDetailLoading=false;
       if (!this.moComparePosts[0]) {
         const choices=(this.moData?.rows || []).filter(row=>key(row)!==key(this.moSelected));
         const similar=choices.find(row=>row.platform===this.moSelected.platform && row.format===this.moSelected.format);
@@ -144,6 +152,7 @@ window.PAINEL_MODULES.marketingOrganicCompare = function () {
         ...(this.moCompareTimeline()?.labels || []).map((day,i)=>[day,this.moCompareTimeline().a[i],this.moCompareTimeline().b[i]])];
     },
     moExportAnalysis() {
+      if (['sales','metrics'].includes(this.moAnalysisTab)) return this.moExportResults();
       if (this.moAnalysisTab!=='compare') return this.moExportSummary();
       if (this.moCompareLoading || !this.moCompareDetails.every(Boolean)) return;
       this.moDownloadCsv(this.moCompareExportRows(),'comparacao-publicacoes-'+this.moSummaryPeriod+'.csv');
