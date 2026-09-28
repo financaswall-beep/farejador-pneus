@@ -23,6 +23,7 @@
   chat.renderThread=()=>{};
   chat.renderQueue=()=>{};
   chat.reset=function(){
+    C.waitlist?.reset();
     chat.stop();if(chat.resetMedia)chat.resetMedia();s.session='';s.id=null;s.detail=null;s.rows=[];chat.channels?.reset();
     s.pending.forEach(m=>{if(m.preview)URL.revokeObjectURL(m.preview);});
     s.drafts.clear();s.pending.clear();s.messages.clear();s.avatars.clear();s.avatarExpiry.clear();s.avatarJobs.clear();s.controls.clear();

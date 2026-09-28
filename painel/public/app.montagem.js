@@ -11,6 +11,7 @@ window.PAINEL_MONTAR = function (estado) {
     'comprasResumo:compras->comprasRelatorios',
   ]);
   const fabricas = [
+    window.PAINEL_MODULES.botWaitlist,
     window.PAINEL_MODULES.vehicleTypes,
     window.PAINEL_MODULES.nav, // app.nav.js (linhas 208-262 pré-obra): título/menu/badge + seleção de unidade (abrir/voltar)
     window.PAINEL_MODULES.redeKpis, // app.rede.kpis.js (linhas 263-455 pré-obra): derivadas da Rede: metas, séries, totais, rankings, alertas

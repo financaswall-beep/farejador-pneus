@@ -211,6 +211,7 @@ export const REQUIRED_SCHEMA_SQL = `
     AND to_regclass('finance.partner_payables_effective') IS NOT NULL
     AND to_regclass('ops.conversation_bot_control') IS NOT NULL
     AND to_regclass('ops.conversation_bot_control_events') IS NOT NULL
+    AND to_regclass('ops.stock_interest_events') IS NOT NULL
     AND to_regprocedure('analytics.extract_lead_location_facts(uuid)') IS NOT NULL
     AND EXISTS (
       SELECT 1 FROM pg_constraint

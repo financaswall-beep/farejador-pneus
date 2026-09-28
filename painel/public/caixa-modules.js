@@ -21,6 +21,7 @@
 
   const tabModules = Object.freeze({
     conversations: 'conversas',
+    waitlist: 'conversas',
     cash: 'vendas',
     sales: 'vendas',
     pickups: 'retiradas',
@@ -104,6 +105,7 @@
   }
 
   function initialOperationTab() {
+    if (window.location.hash === '#lista-de-espera') return authorizedOperationTab('waitlist');
     if (window.location.hash === '#conversas') return authorizedOperationTab('conversations');
     if (location.hash === '#financeiro/despesa') return authorizedOperationTab('finance-expense');
     if (location.hash === '#financeiro/relatorios') return authorizedOperationTab('finance-reports');

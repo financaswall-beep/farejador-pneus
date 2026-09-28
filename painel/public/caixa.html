@@ -13,11 +13,12 @@
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
   <link rel="stylesheet" href="/operacao/caixa-purchases.css?v=20260918-purchasevariants1" />
   <link rel="stylesheet" href="/operacao/caixa-chat.css?v=20260923-chat5" />
+  <link rel="stylesheet" href="/operacao/stock-waitlist.css?v=20260927-1" />
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-core.js?v=20260923-sales-scope1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260923-chat1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260927-waitlist1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260923-caixa2"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20260923-caixa2"></script>
@@ -41,7 +42,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260923-sales-scope1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260927-waitlist1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -79,11 +80,14 @@
   <script defer src="/operacao/caixa-photo.js?v=20260816-notifications1"></script>
   <script defer src="/operacao/caixa-notifications.js?v=20260816-notifications1"></script>
   <script defer src="/operacao/chat-channel-alerts.js?v=20260923-2"></script>
-  <script defer src="/operacao/caixa-chat.js?v=20260923-chat4"></script>
+  <script defer src="/operacao/caixa-chat.js?v=20260927-waitlist1"></script>
   <script defer src="/operacao/caixa-chat-view.js?v=20260923-chat5"></script>
   <script defer src="/operacao/caixa-chat-channels.js?v=20260923-1"></script>
   <script defer src="/operacao/caixa-chat-media.js?v=20260923-chat1"></script>
   <script defer src="/operacao/caixa-chat-customer.js?v=20260923-customer1"></script>
+  <script defer src="/operacao/stock-waitlist-view.js?v=20260927-1"></script>
+  <script defer src="/operacao/stock-waitlist.js?v=20260927-1"></script>
+  <script defer src="/operacao/caixa-waitlist.js?v=20260927-1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -1436,7 +1440,7 @@
             <span>Vendas</span>
           </button>
           <button id="nav-conversations" type="button" data-tab="conversations" class="hidden">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 3h16v14H9l-5 4V3Zm4 5h8m-8 4h5"/></svg><span>Conversas</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 3h16v14H9l-5 4V3Zm4 5h8m-8 4h5"/></svg><span>Atendimento</span>
           </button>
           <button id="nav-pickups" type="button" data-tab="pickups">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6h18l-1 4H4L3 6Z"/><path d="M9 20v-6h6v6"/></svg>

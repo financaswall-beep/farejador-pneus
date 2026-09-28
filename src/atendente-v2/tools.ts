@@ -78,7 +78,7 @@ export function activeToolDefinitions(): ToolDefinition[] {
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
-  return env.ORGANIC_ATTRIBUTION_ENABLED ? [...defs,STOCK_INTEREST_TOOL] : defs;
+  return [...defs,STOCK_INTEREST_TOOL];
 }
 
 // Variante do calcular_frete com bairro OPCIONAL (frete pelo pino). Derivada do schema

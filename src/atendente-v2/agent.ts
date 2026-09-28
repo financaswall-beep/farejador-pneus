@@ -228,7 +228,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           return;
         }
 
-        const isWrite = toolCall.function.name === 'criar_pedido';
+        const isOrderWrite = toolCall.function.name === 'criar_pedido';
+        const isWrite = isOrderWrite || toolCall.function.name === 'registrar_interesse_reposicao';
 
         let result: string;
         if (isWrite) {
@@ -241,7 +242,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
             await client.query('ROLLBACK');
             throw err;
           }
-          await notifyClientesKanban(client, environment, conversationId, 'order');
+          if(isOrderWrite)await notifyClientesKanban(client, environment, conversationId, 'order');
         } else {
           result = await withStockSearchTrace(client, environment as Environment, conversationId,
             { key: `${jobId}:${round}:${toolIndex}`, tool: toolCall.function.name, args: toolArgs, messageId: job.triggerMessageId },

@@ -4,7 +4,8 @@ import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
 // é dado sensível: NUNCA servir ao parceiro (zero grant, mesma régua do sino).
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth, requireAdminOwner } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner, getAdminContext } from '../auth.js';
+import { registerStockWaitlistRoutes } from '../route-stock-waitlist.js';
 import { logger } from '../../shared/logger.js';
 import { businessDateSaoPaulo } from '../../shared/business-time.js';
 import { getBotCampainha, getBotMovement, getBotResilience, getBotVisao,
@@ -40,6 +41,7 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
   await registerBotShortageRoutes(fastify);
   await registerShortageReportRoutes(fastify);
   await registerDemandReportRoutes(fastify);
+  registerStockWaitlistRoutes(fastify,'/admin/api/bot/waitlist',[requireAdminOwner],r=>getAdminContext(r).displayName);
   // Campainha: leve (roda no load e no refresh de 15s) — cliente esperando + escalados.
   fastify.get('/admin/api/bot/campainha', { preHandler: requireAdminAuth }, async (_request, reply) => {
     try {

@@ -218,6 +218,7 @@
 
     if (Caixa.purchases) Caixa.purchases.syncTab(tab);
     if (Caixa.chat) Caixa.chat.syncTab(tab);
+    if (Caixa.waitlist) Caixa.waitlist.syncTab(tab);
     const activeNavigation = document.querySelector('.bottom-nav button.active');
     if (activeNavigation) requestAnimationFrame(function () {
       activeNavigation.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });

@@ -165,7 +165,11 @@
 <link rel="stylesheet" href="/admin/painel/chat-channel-alerts.css?v=20260923-2">
 <script src="/admin/painel/chat-channel-alerts.js?v=20260923-2"></script>
 <script src="/admin/painel/app.bot.channels.js?v=20260923-1"></script>
-<script src="/admin/painel/app.bot.js?v=20260923-channels1"></script>
+<script src="/admin/painel/stock-waitlist-view.js?v=20260927-1"></script>
+<script src="/admin/painel/stock-waitlist.js?v=20260927-1"></script>
+<script src="/admin/painel/app.bot.waitlist.js?v=20260927-1"></script>
+<link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20260927-1">
+<script src="/admin/painel/app.bot.js?v=20260927-waitlist1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.view.js?v=20260911-demanda3"></script>
@@ -263,7 +267,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260927-waitlist1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -6933,7 +6937,11 @@
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda' }">
       <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
-      <section aria-labelledby="bot-heading" x-show="!['entrega','demanda','faltas'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
+      <header x-show="botTab === 'espera'" class="wl-heading" x-cloak>
+        <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome vendas quando o pneu chegar e acompanhe a procura.</p></div>
+        <div class="wl-toolbar"><button @click="exportBotWaitlist()"><i data-lucide="upload"></i>Exportar</button><button @click="refreshBotWaitlist()" aria-label="Atualizar lista de espera"><i data-lucide="refresh-cw"></i></button></div>
+      </header>
+      <section aria-labelledby="bot-heading" x-show="!['entrega','demanda','faltas','espera'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
           <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
           <p class="mt-2 max-w-sm text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
@@ -6990,12 +6998,13 @@
             <button @click="botTab = 'demanda'; $nextTick(() => renderBotMapa())"
                     :class="botTab === 'demanda' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1">Demanda e estoque</button>
+            <button x-show="adminUser?.role === 'owner'" @click="botTab = 'espera'" :class="botTab === 'espera' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium">Lista de espera</button>
             <button @click="bfOpen()" :class="botTab === 'faltas' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium">Faltas por loja</button>
             <button x-show="adminUser?.role === 'owner'" @click="botEntregaAbrir()"
                     :class="botTab === 'entrega' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium">Entrega e cobertura</button>
           </nav>
-          <div x-show="!['visao','entrega','demanda','faltas'].includes(botTab)" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
+          <div x-show="!['visao','entrega','demanda','faltas','espera'].includes(botTab)" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -7006,6 +7015,7 @@
         </div>
       </div>
 
+      <section x-show="botTab === 'espera'" x-effect="syncBotWaitlist(currentPage === 'bot' && botTab === 'espera' && adminAuthenticated && adminUser?.role === 'owner')" x-cloak aria-label="Lista de espera"><div id="bot-waitlist" x-ignore></div></section>
       <section x-show="botTab === 'entrega'" class="bot-delivery" aria-labelledby="bot-delivery-heading">
         <div x-show="botEntregaErro" class="bd-alert bd-error" role="alert"><span x-text="botEntregaErro"></span><button @click="botEntregaCarregar()" :disabled="botEntregaBusy">Recarregar cadastro</button></div>
         <p x-show="botEntregaMensagem" class="bd-alert bd-success" role="status" x-text="botEntregaMensagem"></p>
