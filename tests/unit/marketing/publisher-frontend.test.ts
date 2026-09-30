@@ -78,12 +78,31 @@ it('conferência incerta exige confirmação e mantém formulário quando a Meta
     version:3,platform:'instagram',decision:'not_published',confirmed:true,note:'Conferi a conta e o conteúdo.',
   }]]);
 });
-it('conferência publicada exige ID da Meta e informa conta incorreta sem liberar outro envio',async()=>{
+it('conferência publicada aceita link e mantém o formulário se a Meta não confirmar',async()=>{
   const s=state();s.mpOpenReconciliation({id:'post',title:'Pneu',version:3},{platform:'instagram',status:'uncertain'});
-  Object.assign(s.mpReconciliation,{note:'Conferi o conteúdo na conta.',confirmed:true,provider_id:'https://instagram.com/p/shortcode'});
-  await s.mpReconcile();expect(s.apiPost).not.toHaveBeenCalled();expect(s.mpError).toContain('ID numérico');
-  s.mpReconciliation.provider_id='123';s.apiPost.mockRejectedValue(Error('meta_post_owner_mismatch'));
+  const link='https://instagram.com/p/shortcode/?igsh=tracking';
+  Object.assign(s.mpReconciliation,{note:'Conferi o conteúdo na conta.',confirmed:true,provider_id:link});
+  s.apiPost.mockRejectedValue(Error('publisher_post_url_not_found'));
+  await s.mpReconcile();expect(s.apiPost).toHaveBeenCalledWith('/admin/api/marketing/publisher/posts/post/reconcile',{
+    version:3,platform:'instagram',decision:'published',confirmed:true,note:'Conferi o conteúdo na conta.',post_url:link,
+  });
+  expect(s.mpReconciliation).not.toBe(null);expect(s.mpError).toContain('continua pendente');
+});
+it('continua aceitando ID numérico e informa conta incorreta sem liberar outro envio',async()=>{
+  const s=state();s.mpOpenReconciliation({id:'post',title:'Pneu',version:3},{platform:'instagram',status:'uncertain'});
+  Object.assign(s.mpReconciliation,{note:'Conferi o conteúdo na conta.',confirmed:true,provider_id:'123'});
+  s.apiPost.mockRejectedValue(Error('meta_post_owner_mismatch'));
   await s.mpReconcile();expect(s.mpError).toContain('outra conta');expect(s.mpReconciliation).not.toBe(null);
+  expect(s.apiPost.mock.calls[0][1]).toMatchObject({provider_id:'123'});
+  expect(s.apiPost.mock.calls[0][1]).not.toHaveProperty('post_url');
+});
+it('referência vazia, texto curto e URL sem https não são enviados',async()=>{
+  const s=state();s.mpOpenReconciliation({id:'post',title:'Pneu',version:3},{platform:'instagram',status:'uncertain'});
+  Object.assign(s.mpReconciliation,{note:'Conferi o conteúdo na conta.',confirmed:true});
+  for(const provider of ['', 'shortcode', 'http://instagram.com/p/a/', 'https://instagram.com/p/'+'a'.repeat(2048)]) {
+    s.mpReconciliation.provider_id=provider;await s.mpReconcile();
+  }
+  expect(s.apiPost).not.toHaveBeenCalled();
 });
 it('conexão exibe token expirado sem apresentar permissão confirmada',()=>{
   const s=state();s.mpConnections=[{platform:'facebook',verified:true,permissions_checked:false,publish_allowed:false,error_code:'publisher_token_expired'}];

@@ -33,7 +33,24 @@ describe('Arquivo efetivo e regras por destino', () => {
     expect(() => validate({ ...video, inspection: { ...video.inspection!, video_codec: 'vp9' } })).toThrow('publisher_video_codec');
     expect(() => validate({ ...video, inspection: { ...video.inspection!, fps: 120 } })).toThrow('publisher_instagram_video_fps');
     expect(() => validate({ ...video, inspection: { ...video.inspection!, bit_rate: 56_000_000 } })).toThrow('publisher_instagram_video_bitrate');
-    expect(() => validate({ ...video, inspection: { ...video.inspection!, audio_sample_rate: 44100 } })).toThrow('publisher_instagram_audio_codec');
+  });
+  it.each([44100, 48000])('aceita AAC em %i Hz em Reel e Story do Instagram', sampleRate => {
+    const media = { ...video, inspection: { ...video.inspection!, audio_sample_rate: sampleRate } };
+    for (const format of ['reel', 'story'] as const) {
+      expect(() => validateDestinationMedia(media, [{ platform: 'instagram', format }])).not.toThrow();
+    }
+  });
+  it.each([96000, 48001, 0, -1, 44100.5, NaN, undefined])('rejeita taxa AAC incompatível ou não verificada: %s', sampleRate => {
+    expect(() => validate({ ...video, inspection: { ...video.inspection!, audio_sample_rate: sampleRate } }))
+      .toThrow('publisher_instagram_audio_sample_rate');
+  });
+  it('permite vídeo sem áudio, mas recusa codec diferente de AAC ou desconhecido', () => {
+    const { audio_codec, audio_sample_rate, ...silent } = video.inspection!;
+    expect(() => validate({ ...video, inspection: silent })).not.toThrow();
+    for (const codec of ['opus', 'mp3', '']) {
+      expect(() => validate({ ...video, inspection: { ...video.inspection!, audio_codec: codec } }))
+        .toThrow('publisher_instagram_audio_codec');
+    }
   });
   it('confere Feed foto e duração/dimensões Facebook separadamente', () => {
     const photo = { kind: 'photo', width: 1080, height: 1920 } as Media;

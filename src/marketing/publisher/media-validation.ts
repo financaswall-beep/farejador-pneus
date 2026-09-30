@@ -31,8 +31,13 @@ export function validateDestinationMedia(media: Pick<Media, 'kind' | 'width' | '
         throw new PublisherError('publisher_instagram_video_fps', 400);
       }
       if (Number(inspection.bit_rate) > 25_000_000) throw new PublisherError('publisher_instagram_video_bitrate', 400);
-      if (inspection.audio_codec && (inspection.audio_codec !== 'aac' || inspection.audio_sample_rate !== 48000)) {
-        throw new PublisherError('publisher_instagram_audio_codec', 400);
+      if (inspection.audio_codec !== undefined) {
+        if (inspection.audio_codec !== 'aac') throw new PublisherError('publisher_instagram_audio_codec', 400);
+        const sampleRate = inspection.audio_sample_rate;
+        // A Meta especifica um máximo de 48 kHz; AAC em 44,1 kHz também é válido.
+        if (!Number.isInteger(sampleRate) || !sampleRate || sampleRate < 1 || sampleRate > 48_000) {
+          throw new PublisherError('publisher_instagram_audio_sample_rate', 400);
+        }
       }
       if (destination.format === 'reel' && (duration < 3 || duration > 900)) {
         throw new PublisherError('publisher_instagram_reel_duration', 400);

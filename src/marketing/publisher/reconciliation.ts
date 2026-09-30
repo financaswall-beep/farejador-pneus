@@ -11,8 +11,11 @@ export const reconciliationSchema = z.object({
   decision: z.enum(['published', 'not_published', 'abandon']),
   confirmed: z.literal(true),
   provider_id: z.string().regex(/^[0-9_]{1,100}$/).optional(),
+  post_url: z.string().trim().url().max(2048).optional(),
   note: z.string().trim().min(10).max(500),
-}).strict();
+}).strict().refine(input => !input.post_url || (!input.provider_id && input.decision === 'published'), {
+  message: 'Informe somente o link ou o ID ao confirmar uma publicação.',
+});
 export type Reconciliation = z.infer<typeof reconciliationSchema>;
 interface PendingDelivery extends Delivery { status: string; }
 
@@ -20,14 +23,15 @@ async function proofFor(graph: PublishingGraph, delivery: PendingDelivery, input
   if (input.decision === 'abandon') {
     return { outcome: 'unknown', evidence: 'operator_abandoned_no_retry' } satisfies PublicationProof;
   }
-  if (input.decision === 'published' && !input.provider_id && !delivery.provider_id) {
+  if (input.decision === 'published' && !input.post_url && !input.provider_id && !delivery.provider_id) {
     throw new PublisherError('publisher_provider_required', 400);
   }
   try {
-    return await graph.reconcile({ ...delivery, provider_id: input.provider_id ?? delivery.provider_id });
+    const target = { ...delivery, provider_id: input.provider_id ?? delivery.provider_id };
+    return input.post_url ? await graph.reconcile(target, input.post_url) : await graph.reconcile(target);
   } catch (error) {
     if (error instanceof MetaCommentError) {
-      const status = error.code === 'meta_post_owner_mismatch' ? 400 : 503;
+      const status = error.code === 'meta_post_owner_mismatch' || error.code.startsWith('publisher_post_url_') ? 400 : 503;
       throw new PublisherError(error.code, status);
     }
     throw new PublisherError('publisher_reconciliation_unavailable', 503);
@@ -47,6 +51,7 @@ export async function reconcileDestination(pool: Pool, environment: Environment,
   if (snapshot.status !== 'uncertain') throw new PublisherError('publisher_reconciliation_not_allowed');
   const proof = await proofFor(graph, snapshot, input);
   if (input.decision !== 'abandon' && proof.outcome !== input.decision) {
+    if (proof.evidence === 'publication_link_not_found') throw new PublisherError('publisher_post_url_not_found');
     throw new PublisherError(proof.outcome === 'published'
       ? 'publisher_already_published' : 'publisher_reconciliation_ambiguous');
   }

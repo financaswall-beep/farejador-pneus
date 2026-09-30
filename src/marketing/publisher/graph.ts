@@ -1,6 +1,7 @@
 import { CommentsGraph, MetaCommentError, safePostUrl } from '../../social-comments/graph.js';
 import { commentsConfig, type CommentsConfig } from '../../social-comments/config.js';
 import { accountId, type Destination } from './model.js';
+import { parsePublicationLink, resolvePublicationLink } from './publication-link.js';
 
 export interface Delivery extends Destination {
   account_id: string;
@@ -20,7 +21,7 @@ export interface PublishingGraph {
   ready(d: Delivery): Promise<boolean>;
   publish(d: Delivery): Promise<string>;
   verify(d: Delivery): Promise<{ confirmed: boolean; url: string | null }>;
-  reconcile(d: Delivery): Promise<PublicationProof>;
+  reconcile(d: Delivery, postUrl?: string): Promise<PublicationProof>;
 }
 function providerId(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9_]+$/.test(value)) {
@@ -174,9 +175,15 @@ export class PublisherGraph extends CommentsGraph implements PublishingGraph {
     const result = await this.call(d.provider_id, 'GET', { fields: 'id,is_published,permalink_url' });
     return { confirmed: result.id === d.provider_id && result.is_published === true, url: safePostUrl(result.permalink_url) };
   }
-  async reconcile(d: Delivery): Promise<PublicationProof> {
+  async reconcile(d: Delivery, postUrl?: string): Promise<PublicationProof> {
     this.check(d);
+    const link = postUrl ? parsePublicationLink(postUrl, d.platform) : null;
     await this.assertAccount(d.platform, d.account_id);
+    if (link) {
+      const resolvedId = await resolvePublicationLink(d, link, (path, params) => this.call(path, 'GET', params));
+      if (!resolvedId) return { outcome: 'unknown', evidence: 'publication_link_not_found' };
+      d = { ...d, provider_id: resolvedId };
+    }
     if (d.provider_id) {
       // IDs informados pelo operador precisam pertencer à conta autorizada.
       if (d.platform === 'facebook' && d.format === 'story') {

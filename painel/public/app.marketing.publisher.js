@@ -181,7 +181,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             if (this.mpBusy || delivery.status !== 'uncertain' || this.marketingIsMock?.())
                 return;
             this.mpReconciliation = { post_id: post.id, title: post.title, version: post.version,
-                platform: delivery.platform, decision: 'published', provider_id: delivery.provider_id || '', note: '', confirmed: false };
+                platform: delivery.platform, decision: 'published', provider_id: delivery.post_url || delivery.provider_id || '', note: '', confirmed: false };
             this.$nextTick(() => window.lucide?.createIcons());
         },
         async mpReconcile() {
@@ -189,7 +189,9 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             if (this.mpBusy || !form || !form.confirmed || form.note.trim().length < 10 || this.marketingIsMock?.())
                 return;
             const provider = form.provider_id.trim();
-            if (form.decision === 'published' && (!provider || !/^[0-9_]{1,100}$/.test(provider))) {
+            const isId = /^[0-9_]{1,100}$/.test(provider);
+            const isLink = /^https:\/\/\S+$/i.test(provider) && provider.length <= 2048;
+            if (form.decision === 'published' && (!provider || (!isId && !isLink))) {
                 this.mpError = this.mpErrorText({ message: provider ? 'publisher_provider_invalid' : 'publisher_provider_required' });
                 return;
             }
@@ -198,7 +200,8 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             try {
                 await this.apiPost('/admin/api/marketing/publisher/posts/' + form.post_id + '/reconcile', {
                     version: form.version, platform: form.platform, decision: form.decision, confirmed: true,
-                    note: form.note.trim(), ...(form.decision === 'published' ? { provider_id: provider } : {}),
+                    note: form.note.trim(), ...(form.decision === 'published'
+                        ? (isId ? { provider_id: provider } : { post_url: provider }) : {}),
                 });
                 this.mpReconciliation = null;
                 this.mpMessage = form.decision === 'not_published' ? 'Ausência de publicação confirmada. O reenvio fica disponível como uma ação separada.' :

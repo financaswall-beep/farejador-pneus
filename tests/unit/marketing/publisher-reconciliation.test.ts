@@ -4,6 +4,7 @@ vi.mock('../../../src/shared/config/env.js', () => ({ env: {} }));
 import { reconcileDestination, reconciliationSchema, type Reconciliation } from '../../../src/marketing/publisher/reconciliation.js';
 import type { PublishingGraph } from '../../../src/marketing/publisher/graph.js';
 import { META_BUSINESS_ACCOUNTS as accounts } from '../../../src/shared/meta-business-accounts.js';
+import { MetaCommentError } from '../../../src/social-comments/graph.js';
 
 const snapshot = { status: 'uncertain', platform: 'instagram', account_id: accounts.instagram.id,
   container_id: '301', provider_id: null, media_kind: 'video', format: 'reel' };
@@ -50,6 +51,35 @@ describe('Conciliação explícita e auditável por destino', () => {
     await expect(reconcileDestination(pool as unknown as Pool, 'test', 'post', input({ provider_id: undefined }), 'owner', graph))
       .rejects.toThrow('publisher_provider_required');
     expect(graph.reconcile).not.toHaveBeenCalled();
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+  it('aceita link ou ID, mas rejeita duas referências ou link numa decisão de ausência', () => {
+    const linked = input({ provider_id: undefined, post_url: 'https://instagram.com/reel/ABC/?igsh=tracking' });
+    expect(reconciliationSchema.safeParse(linked).success).toBe(true);
+    for (const change of [{ provider_id: '302' }, { decision: 'not_published' },
+      { decision: 'abandon' }, { post_url: 'não é uma URL' }]) {
+      expect(reconciliationSchema.safeParse({ ...linked, ...change }).success).toBe(false);
+    }
+  });
+  it('confirma link somente com ID e URL verificados pelo provedor, sem salvar o link colado', async () => {
+    const postUrl = 'https://instagram.com/reel/ABC/?igsh=tracking';
+    const verifiedUrl = 'https://www.instagram.com/p/ABC/';
+    vi.mocked(graph.reconcile).mockResolvedValue({ outcome: 'published', provider_id: '302', url: verifiedUrl, evidence: 'owned' });
+    await reconcileDestination(pool as unknown as Pool, 'test', 'post', input({ provider_id: undefined, post_url: postUrl }), 'owner', graph);
+    expect(graph.reconcile).toHaveBeenCalledWith(expect.objectContaining({ account_id: accounts.instagram.id, provider_id: null }), postUrl);
+    const update = client.query.mock.calls.find(([sql]) => sql.startsWith('UPDATE ops.publisher_destinations'))!;
+    expect(update[1].slice(0, 6)).toEqual(['test', 'post', 'instagram', 'published', '302', verifiedUrl]);
+  });
+  it('link ausente na lista da Meta mantém a conferência pendente sem abrir transação', async () => {
+    vi.mocked(graph.reconcile).mockResolvedValue({ outcome: 'unknown', evidence: 'publication_link_not_found' });
+    await expect(reconcileDestination(pool as unknown as Pool, 'test', 'post', input({ provider_id: undefined,
+      post_url: 'https://instagram.com/p/missing/' }), 'owner', graph)).rejects.toThrow('publisher_post_url_not_found');
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+  it('link inválido recebe erro 400 sem vazar detalhes do provedor ou alterar o destino', async () => {
+    vi.mocked(graph.reconcile).mockRejectedValue(new MetaCommentError('publisher_post_url_invalid'));
+    await expect(reconcileDestination(pool as unknown as Pool, 'test', 'post', input({ provider_id: undefined,
+      post_url: 'https://other.test/p/302' }), 'owner', graph)).rejects.toMatchObject({ code: 'publisher_post_url_invalid', status: 400 });
     expect(pool.connect).not.toHaveBeenCalled();
   });
   it('resultado ambíguo não vira falha reenviável', async () => {

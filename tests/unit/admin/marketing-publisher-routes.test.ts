@@ -97,6 +97,20 @@ it('ignora tentativas de escolher ambiente/conta e rejeita datas sem fuso horár
     expect(result.statusCode).toBe(200);expect(m.submit.mock.calls[0]?.slice(1)).toEqual(['test',id,1,'2026-10-01T09:00:00-03:00','Owner']);
   }finally{await app.close();}
 });
+it('aceita conferência por link para owner no ambiente do servidor e rejeita referências conflitantes',async()=>{
+  const app=Fastify();await registerMarketingPublisher(app);
+  try{
+    const url=base+'/posts/'+id+'/reconcile';
+    const payload={version:2,platform:'instagram',decision:'published',confirmed:true,
+      post_url:'https://www.instagram.com/reel/ABC/',note:'Conferi este Reel na conta da matriz.'};
+    expect((await app.inject({method:'POST',url,headers:{'x-role':'owner'},payload})).statusCode).toBe(200);
+    expect(m.reconcile.mock.calls[0]?.slice(1,5)).toEqual(['test',id,payload,'Owner']);
+    for(const invalid of [{...payload,provider_id:'302'},{...payload,decision:'not_published'},{...payload,environment:'prod'}]) {
+      expect((await app.inject({method:'POST',url,headers:{'x-role':'owner'},payload:invalid})).statusCode).toBe(400);
+    }
+    expect(m.reconcile).toHaveBeenCalledOnce();
+  }finally{await app.close();}
+});
 it('status sem migration é explícito e nenhum segredo aparece em erros',async()=>{
   const app=Fastify();await registerMarketingPublisher(app);
   try{

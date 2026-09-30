@@ -157,6 +157,31 @@ it('declaração humana não libera reenvio; prova negativa terminal libera apen
   expect(await publishTick(pool,env,graph,storage)).toBe(false);expect(graph.publish).not.toHaveBeenCalled();
   await postAction(pool,env,p.id,'retry','Owner');await finish();expect(graph.publish).toHaveBeenCalledOnce();
 });
+it('conciliação por link persiste somente prova positiva da Meta e não reenvia',async()=>{
+  const p=await uncertainPost();
+  const input={version:p.version,platform:'instagram' as const,decision:'published' as const,confirmed:true as const,
+    post_url:'https://instagram.com/reel/ABC/?igsh=tracking',note:'Copiei o link e conferi o Reel na conta.'};
+  graph.reconcile.mockResolvedValueOnce({outcome:'unknown',evidence:'publication_link_not_found'});
+  await expect(reconcileDestination(pool,env,p.id,input,'Owner',graph)).rejects.toThrow('publisher_post_url_not_found');
+  expect((await pool.query('SELECT status,provider_id FROM ops.publisher_destinations')).rows[0])
+    .toMatchObject({status:'uncertain',provider_id:null});
+  const verifiedUrl='https://www.instagram.com/p/ABC/';
+  graph.reconcile.mockResolvedValueOnce({outcome:'published',provider_id:'302',url:verifiedUrl,evidence:'provider_published_owned'});
+  await reconcileDestination(pool,env,p.id,input,'Owner',graph);await finish();
+  expect((await pool.query('SELECT status,provider_id,post_url FROM ops.publisher_destinations')).rows[0])
+    .toMatchObject({status:'published',provider_id:'302',post_url:verifiedUrl});
+  expect(graph.publish).not.toHaveBeenCalled();
+  const event=(await pool.query(`SELECT actor,payload FROM ops.publisher_events WHERE event='delivery_reconciled'`)).rows[0];
+  expect(event).toMatchObject({actor:'Owner',payload:{evidence:'provider_published_owned',provider_id:'302'}});
+});
+it('submissão de vídeo AAC em 44,1 kHz usa o mesmo motor sem conversão obrigatória',async()=>{
+  const id=await asset();
+  await pool.query(`UPDATE ops.publisher_media SET inspection=jsonb_set(inspection,'{audio_sample_rate}','44100') WHERE id=$1`,[id]);
+  const p=await post(id,[{platform:'instagram',format:'reel'}]);
+  await submitPost(pool,env,p.id,p.version,null,'Owner');await finish();
+  expect(graph.publish).toHaveBeenCalledOnce();
+  expect((await pool.query('SELECT status FROM ops.publisher_posts')).rows[0].status).toBe('published');
+});
 it('encerrar resultado ambíguo preserva arquivo e não permite reenvio automático',async()=>{
   const p=await uncertainPost();
   await reconcileDestination(pool,env,p.id,{version:p.version,platform:'instagram',decision:'abandon',confirmed:true,
