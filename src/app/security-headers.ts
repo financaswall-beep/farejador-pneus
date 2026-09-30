@@ -16,10 +16,30 @@ const CONTENT_SECURITY_POLICY = [
   "manifest-src 'self'",
 ].join('; ');
 
-export function applySecurityHeaders(reply: FastifyReply, production: boolean, mapsPanel = false): void {
-  const policy = mapsPanel ? CONTENT_SECURITY_POLICY
+function storageOrigin(storageUrl?: string): string | undefined {
+  if (!storageUrl) return undefined;
+  try {
+    const url = new URL(storageUrl);
+    if (url.protocol !== 'https:' || /[\s*;'\"]/.test(url.origin)
+      || url.username || url.password || url.pathname !== '/'
+      || url.search || url.hash) return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+export function applySecurityHeaders(
+  reply: FastifyReply, production: boolean, mapsPanel = false, publisherStorageUrl?: string,
+): void {
+  let policy = mapsPanel ? CONTENT_SECURITY_POLICY
     .replace("https://cdn.jsdelivr.net", "https://cdn.jsdelivr.net https://maps.googleapis.com https://maps.gstatic.com")
     .replace("connect-src 'self'", "connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com") : CONTENT_SECURITY_POLICY;
+  const origin = mapsPanel ? storageOrigin(publisherStorageUrl) : undefined;
+  if (origin) {
+    policy = policy.replace("connect-src 'self'", `connect-src 'self' ${origin}`)
+      .replace("media-src 'self' blob:", `media-src 'self' blob: ${origin}`);
+  }
   reply.header('Content-Security-Policy', policy);
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('X-Frame-Options', 'DENY');
@@ -32,9 +52,11 @@ export function applySecurityHeaders(reply: FastifyReply, production: boolean, m
   }
 }
 
-export function registerSecurityHeaders(fastify: FastifyInstance, production: boolean): void {
+export function registerSecurityHeaders(
+  fastify: FastifyInstance, production: boolean, publisherStorageUrl?: string,
+): void {
   fastify.addHook('onSend', async (request, reply, payload) => {
-    applySecurityHeaders(reply, production, /^\/admin\/painel\/?(?:\?|$)/.test(request.url));
+    applySecurityHeaders(reply, production, /^\/admin\/painel\/?(?:\?|$)/.test(request.url), publisherStorageUrl);
     return payload;
   });
 }

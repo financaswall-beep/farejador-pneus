@@ -26,7 +26,7 @@ export class PublisherStorage {
   }
 
   private async request(path: string, method = 'GET', body?: string | Uint8Array,
-    headers: Record<string, string> = {}): Promise<Response> {
+    headers: Record<string, string> = {}, objectLookup = false): Promise<Response> {
     let response: Response;
     try {
       response = await this.fetcher(`${this.base()}${path}`, {
@@ -41,11 +41,42 @@ export class PublisherStorage {
       throw new PublisherError('publisher_storage_unavailable', 502);
     }
     if (!response.ok) {
-      await response.body?.cancel();
-      if (response.status === 404) throw new PublisherError('publisher_storage_object_missing', 404);
-      throw new PublisherError('publisher_storage_rejected', 502);
+      throw await this.responseError(response, objectLookup);
     }
     return response;
+  }
+
+  /** O Storage pode usar HTTP 400 para NoSuchKey; só o código lógico confirma ausência. */
+  private async responseError(response: Response, objectLookup: boolean): Promise<PublisherError> {
+    const rejected = new PublisherError('publisher_storage_rejected', 502);
+    const reader = response.body?.getReader();
+    if (!reader) return rejected;
+    const parts: Uint8Array[] = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        bytes += part.value.byteLength;
+        if (bytes > 8 * 1024) return rejected;
+        parts.push(part.value);
+      }
+      const data: unknown = JSON.parse(Buffer.concat(parts).toString('utf8'));
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const error = data as { code?: unknown; error?: unknown; statusCode?: unknown };
+        const missingCode = error.code === 'NoSuchKey' || error.code === undefined && error.error === 'not_found';
+        const missing = missingCode && (error.statusCode === '404' || error.statusCode === 404);
+        if (objectLookup && [400, 404].includes(response.status) && missing) {
+          return new PublisherError('publisher_storage_object_missing', 404);
+        }
+      }
+      return rejected;
+    } catch {
+      return rejected;
+    } finally {
+      // Nem o corpo do provedor nem falhas de cancelamento devem escapar no erro público.
+      try { await reader.cancel(); } catch { /* A resposta já foi abortada. */ }
+    }
   }
 
   private signed(value: unknown, expected: string): string {
@@ -80,7 +111,7 @@ export class PublisherStorage {
     const token = new URL(upload_url).searchParams.get('token');
     if (!token) throw new PublisherError('publisher_storage_response', 502);
     return { upload_url, resumable: {
-      endpoint: `${this.base()}/upload/resumable`, token,
+      endpoint: `${this.base()}/upload/resumable/sign`, token,
       bucket: env.MARKETING_PUBLICATIONS_BUCKET, object: path, chunk_size: 6 * 1024 * 1024,
     } };
   }
@@ -97,12 +128,14 @@ export class PublisherStorage {
   }
 
   async info(path: string): Promise<{ bytes: number; mime: string }> {
-    const data = await (await this.request(`/object/info/${this.object(path)}`)).json() as {
-      size?: number; content_type?: string; metadata?: { size?: number; mimetype?: string };
+    const data = await (await this.request(`/object/info/${this.object(path)}`, 'GET', undefined, {}, true)).json() as {
+      size?: unknown; content_type?: unknown;
     };
-    const bytes = Number(data.metadata?.size ?? data.size);
-    if (!Number.isSafeInteger(bytes) || bytes < 1) throw new PublisherError('publisher_storage_response', 502);
-    return { bytes, mime: String(data.metadata?.mimetype ?? data.content_type ?? '').toLowerCase() };
+    const bytes = typeof data.size === 'number' ? data.size : NaN;
+    if (!Number.isSafeInteger(bytes) || bytes < 1 || typeof data.content_type !== 'string' || !data.content_type) {
+      throw new PublisherError('publisher_storage_response', 502);
+    }
+    return { bytes, mime: data.content_type.toLowerCase() };
   }
 
   private async body(response: Response, max: number, truncate = false): Promise<Buffer> {
@@ -131,7 +164,7 @@ export class PublisherStorage {
 
   async read(path: string, max: number, range = false): Promise<Buffer> {
     const response = await this.request(`/object/${this.object(path)}`, 'GET', undefined,
-      range ? { Range: `bytes=0-${max - 1}` } : {});
+      range ? { Range: `bytes=0-${max - 1}` } : {}, true);
     return this.body(response, max, range);
   }
 
@@ -140,7 +173,8 @@ export class PublisherStorage {
     if (![start, end, total].every(Number.isSafeInteger) || start < 0 || end < start || end >= total || end - start >= 8 * 1024 * 1024) {
       throw new PublisherError('publisher_media_range_invalid', 400);
     }
-    const response = await this.request(`/object/${this.object(path)}`, 'GET', undefined, { Range: `bytes=${start}-${end}` });
+    const response = await this.request(`/object/${this.object(path)}`, 'GET', undefined,
+      { Range: `bytes=${start}-${end}` }, true);
     if (response.status !== 206 || response.headers.get('Content-Range') !== `bytes ${start}-${end}/${total}`) {
       await response.body?.cancel();
       throw new PublisherError('publisher_storage_range_required', 502);

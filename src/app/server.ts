@@ -30,7 +30,7 @@ const fastify = Fastify({
   genReqId: createRequestId,
 });
 
-registerSecurityHeaders(fastify, env.NODE_ENV === 'production');
+registerSecurityHeaders(fastify, env.NODE_ENV === 'production', env.SUPABASE_STORAGE_URL);
 registerRequestContext(fastify);
 
 let stopWorker: (() => void) | null = null;

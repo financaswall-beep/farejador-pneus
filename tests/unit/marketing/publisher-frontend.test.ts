@@ -43,6 +43,12 @@ it('aviso da biblioteca mantém calendário e histórico acessíveis',async()=>{
   const s=state();s.apiGet.mockResolvedValue({config:{enabled:true},posts:[{id:'one',status:'scheduled'}],media:[],warnings:['publisher_library_unavailable']});
   await s.mpLoad();expect(s.mpPosts).toHaveLength(1);expect(s.mpWarnings).toEqual(['publisher_library_unavailable']);expect(s.mpError).toBe('');
 });
+it('falhas conhecidas do armazenamento explicam o problema sem instruir reenvio automático',()=>{
+  const s=state();
+  expect(s.mpErrorText(Error('publisher_storage_response'))).toContain('preparar o envio');
+  expect(s.mpErrorText(Error('publisher_storage_rejected'))).toContain('recusou esta operação');
+  expect(s.mpErrorText(Error('publisher_upload_conflict'))).toContain('Atualize a biblioteca');
+});
 it('mídia pendente não pode ser selecionada e miniatura ausente usa imagem substituta',()=>{
   const s=state();s.mpSelectMedia({id:'pending',name:'video.mov',kind:'video',status:'uploading'});
   expect(s.mpForm.media_id).toBe(null);expect(s.mpThumbnail({thumbnail_url:null})).toContain('data:image/svg+xml');

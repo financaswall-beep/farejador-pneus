@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import { randomUUID, webcrypto } from 'node:crypto';
 
-const endpoint='https://example.storage.supabase.co/storage/v1/upload/resumable';
+const endpoint='https://example.storage.supabase.co/storage/v1/upload/resumable/sign';
 const chunk=6*1024*1024;
 const reservation={id:'media-id',resumable:{endpoint,token:'signed-token',bucket:'publisher',object:'test/media-id/original.mp4',chunk_size:chunk}};
 type Request={method:string;url:string;headers:Record<string,string>;bytes:number};
@@ -26,6 +26,9 @@ function browser(initialOffset=0,losePatch=false,stored=new Map<string,string>()
       requests.push({method:this.method,url:this.url,headers:{...this.headers},bytes});
       queueMicrotask(()=>{
         if(this.method==='POST'){
+          if(new URL(this.url).pathname!=='/storage/v1/upload/resumable/sign'){
+            this.status=401;this.onload();return;
+          }
           length=Number(this.headers['Upload-Length']);offset=bytes;this.status=201;
           this.responseHeaders={location:endpoint+'/session','upload-offset':String(offset)};
         }else if(this.method==='HEAD'){
@@ -60,6 +63,7 @@ it('cliente TUS real recupera PATCH aceito com resposta perdida via HEAD, sem du
   expect(b.requests.some(r=>r.method==='HEAD')).toBe(true);
   expect(b.requests.every(r=>r.bytes<=chunk)).toBe(true);
   expect(b.requests.every(r=>r.headers['x-signature']==='signed-token'&&!r.headers.Authorization&&!r.headers.apikey)).toBe(true);
+  expect(b.requests[0]?.url).toBe(endpoint);
   expect([...b.stored.values()].join()).not.toContain('signed-token');
 });
 it('reabre uma sessão interrompida com token renovado e envia somente os bytes restantes',async()=>{
