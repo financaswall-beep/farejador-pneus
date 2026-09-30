@@ -9,10 +9,11 @@
     "node": ">=22.22.0"
   },
   "scripts": {
-    "predev": "npm run build:css",
+    "predev": "npm run build:publisher && npm run build:css",
     "dev": "tsx watch --env-file=.env src/app/server.ts",
     "build:css": "tailwindcss -c tailwind.painel.config.cjs -i styles/tailwind.css -o painel/public/tailwind.css --minify && tailwindcss -c tailwind.parceiro.config.cjs -i styles/tailwind.css -o parceiro/public/tailwind.css --minify",
-    "build": "npm run build:css && tsc -p tsconfig.json",
+    "build:publisher": "node scripts/build-publisher-upload.cjs",
+    "build": "npm run build:publisher && npm run build:css && tsc -p tsconfig.json",
     "start": "node dist/app/server.js",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build:css",
@@ -38,12 +39,14 @@
     "pg": "^8.12.0",
     "pino": "^9.3.0",
     "sharp": "^0.35.3",
+    "tus-js-client": "4.3.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.0",
+    "esbuild": "0.28.2",
     "pino-pretty": "^11.2.0",
     "tailwindcss": "3.4.17",
     "testcontainers": "^12.1.0",

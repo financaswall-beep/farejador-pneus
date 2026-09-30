@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { draftSchema,publicationStatus,validateFormats,uploadSchema } from '../../../src/marketing/publisher/model.js';
+import { draftSchema,publicationStatus,validateFormats,uploadSchema,finalizeSchema } from '../../../src/marketing/publisher/model.js';
 
 describe('Publicações: contratos e estados',()=>{
   it('não permite destinos repetidos, TikTok ou ID de conta vindo do cliente',()=>{
@@ -27,5 +27,12 @@ describe('Publicações: contratos e estados',()=>{
     const file={id:'ad5e2be8-2725-4a4f-96a6-c77aceecdc80',name:'arquivo.html',mime:'text/html',bytes:500};
     expect(uploadSchema.safeParse(file).success).toBe(false);
     expect(uploadSchema.safeParse({...file,mime:'video/mp4',bytes:501*1024*1024}).success).toBe(false);
+  });
+  it('aceita HEIC/HEIF e permite reprocessar sem metadados do navegador',()=>{
+    const file={id:'ad5e2be8-2725-4a4f-96a6-c77aceecdc80',name:'foto.heic',bytes:1024};
+    for(const mime of ['image/heic','image/heif'])expect(uploadSchema.safeParse({...file,mime}).success).toBe(true);
+    expect(finalizeSchema.parse({})).toEqual({});
+    expect(finalizeSchema.safeParse({width:0}).success).toBe(false);
+    expect(finalizeSchema.safeParse({environment:'prod'}).success).toBe(false);
   });
 });

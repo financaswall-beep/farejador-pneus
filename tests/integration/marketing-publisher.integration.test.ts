@@ -12,12 +12,15 @@ import {claimDelivery} from '../../src/marketing/publisher/queue.js';
 import {publishTick} from '../../src/marketing/publisher/worker.js';
 import {deleteMedia,cleanupMedia} from '../../src/marketing/publisher/cleanup.js';
 import {MetaCommentError} from '../../src/social-comments/graph.js';
+import {reconcileDestination} from '../../src/marketing/publisher/reconciliation.js';
+import {PublisherError} from '../../src/marketing/publisher/model.js';
 import {startPostgres,stopPostgres,type IntegrationDb} from './helpers/postgres.js';
 import type {PublisherStorage} from '../../src/marketing/publisher/storage.js';
 
 let pool:Pool;let container:IntegrationDb|undefined;let embedded:any;
-const env='test' as const;const graph={prepare:vi.fn(),ready:vi.fn(),publish:vi.fn(),verify:vi.fn()};
-const storage={signedUrl:vi.fn().mockResolvedValue('https://storage.invalid/signed'),remove:vi.fn().mockResolvedValue(undefined)} as unknown as PublisherStorage;
+const env='test' as const;const graph={assertPermissions:vi.fn(),prepare:vi.fn(),ready:vi.fn(),publish:vi.fn(),verify:vi.fn(),reconcile:vi.fn()};
+const storage={assertPrivateBucket:vi.fn().mockResolvedValue({maxBytes:null,allowedMimes:null}),
+  signedUrl:vi.fn().mockResolvedValue('https://storage.invalid/signed'),remove:vi.fn().mockResolvedValue(undefined)} as unknown as PublisherStorage;
 beforeAll(async()=>{
   if(process.env.PUBLISHER_EMBEDDED_DB==='1') {
     // Fallback explícito para execução local sem Docker. Não usa URLs nem credenciais do projeto.
@@ -27,9 +30,10 @@ beforeAll(async()=>{
       CREATE ROLE farejador_partner_app;CREATE FUNCTION ops.enforce_environment_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN IF NEW.environment IS DISTINCT FROM OLD.environment THEN RAISE EXCEPTION 'environment_immutable';END IF;RETURN NEW;END $$;`);
     await embedded.exec(await readFile('db/migrations/0246_marketing_publisher.sql','utf8'));
+    await embedded.exec(await readFile('db/migrations/0247_marketing_publisher_recovery.sql','utf8'));
     const query=async(sql:string,params?:unknown[])=>{
       const result=await embedded.query(sql,params);
-      for(const row of result.rows)for(const key of ['created_at','updated_at','scheduled_at','started_at','lease_until','deleted_at'])if(row[key]&&!(row[key] instanceof Date))row[key]=new Date(row[key]);
+      for(const row of result.rows)for(const key of ['created_at','updated_at','scheduled_at','started_at','public_started_at','lease_until','deleted_at'])if(row[key]&&!(row[key] instanceof Date))row[key]=new Date(row[key]);
       return {...result,rowCount:result.rows.length||result.affectedRows||0};
     };
     pool={query,connect:async()=>({query,release:()=>undefined})} as unknown as Pool;
@@ -38,11 +42,16 @@ beforeAll(async()=>{
 afterAll(async()=>{if(container)await stopPostgres(container);if(embedded)await embedded.close();});
 beforeEach(async()=>{
   await pool.query('TRUNCATE ops.publisher_events,ops.publisher_destinations,ops.publisher_posts,ops.publisher_media,analytics.publisher_captions');
-  vi.clearAllMocks();graph.prepare.mockResolvedValue('301');graph.ready.mockResolvedValue(true);graph.publish.mockResolvedValue('302');graph.verify.mockResolvedValue({confirmed:true,url:'https://www.instagram.com/p/302/'});
+  vi.clearAllMocks();graph.assertPermissions.mockResolvedValue(undefined);graph.prepare.mockResolvedValue('301');
+  graph.ready.mockResolvedValue(true);graph.publish.mockResolvedValue('302');graph.verify.mockResolvedValue({confirmed:true,url:'https://www.instagram.com/p/302/'});
+  graph.reconcile.mockResolvedValue({outcome:'unknown',evidence:'ambiguous'});
+  vi.mocked(storage.assertPrivateBucket).mockResolvedValue({maxBytes:null,allowedMimes:null});
 });
 async function asset(environment='test') {
-  const id=randomUUID();await pool.query(`INSERT INTO ops.publisher_media(environment,id,name,kind,mime,bytes,status,original_path,publish_path,thumbnail_path,width,height,duration,created_by)
-    VALUES($1,$2,'video.mp4','video','video/mp4',500,'ready',$3,$3,$4,1080,1920,50,'test')`,[environment,id,`${environment}/${id}/original.mp4`,`${environment}/${id}/thumbnail.jpg`]);return id;
+  const id=randomUUID();await pool.query(`INSERT INTO ops.publisher_media(environment,id,name,kind,mime,bytes,status,original_path,publish_path,thumbnail_path,width,height,duration,created_by,inspection)
+    VALUES($1,$2,'video.mp4','video','video/mp4',500,'ready',$3,$3,$4,1080,1920,50,'test',
+      '{"verified":true,"video_codec":"h264","fps":30,"bit_rate":3000000,"audio_codec":"aac","audio_sample_rate":48000}')`,
+    [environment,id,`${environment}/${id}/original.mp4`,`${environment}/${id}/thumbnail.jpg`]);return id;
 }
 async function post(media_id:string,destinations:any[]=[{platform:'instagram',format:'reel'},{platform:'facebook',format:'reel'}]) {
   return saveDraft(pool,env,randomUUID(),{version:0,title:'Vídeo 2W',media_id,caption:'Pneus',destinations,delete_after_publish:true},'owner');
@@ -118,4 +127,64 @@ it('texto de IA é imutável; correção usa outra linha e não muda ambiente',a
     VALUES('test','Pneus','Legenda','v1','low','model') RETURNING id`)).rows[0].id;
   await expect(pool.query('UPDATE analytics.publisher_captions SET caption=$2 WHERE id=$1',[id,'Nova'])).rejects.toThrow('publisher_caption_immutable');
   await expect(pool.query('DELETE FROM analytics.publisher_captions WHERE id=$1',[id])).rejects.toThrow('publisher_caption_immutable');
+});
+async function uncertainPost() {
+  const p=await post(await asset(),[{platform:'instagram',format:'reel'}]);
+  await submitPost(pool,env,p.id,p.version,null,'owner');
+  await pool.query(`UPDATE ops.publisher_destinations SET status='uncertain',container_id='301',provider_id=NULL WHERE post_id=$1`,[p.id]);
+  await pool.query(`UPDATE ops.publisher_posts SET status='failed' WHERE id=$1`,[p.id]);
+  return {...p,version:p.version+1};
+}
+it('conciliação confirma prova positiva e audita o operador sem enviar de novo',async()=>{
+  const p=await uncertainPost();
+  const input={version:p.version,platform:'instagram' as const,decision:'published' as const,confirmed:true as const,
+    provider_id:'302',note:'Conferi a publicação na conta da matriz.'};
+  graph.reconcile.mockResolvedValue({outcome:'published',provider_id:'302',url:'https://www.instagram.com/p/302/',evidence:'provider_published_owned'});
+  await expect(reconcileDestination(pool,env,p.id,{...input,version:1},'Owner',graph)).rejects.toThrow('publisher_version_conflict');
+  const resolved=await reconcileDestination(pool,env,p.id,input,'Owner',graph);
+  expect(resolved.status).toBe('published');await finish();expect(graph.publish).not.toHaveBeenCalled();
+  const event=(await pool.query(`SELECT actor,payload FROM ops.publisher_events WHERE event='delivery_reconciled'`)).rows[0];
+  expect(event.actor).toBe('Owner');expect(event.payload).toMatchObject({decision:'published',previous_status:'uncertain',provider_id:'302'});
+});
+it('declaração humana não libera reenvio; prova negativa terminal libera apenas retry explícito',async()=>{
+  const p=await uncertainPost();
+  const input={version:p.version,platform:'instagram' as const,decision:'not_published' as const,confirmed:true as const,
+    note:'Consultei a conta e revisei o estado deste envio.'};
+  await expect(reconcileDestination(pool,env,p.id,input,'Owner',graph)).rejects.toThrow('publisher_reconciliation_ambiguous');
+  expect((await pool.query('SELECT status FROM ops.publisher_destinations')).rows[0].status).toBe('uncertain');
+  graph.reconcile.mockResolvedValue({outcome:'not_published',evidence:'provider_terminal_failure'});
+  await reconcileDestination(pool,env,p.id,input,'Owner',graph);await due();
+  expect(await publishTick(pool,env,graph,storage)).toBe(false);expect(graph.publish).not.toHaveBeenCalled();
+  await postAction(pool,env,p.id,'retry','Owner');await finish();expect(graph.publish).toHaveBeenCalledOnce();
+});
+it('encerrar resultado ambíguo preserva arquivo e não permite reenvio automático',async()=>{
+  const p=await uncertainPost();
+  await reconcileDestination(pool,env,p.id,{version:p.version,platform:'instagram',decision:'abandon',confirmed:true,
+    note:'Revisei e encerrei esta tentativa sem reenviar.'},'Owner',graph);
+  expect((await pool.query('SELECT status,delete_after_publish FROM ops.publisher_posts')).rows[0])
+    .toMatchObject({status:'cancelled',delete_after_publish:false});
+  await finish();await cleanupMedia(pool,env,storage);
+  expect(graph.reconcile).not.toHaveBeenCalled();expect(graph.publish).not.toHaveBeenCalled();expect(storage.remove).not.toHaveBeenCalled();
+  await expect(postAction(pool,env,p.id,'retry','Owner')).rejects.toThrow('publisher_retry_not_allowed');
+});
+it('falha temporária antes do envio aguarda backoff e se recupera sem duplicar',async()=>{
+  const p=await post(await asset(),[{platform:'instagram',format:'reel'}]);await submitPost(pool,env,p.id,p.version,null,'Owner');
+  graph.prepare.mockRejectedValueOnce(new MetaCommentError('meta_http_503_code_2'));
+  await publishTick(pool,env,graph,storage);
+  const row=(await pool.query('SELECT status,retry_attempts,next_attempt_at FROM ops.publisher_destinations')).rows[0];
+  expect(row).toMatchObject({status:'preparing',retry_attempts:1});
+  expect(new Date(row.next_attempt_at).getTime()).toBeGreaterThan(Date.now()+10000);
+  expect(await publishTick(pool,env,graph,storage)).toBe(false);
+  await finish();expect(graph.publish).toHaveBeenCalledOnce();expect((await pool.query('SELECT status FROM ops.publisher_posts')).rows[0].status).toBe('published');
+});
+it('falhas temporárias têm limite e bucket público bloqueia a chamada irreversível',async()=>{
+  const p=await post(await asset(),[{platform:'instagram',format:'reel'}]);await submitPost(pool,env,p.id,p.version,null,'Owner');
+  graph.prepare.mockRejectedValue(new MetaCommentError('meta_http_503_code_2'));
+  for(let i=0;i<6;i++){await due();await publishTick(pool,env,graph,storage);}
+  expect((await pool.query('SELECT status,retry_attempts FROM ops.publisher_destinations')).rows[0].status).toBe('failed');
+  expect(graph.publish).not.toHaveBeenCalled();
+  graph.prepare.mockResolvedValue('301');await postAction(pool,env,p.id,'retry','Owner');
+  await due();await publishTick(pool,env,graph,storage);await due();
+  vi.mocked(storage.assertPrivateBucket).mockRejectedValue(new PublisherError('publisher_bucket_must_be_private',503));
+  await publishTick(pool,env,graph,storage);expect(graph.publish).not.toHaveBeenCalled();
 });

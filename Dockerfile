@@ -20,6 +20,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Publicador: inspeção real de vídeos e conversão HEIC em processos com recursos limitados.
+RUN apk add --no-cache ffmpeg libheif-tools util-linux \
+    && command -v ffprobe && command -v ffmpeg \
+    && command -v heif-info && command -v heif-convert && command -v prlimit
+
 COPY package*.json ./
 # O sharp distribui o binário e o libvips como dependências opcionais específicas
 # da plataforma. No Alpine, omiti-las produz uma imagem que compila, mas cai no

@@ -35,6 +35,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.marketing.organic.compare.js', 'app.marketing.organic.compare-charts.js',
     'app.marketing.organic.results.js',
     'app.marketing.publisher.js', 'app.marketing.publisher.media.js', 'app.marketing.publisher.view.js',
+    'app.marketing.publisher.helpers.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
@@ -73,6 +74,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'alpine-3.14.9.min.js',
     'chart-4.4.7.umd.min.js',
     'lucide-1.17.0.min.js',
+    'publisher-tus-4.3.1.min.js',
   ]) {
     fastify.get(`/admin/painel/vendor/${vendor}`, async (_request, reply) =>
       sendStatic(

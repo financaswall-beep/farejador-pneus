@@ -27,6 +27,8 @@ temp
 # the production runtime and may contain database exports or operational data.
 output
 outputs
+artifacts
+design
 assets
 proposta-layout-2026-06
 dashboard.html
@@ -38,7 +40,8 @@ _backup-*
 # and parceiro/; these folders are quality, operations, or historical records.
 docs
 tests
-scripts
+scripts/*
+!scripts/build-publisher-upload.cjs
 SECOES
 
 # Logs and OS files
