@@ -84,6 +84,7 @@ window.PAINEL_MODULES.marketingCampaigns = function () {
             && this.marketingCampaignChannel === requestedChannel
             && this.marketingPeriod === requestedPeriod) {
           this.marketingCampaigns = payload;
+          if (this.paidPages) this.marketingCampaignPage = Math.min(this.marketingCampaignPage, this.paidPages());
         }
       } catch {
         if (requestSeq === this.marketingCampaignRequestSeq

@@ -81,6 +81,7 @@ export interface MetaInsightRow {
   clicks?: unknown;
   reach?: unknown;
   actions?: unknown;
+  conversations?: unknown;
 }
 
 interface MetaPage {
@@ -138,6 +139,7 @@ export async function fetchMetaInsightRows(
   until: string,
   level: MetaInsightLevel,
   fetcher: typeof fetch,
+  adIds?: string[],
 ): Promise<MetaInsightRow[]> {
   const first = new URL(
     `https://graph.facebook.com/${encodeURIComponent(config.apiVersion)}/${encodeURIComponent(config.adAccountId)}/insights`,
@@ -160,6 +162,7 @@ export async function fetchMetaInsightRows(
     limit: '200',
   }).toString();
 
+  if (adIds) first.searchParams.set('filtering', JSON.stringify([{ field: 'ad.id', operator: 'IN', value: adIds }]));
   const rows: MetaInsightRow[] = [];
   let next: URL | null = first;
   let pages = 0;

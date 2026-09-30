@@ -117,7 +117,7 @@ export async function getMatrizLedgerCompetenceGate(
              AND deleted_at>=m.month_ts AND deleted_at<m.month_end_ts),0) FROM months m
        UNION ALL
        SELECT m.competence,'marketing',
-         COALESCE((SELECT sum(CASE WHEN $3::boolean THEN financial_spend ELSE spend END)
+         COALESCE((SELECT sum(CASE WHEN $3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=meta_insights_daily_scoped.environment AND a.ad_account_id=meta_insights_daily_scoped.ad_account_id) THEN financial_spend ELSE spend END)
            FROM marketing.meta_insights_daily_scoped
            WHERE environment=$1 AND entity_level='campaign'
              AND account_currency='BRL' AND metric_date>=m.competence
@@ -178,8 +178,8 @@ export async function getMatrizLedgerCompetenceGate(
             (COALESCE(s.value,0)-COALESCE(l.value,0))::numeric(14,2)::text difference,
             (SELECT count(DISTINCT (mi.ad_account_id,mi.campaign_id))::int
                FROM marketing.meta_insights_daily_scoped mi
-              WHERE $3::boolean AND mi.environment=$1
-                AND mi.entity_level='campaign' AND mi.spend>0
+              WHERE ($3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=mi.environment AND a.ad_account_id=mi.ad_account_id)) AND mi.environment=$1
+                AND mi.spend>0
                 AND mi.campaign_scope='pending'
                 AND mi.metric_date>=m.competence AND mi.metric_date<m.month_end)
               AS pending_marketing_campaigns

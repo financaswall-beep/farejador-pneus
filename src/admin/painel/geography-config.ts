@@ -17,7 +17,7 @@ export async function saveGeographyBinding(db:Pool,environment:string,account:st
   try {
     await c.query('BEGIN');
     await c.query("SELECT pg_advisory_xact_lock(hashtext('geo_binding'),hashtext($1))",[environment+account+campaign]);
-    const scope=(await c.query(`SELECT scope FROM marketing.campaign_scopes WHERE environment=$1 AND ad_account_id=$2 AND campaign_id=$3`,[environment,account,campaign])).rows[0];
+    const scope=(await c.query(`SELECT scope FROM marketing.effective_campaign_scopes WHERE environment=$1 AND ad_account_id=$2 AND campaign_id=$3`,[environment,account,campaign])).rows[0];
     if(scope?.scope!=='matrix')throw Error('geography_scope_required');
     const latest=(await c.query(`SELECT id::text FROM marketing.geography_bindings WHERE environment=$1 AND ad_account_id=$2 AND campaign_id=$3 ORDER BY id DESC LIMIT 1`,[environment,account,campaign])).rows[0];
     if((latest?.id??null)!==input.expected_id)throw Error('geography_binding_conflict');

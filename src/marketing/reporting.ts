@@ -27,6 +27,7 @@ export interface MarketingPipelineHealth {
   last_sync_at: string | null;
   last_sync_status: 'running' | 'succeeded' | 'failed' | null;
   rows_upserted: number;
+  identity?: { active: boolean; pending_ads: number };
   capi: {
     pending: number;
     sent: number;
@@ -119,11 +120,11 @@ const REALIZED_CTE = `
   ),
   attributed AS (
     SELECT ar.* FROM attributed_resolved ar
-     WHERE NOT $4::boolean OR EXISTS (
-       SELECT 1 FROM marketing.campaign_scopes s
+     WHERE (NOT $4::boolean OR EXISTS (
+       SELECT 1 FROM marketing.effective_campaign_scopes s
         WHERE s.environment=$1 AND s.ad_account_id=ar.ad_account_id
           AND s.campaign_id=ar.campaign_id AND s.scope='matrix'
-     )
+     )) AND marketing.meta_ad_scope_allowed($1,ar.ad_account_id,ar.source_id)
   )`;
 
 export async function getMarketingAttributionReport(
@@ -210,7 +211,7 @@ export async function getMarketingPipelineHealth(
   dbPool: Pool = defaultPool,
 ): Promise<MarketingPipelineHealth> {
   try {
-    const [sync, capi] = await Promise.all([
+    const [sync, capi, identity] = await Promise.all([
       dbPool.query<{
         finished_at: string | null;
         started_at: string;
@@ -227,6 +228,11 @@ export async function getMarketingPipelineHealth(
           WHERE environment=$1 GROUP BY status`,
         [env.FAREJADOR_ENV],
       ),
+      dbPool.query<{ active: boolean; pending_ads: number }>(`SELECT
+        EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1 AND ad_account_id=$2) active,
+        (SELECT count(DISTINCT entity_id)::int FROM marketing.meta_insights_daily_scoped
+          WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad' AND campaign_scope='pending'
+            AND metric_date>=current_date-60 AND spend>0) pending_ads`, [env.FAREJADOR_ENV, env.META_ADS_ACCOUNT_ID ?? null]),
     ]);
     const last = sync.rows[0];
     const count = (status: string) => num(capi.rows.find((row) => row.status === status)?.total);
@@ -235,6 +241,7 @@ export async function getMarketingPipelineHealth(
       last_sync_at: last?.finished_at ?? last?.started_at ?? null,
       last_sync_status: last?.status ?? null,
       rows_upserted: num(last?.rows_upserted),
+      identity: { active: identity.rows[0]?.active === true, pending_ads: num(identity.rows[0]?.pending_ads) },
       capi: {
         pending: count('pending') + count('processing'),
         sent: count('sent'),

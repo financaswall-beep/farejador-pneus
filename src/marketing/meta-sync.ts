@@ -4,8 +4,6 @@ import { env } from '../shared/config/env.js';
 import {
   canonicalConversationAction,
   clearMetaMarketingCache,
-  fetchMetaInsightRows,
-  getMetaMarketingSnapshot,
   marketingDateWindow,
   summarizeMetaRows,
   type MarketingPeriod,
@@ -16,6 +14,7 @@ import {
 } from '../admin/painel/marketing-meta.js';
 import { reconcileMatrizMarketingSpend } from './matriz-ledger-spend.js';
 import { ensureCampaignScope } from './campaign-scope.js';
+import { fetchMetaAdIdentities, fetchOwnedMetaInsights, persistMetaAdIdentities, campaignAnchors } from './meta-ad-identity.js';
 
 type SyncTrigger = 'startup' | 'scheduled' | 'manual';
 
@@ -109,14 +108,32 @@ export async function syncMetaInsights(options: {
   if (!runId) throw new Error('marketing_sync_run_not_created');
 
   try {
-    const fetched = await Promise.all(levels.map(async (level) => ({
-      level,
-      rows: await fetchMetaInsightRows(config, since, until, level, options.fetcher ?? fetch),
-    })));
+    const identities = await fetchMetaAdIdentities(config, options.fetcher ?? fetch);
+    const ads = await fetchOwnedMetaInsights(config, identities, since, until, options.fetcher ?? fetch);
+    const fetched: { level: MetaInsightLevel; rows: MetaInsightRow[] }[] = [
+      { level: 'ad', rows: ads }, { level: 'campaign', rows: campaignAnchors(ads) },
+    ];
     const client = await dbPool.connect();
     let rowsUpserted = 0;
     try {
       await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+        [`meta-identity:${env.FAREJADOR_ENV}:${config.adAccountId}`]);
+      const newer = await client.query(`SELECT 1 FROM marketing.meta_identity_accounts a
+        JOIN marketing.meta_sync_runs r ON r.environment=a.environment AND r.id=a.sync_run_id
+        WHERE a.environment=$1 AND a.ad_account_id=$2 AND r.started_at>
+          (SELECT started_at FROM marketing.meta_sync_runs WHERE environment=$1 AND id=$3)`,
+      [env.FAREJADOR_ENV, config.adAccountId, runId]);
+      if (newer.rows.length) throw new Error('meta_sync_superseded');
+      await persistMetaAdIdentities(client, env.FAREJADOR_ENV, config.adAccountId, runId, identities);
+      // A successful empty API result is zero delivery, not stale spend from the previous sync.
+      await client.query(`UPDATE marketing.meta_insights_daily i SET spend=0,impressions=0,clicks=0,
+        reach=NULL,conversations=0,actions_raw='[]',sync_run_id=$3,collected_at=now()
+        WHERE i.environment=$1 AND i.ad_account_id=$2 AND i.entity_level='ad'
+          AND i.metric_date BETWEEN $4::date AND $5::date
+          AND EXISTS (SELECT 1 FROM marketing.meta_ad_identities d WHERE d.environment=i.environment
+            AND d.ad_account_id=i.ad_account_id AND d.ad_id=i.entity_id AND d.scope='matrix')`,
+      [env.FAREJADOR_ENV, config.adAccountId, runId, since, until]);
       const ensuredCampaigns = new Set<string>();
       for (const group of fetched) {
         for (const row of group.rows) {
@@ -159,12 +176,15 @@ export async function syncMetaInsights(options: {
               value.reach, value.conversations, value.actionType, JSON.stringify(value.actions),
             ],
           );
-          if (upserted.rows[0]) {
-            await reconcileMatrizMarketingSpend(client, upserted.rows[0].id, runId);
-          }
+          void upserted;
           rowsUpserted += 1;
         }
       }
+      // Both levels are now complete. Reconcile campaign totals once, including history.
+      const affected = await client.query<{ id: string }>(`SELECT id FROM marketing.meta_insights_daily
+        WHERE environment=$1 AND ad_account_id=$2 AND entity_level='campaign' ORDER BY metric_date,id`,
+      [env.FAREJADOR_ENV, config.adAccountId]);
+      for (const row of affected.rows) await reconcileMatrizMarketingSpend(client, row.id, runId);
       await client.query(
         `UPDATE marketing.meta_sync_runs
             SET status='succeeded',rows_upserted=$2,finished_at=now()
@@ -203,12 +223,12 @@ export async function getPersistedMetaSnapshot(
     const result = await (options.dbPool ?? defaultPool).query<MetaInsightRow & { collected_at: string }>(
       `SELECT ad_account_id,campaign_id,campaign_name,
               metric_date::text AS date_start,spend::text,
-              CASE WHEN $5::boolean THEN financial_spend ELSE spend END::text
+              CASE WHEN $5::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1 AND ad_account_id=$2) THEN financial_spend ELSE spend END::text
                 AS financial_spend,
               campaign_scope,
-              CASE WHEN $5::boolean THEN campaign_scope='matrix' ELSE true END
+              CASE WHEN $5::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1 AND ad_account_id=$2) THEN campaign_scope='matrix' ELSE true END
                 AS summary_included,
-              impressions::text,clicks::text,reach::text,actions_raw AS actions,
+              impressions::text,clicks::text,reach::text,conversations,actions_raw AS actions,
               account_currency,collected_at::text
          FROM marketing.meta_insights_daily_scoped
         WHERE environment=$1 AND ad_account_id=$2 AND entity_level='campaign'
@@ -251,8 +271,6 @@ export async function getPersistedOrLiveMetaSnapshot(
 ): Promise<MetaMarketingSnapshot> {
   const persisted = await getPersistedMetaSnapshot(config, period, options);
   if (persisted) return persisted;
-  if (env.MARKETING_SCOPE_ENFORCEMENT_ENABLED) {
-    throw new Error('marketing_scoped_snapshot_unavailable');
-  }
-  return getMetaMarketingSnapshot(config, period, options);
+  // Never fall back to account-wide API totals after the scoped read fails.
+  throw new Error('marketing_scoped_snapshot_unavailable');
 }

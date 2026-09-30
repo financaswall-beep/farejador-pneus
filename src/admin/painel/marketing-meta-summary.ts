@@ -87,7 +87,7 @@ export function summarizeMetaRows(
     if (date < since || date > until) continue;
     const rowSpend = numberValue(row.spend);
     const rowFinancialSpend = numberValue(row.financial_spend ?? row.spend);
-    const rowConversations = canonicalConversationAction(row.actions).value;
+    const rowConversations = row.conversations == null ? canonicalConversationAction(row.actions).value : numberValue(row.conversations);
     const rowImpressions = numberValue(row.impressions);
     const rowClicks = numberValue(row.clicks);
     const included = includedInSummary(row.summary_included);

@@ -70,6 +70,7 @@ export async function loadCampaignAttributionDetailData(
                 FROM marketing.meta_insights_daily mi
                WHERE mi.environment=$1 AND mi.campaign_id=$2
                  AND mi.entity_id=r.source_id
+                 AND marketing.meta_ad_scope_allowed(mi.environment,mi.ad_account_id,r.source_id)
             )`,
         [env.FAREJADOR_ENV, campaignId, since, until],
       ),
@@ -107,6 +108,7 @@ export async function loadCampaignAttributionDetailData(
                  FROM marketing.meta_insights_daily mi
                 WHERE mi.environment=$1 AND mi.campaign_id=$2
                   AND mi.entity_id=r.source_id
+                 AND marketing.meta_ad_scope_allowed(mi.environment,mi.ad_account_id,r.source_id)
                 ORDER BY CASE WHEN mi.entity_level='ad' THEN 0 ELSE 1 END,
                          mi.metric_date DESC,mi.collected_at DESC
                 LIMIT 1

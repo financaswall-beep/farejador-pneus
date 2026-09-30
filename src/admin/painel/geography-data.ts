@@ -2,8 +2,8 @@ import type { Pool } from 'pg';
 import type { GeoBinding, GeoInsight, GeoReferral, GeoSale, GeoSnapshot, GeoStock } from '../../marketing/geography-types.js';
 import { readDeliverySettings } from '../../atendente-v2/matriz-delivery-settings.js';
 
-const ADS=`SELECT DISTINCT ON(entity_id) entity_id,campaign_id FROM marketing.meta_insights_daily
-  WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad' ORDER BY entity_id,metric_date DESC,collected_at DESC`;
+const ADS=`SELECT DISTINCT ON(entity_id) entity_id,campaign_id FROM marketing.meta_insights_daily_scoped
+  WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad' AND campaign_scope='matrix' ORDER BY entity_id,metric_date DESC,collected_at DESC`;
 const VALID=`o.partner_order_id IS NULL AND o.status IN ('confirmed','paid','delivered')
   AND NOT(o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered')`;
 export const geoReferralsSql=`WITH ads AS (${ADS})
@@ -11,7 +11,7 @@ export const geoReferralsSql=`WITH ads AS (${ADS})
   r.captured_at::text,to_char(r.captured_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') AS day,
   r.captured_at<=$5::timestamptz-interval '7 days' AS mature
  FROM marketing.ad_referrals r JOIN ads ON ads.entity_id=r.source_id
- JOIN marketing.campaign_scopes sc ON sc.environment=$1 AND sc.ad_account_id=$2 AND sc.campaign_id=ads.campaign_id AND sc.scope='matrix'
+ JOIN marketing.effective_campaign_scopes sc ON sc.environment=$1 AND sc.ad_account_id=$2 AND sc.campaign_id=ads.campaign_id AND sc.scope='matrix'
  JOIN core.conversations c ON c.environment=$1 AND c.id=r.conversation_id AND c.deleted_at IS NULL
  LEFT JOIN analytics.v_bot_demand_location l ON l.environment=$1 AND l.conversation_id=r.conversation_id
  WHERE r.environment=$1 AND r.captured_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
@@ -24,7 +24,7 @@ export const geoSalesSql=`WITH ads AS (${ADS})
  CASE WHEN costs.n>0 AND costs.missing=0 THEN (o.total_amount-costs.total)::float8 ELSE NULL END AS margin
  FROM marketing.order_attributions a JOIN marketing.ad_referrals r ON r.environment=a.environment AND r.id=a.referral_id
  JOIN ads ON ads.entity_id=r.source_id
- JOIN marketing.campaign_scopes sc ON sc.environment=$1 AND sc.ad_account_id=$2 AND sc.campaign_id=ads.campaign_id AND sc.scope='matrix'
+ JOIN marketing.effective_campaign_scopes sc ON sc.environment=$1 AND sc.ad_account_id=$2 AND sc.campaign_id=ads.campaign_id AND sc.scope='matrix'
  JOIN commerce.orders o ON o.environment=a.environment AND o.id=a.order_id
  JOIN core.conversations c ON c.environment=$1 AND c.id=a.conversation_id AND c.deleted_at IS NULL
  LEFT JOIN analytics.v_bot_demand_location l ON l.environment=$1 AND l.conversation_id=a.conversation_id
@@ -44,13 +44,13 @@ export async function loadGeographyData(db:Pool,environment:'prod'|'test',accoun
     const params=[environment,account,since,until,now.toISOString()];
     const catalog=(await c.query<{id:string;name:string;scope:string}>(`SELECT DISTINCT ON(mi.campaign_id)
       mi.campaign_id AS id,mi.campaign_name AS name,COALESCE(sc.scope,'pending') AS scope
-      FROM marketing.meta_insights_daily mi LEFT JOIN marketing.campaign_scopes sc
+      FROM marketing.meta_insights_daily_scoped mi LEFT JOIN marketing.effective_campaign_scopes sc
       ON sc.environment=mi.environment AND sc.ad_account_id=mi.ad_account_id AND sc.campaign_id=mi.campaign_id
       WHERE mi.environment=$1 AND mi.ad_account_id=$2 AND mi.metric_date BETWEEN $3::date AND $4::date
       ORDER BY mi.campaign_id,mi.metric_date DESC LIMIT 1001`,params.slice(0,4))).rows;
     const insights=(await c.query<GeoInsight>(`SELECT mi.campaign_id,mi.campaign_name,mi.metric_date::text AS day,
       mi.spend::float8,mi.account_currency AS currency,mi.conversations,mi.collected_at::text
-      FROM marketing.meta_insights_daily mi JOIN marketing.campaign_scopes sc
+      FROM marketing.meta_insights_daily_scoped mi JOIN marketing.effective_campaign_scopes sc
       ON sc.environment=mi.environment AND sc.ad_account_id=mi.ad_account_id AND sc.campaign_id=mi.campaign_id AND sc.scope='matrix'
       WHERE mi.environment=$1 AND mi.ad_account_id=$2 AND mi.entity_level='campaign'
       AND mi.metric_date BETWEEN $3::date AND $4::date ORDER BY mi.metric_date,mi.campaign_id LIMIT 50001`,params.slice(0,4))).rows;
@@ -71,7 +71,7 @@ export async function loadGeographyData(db:Pool,environment:'prod'|'test',accoun
     const ads=(await c.query<{id:string;name:string;campaign_id:string;last_spend_day:string|null}>(`SELECT entity_id AS id,
       (array_agg(entity_name ORDER BY metric_date DESC))[1] AS name,campaign_id,
       (max(metric_date) FILTER(WHERE spend>0))::text AS last_spend_day
-      FROM marketing.meta_insights_daily WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad'
+      FROM marketing.meta_insights_daily_scoped WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad'
       AND metric_date BETWEEN $3::date AND $4::date GROUP BY entity_id,campaign_id ORDER BY entity_id LIMIT 10001`,params.slice(0,4))).rows;
     const delivery=await readDeliverySettings(c,environment);
     if(catalog.length>1000||insights.length>50000||refs.length>50000||sales.length>50000||bindings.length>10000||snapshots.length>20000||stock.length>20000||offers.length>10000||ads.length>10000)throw Error('geography_limit');

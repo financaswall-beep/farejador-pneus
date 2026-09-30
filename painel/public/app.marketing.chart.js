@@ -14,17 +14,20 @@ window.PAINEL_MODULES.marketingChart = function () {
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
       };
       window._marketingRhythmChart = new Chart(canvas, {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: rows.map((row) => this.marketingDateLabel(row.date)),
           datasets: [
             {
               label: 'Investimento (R$)',
+              type: 'bar',
               data: rows.map((row) => safe(row.spend)),
               yAxisID: 'investment',
-              borderColor: '#047857',
-              backgroundColor: 'rgba(16,185,129,0.12)',
-              borderWidth: 2.5,
+              borderColor: '#99d9c6',
+              backgroundColor: 'rgba(115,199,172,0.65)',
+              borderWidth: 0,
+              borderRadius: 3,
+              maxBarThickness: 20,
               tension: 0.28,
               fill: true,
               pointRadius: 2.5,
@@ -34,14 +37,14 @@ window.PAINEL_MODULES.marketingChart = function () {
             },
             {
               label: 'Conversas',
+              type: 'line',
               data: rows.map((row) => safe(row.conversations)),
               yAxisID: 'conversations',
-              borderColor: '#34d399',
-              borderDash: [6, 5],
+              borderColor: '#005e4c',
               borderWidth: 2,
               tension: 0.28,
-              pointRadius: 2,
-              pointBackgroundColor: '#34d399',
+              pointRadius: 3,
+              pointBackgroundColor: '#005e4c',
               fill: false,
             },
           ],

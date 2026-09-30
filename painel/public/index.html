@@ -218,12 +218,14 @@
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
 <script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
+<link rel="stylesheet" href="/admin/painel/marketing-paid.css?v=20260930-paid1">
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260930-organic-nav1"></script>
+<script src="/admin/painel/app.marketing.paid.js?v=20260930-paid1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.js?v=20260930-results1"></script>
@@ -238,11 +240,11 @@
 <script src="/admin/painel/app.marketing.organic.networks.view.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.organic.networks.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
-<script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
+<script src="/admin/painel/app.marketing.creatives.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
-<script src="/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1"></script>
-<script src="/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1"></script>
-<script src="/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1"></script>
+<script src="/admin/painel/app.marketing.chart.js?v=20260930-paid1"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260930-paid1"></script>
+<script src="/admin/painel/app.marketing.campaign-detail.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
@@ -274,7 +276,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260930-results1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8122,7 +8124,7 @@
 
     <!-- ═══ TELA: MARKETING — leitura executiva, sem atribuição presumida ═══ -->
     <div x-show="currentPage === 'marketing'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" x-cloak>
-      <header x-show="marketingTab === 'criativos'" class="mc-header">
+      <header x-show="marketingTab === 'criativos'" class="mc-header"><button type="button" class="mc-button" @click="marketingSetTab('visao')">← Conteúdo pago</button>
         <div><div class="mc-breadcrumb">Matriz / Marketing</div><h1>Criativos</h1><p>Veja quais anúncios geram conversas e vendas.</p></div>
         <div class="mc-actions"><span class="mc-badge mc-muted" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button type="button" class="mc-button" @click="exportMarketingCreatives()" :disabled="marketingCreativesLoading || !marketingCreativeFiltered().length"><i data-lucide="upload"></i> Exportar CSV</button></div>
       </header>
@@ -8137,7 +8139,7 @@
           <button class="mo-button" type="button" @click="mpCheckConnections()" :disabled="mpConnectionBusy || marketingIsMock()"><i data-lucide="settings"></i>Gerenciar contas</button>
         </div>
       </header>
-      <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
+      <section x-show="!marketingCampaignDetailId && marketingTab !== 'visao' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
                aria-labelledby="marketing-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
@@ -8173,11 +8175,11 @@
             <template x-for="tab in marketingTabs()" :key="tab.id">
               <button @click="marketingSetTab(tab.id)"
                       class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                      :class="marketingTab === tab.id ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'"
+                      :class="(marketingTab === tab.id || (tab.id === 'visao' && ['campanhas','criativos'].includes(marketingTab))) ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'"
                       x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'" class="mb-3 flex items-center gap-2 lg:mb-0">
+          <div x-show="marketingTab !== 'visao' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'" class="mb-3 flex items-center gap-2 lg:mb-0">
             <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
@@ -8474,334 +8476,54 @@
         </div>
       </section>
 
-      <div x-show="marketingTab === 'visao'" class="space-y-4">
-        <div x-show="marketingLoading" class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-          Carregando dados de Marketing…
+      <section x-show="marketingTab === 'visao'" class="paid-screen" aria-label="Central de conteúdo pago" data-marketing-paid-screen>
+        <header class="paid-head">
+          <div><h1>Conteúdo pago</h1><p>Do investimento à venda, acompanhe o resultado dos seus anúncios.</p></div>
+          <div class="paid-actions"><span class="paid-muted" x-text="paidUpdated()"></span><button class="paid-button" @click="loadMarketing()" :disabled="marketingLoading" aria-label="Atualizar conteúdo pago"><i data-lucide="refresh-cw" :class="marketingLoading && 'animate-spin'"></i></button><button class="paid-button" @click="marketingNavigate('integracoes')"><i data-lucide="settings"></i>Integrações</button></div>
+        </header>
+        <div class="paid-toolbar">
+          <div class="paid-channels" aria-label="Canal de anúncios">
+            <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'all' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'all'" @click="paidChannel('all')">Consolidado</button>
+            <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'meta' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'meta'" @click="paidChannel('meta')"><span class="paid-meta" aria-hidden="true">∞</span>Meta<i class="paid-dot" :class="marketingVisao?.connection?.meta !== 'connected' && 'off'"></i></button>
+            <button class="paid-button paid-channel" disabled title="Google Ads será integrado em uma próxima etapa"><img src="/assets/brands/google-ads.svg" alt="">Google Ads<small>Em breve</small></button>
+            <button class="paid-button paid-channel" disabled title="TikTok Ads será integrado em uma próxima etapa"><span aria-hidden="true">♪</span>TikTok Ads<small>Em breve</small></button>
+          </div>
+          <div class="paid-actions"><label class="paid-button"><i data-lucide="calendar-days"></i><select aria-label="Período do conteúdo pago" x-model="marketingPeriod" @change="marketingPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label><span class="paid-badge"><i data-lucide="store"></i>Matriz</span></div>
         </div>
-        <div x-show="marketingError" class="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          <span x-text="marketingError"></span>
-          <button @click="loadMarketing()" class="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold">Tentar novamente</button>
+        <p class="paid-scope-note" x-text="paidIdentityNote()"></p>
+        <p x-show="marketingIsMock()" class="paid-notice">Prévia de demonstração · dados ilustrativos.</p>
+        <div x-show="marketingError" class="paid-error" role="alert"><span x-text="marketingError"></span><button class="paid-link" @click="loadMarketing()">Tentar novamente</button></div>
+        <div x-show="marketingLoading && !marketingVisao" class="paid-empty" role="status">Carregando indicadores, campanhas e retorno à Meta…</div>
+        <div x-show="marketingVisao && !marketingError" :aria-busy="marketingLoading">
+          <div class="paid-kpis"><template x-for="kpi in paidKpis()" :key="kpi.id"><article class="paid-card paid-kpi" :class="kpi.id === 'result' && 'paid-result'"><div class="paid-kpi-label"><i :data-lucide="kpi.icon"></i><span x-text="kpi.label"></span></div><strong x-text="kpi.value"></strong><small x-text="kpi.detail"></small></article></template></div>
+          <div class="paid-card paid-indicators"><template x-for="item in paidIndicators()" :key="item.label"><div><i :data-lucide="item.icon"></i><span x-text="item.label"></span><strong x-text="item.value"></strong></div></template></div>
+          <div class="paid-middle">
+            <article class="paid-card"><div class="paid-title-row"><div><h2>Investimento e conversas</h2><p class="paid-muted">Meta · no período selecionado</p></div><div class="paid-legend"><span><i></i>Investimento (R$)</span><span><i></i>Conversas</span></div></div><div class="paid-chart-wrap"><canvas id="chartMarketingRhythm" role="img" aria-label="Evolução diária do investimento e das conversas na Meta"></canvas></div><p x-show="!marketingVisao?.series?.length" class="paid-muted">Não há dados de mídia disponíveis neste período.</p></article>
+            <article class="paid-card paid-capi"><div class="paid-title-row"><h2>Retorno das vendas à Meta</h2><span class="paid-badge" :class="paidCapiStatus() !== 'Automático' && 'pending'" x-text="paidCapiStatus()"></span></div><p>As vendas elegíveis são vinculadas ao anúncio e enviadas à plataforma.</p><div class="paid-flow"><div><span><i data-lucide="shopping-cart"></i></span>Venda</div><b></b><div><span><i data-lucide="file-check-2"></i></span>Anúncio identificado</div><b></b><div><span class="paid-meta">∞</span>Meta</div></div><div class="paid-capi-counts"><div><strong x-text="paidCapiCount('sent')"></strong><span>Envios confirmados</span></div><div><strong class="warning" x-text="paidCapiCount('pending')"></strong><span>Na fila</span></div><div><strong :class="((paidCapi()?.failed || 0) + (paidCapi()?.dead_letter || 0)) > 0 && 'danger'" x-text="paidCapiCount('failed')"></strong><span>Com falha</span></div></div><footer class="paid-title-row"><button class="paid-link" @click="marketingNavigate('integracoes')">Conferir envios<i data-lucide="arrow-right"></i></button><span class="paid-muted">Acumulado da fila de conversões</span></footer></article>
+          </div>
         </div>
-
-        <div x-show="!marketingLoading && !marketingError && marketingVisao">
-          <section data-marketing-channel-filter-mock
-                   class="mb-3 flex flex-col gap-3 rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-center gap-3">
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
-                <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>
-              </span>
-              <div>
-                <p class="text-xs font-semibold text-gray-900">Canais da visão</p>
-                <p class="mt-0.5 text-[10px] text-gray-500">Meta somente — Google e TikTok não têm conector neste módulo</p>
-              </div>
+        <div class="paid-bottom">
+          <section class="paid-card paid-list" aria-label="Campanhas e anúncios">
+            <header class="paid-title-row"><div class="paid-actions"><h2>Campanhas e anúncios</h2><div class="paid-segment"><button class="is-active" aria-pressed="true">Campanhas</button><button @click="paidOpenAds()">Todos os anúncios</button></div></div><div class="paid-actions"><button class="paid-button" @click="paidCompare()"><i data-lucide="chart-no-axes-column"></i>Comparar anúncios</button><button class="paid-button" @click="paidExport()" :disabled="!paidRows().length || marketingCampaignsLoading || !!marketingCampaignsError"><i data-lucide="download"></i>Exportar</button></div></header>
+            <div class="paid-filters"><label class="paid-search"><i data-lucide="search"></i><input aria-label="Buscar campanha" placeholder="Buscar campanha" x-model="marketingCampaignSearch" @input="marketingCampaignPage = 1"></label><template x-for="tab in marketingCampaignDecisionTabs()" :key="tab.id"><button class="paid-button" :class="marketingCampaignDecision === tab.id && 'is-active'" :aria-pressed="marketingCampaignDecision === tab.id" @click="marketingCampaignDecision = tab.id; marketingCampaignPage = 1" x-text="tab.label"></button></template><select aria-label="Campanhas exibidas" x-model="paidScope" @change="marketingCampaignPage = 1"><option value="matrix">Da Matriz</option><option value="pending">Pendentes</option><option value="external">Externas · histórico</option><option value="all">Todas · histórico</option></select></div>
+            <p x-show="paidScope !== 'matrix'" class="paid-notice">Consulta de histórico e pendências. Os indicadores superiores continuam exclusivos da Matriz.</p>
+            <div x-show="marketingCampaignsError" class="paid-error" role="alert"><span x-text="marketingCampaignsError"></span><button class="paid-link" @click="loadMarketingCampaigns()">Tentar novamente</button></div>
+            <div x-show="marketingCampaignsLoading && !marketingCampaigns" class="paid-empty" role="status">Carregando campanhas…</div>
+            <div class="paid-table-wrap" x-show="!marketingCampaignsError && paidRows().length">
+              <table class="paid-table"><thead><tr><th><button @click="paidOrder('name')">Campanha<i data-lucide="arrow-up-down"></i></button></th><th>Canal</th><th><button @click="paidOrder('investment')">Investimento<i data-lucide="arrow-up-down"></i></button></th><th><button @click="paidOrder('conversations')">Conversas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="paidOrder('attributed_sales')">Vendas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="paidOrder('profit')">Resultado<i data-lucide="arrow-up-down"></i></button></th><th x-show="paidExpanded">Impressões</th><th x-show="paidExpanded">Cliques / CTR</th><th x-show="paidExpanded">Receita atribuída</th><th x-show="paidExpanded">Decisão</th><th><span class="sr-only">Detalhes</span></th></tr></thead>
+                <tbody><template x-for="row in paidPageRows()" :key="row.id"><tr><td><button class="paid-name" @click="paidOpenCampaign(row)" x-text="row.name"></button><small><span x-text="row.delivery_days"></span> dia(s) com entrega · até <span x-text="marketingDateLabel(row.last_delivery)"></span></small><span class="paid-badge" :class="row.scope" x-text="marketingCampaignScopeLabel(row.scope)"></span></td><td><span class="paid-meta" aria-label="Meta">∞</span></td><td><strong x-text="paidMoney(row.investment)"></strong></td><td><strong x-text="paidNumber(row.conversations)"></strong><small x-text="paidMoney(row.cost_per_conversation) + ' / conversa'"></small></td><td><strong x-text="paidNumber(row.attributed_sales)"></strong></td><td><strong :class="row.profit == null ? '' : row.profit < 0 ? 'negative' : 'positive'" x-text="paidMoney(row.profit)"></strong><small x-show="row.profit == null" x-text="row.scope !== 'matrix' ? 'Fora do resultado' : 'Aguardando custos / atribuição'"></small></td><td x-show="paidExpanded" x-text="paidNumber(row.impressions)"></td><td x-show="paidExpanded"><span x-text="paidNumber(row.clicks)"></span><small x-text="row.ctr == null ? '—' : paidNumber(row.ctr) + '%'"></small></td><td x-show="paidExpanded" x-text="paidMoney(row.attributed_revenue)"></td><td x-show="paidExpanded"><span x-text="row.decision?.label"></span><small x-text="row.decision?.detail"></small></td><td><button class="paid-link" @click="paidOpenCampaign(row)" :aria-label="'Abrir campanha ' + row.name"><i data-lucide="chevron-right"></i></button></td></tr></template></tbody>
+              </table>
             </div>
-            <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Mock dos futuros filtros de canal">
-              <button type="button" aria-pressed="true" title="Fonte ativa"
-                      class="inline-flex cursor-default items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
-                <span class="relative h-5 w-7">
-                  <img src="/assets/brands/facebook.svg" alt="" class="absolute left-0 top-0 h-4 w-4">
-                  <img src="/assets/brands/instagram.svg" alt="" class="absolute bottom-0 right-0 h-4 w-4 rounded-[4px] bg-white ring-1 ring-white">
-                </span>
-                Meta
-                <i data-lucide="check" class="h-3.5 w-3.5 text-emerald-700"></i>
-              </button>
-              <button type="button" disabled aria-pressed="false" title="Sem conector"
-                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-400">
-                <img src="/assets/brands/google-ads.svg" alt="" class="h-5 w-5">
-                Google
-                <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
-              </button>
-              <button type="button" disabled aria-pressed="false" title="Sem conector"
-                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-400">
-                <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 fill-black">
-                  <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
-                </svg>
-                TikTok
-                <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
-              </button>
-              <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">
-                <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
-                Dados reais
-              </span>
-            </div>
+            <div x-show="!marketingCampaignsLoading && !marketingCampaignsError && !paidRows().length" class="paid-empty"><strong>Nenhuma campanha encontrada</strong><p>Confira o período e os filtros ou consulte a coleta em Integrações.</p><button class="paid-link" @click="paidReset()">Limpar filtros</button></div>
+            <footer class="paid-footer"><span x-text="paidRows().length + ' campanha(s) · valores do período'"></span><button class="paid-link" @click="paidExpanded = !paidExpanded; $nextTick(() => lucide.createIcons())" :aria-expanded="paidExpanded"><span x-text="paidExpanded ? 'Mostrar menos indicadores' : 'Mostrar mais indicadores'"></span><i data-lucide="chevron-down"></i></button><div class="paid-actions" x-show="paidPages() > 1"><button class="paid-button" aria-label="Página anterior" :disabled="marketingCampaignPage <= 1" @click="marketingCampaignPage--"><i data-lucide="chevron-left"></i></button><span x-text="marketingCampaignPage + ' / ' + paidPages()"></span><button class="paid-button" aria-label="Próxima página" :disabled="marketingCampaignPage >= paidPages()" @click="marketingCampaignPage++"><i data-lucide="chevron-right"></i></button></div></footer>
+            <p class="paid-notice">Resultado após mídia não é o lucro total da empresa. Ausência de atribuição não significa ausência de vendas.</p>
           </section>
-
-          <section aria-label="Indicadores de Marketing" class="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-8">
-            <template x-for="item in marketingKpis()" :key="item.id">
-              <article class="min-h-[118px] rounded-xl border bg-white p-4 shadow-sm"
-                       :class="item.tone === 'attention' ? 'border-amber-200' : 'border-gray-200'">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                       :class="item.tone === 'attention' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-800'">
-                    <i :data-lucide="item.icon" class="h-4 w-4"></i>
-                  </div>
-                  <span class="text-right text-[10px] font-medium uppercase tracking-wide text-gray-400" x-text="item.detail"></span>
-                </div>
-                <p class="mt-3 text-xs font-medium text-gray-500" x-text="item.label"></p>
-                <p class="mt-1 text-xl font-semibold tracking-tight text-gray-950" x-text="item.value"></p>
-              </article>
-            </template>
-          </section>
-
-          <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-7">
-              <header class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
-                      <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>
-                    </span>
-                    <h2 class="text-base font-semibold text-gray-950">Ritmo de investimento e conversas</h2>
-                  </div>
-                  <p class="mt-1 pl-10 text-xs text-gray-500">Leitura diária da entrega nas campanhas conectadas</p>
-                </div>
-                <div class="flex items-center gap-4 text-[11px] text-gray-500">
-                  <span class="inline-flex items-center gap-2"><span class="h-1 w-6 rounded-full bg-emerald-700"></span>Investimento (R$)</span>
-                  <span class="inline-flex items-center gap-2"><span class="h-0 w-6 border-t-2 border-dashed border-emerald-400"></span>Conversas</span>
-                </div>
-              </header>
-              <div class="px-5 pb-4 pt-3">
-                <div x-show="marketingVisao?.series?.length" class="relative">
-                  <div class="h-[245px]">
-                    <canvas id="chartMarketingRhythm" role="img" aria-label="Gráfico diário de investimento em reais e conversas iniciadas"></canvas>
-                  </div>
-                  <p class="mt-1 text-[10px] text-slate-400">Fonte: Meta Ads · dias sem entrega aparecem como zero</p>
-                </div>
-                <div x-show="!marketingVisao?.series?.length" class="flex min-h-[250px] flex-col items-center justify-center text-center">
-                  <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
-                    <i data-lucide="plug" class="h-5 w-5"></i>
-                  </span>
-                  <p class="mt-3 text-sm font-semibold text-gray-800">Conecte a Meta para iniciar a série</p>
-                  <p class="mt-1 max-w-sm text-xs leading-relaxed text-gray-500">A tela permanece sem valores inventados até que a conta de anúncios esteja configurada no ambiente seguro.</p>
-                </div>
-                <div class="mt-4 flex gap-2 rounded-lg border border-emerald-100 bg-emerald-50/70 p-3 text-xs leading-relaxed text-emerald-900">
-                  <i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0"></i>
-                  <p><strong>Leitura honesta:</strong> zero vendas atribuídas não significa zero vendas realizadas. A venda só entra aqui depois de haver vínculo rastreável.</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-5">
-              <header class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                <div class="flex items-center gap-2">
-                  <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
-                    <i data-lucide="bell-ring" class="h-4 w-4"></i>
-                  </span>
-                  <div>
-                    <h2 class="text-base font-semibold text-gray-950">Central de alertas</h2>
-                    <p class="text-xs text-gray-500">O que exige ação antes de aumentar a verba</p>
-                  </div>
-                </div>
-                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800" x-text="marketingVisao?.alerts?.length || 0"></span>
-              </header>
-              <div class="space-y-2 p-4">
-                <template x-for="alert in marketingVisao?.alerts || []" :key="alert.id">
-                  <button @click="marketingNavigate(alert.target)"
-                          class="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
-                          :class="marketingAlertClass(alert.severity)">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70">
-                      <i :data-lucide="marketingAlertIcon(alert.severity)" class="h-4 w-4"></i>
-                    </span>
-                    <span class="min-w-0 flex-1">
-                      <span class="block text-sm font-semibold" x-text="alert.title"></span>
-                      <span class="mt-0.5 block text-[11px] opacity-80" x-text="alert.detail"></span>
-                    </span>
-                    <i data-lucide="chevron-right" class="h-4 w-4 shrink-0"></i>
-                  </button>
-                </template>
-                <div x-show="!marketingVisao?.alerts?.length" class="py-10 text-center text-sm text-gray-500">Nenhum alerta no período.</div>
-              </div>
-            </section>
-          </div>
-
-          <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <section class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 text-gray-950 shadow-sm lg:col-span-8">
-              <div class="pointer-events-none absolute inset-0 opacity-50"
-                   style="background:radial-gradient(circle at 12% 0%,rgba(209,250,229,.58),transparent 34%),radial-gradient(circle at 88% 100%,rgba(236,253,245,.9),transparent 32%)"></div>
-              <div class="relative flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50">
-                      <i data-lucide="route" class="h-4 w-4 text-emerald-800"></i>
-                    </span>
-                    <h2 class="text-base font-semibold">Do investimento ao lucro</h2>
-                  </div>
-                  <p class="mt-1 pl-10 text-xs text-gray-500">Uma trilha contínua; nenhuma etapa avança sem evidência</p>
-                </div>
-                <span class="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">fluxo auditável</span>
-              </div>
-              <div class="relative mt-6">
-                <svg aria-hidden="true" viewBox="0 0 1000 80" preserveAspectRatio="none"
-                     class="pointer-events-none absolute left-[8%] top-2 hidden h-12 w-[84%] md:block">
-                  <defs>
-                    <linearGradient id="marketingJourneyLine" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stop-color="#6ee7b7"></stop>
-                      <stop offset="38%" stop-color="#34d399"></stop>
-                      <stop offset="72%" stop-color="#10b981" stop-opacity=".45"></stop>
-                      <stop offset="100%" stop-color="#a7f3d0" stop-opacity=".18"></stop>
-                    </linearGradient>
-                  </defs>
-                  <path d="M 10 42 C 105 2, 145 2, 245 42 S 385 82, 495 42 S 635 2, 745 42 S 885 82, 990 42"
-                        fill="none" stroke="rgba(209,250,229,.72)" stroke-width="12" stroke-linecap="round"></path>
-                  <path d="M 10 42 C 105 2, 145 2, 245 42 S 385 82, 495 42 S 635 2, 745 42 S 885 82, 990 42"
-                        fill="none" stroke="url(#marketingJourneyLine)" stroke-width="3" stroke-linecap="round"></path>
-                </svg>
-                <div class="relative grid grid-cols-1 gap-2 md:grid-cols-5">
-                  <template x-for="(stage, index) in marketingFunnel()" :key="stage.label">
-                    <article class="relative rounded-xl border p-3 backdrop-blur-sm"
-                             :class="stage.status === 'ready' ? 'border-emerald-200 bg-emerald-50/70 text-gray-950' : stage.status === 'blocked' ? 'border-gray-200 bg-gray-50/80 text-gray-500' : 'border-gray-200 bg-white/90 text-gray-700'">
-                      <div class="flex items-center justify-between gap-2">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-800 shadow-[0_0_0_5px_rgba(209,250,229,.72)]">
-                          <i :data-lucide="stage.icon" class="h-4 w-4"></i>
-                        </span>
-                        <span class="rounded-full border border-emerald-100 bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800"
-                              x-text="stage.status === 'ready' ? 'confirmado' : stage.status === 'blocked' ? 'bloqueado' : 'pendente'"></span>
-                      </div>
-                      <p class="mt-4 text-[11px] opacity-70" x-text="stage.label"></p>
-                      <p class="mt-1 min-h-[24px] text-base font-semibold" x-text="stage.value"></p>
-                      <p class="mt-1 text-[10px] leading-relaxed opacity-60" x-text="stage.detail"></p>
-                    </article>
-                  </template>
-                </div>
-              </div>
-              <div class="relative mt-4 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-[11px] text-emerald-900">
-                <i data-lucide="shield-check" class="h-3.5 w-3.5 shrink-0 text-emerald-700"></i>
-                O lucro só aparece quando origem, venda e custos estiverem conciliados.
-              </div>
-            </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-4">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h2 class="text-base font-semibold text-gray-950">Comparação de períodos</h2>
-                  <p class="mt-1 text-xs text-gray-500">Atual contra o intervalo anterior equivalente</p>
-                </div>
-                <i data-lucide="calendar-range" class="h-5 w-5 text-emerald-700"></i>
-              </div>
-              <div x-show="marketingVisao?.comparison?.available" class="mt-5 grid grid-cols-2 gap-3">
-                <div class="rounded-xl bg-emerald-50 p-4">
-                  <p class="text-[11px] text-emerald-700">Investimento</p>
-                  <p class="mt-1 text-xl font-semibold text-emerald-950"
-                     x-text="`${Number(marketingVisao?.comparison?.spend_delta_percent || 0).toFixed(1).replace('.', ',')}%`"></p>
-                  <p class="mt-1 text-[10px] text-emerald-700">versus período anterior</p>
-                </div>
-                <div class="rounded-xl bg-emerald-50 p-4">
-                  <p class="text-[11px] text-emerald-700">Conversas</p>
-                  <p class="mt-1 text-xl font-semibold text-emerald-950"
-                     x-text="`${Number(marketingVisao?.comparison?.conversations_delta_percent || 0).toFixed(1).replace('.', ',')}%`"></p>
-                  <p class="mt-1 text-[10px] text-emerald-700">versus período anterior</p>
-                </div>
-              </div>
-              <div x-show="!marketingVisao?.comparison?.available" class="mt-5 flex min-h-[104px] items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-gray-500"><i data-lucide="history" class="h-4 w-4"></i></span>
-                <div>
-                  <p class="text-sm font-semibold text-gray-800">Histórico anterior insuficiente</p>
-                  <p class="mt-1 text-xs leading-relaxed text-gray-500">A comparação aparecerá quando os dois períodos tiverem dados completos.</p>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-7">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-base font-semibold text-gray-950">Canais conectados</h2>
-                  <p class="mt-1 text-xs text-gray-500">Situação real de cada plataforma</p>
-                </div>
-                <button @click="marketingNavigate('integracoes')" class="text-xs font-semibold text-emerald-700 hover:underline">Gerenciar integrações</button>
-              </div>
-              <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <template x-for="channel in marketingVisao?.channels || []" :key="channel.id">
-                  <article class="flex min-h-[154px] flex-col rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                    <div class="flex items-start justify-between gap-2">
-                      <span class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50/60">
-                        <template x-if="channel.id === 'meta'">
-                          <span class="relative h-8 w-10">
-                            <img src="/assets/brands/facebook.svg" alt="Facebook" class="absolute left-0 top-0 h-7 w-7">
-                            <img src="/assets/brands/instagram.svg" alt="Instagram"
-                                 class="absolute bottom-0 right-0 h-7 w-7 rounded-[6px] bg-white ring-2 ring-white">
-                          </span>
-                        </template>
-                        <template x-if="channel.id === 'google'">
-                          <img src="/assets/brands/google-ads.svg" alt="Google Ads" class="h-8 w-8">
-                        </template>
-                        <template x-if="channel.id === 'tiktok'">
-                          <svg role="img" aria-label="TikTok Ads" viewBox="0 0 24 24" class="h-8 w-8 fill-black">
-                            <title>TikTok</title>
-                            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
-                          </svg>
-                        </template>
-                      </span>
-                    </div>
-                    <p class="mt-3 text-sm font-semibold text-gray-950"
-                       x-text="channel.label === 'Meta' ? 'Meta Ads' : channel.label === 'Google' ? 'Google Ads' : 'TikTok Ads'"></p>
-                    <p class="mt-0.5 truncate text-[10px] text-gray-500"
-                       x-text="channel.id === 'meta' ? 'Facebook + Instagram' : channel.id === 'google' ? 'Pesquisa, Display e YouTube' : channel.id === 'tiktok' ? 'TikTok Ads' : 'Canal de mídia'"></p>
-                    <span class="mt-auto inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold"
-                          :class="marketingChannelClass(channel.status)">
-                      <i :data-lucide="channel.status === 'connected' ? 'circle-check' : channel.status === 'planned' ? 'clock-3' : 'circle-minus'" class="h-3 w-3"></i>
-                      <span x-text="marketingChannelStatus(channel.status)"></span>
-                    </span>
-                  </article>
-                </template>
-              </div>
-            </section>
-
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-5">
-              <div class="p-5">
-                <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-base font-semibold text-gray-950">Qualidade da medição</h2>
-                  <span class="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800"
-                        x-text="marketingQualityReady()"></span>
-                </div>
-                <div class="mt-5 grid grid-cols-[104px_minmax(0,1fr)] items-center gap-5">
-                  <div class="relative h-[104px] w-[104px] rounded-full p-2"
-                       :style="`background:conic-gradient(#047857 ${Math.round(((marketingVisao?.quality || []).filter((row) => row.status === 'ok').length / Math.max((marketingVisao?.quality || []).length, 1)) * 100)}%, #d1fae5 0)`">
-                    <div class="flex h-full w-full items-center justify-center rounded-full border border-emerald-100 bg-white">
-                      <span class="text-2xl font-semibold text-emerald-800"
-                            x-text="`${Math.round(((marketingVisao?.quality || []).filter((row) => row.status === 'ok').length / Math.max((marketingVisao?.quality || []).length, 1)) * 100)}%`"></span>
-                    </div>
-                  </div>
-                  <div class="relative flex items-start justify-between">
-                    <div class="absolute left-4 right-4 top-4 h-0.5 bg-gray-200"></div>
-                    <template x-for="row in marketingVisao?.quality || []" :key="row.id">
-                      <div class="relative z-10 flex min-w-0 flex-1 flex-col items-center text-center">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full border"
-                              :class="row.status === 'ok' ? 'border-emerald-700 bg-emerald-700 text-white' : row.status === 'blocked' ? 'border-gray-200 bg-gray-100 text-gray-500' : 'border-emerald-100 bg-emerald-50 text-emerald-700'">
-                          <i :data-lucide="row.status === 'ok' ? 'check' : row.status === 'blocked' ? 'lock-keyhole' : 'clock-3'" class="h-3.5 w-3.5"></i>
-                        </span>
-                        <span class="mt-2 max-w-[64px] text-[9px] leading-tight text-gray-600" x-text="row.label"></span>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 border-t border-emerald-100 bg-emerald-50/70 px-5 py-3 text-xs text-emerald-900">
-                <i data-lucide="target" class="h-4 w-4 shrink-0 text-emerald-700"></i>
-                <span><strong>Próximo passo:</strong> validar atribuição multicanal</span>
-              </div>
-            </section>
-
-            <section class="flex flex-col gap-4 rounded-xl border border-emerald-900/20 bg-emerald-950 px-5 py-4 text-white shadow-sm lg:col-span-12 lg:flex-row lg:items-center">
-              <div class="flex shrink-0 items-center gap-3">
-                <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-800">
-                  <i data-lucide="route" class="h-4 w-4 text-emerald-100"></i>
-                </span>
-                <h2 class="text-sm font-semibold">Próximos passos seguros</h2>
-              </div>
-              <ul class="flex flex-1 flex-wrap gap-x-5 gap-y-2 text-[11px] leading-relaxed text-emerald-50/85">
-                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Conectar a Meta por variável segura</span></li>
-                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Validar a origem do anúncio antes de atribuir vendas</span></li>
-                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Habilitar CAPI somente após a prova ponta a ponta</span></li>
-              </ul>
-              <button @click="marketingNavigate('integracoes')" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-950 hover:bg-emerald-200">
-                Abrir integrações <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
-              </button>
-            </section>
-          </div>
+          <aside class="paid-side"><section class="paid-card"><div class="paid-title-row"><h2>Precisa de atenção</h2><span class="paid-badge pending" x-text="paidAlerts().length"></span></div><template x-for="alert in paidAlerts()" :key="alert.id"><div class="paid-alert"><i data-lucide="triangle-alert"></i><div><strong x-text="alert.title"></strong><p x-text="alert.detail"></p><button class="paid-link" @click="marketingNavigate(alert.target)">Conferir<i data-lucide="arrow-right"></i></button></div></div></template><p x-show="!paidAlerts().length" class="paid-notice">Nenhuma pendência identificada.</p></section>
+            <section class="paid-card"><h2>Qualidade da medição</h2><button class="paid-quality" @click="marketingNavigate('integracoes')"><span><i data-lucide="database"></i>Coleta da Meta</span><small x-text="marketingVisao?.connection?.meta === 'connected' ? 'Disponível' : 'Revisar'"></small></button><button class="paid-quality" @click="marketingNavigate('jornadas')"><span><i data-lucide="link"></i>Rastreio de origem</span><small x-text="marketingVisao?.attribution?.available ? paidNumber(marketingVisao.attribution.tracked) + ' conversas' : 'Indisponível'"></small></button><button class="paid-quality" @click="marketingNavigate('jornadas')"><span><i data-lucide="coins"></i>Custos das vendas</span><small x-text="marketingVisao?.metrics?.pending_margin_orders == null ? 'Aguardando' : marketingVisao.metrics.pending_margin_orders > 0 ? 'Incompletos' : 'Sem pendências'"></small></button><footer class="paid-footer"><button class="paid-link" @click="marketingNavigate('jornadas')">Conversas e vendas<i data-lucide="arrow-right"></i></button></footer></section>
+          </aside>
         </div>
-      </div>
+        <div x-show="paidCompareOpen" x-cloak class="paid-modal-backdrop" @click.self="paidCloseCompare()" @keydown.escape.window="if (paidCompareOpen) paidCloseCompare()"><section class="paid-modal" role="dialog" aria-modal="true" aria-labelledby="paid-compare-heading" @keydown="paidCompareKeydown($event)"><header class="paid-title-row"><div><h2 id="paid-compare-heading">Comparar anúncios da 2W</h2><p>Escolha até 3 anúncios · <span x-text="marketingPeriodLabel()"></span></p></div><button class="paid-button" @click="paidCloseCompare()" aria-label="Fechar comparação"><i data-lucide="x"></i></button></header><p x-show="marketingCreativesLoading" class="paid-empty">Carregando anúncios…</p><p x-show="marketingCreativesError" class="paid-error" x-text="marketingCreativesError"></p><div class="paid-compare-options"><template x-for="ad in paidCompareOptions()" :key="ad.id"><label><input type="checkbox" :checked="paidCompareIds.includes(ad.id)" :disabled="!paidCompareIds.includes(ad.id) && paidCompareIds.length >= 3" @change="paidToggleCompare(ad.id)"> <span x-text="ad.name"></span></label></template></div><div class="paid-compare-grid"><template x-for="ad in paidCompared()" :key="ad.id"><article class="paid-card"><h3 x-text="ad.name"></h3><p class="paid-notice" x-text="ad.campaign_name"></p><dl><div><dt>Investimento</dt><dd x-text="paidMoney(ad.investment)"></dd></div><div><dt>Conversas</dt><dd x-text="paidNumber(ad.conversations)"></dd></div><div><dt>Custo / conversa</dt><dd x-text="paidMoney(ad.cost_per_conversation)"></dd></div><div><dt>Impressões</dt><dd x-text="paidNumber(ad.impressions)"></dd></div><div><dt>Cliques</dt><dd x-text="paidNumber(ad.clicks)"></dd></div><div><dt>Vendas atribuídas</dt><dd x-text="paidNumber(ad.attributed_sales)"></dd></div><div><dt>Receita atribuída</dt><dd x-text="paidMoney(ad.attributed_revenue)"></dd></div></dl></article></template></div><p x-show="!marketingCreativesLoading && !marketingCreativesError && !paidCompareOptions().length" class="paid-empty">Sem anúncios da Matriz disponíveis para comparação neste período.</p><p class="paid-notice">A comparação não altera orçamento nem veiculação dos anúncios.</p></section></div>
+      </section>
 
       <section x-show="marketingTab === 'campanhas' && !marketingCampaignDetailId"
                class="space-y-4"
@@ -9908,7 +9630,7 @@
           <div class="mc-periods" aria-label="Período dos criativos"><button type="button" @click="marketingCreativeSetPeriod('7d')" :class="marketingPeriod === '7d' && 'is-selected'" :aria-pressed="marketingPeriod === '7d'">7 dias</button><button type="button" @click="marketingCreativeSetPeriod('30d')" :class="marketingPeriod === '30d' && 'is-selected'" :aria-pressed="marketingPeriod === '30d'">30 dias</button></div>
           <div class="mc-range"><i data-lucide="calendar-days"></i><span x-text="marketingCreativeRange()"></span></div>
           <select aria-label="Campanha dos criativos" x-model="marketingCreativeCampaign" @change="marketingCreativeFiltersChanged()"><option value="all">Todas as campanhas</option><template x-for="campaign in marketingCreativeCampaigns()" :key="campaign.id"><option :value="campaign.id" x-text="campaign.name"></option></template></select>
-          <select aria-label="Formato dos criativos" x-model="marketingCreativeFormat" @change="marketingCreativeFiltersChanged()"><option value="all">Todos os formatos</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="carousel">Carrossel</option><option value="mixed">Múltiplas mídias</option><option value="unknown">Formato indisponível</option></select>
+          <select aria-label="Escopo dos anúncios" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" x-model="marketingCreativeScope" @change="marketingCreativeFiltersChanged()"><option value="matrix">Anúncios da 2W</option><option value="all">Todos · histórico</option></select><select aria-label="Formato dos criativos" x-model="marketingCreativeFormat" @change="marketingCreativeFiltersChanged()"><option value="all">Todos os formatos</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="carousel">Carrossel</option><option value="mixed">Múltiplas mídias</option><option value="unknown">Formato indisponível</option></select>
           <label class="mc-search"><i data-lucide="search"></i><input type="search" aria-label="Buscar criativo" placeholder="Buscar criativo" x-model="marketingCreativeSearch" @input.debounce.150ms="marketingCreativeFiltersChanged()"></label>
           <button type="button" class="mc-button" @click="loadMarketingCreatives()" :disabled="marketingCreativesLoading" aria-label="Atualizar criativos"><i data-lucide="refresh-cw"></i></button>
         </div>

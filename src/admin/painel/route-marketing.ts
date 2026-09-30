@@ -130,6 +130,9 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
         });
         return reply.status(200).send(result);
       } catch (error) {
+        if (error instanceof Error && error.message === 'campaign_scope_automatic_by_ad_identity') {
+          return reply.status(409).send({ error: 'campaign_scope_automatic_by_ad_identity' });
+        }
         if (error instanceof Error && error.message === 'marketing_campaign_not_found') {
           return reply.status(404).send({ error: 'campaign_not_found' });
         }

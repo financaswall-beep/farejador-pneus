@@ -13,11 +13,9 @@ export interface CreativeAttribution {
 export async function loadCreativeInsights(db: Pool, environment: string, account: string, since: string, until: string) {
   return (await db.query<CreativeInsight>(
     `SELECT mi.entity_id,mi.entity_name,mi.campaign_id,mi.campaign_name,
-            COALESCE(s.scope,'pending') AS campaign_scope,mi.metric_date::text,
+            mi.campaign_scope,mi.metric_date::text,
             mi.account_currency,mi.spend,mi.conversations,mi.impressions,mi.clicks,mi.collected_at::text
-       FROM marketing.meta_insights_daily mi
-       LEFT JOIN marketing.campaign_scopes s ON s.environment=mi.environment
-        AND s.ad_account_id=mi.ad_account_id AND s.campaign_id=mi.campaign_id
+       FROM marketing.meta_insights_daily_scoped mi
       WHERE mi.environment=$1 AND mi.ad_account_id=$2 AND mi.entity_level='ad'
         AND mi.metric_date BETWEEN $3::date AND $4::date
       ORDER BY mi.metric_date,mi.entity_id`, [environment, account, since, until],
@@ -35,7 +33,7 @@ export async function loadCreativeAttribution(db: Pool, environment: string, acc
   return (await db.query<CreativeAttribution>(
     `WITH ads AS (
        SELECT DISTINCT entity_id FROM marketing.meta_insights_daily
-        WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad'
+        WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad' AND marketing.meta_ad_scope_allowed(environment,ad_account_id,entity_id)
      ), tracked AS (
        SELECT r.source_id,count(DISTINCT r.conversation_id)::int AS tracked,
               array_agg(DISTINCT r.channel) AS channels

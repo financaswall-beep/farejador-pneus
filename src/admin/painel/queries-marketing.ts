@@ -14,6 +14,8 @@ import {
 import { getPersistedOrLiveMetaSnapshot } from '../../marketing/meta-sync.js';
 import {
   getMarketingAttributionReport,
+  getMarketingPipelineHealth,
+  type MarketingPipelineHealth,
   type MarketingAttributionReport,
 } from '../../marketing/reporting.js';
 
@@ -63,6 +65,7 @@ export interface MarketingOverview {
     reason: string | null;
   };
   attribution: AttributionHealth;
+  pipeline?: MarketingPipelineHealth;
   alerts: Array<{ id: string; severity: 'high' | 'attention' | 'info'; title: string; detail: string; target: string }>;
   channels: Array<{ id: string; label: string; status: string }>;
   quality: Array<{ id: string; label: string; status: 'ok' | 'pending' | 'blocked' }>;
@@ -107,8 +110,11 @@ async function attributionHealth(
          count(DISTINCT conversation_id) FILTER (WHERE channel='whatsapp')::int AS ctwa,
          count(DISTINCT conversation_id) FILTER (WHERE channel='messenger')::int AS messenger,
          count(DISTINCT conversation_id) FILTER (WHERE channel='instagram')::int AS instagram
-       FROM marketing.ad_referrals
+       FROM marketing.ad_referrals r
        WHERE environment = $1
+         AND (NOT EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1)
+           OR EXISTS (SELECT 1 FROM marketing.meta_ad_identities d WHERE d.environment=$1
+             AND d.ad_id=r.source_id AND d.scope='matrix'))
          AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
          AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`,
       [environment, since, until],
@@ -146,6 +152,7 @@ export async function getMarketingOverview(
   const metaProvider = dependencies.metaProvider;
   const window = marketingDateWindow(period, now);
   const attribution = await attributionHealth(env.FAREJADOR_ENV, window.since, window.until, dbPool);
+  const pipeline = await getMarketingPipelineHealth(dbPool);
 
   let meta: MetaMarketingSnapshot | null = null;
   let metaStatus: ConnectionStatus = config.metaEnabled ? 'not_configured' : 'disabled';
@@ -203,9 +210,9 @@ export async function getMarketingOverview(
   if (pendingScopeCampaigns > 0) {
     alerts.push({
       id: 'campaign-scope-pending', severity: 'high',
-      title: `${pendingScopeCampaigns} campanha(s) aguardando classificação`,
-      detail: 'Esses gastos não entram no Financeiro e bloqueiam o fechamento.',
-      target: 'campanhas',
+      title: `${pendingScopeCampaigns} campanha(s) com identidade pendente`,
+      detail: 'Esses gastos ficam fora do Financeiro. Confira os perfis dos anúncios e execute a coleta Meta.',
+      target: 'integracoes',
     });
   }
 
@@ -261,6 +268,7 @@ export async function getMarketingOverview(
       reason: comparisonAvailable ? null : 'historico_anterior_insuficiente',
     },
     attribution,
+    pipeline,
     alerts,
     channels: [
       { id: 'meta', label: 'Meta', status: metaStatus },

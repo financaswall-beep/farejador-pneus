@@ -49,7 +49,7 @@ const CAPI_SOURCE_SQL = `
         ) mapped
       HAVING count(*)=1
     ) map ON true
-    LEFT JOIN marketing.campaign_scopes s
+    LEFT JOIN marketing.effective_campaign_scopes s
       ON s.environment=a.environment AND s.ad_account_id=map.ad_account_id
      AND s.campaign_id=map.campaign_id
    WHERE a.environment=$1 AND a.status='active' AND a.superseded_by IS NULL
@@ -65,7 +65,8 @@ const CAPI_SOURCE_SQL = `
        OR (r.channel='messenger' AND r.business_account_id=$3)
        OR (r.channel='instagram' AND r.business_account_id=$4))
      AND a.realized_at>=now()-interval '6 days 23 hours'
-     AND (NOT $2::boolean OR s.scope='matrix')`;
+     AND (NOT $2::boolean OR s.scope='matrix')
+     AND marketing.meta_ad_scope_allowed(a.environment,map.ad_account_id,r.source_id)`;
 
 export async function loadProductionCapiSources(dbPool: Pool): Promise<CapiSourceRow[]> {
   const result = await dbPool.query<CapiSourceRow>(

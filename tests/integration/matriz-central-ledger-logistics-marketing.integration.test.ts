@@ -179,10 +179,12 @@ describe('Etapa 4 — logística e marketing no livro central', () => {
 
   it('Meta contabiliza somente campanha e corrige recoleta por diferença', async () => {
     const fetcherFor = (spend: string) => (async (input: URL | RequestInfo) => {
-      const level = new URL(String(input)).searchParams.get('level');
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/ads')) return Response.json({ data: [{ id: '411', campaign_id: '410', creative: { actor_id: '1434857906367394' } }] });
+      const level = url.searchParams.get('level');
       return new Response(JSON.stringify({ data: [{
-        campaign_id: 'camp-etapa4', campaign_name: 'Campanha Etapa 4',
-        ...(level === 'ad' ? { ad_id: 'ad-etapa4', ad_name: 'Criativo' } : {}),
+        campaign_id: '410', campaign_name: 'Campanha Etapa 4',
+        ...(level === 'ad' ? { ad_id: '411', ad_name: 'Criativo' } : {}),
         date_start: '2026-07-25', spend, account_currency: 'BRL',
         impressions: '1000', clicks: '20', actions: [],
       }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });

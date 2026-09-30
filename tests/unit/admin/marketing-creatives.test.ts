@@ -51,7 +51,7 @@ function front() {
     $nextTick: () => {}, marketingIsMock: () => false, marketingPeriod: '30d',
   });
 }
-const row = (id: string, cost: number | null, campaign = '1', format = 'image') => ({ id, name: `Pneu ${id}`, cost_per_conversation: cost, campaign_id: campaign, campaign_name: campaign, media: { format }, currency: 'BRL', investment: 20, conversations: 4 });
+const row = (id: string, cost: number | null, campaign = '1', format = 'image') => ({ id, scope: 'matrix', name: `Pneu ${id}`, cost_per_conversation: cost, campaign_id: campaign, campaign_name: campaign, media: { format }, currency: 'BRL', investment: 20, conversations: 4 });
 describe('Criativos: seleção, filtros e carregamento', () => {
   it('coloca custos sem denominador no fim e atualiza seleção ao filtrar/paginar', () => {
     const app = front();

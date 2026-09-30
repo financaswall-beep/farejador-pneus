@@ -43,7 +43,7 @@ export async function getMarketingCampaignDetail(
     `SELECT entity_level,entity_id,entity_name,campaign_id,campaign_name,
             adset_id,adset_name,metric_date::text,account_currency,
             spend,
-            CASE WHEN $5::boolean THEN financial_spend ELSE spend END
+            CASE WHEN $5::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=meta_insights_daily_scoped.environment AND a.ad_account_id=meta_insights_daily_scoped.ad_account_id) THEN financial_spend ELSE spend END
               AS financial_spend,
             campaign_scope,impressions,clicks,conversations,actions_raw
        FROM marketing.meta_insights_daily_scoped
@@ -73,7 +73,7 @@ export async function getMarketingCampaignDetail(
     byDate.set(row.metric_date, rows);
   }
   const adGroups = new Map<string, InsightRow[]>();
-  for (const row of result.rows.filter((item) => item.entity_level === 'ad')) {
+  for (const row of result.rows.filter((item) => item.entity_level === 'ad' && item.campaign_scope === campaignRows[0]?.campaign_scope)) {
     const rows = adGroups.get(row.entity_id) ?? [];
     rows.push(row);
     adGroups.set(row.entity_id, rows);

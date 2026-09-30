@@ -87,6 +87,9 @@ export async function setCampaignScope(
   const auditId = randomUUID();
   try {
     await client.query('BEGIN');
+    const automatic = await client.query(`SELECT 1 FROM marketing.meta_identity_accounts
+      WHERE environment=$1 AND ad_account_id=$2`, [env.FAREJADOR_ENV, input.adAccountId]);
+    if (automatic.rows.length) throw new Error('campaign_scope_automatic_by_ad_identity');
     const campaignName = await loadCampaignName(
       client,
       env.FAREJADOR_ENV,

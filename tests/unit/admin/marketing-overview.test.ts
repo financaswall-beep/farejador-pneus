@@ -62,7 +62,8 @@ describe('Marketing overview da matriz', () => {
       messenger: 0,
       instagram: 0,
     });
-    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledTimes(4);
+    expect(overview.pipeline?.available).toBe(true);
     expect(query.mock.calls[0]?.[1]?.[0]).toBe(overview.environment);
   });
 

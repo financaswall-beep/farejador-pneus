@@ -431,6 +431,7 @@ describe('pipeline determinístico de Marketing', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // shared identity lock
       .mockResolvedValueOnce({ rows: [{ scope: 'matrix' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'attr-old' }] })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
@@ -470,6 +471,7 @@ describe('pipeline determinístico de Marketing', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // shared identity lock
       .mockResolvedValueOnce({ rows: [{ scope: 'external' }] })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [] });
@@ -506,6 +508,7 @@ describe('pipeline determinístico de Marketing', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // shared identity lock
       .mockResolvedValueOnce({ rows: [{ id: 'attr-legacy' }] })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [] });
@@ -570,7 +573,7 @@ describe('pipeline determinístico de Marketing', () => {
         return {
           rows: [{
             id: 'scope-1', environment: 'test', ad_account_id: 'act_123',
-            campaign_id: 'camp-1', campaign_name: 'WhatsApp', scope: 'pending',
+            campaign_id: '10', campaign_name: 'WhatsApp', scope: 'pending',
             classification_reason: null, classified_by: null, classified_at: null,
             updated_at: '2026-07-26T18:00:00Z',
           }],
@@ -591,12 +594,14 @@ describe('pipeline determinístico de Marketing', () => {
     const dbPool = { query: poolQuery, connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
     const fetcher = vi.fn(async (input: URL | RequestInfo) => {
       const url = new URL(String(input));
+      if (url.pathname.endsWith('/ads')) return Response.json({ data: [{ id: '111', campaign_id: '10',
+        creative: { actor_id: '1434857906367394' } }] });
       const level = url.searchParams.get('level');
       return new Response(JSON.stringify({
         data: [{
-          campaign_id: 'camp-1',
+          campaign_id: '10',
           campaign_name: 'WhatsApp',
-          ...(level === 'ad' ? { ad_id: 'ad-1', ad_name: 'Criativo 1' } : {}),
+          ...(level === 'ad' ? { ad_id: '111', ad_name: 'Criativo 1' } : {}),
           date_start: '2026-07-26',
           spend: '10.50',
           impressions: '1000',

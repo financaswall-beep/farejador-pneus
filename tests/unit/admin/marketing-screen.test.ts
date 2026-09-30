@@ -23,9 +23,8 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('/admin/painel/assets/marketing-hero.webp?v=20260725-marketing-visao1');
     expect(marketingHtml).toContain('aria-label="Seções de Marketing"');
     for (const label of [
-      'Visão geral',
-      'Campanhas',
-      'Criativos',
+      'Conteúdo pago',
+      'Conteúdo orgânico',
       'Jornadas',
       'Geografia e demanda',
       'Integrações',
@@ -42,10 +41,10 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.chart.js'");
     expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
       .toContain('window.PAINEL_MODULES.marketingChart');
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260927-organic4');
-    expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260821-marketing-audit1');
-    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260821-marketing-audit1');
-    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260821-marketing-audit1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260930-paid1');
+    expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260930-paid1');
+    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260930-paid1');
+    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260930-paid1');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[^"\s]+/);
@@ -61,44 +60,23 @@ describe('Marketing — primeira tela da matriz', () => {
   it('não transforma ausência de atribuição em venda zero', () => {
     expect(front).toContain("metrics.attributed_sales ?? '—'");
     expect(front).toContain("metrics.net_after_media == null ? 'Não calculada'");
-    expect(html).toContain('zero vendas atribuídas não significa zero vendas realizadas');
-    expect(html).toContain('A venda só entra aqui depois de haver vínculo rastreável');
+    expect(html).toContain('Ausência de atribuição não é tratada como zero vendas');
+    expect(readFileSync(resolve('painel/public/app.marketing.paid.js'), 'utf8')).toContain('Vendas com origem comprovada');
   });
 
-  it('apresenta uma leitura fluida e marcas reais sem alterar o contrato de dados', () => {
-    const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
-    const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
-    const marketingHtml = html.slice(marketingStart, marketingEnd);
-
-    expect(marketingHtml).toContain('id="chartMarketingRhythm"');
-    expect(chartFront).toContain("label: 'Investimento (R$)'");
-    expect(chartFront).toContain("label: 'Conversas'");
+  it('reúne indicadores, gráfico, campanhas e a fila existente sem canais fictícios', () => {
+    expect(html.includes('data-marketing-paid-screen')).toBe(true);
+    expect(html.includes('id="chartMarketingRhythm"')).toBe(true);
     expect(chartFront).toContain("yAxisID: 'investment'");
     expect(chartFront).toContain("yAxisID: 'conversations'");
-    expect(chartFront).toContain('borderDash: [6, 5]');
-    expect(front).not.toContain('marketingSeriesPoints');
-    expect(marketingHtml).toContain('marketingJourneyLine');
-    expect(marketingHtml).toContain('Uma trilha contínua; nenhuma etapa avança sem evidência');
-    expect(marketingHtml).toContain('/assets/brands/facebook.svg');
-    expect(marketingHtml).toContain('/assets/brands/instagram.svg');
-    expect(marketingHtml).toContain('/assets/brands/google-ads.svg');
-    expect(marketingHtml).toContain('<title>TikTok</title>');
-    expect(marketingHtml).toContain('grid grid-cols-1 gap-2 sm:grid-cols-3');
-    expect(marketingHtml).toContain('background:conic-gradient(#047857');
-    expect(marketingHtml).toContain('<strong>Próximo passo:</strong> validar atribuição multicanal');
-    expect(marketingHtml).toContain('data-marketing-channel-filter-mock');
-    expect(marketingHtml).toContain('Meta somente — Google e TikTok não têm conector neste módulo');
-    expect(marketingHtml).toContain('disabled aria-pressed="false" title="Sem conector"');
-    expect(marketingHtml).not.toContain('<section x-show="marketingIsMock()" x-cloak data-marketing-channel-filter-mock');
-    expect(marketingHtml).toContain('grid grid-cols-1 gap-4 lg:grid-cols-12');
-    expect(marketingHtml).toContain('shadow-sm lg:col-span-8');
-    expect(marketingHtml).toContain('shadow-sm lg:col-span-7');
-    expect(marketingHtml).toContain('absolute right-3 top-3 z-20');
-    expect(marketingHtml).not.toContain('absolute right-3 top-3 z-30');
-    expect(marketingHtml).toContain('2xl:grid-cols-8');
-    expect(marketingHtml).not.toContain('h-4.5 w-4.5');
-    expect(front).toContain("'border-emerald-300 bg-emerald-100/80 text-emerald-950'");
-    expect(front).not.toContain("'border-rose-200 bg-rose-50 text-rose-700'");
+    expect(chartFront).toContain("type: 'bar'");
+    expect(chartFront).toContain("type: 'line'");
+    expect(html.includes('Retorno das vendas à Meta')).toBe(true);
+    expect(html.includes('Acumulado da fila de conversões')).toBe(true);
+    expect(html.includes('Comparar anúncios')).toBe(true);
+    expect(html.includes('Mostrar mais indicadores')).toBe(true);
+    expect(html.includes('paidExport()')).toBe(true);
+    expect(html.includes('Google Ads será integrado em uma próxima etapa')).toBe(true);
   });
 
   it('remove a subaba redundante Canais e direciona gestão para Integrações', () => {
@@ -173,7 +151,7 @@ describe('Marketing — primeira tela da matriz', () => {
     const marketingHtml = html.slice(marketingStart, marketingEnd);
 
     expect(marketingHtml).toContain('data-marketing-campaign-detail-screen');
-    expect(marketingHtml).toContain('@click="openMarketingCampaignDetail(row)"');
+    expect(marketingHtml).toContain('@click="paidOpenCampaign(row)"');
     expect(marketingHtml).toContain('Voltar para campanhas');
     expect(marketingHtml).toContain('Eficiência do atendimento');
     expect(marketingHtml).toContain('Raio-X financeiro');

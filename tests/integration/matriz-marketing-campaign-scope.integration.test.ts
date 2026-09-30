@@ -43,28 +43,11 @@ describe('Marketing — escopo financeiro, histórico e ledger', () => {
   });
 
   it('pending não contabiliza, matrix provisiona e external estorna sem apagar histórico', async () => {
-    const fetcher = (async (input: URL | RequestInfo) => {
-      const level = new URL(String(input)).searchParams.get('level');
-      return new Response(JSON.stringify({ data: [{
-        campaign_id: 'camp-scope',
-        campaign_name: 'Campanha com dono explícito',
-        ...(level === 'ad' ? { ad_id: 'ad-scope', ad_name: 'Criativo' } : {}),
-        date_start: '2026-07-31',
-        spend: '125.50',
-        account_currency: 'BRL',
-        impressions: '1000',
-        clicks: '25',
-        actions: [],
-      }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }) as typeof fetch;
-
-    await syncMetaInsights({
-      dbPool: db.pool,
-      config: { adAccountId: 'act_123', accessToken: 'server-only', apiVersion: 'v21.0' },
-      fetcher,
-      now: new Date('2026-07-31T20:00:00Z'),
-      lookbackDays: 1,
-    });
+    // Legacy data keeps its manual workflow until identity sync is activated for this account.
+    await db.pool.query(`INSERT INTO marketing.meta_insights_daily
+      (environment,ad_account_id,api_version,account_currency,entity_level,entity_id,campaign_id,campaign_name,metric_date,spend,impressions,clicks,actions_raw)
+      VALUES ('test','act_123','v26.0','BRL','campaign','camp-scope','camp-scope','Campanha com dono explícito','2026-07-31',125.50,1000,25,'[]'),
+        ('test','act_123','v26.0','BRL','ad','ad-scope','camp-scope','Campanha com dono explícito','2026-07-31',125.50,1000,25,'[]')`);
 
     await expect(loadProductionCapiSources(db.pool)).resolves.toEqual([]);
 

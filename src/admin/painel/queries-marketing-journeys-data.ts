@@ -41,8 +41,10 @@ export async function loadOperationalJourney(
                 bool_or(channel='whatsapp') AS has_whatsapp,
                 bool_or(channel='messenger') AS has_messenger,
                 bool_or(channel='instagram') AS has_instagram
-         FROM marketing.ad_referrals
+         FROM marketing.ad_referrals r
          WHERE environment = $1
+           AND (NOT EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1)
+             OR EXISTS (SELECT 1 FROM marketing.meta_ad_identities d WHERE d.environment=$1 AND d.ad_id=r.source_id AND d.scope='matrix'))
            AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
            AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
          GROUP BY conversation_id

@@ -13,10 +13,8 @@ const querySchema = z.object({ period: z.enum(['7d', '30d']).default('30d') }).s
 const paramsSchema = z.object({ adId: z.string().regex(/^\d{1,40}$/) }).strict();
 async function findAd(adId: string) {
   return (await pool.query<{ scope: string; name: string }>(
-    `SELECT COALESCE(s.scope,'pending') AS scope,mi.entity_name AS name
-       FROM marketing.meta_insights_daily mi
-       LEFT JOIN marketing.campaign_scopes s ON s.environment=mi.environment
-        AND s.ad_account_id=mi.ad_account_id AND s.campaign_id=mi.campaign_id
+    `SELECT mi.campaign_scope AS scope,mi.entity_name AS name
+       FROM marketing.meta_insights_daily_scoped mi
       WHERE mi.environment=$1 AND mi.ad_account_id=$2 AND mi.entity_level='ad' AND mi.entity_id=$3
       ORDER BY mi.metric_date DESC LIMIT 1`, [env.FAREJADOR_ENV, env.META_ADS_ACCOUNT_ID, adId],
   )).rows[0];

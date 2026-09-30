@@ -189,7 +189,7 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
        COALESCE((SELECT sum(CASE side WHEN 'debit' THEN amount ELSE -amount END)
          FROM month_ledger WHERE account_class='expense'
            AND account_code LIKE 'expense_%'),0) ledger_expenses,
-       COALESCE((SELECT sum(CASE WHEN $2::boolean THEN financial_spend ELSE spend END) FROM
+       COALESCE((SELECT sum(CASE WHEN $2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=meta_insights_daily_scoped.environment AND a.ad_account_id=meta_insights_daily_scoped.ad_account_id) THEN financial_spend ELSE spend END) FROM
          marketing.meta_insights_daily_scoped,bounds b
          WHERE environment=$1 AND entity_level='campaign' AND account_currency='BRL'
            AND metric_date>=b.month_start AND metric_date<b.month_end),0)

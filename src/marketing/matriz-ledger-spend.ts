@@ -15,12 +15,15 @@ export async function reconcileMatrizMarketingSpend(
     environment: 'prod' | 'test'; entity_level: string; entity_id: string;
     entity_name: string | null; campaign_id: string; campaign_name: string | null;
     metric_date: string; spend: string; account_currency: string;
-    campaign_scope: 'pending' | 'matrix' | 'external';
+    campaign_scope: 'pending' | 'matrix' | 'external'; identity_scoped: boolean;
   }>(
     `SELECT i.environment,i.entity_level,i.entity_id,i.entity_name,
-            i.campaign_id,i.campaign_name,i.metric_date::text,i.spend::text,
-            i.account_currency,s.scope AS campaign_scope
+            i.campaign_id,i.campaign_name,i.metric_date::text,v.spend::text,
+            i.account_currency,v.campaign_scope,
+            EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment
+              AND a.ad_account_id=i.ad_account_id) AS identity_scoped
        FROM marketing.meta_insights_daily i
+       JOIN marketing.meta_insights_daily_scoped v ON v.environment=i.environment AND v.id=i.id
        JOIN marketing.campaign_scopes s
          ON s.environment=i.environment
         AND s.ad_account_id=i.ad_account_id
@@ -41,7 +44,7 @@ export async function reconcileMatrizMarketingSpend(
     [insight.environment, insightId],
   );
   const rawSpend = matrizLedgerAmount(insight.spend, 'marketing_spend_invalid');
-  const current = env.MARKETING_SCOPE_ENFORCEMENT_ENABLED
+  const current = insight.identity_scoped || env.MARKETING_SCOPE_ENFORCEMENT_ENABLED
     ? insight.campaign_scope === 'matrix' ? rawSpend : 0
     : rawSpend;
   const delta = Math.round((current - Number(booked.rows[0]?.amount ?? 0)) * 100) / 100;

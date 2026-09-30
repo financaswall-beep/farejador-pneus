@@ -87,6 +87,7 @@ export async function getMarketingCampaigns(
   const campaignAttribution = new Map(
     (attribution?.campaigns ?? []).map((row) => [row.campaign_id, row]),
   );
+  const attributionReady = config.attributionEnabled && attribution?.available === true;
   const campaigns = sourceRows.map((row) => {
     const attributed = campaignAttribution.get(row.id);
     const grossMargin = attributed?.gross_margin ?? null;
@@ -105,10 +106,10 @@ export async function getMarketingCampaigns(
     clicks: row.clicks ?? 0,
     ctr: row.ctr ?? null,
     cost_per_conversation: row.cost_per_conversation,
-    attributed_sales: config.attributionEnabled ? attributed?.attributed_sales ?? 0 : null,
-    attributed_revenue: config.attributionEnabled ? attributed?.attributed_revenue ?? 0 : null,
-    gross_margin: config.attributionEnabled ? grossMargin : null,
-    profit: config.attributionEnabled && grossMargin != null
+    attributed_sales: attributionReady ? attributed?.attributed_sales ?? 0 : null,
+    attributed_revenue: attributionReady ? attributed?.attributed_revenue ?? 0 : null,
+    gross_margin: attributionReady ? grossMargin : null,
+    profit: attributionReady && grossMargin != null
       ? Math.round((grossMargin - (row.financial_spend ?? row.spend)) * 100) / 100
       : null,
     stock_status: 'not_reconciled' as const,

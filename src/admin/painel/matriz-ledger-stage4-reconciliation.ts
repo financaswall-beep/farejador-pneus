@@ -70,7 +70,7 @@ export async function getMatrizStage4LedgerReconciliation(
        (SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
          WHERE i.environment=$1 AND i.entity_level='campaign'
            AND i.account_currency='BRL'
-           AND abs((CASE WHEN $2::boolean THEN i.financial_spend ELSE i.spend END)
+           AND abs((CASE WHEN $2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id) THEN i.financial_spend ELSE i.spend END)
              -COALESCE((
              SELECT sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
                FROM finance.matriz_ledger_transactions t
@@ -87,7 +87,7 @@ export async function getMatrizStage4LedgerReconciliation(
          marketing_currency_unsupported,
        (SELECT count(DISTINCT (i.ad_account_id,i.campaign_id))::int
           FROM marketing.meta_insights_daily_scoped i
-         WHERE $2::boolean AND i.environment=$1 AND i.entity_level='campaign'
+         WHERE ($2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id)) AND i.environment=$1
            AND i.spend>0 AND i.campaign_scope='pending')
          marketing_campaigns_unclassified,
        (SELECT count(*)::int FROM commerce.matriz_delivery_trips t
@@ -189,12 +189,13 @@ export async function runMatrizStage4LedgerBackfill(
     const insights = await client.query<{ id: string; sync_run_id: string | null }>(
       `SELECT i.id,i.sync_run_id
          FROM marketing.meta_insights_daily i
-         JOIN marketing.campaign_scopes s
-           ON s.environment=i.environment AND s.ad_account_id=i.ad_account_id
-          AND s.campaign_id=i.campaign_id
+         JOIN marketing.meta_insights_daily_scoped s ON s.environment=i.environment AND s.id=i.id
+         JOIN marketing.campaign_scopes manual
+           ON manual.environment=i.environment AND manual.ad_account_id=i.ad_account_id
+          AND manual.campaign_id=i.campaign_id
         WHERE i.environment=$1 AND i.entity_level='campaign'
           AND i.account_currency='BRL'
-          AND abs((CASE WHEN $3::boolean AND s.scope<>'matrix' THEN 0 ELSE i.spend END)
+          AND abs((CASE WHEN $3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id) THEN s.financial_spend ELSE s.spend END)
             -COALESCE((
             SELECT sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
               FROM finance.matriz_ledger_transactions t

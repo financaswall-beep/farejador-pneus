@@ -3,7 +3,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingCreatives = function () {
   return {
     marketingCreativesData: null, marketingCreativesLoading: false, marketingCreativesError: '',
-    marketingCreativesSeq: 0, marketingCreativeSearch: '', marketingCreativeCampaign: 'all',
+    marketingCreativeScope: 'matrix', marketingCreativesSeq: 0, marketingCreativeSearch: '', marketingCreativeCampaign: 'all',
     marketingCreativeFormat: 'all', marketingCreativeSort: 'cost', marketingCreativePage: 1,
     marketingCreativeSelectedId: null, marketingCreativeJourneysOpen: false,
     marketingCreativeJourneysData: null, marketingCreativeJourneysLoading: false, marketingCreativeJourneysError: '',
@@ -42,7 +42,8 @@ window.PAINEL_MODULES.marketingCreatives = function () {
     marketingCreativeFiltered() {
       const query = this.marketingCreativeSearch.trim().toLocaleLowerCase('pt-BR');
       const rows = (this.marketingCreativesData?.creatives || []).filter((row) =>
-        (this.marketingCreativeCampaign === 'all' || row.campaign_id === this.marketingCreativeCampaign)
+        (this.marketingCreativeScope === 'all' || row.scope === this.marketingCreativeScope)
+        && (this.marketingCreativeCampaign === 'all' || row.campaign_id === this.marketingCreativeCampaign)
         && (this.marketingCreativeFormat === 'all' || (row.media?.format || 'unknown') === this.marketingCreativeFormat)
         && (!query || `${row.name} ${row.campaign_name}`.toLocaleLowerCase('pt-BR').includes(query)));
       return rows.sort((a, b) => {

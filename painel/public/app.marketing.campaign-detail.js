@@ -95,6 +95,7 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
     },
 
     closeMarketingCampaignDetail() {
+      if (this.marketingTab === 'campanhas') this.marketingTab = 'visao';
       this.marketingCampaignDetailRequestSeq += 1;
       this.marketingCampaignDetailId = null;
       this.marketingCampaignDetail = null;

@@ -75,13 +75,14 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     async loadMarketing() {
+      const campaigns = this.loadMarketingCampaigns();
       const requestedPeriod = this.marketingPeriod;
       const requestSeq = ++this.marketingRequestSeq;
       this.marketingLoading = true;
       this.marketingError = null;
       try {
         const payload = this.marketingIsMock()
-          ? marketingMockPayload(requestedPeriod)
+          ? marketingPaidMockPayload(requestedPeriod)
           : await this.apiGet(`/admin/api/marketing/overview?period=${encodeURIComponent(requestedPeriod)}`);
         if (requestSeq === this.marketingRequestSeq && this.marketingPeriod === requestedPeriod) {
           this.marketingVisao = payload;
@@ -99,13 +100,12 @@ window.PAINEL_MODULES.marketing = function () {
           });
         }
       }
+      await campaigns;
     },
 
     marketingTabs() {
       return [
-        { id: 'visao', label: 'Visão geral' },
-        { id: 'campanhas', label: 'Campanhas' },
-        { id: 'criativos', label: 'Criativos' },
+        { id: 'visao', label: 'Conteúdo pago' },
         { id: 'comentarios', label: 'Conteúdo orgânico' },
         { id: 'jornadas', label: 'Jornadas' },
         { id: 'geografia', label: 'Geografia e demanda' },
@@ -114,12 +114,14 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
+      if (tab === 'campanhas') { this.paidScope = 'pending'; tab = 'visao'; }
       if (tab !== 'comentarios') { this.moClose(); this.mpClose(); }
       if (tab !== 'criativos') { this.destroyMarketingCreativeChart(); this.closeMarketingCreativeJourneys(); }
       if (tab === 'campanhas' && this.marketingCampaignDetailId) {
         this.closeMarketingCampaignDetail();
       }
       this.marketingTab = tab;
+      if (tab === 'visao') { this.closeMarketingCampaignDetail(); void this.loadMarketing(); }
       if (tab === 'comentarios') void this.loadMarketingOrganic();
       if (tab === 'geografia') void this.loadMarketingGeography();
       if (tab === 'criativos') void this.loadMarketingCreatives();
