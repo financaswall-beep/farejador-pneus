@@ -8,7 +8,7 @@
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic-flow1" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260930-results1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
@@ -226,15 +226,17 @@
 <script src="/admin/painel/app.marketing.js?v=20260930-organic-nav1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260930-organic-nav1"></script>
-<script src="/admin/painel/app.marketing.publisher.view.js?v=20260930-organic-nav1"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260930-results1"></script>
+<script src="/admin/painel/app.marketing.publisher.view.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.publisher.helpers.js?v=20260930-publisher2"></script>
-<script src="/admin/painel/app.marketing.publisher.js?v=20260930-organic-nav1"></script>
+<script src="/admin/painel/app.marketing.publisher.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.publisher.media.js?v=20260930-publisher2"></script>
-<script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic-flow1"></script>
-<script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.summary.js?v=20260930-results1"></script>
+<script src="/admin/painel/app.marketing.organic.compare.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic-flow1"></script>
-<script src="/admin/painel/app.marketing.organic.results.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.results.js?v=20260930-results1"></script>
+<script src="/admin/painel/app.marketing.organic.networks.view.js?v=20260930-results1"></script>
+<script src="/admin/painel/app.marketing.organic.networks.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.js?v=20260914-criativos1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260914-criativos1"></script>
@@ -272,7 +274,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260930-publisher1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8207,35 +8209,37 @@
         <div x-show="moView === 'publications'" data-organic-publications>
           <div class="mo-toolbar">
             <select class="mo-input" aria-label="Período das publicações" x-model="moPeriod" @change="moLoad()"><option value="30d">Últimos 30 dias</option><option value="7d">Últimos 7 dias</option></select>
-            <select class="mo-input" aria-label="Rede social das publicações" x-model="moNetwork" @change="moFiltersChanged()"><option value="all">Todas as redes</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select>
+            <select class="mo-input" aria-label="Rede social das publicações" x-model="moNetwork" @change="moFiltersChanged()"><option value="all">Todas as redes</option><template x-for="platform in morActivePlatforms()" :key="platform"><option :value="platform" x-text="moNetworkLabel(platform)"></option></template></select>
             <label class="mo-search"><i data-lucide="search" aria-hidden="true"></i><input type="search" aria-label="Buscar publicação" placeholder="Buscar publicação" x-model.debounce.200ms="moSearch" @input.debounce.200ms="moFiltersChanged()"></label>
             <button class="mo-button mo-refresh" type="button" @click="moLoad()" :disabled="moLoading" aria-label="Atualizar publicações" title="Atualizar publicações"><i data-lucide="refresh-cw"></i></button>
           </div>
           <div x-show="moError" class="mo-notice" role="alert"><span x-text="moError"></span><button type="button" class="mo-button" @click="moLoad()">Tentar novamente</button></div>
           <template x-for="warning in moWarnings()" :key="warning"><p class="mo-notice" role="status" x-text="warning"></p></template>
           <div class="mo-card" :aria-busy="moLoading">
-            <div class="mo-list-head"><div><h2>Publicações</h2><span class="mo-list-count" x-show="!moLoading && moListAvailable()" x-text="moFiltered().length + ' publicações' "></span><p>Clique em um post para abrir a análise completa.</p></div><select class="mo-input" aria-label="Ordenar publicações" x-model="moSort" @change="moFiltersChanged()"><option value="recent">Mais recentes</option><option value="oldest">Mais antigas</option></select></div>
-            <div class="mo-columns" aria-hidden="true"><span>Publicação</span><span>Rede</span><span>Formato</span><span>Publicado em</span><span></span></div>
+            <div class="mo-list-head"><div><h2>Seus conteúdos</h2><span class="mo-list-count" x-show="!moLoading && moListAvailable()" x-text="moFiltered().length + ' publicações' "></span><p>Clique em um post para abrir a análise completa.</p></div><select class="mo-input" aria-label="Ordenar publicações" x-model="moSort" @change="moFiltersChanged()"><option value="recent">Mais recentes</option><option value="oldest">Mais antigas</option></select></div>
+            <div class="mo-columns mor-result-columns" aria-hidden="true"><span>Conteúdo</span><span>Data de publicação</span><span>Redes</span><span>Status</span><span>Visualizações</span><span></span></div>
             <div x-show="moLoading" class="mo-empty" role="status"><i data-lucide="loader-circle"></i><strong>Consultando publicações…</strong><p>Buscando os posts das contas conectadas.</p></div>
             <div x-show="!moLoading && !moError && moListAvailable() && !moFiltered().length" class="mo-empty"><i data-lucide="images"></i><strong>Nenhuma publicação neste filtro</strong><p>Experimente outro período, rede ou termo de busca.</p></div>
-            <div x-show="!moLoading && !moError && moData && !moListAvailable()" class="mo-empty"><i data-lucide="cloud-off"></i><strong>Publicações indisponíveis</strong><p>Confira a conexão com a Meta em Atendimento e tente atualizar.</p><button type="button" class="mo-button" @click="moSetView('attendance')" style="margin-top:16px">Ver conexão</button></div>
+            <div x-show="!moLoading && !moError && moData && !moListAvailable()" class="mo-empty"><i data-lucide="cloud-off"></i><strong>Publicações indisponíveis</strong><p>Confira a autorização da rede selecionada e tente atualizar.</p><button type="button" class="mo-button" @click="moSetView('attendance')" style="margin-top:16px">Ver conexão</button></div>
             <div role="list" aria-label="Lista de publicações">
-              <template x-for="post in moRows()" :key="post.platform + ':' + post.id">
-                <div role="listitem"><button type="button" class="mo-row" @click="moOpen(post)" :aria-label="'Ver análise de ' + post.title + ' no ' + moNetworkLabel(post.platform)">
+              <template x-for="post in moRows()" :key="post.key || post.platform + ':' + post.id">
+                <div role="listitem"><button type="button" class="mo-row mor-result-row" @click="moOpen(post)" :aria-label="'Ver análise de ' + post.title">
                   <div class="mo-identity"><div class="mo-thumb"><template x-if="post.image_url"><img :src="post.image_url" alt="" loading="lazy" referrerpolicy="no-referrer" @error="moImageFailed(post)"></template><template x-if="!post.image_url"><i data-lucide="image" aria-hidden="true"></i></template><span class="mo-play" x-show="post.image_url && ['video','reel'].includes(post.format)"><i data-lucide="play" aria-hidden="true"></i></span></div><div><div class="mo-title" x-text="post.title"></div><p class="mo-caption" x-text="post.caption || 'Sem legenda'"></p></div></div>
-                  <span class="mo-network"><img :src="'/assets/brands/' + post.platform + '.svg'" alt=""><span x-text="moNetworkLabel(post.platform)"></span></span>
-                  <span class="mo-format-cell"><span class="mo-badge" x-text="moFormat(post.format)"></span></span>
-                  <span class="mo-date" x-text="moDate(post.published_at)"></span><span class="mo-link">Ver análise <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+                  <span class="mo-date" x-text="moDate(post.published_at,true)"></span>
+                  <span class="mor-network-icons"><template x-for="delivery in morDeliveries(post)" :key="delivery.platform"><span :title="moNetworkLabel(delivery.platform)"><template x-if="morBrand(delivery.platform)"><img :src="morBrand(delivery.platform)" :alt="moNetworkLabel(delivery.platform)"></template><template x-if="!morBrand(delivery.platform)"><b x-text="moNetworkLabel(delivery.platform)"></b></template></span></template></span>
+                  <span class="mp-badge" :class="'mp-state-'+post.status" x-text="morStatus(post)"></span>
+                  <strong class="mor-result-views" :title="morViewsDate(post)" x-text="morViewsText(post)"></strong><span class="mor-result-arrow"><i data-lucide="chevron-right" aria-hidden="true"></i></span>
                 </button></div>
               </template>
             </div>
             <div class="mo-footer" x-show="!moLoading && moListAvailable() && moFiltered().length"><span x-text="'Mostrando ' + moRows().length + ' de ' + moFiltered().length + ' publicações'"></span><div class="mo-pager"><button type="button" class="mo-button" @click="moChangePage(-1)" :disabled="moPage <= 1" aria-label="Publicações anteriores"><i data-lucide="chevron-left"></i></button><span class="mo-page" x-text="moPage + ' / ' + moPageCount()"></span><button type="button" class="mo-button" @click="moChangePage(1)" :disabled="moPage >= moPageCount()" aria-label="Próximas publicações"><i data-lucide="chevron-right"></i></button></div></div>
           </div>
-          <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Posts do feed e Reels das contas conectadas. <span x-show="moData?.fetched_at" x-text="'Consulta à Meta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
+          <p class="mo-notice" x-show="moData?.central_truncated" role="status">São exibidos os 200 registros mais recentes da Central. Posts diretos das redes também aparecem.</p>
+          <p class="mo-note" x-show="moData"><i data-lucide="info" aria-hidden="true"></i><span>Conteúdos da Central e posts diretos das contas autorizadas. Visualizações são contadores acumulados; totais parciais não incluem dados ausentes. <span x-show="moData?.fetched_at" x-text="'Consulta: ' + moDate(moData?.fetched_at, true) + '.'"></span></span></p>
         </div>
         <dialog x-ref="moDialog" class="mo-dialog" :class="{'is-comparing':moAnalysisTab === 'compare','is-results':['sales','metrics'].includes(moAnalysisTab)}" aria-labelledby="mo-dialog-title" @cancel.prevent="moClose()" @close="if (moSelected) moClose()" @click="if ($event.target === $refs.moDialog) moClose()">
           <header class="mo-dialog-heading">
-            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Publicações</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p x-text="moAnalysisSubtitle()"></p></div>
+            <div><div class="mo-eyebrow">Conteúdo orgânico <span>/</span> <b>Resultados</b></div><h2 id="mo-dialog-title">Análise da publicação</h2><p x-text="moAnalysisSubtitle()"></p></div>
             <div class="mo-dialog-actions">
               <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span>
               <button type="button" class="mo-button" @click="moExportAnalysis()" :disabled="moAnalysisTab === 'compare' ? moCompareLoading || !moCompareDetails.every(Boolean) : !moDetail || moDetailLoading"><i data-lucide="download"></i>Exportar</button>
@@ -8254,6 +8258,8 @@
               <span class="mo-period-range"><i data-lucide="info" aria-hidden="true"></i><span x-text="moAnalysisTab === 'compare' ? 'Mesmo tempo de acompanhamento.' : moSummaryRange()"></span></span>
             </div>
           </div>
+          <div x-html="morContentMarkup" class="mor-content-host"></div>
+          <div class="mp-screen mor-reconciliation-host" x-html="morReconciliationMarkup"></div>
           <div x-show="moAnalysisTab === 'summary'" class="mo-dialog-body" role="tabpanel" id="mo-summary-panel" aria-labelledby="mo-summary-tab" :aria-busy="moDetailLoading">
             <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando resumo…</strong></div>
             <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected, true)">Tentar novamente</button></div>
@@ -8317,7 +8323,7 @@
             <div class="mo-empty" x-show="moDetailLoading" role="status"><i data-lucide="loader-circle"></i><strong>Carregando dados da publicação…</strong></div>
             <div class="mo-notice" x-show="moDetailError" role="alert"><span x-text="moDetailError"></span><button type="button" class="mo-button" @click="moOpen(moSelected,true)">Tentar novamente</button></div>
             <div x-show="!moDetailLoading && !moDetailError">
-              <article class="mor-post">
+              <article class="mor-post" x-show="!moSelected?.key">
                 <span class="mor-post-thumb"><template x-if="moSelected?.image_url"><img :src="moSelected.image_url" alt="Prévia da publicação" referrerpolicy="no-referrer" @error="moImageFailed(moSelected)"></template><template x-if="!moSelected?.image_url"><span><i data-lucide="image"></i></span></template></span>
                 <template x-if="moSelected"><img class="mor-brand" :src="'/assets/brands/'+moSelected.platform+'.svg'" :alt="moNetworkLabel(moSelected.platform)"></template>
                 <div><h3 x-text="moSelected?.title"></h3><p x-text="moCompareContext(moSelected)"></p></div>
@@ -8344,15 +8350,17 @@
                 <p class="mor-info"><i data-lucide="route"></i><span><b>Ver jornada</b> mostra o comentário de origem, a conversa e a venda registrada.</span></p>
               </section>
               <section x-show="moAnalysisTab === 'metrics'" role="tabpanel" id="mo-metrics-panel" aria-labelledby="mo-metrics-tab">
-                <section class="mor-card" x-effect="if(moAnalysisTab==='metrics' &amp;&amp; moSelected) moLoadInsights()">
-<div class="flex items-center justify-between"><h3>Métricas da publicação na Meta</h3><button type="button" class="mor-link" @click="moLoadInsights(true)" :disabled="moInsightsLoading">Atualizar</button></div>
+                <div class="mor-metric-kpis"><template x-for="card in moMetricCards()" :key="card.label"><article><span class="mor-icon" :class="{'is-green':card.green}"><i :data-lucide="card.icon"></i></span><div><strong x-text="card.value"></strong><h3 x-text="card.label"></h3><p x-text="card.detail"></p></div></article></template></div>
+                <div x-show="moSelected?.key" x-html="morMetricsMarkup"></div>
+                <section class="mor-card" x-show="!moSelected?.key" x-effect="if(moAnalysisTab==='metrics' &amp;&amp; moSelected &amp;&amp; !moSelected.key) moLoadInsights()">
+<div class="flex items-center justify-between"><h3 x-text="'Métricas da publicação no '+moNetworkLabel(moSelected?.platform)"></h3><button type="button" class="mor-link" @click="moLoadInsights(true)" :disabled="moInsightsLoading">Atualizar</button></div>
 <p class="mor-card-subtitle">Acumulado da publicação até a consulta. Pode incluir impulsionamento; não acompanha o filtro das vendas.</p>
-<p x-show="moInsightsLoading">Consultando a Meta…</p><p x-show="moInsightsError" x-text="moInsightsError" role="status"></p>
+<p x-show="moInsightsLoading" x-text="'Consultando o '+moNetworkLabel(moSelected?.platform)+'…'"></p><p x-show="moInsightsError" x-text="moInsightsError" role="status"></p>
 <p x-show="moInsights?.notice" x-text="moInsights?.notice" class="mor-card-subtitle" role="status"></p>
 <div class="grid grid-cols-2 gap-3 py-3 md:grid-cols-4"><template x-for="metric in moInsights?.rows || []" :key="metric.metric"><article class="rounded-lg border p-3"><strong class="text-xl" x-text="metric.value==null?'—':moSummaryNumber(metric.value)"></strong><p class="text-sm" x-text="metric.label"></p><small x-show="metric.value==null" class="text-slate-500" x-text="metric.message || 'Indisponível nesta consulta'"></small></article></template></div>
-<small x-show="moInsights" x-text="'Fonte: Meta · consultado em '+moDate(moInsights?.fetched_at,true)"></small>
+<small x-show="moInsights" x-text="'Fonte: '+(moInsights?.source || 'rede social')+' · consultado em '+moDate(moInsights?.fetched_at,true)"></small>
 <p x-show="marketingIsMock()" class="text-sm text-slate-500">As métricas da Meta são consultadas somente na tela com dados reais.</p></section>
-<div class="mor-metric-kpis"><template x-for="card in moMetricCards()" :key="card.label"><article><span class="mor-icon" :class="{'is-green':card.green}"><i :data-lucide="card.icon"></i></span><div><strong x-text="card.value"></strong><h3 x-text="card.label"></h3><p x-text="card.detail"></p></div></article></template></div>
+
                 <div class="mor-metric-grid">
                   <section class="mor-card"><h3>Resposta às mensagens privadas</h3><div class="mor-response" x-show="moResponseSplit()">
                     <div class="mor-donut" role="img" :aria-label="moResponseSplit() ? moResponseSplit().replied+' responderam; '+moResponseSplit().pending+' ainda sem resposta' : 'Sem dados de respostas'" :style="'--mor-rate:'+(moResponseSplit()?.rate ?? 0)+'%' "><div><strong x-text="moSummaryNumber(moResponseSplit()?.sent)"></strong><span>enviadas</span></div></div>

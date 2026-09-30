@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import type { PostReference } from './results-model.js';
 import { organicPublicationWindow } from '../../admin/painel/marketing-organic-period.js';
 
 type Period = ReturnType<typeof organicPublicationWindow>;
@@ -65,21 +66,25 @@ export function buildOrganicReport(period: Period, outreach: Row[], sources: Row
 }
 
 export async function organicAttributionReport(pool: Pool, environment: string, platform: string, account: string,
-  postId: string, publishedAt: string, window: '7d' | '30d') {
+  postId: string, publishedAt: string, window: '7d' | '30d', references?: PostReference[]) {
   const period = organicPublicationWindow(publishedAt, window);
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     await client.query("SET LOCAL statement_timeout='8s'");
-    const args = [environment, platform, account, postId];
+    const args = references ? [environment, JSON.stringify(references)] : [environment, platform, account, postId];
+    const scope = references ? `c.environment=$1 AND EXISTS (SELECT 1 FROM
+      jsonb_to_recordset($2::jsonb) r(platform text,account_id text,post_id text)
+      WHERE r.platform=c.platform AND r.account_id=c.account_id AND r.post_id=c.post_id)`
+      : 'c.environment=$1 AND c.platform=$2 AND c.account_id=$3 AND c.post_id=$4';
     const outreach = await client.query(`SELECT o.* FROM ops.organic_outreach o JOIN core.meta_comments c
       ON c.environment=o.environment AND c.id=o.comment_id
-      WHERE c.environment=$1 AND c.platform=$2 AND c.account_id=$3 AND c.post_id=$4 LIMIT 10001`, args);
+      WHERE ${scope} LIMIT 10001`, args);
     const sources = await client.query(`SELECT s.* FROM analytics.organic_conversation_sources s
       JOIN ops.organic_outreach o ON o.environment=s.environment AND o.id=s.outreach_id
       JOIN core.meta_comments c ON c.environment=o.environment AND c.id=o.comment_id
       JOIN core.conversations cv ON cv.environment=s.environment AND cv.id=s.conversation_id
-      WHERE c.environment=$1 AND c.platform=$2 AND c.account_id=$3 AND c.post_id=$4
+      WHERE ${scope}
         AND s.superseded_by IS NULL AND cv.deleted_at IS NULL
         AND COALESCE(cv.additional_attributes->>'farejador_simulator','false')<>'true' LIMIT 10001`, args);
     const orders = await client.query(`SELECT os.order_id,os.conversation_source_id,os.confirmed_at,
@@ -102,7 +107,7 @@ export async function organicAttributionReport(pool: Pool, environment: string, 
       JOIN core.meta_comments c ON c.environment=out.environment AND c.id=out.comment_id
       LEFT JOIN commerce.partner_orders po ON po.environment=o.environment AND po.id=o.partner_order_id
       LEFT JOIN finance.partner_order_refunds ref ON ref.environment=po.environment AND ref.order_id=po.id
-      WHERE os.superseded_by IS NULL AND c.environment=$1 AND c.platform=$2 AND c.account_id=$3 AND c.post_id=$4
+      WHERE os.superseded_by IS NULL AND ${scope}
         AND COALESCE(cv.additional_attributes->>'farejador_simulator','false')<>'true' LIMIT 10001`, args);
     await client.query('COMMIT');
     if ([outreach, sources, orders].some(r => r.rows.length > 10000)) return { status: 'too_large', period };

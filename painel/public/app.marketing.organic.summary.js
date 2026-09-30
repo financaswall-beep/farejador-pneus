@@ -53,7 +53,8 @@ window.PAINEL_MODULES.marketingOrganicSummary = function () {
       const post = this.moSelected;
       if (!post) return '';
       const measure = (post.title + ' ' + post.caption).match(/\b\d{2,3}\/\d{2,3}\s*[-R]\s*\d{2}\b/i)?.[0];
-      return (measure || this.moFormat(post.format)) + ' · ' + this.moNetworkLabel(post.platform);
+      return (measure || this.moFormat(post.format)) + ' · ' + (post.key
+        ? (this.morNetworks?.() || []).map(p=>this.moNetworkLabel(p)).join(' / ') : this.moNetworkLabel(post.platform));
     },
     moChangeSummaryPeriod() {
       this.moSalesPage=1;this.moShowFailures=false;

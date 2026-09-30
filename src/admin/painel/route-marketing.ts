@@ -28,6 +28,7 @@ import { registerMarketingGeography } from './route-marketing-geography.js';
 import { registerMarketingComments } from './route-marketing-comments.js';
 import { registerMarketingOrganic } from './route-marketing-organic.js';
 import { registerMarketingPublisher } from './route-marketing-publisher.js';
+import { registerMarketingOrganicResults } from './route-marketing-organic-results.js';
 
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
@@ -69,6 +70,7 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
   await registerMarketingComments(fastify);
   await registerMarketingOrganic(fastify);
   await registerMarketingPublisher(fastify);
+  await registerMarketingOrganicResults(fastify);
   fastify.get('/admin/api/marketing/overview', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });

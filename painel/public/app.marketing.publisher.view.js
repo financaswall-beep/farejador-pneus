@@ -83,7 +83,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
     <div class="mp-calendar-grid"><template x-for="cell in mpCalendarDays()" :key="cell.key"><div class="mp-calendar-cell"><strong x-text="cell.day||''"></strong><template x-for="post in cell.posts" :key="post.id"><div class="mp-calendar-post" :class="'mp-state-'+post.status"><strong x-text="post.title"></strong><small x-text="mpDateLabel(post.scheduled_at)"></small><span x-text="mpStatus(post.status)"></span><button class="mp-link" x-show="post.status==='scheduled'" @click="mpAction(post,'cancel')" :disabled="mpBusy">Cancelar agendamento</button></div></template></div></template></div>
     <p class="mp-muted">Para alterar uma publicação agendada, cancele o agendamento e crie uma nova publicação. Envios já iniciados não são cancelados.</p>
   </section>
-  <section class="mp-card mp-history" x-show="mpTab==='published'||mpTab==='drafts'">
+  <section class="mp-card mp-history" x-show="mpTab==='drafts'">
     <div class="mp-card-heading"><div><h3 x-text="mpTab==='drafts'?'Seus rascunhos':'Publicações e acompanhamento'"></h3><p class="mp-muted" x-text="mpTab==='drafts'?'Retome seus conteúdos antes de publicar.':'Confira o resultado de cada rede. Envios incertos não são repetidos automaticamente.'"></p></div><button class="mp-button" @click="mpNew()"><i data-lucide="plus"></i>Nova publicação</button></div>
     <div class="mp-history-filters"><label class="mp-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar publicação" x-model="mpHistorySearch" aria-label="Buscar publicação"></label><select x-model="mpHistoryNetwork" aria-label="Filtrar por rede"><option value="all">Todas as redes</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select><button class="mp-button" @click="mpLoad()" :disabled="mpLoading"><i data-lucide="refresh-cw"></i>Atualizar</button></div>
     <div class="mp-post-list"><template x-for="post in mpFilteredPosts()" :key="post.id"><article class="mp-post-card">
@@ -95,20 +95,6 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
     <div class="mp-empty" x-show="!mpFilteredPosts().length"><i data-lucide="file-text"></i><p x-text="mpTab==='drafts'?'Nenhum rascunho salvo.':'Nenhuma publicação neste filtro.'"></p></div>
     <p class="mp-muted">São exibidas as 200 publicações mais recentes criadas nesta Central. As métricas das suas redes ficam na aba Resultados.</p>
   </section>
-  <template x-if="mpReconciliation"><div class="mp-modal-overlay" @click.self="if(!mpBusy)mpReconciliation=null" @keydown.escape.window="if(!mpBusy)mpReconciliation=null">
-    <section class="mp-modal" role="dialog" aria-modal="true" aria-label="Conferir publicação incerta">
-      <div class="mp-card-heading"><h3>Conferir na rede</h3><button class="mp-icon" @click="mpReconciliation=null" :disabled="mpBusy" aria-label="Fechar conferência"><i data-lucide="x"></i></button></div>
-      <p><strong x-text="mpReconciliation.title"></strong><br><span x-text="mpReconciliation.platform==='instagram'?'Instagram':'Facebook'"></span></p>
-      <p class="mp-muted">Confira a conta na rede. Sua decisão será registrada. Um envio incerto não é repetido sem prova de que não foi publicado.</p>
-      <label class="mp-label">Resultado da conferência<select x-model="mpReconciliation.decision" :disabled="mpBusy"><option value="published">Encontrei a publicação</option><option value="not_published">Não encontrei; verificar se pode reenviar</option><option value="abandon">Encerrar este destino sem reenviar</option></select></label>
-      <label class="mp-label" x-show="mpReconciliation.decision==='published'">Link ou ID da publicação<input type="text" maxlength="2048" x-model="mpReconciliation.provider_id" :disabled="mpBusy" placeholder="Cole o link do post ou Reel"><small class="mp-muted">Cole o link permanente do post ou Reel, ou informe o ID da Meta. A Central verifica a publicação na conta conectada. Para Stories do Instagram, use o ID da Meta.</small></label>
-      <label class="mp-label">Observação da conferência<textarea rows="3" minlength="10" maxlength="500" x-model="mpReconciliation.note" :disabled="mpBusy" placeholder="Descreva o que conferiu na conta (mínimo 10 caracteres)"></textarea></label>
-      <label class="mp-cleanup"><input type="checkbox" x-model="mpReconciliation.confirmed" :disabled="mpBusy"><span>Confirmo que conferi esta conta e este conteúdo.</span></label>
-      <p class="mp-notice mp-warning" x-show="mpReconciliation.decision==='abandon'">Encerra somente este destino e preserva a mídia. Isso não confirma que a publicação falhou; criar outra igual pode duplicar o post.</p>
-      <p class="mp-notice mp-error" x-show="mpError" role="alert" x-text="mpError"></p>
-      <button class="mp-button mp-primary mp-full" type="button" @click="mpReconcile()" :disabled="mpBusy||!mpReconciliation.confirmed||mpReconciliation.note.trim().length<10" x-text="mpBusy?'Conferindo…':'Registrar e verificar'"></button>
-    </section>
-  </div></template>
   <template x-if="mpPreview"><div class="mp-modal-overlay" @click.self="mpPreview=null" @keydown.escape.window="mpPreview=null"><section class="mp-modal mp-media-modal" role="dialog" aria-modal="true" aria-label="Prévia da mídia"><div class="mp-card-heading"><h3 x-text="mpPreview.name"></h3><button class="mp-icon" @click="mpPreview=null" aria-label="Fechar prévia"><i data-lucide="x"></i></button></div><template x-if="mpPreview.kind==='video'"><video :src="mpPreview.url" controls playsinline preload="metadata"></video></template><template x-if="mpPreview.kind==='photo'"><img :src="mpPreview.url" :alt="mpPreview.name"></template><small class="mp-muted">Prévia do arquivo original. A rede pode adaptar a apresentação.</small></section></div></template>
 </div>`;
 
@@ -139,3 +125,20 @@ window.MARKETING_PUBLISHER_CONNECTIONS_TEMPLATE = `
     </section>
   </div>
 </template>`;
+
+window.MARKETING_PUBLISHER_RECONCILIATION_TEMPLATE = `
+  <template x-if="mpReconciliation"><div class="mp-modal-overlay" @click.self="if(!mpBusy)mpReconciliation=null" @keydown.escape.window="if(!mpBusy)mpReconciliation=null">
+    <section class="mp-modal" role="dialog" aria-modal="true" aria-label="Conferir publicação incerta">
+      <div class="mp-card-heading"><h3>Conferir na rede</h3><button class="mp-icon" @click="mpReconciliation=null" :disabled="mpBusy" aria-label="Fechar conferência"><i data-lucide="x"></i></button></div>
+      <p><strong x-text="mpReconciliation.title"></strong><br><span x-text="mpReconciliation.platform==='instagram'?'Instagram':'Facebook'"></span></p>
+      <p class="mp-muted">Confira a conta na rede. Sua decisão será registrada. Um envio incerto não é repetido sem prova de que não foi publicado.</p>
+      <label class="mp-label">Resultado da conferência<select x-model="mpReconciliation.decision" :disabled="mpBusy"><option value="published">Encontrei a publicação</option><option value="not_published">Não encontrei; verificar se pode reenviar</option><option value="abandon">Encerrar este destino sem reenviar</option></select></label>
+      <label class="mp-label" x-show="mpReconciliation.decision==='published'">Link ou ID da publicação<input type="text" maxlength="2048" x-model="mpReconciliation.provider_id" :disabled="mpBusy" placeholder="Cole o link do post ou Reel"><small class="mp-muted">Cole o link permanente do post ou Reel, ou informe o ID da Meta. A Central verifica a publicação na conta conectada. Para Stories do Instagram, use o ID da Meta.</small></label>
+      <label class="mp-label">Observação da conferência<textarea rows="3" minlength="10" maxlength="500" x-model="mpReconciliation.note" :disabled="mpBusy" placeholder="Descreva o que conferiu na conta (mínimo 10 caracteres)"></textarea></label>
+      <label class="mp-cleanup"><input type="checkbox" x-model="mpReconciliation.confirmed" :disabled="mpBusy"><span>Confirmo que conferi esta conta e este conteúdo.</span></label>
+      <p class="mp-notice mp-warning" x-show="mpReconciliation.decision==='abandon'">Encerra somente este destino e preserva a mídia. Isso não confirma que a publicação falhou; criar outra igual pode duplicar o post.</p>
+      <p class="mp-notice mp-error" x-show="mpError" role="alert" x-text="mpError"></p>
+      <button class="mp-button mp-primary mp-full" type="button" @click="mpReconcile()" :disabled="mpBusy||!mpReconciliation.confirmed||mpReconciliation.note.trim().length<10" x-text="mpBusy?'Conferindo…':'Registrar e verificar'"></button>
+    </section>
+  </div></template>
+`;

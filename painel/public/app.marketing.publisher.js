@@ -140,9 +140,10 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                     throw new Error('publisher_demo_disabled');
                 await this.apiPost('/admin/api/marketing/publisher/posts/' + this.mpForm.id + '/submit', { version: this.mpForm.version, scheduled_at: scheduled?.toISOString() || null });
                 this.mpFresh();
-                this.mpTab = scheduled ? 'calendar' : 'published';
+                this.mpTab = scheduled ? 'calendar' : 'create';
                 this.mpMessage = scheduled ? 'Publicação agendada.' : 'Envio iniciado. Acompanhe a confirmação de cada rede.';
                 await this.mpLoad(true);
+                if (!scheduled) this.moSetTab?.('results');
             }
             catch (error) {
                 this.mpError = this.mpErrorText(error);
@@ -175,6 +176,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             try {
                 await this.apiPost('/admin/api/marketing/publisher/posts/' + post.id + '/action', { action });
                 await this.mpLoad(true);
+                await this.morReloadAfterAction?.();
             }
             catch (error) {
                 this.mpError = this.mpErrorText(error);
@@ -213,6 +215,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                 this.mpMessage = form.decision === 'not_published' ? 'Ausência de publicação confirmada. O reenvio fica disponível como uma ação separada.' :
                     form.decision === 'abandon' ? 'Destino encerrado sem reenviar. A mídia e o registro da conferência foram preservados.' : 'Publicação confirmada na conta conectada.';
                 await this.mpLoad(true);
+                await this.morReloadAfterAction?.();
             }
             catch (error) {
                 this.mpError = this.mpErrorText(error);

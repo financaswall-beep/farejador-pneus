@@ -10,6 +10,7 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
     moInsights:null, moInsightsLoading:false, moInsightsError:'', moInsightsKey:'', moInsightsSeq:0,
     async moLoadInsights(force=false) {
       const post=this.moSelected;
+      if (post?.key) return this.morLoadMetrics(force);
       if(!post || this.marketingIsMock()) {
         if(this.moInsightsKey){this.moInsightsSeq++;this.moInsightsKey='';this.moInsights=null;this.moInsightsLoading=false;this.moInsightsError='';}
         return;
@@ -20,7 +21,7 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
       this.moInsightsKey=key;this.moInsights=null;this.moInsightsLoading=true;this.moInsightsError='';
       try{const data=await this.apiGet('/admin/api/marketing/organic/publications/'+post.platform+'/'+encodeURIComponent(post.id)+'/insights'+(force?'?refresh=true':''));
         if(this.moInsightsKey===key && this.moInsightsSeq===seq && !this.marketingIsMock())this.moInsights=data;}
-      catch{if(this.moInsightsKey===key && this.moInsightsSeq===seq)this.moInsightsError='Não foi possível consultar as métricas da Meta.';}
+      catch{if(this.moInsightsKey===key && this.moInsightsSeq===seq)this.moInsightsError='Não foi possível consultar as métricas desta rede.';}
       finally{if(this.moInsightsSeq===seq)this.moInsightsLoading=false;}
     },
     moResetResults() {
@@ -41,7 +42,7 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
     moResultCount(field) { return count(this.moResultValue(field)); },
     moAverageSale() { const sales=this.moResultCount('sales'), revenue=this.moResultValue('revenue');return sales>0 && revenue!=null ? revenue/sales : null; },
     moSafeSocialUrl(url) {
-      try {const u=new URL(url);return u.protocol==='https:' && /(^|\.)(facebook\.com|instagram\.com)$/.test(u.hostname) ? u.href : null;} catch {return null;}
+      try {const u=new URL(url);return u.protocol==='https:' && !u.username && !u.password && /(^|\.)(facebook\.com|instagram\.com|tiktok\.com|youtube\.com|youtu\.be)$/.test(u.hostname) ? u.href : null;} catch {return null;}
     },
     moSalesReady() { return this.moSummaryReady() && !this.moDetailLoading && !this.moDetailError && this.moDetail.attribution.sales_rows_complete===true && Array.isArray(this.moDetail.attribution.sales_rows); },
     moConfirmedSales() {
@@ -127,8 +128,13 @@ window.PAINEL_MODULES.marketingOrganicResults = function () {
         ['Total concluído no filtro',this.moSalesReady()?this.moSalesTotal().count:'Indisponível',this.moSalesReady()?this.moSalesTotal().amount:'Indisponível'],['Observação','Cancelamentos fora dos totais. Valor vendido não representa lucro.']];
       return [...head,...this.moMetricCards().map(c=>[c.label,c.value,c.detail]),[],['Envios com falha',this.moResultCount('private_failed') ?? 'Indisponível'],['Pedidos com tempo registrado',this.moTimedSales() ?? 'Indisponível'],
         ...(this.moTimeBuckets() || []).map(r=>[r.label,r.value]),
-        [],['Métricas da Meta','Acumulado da publicação; pode incluir impulsionamento'],['Consultado em',this.moInsights?.fetched_at || 'Não consultado'],
+        [],['Métricas das redes','Acumulado da publicação; pode incluir impulsionamento'],['Consultado em',this.morMetrics?.fetched_at || this.moInsights?.fetched_at || 'Não consultado'],
         ...(this.moInsights?.rows || []).map(r=>[r.label,r.value ?? 'Indisponível']),
+        ...(this.morNetworkCards?.() || []).flatMap(n=>[['Rede',this.moNetworkLabel(n.platform)],
+          ...(n.insights?.rows || []).map(r=>[r.label,r.value ?? 'Indisponível'])]),
+        [],['Histórico','Acumulado observado por dia; sem reconstrução anterior às coletas'],
+        ...(this.morMetrics?.history || []).filter(r=>this.morNetwork==='all' || r.platform===this.morNetwork)
+          .map(r=>[r.date,this.moNetworkLabel(r.platform),r.views ?? 'Indisponível',r.observed_at]),
         ['Observação','Mensagem enviada não significa lida. Sem resposta não significa venda perdida.']];
     },
     moExportResults() { if(!this.moDetail || this.moDetailLoading || this.moDetailError)return;this.moDownloadCsv(this.moResultsExportRows(),'publicacao-'+this.moSelected.id+'-'+this.moAnalysisTab+'-'+this.moSummaryPeriod+'.csv'); },

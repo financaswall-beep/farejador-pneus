@@ -37,7 +37,7 @@ describe('Navegação direta do conteúdo orgânico', () => {
     expect(app.apiPost).not.toHaveBeenCalled();
   });
 
-  it.each(['calendar', 'published', 'drafts'])('preserva %s escolhida durante o primeiro carregamento', async tab => {
+  it.each(['calendar', 'drafts'])('preserva %s escolhida durante o primeiro carregamento', async tab => {
     const { app } = front();
     let resolve!: (value: unknown) => void;
     app.apiGet.mockReturnValue(new Promise(done => { resolve = done; }));
@@ -56,7 +56,7 @@ describe('Navegação direta do conteúdo orgânico', () => {
     Object.assign(app.mpForm, { title: 'Promoção', caption: 'Texto em edição', media_id: 'media-1' });
     app.mpBrief = 'Destacar atendimento'; app.mpDirty = true;
     const form = app.mpForm;
-    for (const tab of ['calendar', 'published', 'drafts', 'results', 'attendance', 'create']) {
+    for (const tab of ['calendar', 'drafts', 'results', 'attendance', 'create']) {
       app.moSetTab(tab);
       expect(app.moActiveTab()).toBe(tab);
       expect(app.mpForm).toBe(form);
@@ -82,6 +82,16 @@ describe('Navegação direta do conteúdo orgânico', () => {
     expect(app.loadMarketingComments).toHaveBeenCalledOnce();
     expect(app.moLoadControls).toHaveBeenCalledOnce();
     expect(app.apiGet).not.toHaveBeenCalled();
+  });
+
+  it('o destino antigo Publicados abre Resultados e preserva o rascunho', async () => {
+    const { app } = front();
+    await app.loadMarketingOrganic();
+    const form=app.mpForm;
+    app.moSetTab('published');
+    expect(app.moActiveTab()).toBe('results');
+    expect(app.moTabs().map((t: any)=>t.id)).toEqual(['create','calendar','drafts','results','attendance']);
+    expect(app.mpForm).toBe(form);
   });
 
   it('não retoma a atualização automática se o carregamento termina depois de sair da Central', async () => {

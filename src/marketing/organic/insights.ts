@@ -26,6 +26,11 @@ const metrics: Record<Platform,Array<[string,string]>> = {
   facebook:[['post_media_view','Visualizações'],['post_total_media_view_unique','Pessoas alcançadas']],
 };
 export class InsightsGraph extends PublicationsGraph {
+  async readViews(platform: Platform, account: string, postId: string): Promise<number | null> {
+    await this.publication(platform, account, postId);
+    const metric = platform === 'instagram' ? 'views' : 'post_media_view';
+    return insightValue(await this.call(`${postId}/insights`, 'GET', { metric, period: 'lifetime' }), metric);
+  }
   async read(platform:Platform, account:string, postId:string) {
     const post=await this.publication(platform,account,postId);
     // Contadores do post continuam disponíveis mesmo sem acesso aos Insights.

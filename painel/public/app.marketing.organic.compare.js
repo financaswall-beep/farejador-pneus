@@ -18,15 +18,18 @@ window.PAINEL_MODULES.marketingOrganicCompare = function () {
       if (!this.moSelected || !['summary','compare','sales','metrics'].includes(tab)) return;
       if (tab===this.moAnalysisTab) return;
       this.moDestroyChart(); this.moDestroyCompareCharts(); this.moAnalysisTab=tab;
+      this.morDestroyViewsChart?.();
       if (tab!=='compare') {
         ++this.moCompareSeq; this.moCompareLoading=false;
         const post=this.moComparePosts[0] || this.moSelected;
+        if (post?.key) return this.moOpen(post,true);
         if(key(this.moDetail?.publication)===key(post) && this.moDetail?.attribution?.period?.id===this.moSummaryPeriod && !this.moDetailLoading) {
-          this.moSelected=post;this.$nextTick(()=>{lucide.createIcons();this.moRenderChart();});return;
+          this.moSelected=post;this.$nextTick(()=>{lucide.createIcons();this.moRenderChart();this.morRenderViewsChart?.();});return;
         }
         return this.moOpen(post,true);
       }
       ++this.moDetailSeq;this.moDetailLoading=false;
+      this.morNetwork='all';
       if (!this.moComparePosts[0]) {
         const choices=(this.moData?.rows || []).filter(row=>key(row)!==key(this.moSelected));
         const similar=choices.find(row=>row.platform===this.moSelected.platform && row.format===this.moSelected.format);
@@ -39,7 +42,7 @@ window.PAINEL_MODULES.marketingOrganicCompare = function () {
       this.moDestroyCompareCharts(); this.moCompareLoading=true; this.moCompareErrors=['','']; this.moCompareDetails=[null,null];
       const result=await Promise.allSettled(posts.map(post => !post ? Promise.resolve(null) : this.marketingIsMock()
         ? Promise.resolve(marketingOrganicMockDetail(post,period))
-        : this.apiGet('/admin/api/marketing/organic/publications/'+post.platform+'/'+encodeURIComponent(post.id)+'?window='+period)));
+        : this.apiGet(this.moDetailUrl(post,period))));
       if (seq!==this.moCompareSeq || this.moAnalysisTab!=='compare') return;
       this.moCompareDetails=result.map((r,i)=>{
         if (!posts[i]) return null;

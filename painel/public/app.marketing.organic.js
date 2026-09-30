@@ -42,7 +42,6 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       return [
         { id: 'create', label: 'Criar publicação' },
         { id: 'calendar', label: 'Calendário' },
-        { id: 'published', label: 'Publicados' },
         { id: 'drafts', label: 'Rascunhos' },
         { id: 'results', label: 'Resultados' },
         { id: 'attendance', label: 'Atendimento' },
@@ -53,6 +52,7 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       return this.moView === 'publications' ? 'results' : 'attendance';
     },
     moSetTab(tab) {
+      if (tab === 'published') tab = 'results';
       if (!this.moTabs().some(item => item.id === tab)) return;
       if (tab === 'results') return this.moSetView('publications');
       if (tab === 'attendance') return this.moSetView('attendance');
@@ -64,6 +64,7 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       }
     },
     moSetView(view) {
+      this.morStopRefresh?.();
       this.moClose();
       if (this.moView === 'publisher' && view !== 'publisher') this.mpClose();
       this.moView = view;
@@ -77,9 +78,10 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       this.moLoading = true; this.moError = ''; this.moData = null; this.moPage = 1;
       try {
         const data = this.marketingIsMock() ? marketingOrganicMock()
-          : await this.apiGet('/admin/api/marketing/organic/publications?period=' + this.moPeriod);
+          : await this.apiGet('/admin/api/marketing/organic/results?period=' + this.moPeriod);
         if (seq !== this.moSeq) return;
         this.moData = data;
+        this.morScheduleRefresh?.();
       } catch { if (seq === this.moSeq) this.moError = 'Não foi possível consultar as publicações. Tente novamente.'; }
       finally {
         if (seq === this.moSeq) { this.moLoading = false; this.$nextTick(() => lucide.createIcons()); }
@@ -88,7 +90,8 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     moFiltered() {
       const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
       const term = normalize(this.moSearch.trim());
-      return (this.moData?.rows || []).filter(row => (this.moNetwork === 'all' || row.platform === this.moNetwork)
+      return (this.moData?.rows || []).filter(row => (this.moNetwork === 'all' ||
+        (row.deliveries ? row.deliveries.some(d => d.platform === this.moNetwork) : row.platform === this.moNetwork))
         && (!term || normalize(row.title + ' ' + row.caption).includes(term)))
         .sort((a, b) => (this.moSort === 'oldest' ? 1 : -1) * (Date.parse(a.published_at) - Date.parse(b.published_at))
           || (a.platform + a.id).localeCompare(b.platform + b.id));
@@ -110,8 +113,8 @@ window.PAINEL_MODULES.marketingOrganic = function () {
         return name + ': não foi possível consultar os posts. Tente atualizar; as outras redes continuam disponíveis.';
       });
     },
-    moListAvailable() { return this.moSources().some(source => source.status === 'ready'); },
-    moNetworkLabel(platform) { return platform === 'instagram' ? 'Instagram' : 'Facebook'; },
+    moListAvailable() { return this.moData?.central_available === true || this.moSources().some(source => source.status === 'ready'); },
+    moNetworkLabel(platform) { return ({instagram:'Instagram',facebook:'Facebook',tiktok:'TikTok',youtube:'YouTube'})[platform] || 'Todas as redes'; },
     moFormat(format) { return ({image:'Imagem',video:'Vídeo',reel:'Reel',carousel:'Carrossel',text:'Texto'})[format] || 'Não informado'; },
     moDate(value, time = false) {
       if (!value || !Number.isFinite(Date.parse(value))) return '—';
@@ -122,8 +125,9 @@ window.PAINEL_MODULES.marketingOrganic = function () {
     async moOpen(row, keepPeriod = false) {
       const wasOpen = this.$refs.moDialog?.open;
       if (!wasOpen) this._moReturnFocus = document.activeElement;
-      if (!keepPeriod) { this.moSummaryPeriod = '7d'; this.moResetCompare?.(); this.moResetResults?.(); }
+      if (!keepPeriod) { this.moSummaryPeriod = '7d'; this.moResetCompare?.(); this.moResetResults?.(); this.morNetwork = 'all'; }
       this.moDestroyChart();
+      this.morDestroyViewsChart?.();
       this.moSelected = row; this.moDetail = null; this.moDetailError = ''; this.moDetailLoading = true;
       const seq = ++this.moDetailSeq;
       this.$nextTick(() => {
@@ -133,15 +137,20 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       });
       try {
         const detail = this.marketingIsMock() ? marketingOrganicMockDetail(row, this.moSummaryPeriod)
-          : await this.apiGet('/admin/api/marketing/organic/publications/' + row.platform + '/' + encodeURIComponent(row.id) + '?window=' + this.moSummaryPeriod);
+          : await this.apiGet(this.moDetailUrl(row, this.moSummaryPeriod));
         if (seq !== this.moDetailSeq) return;
         this.moDetail = detail; this.moSelected = detail.publication;
       } catch { if (seq === this.moDetailSeq) this.moDetailError = 'Não foi possível abrir o resumo. O post pode ter sido removido ou estar temporariamente indisponível.'; }
-      finally { if (seq === this.moDetailSeq) { this.moDetailLoading = false; this.$nextTick(() => { lucide.createIcons(); this.moRenderChart(); }); } }
+      finally { if (seq === this.moDetailSeq) { this.moDetailLoading = false; this.$nextTick(() => { lucide.createIcons(); this.moRenderChart(); this.morRenderViewsChart?.(); }); } }
+    },
+    moDetailUrl(row, period) {
+      return row.key ? '/admin/api/marketing/organic/results/' + encodeURIComponent(row.key) + '?window=' + period + '&network=' + (this.morNetwork || 'all')
+        : '/admin/api/marketing/organic/publications/' + row.platform + '/' + encodeURIComponent(row.id) + '?window=' + period;
     },
     moClose() {
       ++this.moDetailSeq; this.moDetailLoading = false; this.moSelected = null; this.moDetail = null;
       this.moDestroyChart();
+      this.morClose?.();
       this.moResetCompare?.();
       this.moResetResults?.();
       this.$refs.moDialog?.close(); this._moReturnFocus?.focus(); this._moReturnFocus = null;
