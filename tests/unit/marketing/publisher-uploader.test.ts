@@ -132,3 +132,37 @@ it('objeto ausente limpa estado completo local e permite continuar o envio',asyn
   await b.state.mpReprocessMedia({id:'media-id',name:'iphone.mov'});
   expect(b.state.mpReadUploadSession('media-id')).toBe(null);
 });
+it('lixeira descarta envio pendente sem chamar conferência e limpa sessão e seleção locais', async () => {
+  const b = browser();
+  const media = { id: 'media-id', name: 'foto.jpg', status: 'uploading' };
+  b.state.mpMedia = [media];
+  b.state.mpForm.media_id = media.id;
+  b.state.mpResumeMedia = media;
+  b.state.mpError = 'O arquivo ainda não foi recebido por inteiro.';
+  b.state.mpStoreUploadSession(media.id, { url: endpoint + '/session', fingerprint: 'same' });
+  await b.state.mpRemoveMedia(media);
+  expect(b.state.apiPost.mock.calls).toEqual([['/admin/api/marketing/publisher/media/media-id/remove', {}]]);
+  expect(b.requests).toEqual([]);
+  expect(b.state.mpReadUploadSession(media.id)).toBe(null);
+  expect(b.state.mpResumeMedia).toBe(null);
+  expect(b.state.mpForm.media_id).toBe(null);
+  expect(b.state.mpMedia).toEqual([]);
+  expect(b.state.mpError).toBe('');
+  expect(b.state.mpMessage).toBe('Arquivo removido da biblioteca.');
+});
+it('falha na remoção preserva sessão, seleção e arquivo sem mensagem falsa de sucesso', async () => {
+  const b = browser();
+  const media = { id: 'media-id', name: 'foto.jpg', status: 'uploading' };
+  b.state.mpMedia = [media];
+  b.state.mpForm.media_id = media.id;
+  b.state.mpMessage = 'Arquivo enviado.';
+  b.state.mpStoreUploadSession(media.id, { url: endpoint + '/session', fingerprint: 'same' });
+  b.state.apiPost.mockRejectedValue(Error('publisher_media_in_use'));
+  await b.state.mpRemoveMedia(media);
+  expect(b.state.mpReadUploadSession(media.id)).not.toBe(null);
+  expect(b.state.mpForm.media_id).toBe(media.id);
+  expect(b.state.mpMedia).toEqual([media]);
+  expect(b.state.mpMessage).toBe('');
+  expect(b.state.mpError).toContain('vinculado');
+  expect(b.state.mpBusy).toBe(false);
+});

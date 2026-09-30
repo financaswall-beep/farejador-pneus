@@ -218,13 +218,18 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
             }
             this.mpBusy = true;
             this.mpError = '';
+            this.mpMessage = '';
             try {
                 await this.apiPost('/admin/api/marketing/publisher/media/' + media.id + '/remove', {});
                 this.mpStoreUploadSession(media.id, null);
+                if (this.mpResumeMedia?.id === media.id)
+                    this.mpResumeMedia = null;
+                this.mpMedia = this.mpMedia.filter(item => item.id !== media.id);
                 if (this.mpForm?.media_id === media.id) {
                     this.mpForm.media_id = null;
                     this.mpDirty = true;
                 }
+                this.mpMessage = 'Arquivo removido da biblioteca.';
                 await this.mpLoad(true);
             }
             catch (error) {

@@ -179,12 +179,54 @@ it('limpeza preserva arquivo completo com conversão falha e remove somente órf
   await pool.query(`UPDATE ops.publisher_media SET updated_at=now()-interval '4 hours' WHERE id=$1`, [pending.id]);
   await cleanupMedia(pool, 'test', storage);
   expect(storage.remove).not.toHaveBeenCalled();
-  await expect(deleteMedia(pool, 'test', pending.id, false, storage)).rejects.toThrow('publisher_upload_active');
   await pool.query(`UPDATE ops.publisher_media SET updated_at=now()-interval '25 hours' WHERE id=$1`, [pending.id]);
   await cleanupMedia(pool, 'test', storage);
   expect(storage.remove).toHaveBeenCalledOnce();
   expect((await pool.query('SELECT status FROM ops.publisher_media WHERE id=$1', [pending.id])).rows[0].status).toBe('deleted');
   expect((await pool.query('SELECT status FROM ops.publisher_media WHERE id=$1', [received.id])).rows[0].status).toBe('failed');
+});
+it('operador descarta upload incompleto imediatamente sem conferir nem reenviar o arquivo', async () => {
+  const { data, reservation } = await reserve(await jpeg());
+  await expect(finalizeMedia(pool, 'test', reservation.id, {}, storage)).rejects.toThrow('publisher_upload_incomplete');
+  storage.info.mockClear();
+  await expect(deleteMedia(pool, 'test', reservation.id, false, storage)).resolves.toBe(true);
+  expect(await listMedia(pool, 'test', storage)).toEqual([]);
+  expect(storage.info).not.toHaveBeenCalled();
+  expect(storage.remove).toHaveBeenCalledOnce();
+  await expect(reserveMedia(pool, 'test', data, 'owner', storage)).rejects.toThrow('publisher_upload_conflict');
+  await expect(finalizeMedia(pool, 'test', reservation.id, {}, storage)).rejects.toThrow('publisher_upload_conflict');
+  expect((await pool.query('SELECT status FROM ops.publisher_media')).rows[0].status).toBe('deleting');
+});
+it('descarte limpa envio atrasado de outra aba depois que as autorizações antigas expiram', async () => {
+  const image = await jpeg();
+  const { reservation } = await reserve(image);
+  await deleteMedia(pool, 'test', reservation.id, false, storage);
+  const firstTimestamp = (await pool.query('SELECT updated_at FROM ops.publisher_media')).rows[0].updated_at;
+  await deleteMedia(pool, 'test', reservation.id, false, storage);
+  expect((await pool.query('SELECT updated_at FROM ops.publisher_media')).rows[0].updated_at).toEqual(firstTimestamp);
+  storage.objects.set(reservation.resumable.object, { data: image, mime: 'image/jpeg' });
+  storage.remove.mockClear();
+  await cleanupMedia(pool, 'test', storage);
+  expect(storage.remove).not.toHaveBeenCalled();
+  await pool.query(`UPDATE ops.publisher_media SET updated_at=now()-interval '28 hours' WHERE id=$1`, [reservation.id]);
+  storage.remove.mockRejectedValueOnce(new PublisherError('publisher_storage_unavailable', 502));
+  await expect(cleanupMedia(pool, 'test', storage)).rejects.toThrow('publisher_storage_unavailable');
+  expect((await pool.query('SELECT status FROM ops.publisher_media')).rows[0].status).toBe('deleting');
+  await cleanupMedia(pool, 'test', storage);
+  expect(storage.objects.has(reservation.resumable.object)).toBe(false);
+  expect((await pool.query('SELECT status FROM ops.publisher_media')).rows[0].status).toBe('deleted');
+  storage.remove.mockClear();
+  await deleteMedia(pool, 'test', reservation.id, false, storage);
+  expect(storage.remove).not.toHaveBeenCalled();
+});
+it('descarte de upload pendente respeita ambiente e vínculo com rascunho', async () => {
+  const { reservation } = await reserve(await jpeg());
+  await expect(deleteMedia(pool, 'prod', reservation.id, false, storage)).rejects.toThrow('publisher_media_not_found');
+  await pool.query(`INSERT INTO ops.publisher_posts(environment,id,media_id,title,created_by)
+    VALUES('test',$1,$2,'Rascunho','owner')`, [randomUUID(), reservation.id]);
+  await expect(deleteMedia(pool, 'test', reservation.id, false, storage)).rejects.toThrow('publisher_media_in_use');
+  expect(storage.remove).not.toHaveBeenCalled();
+  expect((await pool.query('SELECT status FROM ops.publisher_media')).rows[0].status).toBe('uploading');
 });
 it('limpeza reconhece upload concluído antes da queda de energia e não apaga o arquivo', async () => {
   const image = await jpeg();
