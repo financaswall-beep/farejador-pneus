@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic-flow1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic-flow1" />
+<link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260929-publisher1" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
 <style>
   [x-cloak]{display:none!important}
@@ -225,7 +226,10 @@
 <script src="/admin/painel/app.marketing.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260930-publisher1"></script>
+<script src="/admin/painel/app.marketing.publisher.view.js?v=20260929-publisher1"></script>
+<script src="/admin/painel/app.marketing.publisher.js?v=20260929-publisher1"></script>
+<script src="/admin/painel/app.marketing.publisher.media.js?v=20260929-publisher1"></script>
 <script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.compare-charts.js?v=20260927-organic-flow1"></script>
@@ -267,7 +271,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260927-waitlist1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260930-publisher1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8124,7 +8128,7 @@
         <div class="mg-header-actions"><span class="mg-badge" :class="marketingIsMock() && 'mg-demo'" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button class="mg-button" @click="mgExport()" :disabled="mgLoading || !mgFiltered().length"><i data-lucide="download"></i> Exportar CSV</button></div>
       </header>
       <header x-show="marketingTab === 'comentarios'" class="mo-screen mo-header">
-        <div><div class="mo-eyebrow">Matriz / Marketing</div><h1>Conteúdo orgânico</h1><p>Escolha uma publicação para acompanhar seus resultados.</p></div>
+        <div><div class="mo-eyebrow">Matriz / Marketing</div><h1>Conteúdo orgânico</h1><p x-text="moView === 'publisher' ? 'Crie, programe e acompanhe seus conteúdos.' : 'Escolha uma publicação para acompanhar seus resultados.'"></p></div>
         <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : '2W Pneus · @2wp.pneus'"></span>
       </header>
       <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
@@ -8179,11 +8183,13 @@
       </div>
 
       <section x-show="marketingTab === 'comentarios'" class="mo-screen" aria-label="Conteúdo orgânico"
-               x-init="$watch('currentPage', page => { if (page !== 'marketing') moClose() })">
+               x-init="$watch('currentPage', page => { if (page !== 'marketing') { moClose(); mpClose(); } })">
         <nav class="mo-subnav" aria-label="Seções de conteúdo orgânico">
+          <button type="button" @click="moSetView('publisher')" :aria-pressed="moView === 'publisher'">Central de publicações</button>
           <button type="button" @click="moSetView('attendance')" :aria-pressed="moView === 'attendance'">Atendimento</button>
           <button type="button" @click="moSetView('publications')" :aria-pressed="moView === 'publications'">Resultados por publicação</button>
         </nav>
+        <div x-show="moView === 'publisher'" x-html="mpMarkup" data-marketing-publisher></div>
         <div x-show="moView === 'publications'" data-organic-publications>
           <div class="mo-toolbar">
             <select class="mo-input" aria-label="Período das publicações" x-model="moPeriod" @change="moLoad()"><option value="30d">Últimos 30 dias</option><option value="7d">Últimos 7 dias</option></select>

@@ -34,6 +34,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.marketing.organic.summary.js',
     'app.marketing.organic.compare.js', 'app.marketing.organic.compare-charts.js',
     'app.marketing.organic.results.js',
+    'app.marketing.publisher.js', 'app.marketing.publisher.media.js', 'app.marketing.publisher.view.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
@@ -108,6 +109,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/relatorios-estoque.css', async (_request, reply) => sendStatic(reply, 'relatorios-estoque.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-organic.css', async (_request, reply) => sendStatic(reply, 'marketing-organic.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-organic-results.css', async (_request, reply) => sendStatic(reply, 'marketing-organic-results.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/marketing-publisher.css', async (_request, reply) => sendStatic(reply, 'marketing-publisher.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/tailwind.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/assets/logistica-hero.webp', async (_request, reply) =>

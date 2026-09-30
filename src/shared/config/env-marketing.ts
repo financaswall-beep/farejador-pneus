@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { publisherEnvShape } from './env-publisher.js';
 
 const booleanStringSchema = z.enum(['true', 'false']).default('false')
   .transform((value) => value === 'true');
 
 /** Configuração dormente de Marketing; segredos vivem somente no ambiente. */
 export const marketingEnvShape = {
+  ...publisherEnvShape,
   META_COMMENTS_ENABLED: booleanStringSchema,
   META_COMMENTS_PUBLISH_ENABLED: booleanStringSchema,
   ORGANIC_ATTRIBUTION_ENABLED: booleanStringSchema,

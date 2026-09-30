@@ -34,12 +34,15 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       finally{this.moControlBusy=false;}
     },
     async loadMarketingOrganic() {
+      if (this.moView === 'publisher') return this.mpLoad();
       if (this.moView === 'attendance') {void this.moLoadControls();return this.loadMarketingComments();}
       return this.moLoad();
     },
     moSetView(view) {
+      if (this.moView === 'publisher' && view !== 'publisher') this.mpClose();
       this.moView = view;
-      if (view === 'attendance') {void this.loadMarketingComments();void this.moLoadControls();}
+      if (view === 'publisher') void this.mpLoad();
+      else if (view === 'attendance') {void this.loadMarketingComments();void this.moLoadControls();}
       else if (!this.moData) void this.moLoad();
       this.$nextTick(() => lucide.createIcons());
     },

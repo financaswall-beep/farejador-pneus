@@ -104,6 +104,8 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.marketingCreatives,
     window.PAINEL_MODULES.marketingComments,
     window.PAINEL_MODULES.marketingOrganic,
+    window.PAINEL_MODULES.marketingPublisher,
+    window.PAINEL_MODULES.marketingPublisherMedia,
     window.PAINEL_MODULES.marketingOrganicSummary,
     window.PAINEL_MODULES.marketingOrganicCompare,
     window.PAINEL_MODULES.marketingOrganicCompareCharts,
