@@ -1,19 +1,6 @@
 // Template estático. Dados do operador são exibidos exclusivamente por x-text/x-model.
 window.MARKETING_PUBLISHER_TEMPLATE = `
 <div class="mp-screen">
-  <div class="mp-heading">
-    <div><p class="mp-eyebrow">Marketing / Conteúdo orgânico</p><h2>Central de publicações</h2><p>Crie, programe e acompanhe seus conteúdos.</p></div>
-    <button class="mp-button" type="button" @click="mpCheckConnections()" :disabled="mpConnectionBusy"><i data-lucide="settings"></i>Gerenciar contas</button>
-  </div>
-  <div class="mp-topbar">
-    <nav class="mp-tabs" aria-label="Central de publicações">
-      <button type="button" @click="mpTab='create'" :aria-selected="mpTab==='create'">Criar publicação</button>
-      <button type="button" @click="mpTab='calendar'" :aria-selected="mpTab==='calendar'">Calendário</button>
-      <button type="button" @click="mpTab='published'" :aria-selected="mpTab==='published'">Publicados</button>
-      <button type="button" @click="mpTab='drafts'" :aria-selected="mpTab==='drafts'">Rascunhos <span class="mp-counter" x-text="mpCount('draft')"></span></button>
-    </nav>
-    <div class="mp-badges"><span class="mp-badge"><i data-lucide="calendar-days"></i><span x-text="mpCount('scheduled')+' agendadas'"></span></span><span class="mp-badge mp-warning" x-show="mpAttention()" x-text="mpAttention()+' precisa(m) de atenção'"></span></div>
-  </div>
   <p class="mp-notice mp-warning" x-show="mpConfig && (!mpConfig.enabled || !mpConfig.schema_ready || !mpConfig.storage_ready || !mpConfig.sending)" x-text="!mpConfig?.schema_ready?'A migration da Central precisa ser aplicada.':!mpConfig?.enabled?'Central preparada. Ative a configuração no servidor para começar.':!mpConfig?.storage_ready?'Configure o bucket privado do Supabase para enviar suas mídias.':'Rascunhos disponíveis. O envio às redes precisa ser habilitado no servidor.'"></p>
   <p class="mp-notice mp-error" role="alert" x-show="mpError" x-text="mpError"></p><p class="mp-notice" role="status" x-show="mpMessage" x-text="mpMessage"></p>
   <template x-for="warning in mpWarnings" :key="warning"><p class="mp-notice mp-warning" role="status" x-text="mpErrorText({message:warning})"></p></template>
@@ -106,9 +93,8 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
       <div class="mp-actions"><button class="mp-button mp-primary" x-show="post.status==='draft'" @click="mpEdit(post)">Continuar edição →</button><button class="mp-button" x-show="post.status==='draft'" @click="mpAction(post,'cancel')" :disabled="mpBusy">Descartar rascunho</button><button class="mp-button" x-show="post.deliveries.some(d=>d.status==='failed')" @click="mpAction(post,'retry')" :disabled="mpBusy||!mpConfig?.sending">Repetir destinos com falha</button></div>
     </article></template></div>
     <div class="mp-empty" x-show="!mpFilteredPosts().length"><i data-lucide="file-text"></i><p x-text="mpTab==='drafts'?'Nenhum rascunho salvo.':'Nenhuma publicação neste filtro.'"></p></div>
-    <p class="mp-muted">São exibidas as 200 publicações mais recentes criadas nesta Central. Os resultados de publicações anteriores continuam na aba Resultados por publicação.</p>
+    <p class="mp-muted">São exibidas as 200 publicações mais recentes criadas nesta Central. As métricas das suas redes ficam na aba Resultados.</p>
   </section>
-  <template x-if="mpConnectionsOpen"><div class="mp-modal-overlay" @click.self="mpConnectionsOpen=false" @keydown.escape.window="mpConnectionsOpen=false"><section class="mp-modal" role="dialog" aria-modal="true" aria-label="Contas da Central"><div class="mp-card-heading"><h3>Contas da Central</h3><button class="mp-icon" @click="mpConnectionsOpen=false" aria-label="Fechar contas"><i data-lucide="x"></i></button></div><p class="mp-muted">A Central usa as contas 2W Pneus já configuradas no Farejador.</p><template x-for="account in mpConfig?.accounts||[]" :key="account.platform"><div class="mp-connection-row"><img :src="'/assets/brands/'+account.platform+'.svg'" :alt="account.platform"><span><strong x-text="account.label"></strong><small x-text="mpConnectionBusy?'Verificando…':mpConnectionLabel(account.platform)"></small><small class="mp-error-text" x-show="mpConnectionError(account.platform)" x-text="mpConnectionError(account.platform)"></small><small class="mp-error-text" x-show="mpMissingPermissions(account.platform)" x-text="'Permissões ausentes: '+mpMissingPermissions(account.platform)"></small></span></div></template><p>A conta e as permissões são conferidas antes do envio. Sem confirmação das permissões, o destino permanece bloqueado.</p><p class="mp-muted">Configure o token e o bucket privado no servidor. Nenhuma chave secreta é enviada ao navegador.</p><button class="mp-button mp-full" @click="mpCheckConnections()" :disabled="mpConnectionBusy">Verificar novamente</button></section></div></template>
   <template x-if="mpReconciliation"><div class="mp-modal-overlay" @click.self="if(!mpBusy)mpReconciliation=null" @keydown.escape.window="if(!mpBusy)mpReconciliation=null">
     <section class="mp-modal" role="dialog" aria-modal="true" aria-label="Conferir publicação incerta">
       <div class="mp-card-heading"><h3>Conferir na rede</h3><button class="mp-icon" @click="mpReconciliation=null" :disabled="mpBusy" aria-label="Fechar conferência"><i data-lucide="x"></i></button></div>
@@ -125,3 +111,31 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
   </div></template>
   <template x-if="mpPreview"><div class="mp-modal-overlay" @click.self="mpPreview=null" @keydown.escape.window="mpPreview=null"><section class="mp-modal mp-media-modal" role="dialog" aria-modal="true" aria-label="Prévia da mídia"><div class="mp-card-heading"><h3 x-text="mpPreview.name"></h3><button class="mp-icon" @click="mpPreview=null" aria-label="Fechar prévia"><i data-lucide="x"></i></button></div><template x-if="mpPreview.kind==='video'"><video :src="mpPreview.url" controls playsinline preload="metadata"></video></template><template x-if="mpPreview.kind==='photo'"><img :src="mpPreview.url" :alt="mpPreview.name"></template><small class="mp-muted">Prévia do arquivo original. A rede pode adaptar a apresentação.</small></section></div></template>
 </div>`;
+
+window.MARKETING_PUBLISHER_CONNECTIONS_TEMPLATE = `
+<template x-if="mpConnectionsOpen">
+  <div class="mp-modal-overlay" @click.self="mpConnectionsOpen=false" @keydown.escape.window="mpConnectionsOpen=false">
+    <section class="mp-modal" role="dialog" aria-modal="true" aria-label="Contas da Central">
+      <div class="mp-card-heading">
+        <h3>Contas da Central</h3>
+        <button class="mp-icon" type="button" @click="mpConnectionsOpen=false" aria-label="Fechar contas"><i data-lucide="x"></i></button>
+      </div>
+      <p class="mp-muted">A Central usa as contas 2W Pneus já configuradas no Farejador.</p>
+      <template x-for="account in mpConfig?.accounts||[]" :key="account.platform">
+        <div class="mp-connection-row">
+          <img :src="'/assets/brands/'+account.platform+'.svg'" :alt="account.platform">
+          <span>
+            <strong x-text="account.label"></strong>
+            <small x-text="mpConnectionBusy?'Verificando…':mpConnectionLabel(account.platform)"></small>
+            <small class="mp-error-text" x-show="mpConnectionError(account.platform)" x-text="mpConnectionError(account.platform)"></small>
+            <small class="mp-error-text" x-show="mpMissingPermissions(account.platform)" x-text="'Permissões ausentes: '+mpMissingPermissions(account.platform)"></small>
+          </span>
+        </div>
+      </template>
+      <p>A conta e as permissões são conferidas antes do envio. Sem confirmação das permissões, o destino permanece bloqueado.</p>
+      <p class="mp-muted">Configure o token e o bucket privado no servidor. Nenhuma chave secreta é enviada ao navegador.</p>
+      <p class="mp-notice mp-error" role="alert" x-show="mpError" x-text="mpError"></p>
+      <button class="mp-button mp-full" type="button" @click="mpCheckConnections()" :disabled="mpConnectionBusy">Verificar novamente</button>
+    </section>
+  </div>
+</template>`;

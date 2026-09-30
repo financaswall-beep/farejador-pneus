@@ -7,7 +7,7 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/resumo.css?v=20260916-overview1" />
-<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260927-organic-flow1" />
+<link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260927-organic-flow1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
@@ -223,13 +223,13 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260927-organic-flow1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260930-organic-nav1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
-<script src="/admin/painel/app.marketing.organic.js?v=20260930-publisher1"></script>
-<script src="/admin/painel/app.marketing.publisher.view.js?v=20260930-publisher2"></script>
+<script src="/admin/painel/app.marketing.organic.js?v=20260930-organic-nav1"></script>
+<script src="/admin/painel/app.marketing.publisher.view.js?v=20260930-organic-nav1"></script>
 <script src="/admin/painel/app.marketing.publisher.helpers.js?v=20260930-publisher2"></script>
-<script src="/admin/painel/app.marketing.publisher.js?v=20260930-publisher2"></script>
+<script src="/admin/painel/app.marketing.publisher.js?v=20260930-organic-nav1"></script>
 <script src="/admin/painel/app.marketing.publisher.media.js?v=20260930-publisher2"></script>
 <script src="/admin/painel/app.marketing.organic.summary.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.compare.js?v=20260927-organic-flow1"></script>
@@ -8129,8 +8129,11 @@
         <div class="mg-header-actions"><span class="mg-badge" :class="marketingIsMock() && 'mg-demo'" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : 'Dados reais'"></span><button class="mg-button" @click="mgExport()" :disabled="mgLoading || !mgFiltered().length"><i data-lucide="download"></i> Exportar CSV</button></div>
       </header>
       <header x-show="marketingTab === 'comentarios'" class="mo-screen mo-header">
-        <div><div class="mo-eyebrow">Matriz / Marketing</div><h1>Conteúdo orgânico</h1><p x-text="moView === 'publisher' ? 'Crie, programe e acompanhe seus conteúdos.' : 'Escolha uma publicação para acompanhar seus resultados.'"></p></div>
-        <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : '2W Pneus · @2wp.pneus'"></span>
+        <div><div class="mo-eyebrow">Matriz / Marketing / Conteúdo orgânico</div><h1>Central de publicações</h1><p x-text="moView === 'attendance' ? 'Acompanhe comentários e o atendimento das suas redes.' : moView === 'publications' ? 'Confira os resultados das publicações nas suas redes.' : 'Crie, programe e acompanhe seus conteúdos.'"></p></div>
+        <div class="mo-header-actions">
+          <span class="mo-badge" x-text="marketingIsMock() ? 'Conceito · dados ilustrativos' : '2W Pneus · @2wp.pneus'"></span>
+          <button class="mo-button" type="button" @click="mpCheckConnections()" :disabled="mpConnectionBusy || marketingIsMock()"><i data-lucide="settings"></i>Gerenciar contas</button>
+        </div>
       </header>
       <section x-show="!marketingCampaignDetailId && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
                aria-labelledby="marketing-heading"
@@ -8185,11 +8188,21 @@
 
       <section x-show="marketingTab === 'comentarios'" class="mo-screen" aria-label="Conteúdo orgânico"
                x-init="$watch('currentPage', page => { if (page !== 'marketing') { moClose(); mpClose(); } })">
-        <nav class="mo-subnav" aria-label="Seções de conteúdo orgânico">
-          <button type="button" @click="moSetView('publisher')" :aria-pressed="moView === 'publisher'">Central de publicações</button>
-          <button type="button" @click="moSetView('attendance')" :aria-pressed="moView === 'attendance'">Atendimento</button>
-          <button type="button" @click="moSetView('publications')" :aria-pressed="moView === 'publications'">Resultados por publicação</button>
-        </nav>
+        <div class="mo-navigation">
+          <nav class="mo-subnav" aria-label="Seções de conteúdo orgânico">
+            <template x-for="tab in moTabs()" :key="tab.id">
+              <button type="button" @click="moSetTab(tab.id)" :aria-pressed="moActiveTab() === tab.id">
+                <span x-text="tab.label"></span>
+                <span class="mp-counter" x-show="tab.id === 'drafts' && mpCount('draft') > 0" x-text="mpCount('draft')"></span>
+              </button>
+            </template>
+          </nav>
+          <div class="mp-badges" x-show="mpConfig">
+            <span class="mp-badge"><i data-lucide="calendar-days"></i><span x-text="mpCount('scheduled') + ' agendadas'"></span></span>
+            <span class="mp-badge mp-warning" x-show="mpAttention()" x-text="mpAttention() + ' precisa(m) de atenção'"></span>
+          </div>
+        </div>
+        <div class="mp-screen mo-connections-host" x-html="mpConnectionsMarkup" data-marketing-publisher-connections></div>
         <div x-show="moView === 'publisher'" x-html="mpMarkup" data-marketing-publisher></div>
         <div x-show="moView === 'publications'" data-organic-publications>
           <div class="mo-toolbar">

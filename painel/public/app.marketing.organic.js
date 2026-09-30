@@ -2,7 +2,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingOrganic = function () {
   return {
-    moView: 'publications', moPeriod: '30d', moNetwork: 'all', moSearch: '', moSort: 'recent', moPage: 1,
+    moView: 'publisher', moPeriod: '30d', moNetwork: 'all', moSearch: '', moSort: 'recent', moPage: 1,
     moData: null, moLoading: false, moError: '', moSeq: 0,
     moSelected: null, moDetail: null, moDetailLoading: false, moDetailError: '', moDetailSeq: 0,
     moControls:null, moControlBusy:false, moControlError:'', moInboxSelection:{},
@@ -38,7 +38,33 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       if (this.moView === 'attendance') {void this.moLoadControls();return this.loadMarketingComments();}
       return this.moLoad();
     },
+    moTabs() {
+      return [
+        { id: 'create', label: 'Criar publicação' },
+        { id: 'calendar', label: 'Calendário' },
+        { id: 'published', label: 'Publicados' },
+        { id: 'drafts', label: 'Rascunhos' },
+        { id: 'results', label: 'Resultados' },
+        { id: 'attendance', label: 'Atendimento' },
+      ];
+    },
+    moActiveTab() {
+      if (this.moView === 'publisher') return this.mpTab;
+      return this.moView === 'publications' ? 'results' : 'attendance';
+    },
+    moSetTab(tab) {
+      if (!this.moTabs().some(item => item.id === tab)) return;
+      if (tab === 'results') return this.moSetView('publications');
+      if (tab === 'attendance') return this.moSetView('attendance');
+      this.mpTab = tab;
+      if (this.moView !== 'publisher') this.moSetView('publisher');
+      else {
+        if (!this.mpConfig) void this.mpLoad();
+        this.$nextTick(() => lucide.createIcons());
+      }
+    },
     moSetView(view) {
+      this.moClose();
       if (this.moView === 'publisher' && view !== 'publisher') this.mpClose();
       this.moView = view;
       if (view === 'publisher') void this.mpLoad();
@@ -120,6 +146,6 @@ window.PAINEL_MODULES.marketingOrganic = function () {
       this.moResetResults?.();
       this.$refs.moDialog?.close(); this._moReturnFocus?.focus(); this._moReturnFocus = null;
     },
-    moGoAttendance() { this.moClose(); this.moSetView('attendance'); },
+    moGoAttendance() { this.moSetView('attendance'); },
   };
 };

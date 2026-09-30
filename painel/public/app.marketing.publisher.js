@@ -3,6 +3,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
     return {
         ...window.PAINEL_MODULES.marketingPublisherHelpers(),
         mpMarkup: window.MARKETING_PUBLISHER_TEMPLATE,
+        mpConnectionsMarkup: window.MARKETING_PUBLISHER_CONNECTIONS_TEMPLATE,
         mpTab: 'create', mpConfig: null, mpMedia: [], mpPosts: [], mpLoading: false, mpBusy: false, mpError: '', mpMessage: '', mpWarnings: [],
         mpSearch: '', mpKind: 'all', mpHistorySearch: '', mpHistoryNetwork: 'all', mpUploadProgress: null,
         mpForm: null, mpDirty: false, mpBrief: '', mpAiBusy: false, mpCustom: false, mpWhen: 'now', mpDate: '', mpTime: '09:00',
@@ -37,14 +38,18 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                 this.mpMedia = data.media;
                 this.mpPosts = data.posts;
                 this.mpWarnings = data.warnings || [];
-                if (!this.mpForm)
+                if (!this.mpForm) {
+                    const selectedTab = this.mpTab;
                     this.mpFresh();
+                    this.mpTab = selectedTab;
+                }
                 if (!this.mpCalendarMonth)
                     this.mpCalendarMonth = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date());
                 clearTimeout(this.mpTimer);
-                if (this.mpPosts.some(p => ['scheduled', 'publishing'].includes(p.status)))
+                if (this.currentPage === 'marketing' && this.marketingTab === 'comentarios' && this.moView === 'publisher'
+                    && this.mpPosts.some(p => ['scheduled', 'publishing'].includes(p.status)))
                     this.mpTimer = setTimeout(() => {
-                        if (this.currentPage === 'marketing' && this.moView === 'publisher')
+                        if (this.currentPage === 'marketing' && this.marketingTab === 'comentarios' && this.moView === 'publisher')
                             void this.mpLoad(true);
                     }, 15000);
             }
@@ -61,6 +66,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             this.mpTimer = null;
             this.mpPreview = null;
             this.mpReconciliation = null;
+            this.mpConnectionsOpen = false;
         },
         mpSelectMedia(media) {
             if (this.mpMediaNeedsRecovery(media))
@@ -236,13 +242,14 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             }
         },
         async mpCheckConnections() {
-            if (this.marketingIsMock?.())
+            if (this.mpConnectionBusy || this.marketingIsMock?.())
                 return;
             this.mpConnectionsOpen = true;
             this.$nextTick(() => window.lucide?.createIcons());
             this.mpConnectionBusy = true;
             this.mpConnections = [];
             try {
+                if (!this.mpConfig) await this.mpLoad(true);
                 this.mpConnections = (await this.apiPost('/admin/api/marketing/publisher/connections', {})).connections;
             }
             catch (error) {

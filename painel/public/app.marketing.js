@@ -114,7 +114,7 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
-      if (tab !== 'comentarios') this.moClose();
+      if (tab !== 'comentarios') { this.moClose(); this.mpClose(); }
       if (tab !== 'criativos') { this.destroyMarketingCreativeChart(); this.closeMarketingCreativeJourneys(); }
       if (tab === 'campanhas' && this.marketingCampaignDetailId) {
         this.closeMarketingCampaignDetail();
