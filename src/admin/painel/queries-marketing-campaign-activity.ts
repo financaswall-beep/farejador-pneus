@@ -21,7 +21,7 @@ export interface CampaignConversionEvent {
 }
 
 export async function loadCampaignConversions(
-  campaignId: string, since: string, until: string, db: Pool,
+  campaignId: string, since: string, until: string, db: Pool, adId?: string,
 ) {
   const base = { enabled: env.MARKETING_CAPI_ENABLED };
   try {
@@ -36,6 +36,7 @@ export async function loadCampaignConversions(
         JOIN marketing.ad_referrals r ON r.environment=a.environment AND r.id=a.referral_id
         JOIN commerce.orders o ON o.environment=a.environment AND o.id=a.order_id
        WHERE c.environment=$1
+         AND ($6::text IS NULL OR r.source_id=$6)
          AND a.realized_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
          AND a.realized_at<(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
          AND EXISTS (
@@ -50,7 +51,7 @@ export async function loadCampaignConversions(
              count(*) FILTER (WHERE status='suppressed')::int AS suppressed,
              COALESCE((SELECT jsonb_agg(e ORDER BY e.updated_at DESC,e.id)
                FROM (SELECT * FROM events ORDER BY updated_at DESC,id LIMIT 30) e),'[]') AS events
-        FROM events`, [env.FAREJADOR_ENV, campaignId, since, until, env.META_ADS_ACCOUNT_ID ?? null]);
+        FROM events`, [env.FAREJADOR_ENV, campaignId, since, until, env.META_ADS_ACCOUNT_ID ?? null, adId ?? null]);
     const row = result.rows[0];
     if (!row) throw new Error('Consulta sem resultado');
     return { ...base, available: true, ...row };

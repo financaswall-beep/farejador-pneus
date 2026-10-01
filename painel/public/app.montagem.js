@@ -117,6 +117,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.marketingCreativeChart,
     window.PAINEL_MODULES.marketingCampaigns, // Marketing: campanhas read-only e filtro real por canal
     window.PAINEL_MODULES.marketingCampaignDetail, // Marketing: detalhe real após clicar em uma campanha
+    window.PAINEL_MODULES.marketingAdDetail, // Detalhe individual, reutilizado pela campanha e galeria
     window.PAINEL_MODULES.marketingJourneys, // Marketing: jornada Meta → CTWA → analytics → venda
     window.PAINEL_MODULES.marketingIntegrations, // Marketing: conexões, rastreamento e auditoria read-only
     window.PAINEL_MODULES.financeiro, // app.financeiro.js (linhas 1630-1743 pré-obra): aba Financeiro — visão geral + cobranças + Recebi/Paguei

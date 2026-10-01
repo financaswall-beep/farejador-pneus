@@ -8,6 +8,7 @@ import { getMarketingCreatives, marketingCreativeConfig } from './queries-market
 import { loadCreativeJourneys } from './queries-marketing-creatives-data.js';
 import { marketingDateWindow } from './marketing-meta.js';
 import { getMetaCreativePreview } from '../../marketing/meta-creatives.js';
+import { getMarketingAdDetail } from './queries-marketing-ad-detail.js';
 
 const querySchema = z.object({ period: z.enum(['7d', '30d']).default('30d') }).strict();
 const paramsSchema = z.object({ adId: z.string().regex(/^\d{1,40}$/) }).strict();
@@ -20,6 +21,20 @@ async function findAd(adId: string) {
   )).rows[0];
 }
 export async function registerMarketingCreatives(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/admin/api/marketing/creatives/:adId/detail', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    const query = querySchema.safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: 'invalid_query' });
+    try {
+      const detail = await getMarketingAdDetail(params.data.adId, query.data.period);
+      if (!detail) return reply.code(404).send({ error: 'creative_not_found' });
+      if (!detail.available) return reply.code(503).send({ error: 'marketing_ad_detail_unavailable' });
+      return reply.header('Cache-Control', 'no-store').send(detail);
+    } catch (err) {
+      logger.error({ err }, 'marketing ad detail read failed');
+      return reply.code(503).send({ error: 'marketing_ad_detail_unavailable' });
+    }
+  });
   fastify.get('/admin/api/marketing/creatives', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = querySchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_query' });

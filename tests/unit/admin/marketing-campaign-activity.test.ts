@@ -15,7 +15,7 @@ describe('Detalhe da campanha: consultas de apoio', () => {
       available: true, sent: 3, pending: 1, failed: 0,
     });
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
-    expect(params).toEqual(['test', '42', '2026-09-01', '2026-09-30', 'act_123']);
+    expect(params).toEqual(['test', '42', '2026-09-01', '2026-09-30', 'act_123', null]);
     expect(sql).not.toMatch(/c\.payload|last_error_summary|INSERT|UPDATE|DELETE/);
     expect(sql).toContain('mi.campaign_id=$2');
     expect(sql).toContain('c.environment=$1');

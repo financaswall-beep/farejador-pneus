@@ -63,7 +63,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.galpao.contagem.js', 'app.galpao.ajuste.js', 'app.galpao.multibrand.js', 'app.galpao.correcao.js', 'app.galpao.js', 'app.catalogo.ficha.js', 'app.catalogo.descobertas.js', 'app.vehicle-types.js', 'app.catalogo.js', 'app.catalogo.bootstrap.js', 'app.catalogo.compatibilidade.js', 'app.catalogo.marca.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.controle.js', 'app.bot.movimento.js', 'app.bot.mapa.js', 'app.clientes.js', 'app.clientes.ficha.js', 'app.clientes.kanban.js', 'app.clientes.leads.js', 'app.clientes.identity.js',
-    'app.marketing.js', 'app.marketing.chart.js', 'app.marketing.campaigns.js', 'app.marketing.campaign-detail.js', 'app.marketing.campaign-detail.mock.js', 'app.marketing.journeys.js', 'app.marketing.integrations.js',
+    'app.marketing.js', 'app.marketing.chart.js', 'app.marketing.campaigns.js', 'app.marketing.campaign-detail.js', 'app.marketing.campaign-detail.mock.js', 'app.marketing.ad-detail.js', 'app.marketing.ad-detail.mock.js', 'app.marketing.journeys.js', 'app.marketing.integrations.js',
     'catalog-create-utils.js', 'purchase-price-utils.js',
     'app.montagem.js', // fatia 07-14: compositor + lista de fábricas (app.js ficou só o estado)
   ];
@@ -98,6 +98,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/marketing-creatives.css', async (_request, reply) => sendStatic(reply, 'marketing-creatives.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-paid.css', async (_request, reply) => sendStatic(reply, 'marketing-paid.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-campaign.css', async (_request, reply) => sendStatic(reply, 'marketing-campaign.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/marketing-ad-detail.css', async (_request, reply) => sendStatic(reply, 'marketing-ad-detail.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-ads.css', async (_request, reply) => sendStatic(reply, 'marketing-ads.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-geography.css', async (_request, reply) => sendStatic(reply, 'marketing-geography.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/clientes-lead.css', async (_request, reply) => sendStatic(reply, 'clientes-lead.css', 'text/css; charset=utf-8'));

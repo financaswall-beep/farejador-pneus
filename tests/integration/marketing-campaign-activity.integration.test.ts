@@ -71,4 +71,11 @@ describe('Campanha — envios à Meta isolados por ambiente e período', () => {
       available: true, sent: 0, pending: 0, failed: 0, events: [],
     });
   });
+  it('no detalhe do anúncio exclui os envios dos demais anúncios da mesma campanha', async () => {
+    const result = await load('10', '2026-09-01', '2026-09-30', db.pool, '99101');
+    expect(result).toMatchObject({ available: true, sent: 1, pending: 0, failed: 0 });
+    expect(result.events).toHaveLength(1);
+    expect(await load('20', '2026-09-01', '2026-09-30', db.pool, '99101'))
+      .toMatchObject({ available: true, sent: 0, pending: 0, events: [] });
+  });
 });

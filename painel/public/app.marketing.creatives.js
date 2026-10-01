@@ -79,14 +79,8 @@ window.PAINEL_MODULES.marketingCreatives = function () {
       this.marketingCreativeReconcile();
     },
     marketingCreativeSelect(row) {
-      analysisTrigger = document.activeElement;
       this.marketingCreativeSelectedId = row.id;
-      this.marketingCreativeAnalysisOpen = true;
-      this.$nextTick(() => {
-        lucide.createIcons(); this.renderMarketingCreativeChart();
-        const panel = document.getElementById('marketing-ad-analysis');
-        panel?.focus({ preventScroll: true }); panel?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      });
+      void this.madOpen(row, 'ads');
     },
     marketingCreativeCloseAnalysis() {
       this.marketingCreativeAnalysisOpen = false; this.destroyMarketingCreativeChart();

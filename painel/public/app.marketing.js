@@ -114,6 +114,7 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
+      if (this.madId) this.madClose(false);
       if (tab === 'campanhas') { this.paidScope = 'pending'; tab = 'visao'; }
       if (tab !== 'comentarios') { this.moClose(); this.mpClose(); }
       if (tab !== 'criativos') { this.marketingCreativeAnalysisOpen = false; this.destroyMarketingCreativeChart(); this.closeMarketingCreativeJourneys(); }

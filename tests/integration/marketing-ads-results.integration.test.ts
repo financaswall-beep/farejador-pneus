@@ -4,14 +4,18 @@ import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postg
 describe('Anúncios — resultado com o motor de atribuição existente', () => {
   let db: IntegrationDb;
   let getCreatives: typeof import('../../src/admin/painel/queries-marketing-creatives.js').getMarketingCreatives;
+  let getOrders: typeof import('../../src/admin/painel/queries-marketing-ad-orders.js').loadMarketingAdOrders;
   let orderId: string;
   beforeAll(async () => {
     Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
       CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin', MARKETING_SCOPE_ENFORCEMENT_ENABLED: 'true' });
     db = await startPostgres();
+    await db.pool.query(`CREATE TABLE IF NOT EXISTS core.messages_2026_09 PARTITION OF core.messages
+      FOR VALUES FROM ('2026-09-01') TO ('2026-10-01')`);
     process.env.DATABASE_URL = db.connectionString;
     vi.resetModules();
     ({ getMarketingCreatives: getCreatives } = await import('../../src/admin/painel/queries-marketing-creatives.js'));
+    ({ loadMarketingAdOrders: getOrders } = await import('../../src/admin/painel/queries-marketing-ad-orders.js'));
     const contact = (await db.pool.query(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
       VALUES ('test',99051,'Cliente de teste') RETURNING id`)).rows[0].id;
     const conversation = (await db.pool.query(`INSERT INTO core.conversations
@@ -50,14 +54,29 @@ describe('Anúncios — resultado com o motor de atribuição existente', () => 
   it('não inventa lucro quando falta custo do pneu', async () => {
     expect((await read()).creatives[0]).toMatchObject({ investment: 20, attributed_sales: 1,
       attributed_revenue: 100, pending_margin_orders: 1, net_after_media: null });
+    expect(await getOrders(db.pool, 'test', 'act_123', '111', '2026-09-01', '2026-09-30', true))
+      .toMatchObject({ available: true, total: 1, product_cost: null,
+        rows: [{ revenue: 100, product_cost: null, gross_margin: null, conversation_id: 99051 }] });
   });
   it('desconta o custo do pneu e a mídia uma única vez', async () => {
     await db.pool.query('UPDATE commerce.order_items SET matriz_unit_cost=60 WHERE environment=$1 AND order_id=$2', ['test', orderId]);
     expect((await read()).creatives[0]).toMatchObject({ attributed_sales: 1, gross_margin: 40, net_after_media: 20, pending_margin_orders: 0 });
+    expect(await getOrders(db.pool, 'test', 'act_123', '111', '2026-09-01', '2026-09-30', true))
+      .toMatchObject({ available: true, total: 1, product_cost: 60, operation_cost: 0,
+        rows: [{ revenue: 100, product_cost: 60, operation_cost: 0, gross_margin: 40 }] });
+    for (const [environment, account, ad, since, until] of [
+      ['prod','act_123','111','2026-09-01','2026-09-30'],
+      ['test','act_other','111','2026-09-01','2026-09-30'],
+      ['test','act_123','222','2026-09-01','2026-09-30'],
+      ['test','act_123','111','2026-09-01','2026-09-28'],
+    ]) expect(await getOrders(db.pool, environment!, account!, ad!, since!, until!, true))
+      .toMatchObject({ available: true, total: 0, rows: [] });
   });
   it('exclui venda cancelada sem apagar a atribuição histórica', async () => {
     await db.pool.query("UPDATE commerce.orders SET status='cancelled' WHERE environment='test' AND id=$1", [orderId]);
     expect((await read()).creatives[0]).toMatchObject({ attributed_sales: 0, attributed_revenue: 0, net_after_media: -20 });
+    expect(await getOrders(db.pool, 'test', 'act_123', '111', '2026-09-01', '2026-09-30', true))
+      .toMatchObject({ available: true, total: 0, rows: [] });
     expect((await db.pool.query('SELECT count(*)::int n FROM marketing.order_attributions WHERE order_id=$1', [orderId])).rows[0].n).toBe(1);
   });
 });
