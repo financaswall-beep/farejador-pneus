@@ -1,92 +1,128 @@
-// Marketing / detalhe da campanha: abre a campanha selecionada sem perder os filtros da lista.
-window.PAINEL_MODULES = window.PAINEL_MODULES || {};
-
-function marketingCampaignDetailMock(row, period) {
-  const conversations = Number(row?.conversations || 0);
-  const replies = Math.round(conversations * 0.727);
-  const investment = Number(row?.investment || 0);
-  const sales = Number(row?.attributed_sales || 0);
-  const revenue = Number(row?.attributed_revenue || 0);
-  const margin = Number(row?.gross_margin || 0);
-  const metric = (factor, date) => ({
-    date, investment: investment * factor, conversations_started: Math.round(conversations * factor),
-    first_replies: Math.round(replies * factor),
-  });
-  return {
-    environment: 'test',
-    period: { id: period, since: period === '7d' ? '2026-07-19' : '2026-06-27', until: '2026-07-25' },
-    campaign: {
-      id: row?.platform_id || '1', name: row?.name || 'Campanha Meta',
-      channel: 'meta', status: 'with_delivery', currency: 'BRL',
-      delivery_days: row?.delivery_days || 1, last_delivery: row?.last_delivery || '2026-07-25',
-    },
-    summary: {
-      investment, impressions: Number(row?.impressions || 0), clicks: Number(row?.clicks || 0),
-      link_clicks: Math.round(Number(row?.clicks || 0) * 0.42), video_views: 3560,
-      post_engagements: 4140, conversations_started: conversations, first_replies: replies,
-      unanswered: Math.max(0, conversations - replies),
-      ctr: row?.ctr ?? null,
-      cpc: row?.clicks ? investment / Number(row.clicks) : null,
-      cpm: row?.impressions ? investment / Number(row.impressions) * 1000 : null,
-      response_rate: conversations ? replies / conversations * 100 : null,
-      cost_per_started: conversations ? investment / conversations : null,
-      cost_per_replied: replies ? investment / replies : null,
-      unanswered_investment: conversations ? investment * ((conversations - replies) / conversations) : null,
-    },
-    trend: [
-      metric(0.18, '2026-07-21'), metric(0.26, '2026-07-22'),
-      metric(0.31, '2026-07-23'), metric(0.25, '2026-07-24'),
-    ],
-    ads: [{
-      id: 'ad-1', name: 'Criativo WhatsApp 01', adset_name: 'Público local',
-      investment, impressions: Number(row?.impressions || 0), clicks: Number(row?.clicks || 0),
-      conversations_started: conversations, first_replies: replies,
-      response_rate: conversations ? replies / conversations * 100 : null,
-      cost_per_replied: replies ? investment / replies : null,
-      attributed_sales: sales, attributed_revenue: revenue, gross_margin: margin,
-      net_after_media: margin - investment,
-      roas: investment ? revenue / investment : null,
-    }],
-    attribution: {
-      status: 'ready', method: 'last_click_messaging_7d', attributed_sales: sales,
-      attributed_revenue: revenue, gross_margin: margin, pending_margin_orders: 0,
-    },
-    financial: {
-      attributed_sales: sales, attributed_revenue: revenue,
-      product_cost: Math.max(0, revenue - margin - 650), operation_cost: 650,
-      gross_margin: margin, pending_margin_orders: 0,
-      net_after_media: margin - investment,
-      retained_percent: revenue ? (margin - investment) / revenue * 100 : null,
-      roas: investment ? revenue / investment : null,
-      cac: sales ? investment / sales : null,
-    },
-    manager_url: 'https://adsmanager.facebook.com/adsmanager/manage/campaigns',
-    tracking: { available: true, ctwa_referrals: 28 },
-    quality: {
-      conversations_meta: conversations, ctwa_referrals: 28,
-      attributed_sales: sales, complete_cost_orders: Math.max(0, sales - 1),
-      conversion_rate: sales ? sales / 28 * 100 : null,
-    },
-    orders_total: sales,
-    orders: [
-      { order_number: 'PED-10482', realized_at: '2026-07-24T14:32:00.000Z', origin: 'WhatsApp',
-        revenue: 890, gross_margin: 312, time_to_sale_minutes: 138, status: 'confirmed' },
-      { order_number: 'PED-10471', realized_at: '2026-07-23T10:08:00.000Z', origin: 'WhatsApp',
-        revenue: 1240, gross_margin: 405, time_to_sale_minutes: 1122, status: 'confirmed' },
-      { order_number: 'PED-10455', realized_at: '2026-07-21T16:51:00.000Z', origin: 'WhatsApp',
-        revenue: 650, gross_margin: 208, time_to_sale_minutes: 4320, status: 'confirmed' },
-    ],
-    decision: {
-      tone: 'attention', title: 'Há espaço para recuperar conversas sem resposta',
-      detail: 'Antes de ampliar a verba, verifique fila, escala e horário de atendimento.',
-    },
-  };
-}
-
+// Detalhe da campanha, dentro de Conteúdo pago. Consultas e apresentação.
 window.PAINEL_MODULES.marketingCampaignDetail = function () {
   return {
+    mcdTab: 'resultado', mcdAdSearch: '', mcdOrderSearch: '', mcdSelected: [], mcdEventsOpen: false, mcdAdDetailId: null,
+    mcdTabs() {
+      return [
+        { id: 'resultado', label: 'Resultado' },
+        { id: 'anuncios', label: `Anúncios (${this.marketingCampaignDetail?.ads?.length || 0})` },
+        { id: 'vendas', label: 'Conversas e vendas' },
+        { id: 'financeiro', label: 'Composição financeira' },
+        { id: 'regioes', label: 'Regiões e ofertas' },
+      ];
+    },
+    mcdSetTab(tab) {
+      if (!this.mcdTabs().some(item => item.id === tab)) return;
+      this.mcdTab = tab;
+      if (tab === 'regioes') void this.loadMarketingGeography();
+      this.$nextTick(() => lucide.createIcons());
+    },
+    async mcdPeriodChanged() {
+      this.marketingCampaignDetail = null;
+      this.mcdEventsOpen = false;
+      this.mcdSelected = [];
+      this.mcdAdDetailId = null;
+      void this.loadMarketing();
+      await this.loadMarketingCampaignDetail();
+      if (this.mcdTab === 'regioes') void this.loadMarketingGeography();
+    },
+    mcdMoney(value, financial = false) {
+      if (value == null) return '—';
+      const currency = financial ? 'BRL' : this.marketingCampaignDetail?.campaign?.currency || 'BRL';
+      return this.marketingCreativeMoney(value, currency);
+    },
+    mcdPercent(value) { return value == null ? '—' : `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`; },
+    mcdKpis() {
+      const d = this.marketingCampaignDetail || {}, s = d.summary || {}, f = d.financial || {};
+      return [
+        { id: 'investment', label: 'Investimento', value: this.mcdMoney(s.investment), icon: 'coins', note: 'Meta' },
+        { id: 'conversations', label: 'Conversas na Meta', value: this.paidNumber(s.conversations_started), icon: 'message-circle', note: `${this.mcdMoney(s.cost_per_started)} por conversa` },
+        { id: 'sales', label: 'Vendas atribuídas', value: this.paidNumber(f.attributed_sales), icon: 'shopping-cart', note: `Receita de ${this.mcdMoney(f.attributed_revenue, true)}` },
+        { id: 'result', label: 'Resultado após mídia', value: this.mcdMoney(f.net_after_media, true), icon: 'chart-no-axes-column-increasing', note: `ROAS ${f.roas == null ? '—' : this.paidNumber(f.roas)}`, negative: f.net_after_media < 0 },
+      ];
+    },
+    mcdIndicators() {
+      const d = this.marketingCampaignDetail || {}, s = d.summary || {};
+      return [
+        { label: 'Impressões', value: this.paidNumber(s.impressions), icon: 'eye' },
+        { label: 'Cliques', value: this.paidNumber(s.clicks), icon: 'mouse-pointer-2' },
+        { label: 'CTR', value: this.mcdPercent(s.ctr), icon: 'chart-no-axes-column-increasing' },
+        { label: 'Mídia por venda', value: this.mcdMoney(d.financial?.cac), icon: 'coins' },
+        { label: 'Origens identificadas', value: this.paidNumber(d.quality?.ctwa_referrals), icon: 'users' },
+      ];
+    },
+    mcdRing() {
+      const value = Math.min(100, Math.max(0, this.marketingCampaignDetail?.summary?.response_rate || 0));
+      return `background:conic-gradient(#00876b ${value}%,#e8f1ef 0)`;
+    },
+    mcdAds() {
+      const search = this.mcdAdSearch.trim().toLocaleLowerCase('pt-BR');
+      const ads = (this.marketingCampaignDetail?.ads || []).filter(ad =>
+        `${ad.name} ${ad.adset_name || ''}`.toLocaleLowerCase('pt-BR').includes(search));
+      return this.mcdTab === 'resultado' ? ads.slice(0, 3) : ads;
+    },
+    mcdOrders() {
+      const search = this.mcdOrderSearch.trim().toLocaleLowerCase('pt-BR');
+      return (this.marketingCampaignDetail?.orders || []).filter(order =>
+        `${order.order_number} ${order.origin}`.toLocaleLowerCase('pt-BR').includes(search));
+    },
+    mcdAdDetail() { return this.marketingCampaignDetail?.ads?.find(ad => ad.id === this.mcdAdDetailId) || null; },
+    mcdAdUrl() {
+      const manager = this.marketingCampaignDetail?.manager_url;
+      if (!manager || !this.mcdAdDetailId) return null;
+      const url = new URL(manager);
+      url.pathname = '/adsmanager/manage/ads';
+      url.searchParams.delete('selected_campaign_ids');
+      url.searchParams.set('selected_ad_ids', this.mcdAdDetailId);
+      return url.toString();
+    },
+    mcdToggleAd(id) {
+      if (this.mcdSelected.includes(id)) this.mcdSelected = this.mcdSelected.filter(value => value !== id);
+      else if (this.mcdSelected.length < 3) this.mcdSelected = [...this.mcdSelected, id];
+    },
+    mcdCompare() {
+      const d = this.marketingCampaignDetail;
+      if (!d) return;
+      const creatives = d.ads.map(ad => ({ ...ad, scope: d.campaign.scope, currency: d.campaign.currency,
+        campaign_id: d.campaign.id, campaign_name: d.campaign.name,
+        conversations: ad.conversations_started, cost_per_conversation: ad.cost_per_started }));
+      void this.paidCompare(this.mcdSelected.length ? this.mcdSelected : creatives.slice(0, 3).map(ad => ad.id),
+        { creatives, period: d.period });
+    },
+    mcdCostsLabel() {
+      const q = this.marketingCampaignDetail?.quality;
+      return q?.complete_cost_orders == null || q?.attributed_sales == null ? 'Indisponível'
+        : `${q.complete_cost_orders} de ${q.attributed_sales}`;
+    },
+    mcdCostsComplete() {
+      const q = this.marketingCampaignDetail?.quality;
+      return q?.attributed_sales > 0 && q.complete_cost_orders === q.attributed_sales;
+    },
+    mcdCapiStatus() {
+      const c = this.marketingCampaignDetail?.conversions;
+      return !c?.available ? 'Indisponível' : c.enabled ? 'Automático' : 'Desativado';
+    },
+    mcdCapiCount(kind) {
+      const c = this.marketingCampaignDetail?.conversions;
+      return c?.available ? this.paidNumber(c[kind]) : '—';
+    },
+    mcdEventStatus(status) {
+      return ({ sent: 'Confirmado', pending: 'Na fila', processing: 'Enviando', failed: 'Falha temporária',
+        dead_letter: 'Precisa de revisão', suppressed: 'Envio suprimido' })[status] || status;
+    },
+    mcdRegions() {
+      if (this.mgData?.period?.id !== this.marketingPeriod) return [];
+      return (this.mgData?.records || []).filter(row => row.id === this.marketingCampaignDetailId);
+    },
     async openMarketingCampaignDetail(row) {
       if (!row?.platform_id) return;
+      this.marketingTab = 'campanhas';
+      this.mcdTab = 'resultado';
+      this.mcdAdSearch = '';
+      this.mcdOrderSearch = '';
+      this.mcdSelected = [];
+      this.mcdEventsOpen = false;
+      this.mcdAdDetailId = null;
       this.marketingCampaignDetailId = row.platform_id;
       this.marketingCampaignDetail = null;
       this.marketingCampaignDetailError = null;
@@ -108,6 +144,7 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
     async loadMarketingCampaignDetail() {
       const campaignId = this.marketingCampaignDetailId;
       if (!campaignId) return;
+      const period = this.marketingPeriod;
       const requestSeq = ++this.marketingCampaignDetailRequestSeq;
       this.marketingCampaignDetailLoading = true;
       this.marketingCampaignDetailError = null;
@@ -118,59 +155,30 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
         const payload = this.marketingIsMock()
           ? marketingCampaignDetailMock(selected, this.marketingPeriod)
           : await this.apiGet(`/admin/api/marketing/campaigns/${encodeURIComponent(campaignId)}?period=${encodeURIComponent(this.marketingPeriod)}`);
-        if (requestSeq === this.marketingCampaignDetailRequestSeq) {
+        if (requestSeq === this.marketingCampaignDetailRequestSeq && period === this.marketingPeriod) {
           this.marketingCampaignDetail = payload;
+          if (!payload) this.marketingCampaignDetailError = 'Sem entrega desta campanha no período selecionado.';
         }
       } catch {
-        if (requestSeq === this.marketingCampaignDetailRequestSeq) {
+        if (requestSeq === this.marketingCampaignDetailRequestSeq && period === this.marketingPeriod) {
           this.marketingCampaignDetailError = 'Não foi possível carregar o detalhe desta campanha.';
         }
       } finally {
-        if (requestSeq === this.marketingCampaignDetailRequestSeq) {
+        if (requestSeq === this.marketingCampaignDetailRequestSeq && period === this.marketingPeriod) {
           this.marketingCampaignDetailLoading = false;
           this.$nextTick(() => lucide.createIcons());
         }
       }
     },
 
-    marketingCampaignDetailKpis() {
-      const detail = this.marketingCampaignDetail || {};
-      const summary = detail.summary || {};
-      const financial = detail.financial || {};
-      const money = (value) => value == null ? '—' : this.formatCurrency(Number(value));
-      const number = (value) => value == null ? '—' : Number(value).toLocaleString('pt-BR');
-      return [
-        { id: 'investment', label: 'Investimento', value: money(summary.investment), source: 'META' },
-        { id: 'sales', label: 'Vendas atribuídas', value: number(financial.attributed_sales), source: 'FAREJADOR' },
-        { id: 'revenue', label: 'Receita atribuída', value: money(financial.attributed_revenue), source: 'FAREJADOR' },
-        { id: 'margin', label: 'Margem bruta', value: money(financial.gross_margin), source: 'FAREJADOR' },
-        { id: 'result', label: 'Resultado após mídia', value: money(financial.net_after_media), source: 'CALCULADO',
-          tone: financial.net_after_media == null ? '' : Number(financial.net_after_media) >= 0 ? 'positive' : 'negative' },
-        { id: 'roas', label: 'ROAS', value: financial.roas == null ? '—' : `${Number(financial.roas).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x`, source: 'CALCULADO' },
-        { id: 'cac', label: 'CAC real', value: money(financial.cac), source: 'CALCULADO' },
-      ];
-    },
-
-    marketingCampaignDetailSourceClass(source) {
-      if (source === 'META') return 'border-sky-300 bg-sky-50 text-sky-700';
-      if (source === 'FAREJADOR') return 'border-emerald-300 bg-emerald-50 text-emerald-700';
-      return 'border-amber-300 bg-amber-50 text-amber-700';
-    },
-
-    marketingCampaignResponseDelta() {
-      const summary = this.marketingCampaignDetail?.summary;
-      if (!summary?.cost_per_started || !summary?.cost_per_replied) return null;
-      return ((summary.cost_per_replied / summary.cost_per_started) - 1) * 100;
-    },
-
     marketingCampaignDetailFinancialRows() {
       const financial = this.marketingCampaignDetail?.financial || {};
-      const investment = this.marketingCampaignDetail?.summary?.investment;
+      const investment = this.marketingCampaignDetail?.summary?.financial_investment ?? this.marketingCampaignDetail?.summary?.investment;
       return [
         { id: 'revenue', label: 'Receita atribuída', value: financial.attributed_revenue, kind: 'positive' },
-        { id: 'products', label: 'Custo dos produtos', value: financial.product_cost == null ? null : -Number(financial.product_cost), kind: 'neutral' },
+        { id: 'products', label: 'Custo dos pneus', value: financial.product_cost == null ? null : -Number(financial.product_cost), kind: 'neutral' },
         { id: 'operation', label: 'Custos, repasses e operação', value: financial.operation_cost == null ? null : -Number(financial.operation_cost), kind: 'neutral' },
-        { id: 'media', label: 'Investimento Meta', value: investment == null ? null : -Number(investment), kind: 'media' },
+        { id: 'media', label: 'Investimento em mídia', value: investment == null ? null : -Number(investment), kind: 'media' },
         { id: 'result', label: 'Resultado após mídia', value: financial.net_after_media, kind: 'result' },
       ];
     },
@@ -195,40 +203,13 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
     },
 
     marketingCampaignSaleTime(minutes) {
-      const value = Number(minutes || 0);
+      if (minutes == null) return '—';
+      const value = Number(minutes);
       if (value < 60) return `${value} min`;
       if (value < 1440) return `${Math.floor(value / 60)}h ${value % 60}min`;
       const days = Math.floor(value / 1440);
       const hours = Math.floor((value % 1440) / 60);
       return hours ? `${days}d ${hours}h` : `${days} dia(s)`;
-    },
-
-    marketingCampaignQualityKpis() {
-      const quality = this.marketingCampaignDetail?.quality || {};
-      return [
-        { id: 'conversations', label: 'Conversas Meta', value: quality.conversations_meta ?? '—', source: 'META', icon: 'messages-square' },
-        { id: 'ctwa', label: 'Origens identificadas', value: quality.ctwa_referrals ?? '—', source: 'FAREJADOR', icon: 'map-pin-check' },
-        { id: 'sales', label: 'Vendas atribuídas', value: quality.attributed_sales ?? '—', source: 'FAREJADOR', icon: 'shopping-bag' },
-        { id: 'costs', label: 'Pedidos com custo completo',
-          value: quality.attributed_sales == null ? '—' : `${quality.complete_cost_orders || 0} de ${quality.attributed_sales}`,
-          source: 'FAREJADOR', icon: 'clipboard-check' },
-      ];
-    },
-
-    marketingCampaignDecisionItems() {
-      const detail = this.marketingCampaignDetail || {};
-      const result = detail.financial?.net_after_media;
-      const conversion = detail.quality?.conversion_rate;
-      return [
-        result == null
-          ? 'Resultado financeiro aguardando atribuição e custos'
-          : result >= 0 ? 'Campanha pagou a mídia e gerou resultado positivo'
-            : 'Campanha ainda não pagou o investimento em mídia',
-        conversion == null
-          ? 'Conversão origem → venda ainda não calculada'
-          : `Conversão origem → venda: ${Number(conversion).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`,
-        'Nenhuma verba será alterada automaticamente',
-      ];
     },
 
     marketingCampaignDetailDecisionClass(tone) {

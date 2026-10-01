@@ -221,12 +221,13 @@
 <link rel="stylesheet" href="/admin/painel/marketing-paid.css?v=20260930-paid1">
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-ads.css?v=20260930-ads1">
+<link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261001-campaign1">
 <link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.paid.js?v=20260930-ads1"></script>
-<script src="/admin/painel/app.marketing.js?v=20260930-ads1"></script>
+<script src="/admin/painel/app.marketing.paid.js?v=20261001-campaign1"></script>
+<script src="/admin/painel/app.marketing.js?v=20261001-campaign1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.js?v=20260930-results1"></script>
@@ -245,7 +246,8 @@
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20260930-ads1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260930-paid1"></script>
-<script src="/admin/painel/app.marketing.campaign-detail.js?v=20260930-paid1"></script>
+<script src="/admin/painel/app.marketing.campaign-detail.mock.js?v=20261001-campaign1"></script>
+<script src="/admin/painel/app.marketing.campaign-detail.js?v=20261001-campaign1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
@@ -8137,7 +8139,7 @@
           <button class="mo-button" type="button" @click="mpCheckConnections()" :disabled="mpConnectionBusy || marketingIsMock()"><i data-lucide="settings"></i>Gerenciar contas</button>
         </div>
       </header>
-      <section x-show="!marketingCampaignDetailId && marketingTab !== 'visao' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
+      <section x-show="!marketingCampaignDetailId && marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'"
                aria-labelledby="marketing-heading"
                class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
         <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
@@ -8166,8 +8168,7 @@
         </div>
       </section>
 
-      <div x-show="!marketingCampaignDetailId || marketingTab === 'criativos' || marketingTab === 'geografia' || marketingTab === 'comentarios'"
-           class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções de Marketing" class="flex items-center gap-1 overflow-x-auto">
             <template x-for="tab in marketingTabs()" :key="tab.id">
@@ -8177,7 +8178,7 @@
                       x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="marketingTab !== 'visao' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'" class="mb-3 flex items-center gap-2 lg:mb-0">
+          <div x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'criativos' && marketingTab !== 'geografia' && marketingTab !== 'comentarios'" class="mb-3 flex items-center gap-2 lg:mb-0">
             <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
@@ -8835,333 +8836,124 @@
         </div>
       </section>
 
-      <section x-show="marketingTab === 'campanhas' && marketingCampaignDetailId"
-               data-marketing-campaign-detail-screen
-               class="space-y-4"
-               x-cloak>
-        <header class="border-b border-gray-200 pb-0">
-          <button type="button" aria-label="Voltar para campanhas" @click="closeMarketingCampaignDetail()"
-                  class="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-emerald-800">
-            <i data-lucide="arrow-left" class="h-4 w-4"></i>
-            Campanhas <span class="text-gray-300">/</span> Resultado da campanha
-          </button>
-          <div class="mt-3 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="truncate text-2xl font-semibold tracking-tight text-gray-950"
-                    x-text="marketingCampaignDetail?.campaign?.name || 'Detalhe da campanha'"></h2>
-                <span class="rounded-lg border px-3 py-1.5 text-[10px] font-semibold"
-                      :class="marketingCampaignDetail?.attribution?.status === 'ready' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-700'"
-                      x-text="marketingCampaignAttributionLabel(marketingCampaignDetail?.attribution?.status)"></span>
-              </div>
-              <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span class="relative h-5 w-16" aria-label="Meta, Facebook e Instagram">
-                  <span class="absolute left-0 top-0 text-lg font-bold text-blue-600">∞</span>
-                  <img src="/assets/brands/facebook.svg" alt="" class="absolute left-6 top-0.5 h-4 w-4">
-                  <img src="/assets/brands/instagram.svg" alt="" class="absolute left-11 top-0.5 h-4 w-4">
-                </span>
-                <span class="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-800">Com entrega</span>
-                <span>Meta Ads</span><span>+</span><span>Farejador</span><span>•</span>
-                <span x-text="marketingCampaignDetail?.period ? `${marketingDateLabel(marketingCampaignDetail.period.since)} — ${marketingDateLabel(marketingCampaignDetail.period.until)}` : 'Período selecionado'"></span>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
-                      class="h-10 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 focus:border-emerald-600 focus:outline-none">
-                <option value="7d">Últimos 7 dias</option>
-                <option value="30d">Últimos 30 dias</option>
-              </select>
-              <a x-show="marketingCampaignDetail?.manager_url"
-                 :href="marketingCampaignDetail?.manager_url" target="_blank" rel="noopener noreferrer"
-                 class="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-700 bg-white px-3.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
-                <i data-lucide="external-link" class="h-4 w-4"></i>
-                Abrir no Gerenciador
-              </a>
-              <button x-show="!marketingCampaignDetail?.manager_url" type="button" disabled
-                      class="inline-flex h-10 cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-xs font-semibold text-gray-400">
-                <i data-lucide="external-link" class="h-4 w-4"></i>
-                Abrir no Gerenciador
-              </button>
+      <section x-show="marketingTab === 'campanhas' && marketingCampaignDetailId" data-marketing-campaign-detail-screen class="paid-screen mcd-screen" x-cloak>
+        <button type="button" class="mcd-back" aria-label="Voltar para campanhas" @click="closeMarketingCampaignDetail()"><i data-lucide="arrow-left"></i> Conteúdo pago / Campanhas</button>
+        <header class="mcd-header">
+          <div>
+            <h1 x-text="marketingCampaignDetail?.campaign?.name || 'Detalhe da campanha'"></h1>
+            <div class="mcd-badges">
+              <span class="mcd-badge mcd-meta"><b>∞</b> Meta Ads</span>
+              <span class="mcd-badge" x-text="marketingCampaignScopeLabel(marketingCampaignDetail?.campaign?.scope)"></span>
+              <span class="mcd-badge mcd-neutral" x-show="marketingCampaignDetail">Com entrega no período</span>
+              <span class="mcd-badge mcd-warning" x-show="marketingIsMock()">Demonstração</span>
             </div>
           </div>
-          <nav aria-label="Seções do detalhe da campanha" class="mt-4 flex items-center gap-6 overflow-x-auto">
-            <button type="button" @click="closeMarketingCampaignDetail(); marketingSetTab('visao')" class="whitespace-nowrap border-b-2 border-transparent px-1 py-3 text-xs font-medium text-gray-500">Visão geral</button>
-            <button type="button" class="whitespace-nowrap border-b-2 border-emerald-700 px-1 py-3 text-xs font-semibold text-emerald-800">Campanhas</button>
-            <button type="button" @click="marketingNavigate('jornadas')" class="whitespace-nowrap border-b-2 border-transparent px-1 py-3 text-xs font-medium text-gray-500">Jornadas</button>
-            <button type="button" @click="marketingNavigate('integracoes')" class="whitespace-nowrap border-b-2 border-transparent px-1 py-3 text-xs font-medium text-gray-500">Integrações</button>
-          </nav>
+          <div class="paid-actions">
+            <label class="mcd-period"><i data-lucide="calendar-days"></i><select aria-label="Período da campanha" x-model="marketingPeriod" @change="mcdPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label>
+            <a class="paid-button mcd-manager" x-show="marketingCampaignDetail?.manager_url" :href="marketingCampaignDetail?.manager_url" target="_blank" rel="noopener noreferrer">Abrir no Gerenciador <i data-lucide="arrow-up-right"></i></a>
+          </div>
         </header>
-
-        <div x-show="marketingCampaignDetailLoading && !marketingCampaignDetail"
-             class="rounded-xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">
-          Carregando os dados reais desta campanha…
-        </div>
-        <div x-show="marketingCampaignDetailError"
-             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <span x-text="marketingCampaignDetailError"></span>
-          <button type="button" @click="loadMarketingCampaignDetail()" class="font-semibold underline">Tentar novamente</button>
-        </div>
-
-        <div x-show="marketingCampaignDetail && !marketingCampaignDetailError" class="space-y-4">
-          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-            <template x-for="(kpi, index) in marketingCampaignDetailKpis()" :key="kpi.id">
-              <article class="min-h-[108px] border-emerald-800/80 px-3 py-4"
-                       :class="index ? 'border-t sm:border-l sm:border-t-0' : ''">
-                <p class="text-[11px] text-emerald-100/75" x-text="kpi.label"></p>
-                <p class="mt-1.5 whitespace-nowrap text-lg font-semibold tracking-tight num"
-                   :class="kpi.tone === 'positive' ? 'text-emerald-300' : kpi.tone === 'negative' ? 'text-rose-300' : 'text-white'"
-                   x-text="kpi.value"></p>
-                <span class="mt-2 inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold"
-                      :class="marketingCampaignDetailSourceClass(kpi.source)"
-                      x-text="kpi.source"></span>
+        <nav class="mcd-tabs" aria-label="Seções do detalhe da campanha">
+          <template x-for="tab in mcdTabs()" :key="tab.id"><button type="button" :aria-pressed="mcdTab === tab.id" @click="mcdSetTab(tab.id)" x-text="tab.label"></button></template>
+        </nav>
+        <div class="mcd-empty" x-show="marketingCampaignDetailLoading" role="status">Carregando dados desta campanha…</div>
+        <div class="mcd-notice mcd-warning" x-show="marketingCampaignDetailError" role="alert"><span x-text="marketingCampaignDetailError"></span><button type="button" @click="loadMarketingCampaignDetail()">Tentar novamente</button></div>
+        <div x-show="marketingCampaignDetail && !marketingCampaignDetailLoading && !marketingCampaignDetailError">
+          <div class="mcd-notice" x-show="marketingCampaignDetail?.attribution?.status !== 'ready'"><i data-lucide="info"></i><span x-text="marketingCampaignAttributionLabel(marketingCampaignDetail?.attribution?.status)"></span></div>
+          <div class="mcd-kpis">
+            <template x-for="kpi in mcdKpis()" :key="kpi.id">
+              <article class="mcd-kpi" :class="{ 'mcd-result': kpi.id === 'result', 'mcd-negative': kpi.negative }">
+                <span class="mcd-kpi-icon"><i :data-lucide="kpi.icon"></i></span><div><p x-text="kpi.label"></p><strong x-text="kpi.value"></strong><small x-text="kpi.note"></small></div>
               </article>
             </template>
-          </section>
-
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-7">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-950">Eficiência do atendimento</h3>
-                <p class="mt-1 text-xs text-gray-500">O anúncio trouxe a conversa. A operação conseguiu responder?</p>
-              </div>
-              <div class="mt-5 grid gap-5 lg:grid-cols-[180px_1fr]">
-                <div class="flex flex-col items-center justify-center">
-                  <div class="grid h-40 w-40 place-items-center rounded-full p-3"
-                       :style="`background:conic-gradient(#047857 ${Math.min(100, marketingCampaignDetail?.summary?.response_rate || 0)}%, #f59e0b 0)`">
-                    <div class="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-inner">
-                      <div>
-                        <strong class="block text-4xl font-semibold text-emerald-800 num"
-                                x-text="marketingCampaignDetail?.summary?.response_rate == null ? '—' : `${Number(marketingCampaignDetail.summary.response_rate).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></strong>
-                        <span class="mt-1 block text-[11px] text-gray-500">resposta registrada<br>pela Meta</span>
-                      </div>
-                    </div>
-                  </div>
-                  <span class="mt-3 inline-flex rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-[9px] font-semibold text-sky-700">META</span>
-                </div>
-                <div class="space-y-4">
-                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <article class="rounded-xl border border-gray-200 p-3 text-center">
-                      <strong class="block text-3xl font-semibold num text-gray-950" x-text="marketingCampaignDetail?.summary?.conversations_started || 0"></strong>
-                      <span class="mt-1 block text-[11px] text-gray-500">Conversas iniciadas</span>
-                    </article>
-                    <article class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 text-center">
-                      <strong class="block text-3xl font-semibold num text-emerald-800" x-text="marketingCampaignDetail?.summary?.first_replies || 0"></strong>
-                      <span class="mt-1 block text-[11px] text-gray-500">Primeiras respostas</span>
-                    </article>
-                    <article class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-                      <strong class="block text-3xl font-semibold num text-amber-700" x-text="marketingCampaignDetail?.summary?.unanswered || 0"></strong>
-                      <span class="mt-1 block text-[11px] text-gray-500">Sem primeira resposta</span>
-                    </article>
-                  </div>
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-center">
-                    <div>
-                      <span class="block text-[10px] text-gray-500">Custo por conversa iniciada</span>
-                      <strong class="mt-1 block text-xl font-semibold text-emerald-800 num"
-                              x-text="marketingCampaignDetail?.summary?.cost_per_started == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cost_per_started))"></strong>
-                    </div>
-                    <div class="text-center">
-                      <strong class="block text-sm text-emerald-800"
-                              x-text="marketingCampaignResponseDelta() == null ? '→' : `+${Number(marketingCampaignResponseDelta()).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></strong>
-                      <i data-lucide="arrow-right" class="mx-auto mt-1 h-4 w-4 text-gray-400"></i>
-                    </div>
-                    <div>
-                      <span class="block text-[10px] text-gray-500">Custo por conversa respondida</span>
-                      <strong class="mt-1 block text-xl font-semibold text-amber-700 num"
-                              x-text="marketingCampaignDetail?.summary?.cost_per_replied == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cost_per_replied))"></strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="mt-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                <i data-lucide="circle-alert" class="mt-0.5 h-4 w-4 shrink-0"></i>
-                <p class="text-xs leading-relaxed">
-                  <strong x-text="marketingCampaignDetail?.summary?.unanswered_investment == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.unanswered_investment))"></strong>
-                  de mídia estão associados proporcionalmente a conversas sem primeira resposta. Antes de aumentar a verba, verifique escala, fila e horário.
-                </p>
-              </div>
-              <p class="mt-3 text-[10px] leading-relaxed text-gray-400">A primeira resposta é a métrica registrada pela Meta. Atendimento humano e tempo de resposta por campanha serão confirmados pelo Chatwoot quando houver vínculo rastreável de mensagem.</p>
-            </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-5">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-950">Raio-X financeiro</h3>
-                <p class="mt-1 text-xs text-gray-500">De cada R$ 100 vendido, quanto realmente sobra.</p>
-              </div>
-              <div class="mt-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-center text-[11px] font-semibold text-gray-800">
-                <span x-text="marketingCampaignDetail?.financial?.attributed_revenue == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.attributed_revenue))"></span>
-                <span> − </span>
-                <span x-text="marketingCampaignDetail?.financial?.product_cost == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.product_cost))"></span>
-                <span> − </span>
-                <span x-text="marketingCampaignDetail?.financial?.operation_cost == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.operation_cost))"></span>
-                <span> − </span>
-                <span x-text="marketingCampaignDetail?.summary?.investment == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.investment))"></span>
-                <span> = </span>
-                <strong class="text-emerald-700" x-text="marketingCampaignDetail?.financial?.net_after_media == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.net_after_media))"></strong>
-              </div>
-              <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_126px]">
-                <div>
-                  <div class="grid grid-cols-[minmax(0,1fr)_92px_48px_110px] gap-2 border-b border-gray-100 px-2 pb-2 text-[9px] text-gray-400">
-                    <span></span><span class="text-right">Valor</span><span class="text-right">%</span><span>Composição</span>
-                  </div>
-                  <template x-for="row in marketingCampaignDetailFinancialRows()" :key="row.id">
-                    <div class="grid grid-cols-[minmax(0,1fr)_92px_48px_110px] items-center gap-2 border-b border-gray-100 px-2 py-2 text-[10px]"
-                         :class="row.kind === 'result' ? 'font-semibold text-emerald-800' : 'text-gray-600'">
-                      <span class="truncate" x-text="row.label"></span>
-                      <strong class="text-right num" x-text="row.value == null ? '—' : formatCurrency(Number(row.value))"></strong>
-                      <span class="text-right num" x-text="marketingCampaignFinancialPercent(row.value) == null ? '—' : `${Number(marketingCampaignFinancialPercent(row.value)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></span>
-                      <span class="h-2 overflow-hidden rounded-full bg-gray-100">
-                        <span class="block h-full rounded-full"
-                              :class="row.kind === 'result' ? 'bg-emerald-600' : row.kind === 'media' ? 'bg-amber-500' : row.kind === 'positive' ? 'bg-emerald-800' : 'bg-gray-500'"
-                              :style="`width:${marketingCampaignFinancialBar(row.value)}`"></span>
-                      </span>
-                    </div>
-                  </template>
-                </div>
-                <article class="flex min-h-[170px] flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-center">
-                  <span class="text-[10px] text-emerald-900">Sobrou da receita</span>
-                  <strong class="mt-3 block text-3xl font-semibold text-emerald-800 num"
-                          x-text="marketingCampaignDetail?.financial?.retained_percent == null ? '—' : `${Number(marketingCampaignDetail.financial.retained_percent).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></strong>
-                  <span class="mt-2 text-sm font-semibold text-emerald-800 num"
-                        x-text="marketingCampaignDetail?.financial?.net_after_media == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.net_after_media))"></span>
-                </article>
-              </div>
-              <div class="mt-3 flex items-start gap-2 text-[10px] leading-relaxed text-gray-400">
-                <i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>
-                <span>Resultado = receita − produtos − custos/repasses da operação − mídia. Só calculamos quando todos os custos atribuídos estão disponíveis.</span>
-              </div>
-            </section>
           </div>
-
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-7">
-              <header class="border-b border-gray-100 px-4 py-3">
-                <h3 class="text-base font-semibold text-gray-950">Vendas atribuídas à campanha</h3>
-              </header>
-              <div x-show="marketingCampaignDetail?.orders?.length" class="overflow-x-auto">
-                <table class="w-full min-w-[780px] text-[10px]">
-                  <thead class="bg-gray-50 text-left text-gray-500">
-                    <tr>
-                      <th class="px-4 py-2 font-medium">Pedido</th>
-                      <th class="px-3 py-2 font-medium">Realizada em</th>
-                      <th class="px-3 py-2 font-medium">Origem</th>
-                      <th class="px-3 py-2 text-right font-medium">Receita</th>
-                      <th class="px-3 py-2 text-right font-medium">Margem bruta</th>
-                      <th class="px-3 py-2 text-right font-medium">Tempo até venda</th>
-                      <th class="px-4 py-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-100">
-                    <template x-for="order in marketingCampaignDetail?.orders || []" :key="order.order_number">
-                      <tr>
-                        <td class="px-4 py-2 font-semibold text-gray-900" x-text="order.order_number"></td>
-                        <td class="px-3 py-2 text-gray-600" x-text="marketingCampaignOrderDate(order.realized_at)"></td>
-                        <td class="px-3 py-2"><span class="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700" x-text="order.origin || 'Mensagem'"></span></td>
-                        <td class="px-3 py-2 text-right num" x-text="formatCurrency(Number(order.revenue || 0))"></td>
-                        <td class="px-3 py-2 text-right num" x-text="order.gross_margin == null ? '—' : formatCurrency(Number(order.gross_margin))"></td>
-                        <td class="px-3 py-2 text-right text-gray-600" x-text="marketingCampaignSaleTime(order.time_to_sale_minutes)"></td>
-                        <td class="px-4 py-2"><span class="inline-flex items-center gap-1 font-semibold text-emerald-700"><i data-lucide="circle-check" class="h-3.5 w-3.5"></i>Confirmada</span></td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
-              <div x-show="!marketingCampaignDetail?.orders?.length" class="flex min-h-[122px] items-center justify-center gap-2 px-5 text-center text-xs text-gray-400">
-                <i data-lucide="lock-keyhole" class="h-4 w-4"></i>
-                <span x-text="marketingCampaignAttributionLabel(marketingCampaignDetail?.attribution?.status)"></span>
-              </div>
-              <footer class="border-t border-gray-100 px-4 py-2 text-center text-[10px] text-gray-500">
-                <span x-text="marketingCampaignDetail?.orders_total == null ? 'Vendas bloqueadas sem atribuição' : `${marketingCampaignDetail.orders_total} venda(s) no período`"></span>
-                <span> • última origem de mensagem em até 7 dias</span>
-              </footer>
-            </section>
-
-            <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-5">
-              <h3 class="text-base font-semibold text-gray-950">Qualidade da atribuição</h3>
-              <div class="mt-4 grid grid-cols-2 divide-x divide-gray-100 lg:grid-cols-4">
-                <template x-for="item in marketingCampaignQualityKpis()" :key="item.id">
-                  <article class="px-3 first:pl-0 last:pr-0">
-                    <i :data-lucide="item.icon" class="h-5 w-5 text-emerald-800"></i>
-                    <span class="mt-2 block min-h-8 text-[10px] leading-tight text-gray-600" x-text="item.label"></span>
-                    <strong class="mt-1 block text-2xl font-semibold text-gray-950 num" x-text="item.value"></strong>
-                    <span class="mt-2 inline-flex rounded border px-1.5 py-0.5 text-[8px] font-semibold"
-                          :class="marketingCampaignDetailSourceClass(item.source)" x-text="item.source"></span>
-                  </article>
-                </template>
-              </div>
-              <div x-show="Number(marketingCampaignDetail?.financial?.pending_margin_orders || 0) > 0"
-                   class="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-800">
-                <i data-lucide="circle-alert" class="h-4 w-4"></i>
-                <span x-text="`${Number(marketingCampaignDetail?.financial?.pending_margin_orders || 0)} venda(s) sem margem calculada.`"></span>
-              </div>
-            </section>
+          <div class="mcd-indicators">
+            <template x-for="metric in mcdIndicators()" :key="metric.label"><div><i :data-lucide="metric.icon"></i><span><small x-text="metric.label"></small><strong x-text="metric.value"></strong></span></div></template>
           </div>
-
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-7">
-              <header class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
-                <div>
-                  <h3 class="text-base font-semibold text-gray-950">Resultado por anúncio</h3>
-                  <p class="mt-1 text-[10px] text-gray-500">Meta + vendas atribuídas pelo Farejador.</p>
-                </div>
-                <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600"
-                      x-text="`${marketingCampaignDetail?.ads?.length || 0} anúncio(s)`"></span>
-              </header>
-              <div x-show="marketingCampaignDetail?.ads?.length" class="overflow-x-auto">
-                <table class="w-full min-w-[690px] text-[10px]">
-                  <thead class="bg-gray-50 text-left text-gray-500">
-                    <tr>
-                      <th class="px-4 py-2 font-medium">Anúncio</th>
-                      <th class="px-3 py-2 text-right font-medium">Investimento</th>
-                      <th class="px-3 py-2 text-right font-medium">Vendas</th>
-                      <th class="px-3 py-2 text-right font-medium">Receita</th>
-                      <th class="px-3 py-2 text-right font-medium">Resultado</th>
-                      <th class="px-4 py-2 text-right font-medium">ROAS</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-100">
-                    <template x-for="ad in marketingCampaignDetail?.ads || []" :key="ad.id">
-                      <tr>
-                        <td class="px-4 py-3"><strong class="block text-gray-900" x-text="ad.name"></strong><span class="mt-1 block text-[9px] text-gray-400" x-text="ad.adset_name || 'Conjunto não informado'"></span></td>
-                        <td class="px-3 py-3 text-right font-semibold num" x-text="formatCurrency(Number(ad.investment || 0))"></td>
-                        <td class="px-3 py-3 text-right num" x-text="ad.attributed_sales == null ? '—' : ad.attributed_sales"></td>
-                        <td class="px-3 py-3 text-right num" x-text="ad.attributed_revenue == null ? '—' : formatCurrency(Number(ad.attributed_revenue))"></td>
-                        <td class="px-3 py-3 text-right font-semibold num"
-                            :class="ad.net_after_media == null ? 'text-gray-400' : Number(ad.net_after_media) >= 0 ? 'text-emerald-700' : 'text-rose-700'"
-                            x-text="ad.net_after_media == null ? '—' : formatCurrency(Number(ad.net_after_media))"></td>
-                        <td class="px-4 py-3 text-right font-semibold num" x-text="ad.roas == null ? '—' : `${Number(ad.roas).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x`"></td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
-              <p x-show="!marketingCampaignDetail?.ads?.length" class="px-5 py-8 text-center text-xs text-gray-500">A campanha tem entrega, mas o detalhamento por anúncio ainda não foi sincronizado.</p>
-            </section>
-
-            <section class="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:col-span-5">
-              <h3 class="text-base font-semibold text-gray-950">Leitura para decisão</h3>
-              <div class="mt-4 grid flex-1 gap-4 sm:grid-cols-[120px_1fr]">
-                <div class="flex flex-col items-center justify-center rounded-xl bg-emerald-50 p-3 text-center text-emerald-800">
-                  <span class="grid h-14 w-14 place-items-center rounded-full bg-white shadow-sm">
-                    <i :data-lucide="marketingCampaignDetail?.decision?.tone === 'positive' ? 'trending-up' : 'scan-search'" class="h-7 w-7"></i>
-                  </span>
-                  <strong class="mt-3 text-xs" x-text="marketingCampaignDetail?.decision?.title"></strong>
-                </div>
-                <div class="space-y-3">
-                  <template x-for="item in marketingCampaignDecisionItems()" :key="item">
-                    <p class="flex items-start gap-2 text-[11px] leading-relaxed text-gray-700">
-                      <i data-lucide="circle-check" class="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"></i>
-                      <span x-text="item"></span>
-                    </p>
-                  </template>
+          <div class="mcd-layout">
+            <article class="mcd-card mcd-half" x-show="mcdTab === 'resultado' || mcdTab === 'vendas'">
+              <div class="mcd-card-title"><h2>Eficiência do atendimento</h2><span class="mcd-badge mcd-meta">∞ Meta Ads</span></div>
+              <p class="mcd-subtitle">O anúncio trouxe a conversa. O atendimento respondeu?</p>
+              <div class="mcd-response">
+                <div class="mcd-ring" :style="mcdRing()"><div><strong x-text="mcdPercent(marketingCampaignDetail?.summary?.response_rate)"></strong><span>com primeira<br>resposta</span></div></div>
+                <div class="mcd-response-data">
+                  <div class="mcd-three">
+                    <div><strong x-text="paidNumber(marketingCampaignDetail?.summary?.conversations_started)"></strong><span>Conversas<br>iniciadas</span></div>
+                    <div><strong x-text="paidNumber(marketingCampaignDetail?.summary?.first_replies)"></strong><span>Primeiras<br>respostas</span></div>
+                    <div class="mcd-amber"><strong x-text="paidNumber(marketingCampaignDetail?.summary?.unanswered)"></strong><span>Sem primeira<br>resposta</span></div>
+                  </div>
+                  <div class="mcd-two"><div><small>Custo por conversa iniciada</small><b x-text="mcdMoney(marketingCampaignDetail?.summary?.cost_per_started)"></b></div><div><small>Custo por conversa respondida</small><b x-text="mcdMoney(marketingCampaignDetail?.summary?.cost_per_replied)"></b></div></div>
                 </div>
               </div>
-              <button type="button" @click="marketingNavigate('jornadas')"
-                      class="mt-4 inline-flex self-end items-center justify-center gap-2 rounded-lg border border-emerald-800 px-3 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-50">
-                Ver jornadas atribuídas
-                <i data-lucide="arrow-right" class="h-4 w-4"></i>
-              </button>
-            </section>
+              <footer class="mcd-footer"><span><i data-lucide="info"></i> Primeiras respostas registradas pela Meta.</span><button type="button" x-show="mcdTab === 'resultado'" @click="mcdSetTab('vendas')">Ver conversas e vendas <i data-lucide="arrow-right"></i></button></footer>
+            </article>
+            <article class="mcd-card mcd-half" :class="{ 'mcd-full': mcdTab === 'financeiro' }" x-show="mcdTab === 'resultado' || mcdTab === 'financeiro'">
+              <div class="mcd-card-title"><h2>Como o resultado foi formado</h2><span class="mcd-badge mcd-neutral">Farejador + Meta</span></div>
+              <div class="mcd-bars">
+                <template x-for="row in marketingCampaignDetailFinancialRows()" :key="row.id"><div class="mcd-bar-row" :class="row.kind"><span x-text="row.label"></span><div class="mcd-track"><div :style="`width:${marketingCampaignFinancialBar(row.value)}`"></div></div><b :class="{ 'mcd-red': row.id === 'result' && row.value < 0 }" x-text="mcdMoney(row.value, true)"></b></div></template>
+              </div>
+              <div class="mcd-retained" x-show="marketingCampaignDetail?.financial?.retained_percent != null"><i data-lucide="chart-no-axes-column-increasing"></i><span x-text="`${mcdMoney(marketingCampaignDetail?.financial?.retained_percent, true)} a cada R$ 100 vendidos, após mídia.`"></span></div>
+              <div class="mcd-notice mcd-warning" x-show="marketingCampaignDetail?.financial?.pending_margin_orders > 0"><i data-lucide="info"></i><span x-text="`${marketingCampaignDetail?.financial?.pending_margin_orders} pedido(s) aguardam custo completo. Resultado indisponível até a conciliação.`"></span></div>
+              <footer class="mcd-footer"><span><i data-lucide="info"></i> Antes das demais despesas da empresa.</span><button type="button" x-show="mcdTab === 'resultado'" @click="mcdSetTab('financeiro')">Ver composição completa <i data-lucide="arrow-right"></i></button></footer>
+            </article>
+            <article class="mcd-card mcd-ads" :class="{ 'mcd-full': mcdTab === 'anuncios' }" x-show="mcdTab === 'resultado' || mcdTab === 'anuncios'">
+              <div class="mcd-card-title"><div><h2>Anúncios desta campanha</h2><p class="mcd-subtitle" x-text="`${marketingCampaignDetail?.ads?.length || 0} anúncios com entrega no período`"></p></div><button class="mcd-link" type="button" x-show="mcdTab === 'resultado'" @click="mcdAdSearch = ''; mcdSetTab('anuncios')">Ver todos <i data-lucide="arrow-right"></i></button></div>
+              <label class="mcd-search" x-show="mcdTab === 'anuncios'"><i data-lucide="search"></i><input aria-label="Buscar anúncio da campanha" x-model="mcdAdSearch" placeholder="Buscar anúncio ou conjunto"></label>
+              <div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Anúncio</th><th>Investimento</th><th>Conversas</th><th>Vendas</th><th>Resultado</th><th><span class="sr-only">Analisar anúncio</span></th></tr></thead><tbody>
+                <template x-for="ad in mcdAds()" :key="ad.id"><tr><td><div class="mcd-ad-name">
+                  <input x-show="mcdTab === 'anuncios' && marketingCampaignDetail?.campaign?.scope === 'matrix'" type="checkbox" :aria-label="`Selecionar ${ad.name} para comparar`" :checked="mcdSelected.includes(ad.id)" :disabled="!mcdSelected.includes(ad.id) && mcdSelected.length >= 3" @change="mcdToggleAd(ad.id)">
+                  <span class="mcd-thumb"><template x-if="ad.media?.image_url"><img :src="ad.media.image_url" alt="" loading="lazy" @error="$el.style.display='none'"></template><i data-lucide="image"></i></span>
+                  <span><b x-text="ad.name"></b><small class="mcd-badge mcd-neutral" x-text="marketingCreativeStatusLabel(ad)"></small></span>
+                </div></td><td x-text="mcdMoney(ad.investment)"></td><td><b x-text="paidNumber(ad.conversations_started)"></b><small x-text="`${mcdMoney(ad.cost_per_started)} / conversa`"></small></td><td x-text="paidNumber(ad.attributed_sales)"></td><td><b :class="ad.net_after_media < 0 ? 'mcd-red' : 'mcd-green'" x-text="mcdMoney(ad.net_after_media, true)"></b></td><td><button type="button" class="mcd-link" :aria-label="`Analisar ${ad.name}`" :aria-expanded="mcdAdDetailId === ad.id" @click="mcdAdDetailId = mcdAdDetailId === ad.id ? null : ad.id; $nextTick(() => lucide.createIcons())"><i data-lucide="chevron-right"></i></button></td></tr></template>
+              </tbody></table></div>
+              <section x-show="mcdAdDetail()" class="mcd-ad-detail" aria-label="Análise do anúncio selecionado">
+                <div class="mcd-card-title"><h3 x-text="mcdAdDetail()?.name"></h3><button type="button" class="mcd-link" aria-label="Fechar análise do anúncio" @click="mcdAdDetailId = null">Fechar ×</button></div>
+                <p class="mcd-subtitle" x-text="mcdAdDetail()?.adset_name || 'Conjunto não informado'"></p>
+                <div class="mcd-quality"><span>Impressões</span><b x-text="paidNumber(mcdAdDetail()?.impressions)"></b><span>Cliques</span><b x-text="paidNumber(mcdAdDetail()?.clicks)"></b><span>Primeiras respostas</span><b x-text="paidNumber(mcdAdDetail()?.first_replies)"></b><span>Taxa de resposta</span><b x-text="mcdPercent(mcdAdDetail()?.response_rate)"></b><span>Receita atribuída</span><b x-text="mcdMoney(mcdAdDetail()?.attributed_revenue, true)"></b></div>
+                <footer class="mcd-footer"><span x-text="marketingCreativeFormatLabel(mcdAdDetail()?.media?.format)"></span><a class="mcd-link" x-show="mcdAdUrl()" :href="mcdAdUrl()" target="_blank" rel="noopener noreferrer">Abrir anúncio na Meta <i data-lucide="arrow-up-right"></i></a></footer>
+              </section>
+              <p class="mcd-empty" x-show="!mcdAds().length">Nenhum anúncio encontrado neste filtro.</p>
+              <footer class="mcd-footer"><span><i data-lucide="info"></i> O status atual não altera os resultados do período.</span><button type="button" x-show="marketingCampaignDetail?.campaign?.scope === 'matrix'" :disabled="!marketingCampaignDetail?.ads?.length" @click="mcdCompare()"><span x-text="mcdSelected.length ? `Comparar ${mcdSelected.length} anúncios` : 'Comparar anúncios'"></span><i data-lucide="arrow-right"></i></button></footer>
+            </article>
+            <div class="mcd-side" x-show="mcdTab === 'resultado' || mcdTab === 'vendas'" :class="{ 'mcd-half': mcdTab === 'vendas' }">
+              <article class="mcd-card">
+                <div class="mcd-card-title"><h2>Retorno das vendas à Meta</h2><span class="mcd-badge" :class="{ 'mcd-warning': mcdCapiStatus() !== 'Automático' }" x-text="mcdCapiStatus()"></span></div>
+                <div class="mcd-three mcd-capi"><div><strong x-text="mcdCapiCount('sent')"></strong><span>Confirmadas</span></div><div><strong x-text="mcdCapiCount('pending')"></strong><span>Na fila</span></div><div><strong x-text="mcdCapiCount('failed')"></strong><span>Com falha</span></div></div>
+                <footer class="mcd-footer"><span><i data-lucide="info"></i> Envios de conversões desta campanha.</span><button type="button" :aria-expanded="mcdEventsOpen" @click="mcdEventsOpen = !mcdEventsOpen">Conferir envios <i data-lucide="arrow-right"></i></button></footer>
+                <div class="mcd-events" x-show="mcdEventsOpen">
+                  <p x-show="!marketingCampaignDetail?.conversions?.available">Consulta indisponível. Tente atualizar a campanha.</p>
+                  <p x-show="marketingCampaignDetail?.conversions?.available && !marketingCampaignDetail?.conversions?.events?.length">Nenhum envio vinculado às vendas do período.</p>
+                  <template x-for="event in marketingCampaignDetail?.conversions?.events || []" :key="event.id"><div><b x-text="event.order_number"></b><span x-text="mcdEventStatus(event.status)"></span><small x-text="`${event.attempts} tentativa(s) · ${marketingCampaignOrderDate(event.sent_at || event.updated_at)}`"></small></div></template>
+                  <small x-show="marketingCampaignDetail?.conversions?.events?.length">Até 30 envios mais recentes. Contagens incluem todos os envios do período, inclusive suprimidos.</small>
+                  <span x-show="marketingCampaignDetail?.conversions?.suppressed > 0" x-text="`${mcdCapiCount('suppressed')} envio(s) suprimido(s)`"></span>
+                </div>
+              </article>
+              <article class="mcd-card">
+                <h2>Qualidade da atribuição</h2>
+                <div class="mcd-quality"><span>Origens identificadas</span><b x-text="paidNumber(marketingCampaignDetail?.quality?.ctwa_referrals)"></b><span>Pedidos com custo completo</span><b x-text="mcdCostsLabel()"></b></div>
+                <footer class="mcd-footer"><span :class="{ 'mcd-green': mcdCostsComplete() }"><i data-lucide="circle-check"></i><span x-text="mcdCostsComplete() ? 'Custos completos nas vendas atribuídas.' : 'Confira a atribuição e os custos das vendas.'"></span></span><button type="button" @click="marketingNavigate('jornadas')">Abrir Jornadas <i data-lucide="arrow-right"></i></button></footer>
+              </article>
+            </div>
+            <article class="mcd-card mcd-full" x-show="mcdTab === 'vendas'">
+              <div class="mcd-card-title"><div><h2>Vendas atribuídas à campanha</h2><p class="mcd-subtitle">Vendas com origem comprovada. Conversas da Meta não são vendas.</p></div><span class="mcd-badge" x-text="`${paidNumber(marketingCampaignDetail?.orders_total)} vendas`"></span></div>
+              <label class="mcd-search"><i data-lucide="search"></i><input aria-label="Buscar pedido atribuído" x-model="mcdOrderSearch" placeholder="Buscar pedido ou canal"></label>
+              <div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Pedido</th><th>Data da venda</th><th>Origem</th><th>Receita</th><th>Margem bruta</th><th>Até a venda</th></tr></thead><tbody><template x-for="order in mcdOrders()" :key="order.order_number"><tr><td><b x-text="order.order_number"></b></td><td x-text="marketingCampaignOrderDate(order.realized_at)"></td><td x-text="order.origin"></td><td x-text="mcdMoney(order.revenue, true)"></td><td x-text="mcdMoney(order.gross_margin, true)"></td><td x-text="marketingCampaignSaleTime(order.time_to_sale_minutes)"></td></tr></template></tbody></table></div>
+              <p class="mcd-empty" x-show="!mcdOrders().length" x-text="marketingCampaignDetail?.tracking?.available ? 'Nenhuma venda disponível neste filtro.' : 'Detalhes de atribuição temporariamente indisponíveis.'"></p>
+              <footer class="mcd-footer"><span x-text="`${mcdOrders().length} pedidos exibidos. Consulta limitada aos 100 mais recentes; totais incluem todas as vendas.`"></span><span x-text="`Conversão das origens em vendas: ${mcdPercent(marketingCampaignDetail?.quality?.conversion_rate)}`"></span></footer>
+            </article>
+            <article class="mcd-card mcd-half" x-show="mcdTab === 'financeiro'">
+              <h2>Indicadores complementares</h2><div class="mcd-quality"><span>Margem bruta</span><b x-text="mcdMoney(marketingCampaignDetail?.financial?.gross_margin, true)"></b><span>CPC</span><b x-text="mcdMoney(marketingCampaignDetail?.summary?.cpc)"></b><span>CPM</span><b x-text="mcdMoney(marketingCampaignDetail?.summary?.cpm)"></b><span>Cliques no link</span><b x-text="paidNumber(marketingCampaignDetail?.summary?.link_clicks)"></b><span>Visualizações de vídeo</span><b x-text="paidNumber(marketingCampaignDetail?.summary?.video_views)"></b><span>Interações com a publicação</span><b x-text="paidNumber(marketingCampaignDetail?.summary?.post_engagements)"></b></div>
+              <p class="mcd-subtitle">Mídia considerada no financeiro: <b x-text="mcdMoney(marketingCampaignDetail?.summary?.financial_investment)"></b>. Apenas o escopo elegível da Matriz entra no resultado.</p>
+            </article>
+            <article class="mcd-card mcd-half" x-show="mcdTab === 'financeiro'"><h2>Leitura para decisão</h2><div class="mcd-notice" :class="marketingCampaignDetailDecisionClass(marketingCampaignDetail?.decision?.tone)"><div><b x-text="marketingCampaignDetail?.decision?.title"></b><p x-text="marketingCampaignDetail?.decision?.detail"></p></div></div><p class="mcd-subtitle">Nenhuma verba é alterada por esta tela. O resultado após mídia considera as vendas atribuídas e não representa o lucro total da empresa.</p></article>
+            <article class="mcd-card mcd-full" x-show="mcdTab === 'financeiro'"><h2>Entrega diária no período</h2><div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Data</th><th>Investimento</th><th>Conversas</th><th>Primeiras respostas</th></tr></thead><tbody><template x-for="day in marketingCampaignDetail?.trend || []" :key="day.date"><tr><td x-text="marketingDateLabel(day.date)"></td><td x-text="mcdMoney(day.investment)"></td><td x-text="paidNumber(day.conversations_started)"></td><td x-text="paidNumber(day.first_replies)"></td></tr></template></tbody></table></div></article>
+            <article class="mcd-card mcd-full" x-show="mcdTab === 'regioes'">
+              <div class="mcd-card-title"><div><h2>Regiões e ofertas desta campanha</h2><p class="mcd-subtitle">Vínculos e disponibilidade consultados no mesmo motor de Geografia e demanda.</p></div><button class="mcd-link" type="button" @click="marketingNavigate('geografia')">Gerenciar vínculos <i data-lucide="arrow-right"></i></button></div>
+              <p class="mcd-empty" x-show="mgLoading">Consultando regiões e estoque…</p><div class="mcd-notice mcd-warning" x-show="mgError"><span x-text="mgError"></span><button type="button" @click="loadMarketingGeography()">Tentar novamente</button></div>
+              <div x-show="!mgLoading && !mgError"><p class="mcd-empty" x-show="!mcdRegions().length">Nenhum vínculo regional disponível para esta campanha no período.</p><template x-for="region in mcdRegions()" :key="region.id + region.region"><section class="mcd-region"><div class="mcd-card-title"><h3 x-text="region.region"></h3><span class="mcd-badge" x-text="mgAvailability(region.availability?.state)"></span></div><div class="mcd-quality"><span>Vendas atribuídas</span><b x-text="paidNumber(region.totals?.sales)"></b><span>Conversas</span><b x-text="paidNumber(region.totals?.conversations)"></b><span>Investimento alocado</span><b x-text="mcdMoney(region.totals?.spend)"></b></div><div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Medida</th><th>Marca</th><th>Condição</th><th>Disponíveis</th></tr></thead><tbody><template x-for="(offer, index) in region.availability?.offers || []" :key="index"><tr><td x-text="offer.measure"></td><td x-text="offer.brand || 'Não informada'"></td><td x-text="mgCondition(offer.condition) || 'Não informada'"></td><td x-text="paidNumber(offer.available)"></td></tr></template></tbody></table></div><p class="mcd-subtitle" x-show="!region.availability?.offers?.length">Ofertas ainda não vinculadas.</p></section></template></div>
+            </article>
           </div>
+          <footer class="mcd-footnote">Meta + Farejador · <span x-text="marketingCampaignDetail?.period ? `${marketingDateLabel(marketingCampaignDetail.period.since)} — ${marketingDateLabel(marketingCampaignDetail.period.until)}` : ''"></span> · Indicadores do período selecionado.</footer>
         </div>
       </section>
 
@@ -9623,7 +9415,7 @@
 
       <!-- Criativos: consulta de anúncios e referências; nenhuma ação de veiculação. -->
       <div class="paid-screen paid-compare-layer">
-        <div x-show="paidCompareOpen" x-cloak class="paid-modal-backdrop" @click.self="paidCloseCompare()" @keydown.escape.window="if (paidCompareOpen) paidCloseCompare()"><section class="paid-modal" role="dialog" aria-modal="true" aria-labelledby="paid-compare-heading" @keydown="paidCompareKeydown($event)"><header class="paid-title-row"><div><h2 id="paid-compare-heading">Comparar anúncios da 2W</h2><p>Escolha até 3 anúncios · <span x-text="marketingCreativeRange()"></span></p></div><button class="paid-button" @click="paidCloseCompare()" aria-label="Fechar comparação"><i data-lucide="x"></i></button></header><p x-show="marketingCreativesLoading" class="paid-empty">Carregando anúncios…</p><p x-show="marketingCreativesError" class="paid-error" x-text="marketingCreativesError"></p><div class="paid-compare-options"><template x-for="ad in paidCompareOptions()" :key="ad.id"><label><input type="checkbox" :checked="paidCompareIds.includes(ad.id)" :disabled="!paidCompareIds.includes(ad.id) && paidCompareIds.length >= 3" @change="paidToggleCompare(ad.id)"> <span x-text="ad.name"></span></label></template></div><div class="paid-compare-grid"><template x-for="ad in paidCompared()" :key="ad.id"><article class="paid-card"><h3 x-text="ad.name"></h3><p class="paid-notice" x-text="ad.campaign_name"></p><dl><div><dt>Investimento</dt><dd x-text="marketingCreativeMoney(ad.investment, ad.currency)"></dd></div><div><dt>Conversas</dt><dd x-text="paidNumber(ad.conversations)"></dd></div><div><dt>Custo / conversa</dt><dd x-text="marketingCreativeMoney(ad.cost_per_conversation, ad.currency)"></dd></div><div><dt>Impressões</dt><dd x-text="paidNumber(ad.impressions)"></dd></div><div><dt>Cliques</dt><dd x-text="paidNumber(ad.clicks)"></dd></div><div><dt>Vendas atribuídas</dt><dd x-text="paidNumber(ad.attributed_sales)"></dd></div><div><dt>Receita atribuída</dt><dd x-text="paidMoney(ad.attributed_revenue)"></dd></div><div><dt>Resultado após mídia</dt><dd x-text="paidMoney(ad.net_after_media)"></dd></div></dl></article></template></div><p x-show="!marketingCreativesLoading && !marketingCreativesError && !paidCompareOptions().length" class="paid-empty">Sem anúncios da Matriz disponíveis para comparação neste período.</p><p class="paid-notice">A comparação não altera orçamento nem veiculação dos anúncios.</p></section></div>
+        <div x-show="paidCompareOpen" x-cloak class="paid-modal-backdrop" @click.self="paidCloseCompare()" @keydown.escape.window="if (paidCompareOpen) paidCloseCompare()"><section class="paid-modal" role="dialog" aria-modal="true" aria-labelledby="paid-compare-heading" @keydown="paidCompareKeydown($event)"><header class="paid-title-row"><div><h2 id="paid-compare-heading">Comparar anúncios da 2W</h2><p>Escolha até 3 anúncios · <span x-text="paidCompareRange()"></span></p></div><button class="paid-button" @click="paidCloseCompare()" aria-label="Fechar comparação"><i data-lucide="x"></i></button></header><p x-show="!paidCompareData && marketingCreativesLoading" class="paid-empty">Carregando anúncios…</p><p x-show="!paidCompareData && marketingCreativesError" class="paid-error" x-text="marketingCreativesError"></p><div class="paid-compare-options"><template x-for="ad in paidCompareOptions()" :key="ad.id"><label><input type="checkbox" :checked="paidCompareIds.includes(ad.id)" :disabled="!paidCompareIds.includes(ad.id) && paidCompareIds.length >= 3" @change="paidToggleCompare(ad.id)"> <span x-text="ad.name"></span></label></template></div><div class="paid-compare-grid"><template x-for="ad in paidCompared()" :key="ad.id"><article class="paid-card"><h3 x-text="ad.name"></h3><p class="paid-notice" x-text="ad.campaign_name"></p><dl><div><dt>Investimento</dt><dd x-text="marketingCreativeMoney(ad.investment, ad.currency)"></dd></div><div><dt>Conversas</dt><dd x-text="paidNumber(ad.conversations)"></dd></div><div><dt>Custo / conversa</dt><dd x-text="marketingCreativeMoney(ad.cost_per_conversation, ad.currency)"></dd></div><div><dt>Impressões</dt><dd x-text="paidNumber(ad.impressions)"></dd></div><div><dt>Cliques</dt><dd x-text="paidNumber(ad.clicks)"></dd></div><div><dt>Vendas atribuídas</dt><dd x-text="paidNumber(ad.attributed_sales)"></dd></div><div><dt>Receita atribuída</dt><dd x-text="paidMoney(ad.attributed_revenue)"></dd></div><div><dt>Resultado após mídia</dt><dd x-text="paidMoney(ad.net_after_media)"></dd></div></dl></article></template></div><p x-show="(paidCompareData || (!marketingCreativesLoading && !marketingCreativesError)) && !paidCompareOptions().length" class="paid-empty">Sem anúncios da Matriz disponíveis para comparação neste período.</p><p class="paid-notice">A comparação não altera orçamento nem veiculação dos anúncios.</p></section></div>
       </div>
       <section x-show="marketingTab === 'criativos'" x-cloak class="paid-screen mc-screen" data-marketing-creatives-screen>
         <header class="paid-head">

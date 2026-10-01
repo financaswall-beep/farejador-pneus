@@ -9,6 +9,7 @@ import {
 } from '../../marketing/reporting.js';
 import { loadCampaignAttributionDetailData } from './queries-marketing-campaign-detail-data.js';
 import { buildCampaignDetailEnrichment } from './queries-marketing-campaign-detail-enrichment.js';
+import { loadCampaignConversions, loadCampaignMedia } from './queries-marketing-campaign-activity.js';
 import {
   aggregate,
   decision,
@@ -28,6 +29,8 @@ export interface MarketingCampaignDetailDependencies {
   config?: DetailConfig;
   attributionProvider?: typeof getMarketingAttributionReport;
   attributionDetailProvider?: typeof loadCampaignAttributionDetailData;
+  mediaProvider?: typeof loadCampaignMedia;
+  conversionsProvider?: typeof loadCampaignConversions;
 }
 
 export async function getMarketingCampaignDetail(
@@ -123,6 +126,11 @@ export async function getMarketingCampaignDetail(
     ads,
     dataProvider: dependencies.attributionDetailProvider,
   });
+  const [media, conversions] = await Promise.all([
+    (dependencies.mediaProvider ?? loadCampaignMedia)(ads.map(ad => ad.id)),
+    (dependencies.conversionsProvider ?? loadCampaignConversions)(campaignId, window.since, window.until, dbPool),
+  ]);
+  const mediaById = new Map(media.map(ad => [ad.id, ad]));
   return {
     environment: env.FAREJADOR_ENV,
     generated_at: now.toISOString(),
@@ -142,7 +150,8 @@ export async function getMarketingCampaignDetail(
       date,
       ...derivedMetrics(aggregate(rows)),
     })),
-    ads: enrichment.ads,
+    ads: enrichment.ads.map(ad => ({ ...ad, media: mediaById.get(ad.id) ?? null })),
+    conversions,
     attribution: {
       status: attributionStatus,
       method: 'last_click_messaging_7d' as const,

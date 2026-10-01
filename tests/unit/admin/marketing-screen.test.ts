@@ -41,10 +41,10 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.chart.js'");
     expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
       .toContain('window.PAINEL_MODULES.marketingChart');
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260930-ads1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20261001-campaign1');
     expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260930-paid1');
     expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260930-paid1');
-    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260930-paid1');
+    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20261001-campaign1');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[^"\s]+/);
@@ -154,10 +154,10 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('@click="paidOpenCampaign(row)"');
     expect(marketingHtml).toContain('Voltar para campanhas');
     expect(marketingHtml).toContain('Eficiência do atendimento');
-    expect(marketingHtml).toContain('Raio-X financeiro');
+    expect(marketingHtml).toContain('Como o resultado foi formado');
     expect(marketingHtml).toContain('Vendas atribuídas à campanha');
     expect(marketingHtml).toContain('Qualidade da atribuição');
-    expect(marketingHtml).toContain('Resultado por anúncio');
+    expect(marketingHtml).toContain('Anúncios desta campanha');
     expect(marketingHtml).toContain('Leitura para decisão');
     expect(marketingHtml).toContain('Abrir no Gerenciador');
     expect(campaignDetailFront).toContain('Custos, repasses e operação');

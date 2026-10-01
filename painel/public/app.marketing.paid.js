@@ -22,7 +22,7 @@ window.PAINEL_MODULES.marketingPaid = function () {
   let compareTrigger = null;
   return {
     paidScope: 'matrix', paidExpanded: false, paidSort: 'investment', paidAscending: false,
-    paidCompareOpen: false, paidCompareIds: [],
+    paidCompareOpen: false, paidCompareIds: [], paidCompareData: null,
     paidMoney(value) { return value == null ? '—' : this.formatCurrency(Number(value)); },
     paidNumber(value) { return value == null ? '—' : Number(value).toLocaleString('pt-BR'); },
     paidDelta(value) {
@@ -101,11 +101,12 @@ window.PAINEL_MODULES.marketingPaid = function () {
       this.marketingSetTab('criativos');
       this.$nextTick(() => document.querySelector('[data-marketing-creatives-screen]')?.scrollIntoView({ block: 'start' }));
     },
-    async paidCompare(selectedIds = null) {
+    async paidCompare(selectedIds = null, data = null) {
+      this.paidCompareData = data;
       compareTrigger = document.activeElement;
       this.paidCompareOpen = true;
       this.$nextTick(() => document.querySelector('.paid-modal [aria-label="Fechar comparação"]')?.focus());
-      if (!Array.isArray(selectedIds)) await this.loadMarketingCreatives();
+      if (!data && !Array.isArray(selectedIds)) await this.loadMarketingCreatives();
       const rows = this.paidCompareOptions();
       this.paidCompareIds = Array.isArray(selectedIds)
         ? selectedIds.filter(id => rows.some(row => row.id === id)).slice(0, 3)
@@ -122,7 +123,11 @@ window.PAINEL_MODULES.marketingPaid = function () {
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     },
-    paidCompareOptions() { return (this.marketingCreativesData?.creatives || []).filter(row => row.scope === 'matrix'); },
+    paidCompareRange() {
+      const period = this.paidCompareData?.period;
+      return period ? `${this.marketingDateLabel(period.since)} — ${this.marketingDateLabel(period.until)}` : this.marketingCreativeRange();
+    },
+    paidCompareOptions() { return ((this.paidCompareData || this.marketingCreativesData)?.creatives || []).filter(row => row.scope === 'matrix'); },
     paidCompared() { return this.paidCompareOptions().filter(row => this.paidCompareIds.includes(row.id)); },
     paidToggleCompare(id) {
       if (this.paidCompareIds.includes(id)) this.paidCompareIds = this.paidCompareIds.filter(value => value !== id);

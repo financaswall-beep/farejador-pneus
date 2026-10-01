@@ -56,9 +56,8 @@ export async function buildCampaignDetailEnrichment(input: EnrichmentInput) {
   const revenue = ready ? input.attributed?.attributed_revenue ?? 0 : null;
   const grossMargin = ready ? input.attributed?.gross_margin ?? null : null;
   const pendingMargin = ready ? input.attributed?.pending_margin_orders ?? 0 : null;
-  const allCostsMapped = ready
-    && detail.available
-    && visibleOrders.length === sales
+  const ordersMapped = ready && detail.available && visibleOrders.length === sales;
+  const allCostsMapped = ordersMapped
     && visibleOrders.every((order) => order.cost_complete);
   const productCost = allCostsMapped ? sum(visibleOrders, 'product_cost') : null;
   const operationCost = allCostsMapped ? sum(visibleOrders, 'operation_cost') : null;
@@ -71,7 +70,7 @@ export async function buildCampaignDetailEnrichment(input: EnrichmentInput) {
     adOrders.set(order.ad_id, rows);
   }
   const ads = input.ads.map((ad) => {
-    if (!ready) {
+    if (!ordersMapped) {
       return {
         ...ad, attributed_sales: null, attributed_revenue: null,
         gross_margin: null, net_after_media: null, roas: null,
@@ -90,7 +89,7 @@ export async function buildCampaignDetailEnrichment(input: EnrichmentInput) {
       roas: ad.investment > 0 ? round(adRevenue / ad.investment) : null,
     };
   });
-  const completeOrders = ready
+  const completeOrders = ordersMapped
     ? visibleOrders.filter((order) => order.cost_complete).length
     : null;
   return {
@@ -99,7 +98,7 @@ export async function buildCampaignDetailEnrichment(input: EnrichmentInput) {
       available: detail.available,
       ctwa_referrals: detail.available ? detail.referrals : null,
     },
-    orders: ready ? visibleOrders.slice(0, 5) : [],
+    orders: ready ? visibleOrders.slice(0, 100) : [],
     orders_total: sales,
     quality: {
       conversations_meta: input.conversations,
