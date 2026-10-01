@@ -93,14 +93,14 @@ describe('Criativos: seleção, filtros e carregamento', () => {
     expect(app.marketingCreativeFiltered().map((r: { id: string }) => r.id)).toEqual(['3']);
     expect([...app.marketingCreativeCompareIds]).toEqual(['3']);
   });
-  it('limita a comparação à 2W e não apresenta um resultado parcial como total', () => {
+  it('limita a dois anúncios, aceita consultar externos e não apresenta resultado parcial como total', () => {
     const app = front();
     const rows = Array.from({ length: 4 }, (_, i) => ({ ...row(String(i), i + 1), attributed_sales: i === 3 ? null : 1, net_after_media: i === 3 ? null : 10 }));
     app.marketingCreativesData = { creatives: rows };
     rows.forEach(r => app.marketingCreativeToggleCompare(r));
-    expect(app.marketingCreativeCompareIds).toHaveLength(3);
+    expect(app.marketingCreativeCompareIds).toHaveLength(2);
     app.marketingCreativeCompareIds = []; app.marketingCreativeToggleCompare({ ...rows[0], scope: 'external' });
-    expect(app.marketingCreativeCompareIds).toHaveLength(0);
+    expect(app.marketingCreativeCompareIds).toHaveLength(1);
     expect(app.marketingCreativeMetrics()).toMatchObject({ count: 4, sales: null, result: null });
     app.marketingCreativesLoading = true;
     expect(app.marketingCreativeMetrics()).toMatchObject({ count: null, investment: null, sales: null, result: null });

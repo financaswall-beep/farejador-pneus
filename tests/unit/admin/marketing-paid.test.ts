@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 function app() {
   const window = { PAINEL_MODULES: {} as Record<string, () => any> };
@@ -29,27 +29,5 @@ describe('Conteúdo pago', () => {
     expect(state.paidRows().map((r: any) => r.id)).toEqual(['external','own']);
     state.paidOrder('investment');
     expect(state.paidRows().map((r: any) => r.id)).toEqual(['own','external']);
-  });
-  it('compara no máximo três anúncios e nunca inclui externos', () => {
-    const state = app();
-    state.marketingCreativesData = { creatives: [{ id: '1', scope: 'matrix' }, { id: '2', scope: 'external' }] };
-    expect(state.paidCompareOptions().map((r: any) => r.id)).toEqual(['1']);
-    ['1','3','4','5'].forEach(id => state.paidToggleCompare(id));
-    expect(state.paidCompareIds).toEqual(['1','3','4']);
-    state.paidToggleCompare('3'); state.paidToggleCompare('5');
-    expect(state.paidCompareIds).toEqual(['1','4','5']);
-  });
-  it('abre a comparação com a seleção dos cards sem substituir por outros anúncios', async () => {
-    const state = app();
-    state.$nextTick = () => {};
-    state.loadMarketingCreatives = vi.fn();
-    state.marketingCreativesData = { creatives: [
-      { id: '1', scope: 'matrix' }, { id: '2', scope: 'matrix' },
-      { id: '3', scope: 'matrix' }, { id: 'outside', scope: 'external' },
-    ] };
-    await state.paidCompare(['2', '3', 'outside', 'missing']);
-    expect(state.paidCompareOpen).toBe(true);
-    expect(state.paidCompareIds).toEqual(['2', '3']);
-    expect(state.loadMarketingCreatives).not.toHaveBeenCalled();
   });
 });

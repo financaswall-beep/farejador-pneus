@@ -30,7 +30,11 @@ window.PAINEL_MODULES.marketingAdDetail = function () {
       this.madLoading = false;
       this.madError = '';
       this.destroyMarketingCreativeChart();
-      this.$nextTick(() => { lucide.createIcons(); if (restore) trigger?.focus(); });
+      this.$nextTick(() => {
+        lucide.createIcons();
+        if (this.paidCompareOpen) this.pcRenderChart();
+        if (restore) trigger?.focus();
+      });
     },
     async madLoad() {
       if (!this.madId) return;
@@ -61,6 +65,7 @@ window.PAINEL_MODULES.marketingAdDetail = function () {
       this.madOrderId = null;
       void this.madLoad();
       void this.loadMarketing();
+      if (this.paidCompareOpen) void this.pcLoad();
       if (this.madOrigin === 'campaign') void this.loadMarketingCampaignDetail();
       else void this.loadMarketingCreatives();
     },
@@ -73,6 +78,7 @@ window.PAINEL_MODULES.marketingAdDetail = function () {
       const campaign = this.madData?.campaign;
       if (!campaign) return;
       this.madClose(false);
+      if (this.paidCompareOpen) this.paidCloseCompare(false);
       void this.openMarketingCampaignDetail({ platform_id: campaign.id });
     },
     madMoney(value, media = false) {
@@ -113,6 +119,7 @@ window.PAINEL_MODULES.marketingAdDetail = function () {
         : `${this.madNumber(Math.abs(delta))}% ${delta < 0 ? 'abaixo' : 'acima'} da média da campanha`;
     },
     madCompare() {
+      if (this.paidCompareOpen) { this.madClose(); return; }
       const data = this.madData;
       if (!data) return;
       const ids = [data.ad.id, ...data.peers.filter(ad => ad.id !== data.ad.id).slice(0, 1).map(ad => ad.id)];

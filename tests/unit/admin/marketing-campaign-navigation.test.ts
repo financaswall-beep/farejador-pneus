@@ -59,7 +59,7 @@ describe('Campanha dentro de Conteúdo pago', () => {
     state.marketingCampaignDetail.conversions = { available: true, enabled: true, sent: 0 };
     expect(state.mcdCapiCount('sent')).toBe('0');
   });
-  it('compara somente os anúncios da campanha sem substituir o catálogo de anúncios', () => {
+  it('encaminha os anúncios selecionados da campanha à comparação no mesmo período', () => {
     const state = app();
     state.marketingCreativesData = { creatives: [{ id: 'outra-campanha', scope: 'matrix' }] };
     state.marketingCampaignDetail = { campaign: { id: '10', name: '2W', scope: 'matrix', currency: 'BRL' },
@@ -67,11 +67,13 @@ describe('Campanha dentro de Conteúdo pago', () => {
         { id: 'a', conversations_started: 3, cost_per_started: 5 },
         { id: 'b', conversations_started: 4, cost_per_started: 6 },
       ] };
+    state.paidCompare = vi.fn();
     state.mcdSelected = ['b'];
     state.mcdCompare();
-    expect(state.paidCompared()).toHaveLength(1);
-    expect(state.paidCompared()[0]).toMatchObject({ id: 'b', conversations: 4, cost_per_conversation: 6 });
-    expect(state.paidCompareRange()).toBe('2026-09-01 — 2026-09-30');
+    expect(state.paidCompare).toHaveBeenCalledWith(['b'], expect.objectContaining({
+      creatives: expect.arrayContaining([expect.objectContaining({ id: 'b', conversations: 4, cost_per_conversation: 6 })]),
+      period: { since: '2026-09-01', until: '2026-09-30' },
+    }));
     expect(state.marketingCreativesData.creatives[0].id).toBe('outra-campanha');
     expect(state.loadMarketingCreatives).not.toHaveBeenCalled();
   });

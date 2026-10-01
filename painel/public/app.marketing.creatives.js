@@ -68,7 +68,7 @@ window.PAINEL_MODULES.marketingCreatives = function () {
     marketingCreativeReconcile() {
       const rows = this.marketingCreativePageRows();
       if (!rows.some((row) => row.id === this.marketingCreativeSelectedId)) this.marketingCreativeSelectedId = rows[0]?.id || null;
-      const visible = new Set(this.marketingCreativeFiltered().filter(row => row.scope === 'matrix').map(row => row.id));
+      const visible = new Set(this.marketingCreativeFiltered().map(row => row.id));
       this.marketingCreativeCompareIds = this.marketingCreativeCompareIds.filter(id => visible.has(id));
       this.$nextTick(() => { lucide.createIcons(); this.renderMarketingCreativeChart(); });
     },
@@ -93,10 +93,9 @@ window.PAINEL_MODULES.marketingCreatives = function () {
       return status ? 'other' : 'unknown';
     },
     marketingCreativeToggleCompare(row) {
-      if (row.scope !== 'matrix') return;
       const ids = this.marketingCreativeCompareIds;
       this.marketingCreativeCompareIds = ids.includes(row.id) ? ids.filter(id => id !== row.id)
-        : ids.length < 3 ? [...ids, row.id] : ids;
+        : ids.length < 2 ? [...ids, row.id] : ids;
     },
     marketingCreativeCompared() {
       return this.marketingCreativeFiltered().filter(row => this.marketingCreativeCompareIds.includes(row.id));

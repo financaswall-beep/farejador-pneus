@@ -78,7 +78,7 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
     },
     mcdToggleAd(id) {
       if (this.mcdSelected.includes(id)) this.mcdSelected = this.mcdSelected.filter(value => value !== id);
-      else if (this.mcdSelected.length < 3) this.mcdSelected = [...this.mcdSelected, id];
+      else if (this.mcdSelected.length < 2) this.mcdSelected = [...this.mcdSelected, id];
     },
     mcdCompare() {
       const d = this.marketingCampaignDetail;
@@ -86,7 +86,7 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
       const creatives = d.ads.map(ad => ({ ...ad, scope: d.campaign.scope, currency: d.campaign.currency,
         campaign_id: d.campaign.id, campaign_name: d.campaign.name,
         conversations: ad.conversations_started, cost_per_conversation: ad.cost_per_started }));
-      void this.paidCompare(this.mcdSelected.length ? this.mcdSelected : creatives.slice(0, 3).map(ad => ad.id),
+      void this.paidCompare(this.mcdSelected.length ? this.mcdSelected : creatives.slice(0, 2).map(ad => ad.id),
         { creatives, period: d.period });
     },
     mcdCostsLabel() {

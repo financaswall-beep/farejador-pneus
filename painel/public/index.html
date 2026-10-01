@@ -219,6 +219,7 @@
 <script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <link rel="stylesheet" href="/admin/painel/marketing-paid.css?v=20260930-paid1">
+<link rel="stylesheet" href="/admin/painel/marketing-compare.css?v=20261001-compare1">
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-ads.css?v=20260930-ads1">
 <link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261001-campaign1">
@@ -227,8 +228,10 @@
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
-<script src="/admin/painel/app.marketing.paid.js?v=20261001-campaign1"></script>
-<script src="/admin/painel/app.marketing.js?v=20261001-ad1"></script>
+<script src="/admin/painel/app.marketing.paid.js?v=20261001-compare1"></script>
+<script src="/admin/painel/app.marketing.compare.js?v=20261001-compare1"></script>
+<script src="/admin/painel/app.marketing.compare.view.js?v=20261001-compare1"></script>
+<script src="/admin/painel/app.marketing.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.comments.js?v=20260923-comments2"></script>
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.js?v=20260930-results1"></script>
@@ -243,14 +246,14 @@
 <script src="/admin/painel/app.marketing.organic.networks.view.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.organic.networks.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.creatives.mock.js?v=20260930-ads1"></script>
-<script src="/admin/painel/app.marketing.creatives.js?v=20261001-ad1"></script>
+<script src="/admin/painel/app.marketing.creatives.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20261001-ad1"></script>
 <script src="/admin/painel/app.marketing.ad-detail.mock.js?v=20261001-ad1"></script>
-<script src="/admin/painel/app.marketing.ad-detail.js?v=20261001-ad1"></script>
+<script src="/admin/painel/app.marketing.ad-detail.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.chart.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.mock.js?v=20261001-campaign1"></script>
-<script src="/admin/painel/app.marketing.campaign-detail.js?v=20261001-campaign1"></script>
+<script src="/admin/painel/app.marketing.campaign-detail.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
@@ -282,7 +285,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261001-ad1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8478,7 +8481,7 @@
         </div>
       </section>
 
-      <section x-show="marketingTab === 'visao'" class="paid-screen" aria-label="Central de conteúdo pago" data-marketing-paid-screen>
+      <section x-show="marketingTab === 'visao' && !paidCompareOpen" class="paid-screen" aria-label="Central de conteúdo pago" data-marketing-paid-screen>
         <header class="paid-head">
           <div><h1>Conteúdo pago</h1><p>Do investimento à venda, acompanhe o resultado dos seus anúncios.</p></div>
           <div class="paid-actions"><span class="paid-muted" x-text="paidUpdated()"></span><button class="paid-button" @click="loadMarketing()" :disabled="marketingLoading" aria-label="Atualizar conteúdo pago"><i data-lucide="refresh-cw" :class="marketingLoading && 'animate-spin'"></i></button><button class="paid-button" @click="marketingNavigate('integracoes')"><i data-lucide="settings"></i>Integrações</button></div>
@@ -8526,7 +8529,7 @@
         </div>
       </section>
 
-      <section x-show="marketingTab === 'campanhas' && !marketingCampaignDetailId"
+      <section x-show="marketingTab === 'campanhas' && !marketingCampaignDetailId && !paidCompareOpen"
                class="space-y-4"
                data-marketing-campaigns-screen
                x-cloak>
@@ -8839,7 +8842,7 @@
         </div>
       </section>
 
-      <section x-show="marketingTab === 'campanhas' && marketingCampaignDetailId && !madId" data-marketing-campaign-detail-screen class="paid-screen mcd-screen" x-cloak>
+      <section x-show="marketingTab === 'campanhas' && marketingCampaignDetailId && !madId && !paidCompareOpen" data-marketing-campaign-detail-screen class="paid-screen mcd-screen" x-cloak>
         <button type="button" class="mcd-back" aria-label="Voltar para campanhas" @click="closeMarketingCampaignDetail()"><i data-lucide="arrow-left"></i> Conteúdo pago / Campanhas</button>
         <header class="mcd-header">
           <div>
@@ -8904,14 +8907,14 @@
               <label class="mcd-search" x-show="mcdTab === 'anuncios'"><i data-lucide="search"></i><input aria-label="Buscar anúncio da campanha" x-model="mcdAdSearch" placeholder="Buscar anúncio ou conjunto"></label>
               <div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Anúncio</th><th>Investimento</th><th>Conversas</th><th>Vendas</th><th>Resultado</th><th><span class="sr-only">Analisar anúncio</span></th></tr></thead><tbody>
                 <template x-for="ad in mcdAds()" :key="ad.id"><tr><td><div class="mcd-ad-name">
-                  <input x-show="mcdTab === 'anuncios' && marketingCampaignDetail?.campaign?.scope === 'matrix'" type="checkbox" :aria-label="`Selecionar ${ad.name} para comparar`" :checked="mcdSelected.includes(ad.id)" :disabled="!mcdSelected.includes(ad.id) && mcdSelected.length >= 3" @change="mcdToggleAd(ad.id)">
+                  <input x-show="mcdTab === 'anuncios'" type="checkbox" :aria-label="`Selecionar ${ad.name} para comparar`" :checked="mcdSelected.includes(ad.id)" :disabled="!mcdSelected.includes(ad.id) && mcdSelected.length >= 2" @change="mcdToggleAd(ad.id)">
                   <span class="mcd-thumb"><template x-if="ad.media?.image_url"><img :src="ad.media.image_url" alt="" loading="lazy" @error="$el.style.display='none'"></template><i data-lucide="image"></i></span>
                   <span><b x-text="ad.name"></b><small class="mcd-badge mcd-neutral" x-text="marketingCreativeStatusLabel(ad)"></small></span>
                 </div></td><td x-text="mcdMoney(ad.investment)"></td><td><b x-text="paidNumber(ad.conversations_started)"></b><small x-text="`${mcdMoney(ad.cost_per_started)} / conversa`"></small></td><td x-text="paidNumber(ad.attributed_sales)"></td><td><b :class="ad.net_after_media < 0 ? 'mcd-red' : 'mcd-green'" x-text="mcdMoney(ad.net_after_media, true)"></b></td><td><button type="button" class="mcd-link" :aria-label="`Analisar ${ad.name}`" @click="madOpen(ad, 'campaign')"><i data-lucide="chevron-right"></i></button></td></tr></template>
               </tbody></table></div>
 
               <p class="mcd-empty" x-show="!mcdAds().length">Nenhum anúncio encontrado neste filtro.</p>
-              <footer class="mcd-footer"><span><i data-lucide="info"></i> O status atual não altera os resultados do período.</span><button type="button" x-show="marketingCampaignDetail?.campaign?.scope === 'matrix'" :disabled="!marketingCampaignDetail?.ads?.length" @click="mcdCompare()"><span x-text="mcdSelected.length ? `Comparar ${mcdSelected.length} anúncios` : 'Comparar anúncios'"></span><i data-lucide="arrow-right"></i></button></footer>
+              <footer class="mcd-footer"><span><i data-lucide="info"></i> O status atual não altera os resultados do período.</span><button type="button" :disabled="!marketingCampaignDetail?.ads?.length" @click="mcdCompare()"><span x-text="mcdSelected.length ? `Comparar ${mcdSelected.length} anúncios` : 'Comparar anúncios'"></span><i data-lucide="arrow-right"></i></button></footer>
             </article>
             <div class="mcd-side" x-show="mcdTab === 'resultado' || mcdTab === 'vendas'" :class="{ 'mcd-half': mcdTab === 'vendas' }">
               <article class="mcd-card">
@@ -9412,11 +9415,62 @@
       </section>
 
       <!-- Criativos: consulta de anúncios e referências; nenhuma ação de veiculação. -->
-      <div class="paid-screen paid-compare-layer">
-        <div x-show="paidCompareOpen" x-cloak class="paid-modal-backdrop" @click.self="paidCloseCompare()" @keydown.escape.window="if (paidCompareOpen) paidCloseCompare()"><section class="paid-modal" role="dialog" aria-modal="true" aria-labelledby="paid-compare-heading" @keydown="paidCompareKeydown($event)"><header class="paid-title-row"><div><h2 id="paid-compare-heading">Comparar anúncios da 2W</h2><p>Escolha até 3 anúncios · <span x-text="paidCompareRange()"></span></p></div><button class="paid-button" @click="paidCloseCompare()" aria-label="Fechar comparação"><i data-lucide="x"></i></button></header><p x-show="!paidCompareData && marketingCreativesLoading" class="paid-empty">Carregando anúncios…</p><p x-show="!paidCompareData && marketingCreativesError" class="paid-error" x-text="marketingCreativesError"></p><div class="paid-compare-options"><template x-for="ad in paidCompareOptions()" :key="ad.id"><label><input type="checkbox" :checked="paidCompareIds.includes(ad.id)" :disabled="!paidCompareIds.includes(ad.id) && paidCompareIds.length >= 3" @change="paidToggleCompare(ad.id)"> <span x-text="ad.name"></span></label></template></div><div class="paid-compare-grid"><template x-for="ad in paidCompared()" :key="ad.id"><article class="paid-card"><h3 x-text="ad.name"></h3><p class="paid-notice" x-text="ad.campaign_name"></p><dl><div><dt>Investimento</dt><dd x-text="marketingCreativeMoney(ad.investment, ad.currency)"></dd></div><div><dt>Conversas</dt><dd x-text="paidNumber(ad.conversations)"></dd></div><div><dt>Custo / conversa</dt><dd x-text="marketingCreativeMoney(ad.cost_per_conversation, ad.currency)"></dd></div><div><dt>Impressões</dt><dd x-text="paidNumber(ad.impressions)"></dd></div><div><dt>Cliques</dt><dd x-text="paidNumber(ad.clicks)"></dd></div><div><dt>Vendas atribuídas</dt><dd x-text="paidNumber(ad.attributed_sales)"></dd></div><div><dt>Receita atribuída</dt><dd x-text="paidMoney(ad.attributed_revenue)"></dd></div><div><dt>Resultado após mídia</dt><dd x-text="paidMoney(ad.net_after_media)"></dd></div></dl></article></template></div><p x-show="(paidCompareData || (!marketingCreativesLoading && !marketingCreativesError)) && !paidCompareOptions().length" class="paid-empty">Sem anúncios da Matriz disponíveis para comparação neste período.</p><p class="paid-notice">A comparação não altera orçamento nem veiculação dos anúncios.</p></section></div>
-      </div>
+      <section x-show="paidCompareOpen && !madId" x-cloak class="paid-screen mcd-screen pc-screen" data-marketing-compare-screen x-init="$watch('currentPage', page => { if (page !== 'marketing' && paidCompareOpen) paidCloseCompare(false) })">
+        <button type="button" class="mcd-back" @click="paidCloseCompare()"><i data-lucide="arrow-left"></i><span x-text="pcBackLabel"></span></button>
+        <header class="mcd-header">
+          <div><h1 id="paid-compare-heading" tabindex="-1">Comparar anúncios</h1><p class="pc-subtitle">Confira a peça, os custos e as vendas no mesmo período.</p></div>
+          <div class="paid-actions">
+            <label class="mcd-period"><i data-lucide="calendar-days"></i><select aria-label="Período da comparação" x-model="marketingPeriod" @change="pcPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label>
+            <label class="mcd-period"><i data-lucide="store"></i><select aria-label="Escopo da comparação" x-model="pcScope" @change="pcScopeChanged()" :disabled="pcLoading"><option value="matrix">Matriz</option><option value="external">Externas</option><option value="pending">Pendentes</option><option value="all">Todos os escopos</option></select></label>
+            <button type="button" class="paid-button mcd-manager" @click="pcExport()" :disabled="pcLoading || pcDetailsLoading || !!pcError || paidCompared().length < 2"><i data-lucide="download"></i>Exportar CSV</button>
+          </div>
+        </header>
+        <p class="pc-range" x-show="paidCompareData"><span x-text="paidCompareRange()"></span><span x-show="marketingIsMock()"> · Prévia de demonstração · dados ilustrativos</span></p>
+        <p class="paid-empty" x-show="pcLoading" role="status">Carregando comparação…</p>
+        <div class="pc-error" x-show="pcError" role="alert"><span x-text="pcError"></span><button type="button" class="paid-link" @click="pcLoad()">Tentar novamente</button></div>
+        <p class="pc-info" x-show="pcSelectionNotice && !pcLoading" x-text="pcSelectionNotice" role="status"></p>
+        <p class="paid-empty" x-show="!pcLoading && !pcError && !paidCompareOptions().length" x-text="pcEmptyMessage()"></p>
+        <div x-show="!pcLoading && !pcError && paidCompareOptions().length">
+          <div class="pc-selectors">
+            <label>Anúncio A<select aria-label="Anúncio A" @change="pcSelect(0, $event.target.value)"><option value="" :selected="!paidCompareIds[0]" disabled>Selecione um anúncio</option><template x-for="ad in paidCompareOptions()" :key="ad.id"><option :value="ad.id" :selected="paidCompareIds[0] === ad.id" x-text="ad.name + ' · ' + ad.campaign_name"></option></template></select></label>
+            <button type="button" class="paid-button pc-swap" aria-label="Trocar anúncios A e B" @click="pcSwap()" :disabled="paidCompared().length < 2"><i data-lucide="arrow-right-left"></i></button>
+            <label>Anúncio B<select aria-label="Anúncio B" @change="pcSelect(1, $event.target.value)"><option value="" :selected="!paidCompareIds[1]" disabled>Selecione outro anúncio</option><template x-for="ad in paidCompareOptions()" :key="ad.id"><option :value="ad.id" :selected="paidCompareIds[1] === ad.id" :disabled="paidCompareIds.length < 2 && paidCompareIds[0] === ad.id" x-text="ad.name + ' · ' + ad.campaign_name"></option></template></select></label>
+          </div>
+          <div class="pc-cards">
+            <template x-for="side in [0,1]" :key="side"><article class="pc-ad" :class="{'pc-highlight': pcHighlight(side)}">
+              <template x-if="pcAd(side)"><div class="pc-ad-content">
+                <div class="pc-media">
+                  <template x-if="pcAd(side).media?.image_url && !pcAd(side).media?.failed"><img :src="pcAd(side).media.image_url" :alt="pcAd(side).name" referrerpolicy="no-referrer" @error="pcAd(side).media.failed=true"></template>
+                  <span x-show="!pcAd(side).media?.image_url || pcAd(side).media?.failed" class="pc-media-empty"><i data-lucide="image"></i><small>Prévia indisponível</small></span>
+                  <span class="pc-video" x-show="pcAd(side).media?.format === 'video'"><i data-lucide="play"></i>Vídeo</span>
+                </div>
+                <div class="pc-ad-description"><h2 x-text="pcAd(side).name"></h2><p x-text="pcAd(side).campaign_name"></p>
+                  <div class="mcd-badges"><span class="mcd-badge mcd-meta"><b>∞</b> Meta Ads</span><span class="mcd-badge" :class="{'mcd-neutral': marketingCreativeStatusGroup(pcAd(side)) !== 'active'}" x-text="marketingCreativeStatusLabel(pcAd(side))"></span><span class="mcd-badge mcd-neutral" x-text="marketingCreativeFormatLabel(pcAd(side).media?.format)"></span></div>
+                  <button type="button" class="paid-link" @click="pcViewAd(side)">Ver análise <i data-lucide="arrow-right"></i></button>
+                </div>
+                <div class="pc-result"><strong :class="{'pc-negative': pcAd(side).net_after_media < 0}" x-text="pcMoney(pcAd(side).net_after_media)"></strong><span>Resultado após mídia</span><small x-show="pcAd(side).pending_margin_orders > 0" class="pc-warning">Custos pendentes</small></div>
+              </div></template>
+              <p x-show="!pcAd(side)" class="paid-empty">É preciso ter outro anúncio neste escopo e período para comparar.</p>
+            </article></template>
+          </div>
+          <p class="pc-info" x-show="paidCompared().some(ad => ad.scope !== 'matrix')"><i data-lucide="info"></i>Anúncios externos ou pendentes não compõem o resultado financeiro da Matriz.</p>
+          <div class="pc-info" x-show="pcDetailsLoading" role="status">Conferindo a composição dos custos…</div>
+          <div class="pc-error" x-show="Object.keys(pcDetailErrors).length && !pcDetailsLoading" role="alert"><span>Parte da composição dos custos não pôde ser carregada. Valores indisponíveis aparecem como —.</span><button type="button" class="paid-link" @click="pcLoadDetails()">Tentar novamente</button></div>
+          <div class="pc-table-wrap">
+            <table class="pc-table"><caption class="sr-only">Comparação dos anúncios selecionados no mesmo período</caption><thead><tr><th scope="col">Indicador</th><th scope="col">Anúncio A</th><th scope="col">Anúncio B</th></tr></thead>
+              <tbody><template x-for="row in pcRows()" :key="row.group || row.label"><tr :class="{'pc-group': !!row.group, 'pc-total': !!row.result}"><th :colspan="row.group ? 3 : 1" :scope="row.group ? 'colgroup' : 'row'" x-text="row.group || row.label"></th><td x-show="!row.group" :class="{'pc-negative': row.result && pcAd(0)?.net_after_media < 0}" x-text="row.values?.[0]"></td><td x-show="!row.group" :class="{'pc-negative': row.result && pcAd(1)?.net_after_media < 0}" x-text="row.values?.[1]"></td></tr></template></tbody>
+            </table>
+          </div>
+          <div class="pc-bottom">
+            <section class="pc-chart-card"><h2>Custo por conversa no período</h2><div class="pc-chart" x-show="pcChartComparable()"><canvas id="chartPaidComparison" role="img" aria-label="Evolução diária do custo por conversa dos anúncios A e B"></canvas></div><p class="paid-empty" x-show="!pcChartComparable()">Selecione anúncios com a mesma moeda para comparar o gráfico.</p><p class="pc-chart-note">Dias sem conversas ficam sem ponto no gráfico. A média considera investimento ÷ conversas do período.</p></section>
+            <aside class="pc-observations"><h2>O que observar</h2><template x-for="note in pcObservations()" :key="note.text"><div class="pc-observation"><span><i :data-lucide="note.icon"></i></span><p x-text="note.text"></p></div></template><p class="pc-info"><i data-lucide="info"></i>Produtos e públicos diferentes também influenciam o resultado.</p></aside>
+          </div>
+          <footer class="pc-footnote">Resultado após mídia antes das demais despesas da empresa. Valores indisponíveis ou sem custo completo são indicados por —.</footer>
+        </div>
+      </section>
+
       <section x-show="madId" x-cloak class="paid-screen mcd-screen mad-screen" data-marketing-ad-detail-screen x-init="$watch('currentPage', page => { if (page !== 'marketing' && madId) madClose(false) })">
-        <button type="button" class="mcd-back" @click="madClose()"><i data-lucide="arrow-left"></i><span x-text="madOrigin === 'campaign' ? (madData?.campaign?.name || 'Campanha') + ' / Anúncio' : 'Conteúdo pago / Todos os anúncios'"></span></button>
+        <button type="button" class="mcd-back" @click="madClose()"><i data-lucide="arrow-left"></i><span x-text="madOrigin === 'compare' ? 'Conteúdo pago / Comparação' : madOrigin === 'campaign' ? (madData?.campaign?.name || 'Campanha') + ' / Anúncio' : 'Conteúdo pago / Todos os anúncios'"></span></button>
         <header class="mcd-header">
           <div class="mad-title"><h1 id="marketing-ad-heading" tabindex="-1" x-text="madData?.ad?.name || 'Detalhe do anúncio'"></h1><div class="mcd-badges" x-show="madData">
             <span class="mcd-badge mcd-meta"><b>∞</b> Meta Ads</span><span class="mcd-badge mcd-neutral" x-text="marketingCreativeStatusLabel(madData?.ad || {})"></span><span class="mcd-badge" x-text="marketingCampaignScopeLabel(madData?.ad?.scope)"></span>
@@ -9438,7 +9492,7 @@
               </div>
               <h3 x-text="madData?.ad?.media?.title || madData?.ad?.name"></h3><p class="mad-body" x-text="madData?.ad?.media?.body || 'Texto da peça não disponível nesta consulta.'"></p>
               <div class="mad-parent"><small>Campanha</small><button type="button" class="mcd-link" @click="madOpenCampaign()"><span x-text="madData?.campaign?.name"></span><i data-lucide="arrow-right"></i></button></div>
-              <button type="button" class="paid-button mcd-manager" x-show="madData?.ad?.scope === 'matrix'" :disabled="(madData?.peers?.length || 0) < 2" @click="madCompare()">Comparar com outro anúncio</button>
+              <button type="button" class="paid-button mcd-manager" :disabled="!madData?.ad" @click="madCompare()"><span x-text="paidCompareOpen ? 'Voltar à comparação' : 'Comparar com outro anúncio'"></span></button>
             </aside>
             <div class="mad-main">
               <article class="mcd-card"><div class="mcd-card-title"><h2>Entrega na Meta</h2><span class="mcd-badge mcd-meta">Meta Ads</span></div><dl class="mad-metrics"><template x-for="metric in madDelivery()" :key="metric.label"><div><dt x-text="metric.label"></dt><dd x-text="metric.value"></dd></div></template></dl></article>
@@ -9480,7 +9534,7 @@
         </div>
       </section>
 
-      <section x-show="marketingTab === 'criativos' && !madId" x-cloak class="paid-screen mc-screen" data-marketing-creatives-screen>
+      <section x-show="marketingTab === 'criativos' && !madId && !paidCompareOpen" x-cloak class="paid-screen mc-screen" data-marketing-creatives-screen>
         <header class="paid-head">
           <div><h1>Conteúdo pago</h1><p>Encontre os anúncios que geram conversas e vendas.</p></div>
           <div class="paid-actions">
@@ -9542,7 +9596,7 @@
                     <div x-show="!row.media?.image_url || row.media?.failed" class="mc-no-media"><i data-lucide="image-off"></i><span>Prévia indisponível</span><span x-show="row.preview_url">Abrir prévia na Meta ↗</span></div>
                     <span x-show="['video','mixed'].includes(row.media?.format)" class="ma-video-label"><i data-lucide="play"></i>Vídeo</span>
                   </a>
-                  <label class="ma-select" :title="row.scope !== 'matrix' ? 'Comparação disponível para anúncios da 2W' : 'Selecionar para comparar'"><input type="checkbox" :aria-label="'Comparar ' + row.name" :checked="marketingCreativeCompareIds.includes(row.id)" :disabled="row.scope !== 'matrix' || (!marketingCreativeCompareIds.includes(row.id) && marketingCreativeCompareIds.length >= 3)" @change="marketingCreativeToggleCompare(row)"></label>
+                  <label class="ma-select" title="Selecionar para comparar"><input type="checkbox" :aria-label="'Comparar ' + row.name" :checked="marketingCreativeCompareIds.includes(row.id)" :disabled="!marketingCreativeCompareIds.includes(row.id) && marketingCreativeCompareIds.length >= 2" @change="marketingCreativeToggleCompare(row)"></label>
                   <span class="ma-network" aria-label="Meta">∞</span>
                 </div>
                 <div class="mc-card-info">
@@ -9566,7 +9620,7 @@
           <div x-show="marketingCreativeView === 'list' && marketingCreativeFiltered().length" class="ma-list-wrap">
             <table class="ma-list"><thead><tr><th><span class="sr-only">Comparar</span></th><th>Anúncio / campanha</th><th>Status</th><th>Investimento</th><th>Conversas</th><th>Custo / conversa</th><th>Vendas</th><th>Resultado após mídia</th><th><span class="sr-only">Análise</span></th></tr></thead><tbody>
               <template x-for="row in marketingCreativePageRows()" :key="row.id"><tr :class="marketingCreativeCompareIds.includes(row.id) && 'is-selected'">
-                <td><input type="checkbox" :aria-label="'Comparar ' + row.name" :checked="marketingCreativeCompareIds.includes(row.id)" :disabled="row.scope !== 'matrix' || (!marketingCreativeCompareIds.includes(row.id) && marketingCreativeCompareIds.length >= 3)" @change="marketingCreativeToggleCompare(row)"></td>
+                <td><input type="checkbox" :aria-label="'Comparar ' + row.name" :checked="marketingCreativeCompareIds.includes(row.id)" :disabled="!marketingCreativeCompareIds.includes(row.id) && marketingCreativeCompareIds.length >= 2" @change="marketingCreativeToggleCompare(row)"></td>
                 <td><button type="button" class="ma-list-title" @click="marketingCreativeSelect(row)" x-text="row.name"></button><small x-text="row.campaign_name"></small></td>
                 <td><span class="mc-badge" :class="marketingCreativeStatusGroup(row) !== 'active' && 'mc-muted'" x-text="marketingCreativeStatusLabel(row)"></span></td>
                 <td x-text="marketingCreativeMoney(row.investment,row.currency)"></td><td x-text="paidNumber(row.conversations)"></td><td x-text="marketingCreativeMoney(row.cost_per_conversation,row.currency)"></td><td x-text="paidNumber(row.attributed_sales)"></td><td :class="row.net_after_media < 0 ? 'ma-negative' : 'ma-positive'" x-text="marketingCreativeMoney(row.net_after_media)"></td><td><button type="button" class="paid-button" @click="marketingCreativeSelect(row)" :aria-label="'Ver análise de ' + row.name"><i data-lucide="arrow-right"></i></button></td>
@@ -9580,7 +9634,7 @@
             <div class="paid-actions"><button type="button" class="paid-button" @click="marketingCreativeSetPage(marketingCreativePage-1)" :disabled="marketingCreativePage <= 1" aria-label="Página anterior de anúncios"><i data-lucide="chevron-left"></i></button><span x-text="'Página ' + marketingCreativePage + ' de ' + marketingCreativePageCount()"></span><button type="button" class="paid-button" @click="marketingCreativeSetPage(marketingCreativePage+1)" :disabled="marketingCreativePage >= marketingCreativePageCount()" aria-label="Próxima página de anúncios"><i data-lucide="chevron-right"></i></button></div>
           </div>
           <div x-show="marketingCreativeCompareIds.length" class="ma-selection" aria-live="polite">
-            <div class="paid-actions"><div class="ma-selected-thumbs"><template x-for="ad in marketingCreativeCompared()" :key="ad.id"><div><template x-if="ad.media?.image_url && !ad.media.failed"><img :src="ad.media.image_url" :alt="ad.name" referrerpolicy="no-referrer" @error="ad.media.failed=true"></template><span x-show="!ad.media?.image_url || ad.media?.failed"><i data-lucide="image"></i></span></div></template></div><div><strong x-text="marketingCreativeCompareIds.length + (marketingCreativeCompareIds.length === 1 ? ' anúncio selecionado' : ' anúncios selecionados')"></strong><p>Mesmo período · selecione de 2 a 3 anúncios</p></div></div>
+            <div class="paid-actions"><div class="ma-selected-thumbs"><template x-for="ad in marketingCreativeCompared()" :key="ad.id"><div><template x-if="ad.media?.image_url && !ad.media.failed"><img :src="ad.media.image_url" :alt="ad.name" referrerpolicy="no-referrer" @error="ad.media.failed=true"></template><span x-show="!ad.media?.image_url || ad.media?.failed"><i data-lucide="image"></i></span></div></template></div><div><strong x-text="marketingCreativeCompareIds.length + (marketingCreativeCompareIds.length === 1 ? ' anúncio selecionado' : ' anúncios selecionados')"></strong><p>Mesmo período · selecione dois anúncios</p></div></div>
             <div class="paid-actions"><button type="button" class="paid-link" @click="marketingCreativeCompareIds=[]">Limpar seleção</button><button type="button" class="paid-button is-active" @click="paidCompare(marketingCreativeCompareIds)" :disabled="marketingCreativeCompareIds.length < 2">Comparar anúncios<i data-lucide="arrow-right"></i></button></div>
           </div>
 
