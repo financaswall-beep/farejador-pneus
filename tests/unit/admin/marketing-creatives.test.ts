@@ -10,11 +10,11 @@ beforeAll(async () => {
 const config = { adAccountId: 'act_123', accessToken: 'private', apiVersion: 'v21.0' };
 const insight = { entity_id: '456', entity_name: 'Pneu', campaign_id: '789', campaign_name: 'Campanha', campaign_scope: 'matrix',
   metric_date: '2026-09-12', account_currency: 'BRL', spend: '60', conversations: '10', impressions: 100, clicks: 20, collected_at: '2026-09-12T12:00:00Z' };
-function db(scope = 'matrix', tracking = 8, rejectAttribution = false) {
+function db(scope = 'matrix', tracking = 8, rejectAttribution = false, values: Record<string, unknown> = {}) {
   return { query: vi.fn(async (sql: string) => {
-    if (sql.includes('WITH ads AS')) {
+    if (sql.includes('ads AS (')) {
       if (rejectAttribution) throw Error('unavailable');
-      return { rows: [{ ad_id: '456', tracked: tracking, channels: ['whatsapp'], sales: 0, revenue: 0 }] };
+      return { rows: [{ ad_id: '456', tracked: tracking, channels: ['whatsapp'], sales: 0, revenue: 0, gross_margin: 0, pending_margin_orders: 0, ...values }] };
     }
     return { rows: [{ ...insight, campaign_scope: scope }, { ...insight, campaign_scope: scope, metric_date: '2026-09-13', conversations: 0, spend: 20 }] };
   }) } as unknown as Pool;
@@ -32,6 +32,14 @@ describe('Criativos: indicadores e atribuição', () => {
   it('mantém ausência de rastreamento diferente de zero vendas', async () => {
     const result = await getMarketingCreatives('7d', { ...common, dbPool: db('matrix', 0) });
     expect(result.creatives[0]).toMatchObject({ attributed_sales: null, attributed_revenue: null, attribution_status: 'pending' });
+  });
+  it('exibe resultado após mídia apenas quando o motor fornece custos completos', async () => {
+    const result = await getMarketingCreatives('7d', { ...common, dbPool: db('matrix', 8, false,
+      { sales: 2, revenue: 300, gross_margin: 220, pending_margin_orders: 0 }) });
+    expect(result.creatives[0]).toMatchObject({ attributed_revenue: 300, gross_margin: 220, investment: 80, net_after_media: 140 });
+    const pending = await getMarketingCreatives('7d', { ...common, dbPool: db('matrix', 8, false,
+      { sales: 2, revenue: 300, gross_margin: 100, pending_margin_orders: 1 }) });
+    expect(pending.creatives[0]).toMatchObject({ attributed_revenue: 300, gross_margin: null, net_after_media: null, pending_margin_orders: 1 });
   });
   it('respeita escopo pendente e flag de atribuição', async () => {
     expect((await getMarketingCreatives('7d', { ...common, dbPool: db('pending') })).creatives[0])
@@ -74,5 +82,27 @@ describe('Criativos: seleção, filtros e carregamento', () => {
   it('não mistura investimento de moedas diferentes', () => {
     const app = front(); app.marketingCreativesData = { creatives: [row('1', 5), { ...row('2', 5), currency: 'USD' }] };
     expect(app.marketingCreativeMetrics()).toMatchObject({ investment: null, cost: null, conversations: 8 });
+  });
+  it('filtra pausados de campanha e mantém seleção para comparação entre páginas', () => {
+    const app = front();
+    const rows = Array.from({ length: 4 }, (_, i) => ({ ...row(String(i), i + 1), media: { format: 'image', status: i === 3 ? 'CAMPAIGN_PAUSED' : 'ACTIVE' } }));
+    app.marketingCreativesData = { creatives: rows };
+    app.marketingCreativeToggleCompare(rows[0]); app.marketingCreativeSetPage(2); app.marketingCreativeToggleCompare(rows[3]);
+    expect([...app.marketingCreativeCompareIds]).toEqual(['0', '3']);
+    app.marketingCreativeStatus = 'paused'; app.marketingCreativeFiltersChanged();
+    expect(app.marketingCreativeFiltered().map((r: { id: string }) => r.id)).toEqual(['3']);
+    expect([...app.marketingCreativeCompareIds]).toEqual(['3']);
+  });
+  it('limita a comparação à 2W e não apresenta um resultado parcial como total', () => {
+    const app = front();
+    const rows = Array.from({ length: 4 }, (_, i) => ({ ...row(String(i), i + 1), attributed_sales: i === 3 ? null : 1, net_after_media: i === 3 ? null : 10 }));
+    app.marketingCreativesData = { creatives: rows };
+    rows.forEach(r => app.marketingCreativeToggleCompare(r));
+    expect(app.marketingCreativeCompareIds).toHaveLength(3);
+    app.marketingCreativeCompareIds = []; app.marketingCreativeToggleCompare({ ...rows[0], scope: 'external' });
+    expect(app.marketingCreativeCompareIds).toHaveLength(0);
+    expect(app.marketingCreativeMetrics()).toMatchObject({ count: 4, sales: null, result: null });
+    app.marketingCreativesLoading = true;
+    expect(app.marketingCreativeMetrics()).toMatchObject({ count: null, investment: null, sales: null, result: null });
   });
 });

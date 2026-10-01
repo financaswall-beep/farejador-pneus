@@ -97,14 +97,19 @@ window.PAINEL_MODULES.marketingPaid = function () {
       return rows;
     },
     paidOpenCampaign(row) { this.marketingTab = 'campanhas'; void this.openMarketingCampaignDetail(row); },
-    paidOpenAds() { this.marketingSetTab('criativos'); },
-    async paidCompare() {
+    paidOpenAds() {
+      this.marketingSetTab('criativos');
+      this.$nextTick(() => document.querySelector('[data-marketing-creatives-screen]')?.scrollIntoView({ block: 'start' }));
+    },
+    async paidCompare(selectedIds = null) {
       compareTrigger = document.activeElement;
       this.paidCompareOpen = true;
       this.$nextTick(() => document.querySelector('.paid-modal [aria-label="Fechar comparação"]')?.focus());
-      await this.loadMarketingCreatives();
+      if (!Array.isArray(selectedIds)) await this.loadMarketingCreatives();
       const rows = this.paidCompareOptions();
-      this.paidCompareIds = rows.slice(0, 3).map(row => row.id);
+      this.paidCompareIds = Array.isArray(selectedIds)
+        ? selectedIds.filter(id => rows.some(row => row.id === id)).slice(0, 3)
+        : rows.slice(0, 3).map(row => row.id);
     },
     paidCloseCompare() {
       this.paidCompareOpen = false;

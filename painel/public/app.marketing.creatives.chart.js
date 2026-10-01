@@ -6,7 +6,7 @@ window.PAINEL_MODULES.marketingCreativeChart = function () {
     },
     renderMarketingCreativeChart() {
       this.destroyMarketingCreativeChart();
-      if (this.currentPage !== 'marketing' || this.marketingTab !== 'criativos' || this.marketingCreativesLoading) return;
+      if (this.currentPage !== 'marketing' || this.marketingTab !== 'criativos' || this.marketingCreativesLoading || !this.marketingCreativeAnalysisOpen) return;
       const row = this.marketingCreativeSelected();
       const canvas = document.getElementById('chartMarketingCreativeCost');
       if (!row || !canvas || typeof Chart === 'undefined') return;

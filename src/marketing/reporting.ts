@@ -52,7 +52,7 @@ function num(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-const REALIZED_CTE = `
+export const REALIZED_CTE = `
   WITH realized AS (
     SELECT o.id,o.source_conversation_id,
       CASE

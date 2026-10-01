@@ -16,6 +16,7 @@ export interface MarketingCreativeRow {
   media: MetaCreative | null; meta_url: string; preview_url: string; investment: number; conversations: number;
   impressions: number; clicks: number; cost_per_conversation: number | null;
   tracked: number | null; channels: string[]; attributed_sales: number | null; attributed_revenue: number | null;
+  gross_margin: number | null; net_after_media: number | null; pending_margin_orders: number | null;
   attribution_status: string; series: Array<{ date: string; spend: number; conversations: number }>;
 }
 
@@ -43,7 +44,7 @@ export async function getMarketingCreatives(period: MarketingPeriod = '30d', dep
   const [metadata, attributionResult] = await Promise.all([
     config && ids.length ? (dependencies.mediaProvider ?? getMetaCreatives)(config, ids)
       : Promise.resolve({ ads: [] as MetaCreative[], unavailable: ids.length }),
-    loadCreativeAttribution(db, env.FAREJADOR_ENV, account, window.since, window.until)
+    loadCreativeAttribution(db, env.FAREJADOR_ENV, account, window.since, window.until, enforceScope)
       .then((rows) => ({ available: true, rows }))
       .catch(() => ({ available: false, rows: [] as CreativeAttribution[] })),
   ]);
@@ -58,6 +59,9 @@ export async function getMarketingCreatives(period: MarketingPeriod = '30d', dep
     const status = !enabled ? 'disabled' : !attributionResult.available ? 'unavailable'
       : enforceScope && latest.campaign_scope !== 'matrix' ? 'scope_pending'
       : num(tracking) > 0 || num(attributed?.sales) > 0 ? 'ready' : 'pending';
+    const pendingCosts = status === 'ready' ? num(attributed?.pending_margin_orders) : null;
+    const margin = status === 'ready' && pendingCosts === 0 && attributed?.gross_margin != null
+      ? money(num(attributed.gross_margin)) : null;
     return {
       id, name: media.get(id)?.name ?? latest.entity_name ?? id,
       campaign_id: latest.campaign_id, campaign_name: latest.campaign_name ?? latest.campaign_id,
@@ -70,6 +74,8 @@ export async function getMarketingCreatives(period: MarketingPeriod = '30d', dep
       tracked: tracking, channels: attributed?.channels ?? [], attribution_status: status,
       attributed_sales: status === 'ready' ? num(attributed?.sales) : null,
       attributed_revenue: status === 'ready' ? money(num(attributed?.revenue)) : null,
+      gross_margin: margin, pending_margin_orders: pendingCosts,
+      net_after_media: margin != null && latest.account_currency === 'BRL' ? money(margin - spend) : null,
       series: rows.map((row) => ({ date: row.metric_date, spend: num(row.spend), conversations: num(row.conversations) })),
     };
   });

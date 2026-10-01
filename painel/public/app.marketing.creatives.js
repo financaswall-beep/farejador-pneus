@@ -1,10 +1,13 @@
 // Criativos: filtros e seleção em dados reais; amostra apenas no modo ?mock=1.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingCreatives = function () {
+  let analysisTrigger = null;
   return {
     marketingCreativesData: null, marketingCreativesLoading: false, marketingCreativesError: '',
     marketingCreativeScope: 'matrix', marketingCreativesSeq: 0, marketingCreativeSearch: '', marketingCreativeCampaign: 'all',
     marketingCreativeFormat: 'all', marketingCreativeSort: 'cost', marketingCreativePage: 1,
+    marketingCreativeStatus: 'all', marketingCreativeView: 'grid', marketingCreativeChannel: 'all',
+    marketingCreativeCompareIds: [], marketingCreativeAnalysisOpen: false,
     marketingCreativeSelectedId: null, marketingCreativeJourneysOpen: false,
     marketingCreativeJourneysData: null, marketingCreativeJourneysLoading: false, marketingCreativeJourneysError: '',
     marketingCreativeJourneysSeq: 0,
@@ -14,6 +17,7 @@ window.PAINEL_MODULES.marketingCreatives = function () {
       const period = this.marketingPeriod;
       this.marketingCreativesLoading = true;
       this.marketingCreativesError = '';
+      this.marketingCreativeAnalysisOpen = false;
       this.closeMarketingCreativeJourneys();
       try {
         const payload = this.marketingIsMock() ? marketingCreativeMockPayload(period)
@@ -36,7 +40,8 @@ window.PAINEL_MODULES.marketingCreatives = function () {
       }
     },
     marketingCreativeCampaigns() {
-      return [...new Map((this.marketingCreativesData?.creatives || []).map((row) =>
+      return [...new Map((this.marketingCreativesData?.creatives || []).filter(row =>
+        this.marketingCreativeScope === 'all' || row.scope === this.marketingCreativeScope).map((row) =>
         [row.campaign_id, { id: row.campaign_id, name: row.campaign_name }])).values()];
     },
     marketingCreativeFiltered() {
@@ -45,6 +50,7 @@ window.PAINEL_MODULES.marketingCreatives = function () {
         (this.marketingCreativeScope === 'all' || row.scope === this.marketingCreativeScope)
         && (this.marketingCreativeCampaign === 'all' || row.campaign_id === this.marketingCreativeCampaign)
         && (this.marketingCreativeFormat === 'all' || (row.media?.format || 'unknown') === this.marketingCreativeFormat)
+        && (this.marketingCreativeStatus === 'all' || this.marketingCreativeStatusGroup(row) === this.marketingCreativeStatus)
         && (!query || `${row.name} ${row.campaign_name}`.toLocaleLowerCase('pt-BR').includes(query)));
       return rows.sort((a, b) => {
         const value = this.marketingCreativeSort === 'cost'
@@ -62,28 +68,75 @@ window.PAINEL_MODULES.marketingCreatives = function () {
     marketingCreativeReconcile() {
       const rows = this.marketingCreativePageRows();
       if (!rows.some((row) => row.id === this.marketingCreativeSelectedId)) this.marketingCreativeSelectedId = rows[0]?.id || null;
+      const visible = new Set(this.marketingCreativeFiltered().filter(row => row.scope === 'matrix').map(row => row.id));
+      this.marketingCreativeCompareIds = this.marketingCreativeCompareIds.filter(id => visible.has(id));
       this.$nextTick(() => { lucide.createIcons(); this.renderMarketingCreativeChart(); });
     },
-    marketingCreativeFiltersChanged() { this.marketingCreativePage = 1; this.marketingCreativeReconcile(); },
+    marketingCreativeFiltersChanged() { this.marketingCreativePage = 1; this.marketingCreativeAnalysisOpen = false; this.marketingCreativeReconcile(); },
     marketingCreativeSetPage(page) {
       this.marketingCreativePage = Math.min(Math.max(1, page), this.marketingCreativePageCount());
+      this.marketingCreativeAnalysisOpen = false;
       this.marketingCreativeReconcile();
     },
     marketingCreativeSelect(row) {
+      analysisTrigger = document.activeElement;
       this.marketingCreativeSelectedId = row.id;
-      this.$nextTick(() => { lucide.createIcons(); this.renderMarketingCreativeChart(); });
+      this.marketingCreativeAnalysisOpen = true;
+      this.$nextTick(() => {
+        lucide.createIcons(); this.renderMarketingCreativeChart();
+        const panel = document.getElementById('marketing-ad-analysis');
+        panel?.focus({ preventScroll: true }); panel?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
+    },
+    marketingCreativeCloseAnalysis() {
+      this.marketingCreativeAnalysisOpen = false; this.destroyMarketingCreativeChart();
+      this.$nextTick(() => analysisTrigger?.focus());
+    },
+    marketingCreativeStatusGroup(row) {
+      const status = row.media?.status;
+      if (status === 'ACTIVE') return 'active';
+      if (['PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED'].includes(status)) return 'paused';
+      return status ? 'other' : 'unknown';
+    },
+    marketingCreativeToggleCompare(row) {
+      if (row.scope !== 'matrix') return;
+      const ids = this.marketingCreativeCompareIds;
+      this.marketingCreativeCompareIds = ids.includes(row.id) ? ids.filter(id => id !== row.id)
+        : ids.length < 3 ? [...ids, row.id] : ids;
+    },
+    marketingCreativeCompared() {
+      return this.marketingCreativeFiltered().filter(row => this.marketingCreativeCompareIds.includes(row.id));
+    },
+    marketingCreativeResetFilters() {
+      this.marketingCreativeSearch = ''; this.marketingCreativeCampaign = 'all';
+      this.marketingCreativeFormat = 'all'; this.marketingCreativeStatus = 'all';
+      this.marketingCreativeFiltersChanged();
+    },
+    marketingCreativeResultNote(row) {
+      if (row?.net_after_media != null) return 'Receita menos custo das vendas e investimento em mídia.';
+      if (row?.pending_margin_orders > 0) return 'Resultado aguardando o custo completo das vendas.';
+      return this.marketingCreativeAttributionNote(row) || 'Resultado ainda não disponível.';
+    },
+    marketingCreativeUpdated() {
+      const date = this.marketingCreativesData?.last_collected;
+      return date ? 'Coleta em ' + new Date(date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Coleta ainda não confirmada';
     },
     marketingCreativeSetPeriod(period) {
       if (this.marketingPeriod === period) return;
+      this.marketingCreativeCompareIds = [];
       this.marketingPeriod = period;
       this.marketingPeriodChanged();
     },
     marketingCreativeMetrics() {
       const rows = this.marketingCreativeFiltered();
+      if (this.marketingCreativesLoading || this.marketingCreativesError || !this.marketingCreativesData || this.marketingCreativesData.available === false)
+        return { count: null, investment: null, conversations: null, cost: null, sales: null, result: null, currency: 'BRL' };
       const currencies = new Set(rows.map((row) => row.currency));
       const spend = rows.reduce((sum, row) => sum + row.investment, 0);
       const conversations = rows.reduce((sum, row) => sum + row.conversations, 0);
+      const completeSum = key => rows.every(row => row[key] != null) ? rows.reduce((sum, row) => sum + Number(row[key]), 0) : null;
       return { count: rows.length, investment: currencies.size > 1 ? null : spend, conversations,
+        sales: completeSum('attributed_sales'), result: currencies.size <= 1 ? completeSum('net_after_media') : null,
         currency: rows[0]?.currency || 'BRL', cost: conversations > 0 && currencies.size <= 1 ? spend / conversations : null };
     },
     marketingCreativeMoney(value, currency = 'BRL') {
@@ -145,9 +198,9 @@ window.PAINEL_MODULES.marketingCreatives = function () {
       if (!rows.length) return;
       const period = this.marketingCreativesData.period;
       const cell = (value) => { const s = String(value ?? ''); return `"${(/^[=+\-@\t\r]/.test(s) ? "'" + s : s).replace(/"/g, '""')}"`; };
-      const lines = [['De', 'Até', 'Anúncio', 'Campanha', 'Formato', 'Status', 'Moeda', 'Investimento', 'Conversas Meta', 'Custo por conversa', 'Conversas identificadas', 'Vendas atribuídas', 'Receita atribuída', 'Atribuição'],
+      const lines = [['De', 'Até', 'Anúncio', 'Campanha', 'Formato', 'Status', 'Moeda', 'Investimento', 'Conversas Meta', 'Custo por conversa', 'Conversas identificadas', 'Vendas atribuídas', 'Receita atribuída', 'Resultado após mídia', 'Custos pendentes', 'Atribuição'],
         ...rows.map((row) => [period.since, period.until, row.name, row.campaign_name, this.marketingCreativeFormatLabel(row.media?.format), this.marketingCreativeStatusLabel(row), row.currency,
-          row.investment, row.conversations, row.cost_per_conversation, row.tracked, row.attributed_sales, row.attributed_revenue, row.attribution_status])];
+          row.investment, row.conversations, row.cost_per_conversation, row.tracked, row.attributed_sales, row.attributed_revenue, row.net_after_media, row.pending_margin_orders, row.attribution_status])];
       const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.map((line) => line.map(cell).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a'); link.href = url; link.download = `criativos-${period.since}-${period.until}.csv`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);

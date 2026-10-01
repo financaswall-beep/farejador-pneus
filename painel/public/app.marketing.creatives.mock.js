@@ -16,6 +16,8 @@ function marketingCreativeMockPayload(period) {
     scope: 'matrix', currency: 'BRL', investment, conversations, impressions: 1800, clicks: 180,
     cost_per_conversation: investment / conversations, tracked: Math.round(conversations * .8), channels: ['whatsapp'],
     attributed_sales: sales, attributed_revenue: sales == null ? null : sales * 190, attribution_status: sales == null ? 'pending' : 'ready',
+    gross_margin: sales == null ? null : sales * 80, net_after_media: sales == null ? null : sales * 80 - investment,
+    pending_margin_orders: sales == null ? null : 0,
     meta_url: null, preview_url: null,
     media: { id: String(i + 1), format, status: i === 4 ? 'PAUSED' : 'ACTIVE', image_url: asset ? `/admin/painel/assets/${asset}` : null },
     series: Array.from({ length: period === '7d' ? 7 : 30 }, (_, index) => {
@@ -25,6 +27,6 @@ function marketingCreativeMockPayload(period) {
       return { date: date.toISOString().slice(0, 10), spend: investment / days, conversations: count };
     }),
   }));
-  return { environment: 'test', available: true, media_status: 'ready', attribution_enabled: true,
+  return { environment: 'test', available: true, media_status: 'ready', attribution_enabled: true, last_collected: new Date().toISOString(),
     period: { id: period, since, until }, creatives };
 }

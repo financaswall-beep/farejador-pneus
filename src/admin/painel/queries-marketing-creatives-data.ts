@@ -1,5 +1,6 @@
 /** Fontes somente leitura, sempre escopadas por ambiente, conta e anúncio. */
 import type { Pool } from 'pg';
+import { REALIZED_CTE } from '../../marketing/reporting.js';
 
 export interface CreativeInsight {
   entity_id: string; entity_name: string | null; campaign_id: string; campaign_name: string | null;
@@ -8,6 +9,7 @@ export interface CreativeInsight {
 }
 export interface CreativeAttribution {
   ad_id: string; tracked: number; channels: string[]; sales: number; revenue: number;
+  gross_margin: number | null; pending_margin_orders: number;
 }
 
 export async function loadCreativeInsights(db: Pool, environment: string, account: string, since: string, until: string) {
@@ -29,34 +31,34 @@ const VALID_ORDERS = `o.status<>'cancelled' AND (
   OR (po.id IS NULL AND o.status IN ('confirmed','paid','delivered')
     AND NOT (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered')))`;
 
-export async function loadCreativeAttribution(db: Pool, environment: string, account: string, since: string, until: string) {
+export async function loadCreativeAttribution(db: Pool, environment: string, account: string, since: string, until: string, enforceScope = true) {
   return (await db.query<CreativeAttribution>(
-    `WITH ads AS (
+    `${REALIZED_CTE}, ads AS (
        SELECT DISTINCT entity_id FROM marketing.meta_insights_daily
-        WHERE environment=$1 AND ad_account_id=$2 AND entity_level='ad' AND marketing.meta_ad_scope_allowed(environment,ad_account_id,entity_id)
+        WHERE environment=$1 AND ad_account_id=$5 AND entity_level='ad' AND marketing.meta_ad_scope_allowed(environment,ad_account_id,entity_id)
      ), tracked AS (
        SELECT r.source_id,count(DISTINCT r.conversation_id)::int AS tracked,
               array_agg(DISTINCT r.channel) AS channels
          FROM marketing.ad_referrals r JOIN ads ON ads.entity_id=r.source_id
         WHERE r.environment=$1
-          AND r.captured_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
-          AND r.captured_at<(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+          AND r.captured_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+          AND r.captured_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
         GROUP BY r.source_id
      ), sales AS (
-       SELECT r.source_id,count(DISTINCT a.order_id)::int AS sales,COALESCE(sum(o.total_amount),0)::float8 AS revenue
-         FROM marketing.order_attributions a
-         JOIN marketing.ad_referrals r ON r.environment=a.environment AND r.id=a.referral_id
-         JOIN ads ON ads.entity_id=r.source_id
-         JOIN commerce.orders o ON o.environment=a.environment AND o.id=a.order_id
-         LEFT JOIN commerce.partner_orders po ON po.environment=o.environment AND po.id=o.partner_order_id
-        WHERE a.environment=$1 AND a.status='active' AND a.superseded_by IS NULL AND ${VALID_ORDERS}
-          AND a.realized_at>=($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
-          AND a.realized_at<(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
-        GROUP BY r.source_id
+       SELECT a.source_id,count(*)::int AS sales,COALESCE(sum(a.total_amount),0)::float8 AS revenue,
+              sum(a.gross_margin)::float8 AS gross_margin,
+              count(*) FILTER (WHERE a.gross_margin IS NULL)::int AS pending_margin_orders
+         FROM attributed a
+         JOIN realized valid ON valid.id=a.order_id
+         JOIN ads ON ads.entity_id=a.source_id
+        WHERE a.ad_account_id=$5
+        GROUP BY a.source_id
      ) SELECT ads.entity_id AS ad_id,COALESCE(t.tracked,0) AS tracked,COALESCE(t.channels,'{}') AS channels,
-              COALESCE(s.sales,0) AS sales,COALESCE(s.revenue,0) AS revenue
+              COALESCE(s.sales,0) AS sales,COALESCE(s.revenue,0) AS revenue,
+              CASE WHEN COALESCE(s.sales,0)=0 THEN 0 ELSE s.gross_margin END AS gross_margin,
+              COALESCE(s.pending_margin_orders,0) AS pending_margin_orders
          FROM ads LEFT JOIN tracked t ON t.source_id=ads.entity_id LEFT JOIN sales s ON s.source_id=ads.entity_id`,
-    [environment, account, since, until],
+    [environment, since, until, enforceScope, account],
   )).rows;
 }
 
