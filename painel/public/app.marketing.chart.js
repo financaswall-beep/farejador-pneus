@@ -7,7 +7,7 @@ window.PAINEL_MODULES.marketingChart = function () {
       const canvas = document.getElementById('chartMarketingRhythm');
       if (!canvas || typeof Chart === 'undefined') return;
       if (window._marketingRhythmChart) window._marketingRhythmChart.destroy();
-      const rows = this.marketingVisao?.series || [];
+      const rows = this.paidChartRows();
       if (!rows.length) return;
       const safe = (value) => {
         const parsed = Number(value);
@@ -36,7 +36,7 @@ window.PAINEL_MODULES.marketingChart = function () {
               pointBorderWidth: 1,
             },
             {
-              label: 'Conversas',
+              label: 'Conversas na Meta',
               type: 'line',
               data: rows.map((row) => safe(row.conversations)),
               yAxisID: 'conversations',

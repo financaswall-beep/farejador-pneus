@@ -9,6 +9,9 @@ import { logger } from '../../shared/logger.js';
 import { sendStatic } from './route-helpers.js';
 
 export async function registerPainelStatic(fastify: FastifyInstance): Promise<void> {
+  for(const [file,type] of [['google-contact.css','text/css'],['google-contact.js','text/javascript'],['google-chatwoot.js','text/javascript']]) {
+    fastify.get(`/admin/painel/assets/${file}`,async(_request,reply)=>sendStatic(reply.header('Cache-Control','no-store'),file!,`${type}; charset=utf-8`));
+  }
   fastify.get('/admin/login', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/login.js', async (_request, reply) =>
@@ -29,7 +32,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
     'stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js',
-    'app.marketing.comments.js', 'app.marketing.paid.js',
+    'app.marketing.comments.js', 'app.marketing.paid.js', 'app.marketing.google.js',
     'app.marketing.compare.js', 'app.marketing.compare.view.js',
     'app.marketing.organic.js', 'app.marketing.organic.mock.js',
     'app.marketing.organic.summary.js',

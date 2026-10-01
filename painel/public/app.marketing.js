@@ -75,7 +75,9 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     async loadMarketing() {
+      if (this.marketingCampaignChannel === 'google') return this.loadGoogleAds();
       const campaigns = this.loadMarketingCampaigns();
+      const google = this.marketingCampaignChannel === 'all' ? this.loadGoogleAds() : Promise.resolve();
       const requestedPeriod = this.marketingPeriod;
       const requestSeq = ++this.marketingRequestSeq;
       this.marketingLoading = true;
@@ -101,6 +103,8 @@ window.PAINEL_MODULES.marketing = function () {
         }
       }
       await campaigns;
+      await google;
+      if(requestSeq===this.marketingRequestSeq)this.$nextTick(()=>this.renderMarketingChart());
     },
 
     marketingTabs() {

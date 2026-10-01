@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { META_BUSINESS_ACCOUNTS } from '../shared/meta-business-accounts.js';
+import { captureGoogleConversations, googleOwnsLastTouch } from './google-attribution.js';
 
 const ATTRIBUTION_MODEL = 'last_click_7d_one_sale';
 const RULE_VERSION = 2;
@@ -205,6 +206,10 @@ export async function reconcileMarketingAttributions(options: {
   const client = await (options.dbPool ?? defaultPool).connect();
   try {
     await client.query('BEGIN');
+    if (env.GOOGLE_ADS_ENABLED) {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('marketing-attribution:'||$1))",[env.FAREJADOR_ENV]);
+      await captureGoogleConversations(client);
+    }
     const referralsBackfilled = await backfillAdReferrals(client);
     const revoked = await revokeInvalidAttributions(client);
     const orders = await loadRealizedOrders(client);
@@ -220,6 +225,7 @@ export async function reconcileMarketingAttributions(options: {
       if (attributedOrders.has(order.id)) continue;
       const referral = await findReferral(client, order, usedReferrals);
       if (!referral) continue;
+      if (await googleOwnsLastTouch(client,order,referral.captured_at)) continue;
       const inserted = await client.query(
         `INSERT INTO marketing.order_attributions (
            environment,order_id,referral_id,conversation_id,status,attribution_model,

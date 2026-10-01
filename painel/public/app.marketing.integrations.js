@@ -128,7 +128,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
       if (platform.id === 'meta' && platform.status === 'connected') {
         await this.marketingRunIntegrationAction('sync');
       } else if (platform.id === 'google') {
-        this.marketingIntegrationsMessage = 'Google Ads ainda não possui conector. Nenhuma configuração foi alterada.';
+        this.googleAdsOpen();
       } else {
         this.marketingIntegrationsMessage = 'TikTok Ads está planejado. Nenhuma configuração foi alterada.';
       }
@@ -136,7 +136,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
 
     marketingIntegrationActionLabel(platform) {
       if (platform.id === 'meta' && platform.status === 'connected') return 'Sincronizar Meta';
-      if (platform.id === 'google') return 'Sem conector';
+      if (platform.id === 'google') return platform.status === 'connected' ? 'Ver Google Ads' : 'Conferir conexão';
       return 'Planejado';
     },
 

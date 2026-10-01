@@ -15,6 +15,7 @@ import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.j
 import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-custos.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 import { startMarketingScheduler } from '../marketing/scheduler.js';
+import { startGoogleAdsWorker } from '../marketing/google-worker.js';
 import { startMarketingCapiWorker } from '../marketing/capi.js';
 import { startMetaMessagingWorker } from '../marketing/meta-messaging-worker.js';
 import { startCommentsWorker } from '../social-comments/worker.js';
@@ -41,6 +42,7 @@ let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
 let stopMarketingScheduler: (() => void) | null = null;
+let stopGoogleAds: (() => void) | null = null;
 let stopMarketingCapi: (() => void) | null = null;
 let stopMetaMessaging: (() => void) | null = null;
 let stopComments: (() => void) | null = null;
@@ -82,6 +84,7 @@ async function start(): Promise<void> {
   // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.
   stopSatisfactionSurvey = startSatisfactionSurveyWorker();
   stopMarketingScheduler = startMarketingScheduler();
+  stopGoogleAds = startGoogleAdsWorker();
   stopMarketingCapi = startMarketingCapiWorker();
   stopMetaMessaging = startMetaMessagingWorker();
   stopComments = startCommentsWorker();
@@ -120,6 +123,7 @@ async function shutdown(signal: string): Promise<void> {
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();
   stopMarketingScheduler?.();
+  stopGoogleAds?.();
   stopMarketingCapi?.();
   stopMetaMessaging?.();
   stopComments?.();

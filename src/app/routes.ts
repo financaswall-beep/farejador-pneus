@@ -19,6 +19,7 @@ import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
 import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
 import { registerPublicLegalRoutes } from '../public/legal.route.js';
+import { registerGoogleContactRoutes } from '../public/google-contact.route.js';
 import { registerMunicipalityCatalogRoute } from '../network/municipality-catalog.route.js';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
@@ -29,6 +30,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerReconcileRoute(fastify);
   await registerAdminLoginRoute(fastify);
   await registerPublicLegalRoutes(fastify);
+  await registerGoogleContactRoutes(fastify);
   await registerMunicipalityCatalogRoute(fastify);
   await registerPainelRoute(fastify);
   await registerParceiroRoute(fastify);

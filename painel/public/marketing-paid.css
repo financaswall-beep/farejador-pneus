@@ -32,6 +32,11 @@
   height:17px;
   flex-shrink:0
 }
+.paid-screen .google-cost-chart {
+  width:100%;
+  height:auto;
+  margin-top:12px
+}
 .paid-screen h1 {
   font-size:29px;
   letter-spacing:-.8px;

@@ -21,24 +21,55 @@ function marketingPaidMockPayload(period) {
 window.PAINEL_MODULES.marketingPaid = function () {
   return {
     paidScope: 'matrix', paidExpanded: false, paidSort: 'investment', paidAscending: false,
+    paidGoogleIncluded() {
+      return this.marketingCampaignChannel === 'all' && !!(this.googleAdsLoading || this.googleAdsError
+        || this.googleAdsReport && !['disabled','not_configured'].includes(this.googleAdsReport.status));
+    },
+    paidGoogleComparable() {
+      const g=this.googleAdsReport,period=this.marketingVisao?.period;
+      return g?.status==='connected' && g.data?.period?.since===period?.since && g.data?.period?.until===period?.until;
+    },
+    paidMetrics() {
+      const m={...(this.marketingVisao?.metrics||{})};
+      if(!this.paidGoogleIncluded())return m;
+      const available=this.paidGoogleComparable(),g=this.googleAdsReport?.data?.totals,r=this.googleAdsReport?.results;
+      const sum=(a,b)=>available && a!=null && b!=null ? Number(a)+Number(b):null;
+      m.investment=sum(m.investment,g?.investment);m.impressions=sum(m.impressions,g?.impressions);m.clicks=sum(m.clicks,g?.clicks);
+      m.ctr=m.impressions>0 && m.clicks!=null?m.clicks/m.impressions*100:null;
+      for(const k of ['attributed_sales','attributed_revenue','gross_margin','pending_margin_orders'])m[k]=sum(m[k],r?.available?r.totals?.[k]:null);
+      m.net_after_media=m.gross_margin!=null && m.investment!=null?m.gross_margin-m.investment:null;
+      // Conversas Meta são métricas da plataforma; seu custo usa somente o investimento Meta.
+      return m;
+    },
+    paidChartRows() {
+      const rows=this.marketingVisao?.series||[];
+      if(!this.paidGoogleIncluded())return rows;
+      if(!this.paidGoogleComparable())return [];
+      const daily=new Map(rows.map(r=>[r.date,{...r}]));
+      for(const r of this.googleAdsReport.data.campaign_daily||[]) {
+        const day=daily.get(r.date)||{date:r.date,spend:0,conversations:0};
+        day.spend+=Number(r.cost_micros)/1e6;daily.set(r.date,day);
+      }
+      return [...daily.values()].sort((a,b)=>a.date.localeCompare(b.date));
+    },
     paidMoney(value) { return value == null ? '—' : this.formatCurrency(Number(value)); },
     paidNumber(value) { return value == null ? '—' : Number(value).toLocaleString('pt-BR'); },
     paidDelta(value) {
       return value == null ? 'Sem comparação anterior' : `${value > 0 ? '+' : ''}${this.paidNumber(value)}% vs. período anterior`;
     },
     paidKpis() {
-      const m = this.marketingVisao?.metrics || {}, c = this.marketingVisao?.comparison || {};
+      const m = this.paidMetrics(), c = this.paidGoogleIncluded() ? {} : this.marketingVisao?.comparison || {};
       return [
         { id: 'investment', label: 'Investimento', value: this.paidMoney(m.investment), icon: 'coins', detail: this.paidDelta(c.spend_delta_percent) },
         { id: 'conversations', label: 'Conversas na Meta', value: this.paidNumber(m.conversations), icon: 'messages-square', detail: this.paidDelta(c.conversations_delta_percent) },
-        { id: 'cost', label: 'Custo por conversa', value: this.paidMoney(m.cost_per_conversation), icon: 'tag', detail: 'Investimento ÷ conversas' },
+        { id: 'cost', label: 'Custo por conversa Meta', value: this.paidMoney(m.cost_per_conversation), icon: 'tag', detail: 'Investimento Meta ÷ conversas Meta' },
         { id: 'sales', label: 'Vendas atribuídas', value: this.paidNumber(m.attributed_sales), icon: 'shopping-cart', detail: 'Vendas com origem comprovada' },
         { id: 'revenue', label: 'Receita atribuída', value: this.paidMoney(m.attributed_revenue), icon: 'banknote', detail: 'Vendas vinculadas aos anúncios' },
         { id: 'result', label: 'Resultado após mídia', value: this.paidMoney(m.net_after_media), icon: 'trending-up', detail: m.pending_margin_orders > 0 ? `${m.pending_margin_orders} pedido(s) sem custo completo` : 'Receita − custos das vendas − mídia' },
       ];
     },
     paidIndicators() {
-      const m = this.marketingVisao?.metrics || {}, a = this.marketingVisao?.attribution;
+      const m = this.paidMetrics(), a = this.marketingVisao?.attribution;
       return [
         { label: 'Impressões', value: this.paidNumber(m.impressions), icon: 'eye' },
         { label: 'Cliques', value: this.paidNumber(m.clicks), icon: 'mouse-pointer-2' },
@@ -64,13 +95,22 @@ window.PAINEL_MODULES.marketingPaid = function () {
       this.paidSort = key; this.marketingCampaignPage = 1;
     },
     paidReset() { this.paidScope = 'matrix'; this.marketingCampaignSearch = ''; this.marketingCampaignDecision = 'all'; this.marketingCampaignPage = 1; },
-    paidChannel(channel) { this.marketingCampaignSetChannel(channel); },
+    paidChannel(channel) {
+      if (channel === 'google') { this.googleAdsOpen(); return; }
+      const fromGoogle = this.marketingCampaignChannel === 'google';
+      this.marketingCampaignSetChannel(channel);
+      if (fromGoogle) void this.loadMarketing();
+    },
     paidIdentityNote() {
       return this.marketingVisao?.pipeline?.identity?.active
         ? 'Indicadores da Matriz: soma dos anúncios identificados como 2W. Campanhas externas ficam fora.'
         : 'Indicadores da Matriz por classificação atual. A separação automática por perfil aguarda a primeira coleta completa.';
     },
     paidUpdated() {
+      if (this.marketingCampaignChannel === 'google') {
+        const at = this.googleAdsReport?.data?.fetched_at;
+        return at ? `Consulta em ${new Date(at).toLocaleString('pt-BR')}` : 'Conexão Google Ads';
+      }
       const at = this.marketingVisao?.connection?.meta_synced_at;
       return at ? `Coleta em ${new Date(at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'Coleta ainda não confirmada';
     },

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { publisherEnvShape } from './env-publisher.js';
+import { googleAdsEnvShape } from './env-google-ads.js';
 
 const booleanStringSchema = z.enum(['true', 'false']).default('false')
   .transform((value) => value === 'true');
@@ -9,6 +10,7 @@ const emptyToUndefined = (value: unknown) =>
 /** Configuração dormente de Marketing; segredos vivem somente no ambiente. */
 export const marketingEnvShape = {
   ...publisherEnvShape,
+  ...googleAdsEnvShape,
   META_COMMENTS_ENABLED: booleanStringSchema,
   META_COMMENTS_PUBLISH_ENABLED: booleanStringSchema,
   ORGANIC_ATTRIBUTION_ENABLED: booleanStringSchema,

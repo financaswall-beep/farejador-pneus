@@ -52,7 +52,7 @@ function num(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export const REALIZED_CTE = `
+export const REALIZED_ORDERS_CTE = `
   WITH realized AS (
     SELECT o.id,o.source_conversation_id,
       CASE
@@ -84,7 +84,8 @@ export const REALIZED_CTE = `
     FROM commerce.order_items oi
     WHERE oi.environment=$1
     GROUP BY oi.order_id
-  ),
+  )`;
+export const REALIZED_CTE = `${REALIZED_ORDERS_CTE},
   active_attribution AS (
     SELECT a.id,a.order_id,a.referral_id,a.realized_at,r.source_id
     FROM marketing.order_attributions a

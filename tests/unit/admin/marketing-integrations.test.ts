@@ -79,7 +79,7 @@ describe('Marketing — integrações read-only', () => {
       status: 'connected',
       account_masked: 'act_••••6789',
     });
-    expect(payload.platforms[1]?.status).toBe('not_connected');
+    expect(payload.platforms[1]?.status).toBe('disabled');
     expect(payload.platforms[2]?.status).toBe('planned');
     expect(payload.pipeline.at(-1)).toMatchObject({ id: 'profit', status: 'blocked' });
     expect(payload.audit_events).toHaveLength(1);

@@ -29,11 +29,10 @@ import { registerMarketingComments } from './route-marketing-comments.js';
 import { registerMarketingOrganic } from './route-marketing-organic.js';
 import { registerMarketingPublisher } from './route-marketing-publisher.js';
 import { registerMarketingOrganicResults } from './route-marketing-organic-results.js';
-
+import { registerMarketingGoogle } from './route-marketing-google.js';
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
 }).strict();
-
 const campaignQuerySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
   channel: z.enum(['all', 'meta', 'google', 'tiktok']).default('all'),
@@ -65,6 +64,7 @@ function capiFailureReason(error: unknown): string {
 }
 
 export async function registerPainelMarketing(fastify: FastifyInstance): Promise<void> {
+  await registerMarketingGoogle(fastify);
   await registerMarketingCreatives(fastify);
   await registerMarketingGeography(fastify);
   await registerMarketingComments(fastify);

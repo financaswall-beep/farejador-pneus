@@ -5,6 +5,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { getGoogleAdsReport } from '../../marketing/google-ads-report.js';
 import { getMarketingOverview, type MarketingOverview } from './queries-marketing.js';
 import type { MarketingPeriod } from './marketing-meta.js';
 import {
@@ -39,6 +40,7 @@ export interface MarketingIntegrationsPayload {
     account_masked: string | null;
     last_sync_at: string | null;
     imported: string[];
+    detail?: string;
   }>;
   pipeline: Array<{ id: string; label: string; status: CheckStatus }>;
   collection: Array<{ id: string; label: string; status: CheckStatus; detail: string }>;
@@ -62,6 +64,7 @@ export interface MarketingIntegrationDependencies {
   overviewProvider?: typeof getMarketingOverview;
   auditProvider?: (pool: Pool) => Promise<MarketingAuditEvent[]>;
   healthProvider?: typeof getMarketingPipelineHealth;
+  googleProvider?: typeof getGoogleAdsReport;
   config?: IntegrationConfig;
 }
 
@@ -99,9 +102,10 @@ export async function getMarketingIntegrations(
   const dbPool = dependencies.dbPool ?? defaultPool;
   const overview: MarketingOverview = await overviewProvider(period);
   const auditProvider = dependencies.auditProvider ?? loadAuditEvents;
-  const [auditEvents, health] = await Promise.all([
+  const [auditEvents, health, google] = await Promise.all([
     auditProvider(dbPool),
     (dependencies.healthProvider ?? getMarketingPipelineHealth)(dbPool),
+    (dependencies.googleProvider ?? getGoogleAdsReport)(period),
   ]);
   const accountId = dependencies.config?.adAccountId ?? env.META_ADS_ACCOUNT_ID;
 
@@ -146,7 +150,7 @@ export async function getMarketingIntegrations(
     environment: overview.environment,
     generated_at: overview.generated_at,
     summary: {
-      connected: metaConnected ? 1 : 0,
+      connected: Number(metaConnected) + Number(google.status === 'connected'),
       total: 3,
       last_sync_at: syncedAt,
       quality_percent: Math.round((ready / quality.length) * 100),
@@ -164,10 +168,11 @@ export async function getMarketingIntegrations(
       {
         id: 'google',
         label: 'Google Ads',
-        status: 'not_connected',
-        account_masked: null,
-        last_sync_at: null,
-        imported: [],
+        status: google.status,
+        account_masked: google.account_masked,
+        last_sync_at: google.data?.fetched_at ?? null,
+        imported: google.status === 'connected' ? ['Campanhas', 'Investimento', 'Impressões', 'Cliques'] : [],
+        detail: google.detail,
       },
       {
         id: 'tiktok',
