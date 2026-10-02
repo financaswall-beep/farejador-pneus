@@ -3,9 +3,26 @@ import { z } from 'zod';
 import { requireAdminOwner,getAdminContext } from '../auth.js';
 import { listMetaIdentityReviews,setMetaIdentityDecision } from '../../marketing/meta-identity-decisions.js';
 import { listGoogleConversionReviews,reviewGoogleConversion } from '../../marketing/google-conversion-review.js';
+import { setMetaFinanceStart } from '../../marketing/meta-finance-start.js';
 
 const reason=z.string().trim().min(10).max(1000);
 export async function registerMarketingReviews(fastify:FastifyInstance) {
+  fastify.post('/admin/api/marketing/meta/ad-accounts/:account/finance-start',
+    {preHandler:requireAdminOwner},async(request,reply)=> {
+      const params=z.object({account:z.string().regex(/^(?:act_)?\d{1,30}$/)}).strict().safeParse(request.params);
+      const body=z.object({since:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>{
+        const date=new Date(value+'T12:00:00Z');return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===value;
+      }),reason}).strict().safeParse(request.body);
+      if(!params.success||!body.success)return reply.code(400).send({error:'invalid_finance_start'});
+      try {return reply.header('Cache-Control','no-store').send(await setMetaFinanceStart({...params.data,...body.data,
+        actor:getAdminContext(request).displayName,idempotencyKey:String(request.id)}));}
+      catch(error) {
+        const code=error instanceof Error?error.message:'meta_finance_start_failed';
+        const known=['meta_account_not_found','meta_finance_start_future','meta_finance_start_has_history'];
+        return reply.code(code==='meta_account_not_found'?404:known.includes(code)?409:503)
+          .send({error:known.includes(code)?code:'meta_finance_start_failed'});
+      }
+    });
   fastify.get('/admin/api/marketing/meta/identity-reviews',{preHandler:requireAdminOwner},async(request,reply)=> {
     if(!z.object({}).strict().safeParse(request.query).success)return reply.code(400).send({error:'invalid_review_query'});
     try {return reply.header('Cache-Control','no-store').send(await listMetaIdentityReviews());}

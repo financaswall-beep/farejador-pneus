@@ -117,10 +117,9 @@ export async function getMatrizLedgerCompetenceGate(
              AND deleted_at>=m.month_ts AND deleted_at<m.month_end_ts),0) FROM months m
        UNION ALL
        SELECT m.competence,'marketing',
-         COALESCE((SELECT sum(CASE WHEN $3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=meta_insights_daily_scoped.environment AND a.ad_account_id=meta_insights_daily_scoped.ad_account_id) THEN financial_spend ELSE spend END)
-           FROM marketing.meta_insights_daily_scoped
-           WHERE environment=$1 AND entity_level='campaign'
-             AND account_currency='BRL' AND metric_date>=m.competence
+         COALESCE((SELECT sum(CASE WHEN $3::boolean THEN scoped_spend ELSE expected_spend END)
+           FROM marketing.meta_spend_expected
+           WHERE environment=$1 AND metric_date>=m.competence
              AND metric_date<m.month_end),0)
          +COALESCE((SELECT sum(expected_spend) FROM marketing.google_spend_expected
            WHERE environment=$1 AND metric_date>=m.competence AND metric_date<m.month_end),0) FROM months m
@@ -179,16 +178,8 @@ export async function getMatrizLedgerCompetenceGate(
             COALESCE(l.value,0)::numeric(14,2)::text ledger_total,
             (COALESCE(s.value,0)-COALESCE(l.value,0))::numeric(14,2)::text difference,
             (SELECT count(*)::int FROM (
-             SELECT DISTINCT mi.ad_account_id,mi.campaign_id
-               FROM marketing.meta_insights_daily_scoped mi
-              WHERE ($3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=mi.environment AND a.ad_account_id=mi.ad_account_id)) AND mi.environment=$1
-                AND mi.spend>0
-                AND mi.campaign_scope='pending'
-                AND mi.metric_date>=m.competence AND mi.metric_date<m.month_end
-             UNION
-             SELECT d.ad_account_id,d.campaign_id FROM marketing.meta_ad_identities d
-              WHERE d.environment=$1 AND d.scope='pending'
-                AND d.verified_at>=m.month_ts AND d.verified_at<m.month_end_ts
+              SELECT DISTINCT ad_account_id,campaign_id FROM marketing.meta_pending_campaigns(
+                $1,m.competence,m.month_end-1,$3)
              ) pending_campaigns)
               AS pending_marketing_campaigns
        FROM months m CROSS JOIN origins o

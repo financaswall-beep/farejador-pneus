@@ -587,11 +587,11 @@ describe('pipeline determinístico de Marketing', () => {
       return { rows: [], rowCount: 0 };
     });
     const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
-    const poolQuery = vi.fn(async (sql: string) => (
-      sql.includes('INSERT INTO marketing.meta_sync_runs')
-        ? { rows: [{ id: 'run-1' }], rowCount: 1 }
-        : { rows: [], rowCount: 1 }
-    ));
+    const poolQuery = vi.fn(async (sql: string) => {
+      if(sql.includes('INSERT INTO marketing.meta_sync_runs'))return { rows: [{ id: 'run-1' }], rowCount: 1 };
+      if(sql.includes('::text since'))return { rows: [{ since: '2026-07-20' }], rowCount: 1 };
+      return { rows: [], rowCount: 1 };
+    });
     const dbPool = { query: poolQuery, connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
     const fetcher = vi.fn(async (input: URL | RequestInfo) => {
       const url = new URL(String(input));

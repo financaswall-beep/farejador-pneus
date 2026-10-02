@@ -1,8 +1,8 @@
+import { insightValues } from './meta-insight-values.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import {
-  canonicalConversationAction,
   clearMetaMarketingCache,
   marketingDateWindow,
   summarizeMetaRows,
@@ -16,6 +16,7 @@ import { reconcileMatrizMarketingSpend } from './matriz-ledger-spend.js';
 import { ensureCampaignScope } from './campaign-scope.js';
 import { fetchMetaAdIdentities, fetchOwnedMetaInsights, persistMetaAdIdentities, campaignAnchors } from './meta-ad-identity.js';
 import { resolveMetaIdentities } from './meta-identity-decisions.js';
+import { collectPendingSpend, persistPendingSpend, ownedBackfillSince } from './meta-pending-spend.js';
 
 type SyncTrigger = 'startup' | 'scheduled' | 'manual';
 
@@ -53,30 +54,6 @@ function metaConfig(): MetaMarketingConfig {
   };
 }
 
-function insightValues(row: MetaInsightRow, level: MetaInsightLevel) {
-  const entityId = String(level === 'ad' ? row.ad_id ?? '' : row.campaign_id ?? '');
-  const campaignId = String(row.campaign_id ?? '');
-  if (!entityId || !campaignId || !row.date_start) return null;
-  const canonical = canonicalConversationAction(row.actions);
-  return {
-    entityId,
-    campaignId,
-    entityName: String(level === 'ad' ? row.ad_name ?? entityId : row.campaign_name ?? entityId),
-    campaignName: String(row.campaign_name ?? campaignId),
-    adsetId: row.adset_id ? String(row.adset_id) : null,
-    adsetName: row.adset_name ? String(row.adset_name) : null,
-    metricDate: String(row.date_start),
-    currency: String(row.account_currency ?? 'BRL'),
-    spend: Number(row.spend ?? 0),
-    impressions: Number(row.impressions ?? 0),
-    clicks: Number(row.clicks ?? 0),
-    reach: row.reach == null ? null : Number(row.reach),
-    conversations: Math.round(canonical.value),
-    actionType: canonical.actionType,
-    actions: Array.isArray(row.actions) ? row.actions : [],
-  };
-}
-
 export async function syncMetaInsights(options: {
   triggerType?: SyncTrigger;
   now?: Date;
@@ -101,9 +78,9 @@ export async function syncMetaInsights(options: {
   );
   const run = await dbPool.query<{ id: string }>(
     `INSERT INTO marketing.meta_sync_runs
-       (environment,trigger_type,window_since,window_until,levels)
-     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [env.FAREJADOR_ENV, options.triggerType ?? 'manual', since, until, levels],
+       (environment,trigger_type,window_since,window_until,levels,ad_account_id)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [env.FAREJADOR_ENV, options.triggerType ?? 'manual', since, until, levels, config.adAccountId],
   );
   const runId = run.rows[0]?.id;
   if (!runId) throw new Error('marketing_sync_run_not_created');
@@ -111,7 +88,11 @@ export async function syncMetaInsights(options: {
   try {
     const identities = await fetchMetaAdIdentities(config, options.fetcher ?? fetch);
     const resolved = await resolveMetaIdentities(dbPool,env.FAREJADOR_ENV,config.adAccountId,identities);
-    const ads = await fetchOwnedMetaInsights(config, resolved.identities, since, until, options.fetcher ?? fetch);
+    const pending = await collectPendingSpend(dbPool, env.FAREJADOR_ENV, config,
+      resolved.identities, since, until, options.fetcher ?? fetch);
+    const ownedSince = await ownedBackfillSince(dbPool, env.FAREJADOR_ENV, config.adAccountId,
+      resolved.identities, pending.financeSince, since);
+    const ads = await fetchOwnedMetaInsights(config, resolved.identities, ownedSince, until, options.fetcher ?? fetch);
     const fetched: { level: MetaInsightLevel; rows: MetaInsightRow[] }[] = [
       { level: 'ad', rows: ads }, { level: 'campaign', rows: campaignAnchors(ads) },
     ];
@@ -131,7 +112,13 @@ export async function syncMetaInsights(options: {
           (SELECT started_at FROM marketing.meta_sync_runs WHERE environment=$1 AND id=$3)`,
       [env.FAREJADOR_ENV, config.adAccountId, runId]);
       if (newer.rows.length) throw new Error('meta_sync_superseded');
-      await persistMetaAdIdentities(client, env.FAREJADOR_ENV, config.adAccountId, runId, identities);
+      const policy = await client.query<{ finance_since: string }>(`SELECT finance_since::text
+        FROM marketing.meta_identity_accounts WHERE environment=$1 AND ad_account_id=$2`,
+      [env.FAREJADOR_ENV, config.adAccountId]);
+      if (policy.rows[0] && policy.rows[0].finance_since !== '-infinity'
+        && policy.rows[0].finance_since !== pending.financeSince) throw new Error('meta_finance_start_changed');
+      await persistMetaAdIdentities(client, env.FAREJADOR_ENV, config.adAccountId, runId, identities, pending.financeSince);
+      await persistPendingSpend(client, env.FAREJADOR_ENV, config.adAccountId, runId, pending);
       const automaticScopes = new Map(identities.map(ad => [ad.id, ad.scope]));
       for(const ad of resolved.identities) {
         if(ad.scope===automaticScopes.get(ad.id))continue;
@@ -139,6 +126,9 @@ export async function syncMetaInsights(options: {
           WHERE environment=$1 AND ad_account_id=$2 AND ad_id=$3`,
         [env.FAREJADOR_ENV,config.adAccountId,ad.id,ad.scope]);
       }
+      await client.query(`UPDATE marketing.meta_ad_identities SET metrics_backfill_pending=false
+        WHERE environment=$1 AND ad_account_id=$2 AND scope='matrix' AND ad_id=ANY($3::text[])`,
+      [env.FAREJADOR_ENV,config.adAccountId,resolved.identities.filter(ad=>ad.scope==='matrix').map(ad=>ad.id)]);
       // A successful empty API result is zero delivery, not stale spend from the previous sync.
       await client.query(`UPDATE marketing.meta_insights_daily i SET spend=0,impressions=0,clicks=0,
         reach=NULL,conversations=0,actions_raw='[]',sync_run_id=$3,collected_at=now()
@@ -146,7 +136,7 @@ export async function syncMetaInsights(options: {
           AND i.metric_date BETWEEN $4::date AND $5::date
           AND EXISTS (SELECT 1 FROM marketing.meta_ad_identities d WHERE d.environment=i.environment
             AND d.ad_account_id=i.ad_account_id AND d.ad_id=i.entity_id AND d.scope='matrix')`,
-      [env.FAREJADOR_ENV, config.adAccountId, runId, since, until]);
+      [env.FAREJADOR_ENV, config.adAccountId, runId, ownedSince, until]);
       const ensuredCampaigns = new Set<string>();
       for (const group of fetched) {
         for (const row of group.rows) {

@@ -16,21 +16,24 @@ export async function reconcileMatrizMarketingSpend(
     entity_name: string | null; campaign_id: string; campaign_name: string | null;
     metric_date: string; spend: string; account_currency: string;
     campaign_scope: 'pending' | 'matrix' | 'external'; identity_scoped: boolean;
+    expected_spend: string;
   }>(
     `SELECT i.environment,i.entity_level,i.entity_id,i.entity_name,
             i.campaign_id,i.campaign_name,i.metric_date::text,v.spend::text,
             i.account_currency,v.campaign_scope,
+            (CASE WHEN $2::boolean THEN expected.scoped_spend ELSE expected.expected_spend END)::text expected_spend,
             EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment
               AND a.ad_account_id=i.ad_account_id) AS identity_scoped
        FROM marketing.meta_insights_daily i
        JOIN marketing.meta_insights_daily_scoped v ON v.environment=i.environment AND v.id=i.id
+       JOIN marketing.meta_spend_expected expected ON expected.environment=i.environment AND expected.id=i.id
        JOIN marketing.campaign_scopes s
          ON s.environment=i.environment
         AND s.ad_account_id=i.ad_account_id
         AND s.campaign_id=i.campaign_id
       WHERE i.id=$1
       FOR UPDATE OF i,s`,
-    [insightId],
+    [insightId, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
   );
   const insight = result.rows[0];
   if (!insight || insight.entity_level !== 'campaign'
@@ -44,9 +47,7 @@ export async function reconcileMatrizMarketingSpend(
     [insight.environment, insightId],
   );
   const rawSpend = matrizLedgerAmount(insight.spend, 'marketing_spend_invalid');
-  const current = insight.identity_scoped || env.MARKETING_SCOPE_ENFORCEMENT_ENABLED
-    ? insight.campaign_scope === 'matrix' ? rawSpend : 0
-    : rawSpend;
+  const current = matrizLedgerAmount(insight.expected_spend, 'marketing_spend_invalid');
   const delta = Math.round((current - Number(booked.rows[0]?.amount ?? 0)) * 100) / 100;
   if (delta === 0) return null;
   const amount = Math.abs(delta);
@@ -86,7 +87,7 @@ export async function reconcileMatrizMarketingCampaign(
     createdBy: string;
   },
 ): Promise<{ scanned: number; posted: number }> {
-  if (!env.MATRIZ_CENTRAL_LEDGER || !env.MARKETING_SCOPE_ENFORCEMENT_ENABLED) {
+  if (!env.MATRIZ_CENTRAL_LEDGER) {
     return { scanned: 0, posted: 0 };
   }
   const result = await client.query<{ id: string }>(

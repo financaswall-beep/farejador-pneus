@@ -82,7 +82,7 @@ describe('identidade Meta, campanha mista e financeiro', () => {
         date_start: '2026-09-29', account_currency: 'BRL', spend: '30', impressions: '100', clicks: '10', actions: [] })) });
     }) as typeof fetch;
     const options = { dbPool: db.pool, config: account, fetcher: mixedFetcher, now: new Date('2026-09-30T12:00:00Z'), lookbackDays: 2 };
-    await sync(options); expect(insightRequests).toBe(0);
+    await sync(options); expect(insightRequests).toBe(1); // Quarantined spend only, no campaign metrics.
     const {listMetaIdentityReviews:list,setMetaIdentityDecision:decide} = await import('../../src/marketing/meta-identity-decisions.js');
     const {getMatrizStage4LedgerReconciliation:stage4} = await import('../../src/admin/painel/matriz-ledger-stage4-reconciliation.js');
     const {getMarketingOverview:overview} = await import('../../src/admin/painel/queries-marketing.js');
@@ -104,7 +104,7 @@ describe('identidade Meta, campanha mista e financeiro', () => {
       .toBe('2 campanha(s) com identidade pendente');
     await db.pool.query(`DELETE FROM marketing.meta_insights_daily WHERE ad_account_id='act_789'`);
     await decide({ account: account.adAccountId, ad: '881', scope: 'matrix', reason: 'Anúncio próprio verificado na Meta', actor: 'test', idempotencyKey: 'meta-decision-test' }, db.pool);
-    await sync(options); expect(insightRequests).toBe(1);
+    await sync(options); expect(insightRequests).toBe(2);
     const scopes = (await db.pool.query(`SELECT ad_id,scope FROM marketing.meta_ad_identities WHERE environment='test' AND ad_account_id='act_789' ORDER BY ad_id`)).rows;
     expect(scopes).toEqual([{ad_id:'881',scope:'matrix'},{ad_id:'882',scope:'external'}]);
     const expense = async () => Number((await db.pool.query(`SELECT COALESCE(sum(CASE side WHEN 'debit' THEN amount ELSE -amount END),0) n

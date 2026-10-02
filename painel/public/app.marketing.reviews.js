@@ -2,10 +2,10 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingReviews = function () {
   return {
-    metaIdentityReviews: {rows:[],pending:0}, googleConversionReviews: [],
+    metaIdentityReviews: {rows:[],pending:0,accounts:[]}, googleConversionReviews: [],
     marketingReviewSeq: 0, marketingReviewLoading: false, marketingReviewError: '',
     marketingReviewSelection: null, marketingReviewScope: 'matrix', marketingReviewAction: 'check',
-    marketingReviewReason: '', marketingReviewBusy: false,
+    marketingReviewReason: '', marketingReviewBusy: false, marketingFinanceStart: '',
     async loadMarketingReviews() {
       if (this.marketingIsMock()) return;
       const seq=++this.marketingReviewSeq;
@@ -15,7 +15,7 @@ window.PAINEL_MODULES.marketingReviews = function () {
         this.apiGet('/admin/api/marketing/google-ads/conversion-reviews'),
       ]);
       if(seq!==this.marketingReviewSeq)return;
-      this.metaIdentityReviews=results[0].status==='fulfilled'?results[0].value:{rows:[],pending:0};
+      this.metaIdentityReviews=results[0].status==='fulfilled'?results[0].value:{rows:[],pending:0,accounts:[]};
       this.googleConversionReviews=results[1].status==='fulfilled'?results[1].value.rows||[]:[];
       if(results.some(result=>result.status==='rejected'))this.marketingReviewError='Uma das listas de revisão não pôde ser carregada. Atualize antes de decidir.';
       this.marketingReviewLoading=false;
@@ -23,6 +23,14 @@ window.PAINEL_MODULES.marketingReviews = function () {
     marketingReviewChoose(kind,row) {
       this.marketingReviewSelection={kind,row};this.marketingReviewReason='';
       this.marketingReviewScope='matrix';this.marketingReviewAction=row.can_check?'check':'close';
+      this.marketingFinanceStart=row.finance_since||'';
+    },
+    marketingIdentityFinancialLabel(row) {
+      if(row.financial_pending_reason==='verification_missing')return 'Coleta do mês incompleta';
+      if(row.scope!=='pending')return 'Classificação definida';
+      return row.financial_pending_reason==='unclassified_spend'?'Gasto no mês · conferir'
+        :row.financial_pending_reason==='verification_missing'?'Coleta do mês incompleta'
+          :'Sem pendência financeira no mês';
     },
     marketingReviewReasonLabel(code) {
       return {google_ingest_ambiguous:'O envio foi interrompido e precisa ser conferido.',
@@ -49,11 +57,16 @@ window.PAINEL_MODULES.marketingReviews = function () {
       this.marketingReviewBusy=true;this.marketingReviewError='';
       try {
         const row=selected.row;
-        const url=selected.kind==='meta'
+        const url=selected.kind==='finance'
+          ? `/admin/api/marketing/meta/ad-accounts/${encodeURIComponent(row.ad_account_id)}/finance-start`
+          : selected.kind==='meta'
           ? `/admin/api/marketing/meta/ad-accounts/${encodeURIComponent(row.ad_account_id)}/ads/${encodeURIComponent(row.ad_id)}/identity-decision`
           : `/admin/api/marketing/google-ads/conversions/${encodeURIComponent(row.id)}/review`;
-        const result=await this.apiPost(url,selected.kind==='meta'?{scope:this.marketingReviewScope,reason}:{action:this.marketingReviewAction,reason});
-        this.marketingIntegrationsMessage=selected.kind==='meta'
+        const result=await this.apiPost(url,selected.kind==='finance'?{since:this.marketingFinanceStart,reason}
+          :selected.kind==='meta'?{scope:this.marketingReviewScope,reason}:{action:this.marketingReviewAction,reason});
+        this.marketingIntegrationsMessage=selected.kind==='finance'
+          ? 'Data de início registrada. Execute a coleta Meta para conferir o período.'
+          : selected.kind==='meta'
           ? 'Decisão registrada. Execute a coleta Meta para atualizar as métricas; os outros anúncios mantêm sua classificação.'
           : result.queued?'Venda recolocada na fila após comprovação da falha.'
             : result.status==='closed'?'Revisão encerrada sem novo envio. O histórico foi preservado.'
@@ -61,7 +74,9 @@ window.PAINEL_MODULES.marketingReviews = function () {
         this.marketingReviewSelection=null;await this.loadMarketingReviews();
       } catch(error) {
         const code=error?.code||error?.error||error?.message;
-        this.marketingReviewError={google_retry_not_proven_safe:'Não há comprovação de rejeição. O reenvio foi bloqueado para evitar duplicidade.',
+        this.marketingReviewError={meta_finance_start_has_history:'Essa data excluiria lançamentos existentes. A limpeza dos testes precisa ser tratada separadamente.',
+          meta_finance_start_future:'Escolha uma data até hoje.',
+          google_retry_not_proven_safe:'Não há comprovação de rejeição. O reenvio foi bloqueado para evitar duplicidade.',
           google_sale_not_eligible:'A venda não está mais elegível. Confira o pedido e o consentimento.',
           google_request_missing:'Esse envio não tem protocolo para consulta. Confira no Google e encerre a revisão sem reenviar.',
           meta_identity_sync_required:'Execute a coleta Meta antes de confirmar essa identidade.'}[code]

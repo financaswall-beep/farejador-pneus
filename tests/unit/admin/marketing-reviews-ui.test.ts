@@ -35,4 +35,15 @@ describe('formulário de revisão de Marketing', () => {
     state.marketingReviewSelection = null; state.apiGet.mockResolvedValue({ rows: [], pending: 0 });
     await state.marketingReviewFromGoogle({ id: 'old-event' }); expect(state.marketingReviewSelection).toBeNull();
   });
+  it('início financeiro usa sua própria rota e mostra a pendência sem confundir com classificação', async () => {
+    const state=app();state.marketingReviewChoose('finance',{ad_account_id:'act_123',finance_since:'2026-06-01'});
+    state.marketingFinanceStart='2026-10-01';state.marketingReviewReason='Início oficial da operação';
+    state.apiPost.mockResolvedValue({since:'2026-10-01'});state.apiGet.mockResolvedValue({rows:[],accounts:[],pending:0});
+    await state.marketingReviewSubmit();
+    expect(state.apiPost).toHaveBeenCalledWith('/admin/api/marketing/meta/ad-accounts/act_123/finance-start',
+      {since:'2026-10-01',reason:'Início oficial da operação'});
+    expect(state.marketingIdentityFinancialLabel({scope:'pending',financial_pending_reason:null})).toContain('Sem pendência');
+    expect(state.marketingIdentityFinancialLabel({scope:'matrix',financial_pending_reason:'verification_missing'})).toContain('incompleta');
+    expect(readFileSync('painel/public/index.html','utf8')).toContain("marketingReviewChoose('finance',account)");
+  });
 });

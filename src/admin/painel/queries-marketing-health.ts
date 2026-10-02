@@ -30,13 +30,10 @@ export async function getMarketingAttributionHealth(
          count(DISTINCT conversation_id) FILTER (WHERE channel='instagram')::int AS instagram,
          (SELECT count(*)::int FROM (
            SELECT d.ad_account_id,d.campaign_id FROM marketing.meta_ad_identities d
-             WHERE d.environment=$1 AND d.scope='pending'
+             WHERE d.environment=$1 AND d.scope='pending' AND d.has_matrix_identity
+               AND d.effective_status='ACTIVE'
            UNION
-           SELECT i.ad_account_id,i.campaign_id FROM marketing.meta_insights_daily_scoped i
-             WHERE i.environment=$1 AND i.campaign_scope='pending' AND i.spend>0
-               AND i.metric_date BETWEEN $2::date AND $3::date
-               AND ($4::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a
-                 WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id))
+           SELECT ad_account_id,campaign_id FROM marketing.meta_pending_campaigns($1,$2::date,$3::date,$4)
          ) pending_campaigns) pending_identity_campaigns
        FROM marketing.ad_referrals r
        WHERE environment=$1

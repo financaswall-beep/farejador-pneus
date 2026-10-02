@@ -28,7 +28,11 @@ export async function getMatrizFinancialRead(
   if (!env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) {
     throw new MatrizCentralLedgerUnavailableError('disabled');
   }
-  const health = await getMatrizLedgerIntegrationHealth(environment, dbPool);
+  const since = selectedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth) ? `${selectedMonth}-01` : null;
+  const [year, month] = selectedMonth?.split('-').map(Number) ?? [];
+  const until = since ? new Date(Date.UTC(year!, month!, 0)) : null;
+  const health = await getMatrizLedgerIntegrationHealth(environment, dbPool,
+    since && until ? { since, until: until.toISOString().slice(0, 10) } : undefined);
   if (health.status === 'red' || health.status === 'disabled') {
     throw new MatrizCentralLedgerUnavailableError(`integration_${health.status}`);
   }

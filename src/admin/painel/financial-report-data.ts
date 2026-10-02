@@ -17,7 +17,7 @@ export async function readFinancialSnapshot(filter:FinancialReportFilter,environ
   try{
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await client.query("SET LOCAL statement_timeout='15s'");
     const reader={query:client.query.bind(client)} as Pool;
-    const health=await getMatrizLedgerIntegrationHealth(environment,reader);
+    const health=await getMatrizLedgerIntegrationHealth(environment,reader,{since:filter.from,until:filter.to});
     if(health.status==='red'||health.status==='disabled')throw new MatrizCentralLedgerUnavailableError(`integration_${health.status}`);
     const clock=(await client.query<{as_of:Date;today:string}>("SELECT now() AS as_of,(now() AT TIME ZONE 'America/Sao_Paulo')::date::text AS today")).rows[0]!;
     const params=[environment,filter.from,filter.to];

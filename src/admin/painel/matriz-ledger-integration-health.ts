@@ -63,10 +63,11 @@ export interface MatrizLedgerIntegrationHealth {
 export async function getMatrizLedgerIntegrationHealth(
   environment: Environment = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  period?: { since: string; until: string },
 ): Promise<MatrizLedgerIntegrationHealth> {
   const [stage3, stage4, stage5, globalResult] = await Promise.all([
     getMatrizStage3LedgerReconciliation(environment, dbPool),
-    getMatrizStage4LedgerReconciliation(environment, dbPool),
+    getMatrizStage4LedgerReconciliation(environment, dbPool, period),
     getMatrizStage5LedgerReconciliation(environment, dbPool),
     dbPool.query<{
       duplicate_sources: number; orphan_sources: number;

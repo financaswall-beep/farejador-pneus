@@ -18,6 +18,17 @@ describe('escopo Meta por identidade do anúncio', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     await expect(fetchMetaAdIdentities(config, async () => Response.json({ error: {} }, { status: 403 }))).rejects.toThrow('api_403');
   });
+  it('mudança de veiculação preserva a identidade usada pela aprovação manual', () => {
+    const paused = classifyMetaAd({ ...own, effective_status: 'PAUSED' });
+    const active = classifyMetaAd({ ...own, effective_status: 'ACTIVE' });
+    expect(active.fingerprint).toBe(paused.fingerprint);
+    expect(active.effectiveStatus).toBe('ACTIVE');
+    expect(classifyMetaAd({ ...own, campaign_id: '20' }).fingerprint).not.toBe(paused.fingerprint);
+  });
+  it('resposta sem dados não pode concluir a recuperação das métricas como zero', async () => {
+    await expect(fetchOwnedMetaInsights(config, [classifyMetaAd(own)], '2026-09-01', '2026-09-30',
+      async () => Response.json({}))).rejects.toThrow('meta_invalid_insights_response');
+  });
   it('só pede métricas dos anúncios próprios e recusa retorno fora da lista', async () => {
     const identities = [classifyMetaAd(own), classifyMetaAd({ id: '222', campaign_id: '10', creative: { actor_id: '999' } })];
     const fetcher = vi.fn(async (url: URL | RequestInfo) => {

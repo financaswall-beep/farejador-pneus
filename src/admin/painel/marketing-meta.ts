@@ -177,7 +177,8 @@ export async function fetchMetaInsightRows(
     });
     const body = await response.json().catch(() => ({})) as MetaPage;
     if (!response.ok || body.error) throw new Error(`meta_api_${response.status}`);
-    if (Array.isArray(body.data)) rows.push(...body.data as MetaInsightRow[]);
+    if (!Array.isArray(body.data)) throw new Error('meta_invalid_insights_response');
+    rows.push(...body.data as MetaInsightRow[]);
     next = validateNextPage(body.paging?.next);
   }
   if (next) throw new Error('meta_pagination_limit');

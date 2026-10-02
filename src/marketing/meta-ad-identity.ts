@@ -7,8 +7,10 @@ type Scope = 'matrix' | 'external' | 'pending';
 export interface MetaAdIdentity {
   id: string; campaignId: string; pageId: string | null; instagramId: string | null; scope: Scope;
   fingerprint?: string;
+  effectiveStatus?: string | null;
+  hasMatrixIdentity?: boolean;
 }
-type MetaAd = { id?: string; campaign_id?: string; creative?: {
+type MetaAd = { id?: string; campaign_id?: string; effective_status?: string; creative?: {
   actor_id?: string; instagram_user_id?: string; effective_object_story_id?: string;
   object_story_spec?: { page_id?: string; instagram_user_id?: string };
 } };
@@ -29,17 +31,18 @@ export function classifyMetaAd(ad: MetaAd): MetaAdIdentity {
     pageId: pages[0] ?? null, instagramId: instagram[0] ?? null,
     fingerprint: createHash('sha256').update(JSON.stringify({campaign:ad.campaign_id,
       pages:[...pages].sort(),instagram:[...instagram].sort()})).digest('hex'),
+    effectiveStatus: ad.effective_status ?? null, hasMatrixIdentity: known,
     scope: known ? foreign ? 'pending' : 'matrix' : foreign ? 'external' : 'pending',
   };
 }
 
 export async function fetchMetaAdIdentities(config: MetaMarketingConfig, fetcher: typeof fetch): Promise<MetaAdIdentity[]> {
   let next: URL | null = new URL(`https://graph.facebook.com/${encodeURIComponent(config.apiVersion)}/${encodeURIComponent(config.adAccountId)}/ads`);
-  next.searchParams.set('fields', 'id,campaign_id,creative{actor_id,instagram_user_id,object_story_spec,effective_object_story_id}');
+  next.searchParams.set('fields', 'id,campaign_id,effective_status,creative{actor_id,instagram_user_id,object_story_spec,effective_object_story_id}');
   next.searchParams.set('limit', '200');
   // Include paused/archived ads: their past spend still belongs in the period.
   next.searchParams.set('filtering', JSON.stringify([{ field: 'effective_status', operator: 'IN',
-    value: ['ACTIVE','PAUSED','DELETED','ARCHIVED','CAMPAIGN_PAUSED','ADSET_PAUSED','DISAPPROVED','PENDING_REVIEW','PREAPPROVED','PENDING_BILLING_INFO','WITH_ISSUES'] }]));
+    value: ['ACTIVE','PAUSED','DELETED','ARCHIVED','CAMPAIGN_PAUSED','ADSET_PAUSED','DISAPPROVED','PENDING_REVIEW','IN_PROCESS','PREAPPROVED','PENDING_BILLING_INFO','WITH_ISSUES'] }]));
   const found = new Map<string, MetaAdIdentity>();
   for (let page = 0; next && page < 100; page++) {
     if (next.protocol !== 'https:' || next.hostname !== 'graph.facebook.com') throw new Error('meta_identity_pagination_origin');
@@ -65,30 +68,43 @@ export async function fetchOwnedMetaInsights(config: MetaMarketingConfig, identi
   for (let start = 0; start < owned.length; start += 50) {
     const batch = owned.slice(start, start + 50);
     const allowed = new Map(batch.map(ad => [ad.id, ad.campaignId]));
-    const fetched = await fetchMetaInsightRows(config, since, until, 'ad', fetcher, batch.map(ad => ad.id));
-    for (const row of fetched) {
-      if (allowed.get(String(row.ad_id)) !== String(row.campaign_id)) throw new Error('meta_insight_identity_mismatch');
-      rows.push(row);
+    // Historical recovery must also fit the existing API pagination limit.
+    for (let from = since; from <= until;) {
+      const next = new Date(Date.parse(from + 'T12:00:00Z') + 31 * 86400000).toISOString().slice(0, 10);
+      const end = new Date(Date.parse(next + 'T12:00:00Z') - 86400000).toISOString().slice(0, 10);
+      const to = end < until ? end : until;
+      const fetched = await fetchMetaInsightRows(config, from, to, 'ad', fetcher, batch.map(ad => ad.id));
+      for (const row of fetched) {
+        if (allowed.get(String(row.ad_id)) !== String(row.campaign_id)) throw new Error('meta_insight_identity_mismatch');
+        if (typeof row.date_start !== 'string' || row.date_start < from || row.date_start > to) throw new Error('meta_insight_date_mismatch');
+        rows.push(row);
+      }
+      from = next;
     }
   }
   return rows;
 }
 
-export async function persistMetaAdIdentities(client: PoolClient, environment: string, account: string, runId: string, identities: MetaAdIdentity[]) {
-  await client.query(`INSERT INTO marketing.meta_identity_accounts(environment,ad_account_id,sync_run_id)
-    VALUES ($1,$2,$3) ON CONFLICT (environment,ad_account_id) DO UPDATE
-    SET sync_run_id=EXCLUDED.sync_run_id,verified_at=now()`, [environment, account, runId]);
+export async function persistMetaAdIdentities(client: PoolClient, environment: string, account: string,
+  runId: string, identities: MetaAdIdentity[], financeSince: string) {
+  await client.query(`INSERT INTO marketing.meta_identity_accounts(environment,ad_account_id,sync_run_id,finance_since)
+    VALUES ($1,$2,$3,$4) ON CONFLICT (environment,ad_account_id) DO UPDATE
+    SET sync_run_id=EXCLUDED.sync_run_id,verified_at=now(),finance_since=CASE
+      WHEN marketing.meta_identity_accounts.finance_since='-infinity'::date THEN EXCLUDED.finance_since
+      ELSE marketing.meta_identity_accounts.finance_since END`, [environment, account, runId, financeSince]);
   // An ad omitted by the API is unresolved, never silently kept as approved.
   await client.query(`UPDATE marketing.meta_ad_identities SET scope='pending'
     WHERE environment=$1 AND ad_account_id=$2`, [environment, account]);
   for (const ad of identities) {
     await client.query(`INSERT INTO marketing.meta_ad_identities
-      (environment,ad_account_id,ad_id,campaign_id,facebook_page_id,instagram_user_id,scope,automatic_scope,identity_fingerprint)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8) ON CONFLICT (environment,ad_account_id,ad_id) DO UPDATE
+      (environment,ad_account_id,ad_id,campaign_id,facebook_page_id,instagram_user_id,scope,automatic_scope,identity_fingerprint,effective_status,has_matrix_identity)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9,$10) ON CONFLICT (environment,ad_account_id,ad_id) DO UPDATE
       SET campaign_id=EXCLUDED.campaign_id,facebook_page_id=EXCLUDED.facebook_page_id,
         instagram_user_id=EXCLUDED.instagram_user_id,scope=EXCLUDED.scope,
-        automatic_scope=EXCLUDED.automatic_scope,identity_fingerprint=EXCLUDED.identity_fingerprint,verified_at=now()`,
-    [environment, account, ad.id, ad.campaignId, ad.pageId, ad.instagramId, ad.scope, ad.fingerprint ?? null]);
+        automatic_scope=EXCLUDED.automatic_scope,identity_fingerprint=EXCLUDED.identity_fingerprint,
+        effective_status=EXCLUDED.effective_status,has_matrix_identity=EXCLUDED.has_matrix_identity,verified_at=now()`,
+    [environment, account, ad.id, ad.campaignId, ad.pageId, ad.instagramId, ad.scope,
+      ad.fingerprint ?? null, ad.effectiveStatus ?? null, ad.hasMatrixIdentity ?? false]);
   }
 }
 

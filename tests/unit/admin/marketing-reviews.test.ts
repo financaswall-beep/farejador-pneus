@@ -1,7 +1,8 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ metaList: vi.fn(), metaDecide: vi.fn(), googleList: vi.fn(), googleReview: vi.fn() }));
+const mocks = vi.hoisted(() => ({ metaList: vi.fn(), metaDecide: vi.fn(), googleList: vi.fn(), googleReview: vi.fn(), financeStart: vi.fn() }));
+vi.mock('../../../src/marketing/meta-finance-start.js', () => ({ setMetaFinanceStart: mocks.financeStart }));
 vi.mock('../../../src/marketing/meta-identity-decisions.js', () => ({ listMetaIdentityReviews: mocks.metaList, setMetaIdentityDecision: mocks.metaDecide }));
 vi.mock('../../../src/marketing/google-conversion-review.js', () => ({ listGoogleConversionReviews: mocks.googleList, reviewGoogleConversion: mocks.googleReview }));
 vi.mock('../../../src/admin/auth.js', () => ({ getAdminContext: () => ({ displayName: 'Administrador' }),
@@ -55,5 +56,23 @@ describe('revisões internas de Marketing', () => {
       const result = await send({ action: 'retry', reason: 'Conferi o envio' });
       expect(result.statusCode).toBe(409); expect(result.json().error).toBe('google_retry_not_proven_safe');
     } finally { await app.close(); }
+  });
+  it('data de início exige dono, data real e justificativa; não aceita ator ou ambiente do cliente', async () => {
+    const app=Fastify();await registerMarketingReviews(app);
+    const url='/admin/api/marketing/meta/ad-accounts/act_123/finance-start';
+    const send=(payload:object)=>app.inject({method:'POST',url,payload,headers:{'x-owner':'yes'}});
+    try {
+      expect((await app.inject({method:'POST',url,payload:{since:'2026-10-01',reason:'Início da operação'}})).statusCode).toBe(403);
+      for(const payload of [{since:'2026-02-30',reason:'Início da operação'},
+        {since:'2026-10-01',reason:'curto'}, {since:'2026-10-01',reason:'Início da operação',environment:'prod'}]) {
+        expect((await send(payload)).statusCode).toBe(400);
+      }
+      expect(mocks.financeStart).not.toHaveBeenCalled();
+      mocks.financeStart.mockResolvedValue({since:'2026-10-01'});
+      expect((await send({since:'2026-10-01',reason:'Início da operação'})).statusCode).toBe(200);
+      expect(mocks.financeStart).toHaveBeenCalledWith(expect.objectContaining({account:'act_123',actor:'Administrador'}));
+      mocks.financeStart.mockRejectedValue(new Error('meta_finance_start_has_history'));
+      expect((await send({since:'2026-10-01',reason:'Início da operação'})).statusCode).toBe(409);
+    } finally {await app.close();}
   });
 });

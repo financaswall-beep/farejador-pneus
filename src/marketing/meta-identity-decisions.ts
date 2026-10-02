@@ -26,8 +26,18 @@ export async function resolveMetaIdentities(db: Pick<Pool,'query'>, environment:
 }
 
 export async function listMetaIdentityReviews(dbPool: Pool = pool) {
-  const rows = await dbPool.query(`SELECT d.ad_account_id,d.ad_id,d.campaign_id,d.facebook_page_id,
-      d.instagram_user_id,d.scope,d.automatic_scope,d.verified_at,
+  const rows = await dbPool.query(`WITH pending AS MATERIALIZED (
+      SELECT * FROM marketing.meta_pending_campaigns($1,NULL,NULL)
+    ) SELECT d.ad_account_id,d.ad_id,d.campaign_id,d.facebook_page_id,
+      d.instagram_user_id,d.scope,d.automatic_scope,d.verified_at,d.effective_status,
+      a.finance_since::text,
+      COALESCE((SELECT sum(p.spend) FROM marketing.meta_pending_spend_daily p
+        WHERE p.environment=d.environment AND p.ad_account_id=d.ad_account_id AND p.ad_id=d.ad_id
+          AND p.identity_fingerprint=d.identity_fingerprint
+          AND p.metric_date>=GREATEST(a.finance_since,date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date)
+          AND p.metric_date<=(now() AT TIME ZONE 'America/Sao_Paulo')::date),0)::text current_month_spend,
+      (SELECT p.reason FROM pending p
+        WHERE p.ad_account_id=d.ad_account_id AND p.ad_id=d.ad_id LIMIT 1) financial_pending_reason,
       o.scope decision,o.reason,o.actor_label,o.created_at decision_at,
       (d.identity_fingerprint IS NOT NULL AND d.verified_at >= a.verified_at) can_decide
     FROM marketing.meta_ad_identities d
@@ -40,7 +50,9 @@ export async function listMetaIdentityReviews(dbPool: Pool = pool) {
     ORDER BY (d.scope='pending') DESC,d.ad_account_id,d.ad_id LIMIT 100`, [env.FAREJADOR_ENV]);
   const count = await dbPool.query<{pending:number}>(`SELECT count(*)::int pending
     FROM marketing.meta_ad_identities WHERE environment=$1 AND scope='pending'`,[env.FAREJADOR_ENV]);
-  return {rows:rows.rows,pending:count.rows[0]?.pending??0};
+  const accounts = await dbPool.query(`SELECT ad_account_id,finance_since::text
+    FROM marketing.meta_identity_accounts WHERE environment=$1 ORDER BY ad_account_id`, [env.FAREJADOR_ENV]);
+  return {rows:rows.rows,pending:count.rows[0]?.pending??0,accounts:accounts.rows};
 }
 
 export async function setMetaIdentityDecision(input: {
@@ -65,7 +77,7 @@ export async function setMetaIdentityDecision(input: {
       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [env.FAREJADOR_ENV,input.account,input.ad,ad.identity_fingerprint,input.scope,input.reason.trim(),input.actor]);
     const scope=input.scope==='automatic'?ad.automatic_scope:input.scope;
-    await client.query(`UPDATE marketing.meta_ad_identities SET scope=$4
+    await client.query(`UPDATE marketing.meta_ad_identities SET scope=$4,metrics_backfill_pending=($4='matrix')
       WHERE environment=$1 AND ad_account_id=$2 AND ad_id=$3`,[env.FAREJADOR_ENV,input.account,input.ad,scope]);
     const reconciliation=await reconcileMatrizMarketingCampaign(client,{
       environment:env.FAREJADOR_ENV,adAccountId:input.account,campaignId:ad.campaign_id,
