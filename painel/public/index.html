@@ -234,7 +234,7 @@
 <script src="/admin/painel/app.marketing.paid.js?v=20261001-google2"></script>
 <script src="/admin/painel/app.marketing.google.overview.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.marketing.google.ads.js?v=20261001-google-ads"></script>
-<script src="/admin/painel/app.marketing.google.js?v=20261002-google-compare"></script>
+<script src="/admin/painel/app.marketing.google.js?v=20261002-hardening1"></script>
 <script src="/admin/painel/app.marketing.google.campaign.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.marketing.google.detail.js?v=20261002-google-compare"></script>
 <script src="/admin/painel/app.marketing.google.compare.js?v=20261002-google-compare"></script>
@@ -264,7 +264,8 @@
 <script src="/admin/painel/app.marketing.campaign-detail.mock.js?v=20261001-campaign1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1"></script>
-<script src="/admin/painel/app.marketing.integrations.js?v=20261001-google2"></script>
+<script src="/admin/painel/app.marketing.reviews.js?v=20261002-hardening1"></script>
+<script src="/admin/painel/app.marketing.integrations.js?v=20261002-hardening1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.visao.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.visao.chart.js?v=20260915-finance1"></script>
@@ -8654,7 +8655,7 @@
                         <p x-show="googleCampaignActivityLoading" role="status">Consultando envios…</p>
                         <p x-show="!googleCampaignActivityLoading && !googleCampaignActivity?.available">Consulta de envios indisponível.</p>
                         <p x-show="googleCampaignActivity?.available && !googleCampaignActivity?.events?.length">Nenhum envio vinculado às vendas do período.</p>
-                        <template x-for="event in googleCampaignActivity?.events || []" :key="event.id"><div><b x-text="'Pedido ' + event.order_id.slice(0,8)"></b><span x-text="googleConversionStatus(event.status)"></span><small x-text="event.attempts + ' tentativa(s) · ' + googleCampaignDate(event.sent_at || event.updated_at)"></small></div></template>
+                        <template x-for="event in googleCampaignActivity?.events || []" :key="event.id"><div><b x-text="'Pedido ' + event.order_id.slice(0,8)"></b><span x-text="googleConversionStatus(event.status)"></span><small x-text="event.attempts + ' tentativa(s) · ' + googleCampaignDate(event.sent_at || event.updated_at)"></small><button type="button" class="mcd-link" x-show="['review','dead_letter'].includes(event.status)" @click="marketingReviewFromGoogle(event)">Resolver pendência →</button></div></template>
                         <small>Até 30 envios recentes. Contagens incluem todos os envios, inclusive revisões após cancelamento.</small>
                         <p x-show="googleCampaignPipeline()?.suppressed > 0" x-text="googleCampaignPipelineCount('suppressed') + ' envio(s) não elegíveis.'"></p>
                       </div>
@@ -8875,8 +8876,8 @@
                     </article>
                     <article class="mcd-card" x-show="googleDetailTab === 'events'"><h2>Envios de conversão</h2><p class="mcd-subtitle">Até 30 envios recentes deste anúncio. As contagens superiores incluem todos os envios do período.</p>
                       <p class="gad-empty" x-show="googleDetailLoading" role="status">Consultando envios…</p>
-                      <div class="mcd-table-scroll" x-show="googleDetailActivity?.available"><table class="mcd-table"><thead><tr><th>Pedido</th><th>Situação</th><th>Tentativas</th><th>Atualizado em</th><th>Confirmado em</th></tr></thead><tbody>
-                        <template x-for="event in googleDetailActivity?.events || []" :key="event.id"><tr><td x-text="event.order_id.slice(0,8)"></td><td><span class="mad-state" :class="googleDetailEventClass(event.status)" x-text="googleConversionStatus(event.status)"></span></td><td x-text="event.attempts"></td><td x-text="googleCampaignDate(event.updated_at)"></td><td x-text="googleCampaignDate(event.sent_at)"></td></tr></template>
+                      <div class="mcd-table-scroll" x-show="googleDetailActivity?.available"><table class="mcd-table"><thead><tr><th>Pedido</th><th>Situação</th><th>Tentativas</th><th>Atualizado em</th><th>Confirmado em</th><th></th></tr></thead><tbody>
+                        <template x-for="event in googleDetailActivity?.events || []" :key="event.id"><tr><td x-text="event.order_id.slice(0,8)"></td><td><span class="mad-state" :class="googleDetailEventClass(event.status)" x-text="googleConversionStatus(event.status)"></span></td><td x-text="event.attempts"></td><td x-text="googleCampaignDate(event.updated_at)"></td><td x-text="googleCampaignDate(event.sent_at)"></td><td><button type="button" class="mcd-link" x-show="['review','dead_letter'].includes(event.status)" @click="marketingReviewFromGoogle(event)">Resolver pendência →</button></td></tr></template>
                       </tbody></table></div>
                       <p class="gad-empty" x-show="!googleDetailLoading && googleDetailActivity?.available && !googleDetailActivity?.events?.length">Nenhum envio de conversão deste anúncio no período.</p>
                       <p class="gad-empty" x-show="!googleDetailLoading && !googleDetailActivity?.available">Consulta de envios indisponível.</p>
@@ -8893,8 +8894,9 @@
                 <p class="mt-3" x-text="googleAdsReport.results?.conversions_enabled && googleAdsReport.results?.conversion_action_configured ? 'Envio das vendas: habilitado' : 'Envio das vendas: aguarda ação de conversão e ativação no servidor'"></p>
                 <p class="paid-notice mt-3" x-show="googleAdsReport.results?.conversions_enabled && googleAdsReport.results?.conversion_destination?.state !== 'ready'">Aguardando validação do destino pelo Google. As vendas ficam na fila; uma meta nova pode demorar para ficar disponível.</p>
                 <h3 class="font-semibold mt-6">Envios das vendas atribuídas no período</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4"><template x-for="state in ['sent','pending','processing','accepted','failed','dead_letter','review','suppressed']" :key="state"><div class="p-4 bg-slate-50 rounded-xl"><strong x-text="googlePipelineCount(state)"></strong><p class="paid-muted" x-text="googleConversionStatus(state)"></p></div></template></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4"><template x-for="state in ['sent','pending','processing','accepted','failed','dead_letter','review','suppressed','closed']" :key="state"><div class="p-4 bg-slate-50 rounded-xl"><strong x-text="googlePipelineCount(state)"></strong><p class="paid-muted" x-text="googleConversionStatus(state)"></p></div></template></div>
                 <p class="paid-notice mt-4">Envios interrompidos e vendas canceladas depois de enviadas aparecem em “Conferir envio”. Não há reenvio automático nesses casos.</p>
+                <button type="button" class="mcd-link mt-3" @click="marketingSetTab('integracoes')">Resolver pendências nas Integrações →</button>
                 <h3 class="font-semibold mt-6">Vendas vinculadas às conversas</h3>
                 <p class="paid-muted mt-2">Até 100 vendas recentes do período selecionado. Conversas sem venda permanecem no indicador de rastreio.</p>
                 <div class="paid-table-wrap mt-4"><table class="paid-table"><thead><tr><th>Pedido</th><th>Conversa</th><th>Receita</th><th>Margem antes da mídia</th><th>Retorno ao Google</th></tr></thead><tbody><template x-for="order in googleAdsReport.results?.orders || []" :key="order.order_id"><tr><td x-text="order.order_id.slice(0,8)"></td><td x-text="'#' + order.conversation_number"></td><td x-text="paidMoney(order.revenue)"></td><td x-text="paidMoney(order.gross_margin)"></td><td x-text="googleConversionStatus(order.conversion_status)"></td></tr></template></tbody></table></div>
@@ -9498,6 +9500,29 @@
                         x-text="marketingIntegrationActionLabel(platform)"></button>
               </article>
             </template>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+            <div class="flex items-center justify-between gap-3"><div><h3 class="text-base font-semibold text-gray-950">Revisar pendências de Marketing</h3><p class="mt-1 text-sm text-gray-500">Decisões registradas por anúncio e por envio, com histórico preservado.</p></div><button type="button" class="mcd-link" @click="loadMarketingReviews()" :disabled="marketingReviewLoading || marketingReviewBusy">Atualizar</button></div>
+            <p x-show="marketingReviewLoading" class="text-sm text-gray-500" role="status">Carregando revisões…</p>
+            <p x-show="marketingReviewError" x-text="marketingReviewError" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900" role="alert"></p>
+            <div><h4 class="font-semibold">Identidade dos anúncios Meta <span class="text-amber-700" x-text="'· ' + metaIdentityReviews.pending + ' pendente(s)'"></span></h4><p class="text-sm text-gray-500 mt-1">Pendências aparecem mesmo sem métricas. Confirmar um anúncio não aprova os demais da campanha. Uma mudança de identidade exige nova revisão.</p>
+              <div class="overflow-x-auto mt-3"><table class="mcd-table"><thead><tr><th>Anúncio / campanha</th><th>Perfis identificados</th><th>Escopo</th><th>Última decisão</th><th>Ações</th></tr></thead><tbody>
+                <template x-for="row in metaIdentityReviews.rows" :key="row.ad_account_id + ':' + row.ad_id"><tr><td><b x-text="row.ad_id"></b><small x-text="'Campanha ' + row.campaign_id"></small></td><td><small x-text="'Facebook: ' + (row.facebook_page_id || 'Não informado')"></small><small x-text="'Instagram: ' + (row.instagram_user_id || 'Não informado')"></small></td><td x-text="({matrix:'Matriz',external:'Externa',pending:'Pendente'})[row.scope]"></td><td><span x-text="row.actor_label || 'Automática'"></span><small x-text="row.reason || 'Aguardando conferência'"></small></td><td><button type="button" class="mcd-link" @click="marketingReviewChoose('meta',row)" :disabled="!row.can_decide || marketingReviewLoading || marketingReviewBusy">Revisar</button><a class="mcd-link" :href="'https://adsmanager.facebook.com/adsmanager/manage/ads?act=' + encodeURIComponent(row.ad_account_id.replace(/^act_/,'')) + '&selected_ad_ids=' + encodeURIComponent(row.ad_id)" target="_blank" rel="noopener noreferrer">Abrir na Meta ↗</a><small x-show="!row.can_decide">Execute a coleta Meta.</small></td></tr></template>
+              </tbody></table></div><p x-show="!marketingReviewLoading && !metaIdentityReviews.rows.length" class="text-sm text-gray-500 mt-2">Nenhuma identidade aguardando revisão.</p><small class="text-gray-400">Até 100 anúncios; após decidir, atualize para ver os próximos.</small>
+            </div>
+            <div class="border-t pt-4"><h4 class="font-semibold">Envios de vendas ao Google</h4><p class="text-sm text-gray-500 mt-1">Conferir consulta o protocolo. Recolocar na fila exige comprovação da falha. Encerrar preserva o histórico e não envia novamente.</p>
+              <div class="overflow-x-auto mt-3"><table class="mcd-table"><thead><tr><th>Pedido / campanha</th><th>Situação</th><th>Motivo</th><th>Tentativas</th><th>Ações</th></tr></thead><tbody>
+                <template x-for="row in googleConversionReviews" :key="row.id"><tr><td><b x-text="row.order_id.slice(0,8)"></b><small x-text="row.campaign_name"></small></td><td x-text="googleConversionStatus(row.status)"></td><td x-text="marketingReviewReasonLabel(row.last_error_code)"></td><td x-text="row.attempts"></td><td><button type="button" class="mcd-link" @click="marketingReviewChoose('google',row)" :disabled="marketingReviewLoading || marketingReviewBusy">Resolver</button></td></tr></template>
+              </tbody></table></div><p x-show="!marketingReviewLoading && !googleConversionReviews.length" class="text-sm text-gray-500 mt-2">Nenhum envio aguardando intervenção.</p>
+            </div>
+            <form x-show="marketingReviewSelection" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3" @submit.prevent="marketingReviewSubmit()">
+              <div class="flex justify-between"><h4 class="font-semibold" x-text="marketingReviewSelection?.kind === 'meta' ? 'Decisão sobre este anúncio' : 'Resolver este envio'"></h4><button type="button" class="mcd-link" @click="marketingReviewSelection = null" :disabled="marketingReviewBusy">Cancelar</button></div>
+              <label class="block" x-show="marketingReviewSelection?.kind === 'meta'">Classificação<select class="block w-full rounded-lg border p-2 mt-1" x-model="marketingReviewScope" :disabled="marketingReviewBusy"><option value="matrix">Confirmo que este anúncio pertence à Matriz</option><option value="external">Este anúncio pertence a outra empresa</option><option value="automatic">Voltar à classificação automática</option></select></label>
+              <label class="block" x-show="marketingReviewSelection?.kind === 'google'">Ação<select class="block w-full rounded-lg border p-2 mt-1" x-model="marketingReviewAction" :disabled="marketingReviewBusy"><option value="check" :disabled="!marketingReviewSelection?.row?.can_check">Conferir processamento no Google</option><option value="retry">Recolocar na fila após comprovar falha</option><option value="close">Encerrar revisão sem reenviar</option></select></label>
+              <label class="block">Justificativa<textarea class="block w-full rounded-lg border p-2 mt-1" x-model="marketingReviewReason" minlength="10" maxlength="1000" required :disabled="marketingReviewBusy" placeholder="Explique o que você conferiu, sem dados pessoais do cliente."></textarea></label>
+              <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white disabled:opacity-50" :disabled="marketingReviewBusy || marketingReviewLoading || marketingReviewReason.trim().length < 10" x-text="marketingReviewBusy ? 'Registrando…' : 'Registrar decisão'"></button>
+            </form>
           </section>
 
           <div x-show="marketingIntegrationsMessage"

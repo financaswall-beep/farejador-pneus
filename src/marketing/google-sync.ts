@@ -10,23 +10,25 @@ import { validateGoogleAdsConfig, type GoogleAdsConfig } from './google-ads-clie
 /** Despesa por campanha/dia. O total por anuncio nunca e lancado novamente. */
 async function reconcileSpend(client: PoolClient, environment: 'prod' | 'test', account: string, runId: string): Promise<number> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return 0;
-  const rows = await client.query<{ id: string; campaign_id: string; name: string; metric_date: string; target: string }>(
-    `SELECT i.id,i.campaign_id,c.name,i.metric_date::text,
-       CASE WHEN c.owned AND a.finance_since IS NOT NULL AND i.metric_date>=a.finance_since
-         THEN round(i.cost_micros::numeric/1000000,2) ELSE 0 END::text target
-     FROM marketing.google_insights_daily i
+  const rows = await client.query<{ id: string; campaign_id: string; name: string; metric_date: string; target: string; booked: string }>(
+    `SELECT i.id,i.campaign_id,c.name,i.metric_date::text,i.expected_spend::text target,
+       COALESCE(booked.amount,0)::text booked
+     FROM marketing.google_spend_expected i
      JOIN marketing.google_campaigns c USING(environment,account_id,campaign_id)
-     JOIN marketing.google_accounts a USING(environment,account_id)
-     WHERE i.environment=$1 AND i.account_id=$2 AND i.entity_level='campaign'
-     ORDER BY i.metric_date,i.id FOR UPDATE OF i`, [environment,account]);
+     LEFT JOIN (
+       SELECT t.metadata->>'insight_id' insight_id,
+         sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END) amount
+       FROM finance.matriz_ledger_transactions t
+       JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+       WHERE t.environment=$1 AND t.source_type='marketing.google_spend.adjustment'
+         AND e.account_code='marketing_expense'
+       GROUP BY t.metadata->>'insight_id'
+     ) booked ON booked.insight_id=i.id::text
+     WHERE i.environment=$1 AND i.account_id=$2
+     ORDER BY i.metric_date,i.id`, [environment,account]);
   let posted = 0;
   for (const row of rows.rows) {
-    const booked = await client.query<{ amount: string }>(
-      `SELECT COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::text amount
-       FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
-       WHERE t.environment=$1 AND t.source_type='marketing.google_spend.adjustment'
-         AND t.metadata->>'insight_id'=$2 AND e.account_code='marketing_expense'`, [environment,row.id]);
-    const delta = Math.round((Number(row.target)-Number(booked.rows[0]?.amount ?? 0))*100)/100;
+    const delta = Math.round((Number(row.target)-Number(row.booked))*100)/100;
     if (!delta) continue;
     const amount = Math.abs(delta), increase = delta > 0;
     await postMatrizLedgerTransaction(client, {
@@ -60,7 +62,9 @@ export async function syncGoogleAds(options: {dbPool?: Pool; config?: GoogleAdsC
     const account = snapshot.account, since = options.financeSince === undefined ? env.GOOGLE_ADS_FINANCE_SINCE : options.financeSince;
     await client.query(`INSERT INTO marketing.google_accounts(environment,account_id,name,currency,time_zone,scope,finance_since,last_sync_at)
       VALUES($1,$2,$3,'BRL',$4,$5,$6,$7) ON CONFLICT(environment,account_id) DO UPDATE
-      SET name=EXCLUDED.name,time_zone=EXCLUDED.time_zone,scope=EXCLUDED.scope,finance_since=EXCLUDED.finance_since,last_sync_at=EXCLUDED.last_sync_at`,
+      SET name=EXCLUDED.name,time_zone=EXCLUDED.time_zone,scope=EXCLUDED.scope,
+        finance_since=COALESCE(EXCLUDED.finance_since,marketing.google_accounts.finance_since),
+        last_sync_at=EXCLUDED.last_sync_at`,
     [config.environment,account.id,account.name,account.time_zone,config.scope,since ?? null,snapshot.fetched_at]);
     await client.query('UPDATE marketing.google_campaigns SET owned=false WHERE environment=$1 AND account_id=$2',[config.environment,account.id]);
     for (const c of snapshot.campaigns) {

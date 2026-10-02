@@ -114,6 +114,10 @@ export async function getMatrizLedgerIntegrationHealth(
                SELECT 1 FROM marketing.meta_insights_daily x
                 WHERE x.environment=t.environment
                   AND x.id::text=t.metadata->>'insight_id'))
+             OR (t.source_type='marketing.google_spend.adjustment' AND NOT EXISTS (
+               SELECT 1 FROM marketing.google_insights_daily x
+                WHERE x.environment=t.environment AND x.entity_level='campaign'
+                  AND x.id::text=t.metadata->>'insight_id'))
              OR (t.source_type LIKE 'network.commission_entry.%'
                AND t.source_type<>'network.commission_entry.reversal'
                AND NOT EXISTS (SELECT 1 FROM network.commission_entries x

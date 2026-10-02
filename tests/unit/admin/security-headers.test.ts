@@ -14,6 +14,19 @@ function mockReply(): FastifyReply & { values: Record<string, string> } {
 }
 
 describe('security response headers', () => {
+  it('preserves a public route CSP while retaining the global security headers', async () => {
+    const server = Fastify();
+    registerSecurityHeaders(server, true);
+    const custom = "default-src 'none'; script-src 'self'; frame-ancestors 'none'";
+    server.get('/marketing/google/contato', async (_request, reply) => reply.header('Content-Security-Policy', custom).send('contact'));
+    try {
+      const response = await server.inject('/marketing/google/contato');
+      expect(response.headers['content-security-policy']).toBe(custom);
+      expect(response.headers['x-content-type-options']).toBe('nosniff');
+      expect(response.headers['x-frame-options']).toBe('DENY');
+      expect(response.headers['strict-transport-security']).toContain('max-age=31536000');
+    } finally { await server.close(); }
+  });
   it('sets browser hardening headers on every environment', () => {
     const reply = mockReply();
     applySecurityHeaders(reply, false);

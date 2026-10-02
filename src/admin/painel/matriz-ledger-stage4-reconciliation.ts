@@ -67,7 +67,7 @@ export async function getMatrizStage4LedgerReconciliation(
              WHERE t.environment=r.environment
                AND t.source_type='commerce.matriz_expense.accrual'
                AND t.source_id=r.ai_expense_id::text)) receipt_expense_missing,
-       (SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
+       ((SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
          WHERE i.environment=$1 AND i.entity_level='campaign'
            AND i.account_currency='BRL'
            AND abs((CASE WHEN $2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id) THEN i.financial_spend ELSE i.spend END)
@@ -79,16 +79,26 @@ export async function getMatrizStage4LedgerReconciliation(
                 AND t.source_type='marketing.meta_spend.adjustment'
                 AND t.metadata->>'insight_id'=i.id::text
                 AND e.account_code='marketing_expense'),0))>0.009)
+       + (SELECT count(*)::int FROM marketing.google_spend_expected i
+           WHERE i.environment=$1 AND abs(i.expected_spend-COALESCE((
+             SELECT sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
+             FROM finance.matriz_ledger_transactions t
+             JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+             WHERE t.environment=i.environment AND t.source_type='marketing.google_spend.adjustment'
+               AND t.metadata->>'insight_id'=i.id::text AND e.account_code='marketing_expense'),0))>0.009))
          marketing_spend_mismatch,
        (SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
          WHERE i.environment=$1 AND i.entity_level='campaign' AND i.spend>0
            AND i.account_currency<>'BRL'
            AND (NOT $2::boolean OR i.campaign_scope='matrix'))
          marketing_currency_unsupported,
-       (SELECT count(DISTINCT (i.ad_account_id,i.campaign_id))::int
-          FROM marketing.meta_insights_daily_scoped i
-         WHERE ($2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id)) AND i.environment=$1
-           AND i.spend>0 AND i.campaign_scope='pending')
+       (SELECT count(*)::int FROM (
+         SELECT i.ad_account_id,i.campaign_id FROM marketing.meta_insights_daily_scoped i
+         WHERE ($2::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=i.environment AND a.ad_account_id=i.ad_account_id))
+           AND i.environment=$1 AND i.spend>0 AND i.campaign_scope='pending'
+         UNION SELECT d.ad_account_id,d.campaign_id FROM marketing.meta_ad_identities d
+           WHERE d.environment=$1 AND d.scope='pending'
+       ) unresolved)
          marketing_campaigns_unclassified,
        (SELECT count(*)::int FROM commerce.matriz_delivery_trips t
          WHERE t.environment=$1 AND COALESCE(t.fuel_spent,0)>0

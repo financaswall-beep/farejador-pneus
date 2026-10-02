@@ -101,7 +101,7 @@ export async function getGoogleResults(account: string, since: string, until: st
        AND a.realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
      GROUP BY g.campaign_id,g.ad_group_id,g.ad_id,q.status`,[...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'']);
   const emptyPipeline = () => ({available:true,pending:0,processing:0,accepted:0,sent:0,failed:0,
-    dead_letter:0,review:0,suppressed:0,last_sent_at:null as string|null});
+    dead_letter:0,review:0,suppressed:0,closed:0,last_sent_at:null as string|null});
   const pipeline = emptyPipeline();
   const campaignPipelines:Record<string,ReturnType<typeof emptyPipeline>> = {};
   const adPipelines:Record<string,ReturnType<typeof emptyPipeline>> = {};

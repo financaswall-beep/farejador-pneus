@@ -46,6 +46,38 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     await sync({dbPool:db.pool,config,snapshot:snapshot(),financeSince:'2026-10-01'});expect(await expense()).toBe(20);
     await sync({dbPool:db.pool,config,snapshot:snapshot('15000000'),financeSince:'2026-10-01'});expect(await expense()).toBe(15);
   });
+  it('preserva a data financeira sem variável e concilia Meta mais Google em todas as verificações',async()=>{
+    await sync({dbPool:db.pool,config,snapshot:snapshot('15000000'),financeSince:null});
+    await sync({dbPool:db.pool,config,snapshot:snapshot('15000000')});
+    expect(await expense()).toBe(15);
+    const account=await db.pool.query(`SELECT finance_since::text FROM marketing.google_accounts WHERE environment='test'`);
+    expect(account.rows[0].finance_since).toBe('2026-10-01');
+    const insight=(await db.pool.query(`INSERT INTO marketing.meta_insights_daily
+      (environment,ad_account_id,api_version,account_currency,entity_level,entity_id,campaign_id,metric_date,spend,impressions,clicks,actions_raw)
+      VALUES('test','act_345','v26.0','BRL','campaign','meta-finance','meta-finance','2026-10-01',30,100,10,'[]') RETURNING id`)).rows[0].id;
+    const {reconcileMatrizMarketingSpend}=await import('../../src/marketing/matriz-ledger-spend.js');
+    const client=await db.pool.connect();
+    try {await client.query('BEGIN');await reconcileMatrizMarketingSpend(client,insight,'proof');await client.query('COMMIT');}
+    finally {client.release();}
+    const {getMatrizCentralLedgerFinancialTruth:truth}=await import('../../src/admin/painel/matriz-ledger-financial-read.js');
+    const {getMatrizLedgerCompetenceGate:gate}=await import('../../src/admin/painel/matriz-ledger-competence-gate.js');
+    const {getMatrizStage4LedgerReconciliation:stage4}=await import('../../src/admin/painel/matriz-ledger-stage4-reconciliation.js');
+    const {getMatrizLedgerIntegrationHealth:health}=await import('../../src/admin/painel/matriz-ledger-integration-health.js');
+    const report=await truth('test',db.pool,'2026-10');
+    const {getMatrizLedgerOpenItems:openItems}=await import('../../src/admin/painel/matriz-ledger-open-items.js');
+    const payable=(await openItems('test',db.pool)).a_pagar.itens.find(item=>item.tipo==='marketing');
+    expect(payable).toMatchObject({nome:'Marketing · Anúncios',valor:'45.00'});
+    expect(report.competencia.status).toBe('confirmado');
+    expect(report.conciliacao.origens.find(row=>row.origem==='marketing')).toMatchObject({origem_total:'45.00',contabilizado:'45.00',diferenca:'0.00'});
+    expect((await gate(['2026-09-01','2026-10-01'],'test',db.pool)).status).toBe('green');
+    expect((await stage4('test',db.pool)).errors.marketing_spend_mismatch).toBe(0);
+    expect((await health('test',db.pool)).modules.marketing.status).toBe('green');
+    await db.pool.query(`UPDATE marketing.google_insights_daily SET cost_micros=16000000 WHERE environment='test' AND entity_level='campaign'`);
+    expect((await stage4('test',db.pool)).errors.marketing_spend_mismatch).toBe(1);
+    expect((await gate(['2026-09-01','2026-10-01'],'test',db.pool)).status).toBe('red');
+    expect((await health('test',db.pool)).modules.marketing.status).toBe('red');
+    await sync({dbPool:db.pool,config,snapshot:snapshot('15000000')});
+  });
   it('faz vinculo explicito, nao inventa lucro sem custo e nao atribui a mesma venda na Meta',async()=>{
     const contact=(await db.pool.query(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name) VALUES('test',99801,'Teste isolado') RETURNING id`)).rows[0].id;
     conversation=(await db.pool.query(`INSERT INTO core.conversations(environment,chatwoot_conversation_id,chatwoot_account_id,channel_type,contact_id,current_status,started_at)
@@ -109,6 +141,29 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect(transport.ingest).toHaveBeenCalledTimes(1);
     expect((await db.pool.query(`SELECT status,last_error_code FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0])
       .toMatchObject({status:'review',last_error_code:'google_ingest_ambiguous'});
+    const {reviewGoogleConversion:review,listGoogleConversionReviews:list}=await import('../../src/marketing/google-conversion-review.js');
+    const row=(await list(db.pool)).rows[0];
+    const reviewInput={id:row.id,reason:'Conferência da prova isolada',actor:'test',idempotencyKey:'google-review-ambiguous'};
+    await expect(review({...reviewInput,action:'retry'},{dbPool:db.pool,transport})).rejects.toThrow('google_retry_not_proven_safe');
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
+    await review({...reviewInput,action:'close'},{dbPool:db.pool,transport});
+    expect((await db.pool.query(`SELECT status FROM marketing.google_conversion_outbox WHERE id=$1`,[row.id])).rows[0].status).toBe('closed');
+    await process({dbPool:db.pool,transport});expect(transport.ingest).toHaveBeenCalledTimes(1);
+    // Reabre somente a fixture para verificar rejeição comprovada, sem mudar o identificador da venda.
+    await db.pool.query(`UPDATE marketing.google_conversion_outbox SET status='review',request_id='request-test',attempts=20 WHERE id=$1`,[row.id]);
+    transport.status.mockResolvedValue('processing');
+    await review({...reviewInput,action:'check',idempotencyKey:'google-check-processing'},{dbPool:db.pool,transport});
+    expect((await db.pool.query(`SELECT status,attempts FROM marketing.google_conversion_outbox WHERE id=$1`,[row.id])).rows[0]).toMatchObject({status:'accepted',attempts:0});
+    await db.pool.query(`UPDATE marketing.google_conversion_outbox SET status='dead_letter' WHERE id=$1`,[row.id]);
+    transport.status.mockResolvedValue('failed');
+    const transactionId=(await db.pool.query(`SELECT transaction_id FROM marketing.google_conversion_outbox WHERE id=$1`,[row.id])).rows[0].transaction_id;
+    await review({...reviewInput,action:'retry',idempotencyKey:'google-retry-rejected'},{dbPool:db.pool,transport});
+    expect((await db.pool.query(`SELECT status,attempts,request_id,transaction_id FROM marketing.google_conversion_outbox WHERE id=$1`,[row.id])).rows[0])
+      .toMatchObject({status:'pending',attempts:0,request_id:null,transaction_id:transactionId});
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
+    await expect(review({...reviewInput,action:'close'},{dbPool:db.pool,transport})).rejects.toThrow('google_conversion_not_reviewable');
+    const audits=await db.pool.query(`SELECT count(*)::int n FROM audit.events WHERE environment='test' AND entity_id=$1 AND event_type='marketing_google_conversion_reviewed'`,[row.id]);
+    expect(audits.rows[0].n).toBe(3);
     // Restabelece o envio confirmado da prova anterior para testar cancelamento posterior.
     await db.pool.query(`UPDATE marketing.google_conversion_outbox SET status='sent',request_id='request-test' WHERE environment='test'`);
   });
@@ -242,6 +297,10 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect(report.ad_pipelines['22:55']).toMatchObject({review:0,pending:1,failed:0});
     expect(report.ad_pipelines['23:33']).toBeUndefined();
     expect(report.pipeline).toMatchObject({review:1,pending:1,failed:0});
+    const otherAction=(await db.pool.query(`SELECT id FROM marketing.google_conversion_outbox WHERE environment='test' AND action_id='999'`)).rows[0].id;
+    const {reviewGoogleConversion:review}=await import('../../src/marketing/google-conversion-review.js');
+    await expect(review({id:otherAction,action:'close',reason:'Outro destino não pode ser alterado',actor:'test',idempotencyKey:'foreign-action'},
+      {dbPool:db.pool,transport:{status:vi.fn()}})).rejects.toThrow('google_conversion_not_found');
   });
 });
 function processEnv(){return globalThis.process.env;}

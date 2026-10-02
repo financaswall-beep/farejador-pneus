@@ -40,7 +40,8 @@ export function applySecurityHeaders(
     policy = policy.replace("connect-src 'self'", `connect-src 'self' ${origin}`)
       .replace("media-src 'self' blob:", `media-src 'self' blob: ${origin}`);
   }
-  reply.header('Content-Security-Policy', policy);
+  // A route may deliberately set a stricter policy than the panel defaults.
+  if (!reply.hasHeader?.('Content-Security-Policy')) reply.header('Content-Security-Policy', policy);
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('X-Frame-Options', 'DENY');
   reply.header('Referrer-Policy', mapsPanel ? 'strict-origin-when-cross-origin' : 'no-referrer');

@@ -12,6 +12,7 @@ import {
   type MetaMarketingSnapshot,
 } from './marketing-meta.js';
 import { getPersistedOrLiveMetaSnapshot } from '../../marketing/meta-sync.js';
+import { getMarketingAttributionHealth, type AttributionHealth } from './queries-marketing-health.js';
 import {
   getMarketingAttributionReport,
   getMarketingPipelineHealth,
@@ -20,15 +21,6 @@ import {
 } from '../../marketing/reporting.js';
 
 type ConnectionStatus = 'connected' | 'disabled' | 'not_configured' | 'error';
-
-interface AttributionHealth {
-  available: boolean;
-  referrals: number;
-  tracked: number;
-  ctwa: number;
-  messenger: number;
-  instagram: number;
-}
 
 export interface MarketingOverview {
   environment: 'prod' | 'test';
@@ -94,44 +86,6 @@ function deltaPercent(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-async function attributionHealth(
-  environment: 'prod' | 'test',
-  since: string,
-  until: string,
-  dbPool: Pool,
-): Promise<AttributionHealth> {
-  try {
-    const result = await dbPool.query<{
-      referrals: number; tracked: number; ctwa: number; messenger: number; instagram: number;
-    }>(
-      `SELECT
-         count(DISTINCT conversation_id)::int AS referrals,
-         count(DISTINCT conversation_id)::int AS tracked,
-         count(DISTINCT conversation_id) FILTER (WHERE channel='whatsapp')::int AS ctwa,
-         count(DISTINCT conversation_id) FILTER (WHERE channel='messenger')::int AS messenger,
-         count(DISTINCT conversation_id) FILTER (WHERE channel='instagram')::int AS instagram
-       FROM marketing.ad_referrals r
-       WHERE environment = $1
-         AND (NOT EXISTS (SELECT 1 FROM marketing.meta_identity_accounts WHERE environment=$1)
-           OR EXISTS (SELECT 1 FROM marketing.meta_ad_identities d WHERE d.environment=$1
-             AND d.ad_id=r.source_id AND d.scope='matrix'))
-         AND captured_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
-         AND captured_at < (($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`,
-      [environment, since, until],
-    );
-    return {
-      available: true,
-      referrals: Number(result.rows[0]?.referrals ?? 0),
-      tracked: Number(result.rows[0]?.tracked ?? result.rows[0]?.referrals ?? 0),
-      ctwa: Number(result.rows[0]?.ctwa ?? 0),
-      messenger: Number(result.rows[0]?.messenger ?? 0),
-      instagram: Number(result.rows[0]?.instagram ?? 0),
-    };
-  } catch {
-    return { available: false, referrals: 0, tracked: 0, ctwa: 0, messenger: 0, instagram: 0 };
-  }
-}
-
 function defaultConfig(): MarketingConfig {
   return {
     metaEnabled: env.MARKETING_META_ENABLED,
@@ -151,7 +105,7 @@ export async function getMarketingOverview(
   const dbPool = dependencies.dbPool ?? defaultPool;
   const metaProvider = dependencies.metaProvider;
   const window = marketingDateWindow(period, now);
-  const attribution = await attributionHealth(env.FAREJADOR_ENV, window.since, window.until, dbPool);
+  const attribution = await getMarketingAttributionHealth(env.FAREJADOR_ENV, window.since, window.until, dbPool);
   const pipeline = await getMarketingPipelineHealth(dbPool);
 
   let meta: MetaMarketingSnapshot | null = null;
@@ -205,13 +159,13 @@ export async function getMarketingOverview(
       target: 'integracoes',
     });
   }
-  const pendingScopeCampaigns = (meta?.current.campaign_rows ?? [])
-    .filter((row) => row.scope === 'pending' && row.spend > 0).length;
+  const pendingScopeCampaigns = attribution.available ? attribution.pending_identity_campaigns ?? 0
+    : (meta?.current.campaign_rows ?? []).filter((row) => row.scope === 'pending' && row.spend > 0).length;
   if (pendingScopeCampaigns > 0) {
     alerts.push({
       id: 'campaign-scope-pending', severity: 'high',
       title: `${pendingScopeCampaigns} campanha(s) com identidade pendente`,
-      detail: 'Esses gastos ficam fora do Financeiro. Confira os perfis dos anúncios e execute a coleta Meta.',
+      detail: 'Os anúncios pendentes ficam fora do Financeiro, mesmo sem métricas coletadas. Revise cada anúncio em Integrações e execute a coleta Meta.',
       target: 'integracoes',
     });
   }

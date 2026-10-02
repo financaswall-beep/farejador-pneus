@@ -121,7 +121,9 @@ export async function getMatrizLedgerCompetenceGate(
            FROM marketing.meta_insights_daily_scoped
            WHERE environment=$1 AND entity_level='campaign'
              AND account_currency='BRL' AND metric_date>=m.competence
-             AND metric_date<m.month_end),0) FROM months m
+             AND metric_date<m.month_end),0)
+         +COALESCE((SELECT sum(expected_spend) FROM marketing.google_spend_expected
+           WHERE environment=$1 AND metric_date>=m.competence AND metric_date<m.month_end),0) FROM months m
        UNION ALL
        SELECT m.competence,'compras',
          COALESCE((SELECT sum(total_amount) FROM commerce.wholesale_purchases
@@ -144,7 +146,7 @@ export async function getMatrizLedgerCompetenceGate(
            WHEN t.source_type LIKE 'network.commission_entry.%' THEN 'comissao'
            WHEN t.source_type LIKE 'network.monthly_fee.%' THEN 'mensalidades'
            WHEN t.source_type LIKE 'commerce.matriz_expense.%' THEN 'despesas'
-           WHEN t.source_type='marketing.meta_spend.adjustment' THEN 'marketing'
+           WHEN t.source_type IN ('marketing.meta_spend.adjustment','marketing.google_spend.adjustment') THEN 'marketing'
            WHEN t.source_type LIKE 'commerce.wholesale_purchase.%' THEN 'compras'
            WHEN t.source_type='finance.inventory_adjustment' THEN 'estoque'
          END origin,e.account_code,e.account_class,e.side,e.amount
@@ -176,12 +178,18 @@ export async function getMatrizLedgerCompetenceGate(
             COALESCE(s.value,0)::numeric(14,2)::text source_total,
             COALESCE(l.value,0)::numeric(14,2)::text ledger_total,
             (COALESCE(s.value,0)-COALESCE(l.value,0))::numeric(14,2)::text difference,
-            (SELECT count(DISTINCT (mi.ad_account_id,mi.campaign_id))::int
+            (SELECT count(*)::int FROM (
+             SELECT DISTINCT mi.ad_account_id,mi.campaign_id
                FROM marketing.meta_insights_daily_scoped mi
               WHERE ($3::boolean OR EXISTS (SELECT 1 FROM marketing.meta_identity_accounts a WHERE a.environment=mi.environment AND a.ad_account_id=mi.ad_account_id)) AND mi.environment=$1
                 AND mi.spend>0
                 AND mi.campaign_scope='pending'
-                AND mi.metric_date>=m.competence AND mi.metric_date<m.month_end)
+                AND mi.metric_date>=m.competence AND mi.metric_date<m.month_end
+             UNION
+             SELECT d.ad_account_id,d.campaign_id FROM marketing.meta_ad_identities d
+              WHERE d.environment=$1 AND d.scope='pending'
+                AND d.verified_at>=m.month_ts AND d.verified_at<m.month_end_ts
+             ) pending_campaigns)
               AS pending_marketing_campaigns
        FROM months m CROSS JOIN origins o
        LEFT JOIN source_values s ON s.competence=m.competence AND s.origin=o.origin

@@ -15,6 +15,7 @@ import {
 import { reconcileMatrizMarketingSpend } from './matriz-ledger-spend.js';
 import { ensureCampaignScope } from './campaign-scope.js';
 import { fetchMetaAdIdentities, fetchOwnedMetaInsights, persistMetaAdIdentities, campaignAnchors } from './meta-ad-identity.js';
+import { resolveMetaIdentities } from './meta-identity-decisions.js';
 
 type SyncTrigger = 'startup' | 'scheduled' | 'manual';
 
@@ -109,7 +110,8 @@ export async function syncMetaInsights(options: {
 
   try {
     const identities = await fetchMetaAdIdentities(config, options.fetcher ?? fetch);
-    const ads = await fetchOwnedMetaInsights(config, identities, since, until, options.fetcher ?? fetch);
+    const resolved = await resolveMetaIdentities(dbPool,env.FAREJADOR_ENV,config.adAccountId,identities);
+    const ads = await fetchOwnedMetaInsights(config, resolved.identities, since, until, options.fetcher ?? fetch);
     const fetched: { level: MetaInsightLevel; rows: MetaInsightRow[] }[] = [
       { level: 'ad', rows: ads }, { level: 'campaign', rows: campaignAnchors(ads) },
     ];
@@ -119,6 +121,10 @@ export async function syncMetaInsights(options: {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
         [`meta-identity:${env.FAREJADOR_ENV}:${config.adAccountId}`]);
+      const decisions=await client.query<{version:string}>(`SELECT COALESCE(max(decision_seq),0)::text version
+        FROM marketing.meta_ad_identity_decisions WHERE environment=$1 AND ad_account_id=$2`,
+      [env.FAREJADOR_ENV,config.adAccountId]);
+      if(decisions.rows[0]?.version!==resolved.version)throw new Error('meta_identity_decisions_changed');
       const newer = await client.query(`SELECT 1 FROM marketing.meta_identity_accounts a
         JOIN marketing.meta_sync_runs r ON r.environment=a.environment AND r.id=a.sync_run_id
         WHERE a.environment=$1 AND a.ad_account_id=$2 AND r.started_at>
@@ -126,6 +132,13 @@ export async function syncMetaInsights(options: {
       [env.FAREJADOR_ENV, config.adAccountId, runId]);
       if (newer.rows.length) throw new Error('meta_sync_superseded');
       await persistMetaAdIdentities(client, env.FAREJADOR_ENV, config.adAccountId, runId, identities);
+      const automaticScopes = new Map(identities.map(ad => [ad.id, ad.scope]));
+      for(const ad of resolved.identities) {
+        if(ad.scope===automaticScopes.get(ad.id))continue;
+        await client.query(`UPDATE marketing.meta_ad_identities SET scope=$4
+          WHERE environment=$1 AND ad_account_id=$2 AND ad_id=$3`,
+        [env.FAREJADOR_ENV,config.adAccountId,ad.id,ad.scope]);
+      }
       // A successful empty API result is zero delivery, not stale spend from the previous sync.
       await client.query(`UPDATE marketing.meta_insights_daily i SET spend=0,impressions=0,clicks=0,
         reach=NULL,conversations=0,actions_raw='[]',sync_run_id=$3,collected_at=now()

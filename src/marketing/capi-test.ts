@@ -6,6 +6,13 @@ import { buildCapiPayload } from './capi.js';
 import { loadLatestCapiTestSource, type CapiSourceRow } from './capi-source.js';
 import { sendCapiPayload } from './capi-transport.js';
 
+/** Only sanitized provider failures may be shown by the diagnostic endpoint. */
+export function capiFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return /^meta_capi_[0-9]+(?::.{1,300})?$/.test(message)
+    ? message : 'marketing_capi_unknown_error';
+}
+
 interface CapiTestConfig {
   whatsappBusinessAccountId?: string;
   pageId?: string;

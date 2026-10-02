@@ -1,5 +1,5 @@
-// Marketing / Integrações: estado técnico read-only + gerador local de UTM.
-// Nenhum botão grava credencial, altera campanha ou presume conexão.
+// Marketing / Integrações: diagnóstico, revisões auditadas e gerador local de UTM.
+// As decisões alteram somente o escopo interno e a fila; não editam campanhas nas redes.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 
 function marketingIntegrationMockPayload() {
@@ -53,6 +53,7 @@ function marketingIntegrationMockPayload() {
 
 window.PAINEL_MODULES.marketingIntegrations = function () {
   return {
+    ...window.PAINEL_MODULES.marketingReviews(),
     async loadMarketingIntegrations() {
       const requestedPeriod = this.marketingPeriod;
       const requestSeq = ++this.marketingIntegrationsRequestSeq;
@@ -64,6 +65,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
           : await this.apiGet(`/admin/api/marketing/integrations?period=${encodeURIComponent(requestedPeriod)}`);
         if (requestSeq === this.marketingIntegrationsRequestSeq && this.marketingPeriod === requestedPeriod) {
           this.marketingIntegrations = payload;
+          await this.loadMarketingReviews();
         }
       } catch {
         if (requestSeq === this.marketingIntegrationsRequestSeq && this.marketingPeriod === requestedPeriod) {

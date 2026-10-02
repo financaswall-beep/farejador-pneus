@@ -61,6 +61,7 @@ describe('Marketing overview da matriz', () => {
       ctwa: 1,
       messenger: 0,
       instagram: 0,
+      pending_identity_campaigns: 0,
     });
     expect(query).toHaveBeenCalledTimes(4);
     expect(overview.pipeline?.available).toBe(true);

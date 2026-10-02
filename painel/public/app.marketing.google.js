@@ -96,7 +96,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleAdOrders(id) {return (this.googleAdsReport?.results?.orders||[]).filter(row=>row.ad_id===id);},
     googleConversionStatus(status) {
       return {pending:'Na fila',processing:'Enviando',accepted:'Processando no Google',sent:'Processamento confirmado',
-        failed:'Falha temporária',suppressed:'Não elegível',dead_letter:'Falha no envio',review:'Conferir envio'}[status]||'Ainda não enfileirada';
+        failed:'Falha temporária',suppressed:'Não elegível',dead_letter:'Falha no envio',review:'Conferir envio',closed:'Revisão encerrada'}[status]||'Ainda não enfileirada';
     },
     async googleSync() {
       if(this.googleAdsSyncing||this.marketingIsMock())return;
@@ -120,7 +120,10 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       this.googleExportCells(cells);
     },
     googleExportCells(cells) {
-      const escape = value => `"${String(value ?? '').replace(/^[=+@\-\t\r]/, "' $&").replaceAll('"', '""')}"`;
+      const escape = value => {
+        if (typeof value === 'number' && Number.isFinite(value)) return String(value).replace('.', ',');
+        return `"${String(value ?? '').replace(/^[\s]*[=+@\-\t\r]/, "' $&").replaceAll('"', '""')}"`;
+      };
       const url = URL.createObjectURL(new Blob(['\uFEFF' + cells.map(row => row.map(escape).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a'); link.href = url; link.download = `google-ads-${this.marketingPeriod}.csv`; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);

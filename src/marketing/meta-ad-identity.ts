@@ -1,10 +1,12 @@
 import type { PoolClient } from 'pg';
+import { createHash } from 'node:crypto';
 import { META_BUSINESS_ACCOUNTS } from '../shared/meta-business-accounts.js';
 import { fetchMetaInsightRows, type MetaInsightRow, type MetaMarketingConfig } from '../admin/painel/marketing-meta.js';
 
 type Scope = 'matrix' | 'external' | 'pending';
 export interface MetaAdIdentity {
   id: string; campaignId: string; pageId: string | null; instagramId: string | null; scope: Scope;
+  fingerprint?: string;
 }
 type MetaAd = { id?: string; campaign_id?: string; creative?: {
   actor_id?: string; instagram_user_id?: string; effective_object_story_id?: string;
@@ -25,6 +27,8 @@ export function classifyMetaAd(ad: MetaAd): MetaAdIdentity {
   return {
     id: String(ad.id ?? ''), campaignId: String(ad.campaign_id ?? ''),
     pageId: pages[0] ?? null, instagramId: instagram[0] ?? null,
+    fingerprint: createHash('sha256').update(JSON.stringify({campaign:ad.campaign_id,
+      pages:[...pages].sort(),instagram:[...instagram].sort()})).digest('hex'),
     scope: known ? foreign ? 'pending' : 'matrix' : foreign ? 'external' : 'pending',
   };
 }
@@ -79,11 +83,12 @@ export async function persistMetaAdIdentities(client: PoolClient, environment: s
     WHERE environment=$1 AND ad_account_id=$2`, [environment, account]);
   for (const ad of identities) {
     await client.query(`INSERT INTO marketing.meta_ad_identities
-      (environment,ad_account_id,ad_id,campaign_id,facebook_page_id,instagram_user_id,scope)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (environment,ad_account_id,ad_id) DO UPDATE
+      (environment,ad_account_id,ad_id,campaign_id,facebook_page_id,instagram_user_id,scope,automatic_scope,identity_fingerprint)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8) ON CONFLICT (environment,ad_account_id,ad_id) DO UPDATE
       SET campaign_id=EXCLUDED.campaign_id,facebook_page_id=EXCLUDED.facebook_page_id,
-        instagram_user_id=EXCLUDED.instagram_user_id,scope=EXCLUDED.scope,verified_at=now()`,
-    [environment, account, ad.id, ad.campaignId, ad.pageId, ad.instagramId, ad.scope]);
+        instagram_user_id=EXCLUDED.instagram_user_id,scope=EXCLUDED.scope,
+        automatic_scope=EXCLUDED.automatic_scope,identity_fingerprint=EXCLUDED.identity_fingerprint,verified_at=now()`,
+    [environment, account, ad.id, ad.campaignId, ad.pageId, ad.instagramId, ad.scope, ad.fingerprint ?? null]);
   }
 }
 

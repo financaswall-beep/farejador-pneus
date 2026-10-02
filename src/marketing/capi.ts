@@ -11,11 +11,10 @@ import {
   loadProductionCapiSources,
   type CapiSourceRow,
 } from './capi-source.js';
-import { lockCapiCampaignScope, purchaseIsStillEligible } from './capi-eligibility.js';
+import { capiPayloadExpired, lockCapiIdentity, lockCapiCampaignScope, purchaseIsStillEligible } from './capi-eligibility.js';
 import { sendCapiPayload } from './capi-transport.js';
 
 const MAX_ATTEMPTS = 5;
-const META_MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const WORKER_ID = `marketing-capi-${randomUUID().slice(0, 8)}`;
 
 export interface CapiOutboxRow {
@@ -181,15 +180,6 @@ async function pickCapiEvent(client: PoolClient): Promise<CapiOutboxRow | null> 
   return result.rows[0] ?? null;
 }
 
-function capiPayloadExpired(payload: Record<string, unknown>, now: Date): boolean {
-  const data = Array.isArray(payload.data) ? payload.data : [];
-  const event = data[0];
-  if (!event || typeof event !== 'object') return false;
-  const eventTime = Number((event as Record<string, unknown>).event_time);
-  return Number.isFinite(eventTime)
-    && eventTime * 1000 < now.getTime() - META_MAX_EVENT_AGE_MS;
-}
-
 export async function pollCapiOutbox(options: {
   dbPool?: Pool;
   fetcher?: typeof fetch;
@@ -206,10 +196,7 @@ export async function pollCapiOutbox(options: {
     if (!row) return false;
     await client.query('BEGIN');
     // Share the identity-sync lock until the send completes: an ad cannot change owner mid-send.
-    await client.query(`SELECT pg_advisory_xact_lock_shared(hashtextextended(
-      'meta-identity:'||environment::text||':'||ad_account_id,0))
-      FROM marketing.capi_outbox WHERE environment=$1 AND id=$2 AND ad_account_id IS NOT NULL`,
-    [row.environment, row.id]);
+    await lockCapiIdentity(client, row);
     const scopeEnforcement = options.scopeEnforcement
       ?? env.MARKETING_SCOPE_ENFORCEMENT_ENABLED;
     const campaignScope = scopeEnforcement

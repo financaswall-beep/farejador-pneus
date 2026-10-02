@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PoolClient } from 'pg';
-import { LOCATION_MARKER, loadHistory } from '../../../src/atendente-v2/history.js';
+import { LOCATION_MARKER, loadHistory, customerTextForAssistant } from '../../../src/atendente-v2/history.js';
 
 interface QueryCall {
   text: string;
@@ -19,6 +19,23 @@ function clientWithRows(rowSets: unknown[][]): PoolClient & { calls: QueryCall[]
 }
 
 const at = (iso: string) => new Date(iso);
+
+describe('referência Google no histórico do bot', () => {
+  const reference = 'Ref: 2W-G' + 'a'.repeat(32);
+  it('remove somente a referência técnica do cliente, sem escrever nas mensagens', async () => {
+    const original = 'Quero dois pneus.\n' + reference;
+    const row = { id: 'm1', sender_type: 'contact', content: original, sent_at: at('2026-10-02T10:00:00Z') };
+    const client = clientWithRows([[row], []]);
+    expect(await loadHistory(client, 'conv')).toEqual([{ role: 'user', content: 'Quero dois pneus.' }]);
+    expect(row.content).toBe(original);
+    expect(client.calls.every(call => !/\b(UPDATE|DELETE\s+FROM|INSERT\s+INTO)\b/i.test(call.text))).toBe(true);
+  });
+  it('preserva texto comum e sinaliza mensagem que continha somente a referência', () => {
+    expect(customerTextForAssistant('Quero a referência Ref: 2W-G123')).toBe('Quero a referência Ref: 2W-G123');
+    expect(customerTextForAssistant(reference)).toBe('[Mensagem sem texto além da referência de atendimento.]');
+    expect(customerTextForAssistant(null)).toBeNull();
+  });
+});
 
 describe('fotos enviadas pelo funcionário', () => {
   it.each(['', 'Ó ele aqui 📸'])('preserva a imagem com legenda "%s"', async caption => {

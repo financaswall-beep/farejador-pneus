@@ -14,7 +14,7 @@ interface CampaignConversation {
   conversation_number:number; current_status:string; channel_type:string;
   observed_at:string; ad_id:string;
 }
-interface CampaignEvent { id:string; order_id:string; status:string; attempts:number; updated_at:string; sent_at:string|null }
+interface CampaignEvent { id:string; order_id:string; status:string; attempts:number; updated_at:string; sent_at:string|null;can_check:boolean;last_error_code:string|null }
 
 // Somente leitura. Conta, ambiente e propriedade nunca vêm do navegador.
 export async function getGoogleCampaignActivity(account:string, campaign:string, since:string, until:string,
@@ -48,7 +48,8 @@ export async function getGoogleCampaignActivity(account:string, campaign:string,
     COALESCE((SELECT jsonb_agg(page ORDER BY observed_at DESC,conversation_number) FROM page),'[]'::jsonb) rows`,
   [...values,(conversationPage-1)*PAGE_SIZE,adId]);
   // Histórico inclui envios em revisão após cancelamento; não depende da lista paginada de vendas.
-  const events=await dbPool.query<CampaignEvent>(`SELECT q.id,a.order_id,q.status,q.attempts,q.updated_at,q.sent_at
+  const events=await dbPool.query<CampaignEvent>(`SELECT q.id,a.order_id,q.status,q.attempts,q.updated_at,q.sent_at,
+    q.request_id IS NOT NULL can_check,q.last_error_code
     FROM marketing.google_order_attributions a
     JOIN marketing.google_clicks g ON g.environment=a.environment AND g.id=a.click_id
     JOIN marketing.google_campaigns p ON p.environment=g.environment AND p.account_id=g.account_id AND p.campaign_id=g.campaign_id

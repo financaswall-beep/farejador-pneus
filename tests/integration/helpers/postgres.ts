@@ -4,6 +4,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool, type PoolClient } from 'pg';
+import { startPortablePostgres } from './portable-postgres.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(HERE, '..', '..', '..', 'db', 'migrations');
@@ -21,14 +22,16 @@ const { recordApplicationMigration } = require('../../../scripts/migration-ledge
 };
 
 export interface IntegrationDb {
-  container: StartedPostgreSqlContainer;
+  container: Pick<StartedPostgreSqlContainer, 'stop'> | Awaited<ReturnType<typeof startPortablePostgres>>;
   pool: Pool;
   connectionString: string;
 }
 
 export async function startPostgres(options: { throughMigration?: string } = {}): Promise<IntegrationDb> {
   // Imagem alinhada com prod (Supabase usa Postgres 17.x).
-  const container = await new PostgreSqlContainer('postgres:17-alpine')
+  const container = process.env.FAREJADOR_TEST_POSTGRES_BIN
+    ? await startPortablePostgres(process.env.FAREJADOR_TEST_POSTGRES_BIN)
+    : await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('farejador_test')
     .withUsername('test')
     .withPassword('test')
@@ -41,7 +44,8 @@ export async function startPostgres(options: { throughMigration?: string } = {})
   const connectionString = container.getConnectionUri().replace('@localhost:', '@127.0.0.1:');
   const pool = new Pool({ connectionString, max: 5 });
 
-  await applyMigrations(pool, options.throughMigration);
+  try { await applyMigrations(pool, options.throughMigration); }
+  catch (error) { await pool.end(); await container.stop(); throw error; }
 
   return { container, pool, connectionString };
 }

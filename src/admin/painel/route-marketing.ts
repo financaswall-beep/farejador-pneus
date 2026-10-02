@@ -17,6 +17,7 @@ import { syncMetaInsights } from '../../marketing/meta-sync.js';
 import { reconcileMarketingAttributions } from '../../marketing/attribution.js';
 import { enqueueCapiPurchases } from '../../marketing/capi.js';
 import {
+  capiFailureReason,
   sendLatestCapiTestPurchase,
   sendLatestWhatsappReferralTestPurchase,
 } from '../../marketing/capi-test.js';
@@ -30,6 +31,7 @@ import { registerMarketingOrganic } from './route-marketing-organic.js';
 import { registerMarketingPublisher } from './route-marketing-publisher.js';
 import { registerMarketingOrganicResults } from './route-marketing-organic-results.js';
 import { registerMarketingGoogle } from './route-marketing-google.js';
+import { registerMarketingReviews } from './route-marketing-reviews.js';
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
 }).strict();
@@ -56,15 +58,9 @@ const syncBodySchema = z.object({
   lookback_days: z.number().int().min(1).max(365).default(60),
 }).strict();
 
-function capiFailureReason(error: unknown): string {
-  const message = error instanceof Error ? error.message : '';
-  return /^meta_capi_[0-9]+(?::.{1,300})?$/.test(message)
-    ? message
-    : 'marketing_capi_unknown_error';
-}
-
 export async function registerPainelMarketing(fastify: FastifyInstance): Promise<void> {
   await registerMarketingGoogle(fastify);
+  await registerMarketingReviews(fastify);
   await registerMarketingCreatives(fastify);
   await registerMarketingGeography(fastify);
   await registerMarketingComments(fastify);

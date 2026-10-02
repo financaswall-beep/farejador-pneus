@@ -67,4 +67,61 @@ describe('identidade Meta, campanha mista e financeiro', () => {
       FROM finance.matriz_ledger_entries WHERE environment='test' AND account_code='marketing_expense'`)).rows[0].net;
     expect(Number(net)).toBe(0);
   });
+  it('alerta sobre identidade pendente sem métricas e aprova só o anúncio escolhido, com auditoria', async () => {
+    const account = { ...config, adAccountId: 'act_789' };
+    let foreignPage = '999', omit = false, insightRequests = 0;
+    const mixedFetcher = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/ads')) return Response.json({ data: omit ? [] : [
+        { id: '881', campaign_id: '88', creative: { actor_id: foreignPage, instagram_user_id: '17841465774227389' } },
+        { id: '882', campaign_id: '88', creative: { actor_id: '999' } },
+      ] });
+      insightRequests++;
+      const ids = JSON.parse(url.searchParams.get('filtering') || '[]')[0]?.value || [];
+      return Response.json({ data: ids.map((id: string) => ({ ad_id: id, campaign_id: '88', campaign_name: 'Mista',
+        date_start: '2026-09-29', account_currency: 'BRL', spend: '30', impressions: '100', clicks: '10', actions: [] })) });
+    }) as typeof fetch;
+    const options = { dbPool: db.pool, config: account, fetcher: mixedFetcher, now: new Date('2026-09-30T12:00:00Z'), lookbackDays: 2 };
+    await sync(options); expect(insightRequests).toBe(0);
+    const {listMetaIdentityReviews:list,setMetaIdentityDecision:decide} = await import('../../src/marketing/meta-identity-decisions.js');
+    const {getMatrizStage4LedgerReconciliation:stage4} = await import('../../src/admin/painel/matriz-ledger-stage4-reconciliation.js');
+    const {getMarketingOverview:overview} = await import('../../src/admin/painel/queries-marketing.js');
+    expect((await list(db.pool)).rows.find(row => row.ad_id === '881')).toMatchObject({ scope: 'pending', can_decide: true });
+    expect((await stage4('test', db.pool)).pending_operational.marketing_campaigns_unclassified).toBe(1);
+    const screen = await overview('30d', { dbPool: db.pool, config: { metaEnabled: false, attributionEnabled: true } });
+    expect(screen.alerts.some(alert => alert.id === 'campaign-scope-pending')).toBe(true);
+    await db.pool.query(`INSERT INTO marketing.meta_insights_daily
+      (environment,ad_account_id,api_version,account_currency,entity_level,entity_id,campaign_id,metric_date,
+        spend,impressions,clicks,conversations,actions_raw)
+      SELECT v.environment::public.env_t,'act_789','v26.0','BRL','ad',v.ad,v.campaign,v.day::date,1,1,1,0,'[]'
+      FROM (VALUES ('test','881','88','2026-09-29'),('test','883','90','2026-09-29'),
+        ('test','884','90','2026-09-28'),('test','885','91','2026-08-01'),
+        ('prod','886','92','2026-09-29')) v(environment,ad,campaign,day)`);
+    const unionScreen = await overview('30d', { dbPool: db.pool, now: new Date('2026-09-30T12:00:00Z'),
+      config: { metaEnabled: false, attributionEnabled: true } });
+    expect(unionScreen.attribution.pending_identity_campaigns).toBe(2);
+    expect(unionScreen.alerts.find(alert => alert.id === 'campaign-scope-pending')?.title)
+      .toBe('2 campanha(s) com identidade pendente');
+    await db.pool.query(`DELETE FROM marketing.meta_insights_daily WHERE ad_account_id='act_789'`);
+    await decide({ account: account.adAccountId, ad: '881', scope: 'matrix', reason: 'Anúncio próprio verificado na Meta', actor: 'test', idempotencyKey: 'meta-decision-test' }, db.pool);
+    await sync(options); expect(insightRequests).toBe(1);
+    const scopes = (await db.pool.query(`SELECT ad_id,scope FROM marketing.meta_ad_identities WHERE environment='test' AND ad_account_id='act_789' ORDER BY ad_id`)).rows;
+    expect(scopes).toEqual([{ad_id:'881',scope:'matrix'},{ad_id:'882',scope:'external'}]);
+    const expense = async () => Number((await db.pool.query(`SELECT COALESCE(sum(CASE side WHEN 'debit' THEN amount ELSE -amount END),0) n
+      FROM finance.matriz_ledger_entries WHERE environment='test' AND account_code='marketing_expense'`)).rows[0].n);
+    expect(await expense()).toBe(30);
+    await expect(db.pool.query(`UPDATE marketing.meta_ad_identity_decisions SET reason='Alteração proibida' WHERE ad_id='881'`)).rejects.toThrow(/immutable/i);
+    expect((await db.pool.query(`SELECT has_table_privilege('farejador_partner_app','marketing.meta_ad_identity_decisions','SELECT') allowed`)).rows[0].allowed).toBe(false);
+    await decide({ account: account.adAccountId, ad: '881', scope: 'automatic', reason: 'Retornar à regra automática', actor: 'test', idempotencyKey: 'meta-return-automatic' },db.pool);
+    await sync(options); expect(await expense()).toBe(0);
+    await decide({ account: account.adAccountId, ad: '881', scope: 'matrix', reason: 'Nova confirmação deste anúncio', actor: 'test', idempotencyKey: 'meta-new-confirmation' },db.pool);
+    await sync(options); expect(await expense()).toBe(30);
+    foreignPage = '998'; await sync(options); expect(await expense()).toBe(0);
+    expect((await list(db.pool)).rows.find(row=>row.ad_id==='881')?.scope).toBe('pending');
+    omit = true; await sync(options);
+    expect((await list(db.pool)).rows.find(row=>row.ad_id==='881')?.can_decide).toBe(false);
+    await expect(decide({ account: account.adAccountId, ad: '881', scope: 'matrix', reason: 'Não aceitar snapshot antigo', actor: 'test', idempotencyKey: 'meta-old-snapshot' },db.pool))
+      .rejects.toThrow('meta_identity_sync_required');
+    expect((await db.pool.query(`SELECT count(*)::int n FROM audit.events WHERE event_type='marketing_meta_ad_identity_decided'`)).rows[0].n).toBe(3);
+  });
 });

@@ -273,7 +273,7 @@ export async function getMatrizLedgerOpenItems(
     [environment],
   );
   if (Number(marketing.rows[0]!.balance) > 0) pagaveis.push({
-    tipo: 'marketing', id: 'marketing_payable', nome: 'Marketing · Meta Ads',
+      tipo: 'marketing', id: 'marketing_payable', nome: 'Marketing · Anúncios',
     categoria: 'marketing', valor: money(marketing.rows[0]!.balance),
     due_date: null, overdue: false, account_code: 'marketing_payable',
     settlement_mode: 'central_account',

@@ -3,6 +3,15 @@ import type { ChatMessage } from './types.js';
 
 const HISTORY_LIMIT = 30;
 
+// Keep the original message intact for attribution; hide only the technical
+// Google reference from the assistant's reading of the customer's text.
+export function customerTextForAssistant(content: string | null): string | null {
+  if (!content) return content;
+  const cleaned = content.replace(/\s*\bRef:\s*2W-G[a-f0-9]{32}\b/gi, '');
+  if (cleaned === content) return content;
+  return cleaned.trim() || '[Mensagem sem texto além da referência de atendimento.]';
+}
+
 /**
  * Marcador injetado quando o cliente compartilhou um pino de localização. O
  * anexo de localização chega SEM texto, então a query principal (que exige
@@ -154,7 +163,8 @@ export async function loadHistory(
         : msg.status === 'failed' ? '[O envio de uma imagem pela loja falhou. Não confirme o envio.]'
           : '[A loja enviou uma imagem ao cliente, mesmo sem legenda. Isso não confirma leitura nem reserva do pneu.]'
       : null;
-    history.push({ role, content: [msg.content, imageMarker].filter(Boolean).join('\n') });
+    const text = role === 'user' ? customerTextForAssistant(msg.content) : msg.content;
+    history.push({ role, content: [text, imageMarker].filter(Boolean).join('\n') });
 
     // Se foi mensagem do cliente, e existem actions disparadas por ela,
     // injeta antes da próxima mensagem (que deve ser a resposta do bot).

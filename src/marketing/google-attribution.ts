@@ -8,12 +8,16 @@ import { META_BUSINESS_ACCOUNTS } from '../shared/meta-business-accounts.js';
 export async function captureGoogleConversations(client: PoolClient, environment = env.FAREJADOR_ENV): Promise<number> {
   const result = await client.query(`INSERT INTO marketing.google_click_conversations(environment,click_id,conversation_id,source,observed_at)
     SELECT DISTINCT ON (g.id) g.environment,g.id,c.id,'message_reference',m.sent_at
-    FROM marketing.google_clicks g JOIN core.messages m ON m.environment=g.environment
-      AND m.sender_type='contact' AND m.message_type=0 AND NOT m.is_private
+    FROM core.messages m
+    CROSS JOIN LATERAL regexp_matches(m.content,
+      '(?<![a-zA-Z0-9])(2W-G[a-f0-9]{32})(?![a-zA-Z0-9])','g') reference_match
+    JOIN marketing.google_clicks g ON g.environment=m.environment AND g.reference=reference_match[1]
       AND m.sent_at>=g.captured_at AND m.sent_at<g.captured_at+interval '7 days'
-      AND m.content ~ ('(^|[^a-zA-Z0-9])'||g.reference||'([^a-zA-Z0-9]|$)')
     JOIN core.conversations c ON c.id=m.conversation_id AND c.environment=m.environment
     WHERE g.environment=$1 AND g.destination='whatsapp'
+      AND m.sender_type='contact' AND m.message_type=0 AND NOT m.is_private
+      AND NOT EXISTS(SELECT 1 FROM marketing.google_click_conversations b
+        WHERE b.environment=g.environment AND b.click_id=g.id)
       AND c.channel_type='whatsapp'
     ORDER BY g.id,m.sent_at,c.id ON CONFLICT DO NOTHING`,[environment]);
   const web = await client.query(`INSERT INTO marketing.google_click_conversations(environment,click_id,conversation_id,source,observed_at)

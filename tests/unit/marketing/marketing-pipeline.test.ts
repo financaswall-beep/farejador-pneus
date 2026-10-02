@@ -569,6 +569,7 @@ describe('pipeline determinístico de Marketing', () => {
 
   it('persiste campanha e anúncio por dia, substituindo a recoleta', async () => {
     const clientQuery = vi.fn(async (sql: string) => {
+      if (sql.includes('max(decision_seq)')) return {rows:[{version:'0'}],rowCount:1};
       if (sql.includes('INSERT INTO marketing.campaign_scopes')) {
         return {
           rows: [{

@@ -88,3 +88,9 @@ scripts/*senha*wallace*
 scripts/preparar-acesso-wallace-prod.cjs
 scripts/resetar-senha-pessoa.cjs
 scripts/seed-login-teste-prod.cjs
+
+# Disposable local runtime and checkout used only by the marketing audit tests.
+artifacts/marketing-hardening-runtime/
+artifacts/marketing-hardening-baseline/
+artifacts/marketing-hardening-baseline.zip
+artifacts/marketing-hardening-release/
