@@ -16,6 +16,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       const seq = ++this.googleAdsSeq, period = this.marketingPeriod;
       this.googleAdsLoading = true; this.googleAdsError = ''; this.googleAdsReport = null; this.googleAdsPage = 1;
       this.googleAdPage = 1;
+      this.googleCompareDestroyChart?.();
       this.googleCampaignInvalidateActivity?.();
       this.googleDetailInvalidate?.();
       this.googleDetailOrderPage = 1; this.googleDetailConversationPage = 1;
@@ -31,7 +32,10 @@ window.PAINEL_MODULES.marketingGoogle = function () {
           this.googleAdsSelected=this.googleAdsSelected.filter(id=>ids.has(id));
           if(this.googleAdsView==='detail' && !ids.has(this.googleAdsDetailId))this.googleAdsView='ads';
           if(this.googleAdsView==='detail')void this.loadGoogleDetailActivity?.();
-          if(this.googleAdsView==='compare' && (!ids.has(this.googleCompareA)||!ids.has(this.googleCompareB)))this.googleAdsView='ads';
+          if (this.googleAdsView === 'compare' && (!ids.has(this.googleCompareA) || !ids.has(this.googleCompareB))) {
+            this.googleAdsView = 'ads';
+            this.googleCompareNotice = 'Um dos anúncios não está disponível neste período. Selecione outro para comparar.';
+          }
           if (this.googleAdsView === 'campaign') {
             if (!(report.data?.campaigns || []).some(row => row.id === this.googleCampaignId)) this.googleSetView('campaigns');
             else void this.loadGoogleCampaignActivity();
@@ -47,6 +51,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
             this.renderGoogleOverviewChart();
             this.renderGoogleCampaignChart?.();
             this.renderGoogleDetailChart?.();
+            this.renderGoogleCompareChart?.();
           });
         }
       }
@@ -77,40 +82,16 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     },
     googleOpenAd(id) {
       if (!this.googleAdById(id)) return;
+      this.googleDetailReturnView = this.googleAdsView === 'compare' ? 'compare' : '';
+      this.googleCompareDestroyChart?.();
       this.googleAdsDetailId=id;this.googleAdsView='detail';this.googleDetailOpen?.();
     },
     googleAdById(id) {return (this.googleAdsReport?.data?.ads||[]).find(row=>row.id===id);},
     googleShowCompare() {
-      if(this.googleAdsSelected.length!==2)return;
+      if (this.googleAdsSelected.length !== 2 || new Set(this.googleAdsSelected).size !== 2
+        || !this.googleAdsSelected.every(id => this.googleAdById(id))) return;
       [this.googleCompareA,this.googleCompareB]=this.googleAdsSelected;this.googleAdsView='compare';
-    },
-    googleCompareRows() {
-      const a=this.googleAdById(this.googleCompareA),b=this.googleAdById(this.googleCompareB);
-      if(!a||!b||a.id===b.id)return [];
-      const ra=this.googleResult(a),rb=this.googleResult(b);
-      return [
-        ['Investimento',this.paidMoney(a.investment),this.paidMoney(b.investment)],
-        ['Impressões',this.paidNumber(a.impressions),this.paidNumber(b.impressions)],
-        ['Cliques',this.paidNumber(a.clicks),this.paidNumber(b.clicks)],
-        ['CTR',a.ctr==null?'—':this.paidNumber(a.ctr)+'%',b.ctr==null?'—':this.paidNumber(b.ctr)+'%'],
-        ['Custo por clique',this.paidMoney(a.cpc),this.paidMoney(b.cpc)],
-        ['CPM',this.paidMoney(a.cpm),this.paidMoney(b.cpm)],
-        ['Conversões no Google',this.paidNumber(a.conversions),this.paidNumber(b.conversions)],
-        ['Conversas identificadas',this.paidNumber(ra.tracked_conversations),this.paidNumber(rb.tracked_conversations)],
-        ['Vendas atribuídas',this.paidNumber(ra.attributed_sales),this.paidNumber(rb.attributed_sales)],
-        ['Receita atribuída',this.paidMoney(ra.attributed_revenue),this.paidMoney(rb.attributed_revenue)],
-        ['Margem antes da mídia',this.paidMoney(ra.gross_margin),this.paidMoney(rb.gross_margin)],
-        ['ROAS',this.paidNumber(ra.roas),this.paidNumber(rb.roas)],
-        ['Resultado após mídia',this.paidMoney(ra.result),this.paidMoney(rb.result)],
-      ].map(([label,a,b])=>({label,a,b}));
-    },
-    googleAdChart(ids) {
-      const ads=ids.map(id=>this.googleAdById(id)).filter(Boolean),window=this.googleAdsReport?.data?.period;
-      if(!window)return {lines:[],max:0};
-      const start=Date.parse(window.since),end=Date.parse(window.until),duration=Math.max(86400000,end-start);
-      const max=Math.max(1,...ads.flatMap(ad=>ad.daily.filter(day=>day.clicks>0).map(day=>Number(day.cost_micros)/1e6/day.clicks)));
-      return {max,lines:ads.map((ad,index)=>({id:ad.id,name:ad.name,color:index?'#647c9c':'#006653',
-        points:ad.daily.filter(day=>day.clicks>0).map(day=>`${40+(Date.parse(day.date)-start)/duration*840},${200-(Number(day.cost_micros)/1e6/day.clicks)/max*165}`).join(' ')}))};
+      this.googleCompareOpen?.();
     },
     googleAdOrders(id) {return (this.googleAdsReport?.results?.orders||[]).filter(row=>row.ad_id===id);},
     googleConversionStatus(status) {
@@ -127,7 +108,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleAdsExport() {
       if(this.googleAdsView==='ads') {this.googleAdExport();return;}
       if(this.googleAdsView==='compare') {
-        this.googleExportCells([['Indicador','Anúncio A','Anúncio B'],...this.googleCompareRows().map(row=>[row.label,row.a,row.b])]);return;
+        this.googleCompareExport();return;
       }
       const rows = this.googleAdsRows();
       if (!rows.length) return;

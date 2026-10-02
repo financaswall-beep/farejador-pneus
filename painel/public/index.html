@@ -226,6 +226,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261002-google-campaign">
 <link rel="stylesheet" href="/admin/painel/marketing-ad-detail.css?v=20261001-ad1">
 <link rel="stylesheet" href="/admin/painel/marketing-google-detail.css?v=20261002-google-detail">
+<link rel="stylesheet" href="/admin/painel/marketing-google-compare.css?v=20261002-google-compare">
 <link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
@@ -233,9 +234,10 @@
 <script src="/admin/painel/app.marketing.paid.js?v=20261001-google2"></script>
 <script src="/admin/painel/app.marketing.google.overview.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.marketing.google.ads.js?v=20261001-google-ads"></script>
-<script src="/admin/painel/app.marketing.google.js?v=20261002-google-detail"></script>
+<script src="/admin/painel/app.marketing.google.js?v=20261002-google-compare"></script>
 <script src="/admin/painel/app.marketing.google.campaign.js?v=20261002-google-campaign"></script>
-<script src="/admin/painel/app.marketing.google.detail.js?v=20261002-google-detail"></script>
+<script src="/admin/painel/app.marketing.google.detail.js?v=20261002-google-compare"></script>
+<script src="/admin/painel/app.marketing.google.compare.js?v=20261002-google-compare"></script>
 <script src="/admin/painel/app.marketing.compare.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.compare.view.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.js?v=20261001-google2"></script>
@@ -292,7 +294,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261002-google-detail"></script>
+<script src="/admin/painel/app.montagem.js?v=20261002-google-compare"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8489,11 +8491,11 @@
       </section>
 
       <section x-show="marketingTab === 'visao' && !paidCompareOpen" class="paid-screen" aria-label="Central de conteúdo pago" data-marketing-paid-screen>
-        <header class="paid-head" x-show="marketingCampaignChannel !== 'google' || !['campaign','detail'].includes(googleAdsView)">
+        <header class="paid-head" x-show="marketingCampaignChannel !== 'google' || !['campaign','detail','compare'].includes(googleAdsView)">
           <div><h1>Conteúdo pago</h1><p>Do investimento à venda, acompanhe o resultado dos seus anúncios.</p></div>
           <div class="paid-actions"><span class="paid-muted" x-text="paidUpdated()"></span><button class="paid-button" @click="loadMarketing()" :disabled="marketingLoading || googleAdsLoading" aria-label="Atualizar conteúdo pago"><i data-lucide="refresh-cw" :class="(marketingLoading || googleAdsLoading) && 'animate-spin'"></i></button><button class="paid-button" @click="marketingNavigate('integracoes')"><i data-lucide="settings"></i>Integrações</button></div>
         </header>
-        <div class="paid-toolbar" x-show="marketingCampaignChannel !== 'google' || !['campaign','detail'].includes(googleAdsView)">
+        <div class="paid-toolbar" x-show="marketingCampaignChannel !== 'google' || !['campaign','detail','compare'].includes(googleAdsView)">
           <div class="paid-channels" aria-label="Canal de anúncios">
             <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'all' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'all'" @click="paidChannel('all')">Consolidado</button>
             <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'meta' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'meta'" @click="paidChannel('meta')"><span class="paid-meta" aria-hidden="true">∞</span>Meta<i class="paid-dot" :class="marketingVisao?.connection?.meta !== 'connected' && 'off'"></i></button>
@@ -8504,7 +8506,7 @@
         </div>
         <section x-show="marketingCampaignChannel === 'google'" data-marketing-google-screen x-cloak>
           <p x-show="marketingIsMock()" class="paid-notice">Prévia de demonstração · dados ilustrativos.</p>
-          <p x-show="!['campaign','detail'].includes(googleAdsView)" class="paid-scope-note">Google Ads · consulta somente da conta e das campanhas aprovadas da 2W.</p>
+          <p x-show="!['campaign','detail','compare'].includes(googleAdsView)" class="paid-scope-note">Google Ads · consulta somente da conta e das campanhas aprovadas da 2W.</p>
           <div x-show="googleAdsLoading" class="paid-empty" role="status">Consultando a conta e os indicadores do Google Ads…</div>
           <p x-show="googleAdsError" class="paid-error" role="alert" x-text="googleAdsError"></p>
           <article x-show="googleAdsReport && googleAdsReport.status !== 'connected'" class="paid-card">
@@ -8686,11 +8688,11 @@
                 </div>
                 <p class="mcd-footnote">Conversões do Google e vendas confirmadas no Farejador são indicadores diferentes. Resultado após mídia antes das demais despesas da empresa.</p>
               </section>
-              <div x-show="!['campaigns','ads','campaign','detail'].includes(googleAdsView)" class="paid-title-row mb-4">
+              <div x-show="!['campaigns','ads','campaign','detail','compare'].includes(googleAdsView)" class="paid-title-row mb-4">
                 <div class="paid-segment"><button @click="googleSetView('campaigns')"><i data-lucide="arrow-left"></i>Campanhas</button><button @click="googleSetView('ads')" :class="googleAdsView === 'ads' && 'is-active'">Todos os anúncios</button><button @click="googleSetView('setup')" :class="googleAdsView === 'setup' && 'is-active'">Rastreio e envios</button></div><button class="paid-button" @click="googleSync()" :disabled="googleAdsSyncing || marketingIsMock()"><i data-lucide="refresh-cw"></i><span x-text="googleAdsSyncing ? 'Coletando…' : 'Atualizar coleta'"></span></button>
               </div>
-              <button class="mcd-back" x-show="googleCampaignReturnId && googleAdsView === 'compare'" @click="googleReturnCampaign()"><i data-lucide="arrow-left"></i>Voltar ao detalhe da campanha</button>
               <section x-show="googleAdsView==='ads'" class="mc-screen google-ads-screen" data-google-ad-screen>
+                <p class="pc-info" x-show="googleCompareNotice" x-text="googleCompareNotice" role="status"></p>
                 <div class="ma-summary">
                   <dl><template x-for="item in googleAdSummaryItems()" :key="item.label"><div><dt x-text="item.label"></dt><dd :class="item.result && (item.negative ? 'ma-negative' : 'ma-positive')" x-text="item.value"></dd></div></template></dl>
                   <p class="paid-muted">Totais de todos os anúncios filtrados no período</p>
@@ -8739,16 +8741,57 @@
                 <div class="ma-selection" x-show="googleAdsSelected.length"><div class="paid-actions"><div class="ma-selected-thumbs"><template x-for="ad in googleAdSelectedRows()" :key="ad.id"><div><template x-if="googleAdImage(ad)"><img :src="googleAdImage(ad)" alt="" referrerpolicy="no-referrer" @error="googleAdImageFailed(ad)"></template><template x-if="!googleAdImage(ad)"><i data-lucide="file-text"></i></template></div></template></div><div><strong x-text="googleAdsSelected.length + ' anúncio(s) selecionado(s)'"></strong><p class="paid-muted">Mesmo período · seleções mantidas entre páginas e filtros</p></div></div><div class="paid-actions"><button class="paid-link" @click="googleAdsSelected=[]">Limpar seleção</button><button class="paid-button is-active" @click="googleShowCompare()" :disabled="googleAdsSelected.length!==2">Comparar anúncios<i data-lucide="arrow-right"></i></button></div></div>
                 <p class="ma-footnote"><i data-lucide="info"></i>Conversões do Google e vendas atribuídas são indicadores diferentes. Resultado após mídia antes das demais despesas da empresa.</p>
               </section>
-              <section x-show="googleAdsView==='compare'">
-                <div class="paid-title-row mb-4"><div><h2>Comparar anúncios</h2><p class="paid-muted">Mesmo período · Google Ads e vendas apuradas no Farejador.</p></div><button class="paid-button" @click="googleAdsExport()">Exportar CSV</button></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><template x-for="side in ['A','B']" :key="side"><label class="paid-card"><span x-text="'Anúncio ' + side"></span><select class="paid-button w-full mt-2" :value="side==='A'?googleCompareA:googleCompareB" @change="side==='A'?googleCompareA=$event.target.value:googleCompareB=$event.target.value"><template x-for="ad in googleAdsReport.data.ads||[]" :key="ad.id"><option :value="ad.id" x-text="ad.name + ' · ' + ad.campaign_name"></option></template></select></label></template></div>
-                <p x-show="googleCompareA===googleCompareB" class="paid-error">Escolha dois anúncios diferentes.</p>
-                <article class="paid-card overflow-x-auto"><table class="paid-table w-full"><thead><tr><th>Indicador</th><th>Anúncio A</th><th>Anúncio B</th></tr></thead><tbody><template x-for="row in googleCompareRows()" :key="row.label"><tr><th x-text="row.label"></th><td x-text="row.a"></td><td x-text="row.b"></td></tr></template></tbody></table></article>
-                <article class="paid-card mt-4"><h3>Custo por clique no período</h3><p class="paid-muted">A: verde · B: cinza. Dias sem cliques ficam sem ponto.</p><svg viewBox="0 0 920 230" class="google-cost-chart" role="img" aria-label="Evolução do custo por clique dos dois anúncios"><line x1="40" y1="200" x2="880" y2="200" stroke="#dce4e9"/><polyline :points="googleAdChart([googleCompareA,googleCompareB]).lines[0]?.points || ''" stroke="#006653" fill="none" stroke-width="3"/><polyline :points="googleAdChart([googleCompareA,googleCompareB]).lines[1]?.points || ''" stroke="#647c9c" fill="none" stroke-width="3"/></svg></article>
-                <p class="paid-notice mt-4">Produto, público e destino também influenciam o resultado. Conversões do Google não equivalem automaticamente a vendas.</p>
+              <section x-show="googleAdsView === 'compare'" class="mcd-screen pc-screen google-compare-screen" data-google-compare-screen
+                x-init="$watch('googleAdsView', view => { if (view !== 'compare') googleCompareDestroyChart() }); $watch('marketingCampaignChannel', channel => { if (channel !== 'google') googleCompareDestroyChart() }); $watch('currentPage', page => { if (page !== 'marketing') googleCompareDestroyChart() }); $watch('marketingTab', tab => { if (tab !== 'visao') googleCompareDestroyChart() })">
+                <button type="button" class="mcd-back" @click="googleCompareBack()"><i data-lucide="arrow-left"></i><span x-text="googleCampaignReturnId ? 'Conteúdo pago / Google Ads / Campanha' : 'Conteúdo pago / Google Ads / Todos os anúncios'"></span></button>
+                <header class="mcd-header">
+                  <div><h1 id="google-compare-heading" tabindex="-1">Comparar anúncios</h1><p class="pc-subtitle">Confira os anúncios, os custos e as vendas no mesmo período.</p></div>
+                  <div class="paid-actions">
+                    <label class="mcd-period"><i data-lucide="calendar-days"></i><select aria-label="Período da comparação Google" x-model="marketingPeriod" @change="marketingPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label>
+                    <span class="mcd-badge"><i data-lucide="store"></i>Matriz</span>
+                    <button type="button" class="paid-button mcd-manager" @click="googleCompareExport()" :disabled="googleAdsLoading || !googleCompareValid()"><i data-lucide="download"></i>Exportar CSV</button>
+                  </div>
+                </header>
+                <p class="pc-range"><span x-text="googleCompareRange()"></span> · valores do período completo</p>
+                <div class="gpc-label"><img src="/assets/brands/google-ads.svg" alt="">Google Ads</div>
+                <p class="pc-info" x-show="googleCompareNotice" x-text="googleCompareNotice" role="status"></p>
+                <div class="pc-selectors">
+                  <label>Anúncio A<select aria-label="Anúncio A do Google" @change="googleCompareSelect(0,$event.target.value)"><option value="" disabled :selected="!googleCompareA">Selecione um anúncio</option><template x-for="ad in googleCompareOptions()" :key="ad.id"><option :value="ad.id" :selected="googleCompareA === ad.id" x-text="ad.name + ' · ' + ad.campaign_name"></option></template></select></label>
+                  <button type="button" class="paid-button pc-swap" aria-label="Trocar anúncios A e B do Google" @click="googleCompareSwap()" :disabled="!googleCompareValid()"><i data-lucide="arrow-right-left"></i></button>
+                  <label>Anúncio B<select aria-label="Anúncio B do Google" @change="googleCompareSelect(1,$event.target.value)"><option value="" disabled :selected="!googleCompareB">Selecione outro anúncio</option><template x-for="ad in googleCompareOptions()" :key="ad.id"><option :value="ad.id" :selected="googleCompareB === ad.id" x-text="ad.name + ' · ' + ad.campaign_name"></option></template></select></label>
+                </div>
+                <p class="pc-info" x-show="!googleCompareValid()">Selecione dois anúncios diferentes para comparar.</p>
+                <div class="pc-cards">
+                  <template x-for="side in [0,1]" :key="side"><article class="pc-ad" :class="{'pc-highlight':googleCompareHighlight(side)}">
+                    <template x-if="googleCompareAd(side)"><div class="pc-ad-content">
+                      <div class="gpc-search-preview" x-show="googleAdIsSearch(googleCompareAd(side))"><small><b>Patrocinado</b> · <span x-text="googleAdPreviewBrand(googleCompareAd(side))"></span></small><h3 x-text="googleAdPreviewTitle(googleCompareAd(side))"></h3><p x-text="googleAdPreviewDescription(googleCompareAd(side)) || 'Texto não disponível.'"></p></div>
+                      <div class="pc-media" x-show="!googleAdIsSearch(googleCompareAd(side))">
+                        <template x-if="googleAdImage(googleCompareAd(side))"><img :src="googleAdImage(googleCompareAd(side))" :alt="googleCompareAd(side).name" referrerpolicy="no-referrer" @error="googleAdImageFailed(googleCompareAd(side))"></template>
+                        <span class="pc-media-empty" x-show="!googleAdImage(googleCompareAd(side))"><i data-lucide="image"></i><small>Prévia indisponível</small></span>
+                      </div>
+                      <div class="pc-ad-description"><h2 x-text="googleCompareAd(side).name"></h2><p x-text="googleCompareAd(side).campaign_name"></p>
+                        <div class="mcd-badges"><span class="mcd-badge mcd-neutral"><img class="google-campaign-logo" src="/assets/brands/google-ads.svg" alt="">Google Ads</span><span class="mcd-badge" :class="googleCompareAd(side).status !== 'ENABLED' && 'mcd-neutral'" x-text="googleCompareStatus(side)"></span><span class="mcd-badge mcd-neutral" x-text="googleAdFormatLabel(googleCompareAd(side).format)"></span></div>
+                        <button type="button" class="paid-link" @click="googleCompareViewAd(side)">Ver análise<i data-lucide="arrow-right"></i></button>
+                      </div>
+                      <div class="pc-result"><strong :class="{'pc-negative':googleCompareAd(side).result < 0}" x-text="paidMoney(googleCompareAd(side).result)"></strong><span>Resultado após mídia</span><small class="pc-warning" x-show="googleCompareAd(side).pending_margin_orders > 0">Custos pendentes</small></div>
+                    </div></template>
+                    <p class="paid-empty" x-show="!googleCompareAd(side)">Escolha um anúncio deste período.</p>
+                  </article></template>
+                </div>
+                <p class="pc-info" x-show="!googleAdsReport.results?.available"><i data-lucide="info"></i>A apuração financeira está indisponível. Vendas, custos e resultado aparecem como —.</p>
+                <div x-show="googleCompareValid()">
+                  <div class="pc-table-wrap"><table class="pc-table"><caption class="sr-only">Comparação dos anúncios Google selecionados no mesmo período</caption><thead><tr><th scope="col">Indicador</th><th scope="col">Anúncio A</th><th scope="col">Anúncio B</th></tr></thead>
+                    <template x-for="group in googleCompareGroups()" :key="group.group"><tbody><tr class="pc-group"><th colspan="3" scope="colgroup" x-text="group.group"></th></tr><template x-for="row in group.rows" :key="row.label"><tr :class="{'pc-total':row.result}"><th scope="row" x-text="row.label"></th><td :class="{'pc-negative':row.result && googleCompareAd(0)?.result < 0}" x-text="row.values[0]"></td><td :class="{'pc-negative':row.result && googleCompareAd(1)?.result < 0}" x-text="row.values[1]"></td></tr></template></tbody></template>
+                  </table></div>
+                  <div class="pc-bottom">
+                    <section class="pc-chart-card"><h2>Custo por clique no período</h2><div class="pc-chart" x-show="googleCompareHasPoints()"><canvas id="chartGoogleComparison" role="img" aria-label="Evolução diária do custo por clique dos anúncios Google A e B"></canvas></div><p class="paid-empty" x-show="!googleCompareHasPoints()">Nenhum dia com cliques disponível para comparar neste período.</p><p class="pc-chart-note">Dias sem cliques ficam sem ponto. A média considera investimento ÷ cliques de todo o período.</p></section>
+                    <aside class="pc-observations"><h2>O que observar</h2><template x-for="note in googleCompareObservations()" :key="note.text"><div class="pc-observation"><span><i :data-lucide="note.icon"></i></span><p x-text="note.text"></p></div></template><p class="pc-info"><i data-lucide="info"></i>Público, formato e destino também influenciam o resultado.</p></aside>
+                  </div>
+                </div>
+                <footer class="pc-footnote">Conversões Google e vendas do Farejador são indicadores diferentes. Resultado após mídia antes das demais despesas da empresa. O status é atual; as prévias de recursos podem variar na veiculação.</footer>
               </section>
               <template x-if="googleAdsView === 'detail' && googleDetailRow()"><section class="mad-screen google-detail-screen" data-google-ad-detail>
-                <button class="mcd-back" @click="googleDetailBack()"><i data-lucide="arrow-left"></i><span x-text="googleCampaignReturnId ? 'Conteúdo pago / Campanha / Anúncio' : 'Conteúdo pago / Todos os anúncios'"></span></button>
+                <button class="mcd-back" @click="googleDetailBack()"><i data-lucide="arrow-left"></i><span x-text="googleDetailReturnView === 'compare' ? 'Conteúdo pago / Google Ads / Comparação' : googleCampaignReturnId ? 'Conteúdo pago / Campanha / Anúncio' : 'Conteúdo pago / Todos os anúncios'"></span></button>
                 <header class="mcd-header">
                   <div class="mad-title"><h1 x-text="googleDetailRow().name"></h1><div class="mcd-badges">
                     <span class="mcd-badge mcd-neutral"><img class="google-campaign-logo" src="/assets/brands/google-ads.svg" alt="">Google Ads</span>

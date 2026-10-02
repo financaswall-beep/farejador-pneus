@@ -2,7 +2,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingGoogleDetail = function () {
   return {
-    googleDetailTab: 'result', googleDetailCalculation: false,
+    googleDetailTab: 'result', googleDetailCalculation: false, googleDetailReturnView: '',
     googleDetailActivity: null, googleDetailLoading: false, googleDetailError: '',
     googleDetailSeq: 0, googleDetailOrderPage: 1, googleDetailConversationPage: 1,
     googleDetailRow() { return this.googleAdById(this.googleAdsDetailId) || null; },
@@ -23,6 +23,9 @@ window.PAINEL_MODULES.marketingGoogleDetail = function () {
       });
     },
     googleDetailBack() {
+      if (this.googleDetailReturnView === 'compare' && this.googleCompareValid?.()) {
+        this.googleAdsView = 'compare'; this.googleCompareOpen(); return;
+      }
       if (this.googleCampaignReturnId) { this.googleReturnCampaign(); return; }
       this.googleAdsView = 'ads';
       this.$nextTick(() => { lucide.createIcons(); document.querySelector('[data-google-ad-gallery]')?.scrollIntoView({ block: 'start' }); });
