@@ -218,7 +218,7 @@
 <script src="/admin/painel/app.clientes.kanban.js?v=20260905-clientes-leads1"></script>
 <script src="/admin/painel/app.clientes.leads.js?v=20260912-kanban-controls1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<link rel="stylesheet" href="/admin/painel/marketing-paid.css?v=20261001-google2">
+<link rel="stylesheet" href="/admin/painel/marketing-paid.css?v=20261001-google-overview">
 <link rel="stylesheet" href="/admin/painel/marketing-compare.css?v=20261001-compare1">
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-ads.css?v=20260930-ads1">
@@ -229,7 +229,8 @@
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.paid.js?v=20261001-google2"></script>
-<script src="/admin/painel/app.marketing.google.js?v=20261001-google2"></script>
+<script src="/admin/painel/app.marketing.google.overview.js?v=20261001-google-overview"></script>
+<script src="/admin/painel/app.marketing.google.js?v=20261001-google-overview"></script>
 <script src="/admin/painel/app.marketing.compare.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.compare.view.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.js?v=20261001-google2"></script>
@@ -251,7 +252,7 @@
 <script src="/admin/painel/app.marketing.creatives.chart.js?v=20261001-ad1"></script>
 <script src="/admin/painel/app.marketing.ad-detail.mock.js?v=20261001-ad1"></script>
 <script src="/admin/painel/app.marketing.ad-detail.js?v=20261001-compare1"></script>
-<script src="/admin/painel/app.marketing.chart.js?v=20261001-google2"></script>
+<script src="/admin/painel/app.marketing.chart.js?v=20261001-google-overview"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260930-paid1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.mock.js?v=20261001-campaign1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20261001-compare1"></script>
@@ -286,7 +287,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261001-google2"></script>
+<script src="/admin/painel/app.montagem.js?v=20261001-google-overview"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8513,28 +8514,73 @@
           </article>
           <template x-if="googleAdsReport?.status === 'connected' && googleAdsReport.data">
             <div>
-              <div class="paid-title-row mb-4">
-                <div><h2 x-text="googleAdsReport.data.account.name"></h2><p class="paid-muted" x-text="'Conta ' + googleAdsReport.account_masked + ' · ' + googleAdsReport.data.period.since + ' a ' + googleAdsReport.data.period.until + ' · ' + googleAdsReport.data.account.time_zone"></p></div>
-                <span class="paid-badge" x-text="googleAdsReport.data.account.scope === 'account' ? 'Conta exclusiva da 2W' : 'Campanhas selecionadas da 2W'"></span>
+              <section x-show="googleAdsView === 'campaigns'" class="google-overview" data-google-overview>
+                <div class="paid-kpis">
+                  <template x-for="kpi in googleOverviewKpis()" :key="kpi.id">
+                    <article class="paid-card paid-kpi" :class="{ 'paid-result': kpi.id === 'result', 'google-result-negative': kpi.negative }">
+                      <div class="paid-kpi-label"><i :data-lucide="kpi.icon"></i><span x-text="kpi.label"></span></div>
+                      <strong x-text="kpi.value"></strong><small x-text="kpi.detail"></small>
+                    </article>
+                  </template>
+                </div>
+                <div class="paid-card paid-indicators">
+                  <template x-for="item in googleOverviewIndicators()" :key="item.label"><div><i :data-lucide="item.icon"></i><span x-text="item.label"></span><strong x-text="item.value"></strong></div></template>
+                </div>
+                <p x-show="!googleAdsReport.results?.available" class="paid-error" role="alert">A apuração de vendas está indisponível. Receita, custos e resultado aguardam uma consulta válida.</p>
+                <div class="paid-middle">
+                  <article class="paid-card">
+                    <div class="paid-title-row"><div><h2>Investimento e cliques</h2><p class="paid-muted">Google Ads · no período</p></div><div class="paid-legend"><span><i></i>Investimento (R$)</span><span><i></i>Cliques</span></div></div>
+                    <div class="paid-chart-wrap"><canvas id="chartGoogleOverview" role="img" aria-label="Evolução diária do investimento e dos cliques no Google Ads"></canvas></div>
+                    <p x-show="!googleAdsReport.data.totals.impressions && !googleAdsReport.data.totals.clicks" class="paid-muted">Nenhuma entrega registrada pelo Google neste período.</p>
+                  </article>
+                  <article class="paid-card paid-capi">
+                    <div class="paid-title-row"><h2>Retorno das vendas ao Google</h2><span class="paid-badge" :class="googlePipelineStatus() !== 'Automático' && 'pending'" x-text="googlePipelineStatus()"></span></div>
+                    <p>As vendas elegíveis são vinculadas ao clique e enviadas ao Google Ads.</p>
+                    <div class="paid-flow"><div><span><i data-lucide="shopping-cart"></i></span>Venda</div><b></b><div><span><i data-lucide="mouse-pointer-2"></i></span>Clique identificado</div><b></b><div><span><img src="/assets/brands/google-ads.svg" alt=""></span>Google</div></div>
+                    <div class="paid-capi-counts"><div><strong x-text="googlePipelineCount('sent')"></strong><span>Confirmadas</span></div><div><strong class="warning" x-text="googlePipelineCount('queued')"></strong><span>Na fila / processando</span></div><div><strong :class="googlePipeline()?.failed + googlePipeline()?.dead_letter > 0 && 'danger'" x-text="googlePipelineCount('errors')"></strong><span>Com falha</span></div></div>
+                    <footer class="paid-title-row"><button class="paid-link" @click="googleSetView('setup')">Conferir envios<i data-lucide="arrow-right"></i></button><span class="paid-muted" x-text="googleLastSentLabel()"></span></footer>
+                  </article>
+                </div>
+                <div class="paid-bottom">
+                  <section class="paid-card paid-list" aria-label="Campanhas e anúncios do Google Ads">
+                    <header class="paid-title-row">
+                      <div class="paid-actions"><h2>Campanhas e anúncios</h2><div class="paid-segment"><button class="is-active" aria-pressed="true">Campanhas</button><button @click="googleSetView('ads')">Todos os anúncios</button></div></div>
+                      <div class="paid-actions"><button class="paid-button" @click="googleStartCompare()" :disabled="(googleAdsReport.data.ads || []).length < 2"><i data-lucide="chart-no-axes-column"></i>Comparar anúncios</button><button class="paid-button" @click="googleAdsExport()" :disabled="!googleAdsRows().length"><i data-lucide="download"></i>Exportar CSV</button></div>
+                    </header>
+                    <div class="paid-filters">
+                      <label class="paid-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar campanha" aria-label="Buscar campanha no Google Ads" x-model="googleAdsSearch" @input="googleAdsPage = 1"></label>
+                      <button class="paid-button" :class="googleCampaignDecision === 'all' && 'is-active'" :aria-pressed="googleCampaignDecision === 'all'" @click="googleCampaignDecision = 'all'; googleAdsPage = 1">Todas</button>
+                      <button class="paid-button" title="Vendas atribuídas com custos pendentes" :class="googleCampaignDecision === 'review' && 'is-active'" :aria-pressed="googleCampaignDecision === 'review'" @click="googleCampaignDecision = 'review'; googleAdsPage = 1">Revisar</button>
+                      <button class="paid-button" title="Campanhas com entrega no período" :class="googleCampaignDecision === 'monitor' && 'is-active'" :aria-pressed="googleCampaignDecision === 'monitor'" @click="googleCampaignDecision = 'monitor'; googleAdsPage = 1">Monitorar</button>
+                      <select aria-label="Status atual das campanhas do Google" x-model="googleCampaignStatus" @change="googleAdsPage = 1"><option value="">Todos os status</option><option value="ENABLED">Ativas</option><option value="PAUSED">Pausadas</option><option value="REMOVED">Removidas</option></select>
+                    </div>
+                    <p x-show="googleCampaignDecision !== 'all'" class="paid-muted" x-text="googleCampaignDecision === 'review' ? 'Vendas com custos pendentes de conferência.' : 'Campanhas com entrega registrada no período.'"></p>
+                    <div class="paid-table-wrap" x-show="googleAdsRows().length">
+                      <table class="paid-table google-campaign-table">
+                        <thead><tr><th><button @click="googleCampaignOrder('name')">Campanha<i data-lucide="arrow-up-down"></i></button></th><th>Tipo</th><th><button @click="googleCampaignOrder('investment')">Investimento<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('clicks')">Cliques<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('tracked_conversations')">Conversas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('attributed_sales')">Vendas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('result')">Resultado<i data-lucide="arrow-up-down"></i></button></th><th x-show="googleCampaignExpanded">Impressões</th><th x-show="googleCampaignExpanded">CTR / CPC</th><th x-show="googleCampaignExpanded">Conversões Google</th><th x-show="googleCampaignExpanded">Receita atribuída</th><th><span class="sr-only">Ver anúncios</span></th></tr></thead>
+                        <tbody><template x-for="row in googleAdsPageRows()" :key="row.id"><tr>
+                          <td><button class="paid-name" @click="googleSetView('ads', row.id)" x-text="row.name"></button><small x-text="row.delivery_days ? row.delivery_days + ' dia(s) com entrega · até ' + marketingDateLabel(row.last_delivery) : 'Sem entrega no período'"></small><span class="paid-badge">Matriz</span><span class="google-campaign-status" x-text="googleAdsStatus(row.status)"></span></td>
+                          <td x-text="googleCampaignType(row.channel_type)"></td><td><strong x-text="paidMoney(row.investment)"></strong></td><td x-text="paidNumber(row.clicks)"></td><td x-text="paidNumber(row.tracked_conversations)"></td><td x-text="paidNumber(row.attributed_sales)"></td>
+                          <td><strong :class="row.result == null ? '' : row.result < 0 ? 'negative' : 'positive'" x-text="paidMoney(row.result)"></strong><small x-show="row.pending_margin_orders > 0" x-text="row.pending_margin_orders + ' venda(s) sem custo'"></small></td>
+                          <td x-show="googleCampaignExpanded" x-text="paidNumber(row.impressions)"></td><td x-show="googleCampaignExpanded"><span x-text="row.ctr == null ? '—' : paidNumber(row.ctr) + '%'"></span><small x-text="paidMoney(row.cpc) + ' / clique'"></small></td><td x-show="googleCampaignExpanded" x-text="paidNumber(row.conversions)"></td><td x-show="googleCampaignExpanded" x-text="paidMoney(row.attributed_revenue)"></td>
+                          <td><button class="paid-link" @click="googleSetView('ads', row.id)" :aria-label="'Ver anúncios da campanha ' + row.name"><i data-lucide="chevron-right"></i></button></td>
+                        </tr></template></tbody>
+                      </table>
+                    </div>
+                    <div x-show="!googleAdsRows().length" class="paid-empty"><strong>Nenhuma campanha encontrada</strong><p>Confira o período e os filtros.</p><button class="paid-link" @click="googleCampaignReset()">Limpar filtros</button></div>
+                    <footer class="paid-footer"><span x-text="googleAdsRows().length + ' campanha(s) · valores do período'"></span><button class="paid-link" @click="googleCampaignExpanded = !googleCampaignExpanded" :aria-expanded="googleCampaignExpanded"><span x-text="googleCampaignExpanded ? 'Mostrar menos indicadores' : 'Mostrar mais indicadores'"></span><i data-lucide="chevron-down"></i></button><div class="paid-actions" x-show="googleAdsPages() > 1"><button class="paid-button" @click="googleAdsPage--" :disabled="googleAdsPage <= 1" aria-label="Página anterior do Google Ads"><i data-lucide="chevron-left"></i></button><span x-text="googleAdsPage + ' / ' + googleAdsPages()"></span><button class="paid-button" @click="googleAdsPage++" :disabled="googleAdsPage >= googleAdsPages()" aria-label="Próxima página do Google Ads"><i data-lucide="chevron-right"></i></button></div></footer>
+                    <p class="paid-notice">Resultado após mídia antes das demais despesas da empresa. Os indicadores superiores representam o período completo.</p>
+                  </section>
+                  <aside class="paid-side">
+                    <section class="paid-card"><div class="paid-title-row"><h2>Precisa de atenção</h2><span class="paid-badge pending" x-text="googleOverviewAlerts().length"></span></div><template x-for="alert in googleOverviewAlerts()" :key="alert.id"><div class="paid-alert"><i data-lucide="triangle-alert"></i><div><strong x-text="alert.title"></strong><p x-text="alert.detail"></p><button class="paid-link" @click="googleAlertOpen(alert)">Conferir<i data-lucide="arrow-right"></i></button></div></div></template><p x-show="!googleOverviewAlerts().length" class="paid-notice">Nenhuma pendência identificada no período.</p></section>
+                    <section class="paid-card"><h2>Qualidade da medição</h2><button class="paid-quality" @click="googleSync()" :disabled="googleAdsSyncing || marketingIsMock()"><span><i data-lucide="database"></i>Coleta do Google Ads</span><small x-text="googleAdsSyncing ? 'Coletando…' : googleAdsReport.results?.health?.last_sync_at ? 'Sincronizada' : 'API consultada'"></small></button><button class="paid-quality" @click="googleSetView('setup')"><span><i data-lucide="link"></i>Conversas rastreadas</span><small x-text="paidNumber(googleOverviewMetrics().tracked_conversations)"></small></button><button class="paid-quality" @click="googleSetView('setup')"><span><i data-lucide="coins"></i>Custos das vendas</span><small x-text="googleCostStatus()"></small></button><footer class="google-quality-footer"><button class="paid-link" @click="googleSetView('setup')">Conferir rastreio e vendas<i data-lucide="arrow-right"></i></button></footer></section>
+                  </aside>
+                </div>
+                <p class="google-overview-note">Conversões do Google e vendas confirmadas no Farejador são indicadores diferentes.</p>
+              </section>
+              <div x-show="googleAdsView !== 'campaigns'" class="paid-title-row mb-4">
+                <div class="paid-segment"><button @click="googleSetView('campaigns')"><i data-lucide="arrow-left"></i>Campanhas</button><button @click="googleSetView('ads')" :class="googleAdsView === 'ads' && 'is-active'">Todos os anúncios</button><button @click="googleSetView('setup')" :class="googleAdsView === 'setup' && 'is-active'">Rastreio e envios</button></div><button class="paid-button" @click="googleSync()" :disabled="googleAdsSyncing || marketingIsMock()"><i data-lucide="refresh-cw"></i><span x-text="googleAdsSyncing ? 'Coletando…' : 'Atualizar coleta'"></span></button>
               </div>
-              <div class="paid-kpis"><template x-for="kpi in googleAdsKpis()" :key="kpi.label"><article class="paid-card paid-kpi"><div class="paid-kpi-label"><i :data-lucide="kpi.icon"></i><span x-text="kpi.label"></span></div><strong x-text="kpi.value"></strong><small x-text="kpi.detail"></small></article></template></div>
-              <p class="paid-notice">Conversões do Google são as metas da plataforma. Vendas atribuídas abaixo são compras realizadas no Farejador com referência de clique na conversa. Resultado após mídia não inclui as demais despesas da empresa.</p>
-              <p x-show="!googleAdsReport.results?.available" class="paid-error" role="alert">A apuração de vendas está indisponível. Os valores de receita e resultado não serão substituídos por zero.</p>
-              <div x-show="googleAdsReport.results?.available" class="paid-kpis mb-4">
-                <article class="paid-card paid-kpi"><span>Vendas atribuídas</span><strong x-text="paidNumber(googleAdsReport.results?.totals?.attributed_sales)"></strong><small>Compras realizadas no Farejador</small></article>
-                <article class="paid-card paid-kpi"><span>Receita atribuída</span><strong x-text="paidMoney(googleAdsReport.results?.totals?.attributed_revenue)"></strong><small>Receita das vendas identificadas</small></article>
-                <article class="paid-card paid-kpi paid-result"><span>Resultado após mídia</span><strong x-text="googleAdsReport.results?.totals?.gross_margin == null ? '—' : paidMoney(googleAdsReport.results.totals.gross_margin - googleAdsReport.data.totals.investment)"></strong><small x-text="googleAdsReport.results?.totals?.pending_margin_orders ? 'Existem vendas com custos pendentes' : 'Margem das vendas menos investimento'"></small></article>
-              </div>
-              <div class="paid-title-row mb-4"><div class="paid-segment"><button @click="googleAdsView='campaigns';googleAdsSearch=''" :class="googleAdsView==='campaigns'?'is-active':''">Campanhas</button><button @click="googleAdsView='ads';googleAdsSearch=''" :class="googleAdsView==='ads'?'is-active':''">Todos os anúncios</button><button @click="googleAdsView='setup'" :class="googleAdsView==='setup'?'is-active':''">Rastreio e envios</button></div><button class="paid-button" @click="googleSync()" :disabled="googleAdsSyncing"><i data-lucide="refresh-cw"></i><span x-text="googleAdsSyncing ? 'Coletando…' : 'Atualizar coleta'"></span></button></div>
-              <article x-show="googleAdsView==='campaigns'" class="paid-card">
-                <div class="paid-title-row"><div><h2>Campanhas no Google Ads</h2><p class="paid-muted">Os indicadores acima correspondem ao período completo; a busca filtra a lista.</p></div><button class="paid-button" @click="googleAdsExport()" :disabled="!googleAdsRows().length"><i data-lucide="download"></i>Exportar CSV</button></div>
-                <label class="paid-search my-4"><i data-lucide="search"></i><input type="search" placeholder="Buscar campanha ou ID" aria-label="Buscar campanha no Google Ads" x-model="googleAdsSearch" @input="googleAdsPage = 1"></label>
-                <div class="overflow-x-auto"><table class="paid-table w-full"><thead><tr><th>Campanha</th><th>Status atual</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Custo/clique</th><th>Conversões Google</th></tr></thead><tbody>
-                  <template x-for="row in googleAdsPageRows()" :key="row.id"><tr><td><button class="paid-link" @click="googleAdsCampaign=row.id;googleAdsView='ads';googleAdsSearch=''" x-text="row.name"></button><small class="block paid-muted" x-text="'#' + row.id + ' · ' + row.channel_type"></small><small class="block" x-text="'Vendas: ' + paidNumber(googleResult(row,'campaign').attributed_sales) + ' · Resultado: ' + paidMoney(googleResult(row,'campaign').result)"></small></td><td x-text="googleAdsStatus(row.status)"></td><td x-text="paidMoney(row.investment)"></td><td x-text="paidNumber(row.impressions)"></td><td x-text="paidNumber(row.clicks)"></td><td x-text="row.ctr == null ? '—' : paidNumber(row.ctr) + '%'"></td><td x-text="paidMoney(row.cpc)"></td><td x-text="paidNumber(row.conversions)"></td></tr></template>
-                </tbody></table></div>
-                <div x-show="!googleAdsRows().length" class="paid-empty"><strong>Nenhuma campanha encontrada</strong><p>Confira o período, a busca e os IDs liberados na conexão.</p></div>
-                <footer class="paid-footer"><span x-text="googleAdsRows().length + ' campanha(s)'"></span><div class="paid-actions" x-show="googleAdsPages() > 1"><button class="paid-button" @click="googleAdsPage--" :disabled="googleAdsPage <= 1" aria-label="Página anterior do Google Ads"><i data-lucide="chevron-left"></i></button><span x-text="googleAdsPage + ' / ' + googleAdsPages()"></span><button class="paid-button" @click="googleAdsPage++" :disabled="googleAdsPage >= googleAdsPages()" aria-label="Próxima página do Google Ads"><i data-lucide="chevron-right"></i></button></div></footer>
-              </article>
               <section x-show="googleAdsView==='ads'">
                 <div class="paid-title-row mb-4"><h2>Todos os anúncios · Google Ads</h2><span class="paid-muted" x-text="googleAdRows().length + ' anúncio(s)'"></span></div>
                 <div class="paid-actions mb-4"><label class="paid-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar anúncio ou campanha" x-model="googleAdsSearch"></label><select class="paid-button" aria-label="Campanha do Google Ads" x-model="googleAdsCampaign"><option value="">Todas as campanhas</option><template x-for="campaign in googleAdsReport.data.campaigns" :key="campaign.id"><option :value="campaign.id" x-text="campaign.name"></option></template></select></div>
@@ -8573,8 +8619,13 @@
                 <p class="mt-4" x-text="googleAdsReport.results?.health?.finance_since ? 'Despesas de mídia no Financeiro a partir de ' + googleAdsReport.results.health.finance_since : 'Financeiro: definir GOOGLE_ADS_FINANCE_SINCE no servidor para lançar os gastos.'"></p>
                 <p class="mt-3" x-text="googleAdsReport.results?.conversions_enabled && googleAdsReport.results?.conversion_action_configured ? 'Envio das vendas: habilitado' : 'Envio das vendas: aguarda ação de conversão e ativação no servidor'"></p>
                 <p class="paid-notice mt-3" x-show="googleAdsReport.results?.conversions_enabled && googleAdsReport.results?.conversion_destination?.state !== 'ready'">Aguardando validação do destino pelo Google. As vendas ficam na fila; uma meta nova pode demorar para ficar disponível.</p>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4"><template x-for="state in ['sent','pending','accepted','review']" :key="state"><div class="p-4 bg-slate-50 rounded-xl"><strong x-text="googleAdsReport.results?.health?.conversions?.[state] || 0"></strong><p class="paid-muted" x-text="googleConversionStatus(state)"></p></div></template></div>
+                <h3 class="font-semibold mt-6">Envios das vendas atribuídas no período</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4"><template x-for="state in ['sent','pending','processing','accepted','failed','dead_letter','review','suppressed']" :key="state"><div class="p-4 bg-slate-50 rounded-xl"><strong x-text="googlePipelineCount(state)"></strong><p class="paid-muted" x-text="googleConversionStatus(state)"></p></div></template></div>
                 <p class="paid-notice mt-4">Envios interrompidos e vendas canceladas depois de enviadas aparecem em “Conferir envio”. Não há reenvio automático nesses casos.</p>
+                <h3 class="font-semibold mt-6">Vendas vinculadas às conversas</h3>
+                <p class="paid-muted mt-2">Até 100 vendas recentes do período selecionado. Conversas sem venda permanecem no indicador de rastreio.</p>
+                <div class="paid-table-wrap mt-4"><table class="paid-table"><thead><tr><th>Pedido</th><th>Conversa</th><th>Receita</th><th>Margem antes da mídia</th><th>Retorno ao Google</th></tr></thead><tbody><template x-for="order in googleAdsReport.results?.orders || []" :key="order.order_id"><tr><td x-text="order.order_id.slice(0,8)"></td><td x-text="'#' + order.conversation_number"></td><td x-text="paidMoney(order.revenue)"></td><td x-text="paidMoney(order.gross_margin)"></td><td x-text="googleConversionStatus(order.conversion_status)"></td></tr></template></tbody></table></div>
+                <p x-show="!googleAdsReport.results?.available" class="paid-error" role="alert">A consulta das vendas está indisponível.</p><p x-show="googleAdsReport.results?.available && !googleAdsReport.results.orders?.length" class="paid-notice">Nenhuma venda atribuída neste período.</p>
               </article>
             </div>
           </template>

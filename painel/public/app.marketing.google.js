@@ -8,6 +8,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleCompareA: '', googleCompareB: '', googleAdsSyncing: false,
     googleAdsOpen() {
       this.marketingCampaignChannel = 'google';
+      this.googleAdsView = 'campaigns';
       this.marketingSetTab('visao');
     },
     async loadGoogleAds() {
@@ -29,14 +30,15 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       } finally {
         if (seq === this.googleAdsSeq) {
           this.googleAdsLoading = false;
-          this.$nextTick(() => lucide.createIcons());
+          this.$nextTick(() => {
+            lucide.createIcons();
+            this.renderGoogleOverviewChart();
+          });
         }
       }
     },
     googleAdsRows() {
-      const search = this.googleAdsSearch.trim().toLocaleLowerCase('pt-BR');
-      return (this.googleAdsReport?.data?.campaigns || []).filter(row =>
-        !search || `${row.name} ${row.id}`.toLocaleLowerCase('pt-BR').includes(search));
+      return this.googleOverviewRows();
     },
     googleAdsPages() { return Math.max(1, Math.ceil(this.googleAdsRows().length / 15)); },
     googleAdsPageRows() { return this.googleAdsRows().slice((this.googleAdsPage - 1) * 15, this.googleAdsPage * 15); },
@@ -106,25 +108,17 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       catch {this.googleAdsError='A coleta não foi concluída. Os dados e lançamentos anteriores foram preservados.';}
       finally {this.googleAdsSyncing=false;}
     },
-    googleAdsKpis() {
-      const m = this.googleAdsReport?.data?.totals || {};
-      return [
-        { label: 'Investimento', value: this.paidMoney(m.investment), detail: 'Valor informado pelo Google Ads', icon: 'coins' },
-        { label: 'Impressões', value: this.paidNumber(m.impressions), detail: 'Exibições dos anúncios', icon: 'eye' },
-        { label: 'Cliques', value: this.paidNumber(m.clicks), detail: 'Cliques no período', icon: 'mouse-pointer-2' },
-        { label: 'CTR', value: m.ctr == null ? '—' : `${this.paidNumber(m.ctr)}%`, detail: 'Cliques ÷ impressões', icon: 'chart-no-axes-column-increasing' },
-        { label: 'Custo por clique', value: this.paidMoney(m.cpc), detail: 'Investimento ÷ cliques', icon: 'tag' },
-        { label: 'Conversões no Google', value: this.paidNumber(m.conversions), detail: 'Metas configuradas na plataforma', icon: 'goal' },
-      ];
-    },
     googleAdsExport() {
       if(this.googleAdsView==='compare') {
         this.googleExportCells([['Indicador','Anúncio A','Anúncio B'],...this.googleCompareRows().map(row=>[row.label,row.a,row.b])]);return;
       }
       const rows = this.googleAdsRows();
       if (!rows.length) return;
-      const cells = [['ID', 'Campanha', 'Status', 'Investimento BRL', 'Impressões', 'Cliques', 'CTR %', 'CPC BRL', 'Conversões Google'],
-        ...rows.map(row => [row.id, row.name, this.googleAdsStatus(row.status), row.investment, row.impressions, row.clicks, row.ctr, row.cpc, row.conversions])];
+      const cells = [['ID', 'Campanha', 'Status', 'Tipo', 'Investimento BRL', 'Impressões', 'Cliques', 'CTR %', 'CPC BRL',
+        'Conversões Google', 'Conversas identificadas', 'Vendas atribuídas', 'Receita BRL', 'Resultado após mídia BRL'],
+        ...rows.map(row => [row.id, row.name, this.googleAdsStatus(row.status), this.googleCampaignType(row.channel_type),
+          row.investment, row.impressions, row.clicks, row.ctr, row.cpc, row.conversions,
+          row.tracked_conversations, row.attributed_sales, row.attributed_revenue, row.result])];
       this.googleExportCells(cells);
     },
     googleExportCells(cells) {

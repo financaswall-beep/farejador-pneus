@@ -37,6 +37,46 @@
   height:auto;
   margin-top:12px
 }
+.google-overview .paid-kpi {
+  box-shadow:0 3px 12px #183e2f03
+}
+.google-overview .paid-kpi-label i,.google-overview .paid-kpi-label svg {
+  color:#00644f
+}
+.google-overview .paid-result .paid-kpi-label i,.google-overview .paid-result .paid-kpi-label svg {
+  color:#c9eee0
+}
+.google-overview .google-result-negative {
+  background:linear-gradient(115deg,#8a3440,#702c39);
+  border-color:#8a3440
+}
+.google-overview .paid-flow img {
+  width:25px;
+  height:25px
+}
+.google-overview .paid-capi footer .paid-muted {
+  max-width:185px;
+  text-align:right
+}
+.google-campaign-status {
+  color:#65738a;
+  font-size:10px;
+  margin-left:8px
+}
+.google-quality-footer {
+  display:flex;
+  justify-content:flex-end;
+  margin-top:12px
+}
+.google-overview-note {
+  margin:14px 0;
+  font-size:11px
+}
+@media(max-width:900px) {
+  .google-overview .paid-kpis {
+    grid-template-columns:repeat(2,minmax(0,1fr))
+  }
+}
 .paid-screen h1 {
   font-size:29px;
   letter-spacing:-.8px;

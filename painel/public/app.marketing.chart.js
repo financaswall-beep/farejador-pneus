@@ -4,16 +4,20 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingChart = function () {
   return {
     renderMarketingChart() {
-      const canvas = document.getElementById('chartMarketingRhythm');
+      this.renderMarketingSeries({ canvasId: 'chartMarketingRhythm', chartKey: '_marketingRhythmChart',
+        rows: this.paidChartRows(), seriesKey: 'conversations', seriesLabel: 'Conversas na Meta' });
+    },
+    renderMarketingSeries({ canvasId, chartKey, rows, seriesKey, seriesLabel }) {
+      const canvas = document.getElementById(canvasId);
       if (!canvas || typeof Chart === 'undefined') return;
-      if (window._marketingRhythmChart) window._marketingRhythmChart.destroy();
-      const rows = this.paidChartRows();
+      if (window[chartKey]) window[chartKey].destroy();
+      window[chartKey] = null;
       if (!rows.length) return;
       const safe = (value) => {
         const parsed = Number(value);
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
       };
-      window._marketingRhythmChart = new Chart(canvas, {
+      window[chartKey] = new Chart(canvas, {
         type: 'bar',
         data: {
           labels: rows.map((row) => this.marketingDateLabel(row.date)),
@@ -36,9 +40,9 @@ window.PAINEL_MODULES.marketingChart = function () {
               pointBorderWidth: 1,
             },
             {
-              label: 'Conversas na Meta',
+              label: seriesLabel,
               type: 'line',
-              data: rows.map((row) => safe(row.conversations)),
+              data: rows.map((row) => safe(row[seriesKey])),
               yAxisID: 'conversations',
               borderColor: '#005e4c',
               borderWidth: 2,
@@ -62,7 +66,7 @@ window.PAINEL_MODULES.marketingChart = function () {
               callbacks: {
                 label: (context) => context.dataset.yAxisID === 'investment'
                   ? `Investimento: ${Number(context.parsed.y || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                  : `Conversas: ${Number(context.parsed.y || 0).toLocaleString('pt-BR')}`,
+                  : `${seriesLabel}: ${Number(context.parsed.y || 0).toLocaleString('pt-BR')}`,
               },
             },
           },

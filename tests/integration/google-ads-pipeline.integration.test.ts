@@ -71,10 +71,16 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     await process({dbPool:db.pool,transport});expect(transport.ingest).toHaveBeenCalledTimes(1);
     expect(transport.ingest.mock.calls[0][0]).toMatchObject({conversionValue:100,eventSource:'MESSAGE',adIdentifiers:{gclid:'test-click'}});
     expect((await db.pool.query(`SELECT status FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0].status).toBe('accepted');
+    const acceptedReport=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(acceptedReport.pipeline).toMatchObject({accepted:1,sent:0});
+    expect(acceptedReport.totals.tracked_conversations).toBe(1);
+    expect((await results(config.customerId,'2026-10-01','2026-10-01',db.pool)).pipeline.accepted).toBe(0);
+    expect((await results('9999999999','2026-09-25','2026-10-01',db.pool)).pipeline.accepted).toBe(0);
     await db.pool.query(`UPDATE marketing.google_conversion_outbox SET not_before=now() WHERE environment='test'`);
     await process({dbPool:db.pool,transport});await process({dbPool:db.pool,transport});
     expect(transport.ingest).toHaveBeenCalledTimes(1);expect(transport.status).toHaveBeenCalledTimes(1);
     expect((await db.pool.query(`SELECT status FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0].status).toBe('sent');
+    expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).pipeline).toMatchObject({accepted:0,sent:1});
   });
   it('envio ambiguo exige revisao e nunca repete o POST automaticamente',async()=>{
     const {GoogleIngestAmbiguous}=await import('../../src/marketing/google-data-manager.js');
@@ -98,6 +104,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     await process({dbPool:db.pool,transport:{ingest:vi.fn(),status:vi.fn()}});
     expect((await db.pool.query(`SELECT status,last_error_code FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0])
       .toMatchObject({status:'review',last_error_code:'sent_sale_cancelled'});
+    expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).pipeline.review).toBe(1);
     expect((await db.pool.query(`SELECT count(*)::int n FROM marketing.google_order_attributions WHERE environment='test'`)).rows[0].n).toBe(2);
   });
   it('vincula o widget web; nota privada e mensagem de funcionario nao comprovam clique',async()=>{
@@ -118,6 +125,22 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect((await db.pool.query(`SELECT conversation_id,source FROM marketing.google_click_conversations WHERE click_id=$1`,[webClick])).rows[0])
       .toMatchObject({conversation_id:web,source:'web_custom_attribute'});
     expect((await db.pool.query(`SELECT count(*)::int n FROM marketing.google_click_conversations WHERE click_id=$1`,[privateClick])).rows[0].n).toBe(0);
+  });
+  it('conta uma conversa só uma vez no total, mesmo vinculada a campanhas diferentes',async()=>{
+    await db.pool.query(`INSERT INTO marketing.google_campaigns(environment,account_id,campaign_id,name,status,channel_type,owned)
+      VALUES('test','1234567890','44','Outra campanha 2W','ENABLED','SEARCH',true)`);
+    await db.pool.query(`INSERT INTO marketing.google_ads(environment,account_id,ad_group_id,ad_id,campaign_id,name,status,format)
+      VALUES('test','1234567890','22','55','44','Outro anuncio','ENABLED','RESPONSIVE_SEARCH_AD')`);
+    const anotherClick=(await db.pool.query(`INSERT INTO marketing.google_clicks(environment,account_id,campaign_id,ad_group_id,ad_id,
+      reference,identifier_type,identifier,identifier_hash,consent_ad_user_data,destination,captured_at)
+      VALUES('test','1234567890','44','22','55',$1,'gclid','other-test','other-hash',true,'whatsapp','2026-09-30T10:10:00Z') RETURNING id`,
+      ['2W-G'+'d'.repeat(32)])).rows[0].id;
+    await db.pool.query(`INSERT INTO marketing.google_click_conversations(environment,click_id,conversation_id,source,observed_at)
+      VALUES('test',$1,$2,'message_reference','2026-09-30T10:11:00Z')`,[anotherClick,conversation]);
+    const report=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(report.campaigns.find(row=>row.id==='11')?.tracked_conversations).toBe(2);
+    expect(report.campaigns.find(row=>row.id==='44')?.tracked_conversations).toBe(1);
+    expect(report.totals.tracked_conversations).toBe(2);
   });
   it('protege as oito tabelas internas com RLS e sem acesso de parceiros',async()=>{
     const tables=await db.pool.query(`SELECT count(*)::int n,bool_and(c.relrowsecurity) protected
