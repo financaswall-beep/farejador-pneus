@@ -1,9 +1,11 @@
 import { GoogleAdsError, type GoogleAdsConfig } from './google-ads-client.js';
+import { enrichGoogleAdPreviews } from './google-ad-previews.js';
 
 export interface GoogleAd {
   id: string; ad_id: string; ad_group_id: string; campaign_id: string;
   name: string; campaign_name: string; status: string; format: string;
   headlines: string[]; descriptions: string[]; final_url: string | null;
+  image_url?: string | null; business_name?: string | null;
   investment: number; impressions: number; clicks: number; conversions: number;
   conversion_value: number; ctr: number | null; cpc: number | null; cpm: number | null;
   daily: Array<{ date: string; cost_micros: string; investment: number; impressions: number; clicks: number; conversions: number }>;
@@ -79,9 +81,11 @@ export async function loadGoogleAdDetails(search: <T>(query: string) => Promise<
     item.conversion_value += positive(row.metrics?.conversionsValue);
     item.daily.push({ date, cost_micros: costText, investment: cents(cost), impressions, clicks, conversions });
   }
-  return [...ads.values()].map(({ micros, ...ad }) => ({ ...ad, investment: cents(micros),
+  const result = [...ads.values()].map(({ micros, ...ad }) => ({ ...ad, investment: cents(micros),
     conversion_value: Math.round(ad.conversion_value * 100) / 100,
     ctr: ratio(ad.clicks, ad.impressions, 100), cpc: ratio(Number(micros) / 1e6, ad.clicks),
     cpm: ratio(Number(micros) / 1e6, ad.impressions, 1000),
   })).sort((a, b) => b.investment - a.investment);
+  await enrichGoogleAdPreviews(search, config, result);
+  return result;
 }

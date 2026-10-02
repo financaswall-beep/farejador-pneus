@@ -14,6 +14,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     async loadGoogleAds() {
       const seq = ++this.googleAdsSeq, period = this.marketingPeriod;
       this.googleAdsLoading = true; this.googleAdsError = ''; this.googleAdsReport = null; this.googleAdsPage = 1;
+      this.googleAdPage = 1;
       try {
         const report = this.marketingIsMock()
           ? { status: 'disabled', detail: 'Prévia: a conexão real exige autorização da conta Google Ads.', missing: [], data: null }
@@ -43,11 +44,6 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleAdsPages() { return Math.max(1, Math.ceil(this.googleAdsRows().length / 15)); },
     googleAdsPageRows() { return this.googleAdsRows().slice((this.googleAdsPage - 1) * 15, this.googleAdsPage * 15); },
     googleAdsStatus(status) { return { ENABLED: 'Ativa', PAUSED: 'Pausada', REMOVED: 'Removida' }[status] || 'Não informado'; },
-    googleAdRows() {
-      const search=this.googleAdsSearch.trim().toLocaleLowerCase('pt-BR');
-      return (this.googleAdsReport?.data?.ads||[]).filter(row=>(!this.googleAdsCampaign||row.campaign_id===this.googleAdsCampaign)
-        &&(!search||`${row.name} ${row.campaign_name} ${row.ad_id}`.toLocaleLowerCase('pt-BR').includes(search)));
-    },
     googleResult(row,level='ad') {
       const results=this.googleAdsReport?.results,available=results?.available===true;
       const found=(level==='ad'?results?.ads:results?.campaigns)?.find(r=>r.id===row?.id);
@@ -61,6 +57,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleToggleAd(id) {
       if(this.googleAdsSelected.includes(id))this.googleAdsSelected=this.googleAdsSelected.filter(x=>x!==id);
       else if(this.googleAdsSelected.length<2)this.googleAdsSelected=[...this.googleAdsSelected,id];
+      this.$nextTick(() => lucide.createIcons());
     },
     googleOpenAd(id) {this.googleAdsDetailId=id;this.googleAdsView='detail';},
     googleAdById(id) {return (this.googleAdsReport?.data?.ads||[]).find(row=>row.id===id);},
@@ -109,6 +106,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       finally {this.googleAdsSyncing=false;}
     },
     googleAdsExport() {
+      if(this.googleAdsView==='ads') {this.googleAdExport();return;}
       if(this.googleAdsView==='compare') {
         this.googleExportCells([['Indicador','Anúncio A','Anúncio B'],...this.googleCompareRows().map(row=>[row.label,row.a,row.b])]);return;
       }

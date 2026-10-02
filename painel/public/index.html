@@ -222,6 +222,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-compare.css?v=20261001-compare1">
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-ads.css?v=20260930-ads1">
+<link rel="stylesheet" href="/admin/painel/marketing-google-ads.css?v=20261001-google-ads">
 <link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261001-campaign1">
 <link rel="stylesheet" href="/admin/painel/marketing-ad-detail.css?v=20261001-ad1">
 <link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
@@ -229,8 +230,9 @@
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.paid.js?v=20261001-google2"></script>
-<script src="/admin/painel/app.marketing.google.overview.js?v=20261001-google-overview"></script>
-<script src="/admin/painel/app.marketing.google.js?v=20261001-google-overview"></script>
+<script src="/admin/painel/app.marketing.google.overview.js?v=20261001-google-ads"></script>
+<script src="/admin/painel/app.marketing.google.ads.js?v=20261001-google-ads"></script>
+<script src="/admin/painel/app.marketing.google.js?v=20261001-google-ads"></script>
 <script src="/admin/painel/app.marketing.compare.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.compare.view.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.js?v=20261001-google2"></script>
@@ -287,7 +289,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261001-google-overview"></script>
+<script src="/admin/painel/app.montagem.js?v=20261001-google-ads"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8578,24 +8580,57 @@
                 </div>
                 <p class="google-overview-note">Conversões do Google e vendas confirmadas no Farejador são indicadores diferentes.</p>
               </section>
-              <div x-show="googleAdsView !== 'campaigns'" class="paid-title-row mb-4">
+              <div x-show="!['campaigns','ads'].includes(googleAdsView)" class="paid-title-row mb-4">
                 <div class="paid-segment"><button @click="googleSetView('campaigns')"><i data-lucide="arrow-left"></i>Campanhas</button><button @click="googleSetView('ads')" :class="googleAdsView === 'ads' && 'is-active'">Todos os anúncios</button><button @click="googleSetView('setup')" :class="googleAdsView === 'setup' && 'is-active'">Rastreio e envios</button></div><button class="paid-button" @click="googleSync()" :disabled="googleAdsSyncing || marketingIsMock()"><i data-lucide="refresh-cw"></i><span x-text="googleAdsSyncing ? 'Coletando…' : 'Atualizar coleta'"></span></button>
               </div>
-              <section x-show="googleAdsView==='ads'">
-                <div class="paid-title-row mb-4"><h2>Todos os anúncios · Google Ads</h2><span class="paid-muted" x-text="googleAdRows().length + ' anúncio(s)'"></span></div>
-                <div class="paid-actions mb-4"><label class="paid-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar anúncio ou campanha" x-model="googleAdsSearch"></label><select class="paid-button" aria-label="Campanha do Google Ads" x-model="googleAdsCampaign"><option value="">Todas as campanhas</option><template x-for="campaign in googleAdsReport.data.campaigns" :key="campaign.id"><option :value="campaign.id" x-text="campaign.name"></option></template></select></div>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <template x-for="ad in googleAdRows().slice(0,90)" :key="ad.id"><article class="paid-card" :class="googleAdsSelected.includes(ad.id) ? 'ring-1 ring-emerald-600' : ''">
-                    <div class="paid-title-row"><label class="flex items-center gap-2"><input type="checkbox" :checked="googleAdsSelected.includes(ad.id)" @change="googleToggleAd(ad.id)" :disabled="googleAdsSelected.length>=2 && !googleAdsSelected.includes(ad.id)"><span class="paid-muted">Comparar</span></label><span class="paid-badge">Google Ads</span></div>
-                    <div class="p-4 my-3 rounded-xl bg-slate-50 border border-slate-100"><small class="paid-muted" x-text="ad.format"></small><h3 class="mt-2" x-text="ad.headlines.length ? ad.headlines.join(' · ') : ad.name"></h3><p class="paid-muted mt-2" x-text="ad.descriptions.join(' ')"></p></div>
-                    <h3 x-text="ad.name"></h3><p class="paid-muted" x-text="ad.campaign_name"></p><span class="paid-badge" x-text="googleAdsStatus(ad.status)"></span>
-                    <dl class="grid grid-cols-3 gap-3 mt-4 text-sm"><div><dt>Investimento</dt><dd class="font-bold" x-text="paidMoney(ad.investment)"></dd></div><div><dt>Cliques</dt><dd class="font-bold" x-text="paidNumber(ad.clicks)"></dd></div><div><dt>Custo/clique</dt><dd class="font-bold" x-text="paidMoney(ad.cpc)"></dd></div><div><dt>Vendas</dt><dd class="font-bold" x-text="paidNumber(googleResult(ad).attributed_sales)"></dd></div><div><dt>Receita</dt><dd class="font-bold" x-text="paidMoney(googleResult(ad).attributed_revenue)"></dd></div><div><dt>Após mídia</dt><dd class="font-bold text-emerald-800" x-text="paidMoney(googleResult(ad).result)"></dd></div></dl>
-                    <footer class="paid-footer"><button class="paid-link" @click="googleOpenAd(ad.id)">Ver análise →</button><a x-show="ad.final_url" :href="ad.final_url" target="_blank" rel="noopener noreferrer" class="paid-link">Ver destino ↗</a></footer>
+              <section x-show="googleAdsView==='ads'" class="mc-screen google-ads-screen" data-google-ad-screen>
+                <div class="ma-summary">
+                  <dl><template x-for="item in googleAdSummaryItems()" :key="item.label"><div><dt x-text="item.label"></dt><dd :class="item.result && (item.negative ? 'ma-negative' : 'ma-positive')" x-text="item.value"></dd></div></template></dl>
+                  <p class="paid-muted">Totais de todos os anúncios filtrados no período</p>
+                </div>
+                <div class="paid-indicators google-ad-indicators"><template x-for="item in googleAdIndicators()" :key="item.label"><div><i :data-lucide="item.icon"></i><span x-text="item.label"></span><strong x-text="item.value"></strong></div></template></div>
+                <p x-show="!googleAdsReport.results?.available" class="paid-error" role="alert">A apuração de vendas está indisponível. Receita e resultado aguardam uma consulta válida.</p>
+                <p x-show="googleAdsReport.results?.available && googleAdSummary().result == null" class="paid-notice">Há vendas com custos pendentes no filtro. O resultado será exibido quando os custos estiverem completos.</p>
+                <div class="ma-gallery-head" data-google-ad-gallery>
+                  <div class="paid-actions"><h2>Campanhas e anúncios</h2><div class="paid-segment"><button @click="googleSetView('campaigns')">Campanhas</button><button class="is-active" aria-pressed="true">Todos os anúncios</button></div></div>
+                  <div class="paid-actions"><button class="paid-button" @click="googleAdsExport()" :disabled="!googleAdRows().length"><i data-lucide="download"></i>Exportar CSV</button><div class="paid-segment"><button @click="googleAdLayout='grid'; $nextTick(() => lucide.createIcons())" :class="googleAdLayout==='grid' && 'is-active'" :aria-pressed="googleAdLayout==='grid'" aria-label="Exibir anúncios em cards"><i data-lucide="layout-grid"></i></button><button @click="googleAdLayout='list'; $nextTick(() => lucide.createIcons())" :class="googleAdLayout==='list' && 'is-active'" :aria-pressed="googleAdLayout==='list'" aria-label="Exibir anúncios em lista"><i data-lucide="list"></i></button></div></div>
+                </div>
+                <div class="ma-filters">
+                  <label class="ma-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar anúncio ou campanha" aria-label="Buscar anúncio do Google Ads" x-model="googleAdsSearch" @input="googleAdPage=1; $nextTick(() => lucide.createIcons())"></label>
+                  <select class="paid-button" aria-label="Campanha dos anúncios do Google" x-model="googleAdsCampaign" @change="googleAdPage=1; $nextTick(() => lucide.createIcons())"><option value="">Todas as campanhas</option><template x-for="campaign in googleAdsReport.data.campaigns" :key="campaign.id"><option :value="campaign.id" x-text="campaign.name"></option></template></select>
+                  <select class="paid-button" aria-label="Formato dos anúncios do Google" x-model="googleAdFormat" @change="googleAdPage=1; $nextTick(() => lucide.createIcons())"><option value="">Todos os formatos</option><template x-for="format in googleAdFormats()" :key="format.id"><option :value="format.id" x-text="format.label"></option></template></select>
+                  <select class="paid-button" aria-label="Status atual dos anúncios do Google" x-model="googleAdStatus" @change="googleAdPage=1; $nextTick(() => lucide.createIcons())"><option value="">Todos os status</option><option value="ENABLED">Ativos</option><option value="PAUSED">Pausados</option><option value="REMOVED">Removidos</option></select>
+                  <select class="paid-button" aria-label="Ordenar anúncios do Google" x-model="googleAdSort" @change="googleAdPage=1; $nextTick(() => lucide.createIcons())"><option value="cpc">Menor custo por clique</option><option value="result">Maior resultado após mídia</option><option value="attributed_sales">Mais vendas atribuídas</option><option value="investment">Maior investimento</option><option value="clicks">Mais cliques</option><option value="name">Nome do anúncio</option></select>
+                </div>
+                <p class="google-ad-count-note">O status é atual; os indicadores correspondem ao período selecionado. Selecione até dois anúncios para comparar.</p>
+                <div class="mc-grid ma-grid" x-show="googleAdLayout==='grid'">
+                  <template x-for="ad in googleAdPageRows()" :key="ad.id"><article class="mc-card ma-ad" :class="googleAdsSelected.includes(ad.id) && 'is-selected'">
+                    <div class="ma-media-wrap">
+                      <div class="google-ad-preview">
+                        <template x-if="googleAdImage(ad)"><img :src="googleAdImage(ad)" :alt="'Recurso de imagem de ' + ad.name" loading="lazy" referrerpolicy="no-referrer" @error="googleAdImageFailed(ad); $nextTick(() => lucide.createIcons())"></template>
+                        <template x-if="!googleAdImage(ad) && googleAdIsSearch(ad)"><div class="google-ad-search"><div class="google-ad-preview-brand"><i data-lucide="globe"></i><span x-text="googleAdPreviewBrand(ad)"></span></div><small>Patrocinado · Prévia de Pesquisa</small><h4 x-text="googleAdPreviewTitle(ad)"></h4><p x-text="googleAdPreviewDescription(ad)"></p></div></template>
+                        <template x-if="!googleAdImage(ad) && !googleAdIsSearch(ad)"><div class="mc-no-media google-ad-preview-empty"><i data-lucide="image"></i><span>Prévia de mídia indisponível</span><small x-text="googleAdFormatLabel(ad.format)"></small></div></template>
+                      </div>
+                      <label class="ma-select"><input type="checkbox" :aria-label="'Selecionar ' + ad.name + ' para comparar'" :checked="googleAdsSelected.includes(ad.id)" @change="googleToggleAd(ad.id)" :disabled="googleAdsSelected.length>=2 && !googleAdsSelected.includes(ad.id)"></label><img class="google-ad-network" src="/assets/brands/google-ads.svg" alt="Google Ads">
+                    </div>
+                    <div class="mc-card-info">
+                      <h3><button @click="googleOpenAd(ad.id)" x-text="ad.name"></button></h3><p class="ma-campaign-name paid-muted" x-text="ad.campaign_name"></p>
+                      <div class="mc-tags"><span class="mc-badge google-ad-status" :class="{'is-paused':ad.status==='PAUSED','is-removed':ad.status==='REMOVED'}" x-text="{ENABLED:'Ativo',PAUSED:'Pausado',REMOVED:'Removido'}[ad.status] || 'Não informado'"></span><span class="mc-badge google-ad-format" x-text="googleAdFormatLabel(ad.format)"></span></div>
+                      <dl class="ma-ad-metrics"><template x-for="item in googleAdCardItems(ad)" :key="item.label"><div><dt x-text="item.label"></dt><dd :class="item.result && (item.negative ? 'ma-negative' : 'ma-positive')" x-text="item.value"></dd></div></template></dl>
+                      <div class="ma-card-context"><span><i data-lucide="message-circle"></i><span x-text="ad.tracked_conversations == null ? 'Rastreio indisponível' : paidNumber(ad.tracked_conversations) + ' conversas identificadas'"></span></span><span class="ma-cost-badge" :class="googleAdCostBadge(ad).best && 'is-best'" x-text="googleAdCostBadge(ad).text"></span></div>
+                      <footer class="ma-card-actions"><button @click="googleOpenAd(ad.id)">Ver análise<i data-lucide="arrow-right"></i></button><a href="https://ads.google.com/aw/ads" target="_blank" rel="noopener noreferrer" :title="'Abrir gerenciador · anúncio ' + ad.ad_id">Abrir no Google Ads<i data-lucide="external-link"></i></a></footer>
+                    </div>
                   </article></template>
                 </div>
+                <div class="ma-list-wrap" x-show="googleAdLayout==='list' && googleAdRows().length">
+                  <table class="ma-list"><thead><tr><th><span class="sr-only">Selecionar</span></th><th>Anúncio / campanha</th><th>Formato / status</th><th>Investimento</th><th>Cliques / CPC</th><th>Vendas</th><th>Receita</th><th>Após mídia</th><th><span class="sr-only">Abrir análise</span></th></tr></thead><tbody><template x-for="ad in googleAdPageRows()" :key="ad.id"><tr :class="googleAdsSelected.includes(ad.id) && 'is-selected'">
+                    <td><input type="checkbox" :aria-label="'Selecionar ' + ad.name + ' para comparar'" :checked="googleAdsSelected.includes(ad.id)" @change="googleToggleAd(ad.id)" :disabled="googleAdsSelected.length>=2 && !googleAdsSelected.includes(ad.id)"></td><td><button class="ma-list-title" @click="googleOpenAd(ad.id)" x-text="ad.name"></button><small x-text="ad.campaign_name"></small></td><td><span x-text="googleAdFormatLabel(ad.format)"></span><small x-text="googleAdsStatus(ad.status)"></small></td><td x-text="paidMoney(ad.investment)"></td><td><span x-text="paidNumber(ad.clicks)"></span><small x-text="paidMoney(ad.cpc)"></small></td><td x-text="paidNumber(ad.attributed_sales)"></td><td x-text="paidMoney(ad.attributed_revenue)"></td><td :class="ad.result < 0 ? 'ma-negative' : 'ma-positive'" x-text="paidMoney(ad.result)"></td><td><button class="paid-link" @click="googleOpenAd(ad.id)" :aria-label="'Ver análise de ' + ad.name"><i data-lucide="arrow-right"></i></button></td>
+                  </tr></template></tbody></table>
+                </div>
                 <p x-show="!googleAdRows().length" class="paid-empty">Nenhum anúncio neste filtro. Campanhas Performance Max usam grupos de recursos e podem não ter anúncios individuais nesta consulta.</p>
-                <p x-show="googleAdRows().length>90" class="paid-muted">Refine a busca para visualizar os demais anúncios.</p>
-                <div x-show="googleAdsSelected.length" class="paid-card paid-title-row mt-4"><strong x-text="googleAdsSelected.length + ' anúncio(s) selecionado(s)'"></strong><div class="paid-actions"><button class="paid-link" @click="googleAdsSelected=[]">Limpar seleção</button><button class="paid-button is-active" @click="googleShowCompare()" :disabled="googleAdsSelected.length!==2">Comparar anúncios →</button></div></div>
+                <footer class="ma-pagination" x-show="googleAdRows().length"><span x-text="'Exibindo ' + googleAdPageRows().length + ' de ' + googleAdRows().length + ' anúncios'"></span><span class="ma-pagination-note"><i data-lucide="info"></i>Prévias de recursos; a combinação entregue pode variar.</span><div class="paid-actions"><button class="paid-button" @click="googleAdNavigatePage(-1)" :disabled="googleAdCurrentPage()<=1" aria-label="Página anterior de anúncios do Google"><i data-lucide="chevron-left"></i></button><span x-text="'Página ' + googleAdCurrentPage() + ' de ' + googleAdPages()"></span><button class="paid-button" @click="googleAdNavigatePage(1)" :disabled="googleAdCurrentPage()>=googleAdPages()" aria-label="Próxima página de anúncios do Google"><i data-lucide="chevron-right"></i></button></div></footer>
+                <div class="ma-selection" x-show="googleAdsSelected.length"><div class="paid-actions"><div class="ma-selected-thumbs"><template x-for="ad in googleAdSelectedRows()" :key="ad.id"><div><template x-if="googleAdImage(ad)"><img :src="googleAdImage(ad)" alt="" referrerpolicy="no-referrer" @error="googleAdImageFailed(ad)"></template><template x-if="!googleAdImage(ad)"><i data-lucide="file-text"></i></template></div></template></div><div><strong x-text="googleAdsSelected.length + ' anúncio(s) selecionado(s)'"></strong><p class="paid-muted">Mesmo período · seleções mantidas entre páginas e filtros</p></div></div><div class="paid-actions"><button class="paid-link" @click="googleAdsSelected=[]">Limpar seleção</button><button class="paid-button is-active" @click="googleShowCompare()" :disabled="googleAdsSelected.length!==2">Comparar anúncios<i data-lucide="arrow-right"></i></button></div></div>
+                <p class="ma-footnote"><i data-lucide="info"></i>Conversões do Google e vendas atribuídas são indicadores diferentes. Resultado após mídia antes das demais despesas da empresa.</p>
               </section>
               <section x-show="googleAdsView==='compare'">
                 <div class="paid-title-row mb-4"><div><h2>Comparar anúncios</h2><p class="paid-muted">Mesmo período · Google Ads e vendas apuradas no Farejador.</p></div><button class="paid-button" @click="googleAdsExport()">Exportar CSV</button></div>

@@ -75,6 +75,7 @@ window.PAINEL_MODULES.marketingGoogleOverview = function () {
       this.googleAdsView = view;
       this.googleAdsCampaign = campaign;
       this.googleAdsSearch = '';
+      this.googleAdPage = 1;
       this.$nextTick(() => {
         lucide.createIcons();
         if (view === 'campaigns') this.renderGoogleOverviewChart();

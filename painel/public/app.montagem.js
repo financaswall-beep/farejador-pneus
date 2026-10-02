@@ -104,6 +104,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.marketingPaid,
     window.PAINEL_MODULES.marketingGoogle,
     window.PAINEL_MODULES.marketingGoogleOverview,
+    window.PAINEL_MODULES.marketingGoogleAds,
     window.PAINEL_MODULES.marketingCompare,
     window.PAINEL_MODULES.marketingCompareView,
     window.PAINEL_MODULES.marketingCreatives,

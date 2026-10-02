@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 function app() {
   const window = { PAINEL_MODULES: {} as Record<string, () => any> };
-  for (const file of ['paid', 'google', 'google.overview']) runInNewContext(readFileSync(`painel/public/app.marketing.${file}.js`, 'utf8'),
+  for (const file of ['paid', 'google', 'google.overview', 'google.ads']) runInNewContext(readFileSync(`painel/public/app.marketing.${file}.js`, 'utf8'),
     { window, document: {querySelector: () => null}, lucide: { createIcons() {} } });
   return { ...window.PAINEL_MODULES.marketingPaid(), ...window.PAINEL_MODULES.marketingGoogle(), ...window.PAINEL_MODULES.marketingGoogleOverview(),
+    ...window.PAINEL_MODULES.marketingGoogleAds(),
     marketingPeriod: '30d', marketingCampaignChannel: 'all', marketingIsMock: () => false,
     formatCurrency: (value: number) => `R$ ${value}`, $nextTick: (fn: () => void) => fn(),
     apiGet: vi.fn(), marketingSetTab: vi.fn(), loadMarketing: vi.fn(), marketingCampaignSetChannel: vi.fn(), renderMarketingSeries: vi.fn() };
