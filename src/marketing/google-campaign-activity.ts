@@ -18,7 +18,7 @@ interface CampaignEvent { id:string; order_id:string; status:string; attempts:nu
 
 // Somente leitura. Conta, ambiente e propriedade nunca vêm do navegador.
 export async function getGoogleCampaignActivity(account:string, campaign:string, since:string, until:string,
-  orderPage=1, conversationPage=1, dbPool:Pool=pool) {
+  orderPage=1, conversationPage=1, dbPool:Pool=pool, adId:string|null=null) {
   const values=[env.FAREJADOR_ENV,since,until,account,campaign];
   const orders=await dbPool.query<Page<CampaignOrder>>(`${GOOGLE_RESULTS_CTE}, selected AS (
     SELECT a.order_id,a.ad_id,a.total_amount::text revenue,a.gross_margin::text gross_margin,
@@ -26,11 +26,11 @@ export async function getGoogleCampaignActivity(account:string, campaign:string,
       c.chatwoot_conversation_id conversation_number,q.status conversion_status
     FROM attributed a JOIN core.conversations c ON c.environment=$1 AND c.id=a.conversation_id
     LEFT JOIN marketing.google_conversion_outbox q ON q.environment=$1 AND q.attribution_id=a.id AND q.action_id=$6
-    WHERE a.campaign_id=$5
+    WHERE a.campaign_id=$5 AND ($8::text IS NULL OR a.ad_id=$8)
   ), page AS (SELECT * FROM selected ORDER BY realized_at DESC,order_id LIMIT 25 OFFSET $7)
   SELECT (SELECT count(*)::int FROM selected) total,
     COALESCE((SELECT jsonb_agg(page ORDER BY realized_at DESC,order_id) FROM page),'[]'::jsonb) rows`,
-  [...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'',(orderPage-1)*PAGE_SIZE]);
+  [...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'',(orderPage-1)*PAGE_SIZE,adId]);
   const conversations=await dbPool.query<Page<CampaignConversation>>(`WITH selected AS (
     SELECT DISTINCT ON (c.id) c.chatwoot_conversation_id conversation_number,c.current_status,c.channel_type,
       b.observed_at,g.ad_group_id||':'||g.ad_id ad_id
@@ -39,13 +39,14 @@ export async function getGoogleCampaignActivity(account:string, campaign:string,
     JOIN core.conversations c ON c.environment=b.environment AND c.id=b.conversation_id
     JOIN marketing.google_campaigns p ON p.environment=g.environment AND p.account_id=g.account_id AND p.campaign_id=g.campaign_id
     WHERE g.environment=$1 AND g.account_id=$4 AND g.campaign_id=$5 AND p.owned
+      AND ($7::text IS NULL OR g.ad_group_id||':'||g.ad_id=$7)
       AND b.observed_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
       AND b.observed_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
     ORDER BY c.id,b.observed_at DESC,g.id
   ), page AS (SELECT * FROM selected ORDER BY observed_at DESC,conversation_number LIMIT 25 OFFSET $6)
   SELECT (SELECT count(*)::int FROM selected) total,
     COALESCE((SELECT jsonb_agg(page ORDER BY observed_at DESC,conversation_number) FROM page),'[]'::jsonb) rows`,
-  [...values,(conversationPage-1)*PAGE_SIZE]);
+  [...values,(conversationPage-1)*PAGE_SIZE,adId]);
   // Histórico inclui envios em revisão após cancelamento; não depende da lista paginada de vendas.
   const events=await dbPool.query<CampaignEvent>(`SELECT q.id,a.order_id,q.status,q.attempts,q.updated_at,q.sent_at
     FROM marketing.google_order_attributions a
@@ -53,9 +54,16 @@ export async function getGoogleCampaignActivity(account:string, campaign:string,
     JOIN marketing.google_campaigns p ON p.environment=g.environment AND p.account_id=g.account_id AND p.campaign_id=g.campaign_id
     JOIN marketing.google_conversion_outbox q ON q.environment=a.environment AND q.attribution_id=a.id AND q.action_id=$6
     WHERE a.environment=$1 AND g.account_id=$4 AND g.campaign_id=$5 AND p.owned
+      AND ($7::text IS NULL OR g.ad_group_id||':'||g.ad_id=$7)
       AND a.realized_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
       AND a.realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
-    ORDER BY q.updated_at DESC,q.id LIMIT 30`,[...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'']);
+    ORDER BY q.updated_at DESC,q.id LIMIT 30`,[...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'',adId]);
   return {available:true,page_size:PAGE_SIZE,orders:{...orders.rows[0],page:orderPage},
     conversations:{...conversations.rows[0],page:conversationPage},events:events.rows};
+}
+
+/** Mesma consulta da campanha, restringindo também à identidade (grupo, anúncio). */
+export function getGoogleAdActivity(account:string, campaign:string, adId:string, since:string, until:string,
+  orderPage=1, conversationPage=1, dbPool:Pool=pool) {
+  return getGoogleCampaignActivity(account,campaign,since,until,orderPage,conversationPage,dbPool,adId);
 }

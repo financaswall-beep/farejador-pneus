@@ -90,8 +90,8 @@ export async function getGoogleResults(account: string, since: string, until: st
        WHERE q.environment=$1 AND g.account_id=$2 GROUP BY q.status) s) conversions
     FROM marketing.google_accounts a WHERE a.environment=$1 AND a.account_id=$2`,[environment,account]);
   // Contadores do período acompanham a venda atribuída, sem incluir outras contas ou ações.
-  const delivery = await dbPool.query<{campaign_id:string;status:string;count:number;last_sent_at:string|null}>(
-    `SELECT g.campaign_id,q.status,count(*)::int count,max(q.sent_at)::text last_sent_at
+  const delivery = await dbPool.query<{campaign_id:string;ad_id:string|null;status:string;count:number;last_sent_at:string|null}>(
+    `SELECT g.campaign_id,g.ad_group_id||':'||g.ad_id ad_id,q.status,count(*)::int count,max(q.sent_at)::text last_sent_at
      FROM marketing.google_order_attributions a
      JOIN marketing.google_clicks g ON g.environment=a.environment AND g.id=a.click_id
      JOIN marketing.google_campaigns c ON c.environment=g.environment AND c.account_id=g.account_id AND c.campaign_id=g.campaign_id
@@ -99,14 +99,17 @@ export async function getGoogleResults(account: string, since: string, until: st
      WHERE a.environment=$1 AND g.account_id=$4 AND c.owned
        AND a.realized_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
        AND a.realized_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
-     GROUP BY g.campaign_id,q.status`,[...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'']);
+     GROUP BY g.campaign_id,g.ad_group_id,g.ad_id,q.status`,[...values,env.GOOGLE_ADS_CONVERSION_ACTION_ID??'']);
   const emptyPipeline = () => ({available:true,pending:0,processing:0,accepted:0,sent:0,failed:0,
     dead_letter:0,review:0,suppressed:0,last_sent_at:null as string|null});
   const pipeline = emptyPipeline();
   const campaignPipelines:Record<string,ReturnType<typeof emptyPipeline>> = {};
+  const adPipelines:Record<string,ReturnType<typeof emptyPipeline>> = {};
   for (const row of delivery.rows) {
     const campaignPipeline = campaignPipelines[row.campaign_id] ??= emptyPipeline();
-    for (const target of [pipeline,campaignPipeline]) {
+    const targets = [pipeline,campaignPipeline];
+    if (row.ad_id) targets.push(adPipelines[row.ad_id] ??= emptyPipeline());
+    for (const target of targets) {
       const state = row.status as keyof typeof pipeline;
       if (state !== 'available' && state !== 'last_sent_at' && state in target) target[state] += row.count;
       if (row.last_sent_at && (!target.last_sent_at || Date.parse(row.last_sent_at)>Date.parse(target.last_sent_at))) {
@@ -120,7 +123,7 @@ export async function getGoogleResults(account: string, since: string, until: st
     pending_margin_orders:rows.reduce((s,r)=>s+r.pending_margin_orders,0),
     tracked_conversations:campaignsTracked.rows.find(row=>row.id==null)?.count??0};
   return {available:true,campaigns:[...campaign.values()],ads:[...ads.values()],totals:total,orders:orders.rows,health:health.rows[0]??null,
-    pipeline,campaign_pipelines:campaignPipelines,
+    pipeline,campaign_pipelines:campaignPipelines,ad_pipelines:adPipelines,
     conversions_enabled:env.GOOGLE_ADS_CONVERSIONS_ENABLED,conversion_action_configured:!!env.GOOGLE_ADS_CONVERSION_ACTION_ID,
     conversion_destination:googleConversionHealth()};
 }

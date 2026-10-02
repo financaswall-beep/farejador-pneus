@@ -1,0 +1,28 @@
+/* Mesma hierarquia, definição e textura da análise Meta. */
+.google-detail-screen {scroll-margin-top:100px;}
+.google-detail-screen .mad-creative {display:block;min-width:0;}
+.gad-preview {border:1px solid #e2e8ef;border-radius:8px;padding:16px;margin:15px 0 0;overflow-wrap:anywhere;}
+.gad-sponsored {font-size:11px;color:#253b43;margin-bottom:14px;}
+.gad-brand {display:flex;align-items:center;gap:9px;font-size:11px;color:#52647a;margin-bottom:14px;overflow-wrap:anywhere;}
+.gad-brand>span {display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:50%;background:#00835b;color:white;font-weight:750;}
+.gad-search-title {font-size:19px;font-weight:650;line-height:1.35;color:#1748b8;margin-bottom:9px;}
+.gad-preview p {font-size:12px;line-height:1.6;color:#53627b;}
+.gad-preview .mad-media {aspect-ratio:4/3;min-height:180px;margin:0 0 12px;}
+.gad-meta {display:grid;gap:15px;border-top:1px solid #e4eaf0;padding-top:16px;margin:18px 0;}
+.gad-meta dt {font-size:11px;color:#67768b;margin-bottom:4px;}
+.gad-meta dd {font-size:12px;overflow-wrap:anywhere;}
+.gad-preview-note {font-size:11px;color:#6d7c91;line-height:1.6;margin-bottom:17px;}
+.gad-legend {display:flex;align-items:center;flex-wrap:wrap;gap:15px;color:#61748e;font-size:11px;}
+.gad-legend span {display:flex;align-items:center;gap:7px;}
+.gad-legend i {display:inline-block;width:20px;border-top:3px solid #006653;}
+.gad-legend span+span i {border-color:#647c9c;border-top-style:dashed;}
+.google-detail-screen .mad-chart {height:205px;}
+.gad-events-layout {display:grid;gap:14px;}
+.gad-empty {padding:15px 0;color:#708096;font-size:12px;line-height:1.6;}
+.google-detail-screen .mad-state {white-space:normal;}
+.google-detail-screen .mcd-notice button {font-weight:650;margin-left:12px;text-decoration:underline;}
+.google-detail-screen .mad-metrics dd {font-size:clamp(18px,1.65vw,25px);}
+.google-detail-screen .mad-sales dd {font-size:clamp(17px,1.35vw,23px);}
+.google-detail-screen .mad-summary-footer button {display:flex;align-items:center;gap:6px;color:#005f4e;white-space:nowrap;}
+.google-detail-screen .mad-title h1 {overflow-wrap:anywhere;}
+@media(max-width:560px) {.gad-preview {padding:12px;}.google-detail-screen .mad-metrics dd {font-size:21px;}.gad-search-title {font-size:18px;}}

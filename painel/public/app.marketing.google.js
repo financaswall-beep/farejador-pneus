@@ -17,6 +17,8 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       this.googleAdsLoading = true; this.googleAdsError = ''; this.googleAdsReport = null; this.googleAdsPage = 1;
       this.googleAdPage = 1;
       this.googleCampaignInvalidateActivity?.();
+      this.googleDetailInvalidate?.();
+      this.googleDetailOrderPage = 1; this.googleDetailConversationPage = 1;
       this.googleCampaignOrderPage = 1; this.googleCampaignConversationPage = 1;
       this.googleCampaignAdPage = 1;
       try {
@@ -28,6 +30,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
           const ids=new Set((report.data?.ads||[]).map(r=>r.id));
           this.googleAdsSelected=this.googleAdsSelected.filter(id=>ids.has(id));
           if(this.googleAdsView==='detail' && !ids.has(this.googleAdsDetailId))this.googleAdsView='ads';
+          if(this.googleAdsView==='detail')void this.loadGoogleDetailActivity?.();
           if(this.googleAdsView==='compare' && (!ids.has(this.googleCompareA)||!ids.has(this.googleCompareB)))this.googleAdsView='ads';
           if (this.googleAdsView === 'campaign') {
             if (!(report.data?.campaigns || []).some(row => row.id === this.googleCampaignId)) this.googleSetView('campaigns');
@@ -43,6 +46,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
             lucide.createIcons();
             this.renderGoogleOverviewChart();
             this.renderGoogleCampaignChart?.();
+            this.renderGoogleDetailChart?.();
           });
         }
       }
@@ -71,7 +75,10 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       else if(this.googleAdsSelected.length<2)this.googleAdsSelected=[...this.googleAdsSelected,id];
       this.$nextTick(() => lucide.createIcons());
     },
-    googleOpenAd(id) {this.googleAdsDetailId=id;this.googleAdsView='detail';},
+    googleOpenAd(id) {
+      if (!this.googleAdById(id)) return;
+      this.googleAdsDetailId=id;this.googleAdsView='detail';this.googleDetailOpen?.();
+    },
     googleAdById(id) {return (this.googleAdsReport?.data?.ads||[]).find(row=>row.id===id);},
     googleShowCompare() {
       if(this.googleAdsSelected.length!==2)return;

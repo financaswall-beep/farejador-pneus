@@ -11,6 +11,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
   let meta:typeof import('../../src/marketing/attribution.js').reconcileMarketingAttributions;
   let results:typeof import('../../src/marketing/google-results.js').getGoogleResults;
   let activity:typeof import('../../src/marketing/google-campaign-activity.js').getGoogleCampaignActivity;
+  let adActivity:typeof import('../../src/marketing/google-campaign-activity.js').getGoogleAdActivity;
   let process:typeof import('../../src/marketing/google-conversions.js').processGoogleConversions;
   let order:string,conversation:string,click:string;
   const config:GoogleAdsConfig={environment:'test',customerId:'1234567890',apiVersion:'v25',scope:'account',campaignIds:[],serviceAccountJson:'test-only'};
@@ -32,6 +33,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     ({reconcileMarketingAttributions:meta}=await import('../../src/marketing/attribution.js'));
     ({getGoogleResults:results}=await import('../../src/marketing/google-results.js'));
     ({getGoogleCampaignActivity:activity}=await import('../../src/marketing/google-campaign-activity.js'));
+    ({getGoogleAdActivity:adActivity}=await import('../../src/marketing/google-campaign-activity.js'));
     ({processGoogleConversions:process}=await import('../../src/marketing/google-conversions.js'));
   },240_000);
   afterAll(async()=>{if(db)await stopPostgres(db);const {pool}=await import('../../src/persistence/db.js');await pool.end();});
@@ -79,6 +81,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     const acceptedReport=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
     expect(acceptedReport.pipeline).toMatchObject({accepted:1,sent:0});
     expect(acceptedReport.campaign_pipelines['11']).toMatchObject({accepted:1,sent:0});
+    expect(acceptedReport.ad_pipelines['22:33']).toMatchObject({accepted:1,sent:0});
     const detail=await activity(config.customerId,'11','2026-09-25','2026-10-01',1,1,db.pool);
     expect(detail.orders).toMatchObject({total:1,page:1,rows:[{order_id:order,revenue:'100.00',product_cost:'60',partner_payout:'0',conversion_status:'accepted'}]});
     expect(detail.conversations.total).toBe(1);expect(detail.events).toHaveLength(1);
@@ -197,6 +200,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     report=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
     expect(report.campaigns.find(r=>r.id==='44')).toMatchObject({product_cost:0,partner_payout:90,gross_margin:10,pending_margin_orders:0});
     expect(report.campaign_pipelines['44']).toMatchObject({pending:1,review:0,failed:0});
+    expect(report.ad_pipelines['22:55']).toMatchObject({pending:1,review:0,failed:0});
     expect(report.campaign_pipelines['11']).toMatchObject({pending:0,review:1,failed:0});
     expect(report.pipeline).toMatchObject({pending:1,review:1,failed:0});
     const detail=await activity(config.customerId,'44','2026-09-25','2026-10-01',1,1,db.pool);
@@ -206,6 +210,38 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     const hidden=await activity(config.customerId,'44','2026-09-25','2026-10-01',1,1,db.pool);
     expect(hidden.orders.total).toBe(0);expect(hidden.conversations.total).toBe(0);expect(hidden.events).toEqual([]);
     expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).campaign_pipelines['44']).toBeUndefined();
+  });
+  it('isola anúncio por grupo, campanha e propriedade, preservando revisão e paginação',async()=>{
+    await db.pool.query(`INSERT INTO marketing.google_ads(environment,account_id,ad_group_id,ad_id,campaign_id,name,status,format)
+      VALUES('test','1234567890','23','33','11','Mesmo ID em outro grupo','ENABLED','RESPONSIVE_SEARCH_AD')`);
+    const other=(await db.pool.query(`INSERT INTO marketing.google_clicks(environment,account_id,campaign_id,ad_group_id,ad_id,
+      reference,identifier_type,identifier,identifier_hash,consent_ad_user_data,destination,captured_at)
+      VALUES('test','1234567890','11','23','33',$1,'gclid','separate-group','separate-group-hash',true,'whatsapp','2026-09-30T11:00:00Z')
+      RETURNING id`,['2W-G'+'e'.repeat(32)])).rows[0].id;
+    await db.pool.query(`INSERT INTO marketing.google_click_conversations(environment,click_id,conversation_id,source,observed_at)
+      VALUES('test',$1,$2,'message_reference','2026-09-30T11:01:00Z')`,[other,conversation]);
+    const detail=await adActivity(config.customerId,'11','22:33','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(detail.conversations.total).toBe(2);expect(detail.orders.total).toBe(0);
+    expect(detail.events).toHaveLength(1);expect(detail.events[0]?.status).toBe('review');
+    const second=await adActivity(config.customerId,'11','22:33','2026-09-25','2026-10-01',2,2,db.pool);
+    expect(second.conversations).toMatchObject({total:2,rows:[]});expect(second.events).toHaveLength(1);
+    const sameId=await adActivity(config.customerId,'11','23:33','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(sameId.conversations.total).toBe(1);expect(sameId.events).toEqual([]);expect(sameId.orders.total).toBe(0);
+    for(const [account,campaign,ad,since] of [[config.customerId,'11','22:55','2026-09-25'],
+      [config.customerId,'44','22:55','2026-09-25'],['9999999999','11','22:33','2026-09-25'],
+      [config.customerId,'11','22:33','2026-10-01']]) {
+      const empty=await adActivity(account,campaign,ad,since,'2026-10-01',1,1,db.pool);
+      expect(empty.orders.total).toBe(0);expect(empty.conversations.total).toBe(0);expect(empty.events).toEqual([]);
+    }
+    await db.pool.query(`UPDATE marketing.google_campaigns SET owned=true WHERE environment='test' AND campaign_id='44'`);
+    const partner=await adActivity(config.customerId,'44','22:55','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(partner.orders.total).toBe(1);expect(Number(partner.orders.rows[0]?.partner_payout)).toBe(90);
+    expect(partner.events).toHaveLength(1);expect(partner.events[0]?.status).toBe('pending');
+    const report=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(report.ad_pipelines['22:33']).toMatchObject({review:1,pending:0});
+    expect(report.ad_pipelines['22:55']).toMatchObject({review:0,pending:1,failed:0});
+    expect(report.ad_pipelines['23:33']).toBeUndefined();
+    expect(report.pipeline).toMatchObject({review:1,pending:1,failed:0});
   });
 });
 function processEnv(){return globalThis.process.env;}

@@ -33,6 +33,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   const painelModulos = [
     'stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js',
     'app.marketing.comments.js', 'app.marketing.paid.js', 'app.marketing.google.js', 'app.marketing.google.overview.js', 'app.marketing.google.ads.js', 'app.marketing.google.campaign.js',
+    'app.marketing.google.detail.js',
     'app.marketing.compare.js', 'app.marketing.compare.view.js',
     'app.marketing.organic.js', 'app.marketing.organic.mock.js',
     'app.marketing.organic.summary.js',
@@ -104,6 +105,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/marketing-compare.css', async (_request, reply) => sendStatic(reply, 'marketing-compare.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-campaign.css', async (_request, reply) => sendStatic(reply, 'marketing-campaign.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-ad-detail.css', async (_request, reply) => sendStatic(reply, 'marketing-ad-detail.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/marketing-google-detail.css', async (_request, reply) => sendStatic(reply, 'marketing-google-detail.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-ads.css', async (_request, reply) => sendStatic(reply, 'marketing-ads.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-google-ads.css', async (_request, reply) => sendStatic(reply, 'marketing-google-ads.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/marketing-geography.css', async (_request, reply) => sendStatic(reply, 'marketing-geography.css', 'text/css; charset=utf-8'));

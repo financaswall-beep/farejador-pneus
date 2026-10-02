@@ -5,20 +5,20 @@ export interface GoogleAd {
   id: string; ad_id: string; ad_group_id: string; campaign_id: string;
   name: string; campaign_name: string; status: string; format: string;
   headlines: string[]; descriptions: string[]; final_url: string | null;
-  image_url?: string | null; business_name?: string | null;
+  image_url?: string | null; business_name?: string | null; ad_group_name?: string;
   investment: number; impressions: number; clicks: number; conversions: number;
   conversion_value: number; ctr: number | null; cpc: number | null; cpm: number | null;
   daily: Array<{ date: string; cost_micros: string; investment: number; impressions: number; clicks: number; conversions: number }>;
 }
 interface Row {
   campaign?: { id?: string; name?: string };
-  adGroup?: { id?: string };
+  adGroup?: { id?: string; name?: string };
   adGroupAd?: { status?: string; ad?: { id?: string; name?: string; type?: string; finalUrls?: string[];
     responsiveSearchAd?: { headlines?: Array<{ text?: string }>; descriptions?: Array<{ text?: string }> } } };
   segments?: { date?: string };
   metrics?: { costMicros?: string; impressions?: string; clicks?: string; conversions?: string | number; conversionsValue?: string | number };
 }
-const fields = `campaign.id, campaign.name, ad_group.id, ad_group_ad.ad.id, ad_group_ad.ad.name,
+const fields = `campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name,
   ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad.final_urls,
   ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions`;
 const ratio = (a: number, b: number, scale = 1) => b ? Math.round(a / b * scale * 100) / 100 : null;
@@ -60,6 +60,7 @@ export async function loadGoogleAdDetails(search: <T>(query: string) => Promise<
     if (!item) {
       const headlines = (ad.responsiveSearchAd?.headlines ?? []).map(x => (x.text ?? '').slice(0, 300));
       item = { id, ad_id: ad.id, ad_group_id: group, campaign_id: campaign, campaign_name: row.campaign?.name ?? campaign,
+        ad_group_name: row.adGroup?.name?.slice(0, 300) || group,
         name: ad.name || headlines.join(' · ') || `Anúncio ${ad.id}`, status: row.adGroupAd?.status ?? 'UNKNOWN',
         format: ad.type ?? 'UNKNOWN', headlines,
         descriptions: (ad.responsiveSearchAd?.descriptions ?? []).map(x => (x.text ?? '').slice(0, 1000)),
