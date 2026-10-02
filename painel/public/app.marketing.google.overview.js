@@ -76,10 +76,12 @@ window.PAINEL_MODULES.marketingGoogleOverview = function () {
       this.googleAdsCampaign = campaign;
       this.googleAdsSearch = '';
       this.googleAdPage = 1;
+      if (view !== 'campaign' && !campaign) this.googleCampaignReturnId = '';
       this.$nextTick(() => {
         lucide.createIcons();
         if (view === 'campaigns') this.renderGoogleOverviewChart();
-        document.querySelector('[data-marketing-google-screen]')?.scrollIntoView({ block: 'start' });
+        if (view === 'campaign') this.renderGoogleCampaignChart();
+        document.querySelector(view === 'campaign' ? '[data-google-campaign-screen]' : '[data-marketing-google-screen]')?.scrollIntoView({ block: 'start' });
       });
     },
     googleStartCompare() {

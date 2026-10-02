@@ -9,12 +9,16 @@ window.PAINEL_MODULES.marketingGoogle = function () {
     googleAdsOpen() {
       this.marketingCampaignChannel = 'google';
       this.googleAdsView = 'campaigns';
+      this.googleCampaignReturnId = '';
       this.marketingSetTab('visao');
     },
     async loadGoogleAds() {
       const seq = ++this.googleAdsSeq, period = this.marketingPeriod;
       this.googleAdsLoading = true; this.googleAdsError = ''; this.googleAdsReport = null; this.googleAdsPage = 1;
       this.googleAdPage = 1;
+      this.googleCampaignInvalidateActivity?.();
+      this.googleCampaignOrderPage = 1; this.googleCampaignConversationPage = 1;
+      this.googleCampaignAdPage = 1;
       try {
         const report = this.marketingIsMock()
           ? { status: 'disabled', detail: 'Prévia: a conexão real exige autorização da conta Google Ads.', missing: [], data: null }
@@ -25,6 +29,10 @@ window.PAINEL_MODULES.marketingGoogle = function () {
           this.googleAdsSelected=this.googleAdsSelected.filter(id=>ids.has(id));
           if(this.googleAdsView==='detail' && !ids.has(this.googleAdsDetailId))this.googleAdsView='ads';
           if(this.googleAdsView==='compare' && (!ids.has(this.googleCompareA)||!ids.has(this.googleCompareB)))this.googleAdsView='ads';
+          if (this.googleAdsView === 'campaign') {
+            if (!(report.data?.campaigns || []).some(row => row.id === this.googleCampaignId)) this.googleSetView('campaigns');
+            else void this.loadGoogleCampaignActivity();
+          }
         }
       } catch {
         if (seq === this.googleAdsSeq) this.googleAdsError = 'Não foi possível consultar o Google Ads. Tente novamente.';
@@ -34,6 +42,7 @@ window.PAINEL_MODULES.marketingGoogle = function () {
           this.$nextTick(() => {
             lucide.createIcons();
             this.renderGoogleOverviewChart();
+            this.renderGoogleCampaignChart?.();
           });
         }
       }
@@ -50,7 +59,10 @@ window.PAINEL_MODULES.marketingGoogle = function () {
       const data={attributed_sales:available?found?.attributed_sales||0:null,
         attributed_revenue:available?found?.attributed_revenue||0:null,
         gross_margin:available?(found?found.gross_margin:0):null,
-        tracked_conversations:available?found?.tracked_conversations||0:null};
+        tracked_conversations:available?found?.tracked_conversations||0:null,
+        product_cost:available?(found?found.product_cost??null:0):null,
+        partner_payout:available?(found?found.partner_payout??null:0):null,
+        pending_margin_orders:available?found?.pending_margin_orders||0:null};
       return {...data,result:data.gross_margin==null?null:data.gross_margin-Number(row?.investment||0),
         roas:Number(row?.investment)>0&&data.attributed_revenue!=null?data.attributed_revenue/row.investment:null};
     },

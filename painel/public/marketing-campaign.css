@@ -105,6 +105,17 @@
 .mcd-footnote {font-size:11px;color:#6d7c91;margin-top:16px;}
 .mcd-region {border-top:1px solid #e0e7ed;margin-top:15px;padding-top:15px;}
 .mcd-ad-detail {margin-top:12px;background:#f5faf8;border:1px solid #c8e3d9;border-radius:8px;padding:14px;}
+.google-campaign-logo {width:16px;height:16px;}
+.google-campaign-screen {scroll-margin-top:100px;}
+.google-campaign-screen .mcd-result p {color:#ecfff7;}
+.google-campaign-chart {height:195px;position:relative;min-width:0;margin:15px 0;}
+.google-campaign-funnel {display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eaf6f1;border-radius:6px;padding:12px;color:#005c48;font-size:11px;}
+.google-campaign-funnel span {display:flex;flex-direction:column;text-align:center;}
+.google-campaign-funnel b {font-size:20px;line-height:1.2;}
+.google-campaign-pagination {display:flex;align-items:center;justify-content:flex-end;gap:12px;font-size:12px;margin-top:12px;}
+.google-campaign-screen .mcd-side.mcd-full {grid-column:1/-1;grid-template-columns:1fr 1fr;}
+.google-campaign-screen .mcd-bar-row.result:has(.mcd-red) .mcd-track>div {background:#ba3640;}
+@media(max-width:850px) {.google-campaign-screen .mcd-side.mcd-full {grid-template-columns:1fr;}}
 @media(min-width:1600px) {.mcd-response {padding:25px 0;}.mcd-ring {width:159px;height:159px;}.mcd-card {padding:20px;}}
 @media(max-width:1200px) {.mcd-header {align-items:flex-start;}.mcd-response {gap:15px;flex-wrap:wrap;justify-content:center;}.mcd-three>div {padding:0 8px;}.mcd-response-data {min-width:240px;}.mcd-kpi {gap:9px;padding:15px 12px;}.mcd-kpi-icon {width:35px;height:35px;}.mcd-card-title {flex-wrap:wrap;}.mcd-bar-row {grid-template-columns:1fr 1fr 100px;gap:8px;}.mcd-ads {grid-column:1/-1;}.mcd-side {grid-column:1/-1;grid-template-columns:1fr 1fr;}.mcd-side.mcd-half {grid-column:span 6;grid-template-columns:1fr;}}
 @media(max-width:850px) {.mcd-header {flex-direction:column;}.mcd-kpis {grid-template-columns:repeat(2,minmax(0,1fr));}.mcd-kpi strong {font-size:24px;}.mcd-half,.mcd-side.mcd-half {grid-column:1/-1;}.mcd-response {flex-wrap:nowrap;}.mcd-indicators {grid-template-columns:repeat(3,1fr);row-gap:15px;}.mcd-indicators>div {justify-content:flex-start;padding-left:13px;}.mcd-indicators>div:nth-child(4) {border-left:0;}.mcd-side {grid-template-columns:1fr;}.mcd-tabs {gap:8px;}}

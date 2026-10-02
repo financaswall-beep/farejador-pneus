@@ -223,16 +223,17 @@
 <link rel="stylesheet" href="/admin/painel/marketing-creatives.css?v=20260914-criativos1">
 <link rel="stylesheet" href="/admin/painel/marketing-ads.css?v=20260930-ads1">
 <link rel="stylesheet" href="/admin/painel/marketing-google-ads.css?v=20261001-google-ads">
-<link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261001-campaign1">
+<link rel="stylesheet" href="/admin/painel/marketing-campaign.css?v=20261002-google-campaign">
 <link rel="stylesheet" href="/admin/painel/marketing-ad-detail.css?v=20261001-ad1">
 <link rel="stylesheet" href="/admin/painel/marketing-geography.css?v=20260914-geo1">
 <script src="/admin/painel/app.marketing.geography.mock.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.geography.actions.js?v=20260914-geo1"></script>
 <script src="/admin/painel/app.marketing.paid.js?v=20261001-google2"></script>
-<script src="/admin/painel/app.marketing.google.overview.js?v=20261001-google-ads"></script>
+<script src="/admin/painel/app.marketing.google.overview.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.marketing.google.ads.js?v=20261001-google-ads"></script>
-<script src="/admin/painel/app.marketing.google.js?v=20261001-google-ads"></script>
+<script src="/admin/painel/app.marketing.google.js?v=20261002-google-campaign"></script>
+<script src="/admin/painel/app.marketing.google.campaign.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.marketing.compare.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.compare.view.js?v=20261001-compare1"></script>
 <script src="/admin/painel/app.marketing.js?v=20261001-google2"></script>
@@ -289,7 +290,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261001-google-ads"></script>
+<script src="/admin/painel/app.montagem.js?v=20261002-google-campaign"></script>
 <script src="/admin/painel/app.js?v=20260923-comments1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -8486,11 +8487,11 @@
       </section>
 
       <section x-show="marketingTab === 'visao' && !paidCompareOpen" class="paid-screen" aria-label="Central de conteúdo pago" data-marketing-paid-screen>
-        <header class="paid-head">
+        <header class="paid-head" x-show="marketingCampaignChannel !== 'google' || googleAdsView !== 'campaign'">
           <div><h1>Conteúdo pago</h1><p>Do investimento à venda, acompanhe o resultado dos seus anúncios.</p></div>
           <div class="paid-actions"><span class="paid-muted" x-text="paidUpdated()"></span><button class="paid-button" @click="loadMarketing()" :disabled="marketingLoading || googleAdsLoading" aria-label="Atualizar conteúdo pago"><i data-lucide="refresh-cw" :class="(marketingLoading || googleAdsLoading) && 'animate-spin'"></i></button><button class="paid-button" @click="marketingNavigate('integracoes')"><i data-lucide="settings"></i>Integrações</button></div>
         </header>
-        <div class="paid-toolbar">
+        <div class="paid-toolbar" x-show="marketingCampaignChannel !== 'google' || googleAdsView !== 'campaign'">
           <div class="paid-channels" aria-label="Canal de anúncios">
             <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'all' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'all'" @click="paidChannel('all')">Consolidado</button>
             <button class="paid-button paid-channel" :class="marketingCampaignChannel === 'meta' && 'is-active'" :aria-pressed="marketingCampaignChannel === 'meta'" @click="paidChannel('meta')"><span class="paid-meta" aria-hidden="true">∞</span>Meta<i class="paid-dot" :class="marketingVisao?.connection?.meta !== 'connected' && 'off'"></i></button>
@@ -8501,7 +8502,7 @@
         </div>
         <section x-show="marketingCampaignChannel === 'google'" data-marketing-google-screen x-cloak>
           <p x-show="marketingIsMock()" class="paid-notice">Prévia de demonstração · dados ilustrativos.</p>
-          <p class="paid-scope-note">Google Ads · consulta somente da conta e das campanhas aprovadas da 2W.</p>
+          <p x-show="googleAdsView !== 'campaign'" class="paid-scope-note">Google Ads · consulta somente da conta e das campanhas aprovadas da 2W.</p>
           <div x-show="googleAdsLoading" class="paid-empty" role="status">Consultando a conta e os indicadores do Google Ads…</div>
           <p x-show="googleAdsError" class="paid-error" role="alert" x-text="googleAdsError"></p>
           <article x-show="googleAdsReport && googleAdsReport.status !== 'connected'" class="paid-card">
@@ -8561,11 +8562,11 @@
                       <table class="paid-table google-campaign-table">
                         <thead><tr><th><button @click="googleCampaignOrder('name')">Campanha<i data-lucide="arrow-up-down"></i></button></th><th>Tipo</th><th><button @click="googleCampaignOrder('investment')">Investimento<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('clicks')">Cliques<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('tracked_conversations')">Conversas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('attributed_sales')">Vendas<i data-lucide="arrow-up-down"></i></button></th><th><button @click="googleCampaignOrder('result')">Resultado<i data-lucide="arrow-up-down"></i></button></th><th x-show="googleCampaignExpanded">Impressões</th><th x-show="googleCampaignExpanded">CTR / CPC</th><th x-show="googleCampaignExpanded">Conversões Google</th><th x-show="googleCampaignExpanded">Receita atribuída</th><th><span class="sr-only">Ver anúncios</span></th></tr></thead>
                         <tbody><template x-for="row in googleAdsPageRows()" :key="row.id"><tr>
-                          <td><button class="paid-name" @click="googleSetView('ads', row.id)" x-text="row.name"></button><small x-text="row.delivery_days ? row.delivery_days + ' dia(s) com entrega · até ' + marketingDateLabel(row.last_delivery) : 'Sem entrega no período'"></small><span class="paid-badge">Matriz</span><span class="google-campaign-status" x-text="googleAdsStatus(row.status)"></span></td>
+                          <td><button class="paid-name" @click="googleOpenCampaign(row.id)" x-text="row.name"></button><small x-text="row.delivery_days ? row.delivery_days + ' dia(s) com entrega · até ' + marketingDateLabel(row.last_delivery) : 'Sem entrega no período'"></small><span class="paid-badge">Matriz</span><span class="google-campaign-status" x-text="googleAdsStatus(row.status)"></span></td>
                           <td x-text="googleCampaignType(row.channel_type)"></td><td><strong x-text="paidMoney(row.investment)"></strong></td><td x-text="paidNumber(row.clicks)"></td><td x-text="paidNumber(row.tracked_conversations)"></td><td x-text="paidNumber(row.attributed_sales)"></td>
                           <td><strong :class="row.result == null ? '' : row.result < 0 ? 'negative' : 'positive'" x-text="paidMoney(row.result)"></strong><small x-show="row.pending_margin_orders > 0" x-text="row.pending_margin_orders + ' venda(s) sem custo'"></small></td>
                           <td x-show="googleCampaignExpanded" x-text="paidNumber(row.impressions)"></td><td x-show="googleCampaignExpanded"><span x-text="row.ctr == null ? '—' : paidNumber(row.ctr) + '%'"></span><small x-text="paidMoney(row.cpc) + ' / clique'"></small></td><td x-show="googleCampaignExpanded" x-text="paidNumber(row.conversions)"></td><td x-show="googleCampaignExpanded" x-text="paidMoney(row.attributed_revenue)"></td>
-                          <td><button class="paid-link" @click="googleSetView('ads', row.id)" :aria-label="'Ver anúncios da campanha ' + row.name"><i data-lucide="chevron-right"></i></button></td>
+                          <td><button class="paid-link" @click="googleOpenCampaign(row.id)" :aria-label="'Ver resultado da campanha ' + row.name"><i data-lucide="chevron-right"></i></button></td>
                         </tr></template></tbody>
                       </table>
                     </div>
@@ -8580,9 +8581,113 @@
                 </div>
                 <p class="google-overview-note">Conversões do Google e vendas confirmadas no Farejador são indicadores diferentes.</p>
               </section>
-              <div x-show="!['campaigns','ads'].includes(googleAdsView)" class="paid-title-row mb-4">
+              <section x-show="googleAdsView === 'campaign'" class="mcd-screen google-campaign-screen" data-google-campaign-screen x-cloak>
+                <button class="mcd-back" @click="googleSetView('campaigns')"><i data-lucide="arrow-left"></i>Conteúdo pago / Campanhas</button>
+                <header class="mcd-header">
+                  <div><h1 x-text="googleCampaignRow()?.name || 'Detalhe da campanha'"></h1>
+                    <div class="mcd-badges">
+                      <span class="mcd-badge mcd-neutral"><img class="google-campaign-logo" src="/assets/brands/google-ads.svg" alt="">Google Ads</span>
+                      <span class="mcd-badge"><i data-lucide="store"></i>Matriz</span>
+                      <span class="mcd-badge mcd-neutral" x-text="googleCampaignRow()?.delivery_days ? 'Com entrega no período' : 'Sem entrega no período'"></span>
+                      <span class="mcd-badge mcd-neutral" x-text="googleCampaignType(googleCampaignRow()?.channel_type)"></span>
+                    </div>
+                  </div>
+                  <div class="paid-actions">
+                    <label class="mcd-period"><i data-lucide="calendar-days"></i><select aria-label="Período da campanha Google" x-model="marketingPeriod" @change="marketingPeriodChanged()"><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select></label>
+                    <a class="paid-button mcd-manager" x-show="googleCampaignManagerUrl()" :href="googleCampaignManagerUrl()" target="_blank" rel="noopener noreferrer">Abrir no Google Ads<i data-lucide="arrow-up-right"></i></a>
+                  </div>
+                </header>
+                <nav class="mcd-tabs" aria-label="Seções do detalhe da campanha Google">
+                  <template x-for="tab in googleCampaignTabs()" :key="tab.id"><button :aria-pressed="googleCampaignTab === tab.id" @click="googleCampaignSetTab(tab.id)" x-text="tab.label"></button></template>
+                </nav>
+                <p x-show="!googleAdsReport.results?.available" class="mcd-notice mcd-warning" role="alert">Apuração de vendas indisponível. Receita, custos e resultado aguardam uma consulta válida.</p>
+                <div class="mcd-kpis">
+                  <template x-for="kpi in googleCampaignKpis()" :key="kpi.id"><article class="mcd-kpi" :class="{ 'mcd-result': kpi.id === 'result', 'mcd-negative': kpi.negative }">
+                    <span class="mcd-kpi-icon"><i :data-lucide="kpi.icon"></i></span><div><p x-text="kpi.label"></p><strong x-text="kpi.value"></strong><small x-text="kpi.note"></small></div>
+                  </article></template>
+                </div>
+                <div class="mcd-indicators"><template x-for="item in googleCampaignIndicators()" :key="item.label"><div><i :data-lucide="item.icon"></i><span><small x-text="item.label"></small><strong x-text="item.value"></strong></span></div></template></div>
+                <div class="mcd-layout">
+                  <article class="mcd-card mcd-half" x-show="googleCampaignTab === 'result'">
+                    <div class="mcd-card-title"><div><h2>Investimento e cliques</h2><p class="mcd-subtitle">Google Ads · dados diários desta campanha</p></div><div class="paid-legend"><span><i></i>Investimento (R$)</span><span><i></i>Cliques</span></div></div>
+                    <div class="google-campaign-chart"><canvas id="chartGoogleCampaign" role="img" aria-label="Investimento e cliques diários da campanha selecionada"></canvas></div>
+                    <p class="mcd-subtitle" x-show="!googleCampaignSeries().length">Série diária indisponível.</p>
+                    <div class="google-campaign-funnel"><span><b x-text="paidNumber(googleCampaignMetrics().clicks)"></b>cliques</span><i data-lucide="arrow-right"></i><span><b x-text="paidNumber(googleCampaignMetrics().tracked_conversations)"></b>conversas identificadas</span><i data-lucide="arrow-right"></i><span><b x-text="paidNumber(googleCampaignMetrics().attributed_sales)"></b>vendas</span></div>
+                    <footer class="mcd-footer"><span>Cliques e conversas observados no período; vendas pela data de realização.</span><button @click="googleCampaignSetTab('sales')">Ver conversas e vendas<i data-lucide="arrow-right"></i></button></footer>
+                  </article>
+                  <article class="mcd-card mcd-half" :class="{ 'mcd-full': googleCampaignTab === 'finance' }" x-show="['result','finance'].includes(googleCampaignTab)">
+                    <div class="mcd-card-title"><h2>Como o resultado foi formado</h2><span class="mcd-badge mcd-neutral">Farejador + Google</span></div>
+                    <div class="mcd-bars"><template x-for="row in googleCampaignFinancialRows()" :key="row.id"><div class="mcd-bar-row" :class="row.kind"><span x-text="row.label"></span><div class="mcd-track"><div :style="'width:' + googleCampaignBar(row.value)"></div></div><b :class="row.id === 'result' && row.value < 0 && 'mcd-red'" x-text="paidMoney(row.value)"></b></div></template></div>
+                    <div class="mcd-retained" x-show="googleCampaignRetained() != null"><i data-lucide="chart-no-axes-column-increasing"></i><span x-text="paidMoney(googleCampaignRetained()) + ' a cada R$ 100 vendidos, após mídia.'"></span></div>
+                    <p class="mcd-notice mcd-warning" x-show="googleCampaignMetrics().pending_margin_orders > 0" x-text="googleCampaignMetrics().pending_margin_orders + ' venda(s) aguardam custos ou repasses completos. Resultado pendente.'"></p>
+                    <footer class="mcd-footer"><span><i data-lucide="info"></i>Antes das demais despesas da empresa.</span><button x-show="googleCampaignTab === 'result'" @click="googleCampaignSetTab('finance')">Ver composição completa<i data-lucide="arrow-right"></i></button></footer>
+                  </article>
+                  <article class="mcd-card mcd-ads" :class="{ 'mcd-full': googleCampaignTab === 'ads' }" x-show="['result','ads'].includes(googleCampaignTab)">
+                    <div class="mcd-card-title"><div><h2>Anúncios desta campanha</h2><p class="mcd-subtitle" x-text="googleCampaignAds().length + ' anúncios · indicadores do período'"></p></div><button class="mcd-link" x-show="googleCampaignTab === 'result'" @click="googleCampaignAdSearch = ''; googleCampaignSetTab('ads')">Ver todos<i data-lucide="arrow-right"></i></button></div>
+                    <label class="mcd-search" x-show="googleCampaignTab === 'ads'"><i data-lucide="search"></i><input type="search" aria-label="Buscar anúncio desta campanha" placeholder="Buscar anúncio ou grupo" x-model="googleCampaignAdSearch" @input="googleCampaignAdPage = 1"></label>
+                    <p class="mcd-subtitle" x-show="googleCampaignTab === 'ads'">Selecione dois anúncios para comparar os resultados.</p>
+                    <div class="mcd-table-scroll"><table class="mcd-table"><thead><tr><th>Anúncio</th><th>Investimento</th><th>Cliques / CPC</th><th>Vendas</th><th>Resultado</th><th><span class="sr-only">Analisar anúncio</span></th></tr></thead><tbody>
+                      <template x-for="ad in googleCampaignAdPageRows()" :key="ad.id"><tr>
+                        <td><div class="mcd-ad-name"><input x-show="googleCampaignTab === 'ads'" type="checkbox" :aria-label="'Selecionar ' + ad.name + ' para comparar'" :checked="googleAdsSelected.includes(ad.id)" :disabled="!googleAdsSelected.includes(ad.id) && googleAdsSelected.length >= 2" @change="googleToggleAd(ad.id)">
+                          <span class="mcd-thumb"><template x-if="googleAdImage(ad)"><img :src="googleAdImage(ad)" alt="" loading="lazy" @error="googleAdImageFailed(ad)"></template><i :data-lucide="googleAdIsSearch(ad) ? 'search' : 'image'"></i></span>
+                          <span><button class="mcd-link" @click="googleOpenAd(ad.id)" x-text="ad.name"></button><small x-text="googleAdFormatLabel(ad.format)"></small><span class="mcd-badge mcd-neutral" x-text="googleAdsStatus(ad.status)"></span></span>
+                        </div></td>
+                        <td x-text="paidMoney(ad.investment)"></td><td><b x-text="paidNumber(ad.clicks)"></b><small x-text="paidMoney(ad.cpc) + ' / clique'"></small></td><td x-text="paidNumber(ad.attributed_sales)"></td><td><b :class="ad.result < 0 ? 'mcd-red' : 'mcd-green'" x-text="paidMoney(ad.result)"></b></td>
+                        <td><button class="mcd-link" :aria-label="'Analisar ' + ad.name" @click="googleOpenAd(ad.id)"><i data-lucide="chevron-right"></i></button></td>
+                      </tr></template>
+                    </tbody></table></div>
+                    <p class="mcd-empty" x-show="!googleCampaignAdPageRows().length">Nenhum anúncio individual disponível neste filtro. Alguns tipos, como Performance Max, têm dados apenas no nível da campanha.</p>
+                    <div class="google-campaign-pagination" x-show="googleCampaignTab === 'ads' && googleCampaignAdPages() > 1"><button class="paid-button" @click="googleCampaignAdPage--; $nextTick(() => lucide.createIcons())" :disabled="googleCampaignAdPage <= 1">Anterior</button><span x-text="googleCampaignAdPage + ' / ' + googleCampaignAdPages()"></span><button class="paid-button" @click="googleCampaignAdPage++; $nextTick(() => lucide.createIcons())" :disabled="googleCampaignAdPage >= googleCampaignAdPages()">Próxima</button></div>
+                    <footer class="mcd-footer"><span><i data-lucide="info"></i>O status atual não altera os resultados do período.</span><button @click="googleCampaignCompare()" :disabled="googleCampaignAds().length < 2"><span x-text="googleAdsSelected.length === 2 ? 'Comparar os 2 anúncios' : 'Comparar anúncios'"></span><i data-lucide="arrow-right"></i></button></footer>
+                  </article>
+                  <div class="mcd-side" :class="{ 'mcd-full': googleCampaignTab === 'sales' }" x-show="['result','sales'].includes(googleCampaignTab)">
+                    <article class="mcd-card">
+                      <div class="mcd-card-title"><h2>Retorno das vendas ao Google</h2><span class="mcd-badge" :class="googlePipelineStatus() !== 'Automático' && 'mcd-warning'" x-text="googlePipelineStatus()"></span></div>
+                      <div class="mcd-three mcd-capi"><div><strong x-text="googleCampaignPipelineCount('sent')"></strong><span>Confirmadas</span></div><div><strong x-text="googleCampaignPipelineCount('queued')"></strong><span>Na fila / processando</span></div><div><strong x-text="googleCampaignPipelineCount('errors')"></strong><span>Com falha</span></div></div>
+                      <p class="mcd-subtitle" x-show="googleCampaignPipeline()?.review > 0" x-text="googleCampaignPipelineCount('review') + ' envio(s) precisam de conferência.'"></p>
+                      <footer class="mcd-footer"><span><i data-lucide="info"></i>Envios desta campanha no período.</span><button :aria-expanded="googleCampaignEventsOpen" @click="googleCampaignEventsOpen = !googleCampaignEventsOpen">Conferir envios<i data-lucide="arrow-right"></i></button></footer>
+                      <div class="mcd-events" x-show="googleCampaignEventsOpen">
+                        <p x-show="googleCampaignActivityLoading" role="status">Consultando envios…</p>
+                        <p x-show="!googleCampaignActivityLoading && !googleCampaignActivity?.available">Consulta de envios indisponível.</p>
+                        <p x-show="googleCampaignActivity?.available && !googleCampaignActivity?.events?.length">Nenhum envio vinculado às vendas do período.</p>
+                        <template x-for="event in googleCampaignActivity?.events || []" :key="event.id"><div><b x-text="'Pedido ' + event.order_id.slice(0,8)"></b><span x-text="googleConversionStatus(event.status)"></span><small x-text="event.attempts + ' tentativa(s) · ' + googleCampaignDate(event.sent_at || event.updated_at)"></small></div></template>
+                        <small>Até 30 envios recentes. Contagens incluem todos os envios, inclusive revisões após cancelamento.</small>
+                        <p x-show="googleCampaignPipeline()?.suppressed > 0" x-text="googleCampaignPipelineCount('suppressed') + ' envio(s) não elegíveis.'"></p>
+                      </div>
+                    </article>
+                    <article class="mcd-card"><h2>Qualidade da atribuição</h2>
+                      <div class="mcd-quality"><span>Conversas identificadas</span><b x-text="paidNumber(googleCampaignMetrics().tracked_conversations)"></b><span>Pedidos com custo completo</span><b x-text="googleCampaignCostsLabel()"></b></div>
+                      <footer class="mcd-footer"><span><i data-lucide="circle-check"></i><span x-text="googleCampaignMetrics().attributed_sales > 0 && googleCampaignMetrics().pending_margin_orders === 0 ? 'Custos completos nas vendas atribuídas.' : 'Confira a origem e os custos das vendas.'"></span></span><button @click="marketingNavigate('jornadas')">Abrir Jornadas<i data-lucide="arrow-right"></i></button></footer>
+                    </article>
+                  </div>
+                  <div class="mcd-full" x-show="googleCampaignActivityError"><p class="mcd-notice mcd-warning" role="alert"><span x-text="googleCampaignActivityError"></span><button @click="loadGoogleCampaignActivity()" :disabled="googleCampaignActivityLoading">Tentar novamente</button></p></div>
+                  <article class="mcd-card mcd-full" x-show="['sales','finance'].includes(googleCampaignTab)">
+                    <div class="mcd-card-title"><div><h2>Vendas atribuídas à campanha</h2><p class="mcd-subtitle">Vendas realizadas com origem comprovada no clique. Valores do motor financeiro.</p></div><span class="mcd-badge" x-text="paidNumber(googleCampaignMetrics().attributed_sales) + ' vendas'"></span></div>
+                    <p class="mcd-empty" x-show="googleCampaignActivityLoading" role="status">Carregando vendas…</p>
+                    <div class="mcd-table-scroll" x-show="googleCampaignActivity?.available"><table class="mcd-table"><thead><tr><th>Pedido / data</th><th>Conversa</th><th>Receita</th><th>Custo dos produtos</th><th>Repasses</th><th>Margem antes da mídia</th><th>Retorno ao Google</th></tr></thead><tbody>
+                      <template x-for="order in googleCampaignActivity?.orders?.rows || []" :key="order.order_id"><tr><td><b x-text="order.order_id.slice(0,8)"></b><small x-text="googleCampaignDate(order.realized_at)"></small></td><td><button class="mcd-link" @click="abrirNoChatwoot(order.conversation_number)" :disabled="!chatwootConvUrl(order.conversation_number)" x-text="'#' + order.conversation_number"></button></td><td x-text="paidMoney(order.revenue)"></td><td x-text="paidMoney(order.product_cost)"></td><td x-text="paidMoney(order.partner_payout)"></td><td x-text="paidMoney(order.gross_margin)"></td><td x-text="googleConversionStatus(order.conversion_status)"></td></tr></template>
+                    </tbody></table></div>
+                    <p class="mcd-empty" x-show="!googleCampaignActivityLoading && googleCampaignActivity?.available && !googleCampaignActivity?.orders?.rows?.length">Nenhuma venda realizada atribuída à campanha neste período.</p>
+                    <p class="mcd-subtitle" x-show="!googleCampaignActivityLoading && !googleCampaignActivity?.available">Detalhes de vendas indisponíveis. Os totais superiores usam a apuração completa.</p>
+                    <footer class="mcd-footer" x-show="googleCampaignActivity?.available"><span x-text="(googleCampaignActivity?.orders?.rows?.length || 0) + ' de ' + (googleCampaignActivity?.orders?.total || 0) + ' vendas. Totais incluem todas as páginas.'"></span><div class="google-campaign-pagination"><button class="paid-button" @click="googleCampaignActivityNavigate('orders',-1)" :disabled="googleCampaignActivityLoading || googleCampaignOrderPage <= 1">Anterior</button><span x-text="googleCampaignOrderPage + ' / ' + googleCampaignActivityPages('orders')"></span><button class="paid-button" @click="googleCampaignActivityNavigate('orders',1)" :disabled="googleCampaignActivityLoading || googleCampaignOrderPage >= googleCampaignActivityPages('orders')">Próxima</button></div></footer>
+                    <p class="mcd-subtitle" x-show="googleCampaignTab === 'finance'">Nas vendas de parceiros, o repasse é o valor da venda menos a comissão da Matriz. O custo do pneu do parceiro não é descontado novamente.</p>
+                  </article>
+                  <article class="mcd-card mcd-full" x-show="googleCampaignTab === 'sales'">
+                    <div class="mcd-card-title"><div><h2>Conversas identificadas</h2><p class="mcd-subtitle">Conversas vinculadas a cliques desta campanha no período, sem duplicar anúncios na mesma conversa.</p></div></div>
+                    <p class="mcd-empty" x-show="googleCampaignActivityLoading" role="status">Carregando conversas…</p>
+                    <div class="mcd-table-scroll" x-show="googleCampaignActivity?.available"><table class="mcd-table"><thead><tr><th>Conversa</th><th>Origem</th><th>Vínculo observado</th><th>Situação atual</th><th>Anúncio</th></tr></thead><tbody>
+                      <template x-for="conversation in googleCampaignActivity?.conversations?.rows || []" :key="conversation.conversation_number"><tr><td><button class="mcd-link" @click="abrirNoChatwoot(conversation.conversation_number)" :disabled="!chatwootConvUrl(conversation.conversation_number)" x-text="'#' + conversation.conversation_number"></button></td><td x-text="conversation.channel_type === 'whatsapp' ? 'WhatsApp' : conversation.channel_type === 'web' ? 'Site' : conversation.channel_type"></td><td x-text="googleCampaignDate(conversation.observed_at)"></td><td x-text="googleCampaignConversationStatus(conversation.current_status)"></td><td><button class="mcd-link" :disabled="!googleAdById(conversation.ad_id)" @click="googleOpenAd(conversation.ad_id)" x-text="googleAdById(conversation.ad_id)?.name || 'Sem anúncio individual identificado'"></button></td></tr></template>
+                    </tbody></table></div>
+                    <p class="mcd-empty" x-show="!googleCampaignActivityLoading && googleCampaignActivity?.available && !googleCampaignActivity?.conversations?.rows?.length">Nenhuma conversa rastreada desta campanha no período.</p>
+                    <footer class="mcd-footer" x-show="googleCampaignActivity?.available"><span x-text="(googleCampaignActivity?.conversations?.rows?.length || 0) + ' de ' + (googleCampaignActivity?.conversations?.total || 0) + ' conversas'"></span><div class="google-campaign-pagination"><button class="paid-button" @click="googleCampaignActivityNavigate('conversations',-1)" :disabled="googleCampaignActivityLoading || googleCampaignConversationPage <= 1">Anterior</button><span x-text="googleCampaignConversationPage + ' / ' + googleCampaignActivityPages('conversations')"></span><button class="paid-button" @click="googleCampaignActivityNavigate('conversations',1)" :disabled="googleCampaignActivityLoading || googleCampaignConversationPage >= googleCampaignActivityPages('conversations')">Próxima</button></div></footer>
+                  </article>
+                </div>
+                <p class="mcd-footnote">Conversões do Google e vendas confirmadas no Farejador são indicadores diferentes. Resultado após mídia antes das demais despesas da empresa.</p>
+              </section>
+              <div x-show="!['campaigns','ads','campaign'].includes(googleAdsView)" class="paid-title-row mb-4">
                 <div class="paid-segment"><button @click="googleSetView('campaigns')"><i data-lucide="arrow-left"></i>Campanhas</button><button @click="googleSetView('ads')" :class="googleAdsView === 'ads' && 'is-active'">Todos os anúncios</button><button @click="googleSetView('setup')" :class="googleAdsView === 'setup' && 'is-active'">Rastreio e envios</button></div><button class="paid-button" @click="googleSync()" :disabled="googleAdsSyncing || marketingIsMock()"><i data-lucide="refresh-cw"></i><span x-text="googleAdsSyncing ? 'Coletando…' : 'Atualizar coleta'"></span></button>
               </div>
+              <button class="mcd-back" x-show="googleCampaignReturnId && ['detail','compare'].includes(googleAdsView)" @click="googleReturnCampaign()"><i data-lucide="arrow-left"></i>Voltar ao detalhe da campanha</button>
               <section x-show="googleAdsView==='ads'" class="mc-screen google-ads-screen" data-google-ad-screen>
                 <div class="ma-summary">
                   <dl><template x-for="item in googleAdSummaryItems()" :key="item.label"><div><dt x-text="item.label"></dt><dd :class="item.result && (item.negative ? 'ma-negative' : 'ma-positive')" x-text="item.value"></dd></div></template></dl>

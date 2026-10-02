@@ -2,6 +2,7 @@ import {afterAll,beforeAll,describe,expect,it,vi} from 'vitest';
 import {startPostgres,stopPostgres,type IntegrationDb} from './helpers/postgres.js';
 import type {GoogleAdsSnapshot} from '../../src/marketing/google-ads.js';
 import type {GoogleAdsConfig} from '../../src/marketing/google-ads-client.js';
+import {createPartnerFixture} from './helpers/partner-fixtures.js';
 
 describe('Google Ads — livro central, atribuicao e entrega',()=>{
   let db:IntegrationDb;
@@ -9,6 +10,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
   let reconcile:typeof import('../../src/marketing/google-attribution.js').reconcileGoogleAttributions;
   let meta:typeof import('../../src/marketing/attribution.js').reconcileMarketingAttributions;
   let results:typeof import('../../src/marketing/google-results.js').getGoogleResults;
+  let activity:typeof import('../../src/marketing/google-campaign-activity.js').getGoogleCampaignActivity;
   let process:typeof import('../../src/marketing/google-conversions.js').processGoogleConversions;
   let order:string,conversation:string,click:string;
   const config:GoogleAdsConfig={environment:'test',customerId:'1234567890',apiVersion:'v25',scope:'account',campaignIds:[],serviceAccountJson:'test-only'};
@@ -29,6 +31,7 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     ({reconcileGoogleAttributions:reconcile}=await import('../../src/marketing/google-attribution.js'));
     ({reconcileMarketingAttributions:meta}=await import('../../src/marketing/attribution.js'));
     ({getGoogleResults:results}=await import('../../src/marketing/google-results.js'));
+    ({getGoogleCampaignActivity:activity}=await import('../../src/marketing/google-campaign-activity.js'));
     ({processGoogleConversions:process}=await import('../../src/marketing/google-conversions.js'));
   },240_000);
   afterAll(async()=>{if(db)await stopPostgres(db);const {pool}=await import('../../src/persistence/db.js');await pool.end();});
@@ -64,6 +67,8 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).totals).toMatchObject({attributed_sales:1,attributed_revenue:100,gross_margin:null,pending_margin_orders:1});
     await db.pool.query(`UPDATE commerce.order_items SET matriz_unit_cost=60 WHERE environment='test' AND order_id=$1`,[order]);
     expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).totals.gross_margin).toBe(40);
+    const financial=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(financial.campaigns[0]).toMatchObject({product_cost:60,partner_payout:0,gross_margin:40});
     expect((await results('9999999999','2026-09-25','2026-10-01',db.pool)).totals.attributed_sales).toBe(0);
   });
   it('um POST aceito so e confirmado apos consulta; recoleta nao envia de novo',async()=>{
@@ -73,6 +78,17 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect((await db.pool.query(`SELECT status FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0].status).toBe('accepted');
     const acceptedReport=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
     expect(acceptedReport.pipeline).toMatchObject({accepted:1,sent:0});
+    expect(acceptedReport.campaign_pipelines['11']).toMatchObject({accepted:1,sent:0});
+    const detail=await activity(config.customerId,'11','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(detail.orders).toMatchObject({total:1,page:1,rows:[{order_id:order,revenue:'100.00',product_cost:'60',partner_payout:'0',conversion_status:'accepted'}]});
+    expect(detail.conversations.total).toBe(1);expect(detail.events).toHaveLength(1);
+    expect(JSON.stringify(detail)).not.toContain('test-click');
+    const second=await activity(config.customerId,'11','2026-09-25','2026-10-01',2,2,db.pool);
+    expect(second.orders).toMatchObject({total:1,rows:[]});expect(second.conversations).toMatchObject({total:1,rows:[]});
+    for(const [account,campaign,since] of [[config.customerId,'99','2026-09-25'],['9999999999','11','2026-09-25'],[config.customerId,'11','2026-10-01']]) {
+      const empty=await activity(account,campaign,since,'2026-10-01',1,1,db.pool);
+      expect(empty.orders.total).toBe(0);expect(empty.conversations.total).toBe(0);expect(empty.events).toEqual([]);
+    }
     expect(acceptedReport.totals.tracked_conversations).toBe(1);
     expect((await results(config.customerId,'2026-10-01','2026-10-01',db.pool)).pipeline.accepted).toBe(0);
     expect((await results('9999999999','2026-09-25','2026-10-01',db.pool)).pipeline.accepted).toBe(0);
@@ -105,6 +121,8 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect((await db.pool.query(`SELECT status,last_error_code FROM marketing.google_conversion_outbox WHERE environment='test'`)).rows[0])
       .toMatchObject({status:'review',last_error_code:'sent_sale_cancelled'});
     expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).pipeline.review).toBe(1);
+    const cancelled=await activity(config.customerId,'11','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(cancelled.orders.total).toBe(0);expect(cancelled.events[0]?.status).toBe('review');
     expect((await db.pool.query(`SELECT count(*)::int n FROM marketing.google_order_attributions WHERE environment='test'`)).rows[0].n).toBe(2);
   });
   it('vincula o widget web; nota privada e mensagem de funcionario nao comprovam clique',async()=>{
@@ -141,6 +159,8 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect(report.campaigns.find(row=>row.id==='11')?.tracked_conversations).toBe(2);
     expect(report.campaigns.find(row=>row.id==='44')?.tracked_conversations).toBe(1);
     expect(report.totals.tracked_conversations).toBe(2);
+    expect(report.campaign_pipelines['44']).toBeUndefined();
+    expect((await activity(config.customerId,'44','2026-09-25','2026-10-01',1,1,db.pool)).conversations.total).toBe(1);
   });
   it('protege as oito tabelas internas com RLS e sem acesso de parceiros',async()=>{
     const tables=await db.pool.query(`SELECT count(*)::int n,bool_and(c.relrowsecurity) protected
@@ -149,6 +169,43 @@ describe('Google Ads — livro central, atribuicao e entrega',()=>{
     expect(tables.rows[0]).toMatchObject({n:8,protected:true});
     const access=await db.pool.query(`SELECT has_table_privilege('farejador_partner_app','marketing.google_clicks','SELECT') allowed`);
     expect(access.rows[0].allowed).toBe(false);
+  });
+  it('separa repasses de parceiros e isola envios por campanha, ação e propriedade',async()=>{
+    const f=await createPartnerFixture(db.pool);
+    const po=(await db.pool.query(`INSERT INTO commerce.partner_orders(environment,unit_id,total_amount,status,
+      fulfillment_mode,awaiting_pickup,retrieved_at,created_at)
+      VALUES('test',$1,100,'confirmed','pickup',false,'2026-09-30T12:00:00Z','2026-09-30T12:00:00Z') RETURNING id`,[f.unitId])).rows[0].id;
+    const customer=(await db.pool.query(`SELECT contact_id FROM core.conversations WHERE id=$1`,[conversation])).rows[0].contact_id;
+    const partnerSale=(await db.pool.query(`INSERT INTO commerce.orders(environment,contact_id,source_conversation_id,
+      total_amount,status,fulfillment_mode,payment_method,delivery_status,partner_order_id,created_at)
+      VALUES('test',$1,$2,100,'confirmed','pickup','pix','pending',$3,'2026-09-30T12:00:00Z') RETURNING id`,[customer,conversation,po])).rows[0].id;
+    const partnerClick=(await db.pool.query(`SELECT id FROM marketing.google_clicks WHERE environment='test' AND campaign_id='44'`)).rows[0].id;
+    const attribution=(await db.pool.query(`INSERT INTO marketing.google_order_attributions(environment,order_id,click_id,
+      conversation_id,status,realized_at,truth_type,confidence_level,source_reference,extractor_version)
+      VALUES('test',$1,$2,$3,'active','2026-09-30T12:00:00Z','observed',1,'{}','integration') RETURNING id`,[partnerSale,partnerClick,conversation])).rows[0].id;
+    let report=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(report.campaigns.find(r=>r.id==='44')).toMatchObject({product_cost:0,partner_payout:null,gross_margin:null,pending_margin_orders:1});
+    await db.pool.query(`INSERT INTO network.commission_entries(environment,partner_id,partner_unit_id,unit_id,
+      partner_order_id,order_total,commission_percent,commission_amount,status,realized_at)
+      VALUES('test',$1,$2,$3,$4,100,10,10,'open','2026-09-30T12:00:00Z')`,[f.partnerId,f.partnerUnitId,f.unitId,po]);
+    const product=(await db.pool.query(`SELECT id FROM commerce.products WHERE environment='test' AND product_code='GOOGLE-TEST'`)).rows[0].id;
+    await db.pool.query(`INSERT INTO commerce.order_items(environment,order_id,product_id,quantity,unit_price,matriz_unit_cost)
+      VALUES('test',$1,$2,1,100,60)`,[partnerSale,product]);
+    await db.pool.query(`INSERT INTO marketing.google_conversion_outbox(environment,attribution_id,order_id,action_id,transaction_id,status)
+      VALUES('test',$1,$2,'987','partner-google-test','pending'),
+            ('test',$1,$2,'999','other-action-test','failed')`,[attribution,partnerSale]);
+    report=await results(config.customerId,'2026-09-25','2026-10-01',db.pool);
+    expect(report.campaigns.find(r=>r.id==='44')).toMatchObject({product_cost:0,partner_payout:90,gross_margin:10,pending_margin_orders:0});
+    expect(report.campaign_pipelines['44']).toMatchObject({pending:1,review:0,failed:0});
+    expect(report.campaign_pipelines['11']).toMatchObject({pending:0,review:1,failed:0});
+    expect(report.pipeline).toMatchObject({pending:1,review:1,failed:0});
+    const detail=await activity(config.customerId,'44','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(detail.orders.total).toBe(1);expect(Number(detail.orders.rows[0]?.partner_payout)).toBe(90);
+    expect(detail.events).toHaveLength(1);expect(JSON.stringify(detail)).not.toContain('partner-google-test');
+    await db.pool.query(`UPDATE marketing.google_campaigns SET owned=false WHERE environment='test' AND campaign_id='44'`);
+    const hidden=await activity(config.customerId,'44','2026-09-25','2026-10-01',1,1,db.pool);
+    expect(hidden.orders.total).toBe(0);expect(hidden.conversations.total).toBe(0);expect(hidden.events).toEqual([]);
+    expect((await results(config.customerId,'2026-09-25','2026-10-01',db.pool)).campaign_pipelines['44']).toBeUndefined();
   });
 });
 function processEnv(){return globalThis.process.env;}
