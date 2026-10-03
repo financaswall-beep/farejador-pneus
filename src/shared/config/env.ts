@@ -55,6 +55,8 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
+  // Prazo aprovado pelo dono; 0 permite desligar sem alterar pedidos.
+  BOT_PICKUP_RESERVATION_HOURS: z.coerce.number().int().min(0).max(720).default(24),
   // Memória comercial entre conversas do mesmo contato. Lê apenas facts
   // estruturados/permitidos; 0 desliga sem apagar dado algum.
   AGENT_V2_MEMORY_DAYS: z.string().transform(Number).pipe(z.number().int().min(0).max(30)).default('11'),

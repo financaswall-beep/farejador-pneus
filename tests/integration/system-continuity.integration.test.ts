@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { expectedMigrationState, expectedMigrationCount } from './helpers/expected-migrations.js';
 import {
   startPostgres, stopPostgres, type IntegrationDb,
 } from './helpers/postgres.js';
@@ -13,10 +14,7 @@ describe('continuidade do schema em PostgreSQL limpo', () => {
     const state = await db.pool.query(
       'SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true',
     );
-    expect(state.rows[0]).toEqual({
-      version: 219,
-      migration_name: '0219_bot_conversation_lifecycle.sql',
-    });
+    expect(state.rows[0]).toEqual(expectedMigrationState);
 
     const ledger = await db.pool.query(`
       SELECT count(*)::int row_count,
@@ -25,9 +23,9 @@ describe('continuidade do schema em PostgreSQL limpo', () => {
         FROM ops.applied_migrations
     `);
     expect(ledger.rows[0]).toEqual({
-      row_count: 220,
-      file_count: 220,
-      latest_order: 219,
+      row_count: expectedMigrationCount,
+      file_count: expectedMigrationCount,
+      latest_order: expectedMigrationState.version,
     });
 
     const constraints = await db.pool.query<{ conname: string; convalidated: boolean }>(`

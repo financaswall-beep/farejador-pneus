@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { cancelMatrizSaleRevenue } from './matriz-ledger-sale-cancel.js';
 import { env } from '../../shared/config/env.js';
 import {
   matrizLedgerActor, matrizLedgerAmount, postMatrizLedgerTransaction,
@@ -240,41 +241,10 @@ export async function postMatrizRetailCancellation(
   if (!sale) return;
   const revenue = await existing(client, sale, 'commerce.order.revenue');
   if (revenue) {
-    const balanceResult = await client.query<{ balance: string }>(
-      `SELECT finance.matriz_ledger_obligation_balance($1::env_t,$2)::text balance`,
-      [environment, revenue.id],
-    );
-    const balance = revenue.transaction_kind === 'sale_receivable'
-      ? Number(balanceResult.rows[0]?.balance ?? 0) : 0;
-    const amount = matrizLedgerAmount(revenue.amount, 'retail_ledger_amount_invalid');
-    if (revenue.transaction_kind === 'sale_receivable' && balance === amount) {
-      await reverseRetailTransaction(client, sale, revenue.id,
-        'commerce.order.revenue_cancel', cancelledAt, actorLabel,
-        'Cancelamento de venda nao recebida', reason);
-    } else {
-      const refund = Math.max(amount - balance, 0);
-      const credits = [
-        ...(balance > 0 ? [{
-          account_code: 'accounts_receivable', account_class: 'asset' as const,
-          side: 'credit' as const, amount: balance,
-        }] : []),
-        ...(refund > 0 ? [{
-          account_code: 'customer_refund_payable', account_class: 'liability' as const,
-          side: 'credit' as const, amount: refund,
-        }] : []),
-      ];
-      await postMatrizLedgerTransaction(client, {
-        environment, sourceType: 'commerce.order.revenue_cancel', sourceId: orderId,
-        kind: 'customer_refund_payable', amount, occurredAt: cancelledAt,
-        description: 'Cancelamento financeiro de venda no varejo',
-        createdBy: matrizLedgerActor(actorLabel),
-        lines: [
-          { account_code: 'sales_returns', account_class: 'revenue', side: 'debit', amount },
-          ...credits,
-        ],
-        metadata: { order_id: orderId, reason, unpaid_amount: balance, refund_amount: refund },
-      });
-    }
+    await cancelMatrizSaleRevenue(client, {
+      environment, orderId, revenueId: revenue.id, sourceType: 'commerce.order.revenue_cancel',
+      cancelledAt, actor: actorLabel, reason,
+    });
   }
   const cogs = await existing(client, sale, 'commerce.order.cogs');
   if (cogs) {

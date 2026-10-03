@@ -1,3 +1,4 @@
+import { partnerActor } from './actor.js';
 import type { PartnerContext } from './auth.js';
 import { withPartnerContext } from './db.js';
 
@@ -39,7 +40,7 @@ export async function confirmPartnerDeliveryReturn(
       throw new DeliveryReturnNotAwaitingError();
     }
 
-    const actor = `partner:${ctx.slug}`;
+    const actor = partnerActor(ctx);
     const returnReason = (reason ?? '').trim().slice(0, 500)
       || 'retorno fisico confirmado pela loja';
     await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [actor]);

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 async function buildRoute() {
   vi.resetModules();
+  Object.assign(process.env, { NODE_ENV:'test', FAREJADOR_ENV:'test', DATABASE_URL:'postgres://test',
+    CHATWOOT_HMAC_SECRET:'test-secret', ADMIN_AUTH_TOKEN:'test-admin-token' });
   vi.doMock('../../../src/admin/chatwoot-channel-health.js',()=>({getChatwootChannelHealth:vi.fn()}));
   vi.doMock('../../../src/admin/painel/route-bot-faltas.js', () => ({ registerBotShortageRoutes:vi.fn() }));
   vi.doMock('../../../src/admin/painel/route-shortage-report.js', () => ({ registerShortageReportRoutes:vi.fn() }));

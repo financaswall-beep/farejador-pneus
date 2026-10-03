@@ -42,9 +42,9 @@ describe('competência e fechamentos de comissões no app', () => {
     expect(await getFinanceCommissionMonthDetail('2026-08', 'person-1', 'other-target', 0, database() as never)).toBeNull();
     expect(await getFinanceCommissionMonthDetail('2026-08', 'person-2', 'closed-1', 0, database() as never)).toBeNull();
   });
-  it('detalhes usam o intervalo do fechamento escolhido com paginação explícita', async () => {
+  it('detalhes usam os fatos congelados do fechamento com paginação explícita', async () => {
     const db = database(); const data = await getFinanceCommissionMonthDetail('2026-08', 'person-1', 'closed-1', 50, db as never);
     expect(data?.total).toBe(120); expect(data?.settlement?.payment_total).toBe('2100.00');
-    expect(db.query.mock.calls.find(([sql]) => sql.includes('count(*) OVER()'))?.[1]).toEqual(['test', '2026-08-01', '2026-09-01', 'person-1', 50]);
+    expect(db.query.mock.calls.find(([sql]) => sql.includes('count(*) OVER()'))?.[1]).toEqual(['test', 'person-1', 'closed-1', 50, 50]);
   });
 });

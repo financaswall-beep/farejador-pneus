@@ -38,7 +38,9 @@ export async function startPortablePostgres(bin: string) {
     await rm(target, { recursive: true, force: true });
   };
   try {
-    await run(executable('initdb'), ['-D', data, '-U', 'test', '-A', 'trust', '--encoding=UTF8', '--locale=C'], { windowsHide: true });
+    // PostgreSQL 17: Unicode case folding também no Windows, independente do locale instalado no SO.
+    await run(executable('initdb'), ['-D', data, '-U', 'test', '-A', 'trust', '--encoding=UTF8',
+      '--locale=C', '--locale-provider=builtin', '--builtin-locale=C.UTF-8'], { windowsHide: true });
     serverProcess = spawn(executable('postgres'), ['-D', data, '-h', '127.0.0.1', '-p', String(port), '-F'],
       { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     serverProcess.stdout?.on('data', chunk => { startupOutput = (startupOutput + chunk).slice(-4000); });

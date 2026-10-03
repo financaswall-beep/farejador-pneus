@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { expectedMigrationState } from './helpers/expected-migrations.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 import { createPartnerFixture } from './helpers/partner-fixtures.js';
@@ -20,10 +21,7 @@ describe('ciclo contabil do credito do parceiro', () => {
     const state = await db.pool.query(
       `SELECT version,migration_name FROM ops.application_schema_state WHERE singleton=true`,
     );
-    expect(state.rows[0]).toEqual({
-      version: 219,
-      migration_name: '0219_bot_conversation_lifecycle.sql',
-    });
+    expect(state.rows[0]).toEqual(expectedMigrationState);
   });
 
   it('nao joga fiado no caixa e reconcilia parcial, perda e recuperacao', async () => {

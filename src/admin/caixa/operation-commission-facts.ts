@@ -3,7 +3,7 @@ export const matrizCommissionFactsSql = `WITH retail AS (
          'Pedido #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,
          o.created_at occurred_at,o.payment_method,o.total_amount gross_amount,
          COALESCE(items.margin,0) margin,COALESCE(items.items_without_cost,0) items_without_cost,
-         'sale'::text event_type,'retail'::text sale_channel,o.id source_id
+         'sale'::text event_type,'retail'::text sale_channel,o.id source_id,o.created_at registered_at
     FROM commerce.orders o
     JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
     LEFT JOIN LATERAL (
@@ -24,7 +24,7 @@ export const matrizCommissionFactsSql = `WITH retail AS (
            THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END occurred_at,
          NULL::text payment_method,COALESCE(o.settled_total_amount,o.total_amount) gross_amount,
          COALESCE(items.margin,0) margin,COALESCE(items.items_without_cost,0) items_without_cost,
-         'sale'::text event_type,'wholesale'::text sale_channel,o.id source_id
+         'sale'::text event_type,'wholesale'::text sale_channel,o.id source_id,o.created_at registered_at
     FROM commerce.wholesale_orders o
     LEFT JOIN LATERAL (
       SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*CASE
@@ -49,18 +49,18 @@ export const matrizCommissionFactsSql = `WITH retail AS (
          'Entrega #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,
          o.delivered_at occurred_at,NULL::text payment_method,0::numeric gross_amount,
          0::numeric margin,0::int items_without_cost,'delivery'::text event_type,
-         NULL::text sale_channel,o.id source_id
+         NULL::text sale_channel,o.id source_id,o.created_at registered_at
     FROM commerce.matriz_delivery_trips t
     JOIN commerce.orders o ON o.environment=t.environment AND o.trip_id=t.id
    WHERE t.environment=$1 AND t.courier_collaborator_id IS NOT NULL
-     AND t.deleted_at IS NULL AND o.delivery_status='delivered' AND o.delivered_at IS NOT NULL
+     AND t.deleted_at IS NULL AND o.status<>'cancelled' AND o.delivery_status='delivered' AND o.delivered_at IS NOT NULL
      AND (o.delivered_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
      AND (o.delivered_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), trip_events AS (
   SELECT t.courier_collaborator_id collaborator_id,t.id::text id,
          'Rota #'||right(t.id::text,6) reference,t.ended_at occurred_at,
          NULL::text payment_method,0::numeric gross_amount,0::numeric margin,
-         0::int items_without_cost,'trip'::text event_type,NULL::text sale_channel,t.id source_id
+         0::int items_without_cost,'trip'::text event_type,NULL::text sale_channel,t.id source_id,t.created_at registered_at
     FROM commerce.matriz_delivery_trips t
    WHERE t.environment=$1 AND t.courier_collaborator_id IS NOT NULL
      AND t.deleted_at IS NULL AND t.status='closed' AND t.ended_at IS NOT NULL

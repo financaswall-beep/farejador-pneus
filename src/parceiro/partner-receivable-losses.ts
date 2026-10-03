@@ -1,3 +1,4 @@
+import { partnerActor } from './actor.js';
 import { moneyCents } from '../shared/catalog-pricing.js';
 import { normalizeBusinessFactInstant } from '../shared/business-time.js';
 import type { PartnerContext } from './auth.js';
@@ -69,14 +70,14 @@ export async function writeOffPartnerReceivable(
        ON CONFLICT (environment,idempotency_key) DO UPDATE
          SET idempotency_key=EXCLUDED.idempotency_key`,
       [ctx.environment, ctx.unitId, receivableId, amount, occurredAt,
-       input.reason.trim(), requestKey, `partner:${ctx.slug}`],
+       input.reason.trim(), requestKey, partnerActor(ctx)],
     );
     await client.query(
       `INSERT INTO audit.events (environment,domain,entity_table,entity_id,
          event_type,actor_label,idempotency_key,payload_after)
        VALUES ($1,'partner_finance','finance.partner_receivables',$2,
          'partner_receivable_written_off',$3,$4,$5::jsonb)`,
-      [ctx.environment, receivableId, `partner:${ctx.slug}`, input.idempotency_key,
+      [ctx.environment, receivableId, partnerActor(ctx), input.idempotency_key,
        JSON.stringify({ unit_id: ctx.unitId, amount, occurred_at: occurredAt,
          reason: input.reason.trim() })],
     );
@@ -120,7 +121,7 @@ export async function recoverPartnerReceivable(
          SET idempotency_key=EXCLUDED.idempotency_key`,
       [ctx.environment, ctx.unitId, receivableId, amount, occurredAt,
        input.payment_method.trim(), normalizePartnerText(input.note),
-       requestKey, `partner:${ctx.slug}`],
+       requestKey, partnerActor(ctx)],
     );
     return { receivable_id: receivableId, recovered: true,
       amount: (moneyCents(amount) / 100).toFixed(2) };
@@ -146,7 +147,7 @@ export async function renegotiatePartnerReceivable(
          event_type,actor_label,payload_after)
        VALUES ($1,'partner_finance','finance.partner_receivables',$2,
          'partner_receivable_renegotiated',$3,$4::jsonb)`,
-      [ctx.environment, receivableId, `partner:${ctx.slug}`,
+      [ctx.environment, receivableId, partnerActor(ctx),
        JSON.stringify({ unit_id: ctx.unitId, due_date: input.due_date,
          reason: input.reason.trim() })],
     );

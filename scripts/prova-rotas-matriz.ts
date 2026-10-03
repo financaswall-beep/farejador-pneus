@@ -13,7 +13,9 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import Fastify, { type RouteOptions } from 'fastify';
+import { requiredMatrixModules } from '../src/admin/panel-modules.js';
 
 Object.assign(process.env, {
   NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
@@ -23,20 +25,24 @@ Object.assign(process.env, {
 const BASELINE = path.join(process.cwd(), 'scripts', 'baseline-rotas-matriz.json');
 const gravar = process.argv.includes('--gravar-baseline');
 
-function contratoDeAcesso(route: RouteOptions): string {
+export function contratoDeAcesso(route: RouteOptions): string {
   const handlers = route.preHandler
     ? (Array.isArray(route.preHandler) ? route.preHandler : [route.preHandler])
     : [];
   const guardas = handlers.map((handler) => handler.name || 'ANONIMO');
 
   if (route.url.startsWith('/admin/api/')) {
-    if (guardas.length !== 1) {
+    if (requiredMatrixModules(route.url)?.length === 0) {
+      throw new Error(`${route.method} ${route.url}: API admin sem módulo de acesso definido`);
+    }
+    const authGuards = guardas.filter(name => name === 'requireAdminOwner' || name === 'requireAdminAuth');
+    if (authGuards.length !== 1 || guardas[0] !== authGuards[0]) {
       throw new Error(`${route.method} ${route.url}: API admin precisa de exatamente um guarda`);
     }
-    if (guardas[0] === 'requireAdminOwner') {
+    if (authGuards[0] === 'requireAdminOwner') {
       return 'GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)';
     }
-    if (guardas[0] === 'requireAdminAuth') {
+    if (authGuards[0] === 'requireAdminAuth') {
       return 'GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)';
     }
     throw new Error(`${route.method} ${route.url}: guarda admin desconhecido (${guardas[0]})`);
@@ -86,7 +92,7 @@ async function main() {
   process.exit(1);
 }
 
-main().catch((err) => {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main().catch((err) => {
   console.error(`[FALHA] prova de rotas não rodou: ${err.message}`);
   process.exit(1);
 });

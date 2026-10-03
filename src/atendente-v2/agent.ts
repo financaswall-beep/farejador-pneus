@@ -236,7 +236,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           // Run inside a transaction for writes
           await client.query('BEGIN');
           try {
-            result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
+            result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs,
+              undefined, { triggerMessageId: job.triggerMessageId });
             await client.query('COMMIT');
           } catch (err) {
             await client.query('ROLLBACK');

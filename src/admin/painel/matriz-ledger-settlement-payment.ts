@@ -1,3 +1,4 @@
+import { lockMatrizObligation } from './matriz-ledger-obligation-lock.js';
 import type { PoolClient } from 'pg';
 import {
   postMatrizLedgerTransaction,
@@ -60,6 +61,7 @@ export async function lockSettlementObligation(
   environment: SettlementEnvironment,
   obligationId: string,
 ): Promise<SettlementObligationRow> {
+  await lockMatrizObligation(client, environment, obligationId);
   const result = await client.query<SettlementObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
             (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff','adjustment')
@@ -99,7 +101,7 @@ export async function lockSettlementObligation(
                 AND cancelled.source_type='commerce.wholesale_order.revenue_cancel')
               OR (t.source_type='commerce.wholesale_purchase.accrual'
                 AND cancelled.source_type='commerce.wholesale_purchase.cancel')))
-      FOR UPDATE OF t`,
+`,
     [environment, obligationId],
   );
   const row = result.rows[0];

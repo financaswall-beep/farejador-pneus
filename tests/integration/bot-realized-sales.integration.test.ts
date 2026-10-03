@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { readdir } from 'node:fs/promises';
 import { startPostgres, stopPostgres, applyMigrationFile, type IntegrationDb } from './helpers/postgres.js';
 
 describe('faturamento do Bot pela realização da venda', () => {
@@ -11,7 +12,13 @@ describe('faturamento do Bot pela realização da venda', () => {
     Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test',
       DATABASE_URL: 'postgres://test', CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-token' });
     vi.resetModules();
-    db = await startPostgres();
+    db = await startPostgres({ throughMigration: '0238_bot_realized_sales_metrics.sql' });
+    // Prova a reexecução no schema correto, antes das evoluções posteriores da view.
+    await applyMigrationFile(db.pool, '0238_bot_realized_sales_metrics.sql');
+    const migrations = await readdir(new URL('../../db/migrations/', import.meta.url));
+    for (const file of migrations.filter(f => f.endsWith('.sql') && f > '0238_bot_realized_sales_metrics.sql').sort()) {
+      await applyMigrationFile(db.pool, file);
+    }
     movement = await import('../../src/admin/painel/queries-bot-movimento.js');
     today = (await db.pool.query(`SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date::text today`)).rows[0].today;
     unitId = (await db.pool.query(`INSERT INTO core.units(environment,slug,name)
@@ -67,8 +74,6 @@ describe('faturamento do Bot pela realização da venda', () => {
     await db.pool.query(`UPDATE commerce.orders SET delivery_status='delivered',delivered_at=now() WHERE id=$1`, [delivery]);
     await expectRevenue(200, 2);
     await db.pool.query(`UPDATE commerce.orders SET status='cancelled' WHERE id=$1`, [pickup]);
-    await expectRevenue(100, 1);
-    await applyMigrationFile(db.pool, '0238_bot_realized_sales_metrics.sql');
     await expectRevenue(100, 1);
   });
 

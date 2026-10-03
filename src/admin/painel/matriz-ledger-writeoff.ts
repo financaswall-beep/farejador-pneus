@@ -1,3 +1,4 @@
+import { lockMatrizObligation } from './matriz-ledger-obligation-lock.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -41,6 +42,7 @@ async function lockReceivable(
   environment: Environment,
   obligationId: string,
 ): Promise<ObligationRow> {
+  await lockMatrizObligation(client, environment, obligationId);
   const result = await client.query<ObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,
             (e.amount-COALESCE((SELECT sum(CASE
@@ -55,9 +57,10 @@ async function lockReceivable(
       WHERE t.environment=$1 AND t.id=$2
         AND e.account_code='accounts_receivable'
         AND e.account_class='asset' AND e.side='debit'
+        AND NOT finance.matriz_ledger_obligation_cancelled($1::env_t,t.id)
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
           WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
-      FOR UPDATE OF t`,
+`,
     [environment, obligationId],
   );
   const row = result.rows[0];

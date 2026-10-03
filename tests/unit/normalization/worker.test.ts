@@ -11,10 +11,11 @@ function createMockClient(rows: Array<Record<string, unknown>> = []): MockClient
   const pendingRows = [...rows];
   const client: MockClient = {
     query: vi.fn().mockImplementation((sql: string) => {
-      if (sql.includes('SELECT id, event_type')) {
+      if (sql.includes('SELECT r.id,r.event_type')) {
         const row = pendingRows.shift();
         return Promise.resolve({ rows: row ? [row] : [] });
       }
+      if (sql.includes('RETURNING attempts')) return Promise.resolve({ rows: [{ attempts: 1 }] });
       if (sql.includes('SAVEPOINT') || sql.includes('RELEASE SAVEPOINT') || sql.includes('ROLLBACK TO SAVEPOINT')) {
         return Promise.resolve({ rows: [] });
       }
@@ -100,32 +101,12 @@ describe('worker pollAndNormalize', () => {
     ]);
 
     // Simulate failure inside dispatch by making the first repository write throw.
-    let selectConsumed = false;
-    let callCount = 0;
-    client.query.mockImplementation((sql: string) => {
-      if (sql.includes('SELECT id, event_type')) {
-        if (selectConsumed) return Promise.resolve({ rows: [] });
-        selectConsumed = true;
-        return Promise.resolve({ rows: [{ id: 2, event_type: 'contact_created', payload: { id: 201 }, environment: 'prod', chatwoot_timestamp: new Date() }] });
-      }
-      if (sql.includes('SAVEPOINT')) return Promise.resolve({ rows: [] });
-      if (sql.includes('ROLLBACK TO SAVEPOINT')) return Promise.resolve({ rows: [] });
-      if (sql.includes('UPDATE raw.raw_events')) {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.reject(new Error('insert failed'));
-        }
-        return Promise.resolve({ rows: [] });
-      }
-      if (sql === 'BEGIN' || sql === 'COMMIT') return Promise.resolve({ rows: [] });
-      return Promise.reject(new Error('insert failed'));
-    });
-
     const worker = await loadWorker(client);
-    await worker.pollAndNormalize();
+    const { pool } = await import('../../../src/persistence/db.js');
+    await worker.pollAndNormalize(pool, async () => { throw new Error('invalid payload'); });
 
     const failedCalls = client.query.mock.calls.filter((c) =>
-      (c[0] as string).includes("SET processing_status = 'failed'"),
+      (c[0] as string).includes('SET processing_status = $5') && c[1][4] === 'failed',
     );
     expect(failedCalls).toHaveLength(1);
   });

@@ -1,3 +1,4 @@
+import { cancelOpenBotOrder } from './cancel-open-order.js';
 import type { PoolClient } from 'pg';
 import {
   buscarProduto,
@@ -30,18 +31,19 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockQty, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
-import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
+import { getMatrizWholesaleStockQty, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
-import { buildOrderIdempotencyKey } from './order-idempotency.js';
+import { botOrderRequestId, previousBotOrderAttempt, resolveBotOrderKey,
+  recordBotOrderAttempt, botOrderReplay, type BotOrderExecution } from './order-attempt.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
-import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
+import { postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
 import {
   applyMatrizPricesToCompatibility,
   applyMatrizPricesToProducts,
@@ -403,6 +405,7 @@ export async function executeTool(
   name: string,
   args: Record<string, unknown>,
   handoffContext?: HumanHandoffContext,
+  execution?: BotOrderExecution,
 ): Promise<string> {
   try {
     if(['criar_pedido','editar_pedido','cancelar_pedido'].includes(name)
@@ -1061,7 +1064,7 @@ export async function executeTool(
       }
 
       case 'criar_pedido': {
-        return await criarPedido(client, environment, conversationId, args);
+        return await criarPedido(client, environment, conversationId, args, execution);
       }
 
       case 'consultar_pedido': {
@@ -1209,7 +1212,11 @@ async function criarPedido(
   environment: Environment,
   conversationId: string,
   args: Record<string, unknown>,
+  execution?: BotOrderExecution,
 ): Promise<string> {
+  const requestId = await botOrderRequestId(client, environment, conversationId, execution);
+  const replay = await previousBotOrderAttempt(client, environment, conversationId, requestId);
+  if (replay) return replay;
   const quotedItems = Array.isArray(args.itens) ? args.itens as PedidoItem[] : [];
   if (quotedItems.length === 0) return JSON.stringify({ erro: 'itens_obrigatorios' });
   let itens = quotedItems;
@@ -1432,7 +1439,13 @@ async function criarPedido(
     // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
     // Impressão digital estável (H2): o MESMO pedido em retry gera a MESMA chave →
     // não duplica o espelho nem o partner_order (register_partner_local_order dedup).
-    const idempotencyKey = buildOrderIdempotencyKey(conversationId, partner.unitId, itens, modalidade);
+    const resolved = await resolveBotOrderKey(client, environment, conversationId,
+      partner.unitId, itens, modalidade, requestId);
+    if (resolved.existingId) {
+      await recordBotOrderAttempt(client, environment, conversationId, requestId, resolved.existingId);
+      return botOrderReplay(client, environment, resolved.existingId);
+    }
+    const idempotencyKey = resolved.key;
 
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,
@@ -1520,7 +1533,13 @@ async function criarPedido(
     // dupla-chamada do MESMO pedido o ON CONFLICT devolve o existente em vez de duplicar.
     // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)
     const unitId = await resolveMatrizUnitId(client, environment);
-    const idempotencyKey = buildOrderIdempotencyKey(conversationId, unitId, itens, modalidade);
+    const resolved = await resolveBotOrderKey(client, environment, conversationId,
+      unitId, itens, modalidade, requestId);
+    if (resolved.existingId) {
+      await recordBotOrderAttempt(client, environment, conversationId, requestId, resolved.existingId);
+      return botOrderReplay(client, environment, resolved.existingId);
+    }
+    const idempotencyKey = resolved.key;
 
     // Camada 1b — TRAVA DE OVERSELL da matriz no varejo: antes de gravar, confere o galpão por
     // MEDIDA com FOR UPDATE (MESMA transação do agent → sem corrida) e, se faltar, ABORTA sem
@@ -1593,6 +1612,7 @@ async function criarPedido(
     );
   }
 
+  await recordBotOrderAttempt(client, environment, conversationId, requestId, order.id);
   return JSON.stringify({
     ok: true,
     order_number: order.order_number,
@@ -1850,13 +1870,7 @@ async function cancelarPedido(
     const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
     try {
       await client.query('BEGIN');
-      await client.query("SELECT set_config('app.partner_actor_label',$1,true)", ['agent_v2_bot']);
-      await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
-        order.partner_order_id,
-        'agent_v2_bot',
-        reason,
-      ]);
-      await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [order.id, 'agent_v2_bot', reason]);
+      await cancelOpenBotOrder(client, environment, order.id, 'agent_v2_bot', reason);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -1887,19 +1901,7 @@ async function cancelarPedido(
   try {
     const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
     await client.query('BEGIN');
-    await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
-      order.id,
-      'agent_v2_bot',
-      reason,
-    ]);
-    await releaseMatrizGalpaoReservation(client, environment, order.id);
-    await applyMatrizGalpaoReturn(client, environment, order.id);
-    const cancelled = await client.query<{ updated_at: string }>(
-      `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,
-      [order.id, environment],
-    );
-    await postMatrizRetailCancellation(client, environment, order.id,
-      cancelled.rows[0]!.updated_at, 'agent_v2_bot', reason);
+    await cancelOpenBotOrder(client, environment, order.id, 'agent_v2_bot', reason);
     await client.query('COMMIT');
 
     logger.info(

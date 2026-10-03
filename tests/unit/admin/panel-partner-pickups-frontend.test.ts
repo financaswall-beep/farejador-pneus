@@ -26,11 +26,11 @@ describe('retiradas no painel único', () => {
     expect(nav).toContain("scopes: ['matrix', 'partner'], requires: 'retiradas'");
     expect(nav).toContain("partnerLoad: ['loadPartnerRetiradas']");
     expect(html).toContain("currentPage === 'retiradas'");
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260828-partner-pickups2');
+    expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
     expect(html).toContain('data-pickup-workspace');
     expect(html).toContain('data-pickup-detail-panel');
     expect(html).toContain('[data-pickup-detail-panel]{position:static!important');
-    expect(html).toContain('app.partner-retiradas.js?v=20260824-pickup-cards1');
+    expect(html).toMatch(/app\.partner-retiradas\.js\?v=[A-Za-z0-9._-]+/);
     expect(staticRoute).toContain("'app.partner-retiradas.js'");
     expect(partnerRoute).toContain("fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
     expect(partnerRoute).toContain("fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");

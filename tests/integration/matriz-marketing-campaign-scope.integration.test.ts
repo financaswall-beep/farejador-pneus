@@ -59,7 +59,7 @@ describe('Marketing — escopo financeiro, histórico e ledger', () => {
       `SELECT count(*)::int total FROM finance.matriz_ledger_transactions
         WHERE environment='test' AND source_type='marketing.meta_spend.adjustment'`,
     ).then((result) => result.rows[0]?.total)).toBe(0);
-    expect(await getStage4('test', db.pool)).toMatchObject({
+    expect(await getStage4('test', db.pool, { since: '2026-07-01', until: '2026-07-31' })).toMatchObject({
       status: 'yellow',
       total_errors: 0,
       pending_operational: { marketing_campaigns_unclassified: 1 },
@@ -70,7 +70,7 @@ describe('Marketing — escopo financeiro, histórico e ledger', () => {
       reason: 'Campanha própria da matriz', actor: 'Wallace', idempotencyKey: 'scope-matrix',
     }, db.pool);
     expect(matrix.reconciliation).toEqual({ scanned: 1, posted: 1 });
-    expect((await getStage4('test', db.pool)).status).toBe('green');
+    expect((await getStage4('test', db.pool, { since: '2026-07-01', until: '2026-07-31' })).status).toBe('green');
 
     const external = await setCampaignScope({
       adAccountId: 'act_123', campaignId: 'camp-scope', scope: 'external',
@@ -99,6 +99,6 @@ describe('Marketing — escopo financeiro, histórico e ledger', () => {
     expect(proof.rows[0]).toEqual({
       transactions: 2, expense: '0.00', payable: '0.00', audit_events: 2,
     });
-    expect((await getStage4('test', db.pool)).status).toBe('green');
+    expect((await getStage4('test', db.pool, { since: '2026-07-01', until: '2026-07-31' })).status).toBe('green');
   });
 });

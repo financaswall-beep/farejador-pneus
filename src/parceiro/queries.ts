@@ -1,3 +1,4 @@
+import { partnerActor } from './actor.js';
 /**
  * Queries do Portal Parceiro — V2 da Etapa 5 (pos-Codex).
  *
@@ -926,7 +927,7 @@ export async function registerPartnerSale(
           input.payment_status === 'receivable' ? 'A receber' : input.payment_method,
           input.fulfillment_mode,
           input.delivery_address ?? null,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           input.idempotency_key,
           input.source_tag ?? 'porta',
           input.discount_amount ?? 0,
@@ -1015,7 +1016,7 @@ export async function registerPartnerSale(
             row.total_amount,
             input.receivable_due_date ?? null,
             `Gerada automaticamente pela venda ${orderId}`,
-            `partner:${ctx.slug}`,
+            partnerActor(ctx),
             `order:${orderId}:receivable`,
             orderId,
           ],
@@ -1032,7 +1033,7 @@ export async function registerPartnerSale(
             [
               ctx.environment,
               receivableId,
-              `partner:${ctx.slug}`,
+              partnerActor(ctx),
               JSON.stringify({
                 unit_id: ctx.unitId,
                 source_order_id: orderId,
@@ -1104,10 +1105,10 @@ export async function cancelPartnerSale(
     // Motivo do cancelamento (free-text do parceiro). Fica gravado no audit e alimenta
     // o antifraude da matriz (2w cancelado + venda porta do mesmo cliente).
     const motivo = (reason ?? '').trim().slice(0, 500) || 'cancelado pelo portal parceiro';
-    await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [`partner:${ctx.slug}`]);
+    await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [partnerActor(ctx)]);
     await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
       orderId,
-      `partner:${ctx.slug}`,
+      partnerActor(ctx),
       motivo,
     ]);
 
@@ -1198,7 +1199,7 @@ export async function updatePartnerDeliveryStatus(
         [
           ctx.environment,
           orderId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({ unit_id: ctx.unitId, delivery_status: 'failed',
             delivery_courier: courier, reason: motivoFalha,
             stock_release_pending_physical_return: true }),
@@ -1215,7 +1216,7 @@ export async function updatePartnerDeliveryStatus(
     if (input.delivery_status === 'delivered' && existing.rows[0]!.delivery_status !== 'delivered') {
       await client.query('SELECT commerce.deliver_partner_local_order($1, $2)', [
         orderId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
       ]);
     }
 
@@ -1274,7 +1275,7 @@ export async function updatePartnerDeliveryStatus(
           `Entrega ${orderId.slice(0, 8)}`, od.total_amount,
           normalizeText(input.payment_method),
           `Entrega paga no recebimento — pedido ${orderId.slice(0, 8)}`,
-          `partner:${ctx.slug}`, `order:${orderId}:receivable`, orderId,
+          partnerActor(ctx), `order:${orderId}:receivable`, orderId,
         ],
       );
     }
@@ -1288,7 +1289,7 @@ export async function updatePartnerDeliveryStatus(
       [
         ctx.environment,
         orderId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         JSON.stringify({ unit_id: ctx.unitId, delivery_status: input.delivery_status, delivery_courier: courier }),
       ],
     );
@@ -1580,7 +1581,7 @@ export async function upsertPartnerStock(
         input.sale_price ?? null,
         input.is_tracked,
         stockStatus(input),
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.item_type ?? 'pneu',
         tireCondition,
         input.shelf_location ?? null,
@@ -1620,7 +1621,7 @@ export async function upsertPartnerStock(
         ctx.environment,
         stockId,
         isCreate ? 'stock_item_created' : 'stock_item_updated',
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         JSON.stringify({
           unit_id: ctx.unitId,
           item_name: input.item_name,
@@ -1684,7 +1685,7 @@ export async function deletePartnerStock(
          AND unit_id = $3
          AND deleted_at IS NULL
        RETURNING id, item_name, quantity_on_hand`,
-      [stockId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [stockId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
 
     if (result.rowCount === 1) {
@@ -1696,7 +1697,7 @@ export async function deletePartnerStock(
         [
           ctx.environment,
           stockId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             item_name: stock.rows[0]!.item_name,
@@ -1747,7 +1748,7 @@ export async function registerPartnerPurchase(
         total,
         paymentStatus === 'payable' ? 'A pagar' : input.payment_method ?? null,
         input.notes ?? null,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
         paymentStatus,
         paymentStatus === 'payable' ? input.payable_due_date : null,
@@ -1787,7 +1788,7 @@ export async function registerPartnerPurchase(
          actor_label, payload_after
        ) VALUES ($1, 'stock', 'commerce.partner_purchases', $2,
                  'partner_purchase_awaiting_receipt', $3, $4::jsonb)`,
-      [ctx.environment, purchaseId, `partner:${ctx.slug}`, JSON.stringify({
+      [ctx.environment, purchaseId, partnerActor(ctx), JSON.stringify({
         purchase_id: purchaseId,
         unit_id: ctx.unitId,
         item_count: input.items.length,
@@ -1819,7 +1820,7 @@ export async function registerPartnerPurchase(
           total,
           input.payable_due_date,
           `Gerado automaticamente pela compra ${purchaseId}`,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           `purchase:${purchaseId}:payable`,
           purchaseId,
         ],
@@ -1835,7 +1836,7 @@ export async function registerPartnerPurchase(
           [
             ctx.environment,
             payableId,
-            `partner:${ctx.slug}`,
+            partnerActor(ctx),
             JSON.stringify({
               unit_id: ctx.unitId,
               source_purchase_id: purchaseId,
@@ -1997,7 +1998,7 @@ export async function deletePartnerPurchase(
                     average_cost::text AS new_average_cost,stock_status AS new_status`,
         [
           stock.stock_id, ctx.environment, ctx.unitId, reversal.next_quantity,
-          reversal.next_average_cost, `partner:${ctx.slug}`,
+          reversal.next_average_cost, partnerActor(ctx),
         ],
       );
       moves.push({
@@ -2018,7 +2019,7 @@ export async function deletePartnerPurchase(
        SET deleted_at = now(),
            deleted_by = $4
        WHERE id = $1 AND environment = $2 AND unit_id = $3`,
-      [purchaseId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [purchaseId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
 
     // Etapa 3: cancela payable vinculado em cascata (mesma logica que
@@ -2034,7 +2035,7 @@ export async function deletePartnerPurchase(
          AND status = 'open'
          AND deleted_at IS NULL
        RETURNING id`,
-      [purchaseId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [purchaseId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
     if (cancelledPayable.rowCount && cancelledPayable.rowCount > 0) {
       await client.query(
@@ -2046,7 +2047,7 @@ export async function deletePartnerPurchase(
         [
           ctx.environment,
           cancelledPayable.rows[0]!.id,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({ source_purchase_id: purchaseId, unit_id: ctx.unitId }),
         ],
       );
@@ -2062,7 +2063,7 @@ export async function deletePartnerPurchase(
         [
           ctx.environment,
           purchaseId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({ purchase_id: purchaseId, moves, items: items.rows }),
         ],
       );
@@ -2106,7 +2107,7 @@ export async function registerPartnerExpense(
         input.description,
         amount,
         input.payment_method ?? null,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
       ],
     );
@@ -2122,7 +2123,7 @@ export async function registerPartnerExpense(
       [
         ctx.environment,
         expenseId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
         JSON.stringify({
           unit_id: ctx.unitId,
@@ -2149,7 +2150,7 @@ export async function deletePartnerExpense(
            deleted_by = $4
        WHERE id = $1 AND environment = $2 AND unit_id = $3 AND deleted_at IS NULL
        RETURNING id, description, amount`,
-      [expenseId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [expenseId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
 
     if (result.rowCount === 1) {
@@ -2162,7 +2163,7 @@ export async function deletePartnerExpense(
         [
           ctx.environment,
           expenseId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             description: result.rows[0]!.description,
@@ -2209,7 +2210,7 @@ export async function registerPartnerPayable(
         input.due_date ?? null,
         input.payment_method ?? null,
         normalizeText(input.notes),
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
       ],
     );
@@ -2225,7 +2226,7 @@ export async function registerPartnerPayable(
       [
         ctx.environment,
         payableId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
         JSON.stringify({
           unit_id: ctx.unitId,
@@ -2362,7 +2363,7 @@ async function _settlePartnerPayableWithClient(
       [ctx.environment, ctx.unitId, payableId, paidAmount, paidAt,
        row.payment_method ?? 'Pix',
        requestKey || `payable:${payableId}:payment:${randomBytes(8).toString('hex')}`,
-       `partner:${ctx.slug}`],
+       partnerActor(ctx)],
     );
     const idempotencyKey = `payable:${payableId}:expense`;
 
@@ -2380,7 +2381,7 @@ async function _settlePartnerPayableWithClient(
         [
           ctx.environment,
           payableId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             paid_at: paidAt,
@@ -2446,7 +2447,7 @@ async function _settlePartnerPayableWithClient(
         row.description,
         row.original_amount,
         row.payment_method,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         idempotencyKey,
         payableId,
         row.competence_month,
@@ -2462,7 +2463,7 @@ async function _settlePartnerPayableWithClient(
       [
         ctx.environment,
         payableId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         JSON.stringify({ unit_id: ctx.unitId, paid_at: paidAt, amount: paidAmount,
           remaining_balance: (remainingCents / 100).toFixed(2) }),
         closed ? 'partner_payable_paid' : 'partner_payable_partially_paid',
@@ -2529,7 +2530,7 @@ export async function updatePartnerPayable(
         [
           ctx.environment,
           payableId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             counterparty_name: input.counterparty_name,
@@ -2563,7 +2564,7 @@ export async function cancelPartnerPayable(
          AND status = 'open'
          AND deleted_at IS NULL
        RETURNING id, description, amount`,
-      [payableId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [payableId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
 
     if (result.rowCount === 1) {
@@ -2576,7 +2577,7 @@ export async function cancelPartnerPayable(
         [
           ctx.environment,
           payableId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             description: result.rows[0]!.description,
@@ -2651,7 +2652,7 @@ export async function registerPartnerReceivable(
         receivedAt,
         input.payment_method ?? null,
         normalizeText(input.notes),
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
       ],
     );
@@ -2666,7 +2667,7 @@ export async function registerPartnerReceivable(
       [
         ctx.environment,
         receivableId,
-        `partner:${ctx.slug}`,
+        partnerActor(ctx),
         input.idempotency_key ?? null,
         JSON.stringify({
           unit_id: ctx.unitId,
@@ -2736,7 +2737,7 @@ export async function updatePartnerReceivable(
         [
           ctx.environment,
           receivableId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             customer_name: input.customer_name,
@@ -2773,7 +2774,7 @@ export async function cancelPartnerReceivable(
            WHERE event.environment=finance.partner_receivables.environment
              AND event.receivable_id=finance.partner_receivables.id)
        RETURNING id, description, amount`,
-      [receivableId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      [receivableId, ctx.environment, ctx.unitId, partnerActor(ctx)],
     );
 
     if (result.rowCount === 1) {
@@ -2786,7 +2787,7 @@ export async function cancelPartnerReceivable(
         [
           ctx.environment,
           receivableId,
-          `partner:${ctx.slug}`,
+          partnerActor(ctx),
           JSON.stringify({
             unit_id: ctx.unitId,
             description: result.rows[0]!.description,

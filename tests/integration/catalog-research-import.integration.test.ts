@@ -24,7 +24,8 @@ beforeAll(async () => {
     ['90/90-10', 'Pirelli'], ['120/70-15', 'Pirelli']]) {
     await createCatalogProduct({ measure, brand, tireCondition: 'novo',
       productCode: `RES-${randomUUID().slice(0, 8)}`, productName: `Pneu ${brand} ${measure}`,
-      actorLabel: 'Teste de importação', environment: 'test' }, db.pool);
+      actorLabel: 'Teste de importação', environment: 'test', vehicleType: 'motorcycle',
+      priceAmount: 99 }, db.pool);
   }
 }, 180_000);
 
@@ -124,6 +125,8 @@ describe('importação de pesquisa de compatibilidades, sem homologação autom�
     const { executeTool } = await import('../../src/atendente-v2/tools.js');
     const client = await db.pool.connect();
     try {
+      const { importVehicleApplications } = await import('../../scripts/vehicle-application-import.js');
+      await importVehicleApplications(client, 'test');
       const before = await untouchedState();
       const products = await loadCatalog(client, 'test');
       const wheel = products.find((p: any) => p.tire_size === '90/90-10');
@@ -133,10 +136,11 @@ describe('importação de pesquisa de compatibilidades, sem homologação autom�
       const result = JSON.parse(await executeTool(client, 'test', randomUUID(), 'buscar_compatibilidade', {
         moto_modelo: 'CB 300F', moto_ano: 2026, posicao_pneu: 'rear',
       }));
-      expect(result).toMatchObject({ encontrado: true, produto_confirmado: false, estoque_consultado: false });
+      expect(result).toMatchObject({ encontrado: true, produto_confirmado: false, estoque_consultado: true,
+        produtos: [], consultas_estoque: [{ medida_pneu: '150/60-17', resultado: { encontrado: false } }] });
       expect(result.aplicacoes[0]).toMatchObject({ tire_size: '150/60R17', position: 'rear' });
-      const noSql = { query: async () => { throw new Error('A referência não depende de aprovação no banco'); } } as any;
-      const direct = JSON.parse(await executeTool(noSql, 'test', randomUUID(), 'buscar_compatibilidade', {
+      // A referência técnica atual vem do catálogo verificado no banco, sem homologar o SKU.
+      const direct = JSON.parse(await executeTool(client, 'test', randomUUID(), 'buscar_compatibilidade', {
         moto_modelo: 'Fazer 250', moto_ano: 2025, posicao_pneu: 'rear', condicao_pneu: 'novo',
       }));
       expect(direct).toMatchObject({ encontrado: true, requer_aprovacao_manual_da_referencia: false,

@@ -27,6 +27,8 @@ export async function hasMatrizPayrollSchema(db: Queryable): Promise<boolean> {
     `SELECT to_regclass('finance.matriz_payroll_items') IS NOT NULL
          AND to_regclass('finance.matriz_payroll_periods') IS NOT NULL
          AND to_regclass('finance.matriz_payroll_adjustments') IS NOT NULL
+         AND to_regclass('finance.matriz_commission_facts') IS NOT NULL
+         AND to_regclass('finance.matriz_commission_legacy_periods') IS NOT NULL
          AND to_regclass('network.matriz_collaborator_compensation') IS NOT NULL
          AND to_regclass('network.matriz_collaborator_commission_rules') IS NOT NULL
          AND EXISTS (

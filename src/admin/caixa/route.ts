@@ -1,3 +1,4 @@
+import { registerCaixaFinanceOverview } from './route-finance-overview.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
@@ -19,14 +20,10 @@ import {
 import { getCaixaMySaleDetail, getCaixaMySales } from './my-sales.js';
 import { caixaSalesScope } from './sales-access.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
+import { registerCaixaSaleRecovery } from './sale-recovery.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
 import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
-import { getMatrizSimpleFinance } from './simple-finance.js';
-import { getMatrizMonthlyFinance } from './monthly-finance.js';
-import { simpleFinanceQuerySchema } from './finance-query.js';
-import { getMatrizFinanceEntries } from './finance-entries.js';
-import { getMatrizFinanceOutputs } from './finance-outputs.js';
 import { registerCaixaCommissionRoutes } from './route-commissions.js';
 import { registerCaixaTeamRoutes } from './route-team.js';
 import { registerCaixaNotificationRoutes } from './route-notifications.js';
@@ -128,6 +125,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     if (!auth?.modules[module]) await reply.status(403).send({ error: 'forbidden' });
   };
   const requireVendas = requireCaixaModule('vendas');
+  registerCaixaSaleRecovery(fastify, [flagGate, requireCaixaAuth, requireVendas]);
   const requireEstoque = requireCaixaModule('estoque');
   const requireEntregas = requireCaixaModule('entregas');
   const requireRetiradas = requireCaixaModule('retiradas');
@@ -158,52 +156,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     });
   });
 
-  fastify.get('/api/caixa/financeiro-simples', {
-    preHandler: [flagGate, requireCaixaAuth, requireFinanceiro],
-  }, async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    try {
-      return reply.status(200).send(parsed.data.period
-        ? await getMatrizMonthlyFinance(parsed.data.period)
-        : await getMatrizSimpleFinance(parsed.data.range));
-    } catch (error) {
-      const code = error instanceof Error ? error.message : 'finance_unavailable';
-      logger.error({ err: error }, 'simple matrix finance unavailable');
-      return reply.status(503).send({ error: code });
-    }
-  });
-
-  fastify.get('/api/caixa/financeiro-entradas', {
-    preHandler: [flagGate, requireCaixaAuth, requireFinanceiro],
-  }, async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    try {
-      return reply.status(200).send(await getMatrizFinanceEntries(parsed.data.range, undefined, parsed.data.period));
-    } catch (error) {
-      const code = error instanceof Error ? error.message : 'finance_unavailable';
-      logger.error({ err: error }, 'matrix finance entries unavailable');
-      return reply.status(503).send({ error: code });
-    }
-  });
-
-  fastify.get('/api/caixa/financeiro-saidas', {
-    preHandler: [flagGate, requireCaixaAuth, requireFinanceiro],
-  }, async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    try {
-      return reply.status(200).send(await getMatrizFinanceOutputs(parsed.data.range, undefined, parsed.data.period));
-    } catch (error) {
-      const code = error instanceof Error ? error.message : 'finance_unavailable';
-      logger.error({ err: error }, 'matrix finance outputs unavailable');
-      return reply.status(503).send({ error: code });
-    }
-  });
+  registerCaixaFinanceOverview(fastify, [flagGate, requireCaixaAuth, requireFinanceiro]);
 
   fastify.get('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth, requireVendas] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

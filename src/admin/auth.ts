@@ -120,7 +120,7 @@ export async function requireAdminAuth(request: FastifyRequest, reply: FastifyRe
         return;
       }
       (request as AdminAuthedRequest).adminContext = context;
-      const required = requiredMatrixModules(request.url);
+      const required = requiredMatrixModules(request.routeOptions?.url ?? request.url);
       const contextModules = Array.isArray(context.modules)
         ? context.modules : matrixPanelModules(context.role);
       if (context.role !== 'owner' && required

@@ -37,7 +37,7 @@ function args() {
 function listarScriptsDoIndex(publicDir) {
   const indexPath = path.join(publicDir, 'index.html');
   const html = fs.readFileSync(indexPath, 'utf8');
-  const re = /<script[^>]+src="\/admin\/painel\/(app[^"?]*\.js)(?:\?[^"]*)?"/g;
+  const re = /<script[^>]+src="\/admin\/painel\/((?:app[^"?]*|chat-channel-alerts)\.js)(?:\?[^"]*)?"/g;
   const arquivos = [];
   let m;
   while ((m = re.exec(html))) arquivos.push(m[1]);
@@ -143,7 +143,7 @@ function main() {
   console.log(`[info] ${total} propriedades no objeto do Alpine (${resumo(propriedades)})`);
 
   if (gravar) {
-    const baseline = { geradoEm: new Date().toISOString(), commitBase: 'dd64a35', total, propriedades };
+    const baseline = { geradoEm: new Date().toISOString(), total, propriedades };
     fs.writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
     console.log(`[OK] baseline gravado em ${path.relative(RAIZ, BASELINE_PATH)} (${total} propriedades)`);
     return;
@@ -155,9 +155,7 @@ function main() {
   }
   const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
   const antes = baseline.propriedades;
-  const sumiram = Object.keys(antes).filter((k) => !(k in propriedades));
-  const surgiram = Object.keys(propriedades).filter((k) => !(k in antes));
-  const mudaram = Object.keys(antes).filter((k) => k in propriedades && antes[k] !== propriedades[k]);
+  const { sumiram, surgiram, mudaram } = compararManifestos(antes, propriedades);
 
   if (sumiram.length === 0 && surgiram.length === 0 && mudaram.length === 0) {
     console.log(`[OK] PARIDADE: manifesto identico ao baseline (${total} propriedades).`);
@@ -170,7 +168,15 @@ function main() {
   process.exit(1);
 }
 
-try {
+function compararManifestos(antes, propriedades) {
+  return {
+    sumiram: Object.keys(antes).filter(k => !Object.hasOwn(propriedades, k)),
+    surgiram: Object.keys(propriedades).filter(k => !Object.hasOwn(antes, k)),
+    mudaram: Object.keys(antes).filter(k => Object.hasOwn(propriedades, k) && antes[k] !== propriedades[k]),
+  };
+}
+module.exports = { compararManifestos };
+if (require.main === module) try {
   main();
 } catch (err) {
   console.error(`[FALHA] prova de paridade nao rodou: ${err.message}`);

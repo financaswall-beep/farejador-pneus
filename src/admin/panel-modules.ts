@@ -68,6 +68,12 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   if (/^\/admin\/api\/wholesale\/(lots|lot-movements|lot-separation-sources|lot-separations)(\/|$)/.test(path)) return ['estoque'];
   if (/^\/admin\/api\/wholesale\/(purchase|purchases|purchase-orders|supplier|suppliers|replenishment)/.test(path)) return ['compras'];
   if (/^\/admin\/api\/wholesale\/stock/.test(path)) return ['estoque'];
+  if (/^\/admin\/api\/wholesale\/measures(\/|$)/.test(path)) return ['vendas', 'compras', 'estoque', 'catalogo'];
+  if (/^\/admin\/api\/wholesale\/(buyers|ranking|resumo)(\/|$)/.test(path)) return ['vendas'];
+  if (/^\/admin\/api\/wholesale\/cargo(\/|$)/.test(path)) return ['logistica'];
+  if (/^\/admin\/api\/varejo\/resumo(\/|$)/.test(path)) return ['vendas'];
+  if (/^\/admin\/api\/sales\/(brands|history-data)(\/|$)/.test(path)) return ['vendas'];
+  if (/^\/admin\/api\/(partner-applications|partner-units)(\/|$)/.test(path)) return ['rede'];
   if (/^\/admin\/api\/logistica(\/|$)/.test(path)) return ['logistica'];
   if (/^\/admin\/api\/(matriz\/(financeiro|despesas)|financeiro)(\/|$)/.test(path)) return ['financeiro'];
   if (/^\/admin\/api\/wholesale\/finance/.test(path)) return ['financeiro'];
@@ -81,5 +87,6 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
     return ['vendas', 'financeiro'];
   }
   if (/^\/admin\/api\/matriz\/notificacoes/.test(path)) return ['resumo'];
-  return null;
+  // Uma API nova não mapeada exige dono até ter seu contrato de acesso definido.
+  return path.startsWith('/admin/api/') ? [] : null;
 }

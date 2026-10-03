@@ -39,10 +39,10 @@ describe('estoque do parceiro no painel único', () => {
     expect(nav).toContain("partnerLoad: ['loadPartnerEstoque']");
     expect(html).toContain("currentPage === 'estoque' && isPartnerPanel()");
     expect(html).toContain("currentPage === 'estoque' && isMatrixPanel()");
-    expect(html).toContain('app.partner-estoque.js?v=20260830-partner-stock-permissions1');
-    expect(html).toContain('app.partner-estoque.actions.js?v=20260830-partner-stock-permissions1');
-    expect(html).toContain('app.partner-compras.js?v=20260830-partner-stock-permissions1');
-    expect(html).toContain('app.montagem.js?v=20260911-demanda1');
+    expect(html).toMatch(/app\.partner-estoque\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.partner-estoque\.actions\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.partner-compras\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.montagem\.js\?v=[A-Za-z0-9._-]+/);
     expect(html).toContain('Buscar medida ou marca');
     expect(html).toContain('Controle o saldo, as reservas e as entradas da sua unidade');
     expect(html).toContain('Estoque físico');

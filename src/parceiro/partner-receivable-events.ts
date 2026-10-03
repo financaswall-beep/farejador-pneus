@@ -1,3 +1,4 @@
+import { partnerActor } from './actor.js';
 import { randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { moneyCents } from '../shared/catalog-pricing.js';
@@ -103,7 +104,7 @@ export async function settlePartnerReceivableInstallment(
       [ctx.environment, ctx.unitId, receivableId, installmentId, amount, receivedAt,
        input.payment_method?.trim() || 'Pix',
        requestKey || `installment:${installmentId}:receipt:${randomBytes(8).toString('hex')}`,
-       `partner:${ctx.slug}`],
+       partnerActor(ctx)],
     );
     if (result.rowCount !== 1) return { installment_id: installmentId, received: false };
     await client.query(
@@ -112,7 +113,7 @@ export async function settlePartnerReceivableInstallment(
          actor_label, payload_after
        ) VALUES ($1, 'partner_finance', 'finance.partner_receivable_installments', $2,
                  'partner_receivable_installment_received', $3, $4::jsonb)`,
-      [ctx.environment, installmentId, `partner:${ctx.slug}`,
+      [ctx.environment, installmentId, partnerActor(ctx),
        JSON.stringify({ unit_id: ctx.unitId, receivable_id: receivableId,
          received_at: receivedAt, amount })],
     );
@@ -165,7 +166,7 @@ export async function settlePartnerReceivable(
       [ctx.environment, ctx.unitId, receivableId, amount, receivedAt,
        input.payment_method?.trim() || 'Pix',
        requestKey || `receivable:${receivableId}:receipt:${randomBytes(8).toString('hex')}`,
-       `partner:${ctx.slug}`],
+       partnerActor(ctx)],
     );
     await client.query(
       `INSERT INTO audit.events (
@@ -173,7 +174,7 @@ export async function settlePartnerReceivable(
          actor_label, payload_after
        ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
                  'partner_receivable_received', $3, $4::jsonb)`,
-      [ctx.environment, receivableId, `partner:${ctx.slug}`,
+      [ctx.environment, receivableId, partnerActor(ctx),
        JSON.stringify({ unit_id: ctx.unitId, received_at: receivedAt, amount })],
     );
     return { receivable_id: receivableId, received: true };

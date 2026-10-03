@@ -24,9 +24,9 @@ describe('verdade financeira na interface da Matriz', () => {
     expect(indicadores).toContain('v.verdade.caixa.movimento_liquido');
     expect(indicadores).not.toContain('const resultado = Number(v.mes.lucro || 0)');
     expect(html).toContain('Saldo em caixa');
-    expect(html).toContain('Saldo registrado no livro financeiro central');
-    expect(html).toContain('Resultado por competência');
-    expect(html).toContain('Inclui vendas fiadas; não representa dinheiro no caixa.');
+    expect(html).toContain('Saldo registrado no sistema');
+    expect(html).toContain('Como chegou ao resultado');
+    expect(html).toContain('Vendas fiadas entram no resultado. O caixa muda quando você recebe ou paga.');
     expect(html).toContain('receita_custo_pendente');
     const extrato = html.indexOf("x-show=\"finTab === 'extrato'\"");
     const indicadorHtml = html.indexOf("x-show=\"finTab === 'indicadores'\"");
@@ -41,8 +41,8 @@ describe('verdade financeira na interface da Matriz', () => {
     expect(html).not.toContain('Fallback automático');
     expect(html).toContain('despesaRemoveDialog.open');
     expect(html).toContain('despesaConfirmarRemocao()');
-    expect(html).toContain('Livro financeiro central');
-    expect(html).toContain('Integração conciliada');
+    expect(html).toContain('financeiroVisao.verdade.caixa.saldo_atual');
+    expect(html).toContain('financeiroVisao.verdade.competencia');
     expect(financeiro).toContain('O cálculo antigo não será usado.');
     expect(html).not.toMatch(/<a href="#"[^>]*>[\s\S]{0,300}<span>Configurações<\/span>/);
   });

@@ -11,6 +11,7 @@ const scriptFiles = [
   'caixa-checkout-catalog.js',
   'caixa-checkout-pricing.js',
   'caixa-checkout.js',
+  'caixa-checkout-submit.js',
   'caixa-checkout-session.js',
   'caixa-sales-weekly.js',
   'caixa-sales-view.js',
@@ -21,6 +22,7 @@ const scriptFiles = [
   'caixa-stock.js',
   'caixa-stock-count.js',
   'caixa-sales.js',
+  'caixa-navigation.js',
   'caixa-deliveries-matrix.js',
   'caixa-deliveries.js',
   'caixa-finance.js',
@@ -41,6 +43,7 @@ const script = scriptFiles
   .join('\n');
 const route = [
   'src/admin/caixa/route.ts',
+  'src/admin/caixa/route-finance-overview.ts',
   'src/admin/caixa/finance-query.ts',
   'src/admin/caixa/route-commissions.ts',
   'src/admin/caixa/route-team.ts',
@@ -196,7 +199,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="nav-stock"');
     expect(html).toContain('id="nav-deliveries"');
     expect(script).toContain("Caixa.operationPath('produtos')");
-    expect(script).toContain("Caixa.operationPath('vendas', '/api/caixa/vendas')");
+    expect(script).toContain("C.operationPath('vendas', '/api/caixa/vendas')");
     expect(script).toContain("partner_stock_id: line.product.partner_stock_id");
     expect(script).toContain("source_tag: 'walkin_balcao'");
     expect(script).toContain('Venda registrada, estoque baixado e financeiro atualizado.');

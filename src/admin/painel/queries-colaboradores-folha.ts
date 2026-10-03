@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { getMatrizCollaboratorManagement } from './queries-colaboradores-gestao.js';
+import { pendingCommissionFacts, lockCommissionSources, freezeCommissionFacts } from '../caixa/commission-batch.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
@@ -78,7 +79,14 @@ export async function closeMatrizPayroll(input: {
   };
   try {
     await client.query('BEGIN');
+    const end = new Date(`${input.competence}T12:00:00Z`);
+    end.setUTCMonth(end.getUTCMonth() + 1);
+    const candidates = await pendingCommissionFacts(client, environment, end.toISOString().slice(0, 10), 'monthly', input.competence);
+    await lockCommissionSources(client, environment, candidates);
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`matriz-payroll:${environment}:${input.competence}`]);
+    const keys = new Set(candidates.map(f => f.fact_key));
+    const facts = (await pendingCommissionFacts(client, environment, end.toISOString().slice(0, 10), 'monthly', input.competence))
+      .filter(f => keys.has(f.fact_key));
     const started = await beginIntegrityOperation<{
       closed: true; period_id: string; items: number;
     }>(client, operation);
@@ -102,8 +110,9 @@ export async function closeMatrizPayroll(input: {
       [environment, input.competence],
     );
     if (assignmentGaps.rows.length) throw new Error('payroll_has_unassigned_events');
-    const overview = await getMatrizCollaboratorManagement(input.competence, environment, client as any);
-    if (overview.collaborators.some((row) => row.eligible_in_competence
+    const overview = await getMatrizCollaboratorManagement(input.competence, environment, client as any, facts);
+    if (facts.some(f => f.commission_basis === 'margin' && f.items_without_cost > 0)
+      || overview.collaborators.some((row) => row.eligible_in_competence
       && row.items_without_cost > 0
       && row.commission_active && row.commission_kind === 'percent'
       && row.commission_basis === 'margin'
@@ -111,7 +120,7 @@ export async function closeMatrizPayroll(input: {
       throw new Error('payroll_has_unresolved_costs');
     }
     const eligible = overview.collaborators.filter((r) => r.eligible_in_competence
-      && (r.employment_type || r.commission_active || r.additions || r.deductions));
+      && (r.employment_type || r.commission_active || r.commission_amount || r.additions || r.deductions));
     if (!eligible.length) throw new Error('nothing_to_close');
     const payableRows = eligible.map((row) => {
       const gross = cents(row.base_salary + row.benefits_total + row.commission_amount + row.additions);
@@ -132,7 +141,7 @@ export async function closeMatrizPayroll(input: {
         recurring_benefits: row.benefits,
         salary_rule: row.salary_frequency === 'weekly'
           ? 'weekly_salary_excluded_from_monthly_payroll' : 'full_configured_monthly_amount',
-        commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
+        commission_event_dates: { retail: 'created_at', wholesale: 'sold_at_or_partner_settled_at', delivery: 'delivered_at', trip: 'ended_at' },
         rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis,
           value: row.commission_value, itemized: row.commission_itemized,
           item_rules: row.commission_item_rules,
@@ -163,6 +172,8 @@ export async function closeMatrizPayroll(input: {
         [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
          row.commission_amount, cents(row.additions + row.benefits_total), appliedDeductions, totalDue, dueDate,
          JSON.stringify(calculation), expense?.rows[0]!.id ?? null, totalDue > 0 ? 'pending' : 'paid']);
+      await freezeCommissionFacts(client, environment, facts.filter(f => f.collaborator_id === row.id),
+        { payrollItemId: item.rows[0]!.id });
       if (row.additions > 0) await client.query(
         `SELECT finance.allocate_matriz_payroll_adjustments($1,$2,$3,'addition',$4)`,
         [environment, row.id, item.rows[0]!.id, row.additions]);

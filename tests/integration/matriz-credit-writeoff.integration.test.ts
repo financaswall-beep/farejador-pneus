@@ -21,7 +21,11 @@ describe('ciclo contabil do credito da Matriz', () => {
   });
 
   it('recebe parcialmente e reconhece a perda restante sem inflar o caixa', async () => {
-    const sourceId = `credit-${randomUUID()}`;
+    const contact = (await db.pool.query(`INSERT INTO core.contacts
+      (environment,chatwoot_contact_id,name) VALUES ('test',910001,'Teste de crédito') RETURNING id`)).rows[0].id;
+    const sourceId = (await db.pool.query(`INSERT INTO commerce.orders
+      (environment,status,fulfillment_mode,total_amount,source,contact_id)
+      VALUES ('test','confirmed','pickup',150,'walkin_balcao',$1) RETURNING id`, [contact])).rows[0].id;
     const obligation = await db.pool.query<{ id: string }>(
       `SELECT finance.post_matriz_ledger_transaction(
          'test','commerce.order.revenue',$1,'sale_credit',150,current_date,

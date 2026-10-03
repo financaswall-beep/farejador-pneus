@@ -1,3 +1,5 @@
+import { cancelPartnerPickup } from './cancel-pickup.js';
+import { registerPartnerSaleRecovery } from './route-sale-recovery.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -474,6 +476,7 @@ function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boole
 }
 
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
+  registerPartnerSaleRecovery(fastify);
   registerPartnerCoverageRoute(fastify);
   registerPartnerCreditRoutes(fastify);
   registerPartnerPanelCanaryRoutes(fastify);
@@ -1412,7 +1415,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const body = cancelSchema.safeParse(request.body ?? {});
     const reason = body.success ? (body.data.reason ?? null) : null;
 
-    const result = await cancelPartnerSale(getPartnerContext(request), parsed.data.orderId, reason);
+    const result = await cancelPartnerPickup(getPartnerContext(request), parsed.data.orderId, reason);
     if (!result.cancelled) return reply.status(404).send({ error: 'order_not_found' });
     return reply.status(200).send(result);
   });

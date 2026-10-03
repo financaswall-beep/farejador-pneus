@@ -624,8 +624,8 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.wholesale_orders
-         (environment,buyer_id,total_amount,status,seller_collaborator_id,created_at)
-       VALUES ('test',$1,300,'confirmed',$2,'2026-04-10T15:00:00Z') RETURNING id`,
+         (environment,buyer_id,total_amount,status,seller_collaborator_id,created_at,sold_at)
+       VALUES ('test',$1,300,'confirmed',$2,'2026-04-10T15:00:00Z','2026-04-10T15:00:00Z') RETURNING id`,
       [buyer.rows[0]!.id, collaborator.rows[0]!.id],
     );
     await closePayroll({ competence: '2026-04-01', environment: 'test' }, db.pool);

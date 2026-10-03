@@ -217,7 +217,8 @@ describe('painel único completo da unidade parceira', () => {
     expect(migration).toContain("has_table_privilege('farejador_partner_app', relation_name, 'SELECT')");
     expect(migration).toContain("'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'");
     expect(migration).not.toMatch(/commerce\.(wholesale_stock|partner_stock_levels|matriz_product_prices|product_prices)/);
-    expect(grants.expected_count).toBe(73);
+    expect(grants.expected_count).toBe(74);
+    expect(grants.grants).toContain('commerce.vehicle_measure_applications:SELECT:NO');
     expect(grants.grants).toEqual(expect.arrayContaining([
       'commerce.vehicle_models:SELECT:NO',
       'commerce.vehicle_fitments:SELECT:NO',

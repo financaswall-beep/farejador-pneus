@@ -16,7 +16,11 @@ it('novas tabelas ficam com RLS e sem acesso do portal parceiro',async()=>{
   const result=await db.pool.query(`SELECT c.relname,c.relrowsecurity,has_table_privilege('farejador_partner_app',c.oid,'SELECT') readable
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname IN ('ops','analytics') AND (c.relname LIKE 'organic_%' OR c.relname IN ('stock_interests','audio_transcriptions','audio_transcription_jobs')) AND c.relkind='r'`);
-  expect(result.rows.length).toBe(9);
+  expect(result.rows.map(r=>r.relname).sort()).toEqual([
+    'audio_transcription_jobs','audio_transcriptions','organic_controls',
+    'organic_conversation_sources','organic_inbound','organic_meta_events',
+    'organic_metric_observations','organic_order_sources','organic_outreach','stock_interests',
+  ]);
   for(const row of result.rows)expect(row).toMatchObject({relrowsecurity:true,readable:false});
 });
 it('vincula por identidade nativa, mantém pedido antigo fora e recalcula ao cancelar',async()=>{

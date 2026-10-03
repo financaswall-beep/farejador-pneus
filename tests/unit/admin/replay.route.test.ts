@@ -237,7 +237,8 @@ describe('registerReplayRoute', () => {
 
     expect(sql).not.toContain('payload');
     expect(sql).not.toContain('chatwoot_delivery_id');
-    expect(sql).not.toContain('received_at');
+    expect(sql.split('SET processing_status')[1]?.split('FROM prev')[0]).not.toContain('received_at');
+    expect(sql).toContain('DELETE FROM ops.normalization_retries');
     expect(sql).not.toContain('chatwoot_signature');
     expect(sql).not.toContain('chatwoot_timestamp');
     expect(sql).not.toContain('event_type');

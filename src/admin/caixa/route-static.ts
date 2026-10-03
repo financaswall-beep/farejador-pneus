@@ -33,6 +33,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   }
   text('/operacao/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
   text('/operacao/caixa-checkout.css', 'caixa-checkout.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-navigation.js', 'caixa-navigation.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-checkout-view.js', 'caixa-checkout-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-chat.css', 'caixa-chat.css', 'text/css; charset=utf-8');
   text('/operacao/stock-waitlist.css', 'stock-waitlist.css', 'text/css; charset=utf-8');
@@ -114,6 +115,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-notifications.js', 'caixa-notifications.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa.js', 'caixa.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-checkout-submit.js', 'caixa-checkout-submit.js', 'text/javascript; charset=utf-8');
   fastify.get('/operacao/som-pedido-novo.mp3', { preHandler: flagGate }, async (_request, reply) => {
     const content = await readFile(path.join(partnerAssetsDir, 'som-pedido-novo.mp3'));
     return reply.header('Content-Type', 'audio/mpeg')

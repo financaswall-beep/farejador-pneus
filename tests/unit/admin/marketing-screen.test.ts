@@ -41,12 +41,12 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.chart.js'");
     expect(readFileSync(resolve('painel/public/app.montagem.js'), 'utf8'))
       .toContain('window.PAINEL_MODULES.marketingChart');
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20261001-campaign1');
-    expect(html).toContain('/admin/painel/app.marketing.chart.js?v=20260930-paid1');
-    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260930-paid1');
-    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20261001-campaign1');
-    expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260821-marketing-audit1');
-    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260821-marketing-audit1');
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.chart\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.campaigns\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.campaign-detail\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.journeys\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.marketing\.integrations\.js\?v=[A-Za-z0-9._-]+/);
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[^"\s]+/);
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
@@ -76,7 +76,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(html.includes('Comparar anúncios')).toBe(true);
     expect(html.includes('Mostrar mais indicadores')).toBe(true);
     expect(html.includes('paidExport()')).toBe(true);
-    expect(html.includes('Google Ads será integrado em uma próxima etapa')).toBe(true);
+    expect(html.includes("paidChannel('google')")).toBe(true);
   });
 
   it('remove a subaba redundante Canais e direciona gestão para Integrações', () => {

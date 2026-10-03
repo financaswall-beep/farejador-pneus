@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
 import { buildMatrizCollaboratorManagement } from './queries-colaboradores-payroll-summary.js';
+import { pendingCommissionFacts, type CommissionFact } from '../caixa/commission-batch.js';
 type Queryable = Pick<Pool, 'query'>;
 export type { CollaboratorManagementRow } from './queries-colaboradores-payroll-summary.js';
 async function runSequential(queries: Array<() => Promise<any>>): Promise<any[]> {
@@ -13,6 +14,7 @@ export async function getMatrizCollaboratorManagement(
   competence: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   db: Queryable = defaultPool,
+  commissionFacts?: CommissionFact[],
 ) {
   if (!(await hasMatrizPayrollSchema(db))) throw new Error('collaborator_management_unavailable');
   // closeMatrizPayroll chama esta leitura dentro de um PoolClient transacional.
@@ -184,6 +186,7 @@ export async function getMatrizCollaboratorManagement(
            LEFT JOIN finance.matriz_payroll_adjustment_allocations al
              ON al.environment=a.environment AND al.adjustment_id=a.id
           WHERE a.environment=$1 AND a.competence<=$2::date AND a.deleted_at IS NULL
+            AND a.original_commission_period_id IS NULL
             AND COALESCE(a.causal_status,'ready')<>'needs_review'
           GROUP BY a.id,a.collaborator_id,a.kind,a.amount
          HAVING a.amount-COALESCE(sum(al.amount),0)>0
@@ -235,7 +238,12 @@ export async function getMatrizCollaboratorManagement(
         ORDER BY p.competence DESC
         LIMIT 12`, [environment]),
   ]);
+  const end = new Date(`${competence}T12:00:00Z`);
+  end.setUTCMonth(end.getUTCMonth() + 1);
+  const pendingFacts = commissionFacts ?? await pendingCommissionFacts(
+    db, environment, end.toISOString().slice(0, 10), 'monthly', competence);
   return buildMatrizCollaboratorManagement({
     competence, people, performance, adjustments, payroll, adjustmentDetails, assignmentGaps, payrollHistory,
+    pendingFacts,
   });
 }

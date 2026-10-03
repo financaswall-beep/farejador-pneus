@@ -10,9 +10,13 @@ describe('Estoque — lista com painel da medida', () => {
     readFileSync(resolve('painel/public/app.galpao.js'), 'utf8'),
   ].join('\n');
   const atacado = readFileSync(resolve('painel/public/app.atacado.js'), 'utf8');
-  const stockStart = html.indexOf('<div x-show="currentPage === \'estoque\' && isMatrixPanel()"');
+  const stockStart = html.indexOf('<template x-if="currentPage === \'estoque\' && isMatrixPanel()');
   const stockEnd = html.indexOf('<div x-show="currentPage === \'logistica\' && isPartnerPanel()"', stockStart);
   const stockHtml = html.slice(stockStart, stockEnd);
+  it('localiza a tela de estoque completa', () => {
+    expect(stockStart).toBeGreaterThan(-1);
+    expect(stockEnd).toBeGreaterThan(stockStart);
+  });
 
   it('mantém os quatro indicadores derivados da mesma lista oficial', () => {
     expect(stockHtml).toContain('aria-label="Resumo do estoque"');
@@ -43,7 +47,9 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml.match(/\/admin\/painel\/assets\/estoque-hero\.webp\?preview=tire/g)).toHaveLength(1);
     expect(stockHtml).not.toContain('Mapa | Lista');
     expect(stockHtml).not.toContain('Criar compra');
-    expect(stockHtml).not.toContain('pagination');
+    const master = stockHtml.slice(stockHtml.indexOf('id="estoque-lista-heading"'), stockHtml.indexOf('id="galpao-filme"'));
+    expect(master.length).toBeGreaterThan(0);
+    expect(master).not.toContain('pagination');
   });
 
   it('reutiliza as ações auditadas da medida selecionada', () => {
@@ -103,24 +109,20 @@ describe('Estoque — lista com painel da medida', () => {
     expect(galpao).not.toContain("this.apiPost('/admin/api/wholesale/replenishment'");
   });
 
-  it('transforma Custos em leitura financeira local sem criar uma nova fonte', () => {
-    expect(stockHtml).toContain('id="capital-medida-heading"');
-    expect(stockHtml).toContain('Capital por medida');
-    expect(stockHtml).toContain('Leitura dos custos');
-    expect(stockHtml).toContain('Pneus com custo conhecido');
-    expect(stockHtml).toContain('Concentração no Top 3');
-    expect(stockHtml).toContain('id="custos-medida-heading"');
-    expect(stockHtml).toContain('Custos por medida e condição');
-    expect(stockHtml).toContain('Como este valor é calculado');
-    expect(stockHtml).toContain('Mesma conta usada no Financeiro');
-    expect(stockHtml).toContain('commerce.wholesale_stock');
-    expect(stockHtml).toContain('custoCapital(row)');
-    expect(stockHtml).toContain('custoPneusComCusto()');
-    expect(stockHtml).toContain('custoTop3Percentual()');
-    expect(stockHtml).toContain("custoOrdem: 'capital'");
-    expect(stockHtml).toContain("stockTab = 'visao'; stockBusca = row.measure");
-    expect(galpao).toContain('group.capital / group.quantity_with_cost');
-    expect(galpao).not.toContain("this.apiGet('/admin/api/wholesale/stock/costs'");
+  it('lê os custos do motor oficial, com capital, reserva e saldo disponível separados', () => {
+    const costs = readFileSync(resolve('painel/public/app.estoque.custos.js'), 'utf8');
+    expect(stockHtml).toContain('id="sc-heading"');
+    expect(stockHtml).toContain('id="sc-capital-heading"');
+    expect(stockHtml).toContain('Onde está o capital');
+    expect(stockHtml).toContain('stockCosts.data.lots');
+    expect(stockHtml).toContain('scTotals.quantity_on_hand');
+    expect(stockHtml).toContain('scTotals.quantity_reserved');
+    expect(stockHtml).toContain('scTotals.quantity_available');
+    expect(stockHtml).toContain('Como os custos são calculados');
+    expect(stockHtml).toContain('scExport()');
+    expect(costs).toContain('/admin/api/wholesale/stock/costs?vehicle_type=');
+    expect(costs).toContain('if (request !== s.request) return');
+    expect(costs).not.toContain('this.apiPost(');
   });
 
   it('aplica a paleta verde sem tokens laranja ou rosa dentro da tela', () => {

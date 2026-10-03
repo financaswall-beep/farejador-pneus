@@ -1,5 +1,7 @@
 import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
 import { commissionItemRulesOf, type OperationCommissionItemRules } from '../../shared/operation-team.js';
+import { applyCommissionPreview } from './commission-preview.js';
+import type { CommissionFact } from '../caixa/commission-batch.js';
 
 type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
 type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
@@ -38,6 +40,7 @@ export function buildMatrizCollaboratorManagement(input: {
   adjustmentDetails: QueryResult;
   assignmentGaps: QueryResult;
   payrollHistory: QueryResult;
+  pendingFacts?: CommissionFact[];
 }) {
   const { competence, people, performance, adjustments, payroll, adjustmentDetails, assignmentGaps, payrollHistory } = input;
   const perf = new Map(performance.rows.map((r: any) => [r.id, r]));
@@ -74,6 +77,7 @@ export function buildMatrizCollaboratorManagement(input: {
       + row.commission_amount + row.additions - row.deductions) * 100) / 100);
     return row;
   });
+  if (input.pendingFacts) applyCommissionPreview(rows, input.pendingFacts);
   const active = rows.filter((r) => r.active);
   const competenceEligible = rows.filter((r) => r.eligible_in_competence);
   const payrollRows = payroll.rows.length ? rows.filter((r) => r.payroll_item_id) : competenceEligible;

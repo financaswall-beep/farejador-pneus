@@ -12,7 +12,6 @@
     "src/atendente-v2/prompt.ts": 367,
     "src/admin/reconcile.service.ts": 365,
     "src/admin/chatwoot-api.client.ts": 354,
-    "src/admin/painel/matriz-ledger-purchases.ts": 341,
     "src/admin/painel/queries-fornecedores-registro.ts": 435,
     "src/parceiro/auth.ts": 349,
     "src/normalization/partner-chat.fanout.ts": 326,

@@ -19,6 +19,26 @@ export async function getMatrizOperationNotifications(
 ): Promise<{ notifications: OperationSystemNotice[] }> {
   const source = await getMatrizNotificacoes(env.FAREJADOR_ENV, dbPool);
   const notifications: OperationSystemNotice[] = [];
+  const expiryFailures = source.bot_reservation_expiry_failures?.matrix_count ?? 0;
+  if (auth.modules.retiradas && expiryFailures > 0) {
+    notifications.push({ id: 'matrix-bot-expiry-failed', kind: 'stock',
+      title: 'Reservas vencidas precisam de revisão',
+      description: `${expiryFailures} reserva(s) não puderam ser liberadas após várias tentativas. Confira os pedidos no painel.`,
+      badge: 'Retiradas', target: 'none', priority: 'attention' });
+  }
+  if (auth.modules.financeiro && source.ledger_health && ['red','yellow','error'].includes(source.ledger_health.status)) {
+    notifications.push({ id: 'matrix-daily-ledger-health', kind: 'finance',
+      title: 'Conferência financeira precisa de atenção',
+      description: source.ledger_health.status === 'error' ? 'A conferência automática será tentada novamente.'
+        : 'Abra o Financeiro para conferir as divergências e pendências registradas.',
+      badge: 'Financeiro', target: 'finance', priority: 'attention' });
+  }
+  if (auth.modules.retiradas && source.bot_reservations_expiring > 0) {
+    notifications.push({ id: 'matrix-bot-reservations', kind: 'stock',
+      title: 'Reservas do bot perto de expirar',
+      description: `${source.bot_reservations_expiring} reserva(s) sem retirada. Confira na aba Retiradas.`,
+      badge: 'Retiradas', target: 'none', priority: 'attention' });
+  }
 
   if (auth.modules.entregas && source.entregas_falhadas.length > 0) {
     notifications.push({

@@ -19,6 +19,7 @@ beforeAll(async () => {
     CREATE TABLE commerce.matriz_delivery_trips(id text, environment text, trip_number text, status text, courier_name text, courier_collaborator_id text, deleted_at timestamptz);
     CREATE TABLE commerce.orders(id text, environment text, order_number text, unit_id text, contact_id text, customer_id text, status text, delivery_status text, delivery_address text, total_amount numeric, payment_method text, created_at timestamptz, dispatched_at timestamptz, delivered_at timestamptz, delivery_failure_reason text, trip_id text, delivery_courier text, scheduled_delivery_date date, fulfillment_mode text);
     CREATE TABLE commerce.order_items(id text, environment text, order_id text, product_id text, quantity numeric, unit_price numeric, discount_amount numeric, created_at timestamptz);
+    ALTER TABLE commerce.orders ADD COLUMN customer_phone text;
     INSERT INTO core.units VALUES ('main','test','main'),('prod','prod','main'),('partner','test','partner');
     INSERT INTO core.contacts VALUES ('c','test','Marina Costa','5511999999999'),('prod-c','prod','Segredo','5511888888888');
     INSERT INTO commerce.products VALUES ('p','test','Pneu 130/70-13');

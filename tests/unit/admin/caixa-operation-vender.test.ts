@@ -14,6 +14,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
   const brandCatalog = source('painel/public/caixa-brand-catalog.js');
   const catalog = source('painel/public/caixa-checkout-catalog.js');
   const checkout = source('painel/public/caixa-checkout.js');
+  const submit = source('painel/public/caixa-checkout-submit.js');
   const pricing = source('painel/public/caixa-checkout-pricing.js');
   const checkoutSession = source('painel/public/caixa-checkout-session.js');
   const partnerRoute = source('src/parceiro/route.ts');
@@ -76,7 +77,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
   });
 
   it('finaliza de forma idempotente e atribui a venda ao login do parceiro', () => {
-    expect(checkout).toContain("Caixa.operationPath('vendas', '/api/caixa/vendas')");
+    expect(submit).toContain("C.operationPath('vendas', '/api/caixa/vendas')");
     expect(catalog).toContain('idempotency_key: checkout.idempotencyKey');
     expect(catalog).toContain("fulfillment_mode: 'pickup'");
     expect(catalog).toContain("source_tag: 'walkin_balcao'");
@@ -103,7 +104,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(checkoutSession).toContain('checkout.cart.clear()');
     expect(checkoutSession).toContain("checkout.customerName = 'Cliente Balcão'");
     expect(checkout).toContain('requestSession !== Caixa.sessionFingerprint()');
-    expect(checkout).toContain('Caixa.checkoutSessionChanged(saleSession)');
-    expect(checkout).toContain("Caixa.showToast('A conta mudou. O carrinho anterior foi limpo.')");
+    expect(submit).toContain('saleSession !== C.sessionFingerprint()');
+    expect(checkoutSession).toContain('checkout.pendingAttempt = null');
   });
 });

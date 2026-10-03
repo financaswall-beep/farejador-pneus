@@ -25,6 +25,37 @@ window.PAINEL_MODULES.sino = function () {
       const itens = [];
       const s = this.sino;
       if (s) {
+        const expiry = s.bot_reservation_expiry_failures;
+        if (expiry && expiry.count > 0) itens.push({
+          id: 'bot-expiry-failed:' + expiry.count + ':' + expiry.orders.map(o => o.order_number).join(','),
+          icon: 'triangle-alert', iconBg: 'bg-rose-50', iconColor: 'text-rose-600',
+          title: expiry.count + ' reserva(s) vencida(s) precisam de revisão',
+          desc: 'A liberação falhou várias vezes. ' + expiry.orders.map(o => o.order_number + ' · ' + o.unit_name).join('; '),
+          page: 'bot', time: 'conferir pedidos do Bot →',
+        });
+        const health = s.ledger_health;
+        if (health && ['red','yellow','error'].includes(health.status)) itens.push({
+          id: 'ledger-health:' + health.status + ':' + health.error_signals + ':' + health.pending_signals,
+          icon: 'shield-alert', iconBg: 'bg-amber-50', iconColor: 'text-amber-600',
+          title: health.status === 'error' ? 'Conferência financeira não concluída' : 'Conferência financeira precisa de atenção',
+          desc: health.status === 'error' ? 'A conferência automática será tentada novamente.'
+            : health.error_signals + ' divergência(s) e ' + health.pending_signals + ' pendência(s). Abra o Financeiro para conferir.',
+          page: 'financeiro', time: 'abrir Financeiro →',
+        });
+        if (s.bot_reservations_expiring > 0) itens.push({
+          id: 'bot-reservations:' + s.bot_reservations_expiring,
+          icon: 'clock', iconBg: 'bg-amber-50', iconColor: 'text-amber-600',
+          title: 'Reservas do bot perto de expirar',
+          desc: s.bot_reservations_expiring + ' reserva(s) sem retirada. Confira antes da liberação automática.',
+          page: 'retiradas', time: 'abrir Retiradas →',
+        });
+        if (s.normalization_failed > 0) itens.push({
+          id: 'normalization-failed:' + s.normalization_failed,
+          icon: 'message-circle', iconBg: 'bg-rose-50', iconColor: 'text-rose-600',
+          title: 'Mensagens precisam de revisão',
+          desc: s.normalization_failed + ' evento(s) não foram processados. Confira a ingestão e reprocesse após corrigir a causa.',
+          page: 'bot', time: 'abrir Bot →',
+        });
         const br = s.bot_resilience;
         if (br && br.enabled && (br.dead_letters > 0 || br.api_ack_unconfirmed > 0)) {
           itens.push({

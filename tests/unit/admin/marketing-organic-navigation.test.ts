@@ -18,7 +18,10 @@ function front() {
     currentPage: 'marketing', marketingTab: 'comentarios', marketingIsMock: () => false,
     $nextTick: (callback: () => void) => callback(), $refs: {},
     moDestroyChart: vi.fn(), loadMarketingComments: vi.fn(), moLoadControls: vi.fn(),
+    // O carregamento de conteúdo pago pertence a outra suíte; aqui verificamos a navegação.
+    loadMarketing: vi.fn().mockResolvedValue(undefined),
     destroyMarketingCreativeChart: vi.fn(), closeMarketingCreativeJourneys: vi.fn(), renderMarketingChart: vi.fn(),
+    closeMarketingCampaignDetail: vi.fn(), closeMarketingAdDetail: vi.fn(), closeMarketingCompare: vi.fn(),
     apiGet: vi.fn().mockResolvedValue({ config: { enabled: true, accounts: [] }, media: [], posts: [] }),
     apiPut: vi.fn(), apiPost: vi.fn(),
   });
@@ -64,6 +67,7 @@ describe('Navegação direta do conteúdo orgânico', () => {
       expect(app.mpDirty).toBe(true);
     }
     app.marketingSetTab('visao'); app.marketingSetTab('comentarios');
+    expect(app.loadMarketing).toHaveBeenCalledOnce();
     expect(app.mpForm).toBe(form);
     expect(app.mpBrief).toBe('Destacar atendimento');
     expect(app.apiPut).not.toHaveBeenCalled();
@@ -100,6 +104,7 @@ describe('Navegação direta do conteúdo orgânico', () => {
     app.apiGet.mockReturnValue(new Promise(done => { resolve = done; }));
     const loading = app.loadMarketingOrganic();
     app.marketingSetTab('visao');
+    expect(app.loadMarketing).toHaveBeenCalledOnce();
     resolve({ config: { enabled: true }, media: [], posts: [{ id: 'scheduled', status: 'scheduled' }] });
     await loading;
     expect(timers.set).not.toHaveBeenCalled();

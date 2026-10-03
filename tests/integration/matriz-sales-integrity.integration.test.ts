@@ -176,7 +176,7 @@ describe('integridade intermodular da aba Vendas da Matriz', () => {
       await import('../../src/admin/painel/queries-atacado-cancelar.js');
     expect((await listWholesaleSalesHistory('30d', 'test', db.pool)).length)
       .toBeGreaterThanOrEqual(21);
-    expect(await getWholesaleResumo('test', db.pool, '30d')).toMatchObject({ faturamento: '123.00' });
+    expect(Number((await getWholesaleResumo('test', db.pool, '30d')).faturamento)).toBe(123);
   });
 
   it('trava só a medida vendida e mantém o restante do galpão disponível', async () => {

@@ -5,6 +5,7 @@ import { businessDateSaoPaulo } from '../../shared/business-time.js';
 import { getMatrizCollaboratorManagement } from '../painel/queries-colaboradores-gestao.js';
 import { matrizCommissionFactsSql } from './operation-commission-facts.js';
 import { money } from '../../shared/operation-commissions.js';
+import { frozenCommissionDetails, pendingMonthlyCommissionDetails } from './commission-detail-facts.js';
 
 type Reader = Pick<Pool, 'query'>;
 type Settlement = {
@@ -30,7 +31,7 @@ export async function getFinanceCommissionMonth(period: string, db: Reader = poo
       [env.FAREJADOR_ENV, b.start, b.end]),
     db.query<Settlement>(
       `SELECT i.id,i.collaborator_id,c.display_name name,c.job_title role,'monthly'::text frequency,
-              p.competence::text period_start,(p.competence+interval '1 month-1 day')::date::text period_end,
+              p.competence::text period_start,(p.competence+interval '1 month' - interval '1 day')::date::text period_end,
               i.commission_amount::text,i.total_due::text payment_total,i.payment_status status,
               i.paid_at::text,i.due_date::text due_on
          FROM finance.matriz_payroll_items i JOIN finance.matriz_payroll_periods p
@@ -42,7 +43,7 @@ export async function getFinanceCommissionMonth(period: string, db: Reader = poo
               w.commission_amount::text,w.commission_amount::text,w.payment_status,e.paid_at::text,e.due_date::text
          FROM finance.matriz_commission_periods w JOIN network.matriz_collaborators c
            ON c.environment=w.environment AND c.id=w.collaborator_id
-         JOIN commerce.matriz_expenses e ON e.environment=w.environment AND e.id=w.source_expense_id
+         LEFT JOIN commerce.matriz_expenses e ON e.environment=w.environment AND e.id=w.source_expense_id
         WHERE w.environment=$1 AND w.period_end >= $2::date AND w.period_end < $3::date
         ORDER BY period_start DESC,name`, [env.FAREJADOR_ENV, b.start, b.next]),
   ]);
@@ -71,7 +72,10 @@ export async function getFinanceCommissionMonthDetail(period: string, collaborat
   const b = bounds(period), start = settlement?.period_start ?? b.start;
   const endDate = settlement ? new Date(settlement.period_end + 'T12:00:00Z') : null;
   if (endDate) endDate.setUTCDate(endDate.getUTCDate() + 1);
-  const sales = await db.query<{ id: string; reference: string; occurred_at: string; gross_amount: string;
+  const preview = !settlement && person?.frequency === 'monthly'
+    ? await pendingMonthlyCommissionDetails(db, env.FAREJADOR_ENV, collaboratorId, b.end, b.start, 50, offset) : null;
+  const sales = await frozenCommissionDetails(db, env.FAREJADOR_ENV, collaboratorId, settlement?.id, 50, offset)
+    ?? preview ?? await db.query<{ id: string; reference: string; occurred_at: string; gross_amount: string;
     commission_amount: string; total: number }>(`${matrizCommissionFactsSql}
     SELECT id,reference,occurred_at,gross_amount::text,commission_amount::text,count(*) OVER()::int total
       FROM ruled WHERE collaborator_id=$4 AND commission_amount<>0 ORDER BY occurred_at DESC,id LIMIT 50 OFFSET $5`,

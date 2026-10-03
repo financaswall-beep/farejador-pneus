@@ -21,6 +21,7 @@ import {
   operationFingerprint, recordIntegrityEvent,
 } from '../painel/stage5-integrity.js';
 import { matrizCommissionFactsSql } from './operation-commission-facts.js';
+import { frozenCommissionDetails, pendingMonthlyCommissionDetails } from './commission-detail-facts.js';
 export { closeMatrizWeeklyCommissions } from './operation-commission-rollover.js';
 
 type Queryable = Pick<Pool, 'query'>;
@@ -57,7 +58,7 @@ export async function getMatrizOperationCommissions(
     db.query<SettlementRow>(
       `SELECT item.collaborator_id,item.id target_id,item.total_due::text payment_total,
               item.payment_status,period.competence::text period_start,
-              (period.competence+interval '1 month-1 day')::date::text period_end,
+              (period.competence+interval '1 month' - interval '1 day')::date::text period_end,
               'monthly'::text settlement_frequency
          FROM finance.matriz_payroll_items item
          JOIN finance.matriz_payroll_periods period
@@ -136,7 +137,10 @@ export async function getMatrizOperationCommissionDetail(
   const exclusiveEnd = collaborator.status === 'payable' && collaborator.payment_period_end
     ? new Date(new Date(`${detailEnd}T12:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10)
     : detailEnd;
-  const result = await db.query<{
+  const preview = collaborator.status === 'open' && collaborator.settlement_frequency === 'monthly' && range === '30d'
+    ? await pendingMonthlyCommissionDetails(db, env.FAREJADOR_ENV, collaboratorId, bounds.end, bounds.competence) : null;
+  const result = await frozenCommissionDetails(db, env.FAREJADOR_ENV, collaboratorId,
+    collaborator.status === 'payable' ? collaborator.payment_target_id ?? undefined : undefined) ?? preview ?? await db.query<{
     id: string; reference: string; occurred_at: string; payment_method: string | null;
     gross_amount: string; commission_amount: string; commission_itemized: boolean;
     commission_item_rules: unknown;

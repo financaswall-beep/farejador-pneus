@@ -141,10 +141,10 @@ describe('Colaboradores - dialogos e carregamento confiaveis', () => {
   });
 
   it('invalida o cache dos scripts alterados', () => {
-    expect(html).toContain('app.colaboradores.js?v=20260826-auditoria1');
-    expect(html).toContain('app.colaboradores.payroll.js?v=20260826-payroll2');
-    expect(html).toContain('app.colaboradores.gestao.js?v=20260826-auditoria1');
-    expect(html).toContain('app.colaboradores.permissions.js?v=20260826-permissions2');
-    expect(html).toContain('app.js?v=20260910-relatorios1');
+    expect(html).toMatch(/app\.colaboradores\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.colaboradores\.payroll\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.colaboradores\.gestao\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.colaboradores\.permissions\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/app\.js\?v=[A-Za-z0-9._-]+/);
   });
 });

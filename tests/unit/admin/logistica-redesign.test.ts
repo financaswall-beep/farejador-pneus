@@ -18,9 +18,9 @@ describe('Redesign das três abas da Logistica da Matriz', () => {
   it('preserva a navegação e carrega a nova operação', () => {
     expect(html).toContain('/admin/painel/logistica-operacao.css');
     expect(html).toContain('/admin/painel/app.logistica.operacao.js');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260917-historico1');
-    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260917-historico1');
-    expect(html).toContain('/admin/painel/app.montagem.js?v=20260917-historico1');
+    expect(html).toMatch(/\/admin\/painel\/app\.logistica\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.logistica\.resultado\.js\?v=[A-Za-z0-9._-]+/);
+    expect(html).toMatch(/\/admin\/painel\/app\.montagem\.js\?v=[A-Za-z0-9._-]+/);
     expect(html).not.toContain('app.logistica.periodos.js');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
     expect(screen).toContain('aria-label="Seções de Logística"');

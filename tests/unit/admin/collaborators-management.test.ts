@@ -35,6 +35,7 @@ describe('gestão de colaboradores da matriz', () => {
           employment_type: 'clt', base_salary: '1000', monthly_base_salary: '1000', payment_day: 5, payment_method: 'pix', payment_note: null, compensation_starts_on: '2026-07-01',
           commission_kind: null, commission_basis: null, commission_value: '0', commission_starts_on: null, commission_active: false },
       ] };
+      if (sql.includes('SELECT * FROM eligible')) return { rows: [{ collaborator_id: 'c1', commission_amount: '100', commission_basis: 'margin', items_without_cost: 0 }] };
       if (sql.includes('WITH retail AS')) return { rows: [{ id: 'c1', sales_count: 10, revenue: '12000', margin: '5000', items_without_cost: 0, commission_amount: '100', deliveries_count: 0, trips_count: 0, distance_km: 0, on_time_pct: null }] };
       if (sql.includes('matriz_payroll_adjustments')) return { rows: [{ collaborator_id: 'c1', additions: '300', deductions: '120' }] };
       if (sql.includes('matriz_payroll_assignment_gaps')) return { rows: [{ missing_count: 0 }] };

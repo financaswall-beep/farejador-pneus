@@ -59,13 +59,14 @@
       const field = document.createElement('span'); field.className = 'checkout-negotiated-field';
       const currency = document.createElement('b'); currency.textContent = 'R$';
       const input = document.createElement('input');
+      input.disabled = Boolean(checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked);
       input.type = 'text'; input.inputMode = 'decimal'; input.autocomplete = 'off';
       input.maxLength = 12; input.size = 8;
       input.value = line.negotiatedPrice == null ? '' : Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
       input.setAttribute('aria-label', 'Preço negociado de ' + productTitle(line.product));
       field.append(currency, input); editor.append(label, field);
       input.addEventListener('input', function () {
-        if (checkout.busy) return;
+        if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
         const price = parseNegotiatedPrice(input.value);
         line.negotiatedPrice = price; checkout.idempotencyKey = null;
         input.classList.toggle('invalid', price == null);

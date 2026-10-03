@@ -60,7 +60,8 @@ describe('Estoque — efeito financeiro dos caminhos manuais', () => {
   it('expõe classificação na tela e envia a chave de repetição', () => {
     expect(html).toContain('Encontrado na contagem');
     expect(html).toContain('Explicação obrigatória');
-    expect(html).toContain('perdas/baixas do estoque já descontadas do lucro');
+    expect(html).toContain('O resultado também inclui ajustes de estoque: ganhos de ');
+    expect(html).toContain('financeiroVisao.verdade.competencia.ajustes_estoque?.perdas');
     expect(frontend).toContain("operation('stock-entry', 'form')");
     expect(frontend).toContain("operation('stock-manual-decrement', 'form')");
   });

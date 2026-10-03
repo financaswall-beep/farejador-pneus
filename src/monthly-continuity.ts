@@ -5,6 +5,8 @@ import { logger } from './shared/logger.js';
 import { closeMatrizWeeklyCommissions } from './admin/caixa/operation-commissions.js';
 import { closeMatrizWeeklySalaries } from './admin/caixa/operation-salary-rollover.js';
 import { sweepCommissionEntries } from './admin/painel/queries-comissoes.js';
+import { startBotReservationExpiry } from './operation/bot-reservations.js';
+import { startDailyLedgerHealth } from './operation/daily-ledger-health.js';
 
 const MONTHLY_CONTINUITY_INTERVAL_MS = 60 * 60_000;
 
@@ -66,6 +68,8 @@ export async function runMonthlyContinuityCycle(): Promise<{
 }
 
 export function startMonthlyContinuityScheduler(): () => void {
+  const stopReservations = startBotReservationExpiry();
+  const stopLedgerHealth = startDailyLedgerHealth();
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
 
@@ -91,6 +95,8 @@ export function startMonthlyContinuityScheduler(): () => void {
   logger.info('monthly continuity scheduler started');
   return () => {
     stopped = true;
+    stopReservations();
+    stopLedgerHealth();
     if (timer) clearTimeout(timer);
   };
 }

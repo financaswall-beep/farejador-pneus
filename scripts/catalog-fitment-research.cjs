@@ -135,14 +135,16 @@ async function insertPendingResearch(client, environment, plan) {
     const product = candidate.products[0];
     const r = candidate.research;
     const summary = evidence(candidate);
+    const years = explicitYears(r.ref);
     await client.query(`INSERT INTO commerce.fitment_discoveries
       (id,environment,vehicle_model_id,tire_spec_id,position,status,discovery_origin,
        source_url,source_title,source_checked_at,evidence_summary,
-       suggested_is_oem,suggested_confidence_level,notes)
-      VALUES ($1,$2,$3,$4,$5,'pending','web_research',$6,$7,$8,$9,false,0,$10)`,
+       suggested_is_oem,suggested_confidence_level,notes,suggested_year_start,suggested_year_end)
+      VALUES ($1,$2,$3,$4,$5,'pending','web_research',$6,$7,$8,$9,false,0,$10,$11,$12)`,
     [id, environment, vehicle.id, product.tire_spec_id, candidate.position, r.url,
       `${r.brand} ${r.model} — ${r.ref}`.slice(0, 300), CHECKED_AT, summary,
-      `${BATCH}; ${candidate.source_key}; sem aprovação automática; especificações dos produtos pendentes`]);
+      `${BATCH}; ${candidate.source_key}; sem aprovação automática; especificações dos produtos pendentes`,
+      years.year_start, years.year_end]);
     await audit(client, environment, id, 'commerce.fitment_discoveries',
       'catalog_fitment_candidate_created', { product_id: product.product_id,
         tire_size: product.tire_size, original_measure: r.measure,

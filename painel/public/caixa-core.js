@@ -2,8 +2,7 @@
   const Caixa = window.Caixa = window.Caixa || {};
   const keys = {
     token: '2w_caixa_token', name: '2w_caixa_nome', user: '2w_caixa_usuario',
-    scope: '2w_caixa_escopo',
-    slug: '2w_caixa_unidade_slug',
+    scope: '2w_caixa_escopo', slug: '2w_caixa_unidade_slug',
     store: '2w_caixa_unidade_nome',
     role: '2w_caixa_papel',
     modules: '2w_caixa_modulos',

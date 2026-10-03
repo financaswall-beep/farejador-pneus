@@ -1,13 +1,4 @@
-/**
- * Farejador-Painel (MATRIZ) — obra 300 (2026-07-05).
- *
- * O painelApp() de 3.002 linhas foi fatiado em módulos-fábrica
- * (window.PAINEL_MODULES.*, arquivos app.*.js ≤300 linhas — fiscal checar-tamanho).
- * Este arquivo guarda só o ESTADO; a MONTAGEM (lista de fábricas + compositor
- * getOwnPropertyDescriptors, NUNCA spread) mora em app.montagem.js (fatia 07-14).
- * Molde: obra do parceiro (PLANO_REFATORACAO_PAINEL_300_2026-06-10.md),
- * prova: prova-paridade-matriz.
- */
+/** Estado do painel Matriz. As fábricas são compostas em app.montagem.js. */
 
 function painelApp() {
   // Migração de segurança: o token antigo não pode continuar persistido entre sessões.

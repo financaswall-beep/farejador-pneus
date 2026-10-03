@@ -1,3 +1,4 @@
+import { partnerActor } from './actor.js';
 import { withPartnerContext } from './db.js';
 import type { PartnerContext } from './auth.js';
 import { moneyCents } from '../shared/catalog-pricing.js';
@@ -71,7 +72,7 @@ export async function updatePartnerPickupStage(
          environment,domain,entity_table,entity_id,event_type,actor_label,payload_after
        ) VALUES ($1,'partner_orders','commerce.partner_orders',$2,
                  'partner_pickup_stage_changed',$3,$4::jsonb)`,
-      [ctx.environment, orderId, `partner:${ctx.slug}`, JSON.stringify({
+      [ctx.environment, orderId, partnerActor(ctx), JSON.stringify({
         unit_id: ctx.unitId, stage: input.stage,
         service_codes: input.services.map((service) => service.code),
         service_total_cents: pickupServicesTotalCents(input.services),
@@ -136,7 +137,7 @@ export async function markPartnerPickupRetrieved(
     }
 
     await client.query('SELECT commerce.complete_partner_pickup($1,$2)', [
-      orderId, `partner:${ctx.slug}`,
+      orderId, partnerActor(ctx),
     ]);
     await client.query(
       `UPDATE commerce.partner_orders
@@ -156,14 +157,14 @@ export async function markPartnerPickupRetrieved(
        (moneyCents(Number(row.total_amount)) + insertedServiceCents) / 100,
        normalizePartnerText(input.payment_method),
        `Retirada paga no balcão — pedido ${orderId.slice(0, 8)}`,
-       `partner:${ctx.slug}`, `order:${orderId}:pickup-receivable`, orderId],
+       partnerActor(ctx), `order:${orderId}:pickup-receivable`, orderId],
     );
     await client.query(
       `INSERT INTO audit.events (
          environment,domain,entity_table,entity_id,event_type,actor_label,payload_after
        ) VALUES ($1,'partner_orders','commerce.partner_orders',$2,
                  'partner_pickup_retrieved',$3,$4::jsonb)`,
-      [ctx.environment, orderId, `partner:${ctx.slug}`, JSON.stringify({
+      [ctx.environment, orderId, partnerActor(ctx), JSON.stringify({
         unit_id: ctx.unitId, payment_method: normalizePartnerText(input.payment_method),
         service_codes: services.map((service) => service.code),
         service_total_cents: pickupServicesTotalCents(services),

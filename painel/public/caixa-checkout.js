@@ -78,7 +78,7 @@
   }
 
   function changeQuantity(product, delta) {
-    if (checkout.busy || (delta > 0 && product.sellable === false)) return;
+    if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked || (delta > 0 && product.sellable === false)) return;
     const current = checkout.cart.get(product.product_id)?.quantity || 0;
     const maximum = product.product_type === 'service' || product.stock_tracked === false ? 50 : Number(product.stock_quantity || 0);
     const next = Math.max(0, Math.min(maximum, current + delta));
@@ -112,6 +112,8 @@
     ui.total.textContent = Caixa.currency.format(totals.total);
     if (!totals.valid) ui.total.textContent = 'Revise os preços';
     ui.reviewButton.disabled = totals.quantity === 0 || !totals.valid || checkout.busy;
+    ui.reviewButton.textContent = checkout.pendingAttempt ? 'Verificar venda' : 'Revisar venda';
+    if (checkout.recoveryBlocked) ui.reviewButton.disabled = true;
     saleView.render();
   }
 
@@ -122,6 +124,7 @@
   }
 
   function openCustomer() {
+    if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
     ui.customerNameInput.value = ['Balcão', 'Cliente Balcão'].includes(checkout.customerName)
       ? '' : checkout.customerName;
     ui.customerPhoneInput.value = checkout.customerPhone;
@@ -134,7 +137,7 @@
   }
 
   function openReview() {
-    if (checkout.cart.size === 0) return;
+    if (checkout.cart.size === 0 || checkout.recoveryBlocked) return;
     ui.submitError.textContent = '';
     ui.reviewContent.replaceChildren();
     const items = document.createElement('div');
@@ -163,16 +166,12 @@
     total.append(label, amount);
     ui.reviewContent.append(items, meta, total);
     updateReviewSummary();
+    if (checkout.pendingAttempt) { ui.submitError.textContent = Caixa.checkoutPendingMessage; ui.confirmButton.textContent = 'VERIFICAR VENDA'; }
     elements.checkoutReviewModal.classList.remove('hidden');
   }
 
   function closeReview() {
     if (!checkout.busy) elements.checkoutReviewModal.classList.add('hidden');
-  }
-
-  function newIdempotencyKey() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'caixa-' + window.crypto.randomUUID();
-    return 'caixa-' + Date.now() + '-' + Math.random().toString(16).slice(2);
   }
 
   function submitErrorMessage(code) {
@@ -186,55 +185,9 @@
     if (code === 'walkin_stock_ambiguous') return 'O estoque deste item precisa ser conferido antes da venda.';
     if (code === 'walkin_product_not_sellable') return 'Um item não está mais disponível para venda.';
     if (code === 'sale_line_total_too_large' || code === 'sale_total_too_large') return 'O total da venda ultrapassa o limite aceito.';
-    return 'Não foi possível concluir. Nenhuma baixa foi feita; tente novamente.';
+    return 'A venda foi recusada. Revise os dados antes de tentar novamente.';
   }
-  async function confirmSale() {
-    if (checkout.busy || checkout.cart.size === 0 || !cartTotals().valid) return;
-    const saleSession = Caixa.sessionFingerprint();
-    if (Caixa.checkoutSessionChanged(saleSession)) {
-      Caixa.resetCheckout(); Caixa.showToast('A conta mudou. O carrinho anterior foi limpo.'); return;
-    }
-    checkout.busy = true;
-    checkout.idempotencyKey = checkout.idempotencyKey || newIdempotencyKey();
-    ui.submitError.textContent = '';
-    ui.confirmButton.disabled = true;
-    ui.confirmButton.textContent = 'REGISTRANDO…';
-    renderCart();
-    const body = Caixa.saleRequestBody(checkout, cartTotals());
-    try {
-      const response = await Caixa.authenticatedFetch(Caixa.operationPath('vendas', '/api/caixa/vendas'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const payload = await Caixa.json(response);
-      if (!response.ok) throw new Error(payload.error || 'request_failed');
-      if (saleSession !== Caixa.sessionFingerprint()) { Caixa.resetCheckout(); return; }
-      checkout.cart.clear();
-      checkout.idempotencyKey = null;
-      elements.checkoutReviewModal.classList.add('hidden');
-      renderCart();
-      await loadCatalog();
-      if (!Caixa.isPartner()) void Caixa.loadSales();
-      if (!Caixa.isPartner() && payload.receipt) {
-        elements.receiptModal.classList.remove('hidden');
-        Caixa.renderReceipt(payload.receipt);
-      }
-      Caixa.showToast('Venda registrada, estoque baixado e financeiro atualizado.');
-    } catch (failure) {
-      if (failure instanceof Error && failure.message === 'invalid_session') return;
-      const code = failure instanceof Error ? failure.message : 'request_failed';
-      ui.submitError.textContent = submitErrorMessage(code);
-      if (code !== 'request_failed') void loadCatalog();
-    } finally {
-      checkout.busy = false;
-      ui.confirmButton.disabled = false;
-      ui.confirmButton.textContent = 'CONFIRMAR VENDA';
-      renderCart();
-    }
-  }
-
-  Caixa.checkoutRuntime = { state: checkout, ui: ui, renderCatalog: renderCatalog, renderCart: renderCart, close: saleView.close };
+  Caixa.checkoutRuntime = { state: checkout, ui: ui, cartTotals: cartTotals, submitErrorMessage: submitErrorMessage, renderCatalog: renderCatalog, renderCart: renderCart, close: saleView.close };
   Caixa.loadCatalog = loadCatalog;
 
   ui.search.addEventListener('input', function () {
@@ -263,6 +216,7 @@
   ui.customerButton.addEventListener('click', openCustomer);
   ui.customerForm.addEventListener('submit', function (event) {
     event.preventDefault();
+    if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
     checkout.customerName = ui.customerNameInput.value.trim() || 'Cliente Balcão';
     checkout.customerPhone = ui.customerPhoneInput.value.trim();
     checkout.idempotencyKey = null;
@@ -274,6 +228,7 @@
   });
   ui.paymentButtons.forEach(function (button) {
     button.addEventListener('click', function () {
+      if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
       checkout.payment = button.dataset.payment;
       checkout.idempotencyKey = null;
       ui.paymentButtons.forEach(function (item) {
@@ -287,6 +242,6 @@
   document.querySelectorAll('[data-close-checkout]').forEach(function (button) {
     button.addEventListener('click', closeReview);
   });
-  ui.confirmButton.addEventListener('click', function () { void confirmSale(); });
+  ui.confirmButton.addEventListener('click', function () { void Caixa.confirmCheckoutSale(); });
   renderCart();
 }());

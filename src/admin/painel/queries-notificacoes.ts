@@ -14,6 +14,8 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica.js';
 import { getBotResilienceCounts } from './queries-bot-resilience.js';
+import { botReservationWarnings, botReservationExpiryFailures } from '../../operation/bot-reservations.js';
+import { latestLedgerHealth, type DailyLedgerHealth } from '../../operation/daily-ledger-health.js';
 
 export interface MatrizNotificacoesPayload {
   /** Entregas da MAIN com delivery_status='failed' e pedido NÃO cancelado —
@@ -26,6 +28,10 @@ export interface MatrizNotificacoesPayload {
     quantity_on_hand: number; min_quantity: number;
   }>;
   bot_resilience: { enabled: boolean; dead_letters: number; api_ack_unconfirmed: number };
+  bot_reservations_expiring: number;
+  bot_reservation_expiry_failures: Awaited<ReturnType<typeof botReservationExpiryFailures>>;
+  normalization_failed: number;
+  ledger_health: DailyLedgerHealth | null;
 }
 
 /** Consultas leves de contagem — roda no load e no refresh de 15s. */
@@ -102,6 +108,9 @@ export async function getMatrizNotificacoes(
   );
   const row = r.rows[0]!;
   const bot = await getBotResilienceCounts(environment, dbPool);
+  const reservations = await botReservationWarnings(environment, dbPool);
+  const failures = await dbPool.query<{ n: number }>(`SELECT count(*)::int n FROM raw.raw_events
+    WHERE environment=$1 AND processing_status='failed'`, [environment]);
   return {
     entregas_falhadas: row.entregas_falhadas ?? [],
     fiado_vencido: { count: row.fiado_count, total: row.fiado_total },
@@ -109,5 +118,9 @@ export async function getMatrizNotificacoes(
     galpao_repor: row.galpao_repor ?? [],
     bot_resilience: { enabled: bot.enabled, dead_letters: bot.deadLetters,
       api_ack_unconfirmed: bot.apiAckUnconfirmed },
+    bot_reservations_expiring: reservations,
+    bot_reservation_expiry_failures: await botReservationExpiryFailures(environment, dbPool),
+    normalization_failed: failures.rows[0]?.n ?? 0,
+    ledger_health: await latestLedgerHealth(environment, dbPool),
   };
 }

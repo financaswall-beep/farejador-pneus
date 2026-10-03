@@ -19,6 +19,8 @@ describe('localização do lead — seleção real no PostgreSQL isolado',() => 
     Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',
       CHATWOOT_HMAC_SECRET:'test-secret',ADMIN_AUTH_TOKEN:'test-admin'});
     db=await startPostgres();process.env.DATABASE_URL=db.connectionString;vi.resetModules();
+    await db.pool.query(`CREATE TABLE IF NOT EXISTS core.messages_2026_09
+      PARTITION OF core.messages FOR VALUES FROM ('2026-09-01') TO ('2026-10-01')`);
     locations=(await import('../../src/admin/painel/customer-lead-location.js')).loadCustomerLeadLocations;
     detail=(await import('../../src/admin/painel/customer-detail.js')).getCustomerDetail;
     board=(await import('../../src/admin/painel/queries-clientes.js')).getClientesPainel;

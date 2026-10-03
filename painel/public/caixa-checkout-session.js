@@ -27,6 +27,8 @@
     checkout.customerPhone = '';
     checkout.idempotencyKey = null;
     checkout.busy = false;
+    checkout.pendingAttempt = null;
+    checkout.recoveryBlocked = false;
     checkout.request = null;
     ui.search.value = '';
     ui.searchClear.classList.add('hidden');
@@ -45,6 +47,7 @@
   function bindCheckoutSession(fingerprint) {
     resetCheckout();
     checkoutSession = fingerprint;
+    if (Caixa.restoreCheckoutAttempt) Caixa.restoreCheckoutAttempt();
   }
 
   function checkoutSessionChanged(fingerprint) {

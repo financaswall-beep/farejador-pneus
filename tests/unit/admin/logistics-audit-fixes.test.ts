@@ -26,7 +26,7 @@ describe('correcoes confirmadas pela auditoria da Logistica', () => {
     expect(route).toContain('trip_id = NULL, delivery_courier = NULL');
     expect(route).toContain('delivery_courier =\n              (SELECT courier_name');
     expect(courier).toContain('COALESCE(c.name,cu.name) AS customer_name');
-    expect(courier).toContain('COALESCE(c.phone_e164,cu.phone_e164) AS customer_phone');
+    expect(courier).toContain('COALESCE(o.customer_phone,c.phone_e164,cu.phone_e164) AS customer_phone');
   });
 
   it('traduz erros no endpoint de upload e preserva a recuperacao de rota fechada', () => {

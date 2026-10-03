@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startPostgres, stopPostgres, applyMigrationFile, type IntegrationDb } from './helpers/postgres.js';
 import { createPartnerFixture } from './helpers/partner-fixtures.js';
@@ -92,7 +93,7 @@ async function quotedFacts(id: string) {
 async function stage(id: string) {
   return (await db.pool.query(
     `SELECT value FROM analytics.conversation_classifications WHERE conversation_id=$1
-     AND dimension='stage_reached' AND extractor_version='sql_v1_2026-05-26'`, [id],
+     AND dimension='stage_reached' ORDER BY created_at DESC LIMIT 1`, [id],
   )).rows[0]?.value;
 }
 
@@ -114,11 +115,11 @@ beforeAll(async () => {
   oldConversation = await conversation();
   await turn(oldConversation);
   expect(await stage(oldConversation.id)).toBe('abriu_conversa');
-  await applyMigrationFile(db.pool, '0217_bot_order_customer_name.sql');
-  await applyMigrationFile(db.pool, '0218_bot_quote_and_demand_analytics.sql');
-  await applyMigrationFile(db.pool, '0220_lead_location_memory.sql');
-  await applyMigrationFile(db.pool, '0221_bot_analytics_trigger_isolation.sql');
-  await applyMigrationFile(db.pool, '0223_matriz_delivery_settings.sql');
+  // Prova o backfill histórico, mas executa o motor atual com seu schema completo.
+  const migrations = await readdir(new URL('../../db/migrations/', import.meta.url));
+  for (const file of migrations.filter(f => f.endsWith('.sql') && f > '0216_conversation_bot_control.sql').sort()) {
+    await applyMigrationFile(db.pool, file);
+  }
 }, 180_000);
 
 afterEach(() => vi.restoreAllMocks());
