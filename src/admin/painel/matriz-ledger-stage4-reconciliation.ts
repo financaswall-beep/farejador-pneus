@@ -99,9 +99,8 @@ export async function getMatrizStage4LedgerReconciliation(
          marketing_campaigns_unclassified,
        (SELECT count(*)::int FROM commerce.matriz_delivery_trips t
          WHERE t.environment=$1 AND COALESCE(t.fuel_spent,0)>0
-           AND NOT EXISTS (SELECT 1 FROM commerce.matriz_trip_receipts r
-             WHERE r.environment=t.environment AND r.trip_id=t.id
-               AND r.workflow_status IN ('linked','legacy_linked')))
+           AND NOT EXISTS (SELECT 1 FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) e
+             WHERE e.category='combustivel'))
          fuel_notes_without_approved_receipt`,
     [environment, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED, period?.since ?? null, period?.until ?? null],
   );

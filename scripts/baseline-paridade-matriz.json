@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-10-03T03:00:36.420Z",
-  "total": 3018,
+  "geradoEm": "2026-10-03T04:23:17.963Z",
+  "total": 3021,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -1173,11 +1173,14 @@
     "loadVendasHistoricoData": "function",
     "loadVendasMarcas": "function",
     "logCon": "value:object",
+    "logConAbrirSemComprovante": "function",
     "logConAnexar": "function",
     "logConConfirmarDivergencia": "function",
     "logConPodeCorrigir": "function",
+    "logConPodeSemComprovante": "function",
     "logConRevisarComprovantes": "function",
     "logConSalvar": "function",
+    "logConSalvarSemComprovante": "function",
     "logConVerDespesas": "function",
     "logEntAtualizado": "value:null",
     "logEntCarregando": "value:boolean",

@@ -150,12 +150,12 @@
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
 <script src="/admin/painel/app.logistica.historico.js?v=20260917-historico1"></script>
-<script src="/admin/painel/app.logistica.conciliacao.js?v=20261003-conciliacao1"></script>
+<script src="/admin/painel/app.logistica.conciliacao.js?v=20261003-semcomprovante1"></script>
 <script src="/admin/painel/app.logistica.entregas.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.operacao.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260917-historico1"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260917-historico1"></script>
-<script src="/admin/painel/app.logistica.comprovantes.js?v=20260917-historico1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20261003-semcomprovante1"></script>
+<script src="/admin/painel/app.logistica.comprovantes.js?v=20261003-semcomprovante1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260821-auditfix1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260826-auditoria1"></script>
 <script src="/admin/painel/app.colaboradores.payroll.js?v=20260826-payroll2"></script>
@@ -5308,7 +5308,7 @@
                         <label class="flex items-start gap-2.5"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].competence_confirmed" class="mt-0.5 rounded border-gray-300 text-emerald-700 focus:ring-emerald-600"><span>Confirmo a competência caso seja diferente da data do documento.</span></label>
                         <label class="flex items-start gap-2.5"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].retroactive_confirmed" class="mt-0.5 rounded border-gray-300 text-emerald-700 focus:ring-emerald-600"><span>Confirmo o lançamento caso seja retroativo há mais de 3 meses.</span></label>
                         <label x-show="receiptReviewDrafts[entry.receipt.id].possible_duplicate_required" class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].possible_duplicate_confirmed" class="mt-0.5 rounded border-amber-400"><span>Conferi a possível duplicidade e quero continuar.</span></label>
-                        <label x-show="receiptReviewDrafts[entry.receipt.id].legacy_expense_required" class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].legacy_expense_confirmed" class="mt-0.5 rounded border-amber-400"><span>Confirmo o vínculo com a despesa legada, sem criar outra.</span></label>
+                        <label x-show="receiptReviewDrafts[entry.receipt.id].legacy_expense_required" class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].legacy_expense_confirmed" class="mt-0.5 rounded border-amber-400"><span>Confirmo o vínculo com a despesa existente, sem criar outra.</span></label>
                       </div>
                     </div>
 
@@ -5452,7 +5452,7 @@
           <div class="log-op-between"><h2 id="log-con-title">Resolver pendência da rota</h2><button type="button" class="log-op-icon-button" @click="fecharConciliacaoRota()" :disabled="logCon.saving || uploadingReceipt || logisticaSaving" aria-label="Fechar conciliação"><i data-lucide="x"></i></button></div>
           <div class="log-op-dialog-body">
             <strong x-text="logCon.trip?.trip_number || ''"></strong>
-            <p x-show="rotaResultado(logCon.trip)?.fuelPending">Combustível anotado: <strong x-text="formatCurrency(Number(logCon.trip?.fuel_spent || 0))"></strong>. Falta uma despesa aprovada com comprovante.</p>
+            <p x-show="rotaResultado(logCon.trip)?.fuelPending">Combustível anotado: <strong x-text="formatCurrency(Number(logCon.trip?.fuel_spent || 0))"></strong>. Falta aprovar a despesa.</p>
             <p x-show="rotaResultado(logCon.trip)?.semCusto" x-text="(rotaResultado(logCon.trip)?.semCusto || 0) + ' item(ns) sem custo registrado. Confira a composição da rota.'"></p>
             <p x-show="rotaResultado(logCon.trip)?.comprovantesPendentes.length" x-text="(rotaResultado(logCon.trip)?.comprovantesPendentes.length || 0) + ' comprovante(s) precisam de revisão.'"></p>
             <div x-show="logCon.trip?.financial_status === 'divergent'">
@@ -5462,7 +5462,22 @@
             <label class="log-op-button" :class="{ 'opacity-50': uploadingReceipt || logCon.saving }"><i data-lucide="paperclip"></i><span x-text="uploadingReceipt ? 'Enviando…' : 'Anexar comprovante'"></span><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" :disabled="uploadingReceipt || logCon.saving" @change="logConAnexar($event)"></label>
             <button type="button" x-show="(logCon.trip?.receipts || []).length" @click="logConRevisarComprovantes()" :disabled="logCon.saving || uploadingReceipt" class="log-op-button">Ver e revisar comprovantes</button>
             <button type="button" @click="logConVerDespesas()" :disabled="logCon.saving || uploadingReceipt" class="log-op-button">Ver composição e despesas</button>
-            <button type="button" x-show="adminUser?.role === 'owner' && Number(logCon.trip?.fuel_spent || 0) > 0" @click="logCon.editing = true" :disabled="logCon.saving || uploadingReceipt" class="log-op-link">Corrigir valor anotado por engano</button>
+            <button type="button" x-show="adminUser?.role === 'owner' && logistica?.receipt_approval && logistica?.receipt_approval_finance && !(logCon.trip?.despesas || []).some(e => e.category === 'combustivel')" @click="logConAbrirSemComprovante()" :disabled="logCon.saving || uploadingReceipt || !!logCon.attempt" class="log-op-button"><i data-lucide="file-warning"></i>Comprovante perdido</button>
+            <form x-show="logCon.lost" @submit.prevent="logConSalvarSemComprovante()">
+              <p class="log-op-note">Aprove somente um gasto real de combustível. O Financeiro registrará a despesa como sem comprovante, com seu nome e o motivo da autorização.</p>
+              <fieldset :disabled="logCon.saving || !!logCon.attempt" class="space-y-3">
+                <label class="log-op-field">Valor da despesa (R$)<input inputmode="decimal" x-model="logCon.amount" required></label>
+                <label class="log-op-field">Data do abastecimento<input type="date" x-model="logCon.expense_date" :max="hojeISO()" required></label>
+                <label class="log-op-field">Pagamento<select x-model="logCon.payment_status" required><option value="">Selecione</option><option value="paid">Já foi pago</option><option value="pending">Ainda a pagar</option></select></label>
+                <label x-show="logCon.payment_status === 'paid'" class="log-op-field">Data do pagamento<input type="date" x-model="logCon.payment_date" :max="hojeISO()" :required="logCon.payment_status === 'paid'"></label>
+                <label x-show="logCon.payment_status === 'pending'" class="log-op-field">Vencimento<input type="date" x-model="logCon.due_date" :required="logCon.payment_status === 'pending'"></label>
+                <label class="log-op-field">Motivo e como você conferiu o gasto<textarea x-model="logCon.reason" minlength="3" maxlength="500" rows="3" required></textarea></label>
+                <label class="flex items-start gap-2 text-xs"><input type="checkbox" x-model="logCon.retroactive_confirmed">Se a despesa tiver mais de 3 meses, confirmo o lançamento retroativo na data informada.</label>
+                <label class="flex items-start gap-2 text-xs"><input type="checkbox" x-model="logCon.confirmed">Como proprietário, confirmo o gasto, o pagamento informado e autorizo registrar esta despesa sem comprovante.</label>
+              </fieldset>
+              <button type="submit" class="log-op-button log-op-primary mt-3" :disabled="!logConPodeSemComprovante()" x-text="logCon.saving ? 'Conferindo…' : logCon.attempt ? 'Verificar aprovação' : 'Aprovar despesa sem comprovante'"></button>
+            </form>
+            <button type="button" x-show="adminUser?.role === 'owner' && Number(logCon.trip?.fuel_spent || 0) > 0" @click="logCon.editing = true; logCon.lost = false; logCon.confirmed = false; logCon.reason = ''" :disabled="logCon.saving || uploadingReceipt || !!logCon.attempt" class="log-op-link">Corrigir valor anotado por engano</button>
             <form x-show="logCon.editing" @submit.prevent="logConSalvar()">
               <p class="log-op-note">Se não houve gasto e o valor foi preenchido por engano, informe zero. A correção preserva as despesas já registradas.</p>
               <label class="log-op-field">Valor correto de combustível (R$)<input inputmode="decimal" x-model="logCon.amount" :disabled="logCon.saving || !!logCon.attempt" required></label>
@@ -5545,12 +5560,12 @@
                 </div>
                 <div class="mt-4 rounded-lg border p-3 text-xs" :class="rotaResultado(logisticaRotaSelecionada()).completo ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-amber-100 bg-amber-50 text-amber-800'">
                   <div class="flex items-center gap-2 font-semibold"><i :data-lucide="rotaResultado(logisticaRotaSelecionada()).completo ? 'badge-check' : 'triangle-alert'" class="w-4 h-4"></i><span x-text="rotaResultado(logisticaRotaSelecionada()).completo ? 'Custos completos' : 'Resultado ainda parcial'"></span></div>
-                  <p x-show="rotaResultado(logisticaRotaSelecionada()).completo" class="mt-1">Todos os itens têm custo e todas as despesas de comprovante foram aprovadas.</p>
+                  <p x-show="rotaResultado(logisticaRotaSelecionada()).completo" class="mt-1">Todos os itens têm custo e todas as despesas vinculadas foram aprovadas.</p>
                   <p x-show="rotaResultado(logisticaRotaSelecionada()).semCusto" class="mt-1" x-text="rotaResultado(logisticaRotaSelecionada()).semCusto + ' item(ns) sem custo congelado.'"></p>
                   <p x-show="rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes.length" class="mt-1" x-text="rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes.length + ' comprovante(s) aguardando leitura ou revisão.'"></p>
-                  <p x-show="rotaResultado(logisticaRotaSelecionada()).fuelPending" class="mt-1 font-semibold">Gasolina anotada sem comprovante aprovado: este resultado está incompleto.</p>
+                  <p x-show="rotaResultado(logisticaRotaSelecionada()).fuelPending" class="mt-1 font-semibold">Gasolina anotada sem despesa aprovada: este resultado está incompleto.</p>
                   <div x-show="rotaResultado(logisticaRotaSelecionada()).financialStatus === 'divergent'" class="mt-2 rounded-md border border-rose-200 bg-white/70 p-2 text-rose-800">
-                    <p class="font-semibold">Valor anotado e comprovante aprovado divergem.</p>
+                    <p class="font-semibold">Valor anotado e despesa aprovada divergem.</p>
                     <p class="mt-1" x-text="'Anotado: ' + formatCurrency(Number(logisticaRotaSelecionada().fuel_spent || 0)) + ' · oficial: ' + formatCurrency(rotaResultado(logisticaRotaSelecionada()).approvedFuelAmount)"></p>
                     <button x-show="adminUser?.role === 'owner'"
                             @click="confirmarDivergenciaRota(logisticaRotaSelecionada())"
@@ -5583,7 +5598,7 @@
                     <div class="p-4 flex items-center gap-3">
                       <a x-show="e.receipt_id && receiptUrls[e.receipt_id]" :href="receiptUrls[e.receipt_id]" target="_blank" class="flex-shrink-0"><img :src="receiptUrls[e.receipt_id]" class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt="comprovante da despesa"></a>
                       <div x-show="!e.receipt_id || !receiptUrls[e.receipt_id]" class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="receipt" class="w-5 h-5 text-amber-700"></i></div>
-                      <div class="min-w-0 flex-1"><p class="text-sm font-medium text-gray-800" x-text="logisticaDespesaCategoriaLabel(e.category)"></p><p class="text-[11px] text-gray-400 truncate" x-text="e.receipt_summary || (e.source === 'comprovante' ? 'Lido do comprovante' : 'Lançado no fechamento da rota')"></p></div>
+                      <div class="min-w-0 flex-1"><p class="text-sm font-medium text-gray-800" x-text="logisticaDespesaCategoriaLabel(e.category)"></p><p class="text-[11px] text-gray-400" x-text="e.source === 'sem_comprovante' ? 'Sem comprovante — aprovada pelo proprietário' : e.receipt_summary || (e.source === 'comprovante' ? 'Lido do comprovante' : 'Lançado no fechamento da rota')"></p><p x-show="e.source === 'sem_comprovante'" class="text-[11px] text-gray-500 mt-1" x-text="(e.approved_by || '') + ' · ' + (e.approval_reason || '')"></p></div>
                       <span class="text-sm font-semibold tabular-nums" x-text="formatCurrency(Number(e.amount || 0))"></span>
                     </div>
                   </template>

@@ -27,14 +27,8 @@ export async function confirmMatrizTripFuelDivergence(
     );
     if (!trip.rows[0]) throw new Error('trip_not_found');
     const official = await client.query<{ amount: string }>(
-      `SELECT COALESCE(sum(x.amount),0)::text AS amount FROM (
-         SELECT DISTINCT e.id,e.amount
-           FROM commerce.matriz_trip_receipts r
-           JOIN commerce.matriz_expenses e
-             ON e.id=r.ai_expense_id AND e.environment=r.environment
-            AND e.deleted_at IS NULL AND e.category='combustivel'
-          WHERE r.trip_id=$2 AND r.environment=$1
-            AND r.workflow_status IN ('linked','legacy_linked')) x`,
+      `SELECT COALESCE(sum(e.amount),0)::text AS amount
+         FROM commerce.matriz_trip_approved_expenses($2,$1) e WHERE e.category='combustivel'`,
       [environment, input.trip_id],
     );
     const approvedFuel = Number(official.rows[0]!.amount);

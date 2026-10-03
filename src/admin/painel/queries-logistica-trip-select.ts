@@ -4,23 +4,14 @@ export const tripSelect = `
            t.status, t.km_start::text, t.km_end::text,
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
            commerce.matriz_trip_financial_status(t.id,t.environment) AS financial_status,
-           (SELECT COALESCE(sum(x.amount),0)::text FROM (
-             SELECT DISTINCT ef2.id,ef2.amount
-               FROM commerce.matriz_trip_receipts rf2
-               JOIN commerce.matriz_expenses ef2
-                 ON ef2.id=rf2.ai_expense_id AND ef2.environment=rf2.environment
-                AND ef2.deleted_at IS NULL AND ef2.category='combustivel'
-              WHERE rf2.environment=t.environment AND rf2.trip_id=t.id
-                AND rf2.workflow_status IN ('linked','legacy_linked')) x) AS approved_fuel_amount,
+           (SELECT COALESCE(sum(e.amount),0)::text
+             FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) e
+             WHERE e.category='combustivel') AS approved_fuel_amount,
            (COALESCE(t.fuel_spent,0)>0 AND NOT EXISTS (
              SELECT 1 FROM commerce.matriz_expenses ef
               WHERE ef.environment=t.environment AND ef.deleted_at IS NULL
                 AND ef.category='combustivel'
-                AND (ef.id=t.fuel_expense_id OR ef.id IN (
-                  SELECT rf.ai_expense_id FROM commerce.matriz_trip_receipts rf
-                   WHERE rf.environment=t.environment AND rf.trip_id=t.id
-                     AND rf.workflow_status IN ('linked','legacy_linked')
-                     AND rf.ai_expense_id IS NOT NULL)))) AS fuel_spent_without_approved_expense,
+                AND ef.id IN (SELECT e.id FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) e))) AS fuel_spent_without_approved_expense,
            ((SELECT COUNT(*)::int FROM commerce.orders o
                WHERE o.trip_id = t.id AND o.environment = t.environment)
              + (SELECT COUNT(*)::int FROM audit.events ae
@@ -98,31 +89,31 @@ export const tripSelect = `
               FROM commerce.matriz_expenses e
              WHERE e.environment = t.environment AND e.deleted_at IS NULL
                AND (e.id = t.fuel_expense_id
-                    OR e.id IN (SELECT r2.ai_expense_id FROM commerce.matriz_trip_receipts r2
-                                 WHERE r2.environment=t.environment AND r2.trip_id=t.id
-                                   AND r2.workflow_status IN ('linked','legacy_linked')
-                                   AND r2.ai_expense_id IS NOT NULL))) AS despesas_total,
+                    OR e.id IN (SELECT a.id FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) a))) AS despesas_total,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
                        'id', x.id, 'category', x.category, 'description', x.description,
                        'amount', x.amount, 'occurred_at', x.occurred_at,
                        'source', x.source, 'receipt_id', x.receipt_id,
-                       'receipt_summary', x.receipt_summary)
+                       'receipt_summary', x.receipt_summary,
+                       'approval_reason', x.approval_reason, 'approved_by', x.approved_by,
+                       'approved_at', x.approved_at)
                        ORDER BY x.occurred_at, x.id)
               FROM (SELECT DISTINCT ON (e2.id)
                            e2.id, e2.category, e2.description, e2.amount, e2.occurred_at,
-                           CASE WHEN r3.id IS NULL THEN 'fechamento' ELSE 'comprovante' END AS source,
-                           r3.id AS receipt_id, r3.ai_summary AS receipt_summary
+                           CASE WHEN a2.id IS NOT NULL THEN 'sem_comprovante'
+                             WHEN r3.id IS NULL THEN 'fechamento' ELSE 'comprovante' END AS source,
+                           r3.id AS receipt_id, r3.ai_summary AS receipt_summary,
+                           a2.reason AS approval_reason,a2.actor_label AS approved_by,a2.created_at AS approved_at
                       FROM commerce.matriz_expenses e2
+                      LEFT JOIN commerce.matriz_trip_lost_receipts a2
+                        ON a2.environment=t.environment AND a2.trip_id=t.id AND a2.expense_id=e2.id
                       LEFT JOIN commerce.matriz_trip_receipts r3
                         ON r3.environment=t.environment AND r3.trip_id=t.id
                        AND r3.workflow_status IN ('linked','legacy_linked')
                        AND r3.ai_expense_id = e2.id
                      WHERE e2.environment = t.environment AND e2.deleted_at IS NULL
                        AND (e2.id = t.fuel_expense_id
-                            OR e2.id IN (SELECT r4.ai_expense_id FROM commerce.matriz_trip_receipts r4
-                                         WHERE r4.environment=t.environment AND r4.trip_id=t.id
-                                           AND r4.workflow_status IN ('linked','legacy_linked')
-                                           AND r4.ai_expense_id IS NOT NULL))
+                            OR e2.id IN (SELECT a.id FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) a))
                      ORDER BY e2.id, r3.created_at DESC) x), '[]'::jsonb) AS despesas,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
                        'id', r.id, 'ai_status', r.ai_status,

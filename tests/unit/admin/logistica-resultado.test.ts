@@ -42,7 +42,9 @@ describe('getMatrizLogistica — resultado real por rota', () => {
       expect(sql).toContain('AS despesas');
       expect(sql).toContain('commerce.matriz_expenses e2');
       expect(sql).toContain('r3.ai_expense_id = e2.id');
-      expect(sql).toContain("CASE WHEN r3.id IS NULL THEN 'fechamento' ELSE 'comprovante' END");
+      expect(sql).toContain("CASE WHEN a2.id IS NOT NULL THEN 'sem_comprovante'");
+      expect(sql).toContain("WHEN r3.id IS NULL THEN 'fechamento' ELSE 'comprovante' END");
+      expect(sql).toContain('commerce.matriz_trip_approved_expenses(t.id,t.environment)');
       expect(sql).toContain("'expense_amount', e3.amount");
     }
   });
@@ -80,7 +82,7 @@ describe('getMatrizLogistica — resultado real por rota', () => {
     }
     expect(resultModule).toContain('Conciliação pendente');
     expect(resultModule).toContain("financialStatus === 'reconciled'");
-    expect(resultModule).toContain('sem comprovante aprovado');
+    expect(resultModule).toContain('sem despesa aprovada');
     expect(resultModule).toContain('fuel_spent_without_approved_expense');
   });
 

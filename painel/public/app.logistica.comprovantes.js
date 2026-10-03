@@ -126,7 +126,7 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
         this.receiptCompleteAction(receipt.id, 'approve');
         delete this.receiptReviewDrafts[receipt.id];
         this.logisticaMsg = { ok: true, text: result.linked_existing
-          ? 'Comprovante aprovado e ligado à despesa legada, sem duplicar dinheiro.'
+          ? 'Comprovante aprovado e ligado à despesa existente, sem duplicar dinheiro.'
           : 'Comprovante aprovado. A despesa entrou uma vez no Financeiro.' };
         await this.loadLogistica();
       } catch (error) {
@@ -135,9 +135,9 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
           this.receiptReviewMessages[receipt.id] = 'Possível duplicidade: confira e marque a confirmação extra.';
         } else if (error.message === 'receipt_legacy_expense_confirmation_required') {
           draft.legacy_expense_required = true;
-          this.receiptReviewMessages[receipt.id] = 'A rota já tem despesa legada igual. Confirme o vínculo sem criar outra.';
+          this.receiptReviewMessages[receipt.id] = 'A rota já tem esta despesa registrada. Confirme o vínculo sem criar outra.';
         } else if (error.message === 'receipt_legacy_expense_conflict') {
-          this.receiptReviewMessages[receipt.id] = 'A despesa legada diverge destes dados; nada foi alterado.';
+          this.receiptReviewMessages[receipt.id] = 'A despesa existente diverge destes dados; nada foi alterado.';
         } else if (error.message === 'receipt_retroactive_confirmation_required') {
           this.receiptReviewMessages[receipt.id] = 'Este documento é retroativo há mais de 3 meses. Marque a confirmação extra.';
         } else if (error.message === 'receipt_competence_confirmation_required') {

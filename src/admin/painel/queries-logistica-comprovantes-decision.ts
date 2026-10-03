@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { insertMatrizExpenseInTransaction } from './queries-financeiro-integridade.js';
+import { existingTripReceiptExpense } from './receipt-existing-trip-expense.js';
 import { normalizeReceiptApproval, validateReceiptRejection,
   type ReceiptApprovalInput } from './receipt-review.js';
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult,
@@ -142,40 +143,10 @@ export async function approveMatrizTripReceipt(
     if (possible.rows[0] && !input.possible_duplicate_confirmed) {
       throw new Error('receipt_possible_duplicate_confirmation_required');
     }
-    let expenseId: string;
-    let linkedExisting = false;
-    if (trip.rows[0].fuel_expense_id) {
-      const legacy = await client.query<{ id: string; category: string; amount: string;
-        payment_status: string; deleted_at: string | null; document_date: string;
-        competence_month: string; payment_date: string | null; due_date: string | null }>(`
-        SELECT id,category,amount::text,payment_status,deleted_at,
-          (occurred_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS document_date,
-          ops.matriz_expense_competence_month(competence_month,occurred_at)::text AS competence_month,
-          (paid_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS payment_date,
-          due_date::text
-          FROM commerce.matriz_expenses WHERE environment=$1 AND id=$2 FOR UPDATE
-      `, [environment, trip.rows[0].fuel_expense_id]);
-      if (legacy.rows[0] && !legacy.rows[0].deleted_at) {
-        const equal = legacy.rows[0].category === normalized.category
-          && moneyCents(Number(legacy.rows[0].amount)) === normalized.amount_cents
-          && legacy.rows[0].payment_status === normalized.payment_status
-          && legacy.rows[0].document_date === normalized.document_date
-          && legacy.rows[0].competence_month === normalized.competence_month
-          && (normalized.payment_status === 'paid'
-            ? legacy.rows[0].payment_date === normalized.payment_date
-            : legacy.rows[0].due_date === normalized.due_date);
-        if (!input.legacy_expense_confirmed || !equal) {
-          throw new Error(equal ? 'receipt_legacy_expense_confirmation_required'
-            : 'receipt_legacy_expense_conflict');
-        }
-        expenseId = legacy.rows[0].id;
-        linkedExisting = true;
-      } else {
-        expenseId = '';
-      }
-    } else {
-      expenseId = '';
-    }
+    let expenseId = await existingTripReceiptExpense(client, { environment,
+      trip_id: receipt.rows[0].trip_id, legacy_expense_id: trip.rows[0].fuel_expense_id,
+      normalized, confirmed: !!input.legacy_expense_confirmed });
+    const linkedExisting = !!expenseId;
 
     if (!expenseId) {
       const description = input.note?.trim()

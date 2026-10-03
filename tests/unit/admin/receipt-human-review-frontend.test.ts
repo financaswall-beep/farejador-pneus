@@ -25,7 +25,7 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     const html = read('painel/public/index.html');
 
     expect(staticRoute).toContain("'app.logistica.comprovantes.js'");
-    expect(html).toMatch(/app\.logistica\.comprovantes\.js\?v=20260917-historico1/);
+    expect(html).toMatch(/app\.logistica\.comprovantes\.js\?v=20261003-semcomprovante1/);
   });
 
   it('evita as tres armadilhas conhecidas do front da casa', () => {

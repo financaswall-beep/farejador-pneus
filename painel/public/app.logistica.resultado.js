@@ -146,7 +146,7 @@ window.PAINEL_MODULES.logisticaResultado = function () {
         financialStatus,
         approvedFuelAmount: Number(t.approved_fuel_amount || 0),
         fuelDifference: Math.round((Number(t.approved_fuel_amount || 0) - Number(t.fuel_spent || 0)) * 100) / 100,
-        fuelWarning: fuelPending ? 'Gasolina anotada sem comprovante aprovado.' : null,
+        fuelWarning: fuelPending ? 'Gasolina anotada sem despesa aprovada.' : null,
         completo: financialStatus === 'reconciled',
         pedidos: Array.isArray(t.pedidos_resultado) ? t.pedidos_resultado : [],
         despesasDetalhadas: Array.isArray(t.despesas) ? t.despesas : [],

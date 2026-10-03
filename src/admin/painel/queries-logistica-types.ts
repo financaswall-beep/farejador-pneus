@@ -36,7 +36,8 @@ export interface MatrizTripRow {
   despesas: Array<{
     id: string; category: string; description: string | null;
     amount: number; occurred_at: string;
-    source: 'comprovante' | 'fechamento';
+    source: 'comprovante' | 'fechamento' | 'sem_comprovante';
+    approval_reason?: string | null; approved_by?: string | null; approved_at?: string | null;
     receipt_id: string | null; receipt_summary: string | null;
   }>;
   receipts: Array<{
