@@ -69,6 +69,31 @@ describe('Ação de resolver pendência na Logística', () => {
     expect(s.logConPodeSemComprovante()).toBe(false); s.logCon.due_date = '2026-10-10';
     expect(s.logConPodeSemComprovante()).toBe(true);
   });
+  it('abre a aprovação diretamente no detalhe da rota sem lançar dinheiro', () => {
+    const s = app(); s.logConAbrirSemComprovante(trip);
+    expect(s.$refs.logConDialog.showModal).toHaveBeenCalledOnce();
+    expect(s.logCon.trip.id).toBe(trip.id); expect(s.logCon.lost).toBe(true);
+    expect(s.logCon.confirmed).toBe(false); expect(s.apiPost).not.toHaveBeenCalled();
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('@click="logConAbrirSemComprovante(logisticaRotaSelecionada())"');
+  });
+  it('explica a configuração desativada e impede abrir ou aprovar por esse atalho', () => {
+    const s = app(); s.logistica.receipt_approval = false;
+    expect(s.logConSemComprovanteBloqueio()).toContain('desativada no servidor');
+    s.logConAbrirSemComprovante(trip); expect(s.$refs.logConDialog.showModal).not.toHaveBeenCalled();
+    expect(s.logConPodeSemComprovante()).toBe(false);
+    s.logistica.receipt_approval = true; s.logistica.receipt_approval_finance = false;
+    expect(s.logConSemComprovanteBloqueio()).toContain('desativada no servidor');
+    s.logistica.receipt_approval_finance = true; s.adminUser.role = 'admin';
+    expect(s.logConSemComprovanteBloqueio()).toContain('Somente o proprietário');
+  });
+  it('o atalho não substitui uma tentativa pendente nem usa uma rota desatualizada', () => {
+    const s = app(); s.logHistErro = 'offline'; s.logConAbrirSemComprovante(trip);
+    expect(s.$refs.logConDialog.showModal).not.toHaveBeenCalled();
+    s.logHistErro = ''; s.logCon.attempt = { trip_id: 'other', amount: 30 };
+    s.logConAbrirSemComprovante(trip); expect(s.logCon.attempt.trip_id).toBe('other');
+    expect(s.logCon.lost).toBe(false); expect(s.$refs.logConDialog.showModal).not.toHaveBeenCalled();
+  });
   it('não muda a aprovação em dúvida e recupera a mesma chave depois de perder a resposta', async () => {
     const s = app(); s.abrirConciliacaoRota(trip); s.logConAbrirSemComprovante();
     Object.assign(s.logCon, { amount: '40', confirmed: true, reason: 'Nota perdida e valor conferido',

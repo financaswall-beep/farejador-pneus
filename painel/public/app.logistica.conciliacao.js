@@ -70,8 +70,22 @@ window.PAINEL_MODULES.logisticaConciliacao = function () {
       await this.confirmarDivergenciaRota(this.logCon.trip);
       if (this.logisticaMsg?.ok) this.fecharConciliacaoRota();
     },
-    logConAbrirSemComprovante() {
-      if (this.adminUser?.role !== 'owner' || this.logCon.saving || this.logCon.attempt) return;
+    logConSemComprovanteBloqueio() {
+      if (this.adminUser?.role !== 'owner') return 'Somente o proprietário pode aprovar uma despesa sem comprovante.';
+      if (!this.logistica) return 'Atualize os dados da Logística antes de continuar.';
+      if (!this.logistica.receipt_approval || !this.logistica.receipt_approval_finance) {
+        return 'A aprovação de despesas está desativada no servidor.';
+      }
+      return '';
+    },
+    logConAbrirSemComprovante(trip) {
+      if (this.logConSemComprovanteBloqueio() || this.logCon.saving || this.logCon.attempt
+        || this.uploadingReceipt || this.logisticaSaving) return;
+      if (trip) {
+        if (!trip.id || trip.status !== 'closed' || this.logHistCarregando || this.logHistErro) return;
+        this.abrirConciliacaoRota(trip);
+      }
+      if (!this.logCon.trip) return;
       Object.assign(this.logCon, { lost: true, editing: false, reason: '', confirmed: false,
         expense_date: '', payment_status: '', payment_date: '', due_date: '', retroactive_confirmed: false, error: '' });
     },

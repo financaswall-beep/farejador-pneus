@@ -150,7 +150,7 @@
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
 <script src="/admin/painel/app.logistica.historico.js?v=20260917-historico1"></script>
-<script src="/admin/painel/app.logistica.conciliacao.js?v=20261003-semcomprovante1"></script>
+<script src="/admin/painel/app.logistica.conciliacao.js?v=20261003-semcomprovante2"></script>
 <script src="/admin/painel/app.logistica.entregas.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.operacao.js?v=20260917-entregas1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260917-historico1"></script>
@@ -5436,6 +5436,10 @@
               <p x-show="rotaResultado(logisticaRotaSelecionada())?.fuelPending" class="log-hist-attention">Gasolina anotada sem comprovante aprovado. O resultado continua parcial.</p>
               <p x-show="logHistStatus(logisticaRotaSelecionada()) === 'divergent'" class="log-hist-attention">Há divergência entre a gasolina anotada e o valor aprovado. Confira os valores em Ver despesas.</p>
               <button type="button" x-show="logHistStatus(logisticaRotaSelecionada()) !== 'reconciled'" @click="abrirConciliacaoRota(logisticaRotaSelecionada())" :disabled="logHistCarregando || !!logHistErro" class="log-op-button log-op-warning"><i data-lucide="list-checks"></i>Resolver pendência</button>
+              <div x-show="adminUser?.role === 'owner' && rotaResultado(logisticaRotaSelecionada())?.fuelPending && !(logisticaRotaSelecionada()?.despesas || []).some(e => e.category === 'combustivel')">
+                <button type="button" @click="logConAbrirSemComprovante(logisticaRotaSelecionada())" :disabled="!!logConSemComprovanteBloqueio() || logHistCarregando || !!logHistErro || logCon.saving || uploadingReceipt || logisticaSaving || !!logCon.attempt" class="log-op-button"><i data-lucide="file-warning"></i>Comprovante perdido</button>
+                <p x-show="logConSemComprovanteBloqueio()" class="log-op-note" role="status" x-text="logConSemComprovanteBloqueio()"></p>
+              </div>
               <div x-show="rotaResultado(logisticaRotaSelecionada())?.comprovantesPendentes.length" class="log-hist-receipt-alert"><i data-lucide="file-text"></i><div><strong x-text="(rotaResultado(logisticaRotaSelecionada())?.comprovantesPendentes.length || 0) + ' comprovante(s) para conferir'"></strong><p>Valores pendentes não incluídos nas despesas aprovadas.</p></div><button class="log-op-button" @click="logHistRevisar()" :disabled="logHistCarregando || !!logHistErro" x-text="adminUser?.role === 'owner' ? 'Revisar comprovante' : 'Ver comprovantes'"></button></div>
               <div class="log-hist-detail-actions"><button class="log-op-button" @click="logHistVerEntregas()" :disabled="logHistCarregando || !!logHistErro"><i data-lucide="list"></i>Ver entregas da rota</button><button class="log-op-button" @click="logHistVerDespesas()"><i data-lucide="receipt-text"></i>Ver despesas</button></div>
             </aside></template>
@@ -5462,7 +5466,8 @@
             <label class="log-op-button" :class="{ 'opacity-50': uploadingReceipt || logCon.saving }"><i data-lucide="paperclip"></i><span x-text="uploadingReceipt ? 'Enviando…' : 'Anexar comprovante'"></span><input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" :disabled="uploadingReceipt || logCon.saving" @change="logConAnexar($event)"></label>
             <button type="button" x-show="(logCon.trip?.receipts || []).length" @click="logConRevisarComprovantes()" :disabled="logCon.saving || uploadingReceipt" class="log-op-button">Ver e revisar comprovantes</button>
             <button type="button" @click="logConVerDespesas()" :disabled="logCon.saving || uploadingReceipt" class="log-op-button">Ver composição e despesas</button>
-            <button type="button" x-show="adminUser?.role === 'owner' && logistica?.receipt_approval && logistica?.receipt_approval_finance && !(logCon.trip?.despesas || []).some(e => e.category === 'combustivel')" @click="logConAbrirSemComprovante()" :disabled="logCon.saving || uploadingReceipt || !!logCon.attempt" class="log-op-button"><i data-lucide="file-warning"></i>Comprovante perdido</button>
+            <button type="button" x-show="adminUser?.role === 'owner' && !(logCon.trip?.despesas || []).some(e => e.category === 'combustivel')" @click="logConAbrirSemComprovante()" :disabled="!!logConSemComprovanteBloqueio() || logCon.saving || uploadingReceipt || !!logCon.attempt" class="log-op-button"><i data-lucide="file-warning"></i>Comprovante perdido</button>
+            <p x-show="adminUser?.role === 'owner' && logConSemComprovanteBloqueio()" class="log-op-note" role="status" x-text="logConSemComprovanteBloqueio()"></p>
             <form x-show="logCon.lost" @submit.prevent="logConSalvarSemComprovante()">
               <p class="log-op-note">Aprove somente um gasto real de combustível. O Financeiro registrará a despesa como sem comprovante, com seu nome e o motivo da autorização.</p>
               <fieldset :disabled="logCon.saving || !!logCon.attempt" class="space-y-3">

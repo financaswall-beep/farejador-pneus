@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-10-03T04:23:17.963Z",
-  "total": 3021,
+  "total": 3022,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -1178,6 +1178,7 @@
     "logConConfirmarDivergencia": "function",
     "logConPodeCorrigir": "function",
     "logConPodeSemComprovante": "function",
+    "logConSemComprovanteBloqueio": "function",
     "logConRevisarComprovantes": "function",
     "logConSalvar": "function",
     "logConSalvarSemComprovante": "function",
