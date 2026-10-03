@@ -72,12 +72,15 @@ describe('gasto Meta pendente por período, sem efeito financeiro automático', 
     expect(await a.pending('2026-07-01', '2026-07-31')).toEqual([expect.objectContaining({ reason: 'unclassified_spend' })]);
     expect(await a.pending('2026-10-01', '2026-10-02')).toEqual([]);
     const { getMatrizLedgerCompetenceGate } = await import('../../src/admin/painel/matriz-ledger-competence-gate.js');
-    const gate = await getMatrizLedgerCompetenceGate(['2026-07-01', '2026-10-01'], 'test', db.pool);
+    // A competência sem gasto precisa estar inteiramente coberta pela coleta simulada.
+    // Outubro é o mês da coleta (02/10); consultá-lo inteiro passa a exigir o dia 03
+    // quando o relógio real do PostgreSQL avança, mesmo com a coleta do teste congelada.
+    const gate = await getMatrizLedgerCompetenceGate(['2026-07-01', '2026-09-01'], 'test', db.pool);
     expect(gate.competences[0].status).toBe('yellow'); expect(gate.competences[1].status).toBe('green');
     expect(gate.total_abs_difference).toBe('0.00');
     const { getMatrizFinancialRead } = await import('../../src/admin/painel/queries-financeiro-read-switch.js');
     expect((await getMatrizFinancialRead('test', db.pool, '2026-07')).integration_status).toBe('yellow');
-    expect((await getMatrizFinancialRead('test', db.pool, '2026-10')).integration_status).toBe('green');
+    expect((await getMatrizFinancialRead('test', db.pool, '2026-09')).integration_status).toBe('green');
     expect((await db.pool.query(`SELECT count(*)::int n FROM marketing.meta_insights_daily WHERE ad_account_id=$1`, [a.config.adAccountId])).rows[0].n).toBe(0);
     await a.classify('external');
   });
