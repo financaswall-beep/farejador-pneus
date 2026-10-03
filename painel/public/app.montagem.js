@@ -42,6 +42,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.logisticaOperacao,
     window.PAINEL_MODULES.logisticaEntregas,
     window.PAINEL_MODULES.logisticaHistorico,
+    window.PAINEL_MODULES.logisticaConciliacao,
     window.PAINEL_MODULES.logisticaResultado, // memória de cálculo e detalhamento do resultado por rota
     window.PAINEL_MODULES.logisticaComprovantes, // Etapa 7: revisão humana e idempotente
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA

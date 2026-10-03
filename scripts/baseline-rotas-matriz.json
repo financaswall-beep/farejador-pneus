@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-10-02T23:07:31.430Z",
-  "total": 534,
+  "geradoEm": "2026-10-03T03:00:40.060Z",
+  "total": 536,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -211,6 +211,7 @@
     "GET /admin/painel/app.js PUBLICA",
     "GET /admin/painel/app.logistica.acoes.js PUBLICA",
     "GET /admin/painel/app.logistica.comprovantes.js PUBLICA",
+    "GET /admin/painel/app.logistica.conciliacao.js PUBLICA",
     "GET /admin/painel/app.logistica.entregas.js PUBLICA",
     "GET /admin/painel/app.logistica.historico.js PUBLICA",
     "GET /admin/painel/app.logistica.js PUBLICA",
@@ -448,6 +449,7 @@
     "POST /admin/api/logistica/rotas GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/logistica/rotas/:tripId/comprovante GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/logistica/rotas/confirmar-divergencia GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/logistica/rotas/corrigir-combustivel GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/logistica/rotas/fechar GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/logistica/rotas/pendurar GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/marketing/capi/test GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",

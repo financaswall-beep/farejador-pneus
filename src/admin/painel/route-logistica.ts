@@ -1,4 +1,5 @@
 import { registerLogisticsHistoryRoutes } from './route-logistica-historico.js';
+import { registerLogisticsReconciliationRoutes } from './route-logistica-conciliacao.js';
 // Obra 300 (2026-07-05): fatia da PORTARIA da matriz — logística (0121): parser de imagem,
 // schemas e LEITURA/status/falhou/recolocar/remarcar. Schemas eram function-local no
 // pré-obra (linhas 812-846): içados pro nível de módulo com 'export' (de-indent mecânico,
@@ -86,6 +87,7 @@ export async function registerPainelLogistica(fastify: FastifyInstance): Promise
   await registerLogisticsReportRoutes(fastify);
   await registerLogisticsDeliveriesRoutes(fastify);
   await registerLogisticsHistoryRoutes(fastify);
+  await registerLogisticsReconciliationRoutes(fastify);
   // ── MATRIZ — LOGÍSTICA (0121, flag MATRIZ_LOGISTICS) ─────────────────────────
   // Entregas da 'main' nos moldes do parceiro + diário de rota do entregador
   // (km inicial/final, gasolina, comprovantes). "Não entregue" CANCELA no caminho
