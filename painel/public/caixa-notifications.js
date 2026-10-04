@@ -14,7 +14,7 @@
 
   Object.assign(state, {
     notificationTab: 'photo', systemNotifications: [], systemNotificationPoll: 0,
-    systemNotificationError: false, hiddenResolvedPhotos: new Set(),
+    systemNotificationError: false, systemNotificationLoadState: 'idle', hiddenResolvedPhotos: new Set(),
   });
 
   function systemPath() {
@@ -177,19 +177,25 @@
     photoView.classList.toggle('hidden', state.notificationTab !== 'photo');
     systemView.classList.toggle('hidden', state.notificationTab !== 'system');
     renderPhotos(); renderSystem();
+    if (Caixa.partnerHome) Caixa.partnerHome.render();
   }
 
   async function loadSystemNotifications() {
     if (!Caixa.token()) return;
+    const session = Caixa.sessionFingerprint();
     try {
       const response = await Caixa.authenticatedFetch(systemPath());
       const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint()) return;
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.systemNotifications = Array.isArray(payload.notifications) ? payload.notifications : [];
       state.systemNotificationError = false;
+      state.systemNotificationLoadState = 'ready';
     } catch (error) {
+      if (session !== Caixa.sessionFingerprint()) return;
       if (error instanceof Error && error.message === 'invalid_session') return;
       state.systemNotificationError = true;
+      state.systemNotificationLoadState = 'error';
     }
     renderNotifications();
   }
@@ -201,7 +207,8 @@
 
   function stopSystemNotifications() {
     window.clearInterval(state.systemNotificationPoll); state.systemNotificationPoll = 0;
-    state.systemNotifications = []; state.systemNotificationError = false; renderNotifications();
+    state.systemNotifications = []; state.systemNotificationError = false;
+    state.systemNotificationLoadState = 'idle'; renderNotifications();
   }
 
   function openNotifications(tab) {

@@ -57,6 +57,7 @@
   }
 
   function authorizedOperationTab(tab) {
+    if (tab === 'partner-home') return Caixa.isPartner() ? tab : firstAllowedTab();
     if (tab === 'profile' || tab === 'notifications') return tab;
     if (['finance-expense', 'finance-reports'].includes(tab) && Caixa.isPartner()) return firstAllowedTab();
     if (tab === 'finance-expense' && Caixa.stored(Caixa.keys.role) !== 'owner') return firstAllowedTab();
@@ -89,6 +90,7 @@
   }
 
   function applyModuleNavigation() {
+    setNavigationVisibility('nav-partner-home', Caixa.isPartner());
     setNavigationVisibility('nav-conversations', canModule('conversas'));
     setNavigationVisibility('nav-cash', canModule('vendas'));
     setNavigationVisibility('nav-sales', canModule('vendas'));
@@ -126,7 +128,7 @@
     if (canModule('retiradas') && window.location.hash === '#retiradas') return 'pickups';
     if (canModule('estoque') && window.location.hash === '#catalogo') return 'catalog';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';
-    return firstAllowedTab();
+    return Caixa.isPartner() ? 'partner-home' : firstAllowedTab();
   }
 
   Object.assign(Caixa, {

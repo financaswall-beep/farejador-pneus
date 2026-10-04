@@ -131,6 +131,11 @@
     if (Caixa.purchases) Caixa.purchases.syncTab(tab);
     if (Caixa.chat) Caixa.chat.syncTab(tab);
     if (Caixa.waitlist) Caixa.waitlist.syncTab(tab);
+    if (Caixa.partnerHome) Caixa.partnerHome.sync(tab);
+    const partnerNavigation = document.getElementById('nav-partner-home');
+    partnerNavigation.classList.toggle('active', tab === 'partner-home');
+    if (tab === 'partner-home') partnerNavigation.setAttribute('aria-current', 'page');
+    else partnerNavigation.removeAttribute('aria-current');
     const activeNavigation = document.querySelector('.bottom-nav button.active');
     if (activeNavigation) requestAnimationFrame(function () {
       activeNavigation.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });

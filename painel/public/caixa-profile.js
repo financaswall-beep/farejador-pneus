@@ -4,6 +4,12 @@
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
 
+  function profileInitials(value) {
+    const words = String(value || 'Operador').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return 'OP';
+    return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : (words[0][1] || ''))).toUpperCase();
+  }
+
   function preferenceValue(key, defaultValue) {
     const storedValue = localStorage.getItem(key);
     return storedValue === null ? defaultValue : storedValue === 'true';
@@ -62,6 +68,7 @@
   }
 
   Object.assign(Caixa, {
+    profileInitials: profileInitials,
     applyPreferences: applyPreferences,
     closePasswordModal: closePasswordModal,
     closeHelpModal: closeHelpModal,

@@ -115,6 +115,7 @@
   }
 
   function clearSession() {
+    if (Caixa.partnerHome) Caixa.partnerHome.reset();
     if (Caixa.chat) Caixa.chat.reset();
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
@@ -159,12 +160,6 @@
     return String(value || 'Operador').trim().split(/\s+/)[0] || 'Operador';
   }
 
-  function initials(value) {
-    const words = String(value || 'Operador').trim().split(/\s+/).filter(Boolean);
-    if (!words.length) return 'OP';
-    return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : (words[0][1] || ''))).toUpperCase();
-  }
-
   function showSession(payload, legacyUserName) {
     const data = typeof payload === 'object' && payload !== null
       ? payload : { display_name: payload, username: legacyUserName };
@@ -173,13 +168,14 @@
     const unitName = data.store_name || data.unit_name || stored(keys.store) || 'Matriz';
     elements.sessionName.textContent = name;
     elements.operatorLabel.textContent = firstName(name);
-    elements.profileInitials.textContent = initials(name);
+    elements.profileInitials.textContent = Caixa.profileInitials(name);
     elements.profileUsername.textContent = data.username || stored(keys.user) || '—';
     const role = stored(keys.role); const courier = role === 'entregador';
     byId('profile-role-label').textContent = role === 'owner' ? 'Proprietário' : role === 'admin' ? 'Administrador' : courier ? 'Entregador da Matriz' : 'Operador de Caixa';
     byId('profile-sales-summary').classList.toggle('hidden', courier);
     elements.operationUnitLabel.textContent = unitName;
     elements.sessionView.dataset.scope = scope();
+    if (Caixa.isPartner() && Caixa.partnerHome) Caixa.partnerHome.start(data);
     if (Caixa.bindCheckoutSession) Caixa.bindCheckoutSession(sessionFingerprint());
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
@@ -198,6 +194,7 @@
   }
 
   function showLogin(message) {
+    if (Caixa.partnerHome) Caixa.partnerHome.reset();
     elements.sessionView.classList.add('hidden');
     elements.loginView.classList.remove('hidden');
     elements.receiptModal.classList.add('hidden');

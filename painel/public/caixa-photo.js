@@ -10,7 +10,7 @@
   Object.assign(state, {
     photoRequests: [], photoResolved: [], photoLastCount: 0, photoPoll: 0, photoES: null,
     photoSseRetry: 0, photoGeneration: 0, photoPreview: null, photoSending: false,
-    photoEnabled: true, photoSelectedId: '',
+    photoEnabled: true, photoSelectedId: '', photoLoadState: 'idle',
   });
   let alertAudio = null;
   let audioContext = null;
@@ -88,10 +88,13 @@
 
   async function loadPhotoRequests() {
     if (!Caixa.token()) return false;
+    const session = Caixa.sessionFingerprint();
     try {
       const response = await Caixa.authenticatedFetch(queuePath());
       const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint()) return false;
       if (!response.ok) throw new Error(payload.error || 'request_failed');
+      state.photoLoadState = 'ready';
       state.photoEnabled = payload.enabled !== false;
       const items = Array.isArray(payload.photo_requests) ? payload.photo_requests : [];
       state.photoRequests = items.filter(function (item) { return !item.status || item.status === 'pending'; });
@@ -110,7 +113,10 @@
       renderAlert();
       return state.photoEnabled;
     } catch (error) {
+      if (session !== Caixa.sessionFingerprint()) return false;
       if (error instanceof Error && error.message === 'invalid_session') return false;
+      state.photoLoadState = 'error';
+      if (Caixa.partnerHome) Caixa.partnerHome.render();
       console.warn('caixa_photo_load_failed', error);
       return false;
     }
@@ -171,6 +177,7 @@
     state.photoPreview = null;
     state.photoRequests = []; state.photoResolved = []; state.photoLastCount = 0;
     state.photoSelectedId = '';
+    state.photoLoadState = 'idle';
     alertButton.classList.add('hidden');
     modal.classList.add('hidden');
     document.title = originalTitle;
