@@ -9,6 +9,8 @@ import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
 import { startBotOutboxWorker } from '../atendente-v2/outbound-worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
+import { startStockConfirmationWorker } from '../atendente-v2/stock-confirmation-worker.js';
+import { assertStockConfirmationSchema } from '../atendente-v2/stock-confirmation-schema.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 import { registerSecurityHeaders } from './security-headers.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
@@ -40,6 +42,7 @@ let stopAgentV2: (() => void) | null = null;
 let stopBotOutbox: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
+let stopStockConfirmation: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
 let stopMarketingScheduler: (() => void) | null = null;
 let stopGoogleAds: (() => void) | null = null;
@@ -68,6 +71,7 @@ fastify.addContentTypeParser(
 
 async function start(): Promise<void> {
   await assertRequiredSchema(pool);
+  await assertStockConfirmationSchema(pool);
   await registerRoutes(fastify);
 
   stopWorker = startWorker();
@@ -81,6 +85,7 @@ async function start(): Promise<void> {
   startClientesKanbanNotifyHub();
   // Foto sob demanda (0094): expira pendentes + fallback. No-op com a flag off.
   stopPhotoExpirer = startPhotoRequestExpirer();
+  stopStockConfirmation = startStockConfirmationWorker();
   // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.
   stopSatisfactionSurvey = startSatisfactionSurveyWorker();
   stopMarketingScheduler = startMarketingScheduler();
@@ -121,6 +126,7 @@ async function shutdown(signal: string): Promise<void> {
   stopConversationAutoResolve?.();
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
+  stopStockConfirmation?.();
   stopSatisfactionSurvey?.();
   stopMarketingScheduler?.();
   stopGoogleAds?.();

@@ -65,6 +65,8 @@ export async function decideStoreGeoOrFallback(
     items: { product_id: string; quantity: number }[];
     bairro: string | null | undefined;
     modality?: 'delivery' | 'quote';
+    excludedUnitIds?:string[];
+    onlyUnitId?:string;
     /** Endereço completo (rua+número) digitado pelo cliente na ENTREGA — geocodifica fino. */
     fullAddress?: string | null;
   },
@@ -90,6 +92,7 @@ export async function decideStoreGeoOrFallback(
       const geo = await decideStoreForItemsGeo(client, environment, {
         municipio: input.municipio??'',
         items: input.items,
+        excludedUnitIds:input.excludedUnitIds,onlyUnitId:input.onlyUnitId,
         modalidade: 'delivery', // calcular_frete e o roteamento de pedido do bot são entrega
         customerLocation,
         clientNeighborhoodCanonical: input.bairro ? normalizeRegion(input.bairro) : null,
@@ -116,7 +119,7 @@ export async function decideStoreGeoOrFallback(
     // sem coordenada → cai no fallback por cidade (caso F)
   }
   if(saved) return {routing:null,blockReason:'needs_location'};
-  const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items });
+  const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items,excludedUnitIds:input.excludedUnitIds,onlyUnitId:input.onlyUnitId });
   await recordPartnerRoutingDecision(client, environment, conversationId, {
     unitId: routing?.unitId ?? null,kind: routing ? 'partner' : 'matrix',
     municipio: input.municipio,modality: input.modality ?? 'delivery',

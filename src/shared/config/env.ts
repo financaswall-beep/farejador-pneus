@@ -117,6 +117,8 @@ const envSchema = z.object({
   // dormente: bot não cria pedido, expirador não roda, endpoints do painel respondem
   // vazio/404. Ver docs/PLANO_FOTO_SOB_DEMANDA_2026-06-10.md.
   PHOTO_REQUESTS: booleanStringSchema,
+  // 0261: parceiro confirma o estoque físico; Matriz mantém o fluxo atual.
+  PARTNER_STOCK_CONFIRMATION: booleanStringSchema,
   // PESQUISA DE SATISFAÇÃO (estrelas) — quando o parceiro marca entregue/retirado, o
   // sistema pergunta a nota (1-5) ao cliente no WhatsApp (commerce.satisfaction_surveys,
   // 0105) e guarda por loja (ranking interno/discreto). Default OFF = dormente: não

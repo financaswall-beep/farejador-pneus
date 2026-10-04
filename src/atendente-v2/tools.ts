@@ -66,6 +66,8 @@ import { removeOpenOrderItems } from './order-item-removal.js';
 import { editOpenOrder } from './order-edit.js';
 import { STOCK_INTEREST_TOOL, registerStockInterest } from './stock-interest.js';
 import { audioNeedsConfirmation } from './audio-transcription.js';
+import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRouteOptions,cancelStockConfirmation,CANCEL_STOCK_CONFIRMATION_TOOL } from './stock-confirmation.js';
+import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -80,7 +82,7 @@ export function activeToolDefinitions(): ToolDefinition[] {
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
-  return [...defs,STOCK_INTEREST_TOOL];
+  return [...defs,STOCK_INTEREST_TOOL,...(env.PARTNER_STOCK_CONFIRMATION?[CANCEL_STOCK_CONFIRMATION_TOOL]:[])];
 }
 
 // Variante do calcular_frete com bairro OPCIONAL (frete pelo pino). Derivada do schema
@@ -137,6 +139,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         type: 'object',
         properties: {
           medida_pneu: { type: 'string', description: 'Medida do pneu. Ex: "90/90-18"' },
+          quantidade: { type: 'integer', minimum: 1, maximum: 20, description: 'Quantidade dessa medida pedida pelo cliente; omita se não informou.' },
           marca: { type: 'string', description: 'Marca. Ex: "Pirelli", "Levorin"' },
           condicao_pneu: {
             type: 'string',
@@ -399,6 +402,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 // ─── Tool executors ────────────────────────────────────────────────────────
 export async function executeTool(
+  client:PoolClient,environment:Environment,conversationId:string,name:string,args:Record<string,unknown>,
+  handoffContext?:HumanHandoffContext,execution?:BotOrderExecution,
+):Promise<string> {
+  const result=await executeToolInternal(client,environment,conversationId,name,args,handoffContext,execution);
+  try { return await gatePartnerSearch(client,environment,conversationId,name,args,result); }
+  catch(error){logger.error({err:error,environment,conversationId},'stock confirmation: consulta não confirmada');
+    return JSON.stringify({erro:'falha_confirmacao_estoque',disponibilidade_confirmada:false,
+      mensagem:'Não foi possível confirmar com a loja. Não prometa disponibilidade, preço nem reserva.'});}
+}
+async function executeToolInternal(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
@@ -413,6 +426,7 @@ export async function executeTool(
         erro:'audio_precisa_confirmacao',orientacao:'Os dados do áudio ainda precisam de confirmação para mudar o pedido. Apresente o resumo e peça confirmação por texto. Se não for possível, ofereça atendente.' });
     args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
+      case 'cancelar_consulta_estoque': return cancelStockConfirmation(client,environment,conversationId);
       case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));
       case 'buscar_compatibilidade': {
         const compatInput = compatibilityInput(environment, args);
@@ -680,7 +694,7 @@ export async function executeTool(
         // Hoisted: serve aos DOIS caminhos (bairro digitado e pino).
         let produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
         if (produtos.length === 0) {
-          const ids = await getRecentProductIds(client, conversationId);
+          const ids = await getRecentProductIds(client, conversationId,env.PARTNER_STOCK_CONFIRMATION?environment:undefined);
           produtos = ids.map((id) => ({ product_id: id, quantidade: 1 }));
         }
         // Frete pelo PINO (flag DELIVERY_FREIGHT_FROM_PIN): o cliente já mandou a localização
@@ -722,6 +736,7 @@ export async function executeTool(
             items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
             bairro: args.bairro as string | undefined,
             modality: 'quote',
+            ...await stockConfirmationRouteOptions(client,environment,conversationId,produtos.map(p=>({product_id:p.product_id,quantity:p.quantidade??1}))),
             fullAddress: args.endereco_entrega as string | undefined,
           });
           if(decision.blockReason)return JSON.stringify(deliveryBlockResponse(decision.blockReason));
@@ -822,7 +837,7 @@ export async function executeTool(
         // bot já buscou na conversa → a loja indicada passa a ser a MESMA do pedido (régua +
         // estoque + anel de retirada), em vez de cair no getUnitMapsUrl sem régua.
         if (productIds.length === 0) {
-          productIds = await getRecentProductIds(client, conversationId);
+          productIds = await getRecentProductIds(client, conversationId,env.PARTNER_STOCK_CONFIRMATION?environment:undefined);
         }
         // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
         // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
@@ -842,6 +857,7 @@ export async function executeTool(
           const geo = await decideStoreForItemsGeo(client, environment, {
             municipio:municipio??'',
             items: productIds.map((id) => ({ product_id: id, quantity: 1 })),
+            ...await stockConfirmationRouteOptions(client,environment,conversationId,productIds.map(product_id=>({product_id,quantity:1}))),
             modalidade: 'pickup',
             customerLocation,
             clientNeighborhoodCanonical,
@@ -964,12 +980,14 @@ export async function executeTool(
         // Produto: o que o LLM passou, senão o último pneu buscado na conversa.
         let productId = typeof args.product_id === 'string' ? args.product_id : null;
         if (!productId) {
-          const ids = await getRecentProductIds(client, conversationId);
+          const ids = await getRecentProductIds(client, conversationId,env.PARTNER_STOCK_CONFIRMATION?environment:undefined);
           productId = ids[0] ?? null;
         }
         if (!productId) {
           return JSON.stringify({ status: 'precisa_produto' });
         }
+        const deferredPhoto=await deferPhotoUntilStockConfirmed(client,environment,conversationId,productId);
+        if(deferredPhoto)return deferredPhoto;
 
         // Localização: mesma cadeia do localizacao_loja (bairro → cidade; pino preenche).
         const bairro = args.bairro as string | undefined;
@@ -995,6 +1013,7 @@ export async function executeTool(
         const geo = await decideStoreForItemsGeo(client, environment, {
           municipio,
           items: [{ product_id: productId, quantity: 1 }],
+          ...await stockConfirmationRouteOptions(client,environment,conversationId,[{product_id:productId,quantity:1}]),
           modalidade: 'pickup',
           customerLocation,
           clientNeighborhoodCanonical,
@@ -1318,6 +1337,8 @@ async function criarPedido(
   // mas com PICKUP_TO_PARTNER on + proximidade (ROUTING_GEO + coordenada) vai pro
   // parceiro mais perto RESERVANDO o pneu (decisão Wallace 2026-06-07).
   let partner: PartnerOrderRouting | null = null;
+  const confirmationRoute=await stockConfirmationRouteOptions(client,environment,conversationId,
+    itens.map(i=>({product_id:i.product_id,quantity:i.quantidade})));
   let pickupRoutingDecisionRecorded = false;
 
   if (modalidade === 'delivery') {
@@ -1335,6 +1356,7 @@ async function criarPedido(
       bairro: args.bairro as string | undefined,
       // Endereço digitado (rua+número) → geocodificação fina da casa; bairro é paraquedas.
       fullAddress: deliveryAddress,
+      ...confirmationRoute,
     });
     if (decision.blockReason) return JSON.stringify(deliveryBlockResponse(decision.blockReason));
     // Caso E (só tem longe): NÃO cria o pedido caladamente — devolve estruturado pro bot
@@ -1379,6 +1401,7 @@ async function criarPedido(
           municipio,
           items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
           modalidade: 'pickup',
+          ...confirmationRoute,
           customerLocation,
           clientNeighborhoodCanonical: args.bairro ? normalizeRegion(args.bairro as string) : null,
         });
@@ -1446,6 +1469,9 @@ async function criarPedido(
       return botOrderReplay(client, environment, resolved.existingId);
     }
     const idempotencyKey = resolved.key;
+
+    const waiting=await requirePartnerStockConfirmation(client,environment,conversationId,partner,args,requestId);
+    if(waiting)return waiting;
 
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,

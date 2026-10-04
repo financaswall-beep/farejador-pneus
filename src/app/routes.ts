@@ -15,6 +15,7 @@ import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operat
 import { registerPartnerOperationDeliveryRoutes } from '../parceiro/route-operation-deliveries.js';
 import { registerPartnerOperationTeamRoutes } from '../parceiro/route-operation-team.js';
 import { registerPartnerOperationNotificationRoutes } from '../parceiro/route-operation-notifications.js';
+import { registerPartnerStockConfirmationRoutes } from '../parceiro/route-stock-confirmation.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
 import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
@@ -43,6 +44,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerPartnerOperationDeliveryRoutes(fastify);
   registerPartnerOperationTeamRoutes(fastify);
   registerPartnerOperationNotificationRoutes(fastify);
+  registerPartnerStockConfirmationRoutes(fastify);
   // Porta única de login (/login) — 0095. Aditiva: o login por slug continua.
   await registerLoginGlobalRoute(fastify);
   // Operação da Loja (/operacao) — Matriz e parceiros; URLs antigas redirecionam.

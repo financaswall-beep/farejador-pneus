@@ -3,6 +3,7 @@ import type { OutboundRow } from './outbound-worker.js';
 import { humanHandoffActor, syncHumanIntervention } from './conversation-control.js';
 import { recordOutboundEvent } from './outbound-events.js';
 import { validateResolutionOutbound } from './auto-resolve.js';
+import { validateStockConfirmationOutbound } from './stock-confirmation-outbound.js';
 
 /** Última trava antes do HTTP, dentro da transação do caller, com lock até o ACK.
  * Mesmo após retomar, respostas antigas e fotos pedidas antes da retomada não saem. */
@@ -38,7 +39,8 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
     const handoffNotice = state.mode==='human' && row.kind==='agent_text'
       && state.updated_by===humanHandoffActor(row.id);
     const baseAllowed = (state.mode==='auto' || handoffNotice) && result.rows[0]?.allowed===true;
-    const allowed = baseAllowed && (row.kind !== 'conversation_resolution'
+    const stockAllowed=row.kind!=='stock_text'||await validateStockConfirmationOutbound(client,row);
+    const allowed = baseAllowed && stockAllowed && (row.kind !== 'conversation_resolution'
       || await validateResolutionOutbound(
         client,row.environment,row.conversation_id,row.id,row.body,
       ));

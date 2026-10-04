@@ -21,6 +21,7 @@ import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operat
 import { registerPartnerOperationDeliveryRoutes } from '../parceiro/route-operation-deliveries.js';
 import { registerPartnerOperationTeamRoutes } from '../parceiro/route-operation-team.js';
 import { registerPartnerOperationNotificationRoutes } from '../parceiro/route-operation-notifications.js';
+import { registerPartnerStockConfirmationRoutes } from '../parceiro/route-stock-confirmation.js';
 import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
@@ -56,6 +57,7 @@ async function start(): Promise<void> {
   registerPartnerOperationDeliveryRoutes(fastify);
   registerPartnerOperationTeamRoutes(fastify);
   registerPartnerOperationNotificationRoutes(fastify);
+  registerPartnerStockConfirmationRoutes(fastify);
   await registerCaixaRoute(fastify);
   // Hub de tempo real (Fatia 3): no preview tambem, pra testar SSE local
   // apontando pro banco de prod (.env.preview).

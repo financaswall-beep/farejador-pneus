@@ -5,6 +5,11 @@
   const state = Caixa.state;
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
+    if (Caixa.isPartner() && Caixa.partnerHome) {
+      Caixa.checkoutRuntime?.close();
+      Caixa.partnerHome.sync(tab);
+      return;
+    }
     const cash = tab === 'cash';
     if (!cash) Caixa.checkoutRuntime?.close();
     const profile = tab === 'profile';

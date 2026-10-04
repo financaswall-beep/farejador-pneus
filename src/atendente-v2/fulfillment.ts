@@ -751,15 +751,17 @@ export interface PartnerOrderRouting {
 export async function decideStoreForItems(
   client: PoolClient,
   environment: Environment,
-  input: { municipio: string | null; items: ItemForDecision[] },
+  input: { municipio: string | null; items: ItemForDecision[]; excludedUnitIds?:string[];onlyUnitId?:string },
 ): Promise<PartnerOrderRouting | null> {
   if (!input.municipio || input.items.length === 0) return null;
 
   // Fase 2: motor multi-parceiro (flag). DESLIGADA = caminho de hoje (abaixo), intocado.
-  if (env.ROUTING_MULTI_CANDIDATE) {
+  if (env.ROUTING_MULTI_CANDIDATE || input.excludedUnitIds?.length || input.onlyUnitId) {
     return decideStoreForItemsMulti(client, environment, {
       municipio: input.municipio,
       items: input.items,
+      excludedUnitIds: input.excludedUnitIds,
+      onlyUnitId:input.onlyUnitId,
     });
   }
 
@@ -804,7 +806,7 @@ export async function decideStoreForItems(
 async function decideStoreForItemsMulti(
   client: PoolClient,
   environment: Environment,
-  input: { municipio: string; items: ItemForDecision[] },
+  input: { municipio: string; items: ItemForDecision[]; excludedUnitIds?:string[];onlyUnitId?:string },
 ): Promise<PartnerOrderRouting | null> {
   const candidates = await resolveUnitCandidates(client, environment, input.municipio);
   if (candidates.length === 0) return null; // ninguém cobre → matriz
@@ -813,7 +815,8 @@ async function decideStoreForItemsMulti(
   // delivery — pickup ainda cai na matriz antes daqui). Loja só-retirada não atende
   // entrega → filtra. O fio do `intent` genérico + a flag ROUTING_MODE_FILTER vêm
   // no próximo tijolo; este filtro é o default seguro pra não escolher pickup-only.
-  const eligible = candidates.filter((c) => c.serviceMode !== 'pickup');
+  const eligible = candidates.filter((c) => c.serviceMode !== 'pickup' && !input.excludedUnitIds?.includes(c.ctx.unitId)
+    && (!input.onlyUnitId || c.ctx.unitId===input.onlyUnitId));
   if (eligible.length === 0) return null;
 
   const byUnit = new Map(eligible.map((c) => [c.ctx.unitId, c]));
@@ -853,6 +856,8 @@ async function decideStoreForItemsMulti(
 // GEO: anéis por distância antes da régua. Ver docs/PLANO_CAMADA_GEO_PROXIMIDADE_REDE_2026-06-06.md §5.6.
 
 export interface GeoDecisionInput {
+  excludedUnitIds?:string[];
+  onlyUnitId?:string;
   /** Restrição da Matriz já validada; ausente preserva integralmente a regra anterior. */
   matrizPolicy?: { canFulfill:boolean; location:GeoPoint; deliveryRadiusKm?:number };
   municipio: string;
@@ -1006,6 +1011,8 @@ export async function decideStoreForItemsGeo(
   const candidates = useProximity
     ? await resolveUnitCandidatesByProximity(client, environment)
     : await resolveUnitCandidates(client, environment, input.municipio);
+  for(let i=candidates.length-1;i>=0;i--)if(input.excludedUnitIds?.includes(candidates[i]!.ctx.unitId)
+    || (input.onlyUnitId && candidates[i]!.ctx.unitId!==input.onlyUnitId))candidates.splice(i,1);
   if (candidates.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
   // ② modo + ④a (puro, de graça) — reduz as checagens de estoque. Proximidade: na

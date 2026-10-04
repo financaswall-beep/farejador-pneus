@@ -91,7 +91,16 @@
   <script defer src="/operacao/stock-waitlist.js?v=20260927-1"></script>
   <script defer src="/operacao/caixa-waitlist.js?v=20260927-1"></script>
   <link rel="stylesheet" href="/operacao/caixa-partner-home.css?v=20261004-partner-home1" />
-  <script defer src="/operacao/caixa-partner-home.js?v=20261004-partner-home1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-partner-screens.css?v=20261004-partner-actions1" />
+  <script defer src="/operacao/caixa-partner-ui.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-data.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-orders.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-waiting.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-photo.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-pickups.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-deliveries.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-extras.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-home.js?v=20261004-partner-actions1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -198,6 +207,10 @@
         <section id="partner-home-panel" class="app-panel partner-home-panel hidden" aria-label="Pedidos do parceiro" data-status="loading">
           <header class="ph-header">
             <div class="ph-header-bar">
+              <i class="ph-header-screw ph-header-screw--tl" aria-hidden="true"></i>
+              <i class="ph-header-screw ph-header-screw--tr" aria-hidden="true"></i>
+              <i class="ph-header-screw ph-header-screw--bl" aria-hidden="true"></i>
+              <i class="ph-header-screw ph-header-screw--br" aria-hidden="true"></i>
               <div class="ph-identity">
                 <div class="ph-store-line">
                   <h2 id="partner-home-store" class="ph-store">Minha loja</h2>
@@ -216,7 +229,7 @@
               </div>
             </div>
           </header>
-          <div class="ph-content">
+          <div id="partner-home-screen" class="ph-content">
             <div class="ph-status" aria-hidden="true">
               <img class="ph-status-art" src="/operacao/assets/partner-status-v2.webp" width="220" height="220" alt="" loading="lazy" decoding="async" />
               <div class="ph-status-face">

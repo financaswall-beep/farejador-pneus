@@ -50,6 +50,10 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.js', 'caixa-partner-home.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.css', 'caixa-partner-home.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-partner-screens.css', 'caixa-partner-screens.css', 'text/css; charset=utf-8');
+  for (const file of ['ui', 'data', 'orders', 'waiting', 'photo', 'pickups', 'deliveries', 'extras']) {
+    text(`/operacao/caixa-partner-${file}.js`, `caixa-partner-${file}.js`, 'text/javascript; charset=utf-8');
+  }
   text('/operacao/assets/partner-steel-v2.webp', 'assets/partner-steel-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-status-v2.webp', 'assets/partner-status-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/caixa-brand-catalog.js', 'caixa-brand-catalog.js', 'text/javascript; charset=utf-8');

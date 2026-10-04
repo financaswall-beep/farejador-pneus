@@ -140,6 +140,7 @@
         try {
           const data = JSON.parse(event.data || '{}');
           if (data.kind === 'photo_request') void loadPhotoRequests();
+          if (data.kind === 'stock_confirmation' && Caixa.isPartner()) void Caixa.partnerData?.load();
         } catch (_) { /* ignora evento inválido */ }
       });
       stream.onerror = function () {
@@ -261,6 +262,7 @@
   }
 
   function openModal(itemId) {
+    if (Caixa.isPartner() && Caixa.partnerPhoto) return Caixa.partnerPhoto.open(itemId || state.photoRequests[0]?.id || '');
     state.photoSelectedId = itemId || '';
     modal.classList.remove('hidden'); renderModal();
   }
@@ -269,7 +271,7 @@
 
   Object.assign(Caixa, {
     startPhotoNotifications, stopPhotoNotifications, setPhotoSoundEnabled,
-    loadPhotoRequests, openPhotoRequest: openModal,
+    loadPhotoRequests, openPhotoRequest: openModal, compressPhoto, photoUploadPath: uploadPath, playPartnerAlert: photoBeep,
   });
   alertButton.addEventListener('click', function () {
     if (Caixa.openNotifications) Caixa.openNotifications('photo');

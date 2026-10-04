@@ -248,7 +248,7 @@ export async function pollBotOutbox(): Promise<void> {
     await lockBotConversation(client,row.environment,row.conversation_id);
     if (!await prepareControlledOutbound(client,row,env.ORGANIC_ATTRIBUTION_ENABLED)) { await client.query('COMMIT'); return; }
     readyToSend = true;
-    if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment',
+    if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment', 'stock_text',
       'conversation_resolution','operator_text','operator_attachment'].includes(row.kind)) {
       throw new Error(`unsupported outbound kind: ${row.kind}`);
     }

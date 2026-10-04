@@ -2,6 +2,7 @@
 const { createServer } = require('node:http');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
+const { fixturePayload } = require('./prova-parceiro-dados.cjs');
 const root = path.resolve(__dirname, '../painel/public');
 const port = Number(process.env.PARTNER_PREVIEW_PORT || 8765);
 const extensions = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg' };
@@ -12,9 +13,16 @@ const server = createServer(async (req, res) => {
   const fixture = url.pathname.startsWith('/_preview/');
   try {
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/parceiro/')) {
-      let body = {};
+      let input = {};
+      if (req.method !== 'GET') {
+        const buffers = []; for await (const chunk of req) buffers.push(chunk);
+        if (String(req.headers['content-type']).includes('application/json')) {
+          try { input = JSON.parse(Buffer.concat(buffers).toString()); } catch { /* fixture */ }
+        }
+      }
+      let body = fixturePayload(req, url, input) || {};
       if (url.pathname.endsWith('/me')) body = { display_name: 'João Meier', username: 'joao', role: 'owner', store_name: url.pathname.startsWith('/parceiro/') ? 'Borracharia Meier' : 'Matriz 2W', modules: { vendas: true, estoque: true, retiradas: true, entregas: true, financeiro: true } };
-      else if (url.pathname.endsWith('/pedidos-foto') || url.pathname.endsWith('/photo-requests')) body = { enabled: true, photo_requests: [] };
+      else if (url.pathname.endsWith('/photo-requests')) body = { enabled: true, photo_requests: [] };
       else if (url.pathname.endsWith('/notificacoes')) body = { notifications: [] };
       else if (url.pathname.endsWith('/vendas') || url.pathname.endsWith('/minhas-vendas')) body = { summary: {}, sales: [], daily_series: [] };
       else if (url.pathname.endsWith('/photo-stream-ticket')) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'feature_off' })); return; }
@@ -29,7 +37,8 @@ const server = createServer(async (req, res) => {
     let content = await readFile(target);
     if (fixture) {
       const partner = url.pathname === '/_preview/parceiro';
-      const values = { '2w_caixa_token': 'preview-only', '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
+      const scenario = ['avisos','foto','retirada','entrega','esperando'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
+      const values = { '2w_caixa_token': 'preview-only-' + scenario, '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
         '2w_caixa_escopo': partner ? 'partner' : 'matrix', '2w_caixa_unidade_slug': partner ? 'meier' : '',
         '2w_caixa_unidade_nome': partner ? 'Borracharia Meier' : 'Matriz 2W', '2w_caixa_papel': 'owner',
         '2w_caixa_modulos': JSON.stringify({ vendas: true, estoque: true, retiradas: true, entregas: true, financeiro: true }) };

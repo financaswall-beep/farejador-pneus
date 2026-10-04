@@ -9,6 +9,7 @@ import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { activeToolDefinitions, executeTool } from './tools.js';
+import { sealStockRequestAndGuardText,publishStockRequest } from './stock-confirmation.js';
 import { sendFinalAgentText } from './final-send.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
@@ -288,6 +289,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
     }
 
+    finalBody=await sealStockRequestAndGuardText(client,environment as Environment,conversationId,finalBody);
     // Guarda anti-eco: se o bot está prestes a mandar o MESMO texto que mandou no
     // turno anterior desta conversa, descarta silenciosamente — o cliente mandou duas
     // mensagens seguidas e os dois turnos convergiram para a mesma resposta.
@@ -297,6 +299,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       conversationId,
     );
     if (lastAcceptedText === finalBody) {
+      await publishStockRequest(client,environment as Environment,conversationId);
       logger.info(logCtx, 'agent_v2: resposta identica ao turno anterior, descartando (anti-eco)');
       return;
     }
@@ -318,6 +321,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       logger.info(logCtx, 'agent_v2: outbox draft superseded by newer customer message');
       return;
     }
+    await publishStockRequest(client,environment as Environment,conversationId);
 
     const cacheHitRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
     logger.info(

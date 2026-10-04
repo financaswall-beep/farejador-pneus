@@ -212,6 +212,10 @@
   }
 
   function openNotifications(tab) {
+    if (Caixa.isPartner() && Caixa.partnerHome) {
+      Caixa.partnerHome.open('partner-home');
+      return;
+    }
     state.notificationTab = tab === 'system' ? 'system' : 'photo';
     window.location.hash = '#notificacoes'; Caixa.showTab('notifications'); renderNotifications();
     void loadSystemNotifications();

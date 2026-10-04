@@ -12,7 +12,7 @@ function hash(value: string): string {
 
 export async function enqueueAccessoryText(
   db: Queryable,
-  input: { environment: Environment; chatwootConversationId: number; kind: 'survey_text' | 'photo_text';
+  input: { environment: Environment; chatwootConversationId: number; kind: 'survey_text' | 'photo_text' | 'stock_text';
     body: string; idempotencyKey: string },
 ): Promise<boolean> {
   const result = await db.query(

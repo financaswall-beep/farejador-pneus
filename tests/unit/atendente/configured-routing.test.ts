@@ -41,6 +41,16 @@ function clientFor(partners:{id:string;lng:number;radius?:number;stock?:boolean;
 beforeEach(()=>{mocks.stock.mockReset().mockResolvedValue(10);mocks.shortfall.mockReset().mockResolvedValue([]);
   mocks.location.mockReset().mockResolvedValue({...input.customerLocation,confidence:'ROOFTOP'});});
 describe('cadastro de entrega sobre o motor real de distribuição',()=>{
+  it('confirmação exclui a loja que negou e mantém a próxima dentro da mesma cobertura e distância',async()=>{
+    const result=await decideConfiguredStore(clientFor([{id:'a',lng:.02},{id:'b',lng:.05}]),'test',
+      {...input,excludedUnitIds:['a']},{...settings,delivery_enabled:false});
+    expect(result).toMatchObject({kind:'partner',routing:{unitId:'b'}});
+  });
+  it('preferência por loja confirmada não permite escapar do raio de entrega dela',async()=>{
+    const result=await decideConfiguredStore(clientFor([{id:'a',lng:.02},{id:'b',lng:.05,radius:1}]),'test',
+      {...input,onlyUnitId:'b'},{...settings,delivery_enabled:false});
+    expect(result).toMatchObject({kind:'matriz',canFulfill:false});
+  });
   it.each([{partners:[]},{partners:[{id:'longe',lng:.6,radius:100}]}])('Matriz pode atender a 50 km, inclusive quando existe somente parceiro distante: %j',async({partners})=>{
     expect(await decideConfiguredStore(clientFor(partners),'test',input,{...settings,radius_km:55,longitude:.45}))
       .toMatchObject({kind:'matriz',canFulfill:true});

@@ -108,7 +108,14 @@ export function extractRecentProductIds(turnsNewestFirst: ChatMessage[][]): stri
  * `agent.turns.actions`). Usado por localizacao_loja/calcular_frete quando o LLM não
  * passou o produto. Sem efeito colateral (só SELECT). Vazio = nada gravado ainda.
  */
-export async function getRecentProductIds(client: PoolClient, conversationId: string): Promise<string[]> {
+export async function getRecentProductIds(client: PoolClient, conversationId: string,confirmationEnvironment?:'prod'|'test'): Promise<string[]> {
+  if(confirmationEnvironment) {
+    const current=await client.query<{items:Array<{product_id:string}>}>(`SELECT routing->'items' AS items
+      FROM commerce.partner_stock_requests WHERE conversation_id=$1 AND environment=$2
+        AND ((status='pending' AND expires_at>now()) OR (status='confirmed' AND valid_until>now()))
+      ORDER BY created_at DESC LIMIT 1`,[conversationId,confirmationEnvironment]);
+    if(current.rows[0]?.items?.length)return current.rows[0].items.map(item=>item.product_id).slice(0,4);
+  }
   const r = await client.query<{ actions: ChatMessage[] | null }>(
     `SELECT actions
        FROM agent.turns

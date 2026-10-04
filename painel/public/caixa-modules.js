@@ -47,6 +47,7 @@
   });
 
   function firstAllowedTab() {
+    if (Caixa.isPartner()) return 'partner-home';
     if (canModule('vendas')) return 'cash';
     if (canModule('estoque')) return 'stock';
     if (canModule('entregas')) return 'deliveries';
@@ -57,6 +58,15 @@
   }
 
   function authorizedOperationTab(tab) {
+    if (Caixa.isPartner()) {
+      const mapped = ({ sales: 'partner-sales', stock: 'partner-stock', catalog: 'partner-stock',
+        pickups: 'partner-pickups', deliveries: 'partner-deliveries', profile: 'partner-profile',
+        notifications: 'partner-home' })[tab] || tab;
+      const permission = ({ 'partner-sales': 'vendas', 'partner-stock': 'estoque',
+        'partner-photos': 'vendas', 'partner-photo': 'vendas', 'partner-waiting': 'vendas', 'partner-pickups': 'retiradas',
+        'partner-pickup': 'retiradas', 'partner-deliveries': 'entregas', 'partner-delivery': 'entregas' })[mapped];
+      return ['partner-home', 'partner-profile'].includes(mapped) || (permission && canModule(permission)) ? mapped : 'partner-home';
+    }
     if (tab === 'partner-home') return Caixa.isPartner() ? tab : firstAllowedTab();
     if (tab === 'profile' || tab === 'notifications') return tab;
     if (['finance-expense', 'finance-reports'].includes(tab) && Caixa.isPartner()) return firstAllowedTab();
@@ -107,6 +117,12 @@
   }
 
   function initialOperationTab() {
+    if (Caixa.isPartner()) {
+      const tab = ({ '#vendas': 'sales', '#catalogo': 'stock', '#meus-pneus': 'stock',
+        '#retiradas': 'pickups', '#entregas': 'deliveries', '#minha-loja': 'profile',
+        '#fotos': 'partner-photos' })[window.location.hash] || 'partner-home';
+      return authorizedOperationTab(tab);
+    }
     if (window.location.hash === '#lista-de-espera') return authorizedOperationTab('waitlist');
     if (window.location.hash === '#conversas') return authorizedOperationTab('conversations');
     if (location.hash === '#financeiro/despesa') return authorizedOperationTab('finance-expense');
