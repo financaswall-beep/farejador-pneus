@@ -2,10 +2,16 @@
   'use strict';
   const C = window.Caixa;
   const U = C.partnerUI;
+  let photoInterval = 0;
+  function stop() { window.clearInterval(photoInterval); photoInterval = 0; }
   function home() {
+    stop();
     const D = C.partnerData;
     if (!D.state.ready || (C.canModule('vendas') && !['ready', 'error'].includes(C.state.photoLoadState))) return U.message('Conferindo pedidos…', 'Aguarde um instante.');
     const photos = C.canModule('vendas') ? C.state.photoRequests || [] : [];
+    const deadlines = photos.map(photo => Date.parse(photo.expires_at || '')).filter(Number.isFinite);
+    const photoDeadline = deadlines.length ? Math.min(...deadlines) : null;
+    let tickPhoto = null;
     const pickups = D.pendingPickups();
     const deliveries = D.pendingDeliveries();
     const errors = D.state.errors.length || (C.canModule('vendas') && C.state.photoLoadState === 'error');
@@ -32,7 +38,23 @@
       row.setAttribute('aria-label', label); row.addEventListener('click', handler);
       row.append(U.icon(kind), U.node('b', count, 'ps-card-count'));
       const text = U.node('span', null, 'ps-card-copy');
-      text.append(U.node('strong', title), U.node('span', subtitle));
+      text.appendChild(U.node('strong', title));
+      const meta = U.node('span', null, 'ps-card-meta'); meta.appendChild(U.node('span', subtitle));
+      if (kind === 'camera' && photoDeadline !== null) {
+        const timer = U.node('span', null, 'ps-photo-countdown'); timer.setAttribute('role', 'timer');
+        timer.title = count > 1 ? 'Menor prazo entre os pedidos de foto' : 'Tempo restante para enviar a foto';
+        const clock = U.icon('clock'); clock.setAttribute('aria-hidden', 'true');
+        const digits = U.node('b'); timer.append(clock, digits); meta.appendChild(timer);
+        tickPhoto = () => {
+          const seconds = Math.max(0, Math.ceil((photoDeadline - Date.now()) / 1000));
+          const value = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+          digits.textContent = value;
+          timer.setAttribute('aria-label', seconds ? 'Tempo restante para enviar a foto: ' + value : 'Prazo da foto encerrado');
+          if (!seconds) stop();
+          return seconds > 0;
+        };
+      }
+      text.appendChild(meta);
       const arrow = U.icon('back'); arrow.classList.add('ps-card-chevron');
       row.append(text, arrow); page.appendChild(row);
     }
@@ -57,6 +79,7 @@
       page.append(U.node('p', 'Alguns avisos não puderam ser atualizados.', 'ps-copy'), U.button('TENTAR DE NOVO', () => C.partnerHome.refresh(), 'secondary'));
     }
     U.mount(page, 'home');
+    if (tickPhoto && tickPhoto()) photoInterval = window.setInterval(tickPhoto, 1000);
   }
-  C.partnerOrders = { home };
+  C.partnerOrders = { home, stop };
 }());

@@ -12,6 +12,7 @@ export class TestNode {
   handlers: Record<string, Array<(...args: any[]) => unknown>> = {};
   disabled = false;
   hidden = false;
+  title = '';
   value = '';
   files: unknown[] = [];
   style: Record<string, any> = { removeProperty: vi.fn() };
@@ -80,7 +81,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
   const root = node('partner-home-screen');
   return { C, node, root, location, context, storage,
     setSession: (value: string) => { session = value; },
-    button: (label: string) => root.querySelectorAll('button').find(button => button.textContent === label)!,
+    button: (label: string) => root.querySelectorAll('button').find(button => button.attributes['aria-label'] === label || button.textContent === label)!,
     ready: () => { C.partnerData.state.ready = true; C.partnerHome.sync('partner-home'); },
   };
 }

@@ -42,17 +42,17 @@ describe('Operação simples exclusiva do parceiro', () => {
     C.state.photoLoadState = 'ready'; C.partnerHome.render(); expect(root.textContent).toContain('Tudo em dia!');
   });
   it('mostra somente foto e retirada quando não existe entrega, com contador real', () => {
-    const { C, root, ready, node } = partnerScreen();
+    const { C, root, ready, node, button } = partnerScreen();
     C.state.photoRequests = [{ id: 'photo-a', tire_size: '90/90-18', customer_name: 'Segredo' }];
     C.partnerData.state.pickups = [pickup]; ready();
-    expect(root.textContent).toContain('Cliente pediu foto'); expect(root.textContent).toContain('retirada pendente');
-    expect(root.textContent).not.toContain('VER ENTREGAS'); expect(root.textContent).not.toContain('Segredo');
+    expect(root.textContent).toContain('Cliente pediu foto'); expect(root.textContent).toContain('Retirada pendente');
+    expect(button('VER ENTREGAS')).toBeUndefined(); expect(root.textContent).not.toContain('Segredo');
     expect(node('partner-home-badge').textContent).toBe('2');
   });
   it('some com categorias vazias e não oculta falhas de consulta', () => {
-    const { C, root, ready } = partnerScreen();
+    const { C, root, ready, button } = partnerScreen();
     C.partnerData.state.deliveries = [delivery]; ready();
-    expect(root.textContent).toContain('VER ENTREGAS'); expect(root.textContent).not.toContain('ENVIAR FOTO');
+    expect(button('VER ENTREGAS')).toBeDefined(); expect(button('ENVIAR FOTO')).toBeUndefined();
     C.partnerData.state.deliveries = []; C.partnerData.state.errors = ['deliveries']; C.partnerHome.render();
     expect(root.textContent).toContain('Não consegui atualizar'); expect(root.textContent).not.toContain('Tudo em dia!');
   });

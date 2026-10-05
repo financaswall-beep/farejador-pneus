@@ -43,6 +43,7 @@
     C.partnerData.start();
   }
   function sync(next) {
+    C.partnerOrders.stop();
     active = C.isPartner() && Boolean(C.token());
     tab = next;
     C.elements.app.classList.toggle('is-partner-home', active);
@@ -58,6 +59,7 @@
   }
   function reset() {
     active = false; tab = 'partner-home';
+    C.partnerOrders.stop();
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';
