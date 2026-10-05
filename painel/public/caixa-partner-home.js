@@ -5,12 +5,16 @@
   const panel = id('panel');
   let active = false;
   let tab = 'partner-home';
-  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy(); }
+  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy(); }
   function renderConnection() {
     const online = window.navigator?.onLine !== false;
     id('connection').dataset.state = online ? 'online' : 'offline';
     id('connection').setAttribute('aria-label', online ? 'Dispositivo online' : 'Dispositivo offline');
     id('connection').title = online ? 'Dispositivo online' : 'Dispositivo offline';
+  }
+  function clearAvatar() {
+    id('avatar').removeAttribute('src'); id('avatar').classList.add('hidden');
+    id('profile').classList.remove('has-avatar');
   }
   function render() {
     if (!active || !C.isPartner() || !C.token()) return;
@@ -36,7 +40,13 @@
   function start(data) {
     renderConnection();
     id('store').textContent = data.store_name || data.unit_name || C.stored(C.keys.store) || 'Minha loja';
+    id('store').title = id('store').textContent;
     id('profile').setAttribute('aria-label', 'Minha loja — ' + (data.display_name || C.stored(C.keys.name) || 'Operador'));
+    clearAvatar();
+    if (typeof data.avatar_url === 'string' && /^(https?:\/\/|\/(?!\/))/.test(data.avatar_url)) {
+      id('avatar').setAttribute('src', data.avatar_url); id('avatar').classList.remove('hidden');
+      id('profile').classList.add('has-avatar');
+    }
     ['stock', 'sales'].forEach(name => {
       const allowed = C.canModule(name === 'stock' ? 'estoque' : 'vendas');
       id(name).disabled = !allowed;
@@ -50,6 +60,7 @@
     active = C.isPartner() && Boolean(C.token());
     tab = next;
     if (!active || next !== 'partner-sales') C.partnerSales.leave();
+    if (next !== 'partner-stock') C.partnerStockForm.reset();
     C.elements.app.classList.toggle('is-partner-home', active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
@@ -71,6 +82,7 @@
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';
+    id('store').title = ''; clearAvatar();
     id('profile').setAttribute('aria-label', 'Minha loja');
     C.partnerUI.root.replaceChildren();
   }
@@ -89,6 +101,7 @@
   id('stock').addEventListener('click', () => open('partner-stock'));
   id('profile').addEventListener('click', () => open('partner-profile'));
   id('notifications').addEventListener('click', () => open('partner-home'));
+  id('avatar').addEventListener('error', clearAvatar);
   window.addEventListener?.('online', renderConnection);
   window.addEventListener?.('offline', renderConnection);
   document.getElementById('nav-partner-home').addEventListener('click', () => open('partner-home'));

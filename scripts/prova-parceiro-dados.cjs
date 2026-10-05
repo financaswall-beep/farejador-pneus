@@ -16,7 +16,11 @@ function initial(scenario) {
       items: index === 0 ? items : [item(index === 1 ? '100/90-18' : '110/90-17')],
       expires_at: new Date(Date.now() + 282000 + index * 8000).toISOString(),
     })) : [],
-    stock: items.map((row, index) => ({ ...row, stock_id: 'stock-' + index, item_type: 'pneu', is_tracked: true, quantity_on_hand: 3, quantity_reserved: index ? 0 : 2 })),
+    stock: [
+      { ...item('90/90-18'), stock_id: 'stock-0', brand: null, item_type: 'pneu', is_tracked: true, quantity_on_hand: 3, quantity_reserved: 2 },
+      { ...item('80/100-14'), stock_id: 'stock-1', brand: 'Pirelli', tire_condition: 'novo', item_type: 'pneu', is_tracked: true, quantity_on_hand: 5, quantity_reserved: 0 },
+      { ...item('100/90-18'), stock_id: 'stock-2', brand: null, item_type: 'pneu', is_tracked: true, quantity_on_hand: 2, quantity_reserved: 0 },
+    ],
   };
 }
 function fixturePayload(req, url, input) {
@@ -55,6 +59,15 @@ function fixturePayload(req, url, input) {
     return { ok: true };
   }
   if (pathname.endsWith('/operacao/estoque')) return { rows: data.stock };
+  if (pathname.includes('/operacao/estoque/') && pathname.endsWith('/saldo') && req.method === 'POST') {
+    const row = data.stock.find(item => item.stock_id === pathname.split('/').at(-2));
+    if (row) row.quantity_on_hand = Math.max(Number(row.quantity_reserved || 0), input.quantity_on_hand);
+    return { changed: true, stock_id: row?.stock_id, quantity_on_hand: row?.quantity_on_hand };
+  }
+  if (pathname.endsWith('/operacao/estoque/itens') && req.method === 'POST') {
+    const row = { ...input, stock_id: 'stock-' + data.stock.length, item_type: 'pneu', is_tracked: true, quantity_reserved: 0 };
+    data.stock.push(row); return { stock_id: row.stock_id };
+  }
   return null;
 }
 module.exports = { fixturePayload };

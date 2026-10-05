@@ -5,6 +5,19 @@ const pickup = { order_id: 'pickup-a', awaiting_pickup: true, customer_name: 'Ca
 const delivery = { order_id: 'delivery-a', order_status: 'confirmed', delivery_status: 'pending', customer_name: 'Maria', total_amount: 120, items: [{ label: '80/100-14', quantity: 1 }] };
 
 describe('Operação simples exclusiva do parceiro', () => {
+  it('usa somente a foto recebida da sessão e limpa o avatar ao sair ou quando a foto falha', async () => {
+    const { C, node } = partnerScreen(); C.partnerData.start = vi.fn();
+    C.partnerHome.start({ store_name: 'Borracharia Meier', display_name: 'João', avatar_url: '/operacao/foto-operador.webp' });
+    expect(node('partner-home-avatar').attributes.src).toBe('/operacao/foto-operador.webp');
+    expect(node('partner-home-profile').classList.contains('has-avatar')).toBe(true);
+    await node('partner-home-avatar').fire('error');
+    expect(node('partner-home-profile').classList.contains('has-avatar')).toBe(false);
+    C.partnerHome.start({ display_name: 'Outro operador', avatar_url: 'javascript:alert(1)' });
+    expect(node('partner-home-avatar').attributes.src).toBeUndefined();
+    C.partnerHome.start({ avatar_url: '/operacao/foto-operador.webp' }); C.partnerHome.reset();
+    expect(node('partner-home-avatar').attributes.src).toBeUndefined();
+    expect(node('partner-home-profile').classList.contains('has-avatar')).toBe(false);
+  });
   it('abre diretamente a confirmação mais urgente e envia a revisão recebida pelo servidor', async () => {
     const screen = partnerScreen(); screen.ready();
     const item = (id: string, seconds: number) => ({ id, revision: 2, expires_at: new Date(Date.now() + seconds * 1000).toISOString(), items: [{ tire_size: '90/90-18', quantity: 1 }] });
