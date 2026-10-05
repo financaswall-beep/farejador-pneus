@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const C = window.Caixa;
-  const state = { pickups: [], deliveries: [], waiting: [], errors: [], ready: false };
+  const state = { pickups: [], deliveries: [], waiting: [], replenishment: null, errors: [], ready: false };
   let generation = 0;
   let controller = null;
   let poll = 0;
@@ -30,7 +30,10 @@
     state.errors = [];
     resources.forEach(([key], i) => {
       const result = results[i];
-      if (result.status === 'fulfilled') state[key] = Array.isArray(result.value.rows) ? result.value.rows : [];
+      if (result.status === 'fulfilled') {
+        state[key] = Array.isArray(result.value.rows) ? result.value.rows : [];
+        if (key === 'deliveries') state.replenishment = result.value.replenishment || null;
+      }
       else state.errors.push(key);
     });
     state.ready = true; controller = null;
@@ -44,7 +47,7 @@
   function reset() {
     ++generation; controller?.abort(); controller = null;
     window.clearInterval(poll); poll = 0;
-    Object.assign(state, { pickups: [], deliveries: [], waiting: [], errors: [], ready: false });
+    Object.assign(state, { pickups: [], deliveries: [], waiting: [], replenishment: null, errors: [], ready: false });
   }
   function pendingPickups() {
     return state.pickups.filter(row => row.awaiting_pickup && !row.retrieved_at && row.status !== 'cancelled');

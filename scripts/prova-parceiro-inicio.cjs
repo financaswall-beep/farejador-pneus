@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '../painel/public');
 const port = Number(process.env.PARTNER_PREVIEW_PORT || 8765);
 const extensions = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
 const routes = require('node:fs').readFileSync(path.resolve(__dirname, '../src/admin/caixa/route-static.ts'), 'utf8');
-const files = new Map([...routes.matchAll(/text\('([^']+)', '([^']+)'/g)].map(match => [match[1], match[2]]));
+const files = new Map([...routes.matchAll(/text\s*\(\s*'([^']+)'\s*,\s*'([^']+)'/g)].map(match => [match[1], match[2]]));
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:' + port);
   const fixture = url.pathname.startsWith('/_preview/');
