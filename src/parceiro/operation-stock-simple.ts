@@ -3,11 +3,13 @@ import { moneyCents } from '../shared/catalog-pricing.js';
 import type { PartnerContext } from './auth.js';
 import { withPartnerContext } from './db.js';
 import { resolveCatalogProductForStock } from './operation-stock-catalog-link.js';
+import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
 
 export type SimpleTireCondition = 'novo' | 'meia_vida' | 'remold';
 
 export interface SimpleTireInput {
   tire_size: string;
+  vehicle_type?: TireVehicleType;
   tire_width_mm: number;
   tire_aspect_ratio: number;
   tire_rim_diameter: number;
@@ -96,34 +98,37 @@ export async function createSimpleOperationTire(
 
       const productId = await resolveCatalogProductForStock(client, ctx, {
         item_type: 'pneu', tire_size: input.tire_size, brand,
-        tire_condition: input.tire_condition,
+        tire_condition: input.tire_condition, vehicle_type: input.vehicle_type,
       });
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO commerce.partner_stock_levels (
            environment,unit_id,product_id,item_name,item_type,tire_size,
            tire_width_mm,tire_aspect_ratio,tire_rim_diameter,brand,
            quantity_on_hand,minimum_quantity,average_cost,sale_price,
-           tire_condition,is_tracked,stock_status,updated_by
+           tire_condition,is_tracked,stock_status,updated_by,vehicle_type
          ) VALUES (
            $1,$2,$3,$4,'pneu',$4,$5,$6,$7,$8,$9,$10,NULL,$11,$12,true,
-           commerce.partner_stock_status($9,0,$10,true),$13
+           commerce.partner_stock_status($9,0,$10,true),$13,$14
          ) RETURNING id`,
         [ctx.environment, ctx.unitId, productId, input.tire_size,
           input.tire_width_mm, input.tire_aspect_ratio, input.tire_rim_diameter,
           brand, input.quantity_on_hand, input.minimum_quantity ?? null,
-          salePrice, input.tire_condition, actor],
+          salePrice, input.tire_condition, actor, input.vehicle_type ?? null],
       );
       const stockId = inserted.rows[0]!.id;
       await audit(client, ctx, stockId, 'stock_item_created', actor, null, {
         stock_id: stockId, item_name: input.tire_size, brand,
         tire_condition: input.tire_condition,
         quantity_on_hand: input.quantity_on_hand, sale_price: salePrice,
-        product_id: productId,
+        product_id: productId, vehicle_type: input.vehicle_type ?? null,
       });
       return { stock_id: stockId, quantity_on_hand: input.quantity_on_hand, sale_price: salePrice };
     });
   } catch (error) {
     if (error instanceof OperationStockSimpleError) throw error;
+    if ((error as Error).message === 'stock_vehicle_type_conflict') {
+      throw new OperationStockSimpleError('stock_vehicle_type_conflict', 400);
+    }
     if ((error as { code?: string }).code === '23505') {
       throw new OperationStockSimpleError('stock_item_already_exists', 409);
     }

@@ -26,6 +26,7 @@ export interface SafeStockRow {
   item_name: string;
   item_type: OperationItemType;
   tire_size: string | null;
+  vehicle_type?: 'motorcycle' | 'car' | null;
   tire_width_mm: number | null;
   tire_aspect_ratio: number | null;
   tire_rim_diameter: number | null;
@@ -66,7 +67,7 @@ export async function getOperationStock(ctx: PartnerContext): Promise<{
                 CASE WHEN quantity_on_hand IS NULL THEN NULL
                      ELSE GREATEST(quantity_on_hand-quantity_reserved, 0) END AS quantity_available,
                 minimum_quantity, stock_status, tire_condition, shelf_location,
-                tire_position, is_tracked, updated_at
+                tire_position, is_tracked, updated_at, vehicle_type
            FROM commerce.partner_stock_levels
           WHERE environment=$1 AND unit_id=$2 AND deleted_at IS NULL
           ORDER BY (item_type='servico'), item_name, brand NULLS LAST`,

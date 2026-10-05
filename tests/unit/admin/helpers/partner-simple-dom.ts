@@ -15,6 +15,10 @@ export class TestNode {
   title = '';
   value = '';
   files: unknown[] = [];
+  open = false;
+  focus = vi.fn();
+  showModal() { this.open = true; }
+  close() { this.open = false; void this.fire('close'); }
   style: Record<string, any> = { removeProperty: vi.fn() };
   constructor(tagName = 'div') { this.tagName = tagName; }
   get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(''); }
@@ -76,7 +80,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-form', 'partner-stock', 'partner-extras', 'partner-replenishment', 'partner-home']) {
+  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-extras', 'partner-replenishment', 'partner-home']) {
     runInNewContext(readFileSync('painel/public/caixa-' + file + '.js', 'utf8'), context);
   }
   C.showTab = (tab: string) => C.partnerHome.sync(C.authorizedOperationTab(tab));

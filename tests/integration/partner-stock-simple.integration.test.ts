@@ -72,6 +72,7 @@ describe('estoque simples do parceiro no banco novo', () => {
     const input = {
       tire_size: '110/70-17', tire_width_mm: 110, tire_aspect_ratio: 70,
       tire_rim_diameter: 17, brand: 'Pirelli', tire_condition: 'novo' as const,
+      vehicle_type: 'motorcycle' as const,
       quantity_on_hand: 5, minimum_quantity: 2, sale_price: 149.9,
     };
 
@@ -82,13 +83,14 @@ describe('estoque simples do parceiro no banco novo', () => {
       unit_id: string; average_cost: string | null; sale_price: string;
       quantity_on_hand: number; stock_status: string;
     }>(
-      `SELECT unit_id,average_cost::text,sale_price::text,quantity_on_hand,stock_status
+      `SELECT unit_id,average_cost::text,sale_price::text,quantity_on_hand,stock_status,vehicle_type
          FROM commerce.partner_stock_levels WHERE id=$1`,
       [result.stock_id],
     );
     expect(saved.rows[0]).toMatchObject({
       unit_id: fixture.unitId, average_cost: null, sale_price: '149.90',
       quantity_on_hand: 5, stock_status: 'in_stock',
+      vehicle_type: 'motorcycle',
     });
     const { getOperationStock } = await import('../../src/parceiro/operation-stock.js');
     expect((await getOperationStock(fixture.ctx)).rows).toEqual(expect.arrayContaining([
@@ -97,5 +99,27 @@ describe('estoque simples do parceiro no banco novo', () => {
     await expect(operation.createSimpleOperationTire(
       fixture.ctx, 'Proprietário', input,
     )).rejects.toMatchObject({ code: 'stock_item_already_exists', status: 409 });
+  });
+  it('vincula o tipo correto, bloqueia conflito com catálogo e mantém preço central', async () => {
+    const operation = await import('../../src/parceiro/operation-stock-simple.js');
+    const fixture = await createPartnerFixture(db.pool);
+    const product = (await db.pool.query(`INSERT INTO commerce.products
+      (environment,product_code,product_name,product_type,brand,tire_condition)
+      VALUES('test',$1,'Pneu Michelin 120/80-17','tire','Michelin','meia_vida') RETURNING id`, [fixture.unitId])).rows[0].id;
+    await db.pool.query(`INSERT INTO commerce.tire_specs(environment,product_id,tire_size,vehicle_type)
+      VALUES('test',$1,'120/80-17','motorcycle')`, [product]);
+    await db.pool.query(`INSERT INTO commerce.product_prices(environment,product_id,price_amount) VALUES('test',$1,180)`, [product]);
+    const input = { tire_size: '120/80-17', tire_width_mm: 120, tire_aspect_ratio: 80, tire_rim_diameter: 17,
+      brand: 'Michelin', tire_condition: 'meia_vida' as const, quantity_on_hand: 2, sale_price: 555 };
+    await expect(operation.createSimpleOperationTire(fixture.ctx, 'Dono', { ...input, vehicle_type: 'car' }))
+      .rejects.toMatchObject({ code: 'stock_vehicle_type_conflict', status: 400 });
+    const saved = await operation.createSimpleOperationTire(fixture.ctx, 'Dono', { ...input, vehicle_type: 'motorcycle' });
+    const state = (await db.pool.query(`SELECT s.product_id,s.vehicle_type,s.sale_price::text,
+      (SELECT price_amount::text FROM commerce.product_prices WHERE environment=s.environment AND product_id=s.product_id LIMIT 1) central_price
+      FROM commerce.partner_stock_levels s WHERE s.id=$1`, [saved.stock_id])).rows[0];
+    expect(state.product_id).toBeTruthy(); expect(state.vehicle_type).toBe('motorcycle');
+    expect(state.sale_price).toBe('555.00'); expect(state.central_price).toBe('180.00');
+    await expect(db.pool.query(`UPDATE commerce.partner_stock_levels SET vehicle_type='car' WHERE id=$1`, [saved.stock_id]))
+      .rejects.toMatchObject({ code: '23514', message: 'stock_vehicle_type_conflict' });
   });
 });

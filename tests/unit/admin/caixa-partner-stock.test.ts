@@ -71,8 +71,8 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
   });
   it('cadastra pelos campos sem foto, preserva o formulário ao atualizar avisos e recarrega a lista', async () => {
     const { C, root, button } = await stockView();
-    C.populateCatalogBrandSelect = vi.fn((select: TestNode) => { select.value = 'Pirelli'; });
     await button('ADICIONAR PNEU').click();
+    await button('Marca').click(); await button('Pirelli').click();
     const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
     const inputs: any[] = root.querySelectorAll('input');
     inputs.find(input => input.name === 'tire_size').value = '110/90-17';
@@ -83,14 +83,14 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
     C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockResolvedValue(reply({ rows: [row] }));
     await form.fire('submit');
     expect(C.authenticatedFetch.mock.calls[0]).toEqual(['/parceiro/meier/api/operacao/estoque/itens', expect.objectContaining({
-      method: 'POST', body: JSON.stringify({ tire_size: '110/90-17', brand: 'Pirelli', tire_condition: 'meia_vida', quantity_on_hand: 4, sale_price: 180 }),
+      method: 'POST', body: JSON.stringify({ tire_size: '110/90-17', vehicle_type: 'motorcycle', brand: 'Pirelli', tire_condition: 'meia_vida', quantity_on_hand: 4, sale_price: 180 }),
     })]);
     expect(root.dataset.view).toBe('stock'); expect(root.textContent).toContain('90/90-18');
   });
   it('envia a condição escolhida e preserva os dados e limites da quantidade quando o cadastro falha', async () => {
     const { C, root, button } = await stockView();
-    C.populateCatalogBrandSelect = vi.fn((select: TestNode) => { select.value = 'Pirelli'; });
     await button('ADICIONAR PNEU').click();
+    await button('Marca').click(); await button('Pirelli').click();
     const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
     const inputs: any[] = root.querySelectorAll('input');
     const quantity = inputs.find(input => input.name === 'quantity_on_hand');
@@ -101,18 +101,18 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
     quantity.value = '0'; await quantity.fire('input');
     inputs.find(input => input.name === 'tire_size').value = '90/90-18';
     inputs.find(input => input.name === 'sale_price').value = '50';
-    inputs.filter(input => input.type === 'radio').forEach(input => { input.checked = input.value === 'novo'; });
+    inputs.filter(input => input.name === 'tire_condition').forEach(input => { input.checked = input.value === 'novo'; });
     C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
     await form.fire('submit');
-    expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body)).toEqual({ tire_size: '90/90-18', brand: 'Pirelli', tire_condition: 'novo', quantity_on_hand: 0, sale_price: 50 });
+    expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body)).toEqual({ tire_size: '90/90-18', vehicle_type: 'motorcycle', brand: 'Pirelli', tire_condition: 'novo', quantity_on_hand: 0, sale_price: 50 });
     expect(root.querySelectorAll('form')[0]).toBe(form); expect(root.textContent).toContain('Não consegui cadastrar');
     expect(quantity.value).toBe('0'); expect(button('Diminuir quantidade').disabled).toBe(true);
     expect(button('Aumentar quantidade').disabled).toBe(false);
   });
   it('converte reais com vírgula sem alterar o valor e bloqueia preço inválido antes de enviar', async () => {
     const { C, root, button } = await stockView();
-    C.populateCatalogBrandSelect = vi.fn((select: TestNode) => { select.value = 'Pirelli'; });
     await button('ADICIONAR PNEU').click();
+    await button('Marca').click(); await button('Pirelli').click();
     const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
     const inputs: any[] = root.querySelectorAll('input');
     inputs.find(input => input.name === 'tire_size').value = '90/90-18';
@@ -128,5 +128,28 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
     C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
     price.value = '180.50'; await price.fire('blur'); expect(price.value).toBe('180,50');
     await form.fire('submit'); expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body).sale_price).toBe(180.5);
+  });
+  it('busca marcas dentro do app, escolhe em um toque e envia Carro com a medida normalizada', async () => {
+    const { C, root, button } = await stockView();
+    await button('ADICIONAR PNEU').click(); await button('Marca').click();
+    const dialog = root.querySelectorAll('dialog')[0]; expect(dialog.open).toBe(true);
+    const search = root.querySelectorAll('input').find(input => input.attributes['aria-label'] === 'Buscar marca')!;
+    search.value = 'mic'; await search.fire('input');
+    expect(dialog.textContent).toContain('Michelin'); expect(dialog.textContent).not.toContain('Pirelli');
+    await button('Michelin').click(); expect(dialog.open).toBe(false);
+    expect(button('Marca').textContent).toBe('Michelin'); expect(button('Marca').focus).toHaveBeenCalled();
+    await button('Marca').click(); search.value = 'naoexiste'; await search.fire('input');
+    expect(dialog.textContent).toContain('Nenhuma marca'); await button('Fechar marcas').click();
+    expect(button('Marca').textContent).toBe('Michelin');
+    const inputs: any[] = root.querySelectorAll('input');
+    inputs.filter(input => input.name === 'vehicle_type').forEach(input => { input.checked = input.value === 'car'; });
+    const size = inputs.find(input => input.name === 'tire_size'); size.value = '1956515'; await size.fire('blur');
+    expect(size.value).toBe('195/65-15'); expect(root.textContent).toContain('1956515 → 195/65-15');
+    inputs.find(input => input.name === 'sale_price').value = '250';
+    const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
+    C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    await form.fire('submit');
+    expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body)).toMatchObject({ vehicle_type: 'car', tire_size: '195/65-15', brand: 'Michelin' });
+    C.partnerStockForm.reset(); expect(dialog.open).toBe(false);
   });
 });

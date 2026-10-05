@@ -1,0 +1,59 @@
+/* Controles do cadastro simples: aço acetinado, campos rebaixados e ações verdes. */
+.is-partner-home .ps-stock-vehicle .ps-stock-condition-options { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.is-partner-home .ps-stock-vehicle .ps-stock-condition-choice { min-height: 48px; font-size: 22px; gap: 7px; }
+.is-partner-home .ps-stock-vehicle .ps-stock-condition-choice > svg.ps-stock-vehicle-icon { display: block; flex: 0 0 31px; width: 31px; height: 27px; stroke-width: 2.3; }
+.is-partner-home .ps-stock-form input.ps-stock-size-input { min-height: 66px; padding-top: 4px; padding-bottom: 4px; font-size: clamp(48px,15.3vw,72px); line-height: 1; }
+.is-partner-home .ps-stock-form .ps-screen-heading { margin-top: 4px; margin-bottom: 8px; }
+.is-partner-home .ps-stock-form .ps-button--back { margin: 0; }
+.is-partner-home .ps-stock-form > form { gap: 8px; }
+.is-partner-home .ps-stock-form .ps-stock-entry { padding-top: 12px; padding-bottom: 12px; }
+.is-partner-home .ps-stock-form .ps-field { gap: 6px; }
+.is-partner-home .ps-stock-form .ps-stock-condition { padding-bottom: 8px; margin-bottom: 8px; }
+.is-partner-home .ps-stock-form .ps-stock-condition legend { margin-bottom: 6px; }
+.is-partner-home .ps-stock-form .ps-stock-size-field { padding-bottom: 8px; margin-bottom: 8px; }
+.is-partner-home .ps-stock-form .ps-stock-entry--balance { margin-top: 0; }
+.is-partner-home .ps-stock-form .ps-stock-add { margin: 0 1px 7px; }
+.is-partner-home .ps-stock-measure-hint { display: flex; align-items: center; gap: 6px; margin: -3px 0 0; font: 700 16px/1.1 'Partner Condensed',Arial,sans-serif; }
+.is-partner-home .ps-stock-measure-hint[hidden] { display: none; }
+.is-partner-home .ps-stock-measure-hint > svg { flex: 0 0 20px; width: 20px; height: 20px; color: #075b36; stroke-width: 4; }
+.is-partner-home .ps-stock-brand-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 48px; padding: 7px 11px;
+  border: 1px solid #909a95; border-radius: 7px; color: #080d0c; text-align: left; cursor: pointer;
+  background-image: linear-gradient(180deg,#5e696118,#ffffff12 32%,#ffffff7a),linear-gradient(110deg,#ffffff44,#ffffff16),var(--ph-metal);
+  background-size: 100% 100%,100% 100%,540px 540px;
+  box-shadow: inset 0 2px 3px #293b3630,inset 1px 0 1px #38473e17,0 1px 0 #fffffff0;
+  font: 800 26px/1.1 'Partner Condensed',Arial,sans-serif;
+}
+.is-partner-home .ps-stock-brand-trigger > svg { flex: 0 0 22px; width: 22px; height: 22px; stroke-width: 3; }
+.is-partner-home .ps-stock-brand-trigger:focus-visible,.is-partner-home .ps-brand-option:focus-visible,.is-partner-home .ps-brand-close:focus-visible { outline: 2px solid #075b36; outline-offset: 2px; }
+.is-partner-home .ps-stock-brand-trigger:disabled { opacity: .65; cursor: wait; }
+.is-partner-home .ps-brand-dialog {
+  position: fixed; inset: auto 0 max(68px,calc(68px + env(safe-area-inset-bottom))); margin: 0 auto;
+  width: min(100%,540px); max-width: 100%; max-height: min(480px,calc(100dvh - 150px)); padding: 0;
+  border: 0; border-radius: 17px 17px 8px 8px; color: #080d0c; background: #cbd0cc;
+  box-shadow: 0 -2px 1px #ffffffbd,0 -6px 22px #121c1759,0 4px 10px #0005;
+  font-family: 'Partner Condensed',Arial,sans-serif; overflow: hidden;
+}
+.is-partner-home .ps-brand-dialog::backdrop { background: #1118148f; }
+.is-partner-home .ps-brand-sheet {
+  position: relative; display: flex; flex-direction: column; max-height: inherit; padding: 20px 22px 16px;
+  border: 1px solid #8f9995; border-radius: inherit;
+  background-image: linear-gradient(110deg,#ffffff70,#ffffff24 45%,#ffffff57 78%,#58615d0a),var(--ph-metal);
+  background-size: 100% 100%,540px 540px; box-shadow: inset 0 1px 0 #fff,inset 0 -1px 1px #61706a66;
+}
+.is-partner-home .ps-brand-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.is-partner-home .ps-brand-heading h3 { margin: 0; font: 900 clamp(30px,9.1vw,42px)/1.05 'Partner Condensed',Arial,sans-serif; letter-spacing: -.025em; }
+.is-partner-home .ps-brand-close { flex: 0 0 44px; min-height: 44px; padding: 0; border: 1px solid #8f9995; border-radius: 8px; color: #080d0c; background-image: linear-gradient(#ffffff60,#ffffff0d),var(--ph-metal); background-size: 100% 100%,540px 540px; box-shadow: inset 0 1px 0 #fff,0 2px 2px #273c314d; font: 800 36px/1 Arial,sans-serif; cursor: pointer; }
+.is-partner-home .ps-brand-sheet .ps-stock-search { flex: 0 0 auto; min-height: 45px; margin: 0 0 12px; }
+.is-partner-home .ps-brand-sheet .ps-stock-search input { width: 100%; min-height: 43px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; font: 600 22px/1 'Partner Condensed',Arial,sans-serif; }
+.is-partner-home .ps-brand-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 2px 2px; }
+.is-partner-home .ps-brand-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 51px; padding: 8px 6px; border: 0; border-top: 1px solid #87918b99; border-radius: 0; color: #080d0c; background: none; box-shadow: inset 0 1px 0 #ffffffe0; text-align: left; font: 800 28px/1.05 'Partner Condensed',Arial,sans-serif; cursor: pointer; }
+.is-partner-home .ps-brand-option > svg { flex: 0 0 28px; width: 28px; height: 28px; padding: 5px; border-radius: 50%; color: #fff; background: #075b36; stroke-width: 3; box-shadow: inset 0 1px 0 #74a48a,0 1px 1px #12351d40; }
+.is-partner-home .ps-brand-option:hover,.is-partner-home .ps-brand-option:active { background: #ffffff38; }
+.is-partner-home .ps-brand-empty { margin: 10px 6px; font-size: 21px; }
+@media (max-width: 360px) {
+  .is-partner-home .ps-stock-vehicle .ps-stock-condition-choice { font-size: 20px; }
+  .is-partner-home .ps-brand-sheet { padding: 18px 16px 14px; }
+  .is-partner-home .ps-brand-heading { gap: 8px; }
+  .is-partner-home .ps-brand-heading h3 { font-size: 29px; }
+}

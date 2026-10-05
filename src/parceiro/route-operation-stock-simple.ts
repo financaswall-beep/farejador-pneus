@@ -13,6 +13,8 @@ import {
   OperationStockSimpleError,
 } from './operation-stock-simple.js';
 import { getPartnerSelfIdentity } from './queries.js';
+import { tireVehicleTypeSchema } from '../shared/tire-vehicle-type.js';
+import { normalizePartnerTireMeasure } from './stock-tire-measure.js';
 
 const slugSchema = z.object({ slug: z.string().trim().min(1).max(120) });
 const stockParamsSchema = slugSchema.extend({ stockId: z.string().uuid() });
@@ -22,7 +24,9 @@ const moneySchema = z.number().positive().max(99_999_999.99)
 const tireSizePattern = /^(\d{2,3})\/(\d{2,3})-(\d{2})$/;
 
 const newTireSchema = z.object({
-  tire_size: z.string().trim().regex(tireSizePattern, 'invalid_tire_size'),
+  tire_size: z.string().max(30).transform(value => normalizePartnerTireMeasure(value) ?? '')
+    .pipe(z.string().regex(tireSizePattern, 'invalid_tire_size')),
+  vehicle_type: tireVehicleTypeSchema.optional(),
   brand: z.string().trim().min(1).max(120),
   tire_condition: z.enum(['novo', 'meia_vida', 'remold']),
   quantity_on_hand: z.number().int().nonnegative().max(999_999),

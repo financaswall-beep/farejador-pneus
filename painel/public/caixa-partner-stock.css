@@ -67,7 +67,7 @@
   box-shadow: inset 0 1px 0 #ffffff,inset 1px 0 0 #ffffff8c,inset 0 -1px 1px #61706a66,0 2px 2px #142b2740,0 5px 6px #243a302e;
 }
 .is-partner-home .ps-stock-form .ps-field,.is-partner-home .ps-stock-quantity-field { display: flex; min-width: 0; flex-direction: column; gap: 8px; margin: 0; font: 800 22px/1.1 'Partner Condensed',Arial,sans-serif; }
-.is-partner-home .ps-stock-entry > .ps-field:first-of-type { padding-bottom: 13px; margin-bottom: 12px; border-bottom: 1px solid #87918b99; box-shadow: 0 1px 0 #ffffffe0; }
+.is-partner-home .ps-stock-entry > .ps-stock-size-field { padding-bottom: 13px; margin-bottom: 12px; border-bottom: 1px solid #87918b99; box-shadow: 0 1px 0 #ffffffe0; }
 .is-partner-home .ps-stock-form input:not([type='radio']),.is-partner-home .ps-stock-form select {
   min-width: 0; width: 100%; min-height: 52px; padding: 8px 11px; border: 1px solid #909a95; border-radius: 7px; color: #080d0c;
   background-image: linear-gradient(180deg,#5e696118,#ffffff12 32%,#ffffff7a),linear-gradient(110deg,#ffffff44,#ffffff16),var(--ph-metal); background-size: 100% 100%,100% 100%,540px 540px;

@@ -5,12 +5,13 @@
   let page = null;
   let saving = false;
   let generation = 0;
+  let brandPicker = null;
   function close() {
     if (saving) return;
-    page = null; C.partnerStock.render();
+    brandPicker?.close(); page = null; C.partnerStock.render();
   }
   function field(form, label, name, type, value) {
-    const wrap = U.node('label', label, 'ps-field');
+    const wrap = U.node('label', label, 'ps-field' + (name === 'tire_size' ? ' ps-stock-size-field' : ''));
     const input = U.node('input'); input.name = name; input.type = type; input.value = value || '';
     input.required = true; input.setAttribute('aria-label', label);
     wrap.appendChild(input); form.appendChild(wrap); return input;
@@ -77,16 +78,16 @@
     if (!C.isPartner() || !C.canModule('estoque') || C.partnerStock.busy()) return;
     page = U.section('Adicionar pneu', close); page.classList.add('ps-stock', 'ps-stock-form');
     page.querySelectorAll('button')[0].classList.add('ps-stock-step');
-    const form = U.node('form');
+    const form = U.node('form'); form.noValidate = true;
     const identity = plate();
+    const vehicle = C.partnerStockFields.vehicle(identity);
     const size = field(identity, 'Medida', 'tire_size', 'text', ''); size.placeholder = '90/90-18';
     size.classList.add('ps-stock-size-input'); size.autocomplete = 'off'; size.spellcheck = false;
     size.pattern = '[0-9]{2,3}/[0-9]{2,3}-[0-9]{2}'; size.maxLength = 10;
+    const normalizeSize = C.partnerStockFields.measure(size, size.parentElement || identity);
     const condition = conditionField(identity);
-    const brandField = U.node('label', 'Marca', 'ps-field'); const brand = U.node('select');
-    brand.name = 'brand'; brand.required = true; brand.setAttribute('aria-label', 'Marca');
-    const chooseBrand = U.node('option', 'Escolha a marca'); chooseBrand.value = ''; brand.appendChild(chooseBrand);
-    C.populateCatalogBrandSelect(brand); brandField.appendChild(brand); identity.appendChild(brandField);
+    brandPicker = C.partnerStockFields.brand(identity, page);
+    const brand = brandPicker.input;
     const balance = plate('ps-stock-entry--balance');
     const quantity = quantityField(balance);
     const price = priceField(balance);
@@ -95,7 +96,10 @@
     form.append(identity, balance, error, submit); page.appendChild(form);
     form.addEventListener('submit', async event => {
       event.preventDefault();
-      if (saving || !C.isPartner() || !C.canModule('estoque') || !form.reportValidity()) return;
+      if (saving || !C.isPartner() || !C.canModule('estoque')) return;
+      const validSize = normalizeSize();
+      if (!form.reportValidity() || !validSize) return;
+      if (!brand.value) { error.textContent = 'Escolha a marca do pneu.'; brandPicker.open(); return; }
       const amount = priceValue(price.value);
       if (amount == null) { error.textContent = 'Informe um preço maior que zero, como 180,00.'; return; }
       const session = C.sessionFingerprint(); const version = generation;
@@ -103,7 +107,7 @@
       const buttons = [...page.querySelectorAll('button,input,select')]; buttons.forEach(control => { control.disabled = true; });
       try {
         await C.partnerData.api('operacao/estoque/itens', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tire_size: size.value.trim(), brand: brand.value, tire_condition: condition(),
+          body: JSON.stringify({ tire_size: size.value.trim(), vehicle_type: vehicle(), brand: brand.value, tire_condition: condition(),
             quantity_on_hand: Number(quantity.input.value), sale_price: amount }),
         });
         if (version !== generation || session !== C.sessionFingerprint()) return;
@@ -112,7 +116,8 @@
       } catch (failure) {
         if (version !== generation || session !== C.sessionFingerprint()) return;
         error.textContent = failure?.message === 'stock_item_already_exists' ? 'Esse pneu já está cadastrado. Ajuste a quantidade na lista.'
-          : failure?.message === 'invalid_tire_size' ? 'Use a medida no formato 90/90-18.' : 'Não consegui cadastrar. Confira os dados e tente novamente.';
+          : failure?.message === 'stock_vehicle_type_conflict' ? 'Confira Carro/Moto: o catálogo tem outro tipo para esse pneu.'
+          : failure?.message === 'invalid_tire_size' ? 'Confira a medida, como 90/90-18.' : 'Não consegui cadastrar. Confira os dados e tente novamente.';
       } finally {
         if (version === generation && session === C.sessionFingerprint()) {
           saving = false; buttons.forEach(control => { control.disabled = false; });
@@ -123,6 +128,6 @@
     render(); U.root.scrollTop = 0;
   }
   function render() { if (page && U.root.dataset.view !== 'stock-form') U.mount(page, 'stock-form'); }
-  function reset() { ++generation; page = null; saving = false; }
+  function reset() { ++generation; brandPicker?.close(); brandPicker = null; page = null; saving = false; }
   C.partnerStockForm = { open, render, reset, isOpen: () => Boolean(page), busy: () => saving };
 }());
