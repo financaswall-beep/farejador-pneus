@@ -74,7 +74,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-extras', 'partner-home']) {
+  for (const file of ['modules', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-extras', 'partner-replenishment', 'partner-home']) {
     runInNewContext(readFileSync('painel/public/caixa-' + file + '.js', 'utf8'), context);
   }
   C.showTab = (tab: string) => C.partnerHome.sync(C.authorizedOperationTab(tab));

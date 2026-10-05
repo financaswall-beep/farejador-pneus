@@ -49,6 +49,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.js', 'caixa-partner-home.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-partner-replenishment.js', 'caixa-partner-replenishment.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.css', 'caixa-partner-home.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-screens.css', 'caixa-partner-screens.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-waiting.css', 'caixa-partner-waiting.css', 'text/css; charset=utf-8');

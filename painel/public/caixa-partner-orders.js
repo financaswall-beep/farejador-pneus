@@ -16,19 +16,21 @@
     const deliveries = D.pendingDeliveries();
     const errors = D.state.errors.length || (C.canModule('vendas') && C.state.photoLoadState === 'error');
     const waiting = Boolean(C.partnerWaiting.current() && C.partnerWaiting.remaining());
+    const opportunity = C.canModule('estoque') ? D.state.replenishment : null;
+    const hasOpportunity = Boolean(opportunity?.measure && opportunity.demand_count > 0 && opportunity.quantity_available > 0);
     const total = photos.length + pickups.length + deliveries.length + C.partnerWaiting.count();
-    const page = U.node('div', null, total || errors ? 'ps-home ps-home--notices' : 'ps-home ps-home--idle');
+    const page = U.node('div', null, total || errors || hasOpportunity ? 'ps-home ps-home--notices' : 'ps-home ps-home--idle');
     if (waiting) {
       page.className = 'ps-home ps-home--notices';
       page.appendChild(U.button('CLIENTE ESPERANDO', () => C.partnerHome.open('partner-waiting'), 'primary', 'clock'));
     }
     const status = U.node('div', null, 'ps-home-status');
-    const image = total && !waiting ? U.node('span', null, 'ps-home-ok') : U.node('img');
+    const image = (total || hasOpportunity) && !waiting ? U.node('span', null, 'ps-home-ok') : U.node('img');
     if (image.tagName === 'IMG') {
       image.src = '/operacao/assets/partner-status-v2.webp'; image.alt = ''; image.width = 182; image.height = 182;
     } else { image.setAttribute('aria-hidden', 'true'); image.appendChild(U.icon('check')); }
     const copy = U.node('div');
-    copy.appendChild(U.node('h3', waiting ? 'Cliente esperando' : errors && !total ? 'Não consegui atualizar' : total ? 'Sem pedidos novos' : 'Tudo em dia!'));
+    copy.appendChild(U.node('h3', waiting ? 'Cliente esperando' : errors && !total ? 'Não consegui atualizar' : total || hasOpportunity ? 'Sem pedidos novos' : 'Tudo em dia!'));
     copy.appendChild(U.node('p', total ? 'Você tem ' + total + (total === 1 ? ' aviso' : ' avisos') : errors ? 'Tente novamente.' : C.state.photoLoadState === 'idle' && C.canModule('vendas') ? 'Conferindo pedidos de foto…' : 'Nada para responder agora.'));
     status.append(image, copy); page.appendChild(status);
     if (photos.length || pickups.length || deliveries.length) page.appendChild(U.node('h4', 'HOJE NA SUA LOJA', 'ps-notices-heading'));
@@ -61,18 +63,17 @@
     notice('camera', photos.length, photos.length === 1 ? 'Cliente pediu foto' : 'Pedidos de foto', photos.length === 1 ? photos[0].tire_size : 'Clientes aguardando', 'ENVIAR FOTO', () => C.partnerHome.open('partner-photos'));
     notice('pickup', pickups.length, pickups.length === 1 ? 'Retirada pendente' : 'Retiradas pendentes', 'Cliente vem buscar', 'VER PEDIDO', () => C.partnerHome.open('partner-pickups'));
     notice('delivery', deliveries.length, deliveries.length === 1 ? 'Entrega pendente' : 'Entregas pendentes', deliveries.some(row => row.delivery_status === 'failed') ? 'Há entrega com problema' : 'Ver pedidos para entregar', 'VER ENTREGAS', () => C.partnerHome.open('partner-deliveries'));
-    // Somente a prévia local fornece este exemplo; não inventa procura no app real.
-    const opportunity = D.state.replenishment;
-    if (opportunity?.preview_only === true && typeof opportunity.measure === 'string') {
+    if (hasOpportunity) {
       const card = U.node('section', null, 'ps-replenishment');
       const tire = U.node('img'); tire.src = '/operacao/catalog-tire.webp'; tire.alt = 'Pneu ilustrativo'; tire.width = 120; tire.height = 205;
       const visual = U.node('div', null, 'ps-replenishment-visual'); visual.appendChild(tire);
       const content = U.node('div', null, 'ps-replenishment-copy');
       content.append(U.node('small', 'OPORTUNIDADE DE REPOSIÇÃO'), U.node('strong', 'Te pediram'),
-        U.node('b', opportunity.measure, 'ps-replenishment-size'), U.node('p', 'Veja pneus disponíveis na 2W.'));
+        U.node('b', opportunity.measure, 'ps-replenishment-size'),
+        U.node('p', opportunity.demand_count + (opportunity.demand_count === 1 ? ' cliente nos últimos 7 dias.' : ' clientes nos últimos 7 dias.')));
       const buy = U.node('button', 'VER NA 2W', 'ps-replenishment-buy'); buy.type = 'button';
-      buy.disabled = true; buy.title = 'Exemplo visual: a compra na 2W ainda será conectada';
-      content.append(buy, U.node('span', 'Exemplo na prévia', 'ps-replenishment-preview'));
+      buy.addEventListener('click', () => C.partnerHome.open('partner-replenishment'));
+      content.appendChild(buy);
       card.append(visual, content); page.appendChild(card);
     }
     if (errors) {

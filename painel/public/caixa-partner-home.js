@@ -29,6 +29,7 @@
     else if (tab === 'partner-pickup') C.partnerPickups.render();
     else if (tab === 'partner-deliveries') C.partnerDeliveries.list();
     else if (tab === 'partner-delivery') C.partnerDeliveries.render();
+    else if (tab === 'partner-replenishment') C.partnerReplenishment.render();
     else C.partnerExtras.render(tab);
   }
   function start(data) {
@@ -44,6 +45,7 @@
   }
   function sync(next) {
     C.partnerOrders.stop();
+    C.partnerReplenishment.reset();
     active = C.isPartner() && Boolean(C.token());
     tab = next;
     C.elements.app.classList.toggle('is-partner-home', active);
@@ -60,13 +62,14 @@
   function reset() {
     active = false; tab = 'partner-home';
     C.partnerOrders.stop();
+    C.partnerReplenishment.reset();
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';
     id('profile').setAttribute('aria-label', 'Minha loja');
     C.partnerUI.root.replaceChildren();
   }
-  const hashes = { 'partner-home': '#pedidos', 'partner-sales': '#vendas', 'partner-stock': '#meus-pneus', 'partner-pickups': '#retiradas', 'partner-deliveries': '#entregas', 'partner-profile': '#minha-loja', 'partner-photos': '#fotos' };
+  const hashes = { 'partner-home': '#pedidos', 'partner-sales': '#vendas', 'partner-stock': '#meus-pneus', 'partner-pickups': '#retiradas', 'partner-deliveries': '#entregas', 'partner-profile': '#minha-loja', 'partner-photos': '#fotos', 'partner-replenishment': '#reposicao' };
   function open(next, afterSave) {
     if (!C.isPartner() || !C.token()) return;
     if (busy() && !afterSave && next !== tab) { C.showToast('Aguarde a conclusão.'); return; }

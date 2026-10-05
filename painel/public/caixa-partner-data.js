@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const C = window.Caixa;
-  const state = { pickups: [], deliveries: [], waiting: [], replenishment: null, errors: [], ready: false };
+  const state = { pickups: [], deliveries: [], waiting: [], replenishment: null, offers: [], errors: [], ready: false };
   let generation = 0;
   let controller = null;
   let poll = 0;
@@ -24,6 +24,7 @@
       ['pickups', 'retiradas', 'retiradas'],
       ['deliveries', 'operacao/entregas', 'entregas'],
       ['waiting', 'operacao/confirmacoes-estoque', 'vendas'],
+      ['replenishment', 'operacao/reposicao', 'estoque'],
     ].filter(([, , permission]) => C.canModule(permission));
     const results = await Promise.allSettled(resources.map(([, resource]) => api(resource, { signal: controller.signal })));
     if (current !== generation || session !== C.sessionFingerprint()) return;
@@ -31,10 +32,15 @@
     resources.forEach(([key], i) => {
       const result = results[i];
       if (result.status === 'fulfilled') {
-        state[key] = Array.isArray(result.value.rows) ? result.value.rows : [];
-        if (key === 'deliveries') state.replenishment = result.value.replenishment || null;
+        if (key === 'replenishment') {
+          state.replenishment = result.value.replenishment || null;
+          state.offers = Array.isArray(result.value.rows) ? result.value.rows : [];
+        } else state[key] = Array.isArray(result.value.rows) ? result.value.rows : [];
       }
-      else state.errors.push(key);
+      else {
+        state.errors.push(key);
+        if (key === 'replenishment') { state.replenishment = null; state.offers = []; }
+      }
     });
     state.ready = true; controller = null;
     C.partnerWaiting.sync(state.waiting);
@@ -47,7 +53,7 @@
   function reset() {
     ++generation; controller?.abort(); controller = null;
     window.clearInterval(poll); poll = 0;
-    Object.assign(state, { pickups: [], deliveries: [], waiting: [], replenishment: null, errors: [], ready: false });
+    Object.assign(state, { pickups: [], deliveries: [], waiting: [], replenishment: null, offers: [], errors: [], ready: false });
   }
   function pendingPickups() {
     return state.pickups.filter(row => row.awaiting_pickup && !row.retrieved_at && row.status !== 'cancelled');

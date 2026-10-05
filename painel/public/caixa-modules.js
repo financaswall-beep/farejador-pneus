@@ -63,6 +63,7 @@
         pickups: 'partner-pickups', deliveries: 'partner-deliveries', profile: 'partner-profile',
         notifications: 'partner-home' })[tab] || tab;
       const permission = ({ 'partner-sales': 'vendas', 'partner-stock': 'estoque',
+        'partner-replenishment': 'estoque',
         'partner-photos': 'vendas', 'partner-photo': 'vendas', 'partner-waiting': 'vendas', 'partner-pickups': 'retiradas',
         'partner-pickup': 'retiradas', 'partner-deliveries': 'entregas', 'partner-delivery': 'entregas' })[mapped];
       return ['partner-home', 'partner-profile'].includes(mapped) || (permission && canModule(permission)) ? mapped : 'partner-home';
@@ -120,7 +121,7 @@
     if (Caixa.isPartner()) {
       const tab = ({ '#vendas': 'sales', '#catalogo': 'stock', '#meus-pneus': 'stock',
         '#retiradas': 'pickups', '#entregas': 'deliveries', '#minha-loja': 'profile',
-        '#fotos': 'partner-photos' })[window.location.hash] || 'partner-home';
+        '#fotos': 'partner-photos', '#reposicao': 'partner-replenishment' })[window.location.hash] || 'partner-home';
       return authorizedOperationTab(tab);
     }
     if (window.location.hash === '#lista-de-espera') return authorizedOperationTab('waitlist');

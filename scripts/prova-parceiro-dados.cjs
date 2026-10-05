@@ -41,8 +41,11 @@ function fixturePayload(req, url, input) {
     data.pickups = data.pickups.filter(row => row.order_id !== pathname.split('/').at(-1));
     return req.method === 'DELETE' ? { cancelled: true } : { retrieved: true };
   }
-  if (pathname.endsWith('/operacao/entregas')) return { rows: data.deliveries, summary: {},
-    replenishment: scenario === 'avisos' ? { preview_only: true, measure: '90/90-18' } : null };
+  if (pathname.endsWith('/operacao/entregas')) return { rows: data.deliveries, summary: {} };
+  if (pathname.endsWith('/operacao/reposicao')) return scenario === 'avisos' || scenario === 'reposicao' ? {
+    replenishment: { measure: '90/90-18', demand_count: 3, quantity_available: 8, period_days: 7 },
+    rows: [{ measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida', vehicle_type: 'motorcycle', quantity_available: 8 }],
+  } : { replenishment: null, rows: [] };
   if (pathname.includes('/api/entregas/') && req.method === 'POST') {
     const row = data.deliveries.find(item => item.order_id === pathname.split('/').at(-1));
     if (row) { row.delivery_status = input.delivery_status; row.delivery_courier = input.delivery_courier; }
