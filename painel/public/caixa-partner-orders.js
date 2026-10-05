@@ -44,13 +44,14 @@
     if (opportunity?.preview_only === true && typeof opportunity.measure === 'string') {
       const card = U.node('section', null, 'ps-replenishment');
       const tire = U.node('img'); tire.src = '/operacao/catalog-tire.webp'; tire.alt = 'Pneu ilustrativo'; tire.width = 120; tire.height = 205;
+      const visual = U.node('div', null, 'ps-replenishment-visual'); visual.appendChild(tire);
       const content = U.node('div', null, 'ps-replenishment-copy');
       content.append(U.node('small', 'OPORTUNIDADE DE REPOSIÇÃO'), U.node('strong', 'Te pediram'),
         U.node('b', opportunity.measure, 'ps-replenishment-size'), U.node('p', 'Veja pneus disponíveis na 2W.'));
       const buy = U.node('button', 'VER NA 2W', 'ps-replenishment-buy'); buy.type = 'button';
       buy.disabled = true; buy.title = 'Exemplo visual: a compra na 2W ainda será conectada';
       content.append(buy, U.node('span', 'Exemplo na prévia', 'ps-replenishment-preview'));
-      card.append(tire, content); page.appendChild(card);
+      card.append(visual, content); page.appendChild(card);
     }
     if (errors) {
       page.append(U.node('p', 'Alguns avisos não puderam ser atualizados.', 'ps-copy'), U.button('TENTAR DE NOVO', () => C.partnerHome.refresh(), 'secondary'));

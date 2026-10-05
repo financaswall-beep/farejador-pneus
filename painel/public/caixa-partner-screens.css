@@ -109,6 +109,10 @@
   display: flex; align-items: center; gap: 12px; width: 100%; min-height: 80px;
   margin: 0 0 10px; padding: 13px 14px; color: #0b1010; text-align: left;
   font-family: inherit; cursor: pointer;
+  background-image: linear-gradient(110deg,#fffffff2 0%,#ffffffe0 18%,#ffffffa6 37%,#ffffff38 65%,#17232c18 100%),
+    linear-gradient(180deg,#ffffff24,#15212b0d),var(--ph-metal);
+  background-size: 100% 100%,100% 100%,390px 390px;
+  box-shadow: 0 4px 6px #18232b40,inset 0 1px 1px #fff,inset 0 -1px 1px #64727e50;
 }
 .is-partner-home .ps-notice-card > svg {
   flex: 0 0 auto; width: 38px; height: 38px; fill: none; stroke: #005c27;
@@ -120,8 +124,27 @@
 .is-partner-home .ps-card-copy > span { font-size: clamp(14px,4vw,17px); font-weight: 400; line-height: 1.2; }
 .is-partner-home .ps-notice-card > .ps-card-chevron { width: 18px; height: 18px; stroke: #0b1010; transform: rotate(180deg); }
 .is-partner-home .ps-notice-card:active { transform: translateY(1px); background-color: #ffffff30; }
-.is-partner-home .ps-replenishment { display: grid; grid-template-columns: minmax(90px,1fr) minmax(0,1.7fr); align-items: center; gap: 8px; margin-top: 20px; padding: 14px 14px 12px 7px; }
-.is-partner-home .ps-replenishment > img { width: 100%; height: 205px; object-fit: contain; mix-blend-mode: multiply; }
+.is-partner-home .ps-replenishment {
+  display: grid; grid-template-columns: minmax(90px,1fr) minmax(0,1.7fr); align-items: center;
+  gap: 8px; margin-top: 20px; padding: 14px 14px 12px 7px;
+  box-shadow: 0 6px 9px #17232b50,inset 0 1px 1px #fff,inset 0 -1px 2px #4b5a6766;
+}
+/* A sombra acompanha a foto e apoia o pneu na placa, sem alterar o arquivo da imagem. */
+.is-partner-home .ps-replenishment-visual { position: relative; min-width: 0; height: 205px; }
+.is-partner-home .ps-replenishment-visual::before,
+.is-partner-home .ps-replenishment-visual::after { content: ''; position: absolute; pointer-events: none; }
+.is-partner-home .ps-replenishment-visual::before {
+  right: -12%; bottom: 4px; width: 93%; height: 60%;
+  background: radial-gradient(ellipse at 44% 72%,#111b2240 0%,#111b2222 35%,#111b2200 68%);
+}
+.is-partner-home .ps-replenishment-visual::after {
+  left: -3%; bottom: -6px; width: 113%; height: 25px;
+  background: radial-gradient(ellipse at center,#0e171bd9 0%,#0e171b80 24%,#0e171b30 45%,#0e171b00 70%);
+}
+.is-partner-home .ps-replenishment-visual > img {
+  position: relative; z-index: 1; display: block; width: 100%; height: 205px;
+  object-fit: contain; mix-blend-mode: multiply;
+}
 .is-partner-home .ps-replenishment-copy small { display: block; margin-bottom: 9px; font-size: clamp(10px,2.9vw,13px); font-weight: 800; line-height: 1.15; }
 .is-partner-home .ps-replenishment-copy > strong { display: block; font-size: clamp(21px,6vw,27px); font-weight: 800; line-height: 1.1; }
 .is-partner-home .ps-replenishment-size { display: block; margin: 2px 0 6px; font-size: clamp(29px,8.7vw,40px); font-weight: 900; line-height: 1; letter-spacing: -.04em; white-space: nowrap; }
