@@ -31,7 +31,7 @@ function screen() {
   const elements: any = new Proxy({}, { get: (_, key) => node(String(key)) });
   const documentRoot = new Node('document');
   const sessionView = node('sessionView');
-  documentRoot.append(sessionView, node('partner-home-screen'), elements.receiptModal);
+  documentRoot.append(sessionView, node('partner-home-screen'), node('partner-home-panel'), elements.receiptModal, node('afterReceipt'));
   elements.receiptModal.append(elements.receiptContent);
   sessionView.append(elements.salesPanel, node('nextPanel'));
   elements.salesPanel.append(elements.weeklySummary, elements.salesList);
@@ -52,7 +52,7 @@ function screen() {
   const context = { window: { Caixa: C }, document: { getElementById: node, createElement: (tag: string) => new Node(tag),
     createTextNode: (text: string) => { const result = new Node('#text'); result.textContent = text; return result; }, querySelectorAll: () => [] },
     Intl, Date, AbortController, URLSearchParams, DOMException };
-  for (const file of ['partner-ui', 'sales-weekly', 'sales-view', 'sales', 'partner-sales']) {
+  for (const file of ['partner-ui', 'sales-weekly', 'sales-view', 'sales', 'partner-receipt', 'partner-sales']) {
     runInNewContext(readFileSync('painel/public/caixa-' + file + '.js', 'utf8'), context);
   }
   return { C, elements, node, root: node('partner-home-screen'), sessionView,
@@ -130,7 +130,7 @@ describe('Vendas metálicas do parceiro reutilizando os motores existentes', () 
     const { C, elements } = screen(); C.partnerSales.render(); C.renderSales(payload);
     C.authenticatedFetch.mockResolvedValue(response({ ...sale, items: [], seller_name: 'João' }));
     const button = elements.salesList.querySelectorAll('button')[0]; await button.click();
-    await vi.waitFor(() => expect(elements.receiptContent.textContent).toContain('MINHA COMISSÃO'));
+    await vi.waitFor(() => expect(elements.receiptContent.textContent).toContain('Minha comissão'));
     expect(C.authenticatedFetch.mock.calls[0][0]).toBe('/parceiro/meier/api/minhas-vendas/sale-a');
     expect(elements.receiptModal.classList.contains('hidden')).toBe(false);
     C.partnerSales.leave(); expect(elements.receiptModal.classList.contains('hidden')).toBe(true);
@@ -148,5 +148,71 @@ describe('Vendas metálicas do parceiro reutilizando os motores existentes', () 
     C.authenticatedFetch.mockResolvedValue(response({ week_offset: 0, summary: {}, daily_series: [], sales: [] }));
     await C.partnerSales.load(); expect(elements.salesEmpty.classList.contains('hidden')).toBe(false);
     expect(elements.salesError.classList.contains('hidden')).toBe(true);
+  });
+
+  it('usa o detalhe em tela cheia só no parceiro e restaura o recibo ao voltar', async () => {
+    const { C, elements, node, scope } = screen();
+    const original = elements.receiptModal.parentNode;
+    C.authenticatedFetch.mockResolvedValue(response({ ...sale, items: [] }));
+    await C.openReceipt(sale.order_id);
+    expect(elements.receiptModal.parentNode).toBe(node('partner-home-panel'));
+    expect(elements.receiptModal.attributes.role).toBe('region');
+    expect(elements.receiptModal.attributes['aria-modal']).toBeUndefined();
+    C.closeReceipt();
+    expect(elements.receiptModal.parentNode).toBe(original);
+    expect(elements.receiptModal.nextSibling).toBe(node('afterReceipt'));
+    expect(elements.receiptModal.attributes.role).toBe('dialog');
+    expect(elements.receiptModal.attributes['aria-modal']).toBe('true');
+    scope(false); await C.openReceipt(sale.order_id);
+    expect(elements.receiptModal.parentNode).toBe(original);
+    expect(elements.receiptModal.classList.contains('pr-detail')).toBe(false);
+    expect(C.authenticatedFetch.mock.calls.at(-1)[0]).toBe('/api/caixa/vendas/sale-a/recibo');
+  });
+
+  it('mantém total, quantidade, marca e imagem sem duplicar o preço unitário normal', () => {
+    const { C, elements } = screen();
+    C.renderReceipt({ ...sale, seller_name: 'João', commission_status: 'receivable', items: [
+      { product_name: 'Pneu Bridgestone 225/45-17', quantity: 2, unit_price: 90,
+        reference_unit_price: 90, line_total: 180, vehicle_type: 'car' },
+    ] });
+    const text = elements.receiptContent.textContent;
+    expect(text).toContain('225/45-17'); expect(text).toContain('Bridgestone');
+    expect(text).toContain('2 pneus'); expect(text).toContain('Você ganhou R$');
+    expect(text).toContain('A receber'); expect(text).not.toContain(' cada');
+    const image = elements.receiptContent.querySelectorAll('img')[0] as Node & { src: string };
+    expect(image.src).toBe('/operacao/catalog-tire-car.png');
+    expect(elements.receiptContent.querySelectorAll('strong').filter(el => el.className === 'pr-recessed').map(el => el.textContent))
+      .toEqual([C.currency.format(180), C.currency.format(180)]);
+  });
+
+  it('preserva a informação de negociação e os estados reais da comissão', () => {
+    const { C, elements } = screen();
+    C.renderReceipt({ ...sale, commission_status: 'paid', items: [
+      { product_name: 'Pneu 90/90-18', quantity: 1, unit_price: 180, reference_unit_price: 200, line_total: 180 },
+    ] });
+    expect(elements.receiptContent.textContent).toContain('Oficial R$');
+    expect(elements.receiptContent.textContent).toContain('negociado R$');
+    expect(elements.receiptContent.textContent).toContain('Paga');
+    C.renderReceipt({ ...sale, status: 'cancelled', commission_status: 'reversed', seller_name: null, items: [] });
+    expect(elements.receiptContent.textContent).toContain('Cancelada');
+    expect(elements.receiptContent.textContent).not.toContain('Concluída');
+    expect(elements.receiptContent.textContent).not.toContain('null');
+  });
+
+  it('descarta o detalhe que chega depois de fechar e permite voltar quando a consulta falha', async () => {
+    const { C, elements, node } = screen();
+    let finish!: (value: unknown) => void;
+    C.authenticatedFetch.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const pending = C.openReceipt(sale.order_id);
+    expect(node('receipt-print').disabled).toBe(true);
+    C.closeReceipt();
+    finish(response({ ...sale, items: [] })); await pending;
+    expect(elements.receiptContent.textContent).toBe('');
+    expect(elements.receiptModal.classList.contains('hidden')).toBe(true);
+    C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    await C.openReceipt(sale.order_id);
+    expect(elements.receiptContent.textContent).toBe('Não foi possível abrir esta venda.');
+    expect(node('receipt-print').disabled).toBe(true);
+    C.closeReceipt(); expect(elements.receiptModal.classList.contains('pr-detail')).toBe(false);
   });
 });

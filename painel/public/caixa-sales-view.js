@@ -189,6 +189,9 @@
   }
 
   function renderReceipt(receipt) {
+    if (Caixa.isPartner() && Caixa.partnerReceipt) {
+      return Caixa.partnerReceipt.render(receipt, { orderLabel, paymentLabel, commissionRule, commissionStatus });
+    }
     const matrix = receipt.sales_scope === 'matrix';
     elements.receiptContent.replaceChildren();
     const meta = document.createElement('div');

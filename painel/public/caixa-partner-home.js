@@ -67,6 +67,7 @@
     C.partnerOrders.stop();
     C.partnerReplenishment.reset();
     C.partnerSales.leave();
+    C.partnerReceipt?.close();
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';

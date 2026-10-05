@@ -27,7 +27,7 @@
   <script defer src="/operacao/caixa-checkout-submit.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-sales-weekly.js?v=20260923-sales-scope1"></script>
-  <script defer src="/operacao/caixa-sales-view.js?v=20261005-partner-sales2"></script>
+  <script defer src="/operacao/caixa-sales-view.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
@@ -44,7 +44,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-navigation.js?v=20261002-audit1"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20261002-audit1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -93,8 +93,10 @@
   <link rel="stylesheet" href="/operacao/caixa-partner-home.css?v=20261004-partner-nav4" />
   <link rel="stylesheet" href="/operacao/caixa-partner-screens.css?v=20261005-partner-photo-timer1" />
   <link rel="stylesheet" href="/operacao/caixa-partner-waiting.css?v=20261004-partner-nav4" />
-  <link rel="stylesheet" href="/operacao/caixa-partner-sales.css?v=20261005-partner-sales3" />
+  <link rel="stylesheet" href="/operacao/caixa-partner-sales.css?v=20261005-partner-sales5" />
+  <link rel="stylesheet" href="/operacao/caixa-partner-receipt.css?v=20261005-partner-receipt1" />
   <script defer src="/operacao/caixa-partner-ui.js?v=20261004-partner-waiting2"></script>
+  <script defer src="/operacao/caixa-partner-receipt.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa-partner-data.js?v=20261005-partner-replenishment1"></script>
   <script defer src="/operacao/caixa-partner-orders.js?v=20261005-partner-replenishment1"></script>
   <script defer src="/operacao/caixa-partner-waiting.js?v=20261004-partner-waiting2"></script>
@@ -104,7 +106,7 @@
   <script defer src="/operacao/caixa-partner-extras.js?v=20261005-partner-sales1"></script>
   <script defer src="/operacao/caixa-partner-sales.js?v=20261005-partner-sales3"></script>
   <script defer src="/operacao/caixa-partner-replenishment.js?v=20261005-partner-replenishment1"></script>
-  <script defer src="/operacao/caixa-partner-home.js?v=20261005-partner-sales1"></script>
+  <script defer src="/operacao/caixa-partner-home.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -1741,6 +1743,10 @@
         <button class="receipt-backdrop" type="button" data-close-receipt aria-label="Fechar recibo"></button>
         <article class="receipt-sheet">
           <header>
+            <button id="partner-receipt-back" class="partner-receipt-back" type="button" data-close-receipt aria-label="Voltar para Vendas">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>
+            </button>
+            <span class="partner-receipt-back-label">Vendas</span>
             <div>
               <p>Minhas vendas</p>
               <h2 id="receipt-title">Detalhes da venda</h2>

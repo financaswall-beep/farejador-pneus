@@ -56,6 +56,7 @@
 
   async function openReceipt(orderId) {
     const session = Caixa.sessionFingerprint();
+    if (Caixa.isPartner()) Caixa.partnerReceipt?.open();
     elements.receiptModal.classList.remove('hidden');
     elements.receiptContent.replaceChildren();
     const loading = document.createElement('p');
@@ -78,6 +79,7 @@
   function closeReceipt() {
     elements.receiptModal.classList.add('hidden');
     elements.receiptContent.replaceChildren();
+    Caixa.partnerReceipt?.close();
   }
   function resetSales() {
     if (state.salesRequest) state.salesRequest.abort();

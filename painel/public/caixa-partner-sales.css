@@ -15,8 +15,7 @@
 .is-partner-home .ps-sales .weekly-week-nav span { color: #101817; font-size: clamp(16px,4.7vw,21px); font-weight: 800; letter-spacing: -.035em; }
 .is-partner-home .ps-sales .weekly-week-nav small { margin-top: 3px; color: #25332c; font-size: 13px; line-height: 1.1; }
 .is-partner-home .ps-sales .weekly-week-nav button,
-.is-partner-home .ps-sales .weekly-clear-day,
-.is-partner-home .receipt-close,.is-partner-home .receipt-done {
+.is-partner-home .ps-sales .weekly-clear-day {
   border: 1px solid #8a9498; border-radius: 8px; color: #111a17;
   background-image: linear-gradient(135deg,#ffffffba,#ffffff38 47%,#43534a20),var(--ph-metal);
   background-size: 100% 100%,390px 390px;
@@ -24,14 +23,14 @@
 }
 .is-partner-home .ps-sales .weekly-week-nav button { width: 38px; height: 44px; }
 .is-partner-home .ps-sales .weekly-week-nav button:disabled { opacity: .35; box-shadow: inset 0 1px #ffffff80; cursor: default; }
-.is-partner-home .ps-sales .weekly-summary-head { justify-items: start; gap: 5px; padding: 18px 0 17px; text-align: left; }
+.is-partner-home .ps-sales .weekly-summary-head { justify-items: start; gap: 5px; padding: 18px 0 6px; text-align: left; }
 .is-partner-home .ps-sales .weekly-summary-head > span { color: #202d28; font-size: 20px; font-weight: 400; text-transform: none; letter-spacing: -.02em; }
 .is-partner-home .ps-sales .weekly-summary-head h3 {
   position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 .is-partner-home .ps-sales .weekly-summary-head > strong {
   max-width: 100%; margin: 0; color: #005d2b; font-family: 'Partner Condensed',Arial,sans-serif;
-  font-size: clamp(40px,12.7vw,63px); font-weight: 900; line-height: 1.1; letter-spacing: -.045em;
+  font-size: clamp(38px,11.8vw,58px); font-weight: 900; line-height: 1.1; letter-spacing: -.045em;
 }
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .is-partner-home .ps-sales .weekly-summary-head > strong {
@@ -85,7 +84,7 @@
   color: #0b1010; font-family: 'Partner Condensed',Arial,sans-serif; font-size: clamp(19px,5.4vw,25px); font-weight: 800;
   overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere;
 }
-.is-partner-home .ps-sales .sales-list-heading { align-items: baseline; gap: 8px; margin: 2px 0 12px; padding-top: 13px; border-top: 1px solid #697b7159; box-shadow: inset 0 1px #ffffffa6; }
+.is-partner-home .ps-sales .sales-list-heading { align-items: baseline; gap: 8px; margin: 2px 0 5px; padding-top: 13px; border-top: 1px solid #697b7159; box-shadow: inset 0 1px #ffffffa6; }
 .is-partner-home .ps-sales .sales-list-heading h3 { font-size: clamp(20px,5.8vw,26px); }
 .is-partner-home .ps-sales .sales-list-heading > span { flex: 0 0 auto; color: #34453b; font-size: 12px; }
 .is-partner-home .ps-sales .sale-card {
@@ -93,6 +92,7 @@
   background-image: linear-gradient(135deg,#ffffff6e,#ffffff18 54%,#26332c12),var(--ph-metal);
   background-size: 100% 100%,390px 390px; box-shadow: inset 0 1px #fff,0 3px 4px #13241b2e;
 }
+.is-partner-home .ps-sales .sales-list > .sale-card:first-child { margin-top: 0; }
 .is-partner-home .ps-sales .ps-sale-screw {
   width: 11px; height: 11px; border: 0; background: var(--ps-screw) center/contain no-repeat; box-shadow: none;
 }
@@ -115,10 +115,10 @@
 .is-partner-home .ps-sales .sale-card-body { gap: 10px; margin-top: 10px; }
 .is-partner-home .ps-sales .sale-card-copy > p { color: #0b1010; font-size: 20px; font-weight: 700; white-space: normal; overflow-wrap: anywhere; }
 .is-partner-home .ps-sales .sale-payment { margin-top: 5px; color: #273b2e; font-size: 15px; }
-.is-partner-home .ps-sales .sale-amount { color: #0b1010; font-family: 'Partner Condensed',Arial,sans-serif; font-size: 27px; font-weight: 800; }
+.is-partner-home .ps-sales .sale-amount { color: #0b1010; font-family: 'Partner Condensed',Arial,sans-serif; font-size: 25px; font-weight: 800; }
 .is-partner-home .ps-sales .sale-commission { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-height: 0; margin: 7px 0 0; padding: 0; border: 0; color: #26392d; background: none; font-size: 14px; font-weight: 400; }
 .is-partner-home .ps-sales .sale-commission > span { text-align: right; }
-.is-partner-home .ps-sales .receipt-button,.is-partner-home .receipt-print {
+.is-partner-home .ps-sales .receipt-button {
   display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; height: auto;
   padding: 10px 12px; border: 2px solid #e2eae4; outline: 1px solid #4c6857; border-radius: 8px; color: #fff;
   background-image: linear-gradient(110deg,#0e8740e0,#006128e8),var(--ph-metal); background-size: 100% 100%,390px 390px;
@@ -146,19 +146,6 @@
 .is-partner-home .ps-sales .weekly-summary.hidden ~ .sales-list-heading { visibility: hidden; }
 .is-partner-home .ps-sales .sales-loading p,.is-partner-home .ps-sales .sales-error p,.is-partner-home .ps-sales .sales-empty span { color: #203629; font-size: 17px; }
 .is-partner-home .ps-sales .sales-error button { min-height: 48px; padding: 0 18px; border: 1px solid #295a3f; border-radius: 8px; color: #fff; background: #006128; font-size: 17px; }
-/* Os detalhes continuam usando a consulta e o recibo existentes. */
-.is-partner-home .receipt-sheet { font-family: 'Partner Display',Arial,sans-serif; color: #0b1010; border: 1px solid #a2aba6; background-image: linear-gradient(135deg,#ffffff47,#ffffff08),var(--ph-metal); background-size: 100% 100%,390px 390px; box-shadow: inset 0 1px #fff,0 -10px 35px #0d231f59; }
-.is-partner-home .receipt-sheet > header,.is-partner-home .receipt-sheet > footer { border-color: #6b7c7359; background: none; }
-.is-partner-home .receipt-sheet > header p { font-size: 13px; }
-.is-partner-home .receipt-meta small,.is-partner-home .receipt-items span small { color: #334c3c; font-size: 13px; }
-.is-partner-home .receipt-meta strong { color: #0b1010; font-size: 15px; white-space: normal; }
-.is-partner-home .receipt-content h3 { font-size: 19px; }
-.is-partner-home .receipt-items span b { color: #0b1010; font-size: 16px; white-space: normal; }
-.is-partner-home .receipt-items > div { border-color: #6b7c7359; }
-.is-partner-home .receipt-total { border-color: #6b7c7380; font-size: 17px; }
-.is-partner-home .receipt-commission { border-top: 1px solid #6b7c7359; border-radius: 0; padding: 15px 0 35px; background: none; }
-.is-partner-home .receipt-commission em { right: 0; bottom: 0; background: #dde9df; }
-.is-partner-home .receipt-done { min-height: 48px; font-size: 16px; }
 .is-partner-home:has(.ps-sales) #partner-home-sales[aria-current='page'] .ph-nav-icon { border: 0; border-radius: 0; color: #005f2c; background: none; box-shadow: none; }
 .is-partner-home:has(.ps-sales) #partner-home-sales[aria-current='page'] svg { width: 24px; height: 24px; }
 @media (max-width: 360px) {
@@ -168,5 +155,5 @@
   .is-partner-home .ps-sales .weekly-stats-grid > div { grid-template-columns: 25px minmax(0,1fr); gap: 6px; padding: 10px 4px; }
   .is-partner-home .ps-sales .weekly-stat-icon,.is-partner-home .ps-sales .weekly-stat-icon svg { width: 25px; }
   .is-partner-home .ps-sales .sale-card-heading > strong { font-size: 17px; }
-  .is-partner-home .ps-sales .sale-amount { font-size: 25px; }
+  .is-partner-home .ps-sales .sale-amount { font-size: 23px; }
 }
