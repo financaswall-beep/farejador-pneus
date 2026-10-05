@@ -89,14 +89,27 @@
 }
 .is-partner-home .ps-home--notices .ps-home-status p { margin-top: 4px; font-size: 19px; font-weight: 400; }
 .is-partner-home .ps-home-ok {
-  display: grid; place-items: center; flex: 0 0 auto; width: 46px; height: 46px;
-  border: 2px solid #c5cdca; border-radius: 50%; color: #fff;
-  background: radial-gradient(circle at 30% 20%,#20b651,#00762d 60%,#004f22);
-  box-shadow: 0 2px 3px #17231b66, inset 0 1px 1px #75d38d, inset 0 -2px 2px #003819;
+  position: relative; display: grid; place-items: center; flex: 0 0 auto; width: 46px; height: 46px;
+  border: 3px solid transparent; border-radius: 50%; color: #edf0e7;
+  background-image: linear-gradient(130deg,#d2e9c41c,#ffffff00 35%,#0b251c61),
+    repeating-linear-gradient(118deg,#d7e5ce18 0px,#d7e5ce18 .7px,#002c1c00 .7px,#002c1c00 4px),
+    linear-gradient(135deg,#3e8540,#125c2f 55%,#0a3b25),
+    linear-gradient(145deg,#eff1ed,#899391 28%,#c7cecc 49%,#555e5d 76%,#e4e8e6);
+  background-origin: padding-box,padding-box,padding-box,border-box;
+  background-clip: padding-box,padding-box,padding-box,border-box;
+  box-shadow: 0 2px 3px #14231bc2,0 0 0 1px #5c6963,inset 0 1px 1px #a8c39b80,inset 0 -2px 3px #041b12b3;
 }
+.is-partner-home .ps-home-ok::before,.is-partner-home .ps-home-ok::after {
+  content: '+'; position: absolute; top: calc(50% - 2px); width: 4px; height: 4px;
+  border: .5px solid #515d56; border-radius: 50%; color: #24392e;
+  background: linear-gradient(135deg,#f3f5ee,#7d8c81); box-shadow: 0 1px 1px #12281c80;
+  font: 700 4px/3px Arial,sans-serif; text-align: center; pointer-events: none;
+}
+.is-partner-home .ps-home-ok::before { left: -2px; }
+.is-partner-home .ps-home-ok::after { right: -2px; }
 .is-partner-home .ps-home-ok svg {
-  width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 4;
-  stroke-linecap: square; stroke-linejoin: round; filter: drop-shadow(0 1px 1px #00321b);
+  width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 3.8;
+  stroke-linecap: square; stroke-linejoin: miter; filter: drop-shadow(0 2px 1px #082719);
 }
 .is-partner-home .ps-notices-heading { margin: 6px 0 12px; font-size: 20px; font-weight: 800; letter-spacing: -.025em; }
 .is-partner-home .ps-notice-card,.is-partner-home .ps-replenishment {
