@@ -7,6 +7,12 @@
   let interval = 0;
   let busy = false;
   let error = '';
+  let queue = [];
+  const answered = new Set();
+  function pending(rows) {
+    return rows.filter(item => !answered.has(item.id) && Date.parse(item.expires_at) > Date.now())
+      .sort((a, b) => Date.parse(a.expires_at) - Date.parse(b.expires_at));
+  }
   function remaining() {
     const end = Date.parse(request?.expires_at || '');
     return Number.isFinite(end) ? Math.max(0, Math.ceil((end - Date.now()) / 1000)) : 0;
@@ -19,7 +25,7 @@
   function tick() {
     const timer = document.getElementById('partner-waiting-time');
     if (timer) timer.textContent = timerText();
-    if (!remaining()) { stop(); C.partnerHome.render(); }
+    if (!remaining()) { stop(); sync(C.partnerData.state.waiting); C.partnerHome.render(); }
   }
   async function answer(available) {
     if (busy || !respond || !request || !remaining()) return;
@@ -29,9 +35,15 @@
       // O produtor da solicitação fornece a resposta real; a tela não cria reservas.
       await respond(current.id, available);
       if (session !== C.sessionFingerprint() || request !== current) return;
-      reset(); C.showToast(available ? 'Resposta enviada.' : 'Indisponibilidade informada.');
+      answered.add(current.id);
+      C.partnerData.state.waiting = C.partnerData.state.waiting.filter(item => item.id !== current.id);
+      queue = pending(queue); clearCurrent();
+      C.showToast(available ? 'Resposta enviada.' : 'Indisponibilidade informada.');
       await C.partnerHome.refresh();
-      if (session === C.sessionFingerprint()) C.partnerHome.open('partner-home', true);
+      if (session === C.sessionFingerprint()) {
+        sync(C.partnerData.state.waiting);
+        C.partnerHome.open(request && remaining() ? 'partner-waiting' : 'partner-home', true);
+      }
     } catch (failure) {
       if (session === C.sessionFingerprint() && request === current) error = U.errorMessage(failure);
     } finally {
@@ -40,7 +52,12 @@
   }
   function render() {
     if (!request) return C.partnerOrders.home();
-    const page = U.section('Cliente esperando', () => C.partnerHome.open('partner-home'));
+    const page = U.section('Cliente esperando'); page.classList.add('ps-waiting');
+    const total = answered.size + Math.max(1, queue.length);
+    if (total > 1) {
+      const progress = U.node('p', 'PEDIDO ' + (answered.size + 1) + ' DE ' + total, 'ps-waiting-progress');
+      page.children[0].replaceChildren(progress, U.node('h3', 'Cliente esperando'));
+    }
     const timer = U.node('div', null, 'ps-timer');
     const clock = U.node('span', null, 'ps-clock'); clock.setAttribute('aria-hidden', 'true'); clock.appendChild(U.icon('clock'));
     const copy = U.node('p');
@@ -53,6 +70,13 @@
       const no = U.button('NÃO TENHO', () => void answer(false), 'danger', 'close');
       yes.disabled = no.disabled = busy || !respond;
       page.append(yes, no);
+      if (queue.length > 1) {
+        const count = queue.length - 1;
+        const next = U.node('div', null, 'ps-waiting-next');
+        next.append(U.node('strong', 'Mais ' + count + (count === 1 ? ' cliente aguardando' : ' clientes aguardando')),
+          U.node('p', 'Ao responder, abre o próximo.'));
+        page.appendChild(next);
+      }
     } else {
       page.append(U.node('p', 'Este pedido não aceita mais resposta.', 'ps-copy'), U.button('VOLTAR AOS PEDIDOS', () => C.partnerHome.open('partner-home'), 'secondary'));
     }
@@ -61,16 +85,18 @@
   }
   function open(item, handler) {
     if (!C.isPartner() || !C.canModule('vendas') || !item?.id || !Array.isArray(item.items) || !Number.isFinite(Date.parse(item.expires_at))) return;
-    reset(); request = item; respond = typeof handler === 'function' ? handler : null;
+    clearCurrent(); request = item; respond = typeof handler === 'function' ? handler : null;
+    if (!queue.some(row => row.id === item.id)) { answered.clear(); queue = [item]; }
     C.partnerHome.open('partner-waiting');
     if (remaining()) interval = window.setInterval(tick, 1000);
   }
-  function reset() { stop(); request = null; respond = null; busy = false; error = ''; }
+  function clearCurrent() { stop(); request = null; respond = null; busy = false; error = ''; }
+  function reset() { clearCurrent(); queue = []; answered.clear(); }
   function sync(rows) {
     if (busy) return;
-    const pending = rows.filter(item => Date.parse(item.expires_at) > Date.now()).sort((a, b) => Date.parse(a.expires_at) - Date.parse(b.expires_at));
-    const first = pending[0];
-    if (!first) { if (request && !request.demo) reset(); return; }
+    queue = pending(rows);
+    const first = queue[0];
+    if (!first) { if (!request?.demo) reset(); return; }
     const handler = (id, available) => C.partnerData.api('operacao/confirmacoes-estoque/' + encodeURIComponent(id), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ available, revision: first.revision }),
     });
@@ -80,5 +106,5 @@
     if (home) open(first, handler);
     else { stop(); request = first; respond = handler; interval = window.setInterval(tick, 1000); }
   }
-  C.partnerWaiting = { open, render, reset, stop, sync, current: () => request, remaining, busy: () => busy };
+  C.partnerWaiting = { open, render, reset, stop, sync, current: () => request, remaining, count: () => pending(queue).length, busy: () => busy };
 }());

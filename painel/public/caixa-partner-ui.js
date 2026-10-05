@@ -20,6 +20,7 @@
   function button(label, handler, kind, symbol) {
     const el = node('button', null, 'ps-button ps-button--' + (kind || 'primary'));
     el.type = 'button';
+    el.setAttribute('aria-label', label);
     if (symbol) el.appendChild(icon(symbol));
     el.appendChild(node('span', label));
     el.addEventListener('click', handler);

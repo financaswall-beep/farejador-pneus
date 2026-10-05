@@ -10,7 +10,7 @@
     const deliveries = D.pendingDeliveries();
     const errors = D.state.errors.length || (C.canModule('vendas') && C.state.photoLoadState === 'error');
     const waiting = Boolean(C.partnerWaiting.current() && C.partnerWaiting.remaining());
-    const total = photos.length + pickups.length + deliveries.length + D.state.waiting.length;
+    const total = photos.length + pickups.length + deliveries.length + C.partnerWaiting.count();
     const page = U.node('div', null, total || errors ? 'ps-home ps-home--notices' : 'ps-home ps-home--idle');
     if (waiting) {
       page.className = 'ps-home ps-home--notices';

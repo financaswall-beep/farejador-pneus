@@ -1,11 +1,12 @@
 // Prévia local com dados fictícios; não inicia o Farejador nem consulta bancos.
 const { createServer } = require('node:http');
 const { readFile } = require('node:fs/promises');
+const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { fixturePayload } = require('./prova-parceiro-dados.cjs');
 const root = path.resolve(__dirname, '../painel/public');
 const port = Number(process.env.PARTNER_PREVIEW_PORT || 8765);
-const extensions = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg' };
+const extensions = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
 const routes = require('node:fs').readFileSync(path.resolve(__dirname, '../src/admin/caixa/route-static.ts'), 'utf8');
 const files = new Map([...routes.matchAll(/text\('([^']+)', '([^']+)'/g)].map(match => [match[1], match[2]]));
 const server = createServer(async (req, res) => {
@@ -37,8 +38,9 @@ const server = createServer(async (req, res) => {
     let content = await readFile(target);
     if (fixture) {
       const partner = url.pathname === '/_preview/parceiro';
-      const scenario = ['avisos','foto','retirada','entrega','esperando'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
-      const values = { '2w_caixa_token': 'preview-only-' + scenario, '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
+      const scenario = ['avisos','foto','retirada','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
+      // Reabrir a prévia começa uma simulação nova, sem renovar prazos de pedidos reais.
+      const values = { '2w_caixa_token': 'preview-only-' + scenario + ':' + randomUUID(), '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
         '2w_caixa_escopo': partner ? 'partner' : 'matrix', '2w_caixa_unidade_slug': partner ? 'meier' : '',
         '2w_caixa_unidade_nome': partner ? 'Borracharia Meier' : 'Matriz 2W', '2w_caixa_papel': 'owner',
         '2w_caixa_modulos': JSON.stringify({ vendas: true, estoque: true, retiradas: true, entregas: true, financeiro: true }) };

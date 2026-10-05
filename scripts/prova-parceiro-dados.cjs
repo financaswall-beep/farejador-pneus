@@ -10,13 +10,17 @@ function initial(scenario) {
     pickups: ['avisos', 'retirada'].includes(scenario) ? [pickup] : [],
     deliveries: ['avisos', 'entrega'].includes(scenario) ? [delivery('22222222-2222-4222-8222-222222222222', 'Maria', 'pending', null), delivery('33333333-3333-4333-8333-333333333333', 'Pedro', 'dispatched', 'João Meier')] : [],
     photos: ['avisos', 'foto'].includes(scenario) ? [photo] : [],
-    waiting: scenario === 'esperando' ? [{ id: '55555555-5555-4555-8555-555555555555', revision: 1, items, expires_at: new Date(Date.now() + 282000).toISOString() }] : [],
+    waiting: ['esperando', 'fila'].includes(scenario) ? Array.from({ length: scenario === 'fila' ? 3 : 1 }, (_, index) => ({
+      id: '55555555-5555-4555-8555-' + String(index + 1).padStart(12, '5'), revision: index + 1,
+      items: index === 0 ? items : [item(index === 1 ? '100/90-18' : '110/90-17')],
+      expires_at: new Date(Date.now() + 282000 + index * 8000).toISOString(),
+    })) : [],
     stock: items.map((row, index) => ({ ...row, stock_id: 'stock-' + index, item_type: 'pneu', is_tracked: true, quantity_on_hand: 3, quantity_reserved: index ? 0 : 2 })),
   };
 }
 function fixturePayload(req, url, input) {
   const token = String(req.headers.authorization || '');
-  const scenario = token.startsWith('Bearer preview-only-') ? token.slice('Bearer preview-only-'.length) : 'vazio';
+  const scenario = token.startsWith('Bearer preview-only-') ? token.slice('Bearer preview-only-'.length).split(':')[0] : 'vazio';
   if (!stores.has(token)) stores.set(token, initial(scenario));
   const data = stores.get(token);
   const pathname = url.pathname;

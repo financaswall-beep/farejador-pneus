@@ -16,7 +16,7 @@
     if (!active || !C.isPartner() || !C.token()) return;
     const total = (C.canModule('vendas') ? C.state.photoRequests?.length || 0 : 0)
       + C.partnerData.pendingPickups().length + C.partnerData.pendingDeliveries().length
-      + C.partnerData.state.waiting.length;
+      + C.partnerWaiting.count();
     id('badge').textContent = String(total);
     id('badge').classList.toggle('hidden', total === 0);
     id('notifications').setAttribute('aria-label', total ? 'Ver avisos: ' + total : 'Ver avisos');
