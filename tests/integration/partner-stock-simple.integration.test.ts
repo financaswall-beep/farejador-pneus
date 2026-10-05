@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres';
+import { applyMigrationFile, buildRestrictedConnectionString, startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres';
 import { createPartnerFixture, getStockQty } from './helpers/partner-fixtures';
 
 let db: IntegrationDb;
@@ -7,6 +7,7 @@ let db: IntegrationDb;
 beforeAll(async () => {
   db = await startPostgres();
   process.env.DATABASE_URL = db.connectionString;
+  process.env.PARTNER_DATABASE_URL = buildRestrictedConnectionString(db.connectionString);
   process.env.FAREJADOR_ENV = 'test';
   process.env.NODE_ENV = 'test';
   process.env.CHATWOOT_HMAC_SECRET = 'test-secret-not-used-here';
@@ -14,10 +15,35 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  if (db) await stopPostgres(db);
+  if (!db) return;
+  const { partnerPool } = await import('../../src/parceiro/db.js');
+  await partnerPool.end();
+  await stopPostgres(db);
 });
 
 describe('estoque simples do parceiro no banco novo', () => {
+  it('reproduz a falta de permissão do catálogo e cadastra com a role restrita após a correção', async () => {
+    const operation = await import('../../src/parceiro/operation-stock-simple.js');
+    const fixture = await createPartnerFixture(db.pool);
+    const input = { tire_size: '100/80-17', tire_width_mm: 100, tire_aspect_ratio: 80,
+      tire_rim_diameter: 17, brand: 'Pirelli', tire_condition: 'meia_vida' as const,
+      quantity_on_hand: 2, sale_price: 180 };
+    await db.pool.query('REVOKE EXECUTE ON FUNCTION commerce.catalog_measure_identity(TEXT), commerce.catalog_brand_identity(TEXT) FROM farejador_partner_app');
+    try {
+      await expect(operation.createSimpleOperationTire(fixture.ctx, 'Proprietário', input))
+        .rejects.toMatchObject({ code: '42501' });
+      expect((await db.pool.query(`SELECT count(*)::int AS total FROM commerce.partner_stock_levels
+        WHERE environment='test' AND unit_id=$1 AND tire_size=$2`, [fixture.unitId, input.tire_size])).rows[0].total).toBe(0);
+    } finally {
+      await applyMigrationFile(db.pool, '0263_partner_stock_catalog_read.sql');
+    }
+    const saved = await operation.createSimpleOperationTire(fixture.ctx, 'Proprietário', input);
+    expect(await getStockQty(db.pool, saved.stock_id)).toBe(2);
+    expect((await db.pool.query(`SELECT
+      has_table_privilege('farejador_partner_app','commerce.products','INSERT') AS catalog_write,
+      has_table_privilege('farejador_partner_app','commerce.wholesale_stock','SELECT') AS matrix_read`)).rows[0])
+      .toEqual({ catalog_write: false, matrix_read: false });
+  });
   it('corrige somente a própria unidade e preserva reservas', async () => {
     const operation = await import('../../src/parceiro/operation-stock-simple.js');
     const own = await createPartnerFixture(db.pool, { initialStockQty: 5 });
@@ -64,6 +90,10 @@ describe('estoque simples do parceiro no banco novo', () => {
       unit_id: fixture.unitId, average_cost: null, sale_price: '149.90',
       quantity_on_hand: 5, stock_status: 'in_stock',
     });
+    const { getOperationStock } = await import('../../src/parceiro/operation-stock.js');
+    expect((await getOperationStock(fixture.ctx)).rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stock_id: result.stock_id, tire_size: '110/70-17', quantity_on_hand: 5 }),
+    ]));
     await expect(operation.createSimpleOperationTire(
       fixture.ctx, 'Proprietário', input,
     )).rejects.toMatchObject({ code: 'stock_item_already_exists', status: 409 });
