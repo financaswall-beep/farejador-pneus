@@ -27,7 +27,7 @@
   <script defer src="/operacao/caixa-checkout-submit.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-sales-weekly.js?v=20260923-sales-scope1"></script>
-  <script defer src="/operacao/caixa-sales-view.js?v=20260923-sales-scope1"></script>
+  <script defer src="/operacao/caixa-sales-view.js?v=20261005-partner-sales2"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20260824-operation-catalog1"></script>
@@ -93,6 +93,7 @@
   <link rel="stylesheet" href="/operacao/caixa-partner-home.css?v=20261004-partner-nav4" />
   <link rel="stylesheet" href="/operacao/caixa-partner-screens.css?v=20261005-partner-photo-timer1" />
   <link rel="stylesheet" href="/operacao/caixa-partner-waiting.css?v=20261004-partner-nav4" />
+  <link rel="stylesheet" href="/operacao/caixa-partner-sales.css?v=20261005-partner-sales3" />
   <script defer src="/operacao/caixa-partner-ui.js?v=20261004-partner-waiting2"></script>
   <script defer src="/operacao/caixa-partner-data.js?v=20261005-partner-replenishment1"></script>
   <script defer src="/operacao/caixa-partner-orders.js?v=20261005-partner-replenishment1"></script>
@@ -100,9 +101,10 @@
   <script defer src="/operacao/caixa-partner-photo.js?v=20261004-partner-actions1"></script>
   <script defer src="/operacao/caixa-partner-pickups.js?v=20261004-partner-actions1"></script>
   <script defer src="/operacao/caixa-partner-deliveries.js?v=20261004-partner-actions1"></script>
-  <script defer src="/operacao/caixa-partner-extras.js?v=20261004-partner-actions1"></script>
+  <script defer src="/operacao/caixa-partner-extras.js?v=20261005-partner-sales1"></script>
+  <script defer src="/operacao/caixa-partner-sales.js?v=20261005-partner-sales3"></script>
   <script defer src="/operacao/caixa-partner-replenishment.js?v=20261005-partner-replenishment1"></script>
-  <script defer src="/operacao/caixa-partner-home.js?v=20261005-partner-replenishment1"></script>
+  <script defer src="/operacao/caixa-partner-home.js?v=20261005-partner-sales1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -405,6 +407,7 @@
             </div>
 
             <div class="weekly-chart" role="group" aria-label="Faturamento diário da semana">
+              <h4 class="partner-sales-chart-title">Vendas por dia</h4>
               <div class="weekly-chart-plot">
                 <div id="weekly-grid" class="weekly-grid" aria-hidden="true"></div>
                 <div id="weekly-reference" class="weekly-reference"><span id="weekly-reference-value"></span></div>

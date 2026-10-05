@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <radialGradient id="cap" cx="34%" cy="22%" r="84%">
+      <stop stop-color="#fff"/><stop offset=".28" stop-color="#e1e6e6"/>
+      <stop offset=".58" stop-color="#a9b3b3"/><stop offset=".8" stop-color="#768181"/>
+      <stop offset="1" stop-color="#d7dddd"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#eef1f0"/><stop offset=".5" stop-color="#6e7778"/><stop offset="1" stop-color="#343e3e"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="12" cy="13.5" rx="10" ry="9.8" fill="#10221c" opacity=".25"/>
+  <circle cx="12" cy="11.5" r="9.6" fill="url(#rim)"/>
+  <circle cx="12" cy="11.5" r="8.1" fill="url(#cap)" stroke="#f6f8f7" stroke-width=".65"/>
+  <path d="M6 7.3a7.2 7.2 0 0 1 11.8-.4" fill="none" stroke="#fff" stroke-width=".9" opacity=".75"/>
+  <path d="M10.7 6.8h2.6l.25 3.2 3.2.25v2.6l-3.2.25-.25 3.2h-2.6l-.25-3.2-3.2-.25v-2.6l3.2-.25z" fill="#384242"/>
+  <path d="M11.5 7.2h1l.2 3.8 3.8.2v1l-3.8.2-.2 3.8h-1l-.2-3.8-3.8-.2v-1l3.8-.2z" fill="#121d1b"/>
+  <path d="M8 13.35h2.8v2.9m2.45-8.8v2.8h2.9" fill="none" stroke="#edf2ef" stroke-width=".55" opacity=".7"/>
+</svg>

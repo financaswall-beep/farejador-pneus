@@ -30,6 +30,7 @@
     else if (tab === 'partner-deliveries') C.partnerDeliveries.list();
     else if (tab === 'partner-delivery') C.partnerDeliveries.render();
     else if (tab === 'partner-replenishment') C.partnerReplenishment.render();
+    else if (tab === 'partner-sales') C.partnerSales.render();
     else C.partnerExtras.render(tab);
   }
   function start(data) {
@@ -48,6 +49,7 @@
     C.partnerReplenishment.reset();
     active = C.isPartner() && Boolean(C.token());
     tab = next;
+    if (!active || next !== 'partner-sales') C.partnerSales.leave();
     C.elements.app.classList.toggle('is-partner-home', active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
@@ -56,13 +58,15 @@
       if (name === current) id(name).setAttribute('aria-current', 'page');
       else id(name).removeAttribute('aria-current');
     });
-    if (['partner-sales', 'partner-stock'].includes(next)) void C.partnerExtras.load(next);
     render();
+    if (next === 'partner-sales') void C.partnerSales.load();
+    else if (next === 'partner-stock') void C.partnerExtras.load(next);
   }
   function reset() {
     active = false; tab = 'partner-home';
     C.partnerOrders.stop();
     C.partnerReplenishment.reset();
+    C.partnerSales.leave();
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';

@@ -25,7 +25,7 @@ const server = createServer(async (req, res) => {
       if (url.pathname.endsWith('/me')) body = { display_name: 'João Meier', username: 'joao', role: 'owner', store_name: url.pathname.startsWith('/parceiro/') ? 'Borracharia Meier' : 'Matriz 2W', modules: { vendas: true, estoque: true, retiradas: true, entregas: true, financeiro: true } };
       else if (url.pathname.endsWith('/photo-requests')) body = { enabled: true, photo_requests: [] };
       else if (url.pathname.endsWith('/notificacoes')) body = { notifications: [] };
-      else if (url.pathname.endsWith('/vendas') || url.pathname.endsWith('/minhas-vendas')) body = { summary: {}, sales: [], daily_series: [] };
+      else if ((url.pathname.endsWith('/vendas') || url.pathname.endsWith('/minhas-vendas')) && !body.daily_series) body = { summary: {}, sales: [], daily_series: [] };
       else if (url.pathname.endsWith('/photo-stream-ticket')) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'feature_off' })); return; }
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify(body)); return;

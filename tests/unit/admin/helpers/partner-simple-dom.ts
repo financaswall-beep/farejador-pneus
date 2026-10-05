@@ -63,6 +63,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     compressPhoto: vi.fn(async () => ({ type: 'image/jpeg' })),
     photoUploadPath: (id: string) => '/parceiro/meier/api/operacao/pedidos-foto/' + id + '/foto',
     loadPhotoRequests: vi.fn(async () => {}),
+    partnerSales: { render: vi.fn(), load: vi.fn(async () => {}), leave: vi.fn() },
   };
   const context = {
     window: { Caixa: C, location, navigator: { onLine: true }, addEventListener: vi.fn(),

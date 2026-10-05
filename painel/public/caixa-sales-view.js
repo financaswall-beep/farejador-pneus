@@ -102,6 +102,12 @@
     const meta = document.createElement('span');
     meta.className = 'sale-payment';
     meta.textContent = paymentLabel(sale.payment_method);
+    const created = new Date(sale.created_at);
+    if (Caixa.isPartner() && !Number.isNaN(created.getTime())) {
+      meta.textContent += ' · ' + new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo',
+      }).format(created);
+    }
     if (matrix) meta.textContent += ' · ' + saleOrigin(sale);
     const amount = document.createElement('strong');
     amount.className = 'sale-amount';
@@ -128,6 +134,14 @@
     body.append(copy, amount);
     details.append(heading, body, commission);
     article.append(saleIcon(), details);
+    if (Caixa.isPartner()) {
+      ['tl', 'tr', 'bl', 'br'].forEach(function (corner) {
+        const screw = document.createElement('span');
+        screw.className = 'ph-header-screw ps-sale-screw ps-sale-screw--' + corner;
+        screw.setAttribute('aria-hidden', 'true');
+        article.appendChild(screw);
+      });
+    }
     return article;
   }
 
@@ -141,8 +155,9 @@
     if (!elements.salesPanel.classList.contains('hidden')) {
       elements.appHeadingTitle.textContent = matrix ? 'Vendas da Matriz' : 'Minhas vendas';
     }
-    elements.salesEmpty.querySelector('span').textContent = matrix
-      ? 'As vendas da Matriz desta semana aparecerão aqui.' : 'Suas vendas desta semana aparecerão aqui.';
+    elements.salesEmpty.querySelector('span').textContent = Caixa.isPartner()
+      ? (Caixa.state.selectedSalesDay ? 'Nenhuma venda neste dia.' : 'Nenhuma venda nesta semana.')
+      : matrix ? 'As vendas da Matriz desta semana aparecerão aqui.' : 'Suas vendas desta semana aparecerão aqui.';
     sales.forEach(function (sale) { elements.salesList.appendChild(saleCard(sale, matrix)); });
     const selected = Caixa.selectedSalesDay(payload);
     elements.salesResultCount.textContent = sales.length

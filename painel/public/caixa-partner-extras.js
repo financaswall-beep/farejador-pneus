@@ -2,16 +2,15 @@
   'use strict';
   const C = window.Caixa;
   const U = C.partnerUI;
-  const state = { sales: null, stock: null, errors: {}, query: '' };
+  const state = { stock: null, errors: {}, query: '' };
   let generation = 0;
   async function load(tab) {
-    const key = tab === 'partner-sales' ? 'sales' : 'stock';
-    const permission = key === 'sales' ? 'vendas' : 'estoque';
-    if (!C.canModule(permission)) return;
+    const key = 'stock';
+    if (!C.canModule('estoque')) return;
     const session = C.sessionFingerprint(); const current = ++generation;
     state.errors[key] = false;
     try {
-      const payload = await C.partnerData.api(key === 'sales' ? 'minhas-vendas?week=0' : 'operacao/estoque');
+      const payload = await C.partnerData.api('operacao/estoque');
       if (session !== C.sessionFingerprint() || current !== generation) return;
       state[key] = payload;
     } catch (failure) {
@@ -19,30 +18,6 @@
       state.errors[key] = true;
     }
     if (C.partnerHome.currentTab() === tab) render(tab);
-  }
-  function sales(page) {
-    const payload = state.sales;
-    const summary = payload.summary || {};
-    page.appendChild(U.info('Vendido nesta semana', C.currency.format(Number(summary.revenue || 0))));
-    page.appendChild(U.node('p', (summary.sales_count || 0) + ' vendas', 'ps-copy'));
-    const chart = U.node('div', null, 'ps-sales-chart');
-    chart.setAttribute('role', 'img'); chart.setAttribute('aria-label', 'Vendas por dia da semana');
-    const series = payload.daily_series || [];
-    const max = Math.max(1, ...series.map(day => Number(day.revenue || 0)));
-    series.forEach(day => {
-      const col = U.node('div'); const bar = U.node('span', null, 'ps-sales-bar');
-      bar.style.height = Math.max(2, Number(day.revenue || 0) / max * 100) + 'px';
-      const date = new Date(day.date + 'T12:00:00-03:00');
-      const name = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'America/Sao_Paulo' });
-      col.append(U.node('small', C.currency.format(Number(day.revenue || 0))), bar, U.node('b', name)); chart.appendChild(col);
-    });
-    if (series.length) page.appendChild(chart);
-    (payload.sales || []).forEach(sale => {
-      const row = U.node('div', null, 'ps-order-row');
-      row.append(U.node('strong', U.orderLabel({ order_id: sale.id || sale.order_id, order_number: sale.order_number })), U.node('p', C.currency.format(Number(sale.total_amount || 0))));
-      page.appendChild(row);
-    });
-    if (!(payload.sales || []).length) page.appendChild(U.node('p', 'Nenhuma venda nesta semana.', 'ps-copy'));
   }
   function stock(page) {
     const field = U.node('label', 'Buscar medida', 'ps-field');
@@ -73,16 +48,15 @@
     page.appendChild(U.button('SAIR', () => C.elements.logout.click(), 'secondary'));
   }
   function render(tab) {
-    const key = tab === 'partner-sales' ? 'sales' : tab === 'partner-stock' ? 'stock' : 'profile';
-    const page = U.section(({ sales: 'Vendas', stock: 'Meus pneus', profile: 'Minha loja' })[key], () => C.partnerHome.open('partner-home'));
+    const key = tab === 'partner-stock' ? 'stock' : 'profile';
+    const page = U.section(({ stock: 'Meus pneus', profile: 'Minha loja' })[key], () => C.partnerHome.open('partner-home'));
     if (key === 'profile') profile(page);
     else if (state.errors[key]) {
       page.append(U.node('p', 'Não consegui atualizar.', 'ps-copy'), U.button('TENTAR DE NOVO', () => void load(tab)));
     } else if (!state[key]) page.appendChild(U.node('p', 'Carregando…', 'ps-copy'));
-    else if (key === 'sales') sales(page);
     else stock(page);
     U.mount(page, key);
   }
-  function reset() { ++generation; Object.assign(state, { sales: null, stock: null, errors: {}, query: '' }); }
+  function reset() { ++generation; Object.assign(state, { stock: null, errors: {}, query: '' }); }
   C.partnerExtras = { load, render, reset };
 }());

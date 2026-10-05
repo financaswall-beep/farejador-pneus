@@ -35,6 +35,17 @@ describe('Operação simples exclusiva do parceiro', () => {
     expect(denied.C.authorizedOperationTab('partner-deliveries')).toBe('partner-home');
     expect(denied.C.authorizedOperationTab('partner-photo')).toBe('partner-home');
   });
+  it('usa o motor existente de Vendas e o libera ao navegar para Pedidos', () => {
+    const { C, ready } = partnerScreen(); ready();
+    C.partnerHome.open('partner-sales');
+    expect(C.partnerSales.render).toHaveBeenCalled();
+    expect(C.partnerSales.load).toHaveBeenCalledOnce();
+    C.partnerSales.leave.mockClear(); C.partnerHome.open('partner-home');
+    expect(C.partnerSales.leave).toHaveBeenCalledOnce();
+    const denied = partnerScreen(true, { vendas: false });
+    denied.C.partnerHome.open('partner-sales');
+    expect(denied.C.partnerSales.load).not.toHaveBeenCalled();
+  });
   it('não anuncia tudo em dia antes de consultar todas as fontes permitidas', () => {
     const { C, root, ready } = partnerScreen();
     C.partnerHome.sync('partner-home'); expect(root.textContent).toContain('Conferindo pedidos');
