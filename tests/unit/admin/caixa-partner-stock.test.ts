@@ -87,4 +87,46 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
     })]);
     expect(root.dataset.view).toBe('stock'); expect(root.textContent).toContain('90/90-18');
   });
+  it('envia a condição escolhida e preserva os dados e limites da quantidade quando o cadastro falha', async () => {
+    const { C, root, button } = await stockView();
+    C.populateCatalogBrandSelect = vi.fn((select: TestNode) => { select.value = 'Pirelli'; });
+    await button('ADICIONAR PNEU').click();
+    const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
+    const inputs: any[] = root.querySelectorAll('input');
+    const quantity = inputs.find(input => input.name === 'quantity_on_hand');
+    await button('Aumentar quantidade').click(); expect(quantity.value).toBe('2');
+    await button('Diminuir quantidade').click(); await button('Diminuir quantidade').click();
+    expect(quantity.value).toBe('0'); expect(button('Diminuir quantidade').disabled).toBe(true);
+    quantity.value = '999999'; await quantity.fire('input'); expect(button('Aumentar quantidade').disabled).toBe(true);
+    quantity.value = '0'; await quantity.fire('input');
+    inputs.find(input => input.name === 'tire_size').value = '90/90-18';
+    inputs.find(input => input.name === 'sale_price').value = '50';
+    inputs.filter(input => input.type === 'radio').forEach(input => { input.checked = input.value === 'novo'; });
+    C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    await form.fire('submit');
+    expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body)).toEqual({ tire_size: '90/90-18', brand: 'Pirelli', tire_condition: 'novo', quantity_on_hand: 0, sale_price: 50 });
+    expect(root.querySelectorAll('form')[0]).toBe(form); expect(root.textContent).toContain('Não consegui cadastrar');
+    expect(quantity.value).toBe('0'); expect(button('Diminuir quantidade').disabled).toBe(true);
+    expect(button('Aumentar quantidade').disabled).toBe(false);
+  });
+  it('converte reais com vírgula sem alterar o valor e bloqueia preço inválido antes de enviar', async () => {
+    const { C, root, button } = await stockView();
+    C.populateCatalogBrandSelect = vi.fn((select: TestNode) => { select.value = 'Pirelli'; });
+    await button('ADICIONAR PNEU').click();
+    const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
+    const inputs: any[] = root.querySelectorAll('input');
+    inputs.find(input => input.name === 'tire_size').value = '90/90-18';
+    const price = inputs.find(input => input.name === 'sale_price');
+    C.authenticatedFetch.mockClear();
+    for (const value of ['', '0', '-10', '180.123', '1,2,3', '100000000']) {
+      price.value = value; await form.fire('submit');
+    }
+    expect(C.authenticatedFetch).not.toHaveBeenCalled();
+    price.value = '1234,56'; await price.fire('blur'); expect(price.value).toBe('1.234,56');
+    C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    await form.fire('submit'); expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body).sale_price).toBe(1234.56);
+    C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    price.value = '180.50'; await price.fire('blur'); expect(price.value).toBe('180,50');
+    await form.fire('submit'); expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body).sale_price).toBe(180.5);
+  });
 });
