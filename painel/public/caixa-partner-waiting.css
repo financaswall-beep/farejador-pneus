@@ -125,8 +125,7 @@
 @media (max-height: 760px) {
   .is-partner-home:has(.ps-waiting) .ph-header { padding-top: max(12px,env(safe-area-inset-top)); padding-bottom: 10px; }
   .is-partner-home:has(.ps-waiting) .ph-header-bar { min-height: 62px; padding-top: 8px; padding-bottom: 8px; }
-  .is-partner-home:has(.ps-waiting) .ph-nav { min-height: 84px; padding-top: 8px; }
-  .is-partner-home:has(.ps-waiting) .ph-nav button { min-height: 66px; font-size: 14px; line-height: 1.05; }
+  .is-partner-home:has(.ps-waiting) .ph-nav button { font-size: 14px; line-height: 1.05; }
   .is-partner-home .ps-waiting h3 { font-size: clamp(30px,8.5vw,44px); }
   .is-partner-home .ps-waiting .ps-waiting-progress { font-size: 21px; }
   .is-partner-home .ps-waiting .ps-size { font-size: clamp(42px,11.5vw,58px); }

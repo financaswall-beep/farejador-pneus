@@ -90,20 +90,20 @@
 .is-partner-home [data-status='error'] .ph-status-symbol::before { content: '?'; }
 .is-partner-home [data-status='pending'] .ph-status-symbol::before,
 .is-partner-home [data-status='notice'] .ph-status-symbol::before { content: '!'; }
-.is-partner-home .ph-nav { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); flex: 0 0 auto; min-height: 88px; gap: 0; overflow: hidden; padding: 8px 2px max(8px,env(safe-area-inset-bottom)); border: 1px solid #8d969c; border-bottom: 0; border-radius: 24px 24px 0 0; background-image: var(--ph-metal); background-size: 390px 390px; box-shadow: 0 -3px 7px #27333c40, inset 0 2px 1px #fff; }
+.is-partner-home .ph-nav { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); flex: 0 0 auto; min-height: 68px; gap: 0; overflow: hidden; padding: 6px 2px max(6px,env(safe-area-inset-bottom)); border: 1px solid #8d969c; border-bottom: 0; border-radius: 24px 24px 0 0; background-image: var(--ph-metal); background-size: 390px 390px; box-shadow: 0 -3px 7px #27333c40, inset 0 2px 1px #fff; }
 .is-partner-home .ph-nav .ph-nav-metal { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; fill: none; stroke: none; pointer-events: none; }
 .is-partner-home .ph-nav-selected-metal { fill: #ffffff20; }
 .is-partner-home .ph-nav-curve-light { fill: none; stroke: #ffffffe0; stroke-width: 1; }
 .is-partner-home .ph-nav-curve-shadow { fill: none; stroke: #6d767d45; stroke-width: .7; }
-.is-partner-home .ph-nav button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; min-height: 68px; padding: 0 2px 7px; border: 0; border-radius: 10px; color: #0b1010; background: none; font-size: clamp(12px,3.4vw,17px); font-weight: 600; line-height: 1.12; letter-spacing: -.045em; cursor: pointer; }
-.is-partner-home .ph-nav-icon { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; }
+.is-partner-home .ph-nav button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 54px; padding: 0 2px 2px; border: 0; border-radius: 10px; color: #0b1010; background: none; font-size: clamp(12px,3.4vw,17px); font-weight: 600; line-height: 1.12; letter-spacing: -.045em; cursor: pointer; }
+.is-partner-home .ph-nav-icon { position: relative; display: grid; width: 26px; height: 26px; flex: 0 0 auto; place-items: center; }
 .is-partner-home #partner-home-stock > span { transform: translateX(8px); }
-.is-partner-home .ph-nav button svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.is-partner-home .ph-nav button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .is-partner-home .ph-nav .ph-cart { fill: currentColor; stroke-width: 1.2; }
 .is-partner-home .ph-nav button[aria-current='page'] { color: #006029; }
 .is-partner-home .ph-nav button[aria-current='page'] .ph-nav-icon { border: 1px solid #036d28; border-radius: 6px; color: #fff; background: linear-gradient(#05a844,#007528); box-shadow: inset 0 1px 1px #95dea8, 0 2px 3px #0e1b1750; }
-.is-partner-home .ph-nav button[aria-current='page'] svg { width: 22px; height: 22px; }
-.is-partner-home .ph-nav button[aria-current='page']::after { content: ''; position: absolute; right: 20%; bottom: 0; left: 20%; height: 4px; border-radius: 3px; background: linear-gradient(#05a844,#007528); box-shadow: inset 0 1px 0 #44c477; }
+.is-partner-home .ph-nav button[aria-current='page'] svg { width: 20px; height: 20px; }
+.is-partner-home .ph-nav button[aria-current='page'] .ph-nav-icon::after { content: ''; position: absolute; top: calc(100% + 2px); left: calc(50% - 11px); width: 22px; height: 3px; border-radius: 3px; background: linear-gradient(#05a844,#007528); box-shadow: inset 0 1px 0 #44c477; }
 .is-partner-home .ph-nav button:disabled { color: #454c50; cursor: default; }
 .is-partner-home button:focus-visible { outline: 3px solid #007c38; outline-offset: 3px; }
 @media (max-width: 560px) {
