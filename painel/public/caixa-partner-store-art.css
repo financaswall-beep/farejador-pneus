@@ -1,7 +1,9 @@
 /* Ícones renderizados e ornamentos da referência; rótulos e controles são HTML. */
-.caixa-app.is-partner-home:has(.ps-store--home) {
+.is-partner-home #partner-home-screen:has(.ps-store--home) { padding: 0; }
+.is-partner-home .ps-store--home {
+  box-sizing: border-box; min-height: 100%; padding: 8px 16px 16px;
   background-image: url('/operacao/assets/partner-store-background-v2.webp');
-  background-size: 100% calc(100% + 40px); background-position: center top; background-repeat: no-repeat;
+  background-size: 100% calc(100% + 40px); background-position: center bottom; background-repeat: no-repeat;
 }
 .is-partner-home .ps-store {
   --ps-store-steel: url('/operacao/assets/partner-store-background-v2.webp');
