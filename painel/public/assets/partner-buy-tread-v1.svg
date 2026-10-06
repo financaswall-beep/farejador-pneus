@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="240" viewBox="0 0 150 240">
+  <defs>
+    <pattern id="tread" width="48" height="18" patternUnits="userSpaceOnUse">
+      <path fill="#37463c" d="M1 2h13l7 7-6 7H2l6-7Zm31 0h15l-6 7 6 7H32l-8-7Z"/>
+      <path fill="#667369" d="M18 1h8l4 6-6 8-6-7Z"/>
+    </pattern>
+  </defs>
+  <g opacity=".085" transform="rotate(44 75 120)">
+    <path fill="url(#tread)" d="M51-70h48v380H51Z"/>
+  </g>
+</svg>

@@ -19,6 +19,16 @@ export class TestNode {
   focus = vi.fn();
   parentElement: TestNode | null = null;
   remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); }
+  replaceWith(node: TestNode) {
+    if (!this.parentElement) return;
+    node.parentElement = this.parentElement;
+    this.parentElement.children[this.parentElement.children.indexOf(this)] = node;
+  }
+  after(node: TestNode) {
+    if (!this.parentElement) return;
+    node.parentElement = this.parentElement;
+    this.parentElement.children.splice(this.parentElement.children.indexOf(this) + 1, 0, node);
+  }
   showModal() { this.open = true; }
   close() { this.open = false; void this.fire('close'); }
   style: Record<string, any> = {
@@ -29,9 +39,9 @@ export class TestNode {
   get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(''); }
   set textContent(value: string) { this.ownText = String(value); this.children = []; }
   append(...nodes: TestNode[]) { nodes.forEach(node => { node.parentElement = this; }); this.children.push(...nodes); }
-  prepend(...nodes: TestNode[]) { this.children.unshift(...nodes); }
+  prepend(...nodes: TestNode[]) { nodes.forEach(node => { node.parentElement = this; }); this.children.unshift(...nodes); }
   appendChild(node: TestNode) { node.parentElement = this; this.children.push(node); return node; }
-  replaceChildren(...nodes: TestNode[]) { this.ownText = ''; this.children = nodes; }
+  replaceChildren(...nodes: TestNode[]) { this.ownText = ''; this.children = []; this.append(...nodes); }
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   removeAttribute(name: string) { delete this.attributes[name]; }
   addEventListener(name: string, handler: (...args: any[]) => unknown) { (this.handlers[name] ||= []).push(handler); }
@@ -39,7 +49,7 @@ export class TestNode {
   fire(name: string) { return Promise.all((this.handlers[name] || []).map(handler => handler({ target: this, preventDefault: () => {} }))); }
   querySelectorAll(selector: string): TestNode[] {
     const tags = selector.split(',');
-    return this.children.flatMap(child => [...(tags.includes(child.tagName) ? [child] : []), ...child.querySelectorAll(selector)]);
+    return this.children.flatMap(child => [...(tags.some(tag => tag.startsWith('.') ? child.classList.contains(tag.slice(1)) : tag === child.tagName) ? [child] : []), ...child.querySelectorAll(selector)]);
   }
   classList = {
     add: (...names: string[]) => { this.className = [...new Set(this.className.split(' ').concat(names))].join(' ').trim(); },
@@ -85,7 +95,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-replenishment', 'partner-home']) {
+  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-buy-ui', 'partner-buy', 'partner-replenishment', 'partner-home']) {
     runInNewContext(readFileSync('painel/public/caixa-' + file + '.js', 'utf8'), context);
   }
   C.showTab = (tab: string) => C.partnerHome.sync(C.authorizedOperationTab(tab));

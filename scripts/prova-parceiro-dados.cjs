@@ -2,6 +2,7 @@
 const stores = new Map();
 const { salesFixture } = require('./prova-parceiro-vendas.cjs');
 const { storeFixture } = require('./prova-parceiro-loja.cjs');
+const { buyFixture } = require('./prova-parceiro-comprar.cjs');
 function initial(scenario) {
   const item = (size, qty = 1) => ({ tire_size: size, label: size, quantity: qty, tire_condition: 'meia_vida' });
   const items = [item('90/90-18'), item('80/100-14')];
@@ -34,6 +35,8 @@ function fixturePayload(req, url, input) {
   if (store) return store;
   const sales = salesFixture(url);
   if (sales) return sales;
+  const buy = buyFixture(req, url, input, data);
+  if (buy) return buy;
   if (pathname.endsWith('/confirmacoes-estoque')) return { enabled: true, rows: data.waiting };
   if (pathname.includes('/confirmacoes-estoque/') && req.method === 'POST') {
     data.waiting = data.waiting.filter(row => row.id !== pathname.split('/').at(-1));

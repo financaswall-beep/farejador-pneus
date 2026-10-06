@@ -33,7 +33,7 @@
       document.documentElement.style.removeProperty('--partner-ios-top');
     }
   }
-  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy() || C.partnerStore.busy(); }
+  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy() || C.partnerStore.busy() || C.partnerBuy.busy(); }
   function renderConnection() {
     const online = window.navigator?.onLine !== false;
     id('connection').dataset.state = online ? 'online' : 'offline';
@@ -62,6 +62,8 @@
     else if (tab === 'partner-deliveries') C.partnerDeliveries.list();
     else if (tab === 'partner-delivery') C.partnerDeliveries.render();
     else if (tab === 'partner-replenishment') C.partnerReplenishment.render();
+    else if (tab === 'partner-buy') C.partnerBuy.render('catalog');
+    else if (tab === 'partner-cart') C.partnerBuy.render('cart');
     else if (tab === 'partner-sales') C.partnerSales.render();
     else C.partnerExtras.render(tab);
   }
@@ -75,8 +77,8 @@
       id('avatar').setAttribute('src', data.avatar_url); id('avatar').classList.remove('hidden');
       id('profile').classList.add('has-avatar');
     }
-    ['stock', 'sales'].forEach(name => {
-      const allowed = C.canModule(name === 'stock' ? 'estoque' : 'vendas');
+    ['stock', 'sales', 'buy'].forEach(name => {
+      const allowed = C.canModule(name === 'sales' ? 'vendas' : 'estoque');
       id(name).disabled = !allowed;
       id(name).title = allowed ? '' : 'Indisponível para este acesso';
     });
@@ -94,13 +96,14 @@
     syncViewport(active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
-    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : 'orders';
-    ['orders', 'sales', 'stock'].forEach(name => {
+    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : ['partner-buy', 'partner-cart'].includes(next) ? 'buy' : 'orders';
+    ['orders', 'sales', 'stock', 'buy'].forEach(name => {
       if (name === current) id(name).setAttribute('aria-current', 'page');
       else id(name).removeAttribute('aria-current');
     });
     render();
     if (next === 'partner-sales') void C.partnerSales.load();
+    else if (['partner-buy', 'partner-cart'].includes(next)) void C.partnerBuy.load();
     else if (next === 'partner-stock' || next === 'partner-profile') void C.partnerExtras.load(next);
   }
   function reset() {
@@ -110,6 +113,7 @@
     C.partnerReplenishment.reset();
     C.partnerSales.leave();
     C.partnerReceipt?.close();
+    C.partnerBuy.reset();
     C.partnerData.reset(); C.partnerPhoto.reset(); C.partnerPickups.reset(); C.partnerDeliveries.reset(); C.partnerExtras.reset(); C.partnerWaiting.reset();
     panel.classList.add('hidden'); C.elements.app.classList.remove('is-partner-home');
     id('badge').classList.add('hidden'); id('store').textContent = 'Minha loja';
@@ -117,7 +121,7 @@
     id('profile').setAttribute('aria-label', 'Minha loja');
     C.partnerUI.root.replaceChildren();
   }
-  const hashes = { 'partner-home': '#pedidos', 'partner-sales': '#vendas', 'partner-stock': '#meus-pneus', 'partner-pickups': '#retiradas', 'partner-deliveries': '#entregas', 'partner-profile': '#minha-loja', 'partner-photos': '#fotos', 'partner-replenishment': '#reposicao' };
+  const hashes = { 'partner-home': '#pedidos', 'partner-sales': '#vendas', 'partner-stock': '#meus-pneus', 'partner-pickups': '#retiradas', 'partner-deliveries': '#entregas', 'partner-profile': '#minha-loja', 'partner-photos': '#fotos', 'partner-replenishment': '#reposicao', 'partner-buy': '#comprar', 'partner-cart': '#carrinho' };
   function open(next, afterSave) {
     if (!C.isPartner() || !C.token()) return;
     if (busy() && !afterSave && next !== tab) { C.showToast('Aguarde a conclusão.'); return; }
@@ -130,6 +134,7 @@
   id('orders').addEventListener('click', () => open('partner-home'));
   id('sales').addEventListener('click', () => open('partner-sales'));
   id('stock').addEventListener('click', () => open('partner-stock'));
+  id('buy').addEventListener('click', () => open('partner-buy'));
   id('profile').addEventListener('click', () => open('partner-profile'));
   id('notifications').addEventListener('click', () => open('partner-home'));
   id('avatar').addEventListener('error', clearAvatar);

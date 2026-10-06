@@ -52,6 +52,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-partner-replenishment.js', 'caixa-partner-replenishment.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.css', 'caixa-partner-home.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-screens.css', 'caixa-partner-screens.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-partner-buy.css', 'caixa-partner-buy.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-idle.css', 'caixa-partner-idle.css', 'text/css; charset=utf-8');
   text('/operacao/assets/partner-idle-emblem-v1.webp', 'assets/partner-idle-emblem-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-idle-background-v1.webp', 'assets/partner-idle-background-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
@@ -68,7 +69,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/assets/partner-store-icons-v2.webp', 'assets/partner-store-icons-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-store-background-v2.webp', 'assets/partner-store-background-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-screw.svg', 'assets/partner-screw.svg', 'image/svg+xml');
-  for (const file of ['ui', 'data', 'orders', 'waiting', 'photo', 'pickups', 'deliveries', 'stock-fields', 'stock-form', 'stock', 'store', 'store-form', 'team', 'extras']) {
+  text('/operacao/assets/partner-buy-tread-v1.svg', 'assets/partner-buy-tread-v1.svg', 'image/svg+xml', 'public, max-age=31536000, immutable');
+  for (const file of ['ui', 'data', 'orders', 'waiting', 'photo', 'pickups', 'deliveries', 'stock-fields', 'stock-form', 'stock', 'store', 'store-form', 'team', 'extras', 'buy-ui', 'buy']) {
     text(`/operacao/caixa-partner-${file}.js`, `caixa-partner-${file}.js`, 'text/javascript; charset=utf-8');
   }
   text('/operacao/assets/partner-steel-v2.webp', 'assets/partner-steel-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');

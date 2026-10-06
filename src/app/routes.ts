@@ -13,6 +13,7 @@ import { registerPartnerOperationStockPriceRoutes } from '../parceiro/route-oper
 import { registerPartnerOperationStockSimpleRoutes } from '../parceiro/route-operation-stock-simple.js';
 import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operation-purchases.js';
 import { registerPartnerReplenishmentRoutes } from '../parceiro/route-operation-replenishment.js';
+import { registerPartnerBuyCatalogRoutes } from '../parceiro/route-operation-buy-catalog.js';
 import { registerPartnerOperationDeliveryRoutes } from '../parceiro/route-operation-deliveries.js';
 import { registerPartnerOperationTeamRoutes } from '../parceiro/route-operation-team.js';
 import { registerPartnerOperationNotificationRoutes } from '../parceiro/route-operation-notifications.js';
@@ -43,6 +44,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerPartnerOperationStockSimpleRoutes(fastify);
   registerPartnerOperationPurchaseRoutes(fastify);
   registerPartnerReplenishmentRoutes(fastify);
+  registerPartnerBuyCatalogRoutes(fastify);
   registerPartnerOperationDeliveryRoutes(fastify);
   registerPartnerOperationTeamRoutes(fastify);
   registerPartnerOperationNotificationRoutes(fastify);
