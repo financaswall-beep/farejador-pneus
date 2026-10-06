@@ -55,6 +55,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-partner-idle.css', 'caixa-partner-idle.css', 'text/css; charset=utf-8');
   text('/operacao/assets/partner-idle-emblem-v1.webp', 'assets/partner-idle-emblem-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-idle-background-v1.webp', 'assets/partner-idle-background-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
+  text('/operacao/assets/partner-replenishment-tire-v1.webp', 'assets/partner-replenishment-tire-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/caixa-partner-waiting.css', 'caixa-partner-waiting.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-sales.css', 'caixa-partner-sales.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-sales.js', 'caixa-partner-sales.js', 'text/javascript; charset=utf-8');

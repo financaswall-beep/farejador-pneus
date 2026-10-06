@@ -88,10 +88,15 @@ describe('Reposição do parceiro — PostgreSQL e role restrita', () => {
     await insert([item, { ...item, tire_size: '80/100-14' }]); expect(await offers()).toEqual([]);
     await insert([item]); expect((await offers())[0]).toMatchObject({ demand_count: 1, quantity_available: 8 });
   });
-  it('escolhe uma única medida pela maior procura, sem oferecer a segunda', async () => {
+  it('retorna todas as medidas elegíveis, pela maior procura, sem duplicar clientes entre marcas', async () => {
     await search(); await search(); await search({ measure: '80/100-14' });
     await client.query(`INSERT INTO commerce.wholesale_stock (environment,measure,brand,tire_condition,quantity_on_hand)
       VALUES('test','80/100-14','Pirelli','meia_vida',20)`);
-    expect((await offers()).map(row => row.measure)).toEqual(['90/90-18']);
+    await client.query(`INSERT INTO commerce.wholesale_stock (environment,measure,brand,tire_condition,quantity_on_hand)
+      VALUES('test','90/90-18','Michelin','meia_vida',3)`);
+    const rows = await offers();
+    expect(rows.map(row => row.measure)).toEqual(['90/90-18','90/90-18','80/100-14']);
+    expect(rows.filter(row => row.measure === '90/90-18').map(row => row.demand_count)).toEqual([2,2]);
+    expect(rows.find(row => row.measure === '80/100-14')?.quantity_available).toBe(20);
   });
 });

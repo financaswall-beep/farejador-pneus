@@ -10,11 +10,11 @@ describe('Relógio do cartão de foto do parceiro', () => {
       const { C, root, ready, context } = partnerScreen();
       C.state.photoRequests = [photo('foto-a', 282)]; ready();
       const timer = () => root.querySelectorAll('span').find(el => el.attributes.role === 'timer')!;
-      expect(timer().textContent).toBe('04:42');
+      expect(timer().textContent).toBe('4:42');
       const tick = context.window.setInterval.mock.calls.at(-1)![0];
       vi.advanceTimersByTime(2000); tick();
-      expect(timer().textContent).toBe('04:40');
-      C.partnerHome.render(); expect(timer().textContent).toBe('04:40');
+      expect(timer().textContent).toBe('4:40');
+      C.partnerHome.render(); expect(timer().textContent).toBe('4:40');
       expect(C.authenticatedFetch).not.toHaveBeenCalled();
       C.partnerHome.open('partner-photos');
       expect(context.window.clearInterval).toHaveBeenCalledWith(1);
@@ -27,7 +27,7 @@ describe('Relógio do cartão de foto do parceiro', () => {
     const { C, root, ready } = partnerScreen();
     C.state.photoRequests = [photo('menos-urgente', 600), { id: 'invalida', expires_at: 'inválido' }, photo('urgente', 60)]; ready();
     const timer = root.querySelectorAll('span').find(el => el.attributes.role === 'timer')!;
-    expect(timer.textContent).toBe('01:00');
+    expect(timer.textContent).toBe('1:00');
     expect(timer.title).toBe('Menor prazo entre os pedidos de foto');
     C.state.photoRequests = [{ id: 'sem-prazo', tire_size: '90/90-18' }]; C.partnerHome.render();
     expect(root.querySelectorAll('span').some(el => el.attributes.role === 'timer')).toBe(false);
@@ -40,7 +40,7 @@ describe('Relógio do cartão de foto do parceiro', () => {
       const tick = context.window.setInterval.mock.calls.at(-1)![0];
       vi.advanceTimersByTime(3000); tick();
       const timer = root.querySelectorAll('span').find(el => el.attributes.role === 'timer')!;
-      expect(timer.textContent).toBe('00:00');
+      expect(timer.textContent).toBe('0:00');
       expect(timer.attributes['aria-label']).toBe('Prazo da foto encerrado');
       expect(context.window.clearInterval).toHaveBeenCalledWith(1);
       expect(root.textContent).toContain('Cliente pediu foto');

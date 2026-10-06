@@ -362,3 +362,7 @@ SELECT ops.anonymize_contact(
 ```
 
 Zera PII do contato, mantém agregados, registra em `ops.erasure_log`.
+
+### Reposição com várias medidas
+
+`0265_partner_replenishment_multiple_measures.sql` amplia a projeção existente para todas as medidas com falta registrada na própria loja e saldo livre na 2W. Mantém a janela de 7 dias, isolamento de ambiente/unidade, condições, marcas e bloqueio de simulações; ordena pela procura sem expor clientes ou custos.

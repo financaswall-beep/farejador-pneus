@@ -7,7 +7,7 @@ function initial(scenario) {
   const items = [item('90/90-18'), item('80/100-14')];
   const pickup = { order_id: '11111111-1111-4111-8111-111111111111', order_number: 'PED-0248', awaiting_pickup: true, customer_name: 'Carlos', status: 'confirmed', payment_method: null, total_amount: 180, created_at: new Date().toISOString(), items };
   const delivery = (id, name, status, courier) => ({ order_id: id, order_status: 'confirmed', order_number: name === 'Maria' ? 'PED-0249' : 'PED-0250', customer_name: name, delivery_address: 'Rua dos Pneus, 100 — Méier, Rio de Janeiro', delivery_status: status, delivery_courier: courier, total_amount: 120, items: [item('90/90-18')], created_at: new Date().toISOString() });
-  const photo = { id: '44444444-4444-4444-8444-444444444444', tire_size: '90/90-18', brand: null, photo_count: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 900000).toISOString(), status: 'pending' };
+  const photo = { id: '44444444-4444-4444-8444-444444444444', order_number: 'PED-0248', tire_size: '90/90-18', brand: null, photo_count: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 282000).toISOString(), status: 'pending' };
   return {
     pickups: ['avisos', 'retirada'].includes(scenario) ? [pickup] : [],
     deliveries: ['avisos', 'entrega'].includes(scenario) ? [delivery('22222222-2222-4222-8222-222222222222', 'Maria', 'pending', null), delivery('33333333-3333-4333-8333-333333333333', 'Pedro', 'dispatched', 'João Meier')] : [],
@@ -53,8 +53,12 @@ function fixturePayload(req, url, input) {
   }
   if (pathname.endsWith('/operacao/entregas')) return { rows: data.deliveries, summary: {} };
   if (pathname.endsWith('/operacao/reposicao')) return scenario === 'avisos' || scenario === 'reposicao' ? {
-    replenishment: { measure: '90/90-18', demand_count: 3, quantity_available: 8, period_days: 7 },
-    rows: [{ measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida', vehicle_type: 'motorcycle', quantity_available: 8 }],
+    replenishment: { measure: '100/90-18', demand_count: 4, quantity_available: 10, period_days: 7,
+      measures: [{ measure: '100/90-18', demand_count: 4, quantity_available: 10 },
+        { measure: '90/90-18', demand_count: 3, quantity_available: 12 },
+        { measure: '80/100-14', demand_count: 2, quantity_available: 8 }] },
+    rows: [['100/90-18',10],['90/90-18',12],['80/100-14',8]].map(([measure,quantity_available]) =>
+      ({ measure, brand: 'Pirelli', tire_condition: 'meia_vida', vehicle_type: 'motorcycle', quantity_available })),
   } : { replenishment: null, rows: [] };
   if (pathname.includes('/api/entregas/') && req.method === 'POST') {
     const row = data.deliveries.find(item => item.order_id === pathname.split('/').at(-1));

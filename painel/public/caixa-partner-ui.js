@@ -9,6 +9,8 @@
     delivery: 'M2 5h12v12H2ZM14 9h4l4 5v3h-8M7 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm11 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
     clock: 'M12 7v5l4 3', back: 'm14 6-6 6 6 6',
     order: 'M8 3h8v4H8ZM6 5H4v17h16V5h-2M8 11h8M8 16h6',
+    target: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0ZM14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
+    cart: 'M2 3h3l3 13h12l2-10H6M9 20h.01M19 20h.01',
   };
   function node(tag, text, className) {
     const el = document.createElement(tag);
@@ -16,7 +18,15 @@
     if (className) el.className = className;
     return el;
   }
-  function icon(kind) { return C.createSvg([{ d: paths[kind] || paths.order }]); }
+  const solid = {
+    'camera-solid': 'M8 4h8l2 3h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l2-3ZM12 9a5 5 0 1 0 0 10 5 5 0 0 0 0-10ZM12 11a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
+    'pickup-solid': 'M3 3h18l2 7a4 4 0 0 1-2 3v9H3v-9a4 4 0 0 1-2-3l2-7ZM5 5l-1 5h3l1-5H5Zm5 0-.5 5h5L14 5h-4Zm6 0 1 5h3l-1-5h-3ZM5 14v6h4v-6H5Zm7 2v6h5v-6h-5Z',
+    'delivery-solid': 'M1 3h13a1 1 0 0 1 1 1v3h4l4 5v6h-2a4 4 0 0 1-8 0H9a4 4 0 0 1-8 0V3ZM16 9v4h5l-3-4h-2ZM5 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm12 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
+  };
+  function icon(kind) {
+    return C.createSvg([{ d: solid[kind] || paths[kind] || paths.order,
+      ...(solid[kind] ? { fill: 'currentColor', stroke: 'none', 'fill-rule': 'evenodd' } : {}) }]);
+  }
   function button(label, handler, kind, symbol) {
     const el = node('button', null, 'ps-button ps-button--' + (kind || 'primary'));
     el.type = 'button';

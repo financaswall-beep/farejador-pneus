@@ -15,11 +15,13 @@ describe('Oportunidade de reposição do parceiro', () => {
   it('carrega sem permissão de entrega e abre somente os pneus da oportunidade', async () => {
     const { C, root, ready, button, location } = partnerScreen(true, { estoque: true });
     ready(); responses(C); await C.partnerData.load();
-    expect(root.textContent).toContain('Te pediram90/90-18');
-    expect(root.textContent).toContain('3 clientes nos últimos 7 dias');
+    expect(root.textContent).toContain('Te pediram e você não tinha');
+    expect(root.textContent).toContain('1 medida para repor');
     expect(root.textContent).not.toContain('Exemplo');
-    await button('VER NA 2W').click();
+    await button('REPOR PNEUS').click();
     expect(location.hash).toBe('#reposicao');
+    expect(root.textContent).toContain('90/90-18');
+    expect(root.textContent).toContain('3 clientes pediram');
     expect(root.textContent).toContain('Meia-vidaPirelli8 disponíveis');
     expect(root.textContent).not.toContain('Faturamento');
     await button('Voltar').click(); expect(location.hash).toBe('#pedidos');
@@ -36,8 +38,23 @@ describe('Oportunidade de reposição do parceiro', () => {
     });
     await C.partnerData.load();
     expect(C.partnerData.state.replenishment).toBeNull();
-    expect(root.textContent).not.toContain('VER NA 2W');
+    expect(root.textContent).not.toContain('REPOR PNEUS');
     C.partnerHome.open('partner-replenishment'); expect(root.textContent).toContain('Não consegui atualizar a 2W');
+  });
+  it('conta medidas, sem somar clientes nem variantes, e abre todas as oportunidades', async () => {
+    const { C, root, ready, button } = partnerScreen(); ready();
+    const measures = [
+      { measure: '100/90-18', demand_count: 4, quantity_available: 10 },
+      { measure: '90/90-18', demand_count: 3, quantity_available: 12 },
+      { measure: '80/100-14', demand_count: 2, quantity_available: 8 },
+      { measure: '110/90-17', demand_count: 8, quantity_available: 0 },
+    ];
+    responses(C, { replenishment: { ...measures[0], measures }, rows: measures.map(row => ({ ...row, brand: 'Pirelli', tire_condition: 'meia_vida' })) });
+    await C.partnerData.load(); expect(root.textContent).toContain('3 medidas para repor');
+    expect(root.textContent).not.toContain('9 medidas');
+    await button('REPOR PNEUS').click();
+    for (const row of measures.slice(0, 3)) expect(root.textContent).toContain(row.measure);
+    expect(root.textContent).not.toContain('110/90-17');
   });
   it('respeita a permissão de estoque, o ambiente matriz e o fim da sessão', async () => {
     const denied = partnerScreen(true, { vendas: true }); denied.ready(); responses(denied.C);

@@ -61,5 +61,10 @@
   function pendingDeliveries() {
     return state.deliveries.filter(row => ['pending', 'dispatched', 'failed'].includes(row.delivery_status) && row.order_status !== 'cancelled');
   }
-  C.partnerData = { state, api, load, start, reset, pendingPickups, pendingDeliveries };
+  function opportunities() {
+    if (!state.replenishment) return [];
+    const rows = state.replenishment.measures || [state.replenishment];
+    return rows.filter(row => row.measure && row.demand_count > 0 && row.quantity_available > 0);
+  }
+  C.partnerData = { state, api, load, start, reset, pendingPickups, pendingDeliveries, opportunities };
 }());

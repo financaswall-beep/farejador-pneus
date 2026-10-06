@@ -1,0 +1,12 @@
+{
+  "mode": "built-in image_gen",
+  "purpose": "Pneu ilustrativo recortado para o card de reposição da home do parceiro",
+  "reference": "exec-dad0277a-132b-4776-bce8-621aab2af20e.png",
+  "assets": [
+    {
+      "path": "painel/public/assets/partner-replenishment-tire-v1.webp",
+      "transparent_background": true,
+      "prompt": "Use case: product-mockup. Asset type: transparent PNG cutout tire illustration for the replenishment card in an actual app. Input image is a STYLE and SUBJECT REFERENCE only: use the single black motorcycle tire visible at the lower left of the \"Te pediram e você não tinha\" card. Generate ONLY that upright unbranded black motorcycle tire, isolated against genuinely transparent background. Same three-quarter view and same realistic bold tread, thick convincing rubber profile, large dark open center, without wheel rim or hub. Clean sharp studio product photography, moderate soft highlights, realistic black rubber, NOT grey rubber, no text or brand markings. Vertically centered object taking most of the canvas with about 6% clear alpha margin, upright slightly rotated so tread on left and dark circular opening on right. No phone, cards, UI, screws, green target, numbers, background, floor, or cast shadow baked in; only the tire with alpha. This image is illustrative, not a catalog SKU photo."
+    }
+  ]
+}
