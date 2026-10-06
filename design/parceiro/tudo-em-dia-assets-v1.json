@@ -1,0 +1,17 @@
+{
+  "mode": "built-in image_gen",
+  "purpose": "Tela Tudo em dia do parceiro; ativos decorativos, textos e navegação reais",
+  "reference": "exec-8fbd5467-0d76-4019-b68c-0a3471c3a428.png",
+  "assets": [
+    {
+      "path": "painel/public/assets/partner-idle-emblem-v1.webp",
+      "transparent_background": true,
+      "prompt": "Use case: background-extraction. Asset type: transparent production UI emblem for Farejador partner app.\nInput image: reference and extraction target. Extract and faithfully recreate ONLY the central round green confirmation emblem from the supplied approved phone concept.\nA face-on emerald forest-green brushed circular metal disk, raised brushed silver check mark with rounded corners, thick satin silver machined bezel, thin dark-green edge, four small realistic Phillips screws at the cardinal positions, exact proportions, highlights and compact realistic contact shadow from the reference.\nComposition: one circular emblem centered on a square canvas, occupying 90% of its width with a small transparent margin and unclipped short shadow. Strictly face-on, no perspective tilt.\nReal materials and restrained physical depth, same quiet studio lighting as reference. Preserve genuine alpha transparency outside the emblem. No background metal sheet, phone, text, UI, extra elements, glow, neon, cartoon or game styling."
+    },
+    {
+      "path": "painel/public/assets/partner-idle-background-v1.webp",
+      "transparent_background": false,
+      "prompt": "Use case: precise-object-edit. Asset type: portrait brushed-metal background texture for the empty-state content area of a mobile app.\nInput image: approved phone concept, style and composition reference. Create ONLY the interior content background as a standalone flat rectangular texture, roughly 2:3 portrait. Reproduce its light satin silver horizontal fine brushed steel, soft broad vertical reflections, subtle worn grey diagonal tire tread entering from upper right and another entering from lower left, dark forest-green and silver thin angled machined strips in the lower right. Very small realistic metal rivets in the top left and bottom corners.\nKeep the entire central 65% quiet uninterrupted silver metal for live text and an emblem to be overlaid by code. Tire tread must be low contrast and only touch peripheral corners. Match the restrained realistic material and contrast of the reference.\nRemove the entire central check emblem, all text, top header, footer, profile photo, icons, phone frame and outside surroundings. No horizontal panel seam, no big dividers, no holes in the center, no green wash, no neon, no ornate extra decorations. Fill the whole output edge to edge with the rectangular metal content background. No transparent background."
+    }
+  ]
+}

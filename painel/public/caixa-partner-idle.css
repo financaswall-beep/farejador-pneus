@@ -1,0 +1,74 @@
+/* O fundo acompanha o conteúdo: nunca fica preso atrás da área de rolagem. */
+.is-partner-home #partner-home-screen:has(.ps-home--idle) {
+  padding: 0;
+  scrollbar-gutter: auto;
+}
+.is-partner-home .ps-home--idle {
+  box-sizing: border-box;
+  flex: 1 0 auto;
+  min-height: 100%;
+  padding: 24px 16px 72px;
+  background-image: url('/operacao/assets/partner-idle-background-v1.webp');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.is-partner-home .ps-home--idle .ps-home-status {
+  width: 100%;
+  gap: 20px;
+  font-family: 'Partner Condensed', 'Arial Narrow', Arial, sans-serif;
+}
+.is-partner-home .ps-home--idle .ps-home-status img {
+  width: clamp(190px, 57vw, 260px);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.is-partner-home .ps-home--idle h3 {
+  color: #050807;
+  font-size: clamp(42px, 11.8vw, 62px);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+.is-partner-home .ps-home--idle p {
+  margin-top: 10px;
+  color: #101715;
+  font-size: clamp(21px, 6.4vw, 32px);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+.caixa-app.is-partner-home:has(.ps-home--idle) .ph-store {
+  font-family: 'Partner Condensed', 'Arial Narrow', Arial, sans-serif;
+  font-size: clamp(19px, 5.4vw, 24px);
+  letter-spacing: -.025em;
+}
+.is-partner-home:has(.ps-home--idle) .ph-nav {
+  border-top: 3px solid #08613c;
+  box-shadow: 0 -2px 3px #13372b45, inset 0 1px 0 #fff;
+}
+.is-partner-home:has(.ps-home--idle) .ph-nav button {
+  font-family: 'Partner Condensed', 'Arial Narrow', Arial, sans-serif;
+  font-size: clamp(14px, 3.8vw, 18px);
+  font-weight: 700;
+}
+.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] .ph-nav-icon {
+  border-color: transparent;
+  color: #07552d;
+  background: none;
+  box-shadow: none;
+}
+.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] svg {
+  width: 24px;
+  height: 24px;
+}
+.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] .ph-nav-icon::after {
+  height: 2px;
+  background: #07552d;
+  box-shadow: 0 1px 0 #ffffffa6;
+}
+@media (max-height: 650px) {
+  .is-partner-home .ps-home--idle { padding: 24px 12px 36px; }
+  .is-partner-home .ps-home--idle .ps-home-status { gap: 14px; }
+}

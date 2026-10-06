@@ -19,15 +19,18 @@
     const opportunity = C.canModule('estoque') ? D.state.replenishment : null;
     const hasOpportunity = Boolean(opportunity?.measure && opportunity.demand_count > 0 && opportunity.quantity_available > 0);
     const total = photos.length + pickups.length + deliveries.length + C.partnerWaiting.count();
-    const page = U.node('div', null, total || errors || hasOpportunity ? 'ps-home ps-home--notices' : 'ps-home ps-home--idle');
+    const idle = !total && !errors && !hasOpportunity && !waiting;
+    const page = U.node('div', null, idle ? 'ps-home ps-home--idle' : 'ps-home ps-home--notices');
     if (waiting) {
       page.className = 'ps-home ps-home--notices';
       page.appendChild(U.button('CLIENTE ESPERANDO', () => C.partnerHome.open('partner-waiting'), 'primary', 'clock'));
     }
     const status = U.node('div', null, 'ps-home-status');
-    const image = (total || hasOpportunity) && !waiting ? U.node('span', null, 'ps-home-ok') : U.node('img');
-    if (image.tagName === 'IMG') {
-      image.src = '/operacao/assets/partner-status-v2.webp'; image.alt = ''; image.width = 182; image.height = 182;
+    const inlineIcon = (total || hasOpportunity) && !waiting;
+    const image = inlineIcon ? U.node('span', null, 'ps-home-ok') : U.node('img');
+    if (!inlineIcon) {
+      image.src = idle ? '/operacao/assets/partner-idle-emblem-v1.webp' : '/operacao/assets/partner-status-v2.webp';
+      image.alt = ''; image.width = idle ? 222 : 182; image.height = image.width; image.decoding = 'async';
     } else { image.setAttribute('aria-hidden', 'true'); image.appendChild(U.icon('check')); }
     const copy = U.node('div');
     copy.appendChild(U.node('h3', waiting ? 'Cliente esperando' : errors && !total ? 'Não consegui atualizar' : total || hasOpportunity ? 'Sem pedidos novos' : 'Tudo em dia!'));
