@@ -1,0 +1,96 @@
+/* Ícones renderizados e ornamentos da referência; rótulos e controles são HTML. */
+.caixa-app.is-partner-home:has(.ps-store--home) {
+  background-image: url('/operacao/assets/partner-store-background-v2.webp');
+  background-size: 100% calc(100% + 40px); background-position: center top; background-repeat: no-repeat;
+}
+.is-partner-home .ps-store {
+  --ps-store-steel: url('/operacao/assets/partner-store-background-v2.webp');
+}
+.is-partner-home .ps-store-art-icon {
+  display: block; flex: 0 0 auto; width: 72px; height: 72px;
+  background-image: url('/operacao/assets/partner-store-icons-v2.webp');
+  background-size: 200% 200%; background-repeat: no-repeat; pointer-events: none;
+}
+.is-partner-home .ps-store-art-icon--clock { background-position: left top; }
+.is-partner-home .ps-store-art-icon--people { background-position: right top; }
+.is-partner-home .ps-store-art-icon--delivery { background-position: left bottom; }
+.is-partner-home .ps-store-art-icon--sound { background-position: right bottom; }
+.is-partner-home .ps-store--home .ps-screen-heading { position: relative; padding-bottom: 15px; margin-bottom: 0; }
+.is-partner-home .ps-store--home .ps-screen-heading::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg,#5a66615e,#dce3e2 20%,#075b36 24%,#075b36 74%,#dce3e2 79%,#5a66615e);
+  box-shadow: 0 1px 0 #fff; pointer-events: none;
+}
+.is-partner-home .ps-store--home .ps-store-identity {
+  border: 0; box-shadow: none; padding: 16px 1px 21px; margin-bottom: 12px;
+}
+.is-partner-home .ps-store--home .ps-store-identity strong { font-size: 30px; text-shadow: 0 1px 0 #fff8; }
+.is-partner-home .ps-store--home .ps-store-menu { gap: 11px; }
+.is-partner-home .ps-store-row {
+  grid-template-columns: 72px minmax(0,1fr) 22px; gap: 12px; min-height: 89px;
+  padding: 8px 16px 9px; border: 1px solid #6c7671; border-radius: 11px;
+  background-image: linear-gradient(108deg,#ffffff45,#ffffff22 44%,#ffffff42 80%,#5a65600a),var(--ps-store-steel);
+  background-size: 100% 100%,540px 810px; background-position: center,center 48%;
+  box-shadow: inset 0 1px 0 #fff,inset 0 0 0 2px #e9efebc0,inset 0 -2px 2px #4b575a99,0 3px 3px #17261e80,0 6px 6px #17261e30;
+}
+.is-partner-home .ps-store-row::before {
+  content: ''; position: absolute; inset: 3px; border: 1px solid #8b969182; border-top-color: #ffffffb3;
+  border-radius: 8px; pointer-events: none;
+}
+.is-partner-home .ps-store-row::after {
+  content: ''; position: absolute; bottom: 0; right: 17px; width: 84px; height: 10px;
+  background: linear-gradient(135deg,#03482c,#147547 38%,#d9e0db 39%,#fff 43%,#87958e 44%,#a0aaa5 48%,transparent 49%);
+  clip-path: polygon(13% 0,100% 0,100% 18%,31% 18%,19% 100%,0 100%);
+  pointer-events: none;
+}
+.is-partner-home .ps-store-row .ps-store-copy {
+  align-self: stretch; justify-content: center; border-left: 1px solid #76857d;
+  box-shadow: -1px 0 0 #ffffffe0; padding: 0 0 0 11px; margin: 8px 0;
+}
+.is-partner-home .ps-store-row .ps-store-copy strong { font-size: clamp(21px,6.3vw,30px); letter-spacing: -.02em; }
+.is-partner-home .ps-store-row .ps-store-copy > span { font-size: 18px; }
+.is-partner-home .ps-store-arrow-art { color: #101713; filter: drop-shadow(-1px -1px 0 #ffffffe0) drop-shadow(1px 1px 0 #00643f); }
+.is-partner-home .ps-store .ps-store-exit-art { filter: drop-shadow(-1px -1px 0 #fff) drop-shadow(0 1px 0 #00381a); }
+.is-partner-home .ps-store--home .ps-store-sound {
+  position: relative; grid-template-columns: 72px minmax(0,1fr) 65px; gap: 12px;
+  padding: 12px 2px; margin-top: 16px; border-color: #5f6c6280;
+}
+.is-partner-home .ps-store--home .ps-store-sound::before,
+.is-partner-home .ps-store--home .ps-store-sound::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg,#076137 0%,#076137 24%,#f4f8f5 25%,#d8ded9 60%,#656f68 100%);
+  box-shadow: 0 1px 0 #fff; pointer-events: none;
+}
+.is-partner-home .ps-store--home .ps-store-sound::before { top: -1px; }
+.is-partner-home .ps-store--home .ps-store-sound::after { bottom: -1px; background: linear-gradient(90deg,#727c7499,#e9eee9 26%,#076137 27%,#076137 70%,#e9eee9 71%,#727c7499); }
+.is-partner-home .ps-store--home .ps-store-sound .ps-store-copy strong { font-size: 25px; }
+.is-partner-home .ps-store--home .ps-store-switch { width: 65px; }
+.is-partner-home .ps-store--home .ps-store-switch::before {
+  border: 1px solid #425a4c; outline: 1px solid #d8e3dc;
+  box-shadow: inset 0 0 0 1px #a7c3b099,inset 0 2px 2px #002218aa,0 2px 3px #1c2b2366;
+}
+.is-partner-home .ps-store--home .ps-store-switch > span {
+  width: 28px; height: 28px; border-color: #b1b8b5;
+  background: conic-gradient(from 30deg,#f3f5f4,#b0b9b5 11%,#f8faf9 24%,#a2aca7 39%,#f5f7f6 54%,#b5bfbb 72%,#f7f9f8 91%,#e4e9e6);
+  box-shadow: inset 0 0 0 1px #f2f6f4b3,0 1px 2px #0009;
+}
+.is-partner-home .ps-store--home .ps-store-logout {
+  width: 78%; margin-top: 20px; min-height: 59px; border: 1px solid #697770; border-radius: 11px;
+  background-image: linear-gradient(108deg,#ffffff52,#ffffff26),var(--ps-store-steel);
+  background-size: 100% 100%,540px 810px; background-position: center,center 48%;
+  box-shadow: inset 0 1px 0 #fff,inset 0 0 0 2px #e9efebc0,inset 0 -2px 2px #4b575a80,0 3px 3px #17261e80,0 6px 6px #17261e30;
+}
+.is-partner-home .ps-store--home .ps-store-logout > svg { width: 35px; height: 35px; }
+.caixa-app.is-partner-home:has(.ps-store--home) .ph-store { font-family: 'Partner Condensed',Arial,sans-serif; font-size: clamp(19px,5.5vw,24px); font-weight: 900; }
+.caixa-app.is-partner-home:has(.ps-store--home) .ph-nav { border-top: 3px solid #08663b; box-shadow: 0 -1px 0 #dcece2,0 -3px 6px #16281e66,inset 0 2px 1px #fff; }
+@media (max-width: 360px) {
+  .is-partner-home .ps-store-row { grid-template-columns: 59px minmax(0,1fr) 18px; gap: 8px; padding: 8px 12px; min-height: 80px; }
+  .is-partner-home .ps-store-row .ps-store-art-icon { width: 59px; height: 59px; }
+  .is-partner-home .ps-store-row .ps-store-copy { padding-left: 8px; }
+  .is-partner-home .ps-store-row .ps-store-copy strong { font-size: 21px; }
+  .is-partner-home .ps-store-row .ps-store-copy > span { font-size: 16px; }
+  .is-partner-home .ps-store--home .ps-store-sound { grid-template-columns: 59px minmax(0,1fr) 54px; gap: 8px; }
+  .is-partner-home .ps-store--home .ps-store-sound .ps-store-art-icon { width: 59px; height: 59px; }
+  .is-partner-home .ps-store--home .ps-store-sound .ps-store-copy strong { font-size: 22px; }
+  .is-partner-home .ps-store--home .ps-store-switch { width: 54px; }
+}

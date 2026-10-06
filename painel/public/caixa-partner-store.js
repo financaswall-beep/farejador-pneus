@@ -17,14 +17,25 @@
     exit: 'M10 3H3v18h7m4-15 6 6-6 6M8 12h12',
     arrow: 'm9 5 7 7-7 7',
   };
-  function icon(kind) { return paths[kind] ? C.createSvg([{ d: paths[kind] }]) : U.icon(kind); }
-  function plate(tag = 'div') {
-    const el = U.node(tag, null, 'ps-store-plate');
+  function icon(kind) {
+    if (['clock', 'people', 'delivery', 'sound'].includes(kind)) {
+      const el = U.node('span', null, 'ps-store-art-icon ps-store-art-icon--' + kind);
+      el.setAttribute('aria-hidden', 'true'); return el;
+    }
+    if (kind === 'exit') return C.createSvg([
+      { d: 'M10 3H3v18h7', 'stroke-width': '3.2' },
+      { d: 'm14 6 6 6-6 6M8 12h12', stroke: '#075b36', 'stroke-width': '3.2' },
+    ], 'ps-store-exit-art');
+    return paths[kind] ? C.createSvg([{ d: paths[kind] }], 'ps-store-arrow-art') : U.icon(kind);
+  }
+  function pins(el) {
     ['tl', 'tr', 'bl', 'br'].forEach(corner => {
       const pin = U.node('i', null, 'ps-store-screw ps-store-screw--' + corner);
       pin.setAttribute('aria-hidden', 'true'); el.appendChild(pin);
     });
-    return el;
+  }
+  function plate(tag = 'div') {
+    const el = U.node(tag, null, 'ps-store-plate'); pins(el); return el;
   }
   function screen(title, back) {
     const el = U.section(title, back); el.classList.add('ps-store'); return el;
@@ -53,6 +64,7 @@
   }
   function home() {
     const el = screen('Minha loja', () => C.partnerHome.open('partner-home'));
+    el.classList.add('ps-store--home');
     const identity = U.node('div', null, 'ps-store-identity');
     identity.append(U.node('strong', C.stored(C.keys.name) || 'Operador'), U.node('p', owner() ? 'Responsável pela loja' : 'Funcionário da loja'));
     el.appendChild(identity);
@@ -72,7 +84,7 @@
     }
     el.appendChild(soundRow());
     const logout = action('SAIR DA CONTA', () => C.elements.logout.click(), 'secondary');
-    logout.prepend(icon('exit')); logout.classList.add('ps-store-logout'); el.appendChild(logout); return el;
+    logout.prepend(icon('exit')); logout.classList.add('ps-store-logout'); pins(logout); el.appendChild(logout); return el;
   }
   function render() {
     if (!C.isPartner() || !C.token()) return;
