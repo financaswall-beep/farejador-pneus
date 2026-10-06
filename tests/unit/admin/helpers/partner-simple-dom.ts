@@ -21,7 +21,10 @@ export class TestNode {
   remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); }
   showModal() { this.open = true; }
   close() { this.open = false; void this.fire('close'); }
-  style: Record<string, any> = { removeProperty: vi.fn() };
+  style: Record<string, any> = {
+    setProperty: vi.fn((name: string, value: string) => { this.style[name] = value; }),
+    removeProperty: vi.fn((name: string) => { delete this.style[name]; }),
+  };
   constructor(tagName = 'div') { this.tagName = tagName; }
   get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(''); }
   set textContent(value: string) { this.ownText = String(value); this.children = []; }
@@ -73,10 +76,10 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     partnerSales: { render: vi.fn(), load: vi.fn(async () => {}), leave: vi.fn() },
   };
   const context = {
-    window: { Caixa: C, location, navigator: { onLine: true }, addEventListener: vi.fn(),
+    window: { Caixa: C, location, navigator: { onLine: true }, addEventListener: vi.fn(), removeEventListener: vi.fn(), scrollTo: vi.fn(),
       setInterval: vi.fn(() => 1), clearInterval: vi.fn() }, location,
     history: { replaceState: (_: any, __: any, path: string) => { location.hash = path.includes('#') ? '#' + path.split('#')[1] : ''; } },
-    document: { getElementById: node, createElement: (tag: string) => new TestNode(tag), createTextNode: (text: string) => { const el = new TestNode('#text'); el.textContent = text; return el; },
+    document: { documentElement: new TestNode('html'), getElementById: node, createElement: (tag: string) => new TestNode(tag), createTextNode: (text: string) => { const el = new TestNode('#text'); el.textContent = text; return el; },
       querySelector: () => node('legacy-nav') },
     localStorage: { getItem: (key: string) => storage.get(key) || null, setItem: (key: string, value: string) => storage.set(key, value) },
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,

@@ -118,3 +118,13 @@
   .is-partner-home .ph-content { gap: 20px; padding: 22px 18px; }
   .is-partner-home .ph-status { transform: scale(.85); margin: -13px 0; }
 }
+/* Somente iOS autenticado como parceiro: o documento não deve rolar junto com os cards. */
+@media screen {
+  html.partner-ios-locked { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
+  html.partner-ios-locked body { position: fixed; top: var(--partner-ios-top,0px); right: 0; left: 0; height: var(--partner-ios-height,100dvh); min-height: 0; overflow: hidden; overscroll-behavior: none; }
+  .partner-ios-locked .caixa-shell { height: 100%; min-height: 0; padding: 0; overflow: hidden; }
+  .partner-ios-locked .caixa-app.is-partner-home { height: 100%; min-height: 0; max-height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .partner-ios-locked .is-partner-home #partner-home-screen,
+  .partner-ios-locked .is-partner-home .pr-detail .receipt-content,
+  .partner-ios-locked .is-partner-home .ps-brand-list { overscroll-behavior: none; }
+}

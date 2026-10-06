@@ -5,6 +5,34 @@
   const panel = id('panel');
   let active = false;
   let tab = 'partner-home';
+  let viewportLocked = false;
+  function updateViewport() {
+    const viewport = window.visualViewport;
+    // O zoom continua sob controle do navegador; não encolha o layout durante o gesto.
+    if (!viewportLocked || (viewport && viewport.scale !== 1)) return;
+    const height = viewport?.height || window.innerHeight;
+    if (!Number.isFinite(height) || height <= 0) return;
+    document.documentElement.style.setProperty('--partner-ios-height', height + 'px');
+    document.documentElement.style.setProperty('--partner-ios-top', Math.max(0, viewport?.offsetTop || 0) + 'px');
+  }
+  function syncViewport(enabled) {
+    const nav = window.navigator;
+    const ios = /iPhone|iPad|iPod/.test(nav?.userAgent || '')
+      || (nav?.platform === 'MacIntel' && nav.maxTouchPoints > 1);
+    const locked = enabled && ios;
+    if (locked === viewportLocked) return;
+    viewportLocked = locked;
+    document.documentElement.classList.toggle('partner-ios-locked', locked);
+    const listener = locked ? 'addEventListener' : 'removeEventListener';
+    window[listener]('resize', updateViewport);
+    window.visualViewport?.[listener]('resize', updateViewport);
+    window.visualViewport?.[listener]('scroll', updateViewport);
+    if (locked) { window.scrollTo(0, 0); updateViewport(); }
+    else {
+      document.documentElement.style.removeProperty('--partner-ios-height');
+      document.documentElement.style.removeProperty('--partner-ios-top');
+    }
+  }
   function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy() || C.partnerStore.busy(); }
   function renderConnection() {
     const online = window.navigator?.onLine !== false;
@@ -63,6 +91,7 @@
     if (next !== 'partner-stock') C.partnerStockForm.reset();
     if (next !== 'partner-profile') C.partnerStore.leave();
     C.elements.app.classList.toggle('is-partner-home', active);
+    syncViewport(active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
     const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : 'orders';
@@ -76,6 +105,7 @@
   }
   function reset() {
     active = false; tab = 'partner-home';
+    syncViewport(false);
     C.partnerOrders.stop();
     C.partnerReplenishment.reset();
     C.partnerSales.leave();
