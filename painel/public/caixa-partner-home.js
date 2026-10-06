@@ -5,7 +5,7 @@
   const panel = id('panel');
   let active = false;
   let tab = 'partner-home';
-  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy(); }
+  function busy() { return C.partnerPhoto.busy() || C.partnerPickups.busy() || C.partnerDeliveries.busy() || C.partnerWaiting.busy() || C.partnerStock.busy() || C.partnerStore.busy(); }
   function renderConnection() {
     const online = window.navigator?.onLine !== false;
     id('connection').dataset.state = online ? 'online' : 'offline';
@@ -61,17 +61,18 @@
     tab = next;
     if (!active || next !== 'partner-sales') C.partnerSales.leave();
     if (next !== 'partner-stock') C.partnerStockForm.reset();
+    if (next !== 'partner-profile') C.partnerStore.leave();
     C.elements.app.classList.toggle('is-partner-home', active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
-    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : 'orders';
+    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : 'orders';
     ['orders', 'sales', 'stock'].forEach(name => {
       if (name === current) id(name).setAttribute('aria-current', 'page');
       else id(name).removeAttribute('aria-current');
     });
     render();
     if (next === 'partner-sales') void C.partnerSales.load();
-    else if (next === 'partner-stock') void C.partnerExtras.load(next);
+    else if (next === 'partner-stock' || next === 'partner-profile') void C.partnerExtras.load(next);
   }
   function reset() {
     active = false; tab = 'partner-home';

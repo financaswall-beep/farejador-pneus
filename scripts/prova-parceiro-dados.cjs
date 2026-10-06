@@ -1,6 +1,7 @@
 // Cenários exclusivamente locais. Não consulta Chatwoot ou banco de dados.
 const stores = new Map();
 const { salesFixture } = require('./prova-parceiro-vendas.cjs');
+const { storeFixture } = require('./prova-parceiro-loja.cjs');
 function initial(scenario) {
   const item = (size, qty = 1) => ({ tire_size: size, label: size, quantity: qty, tire_condition: 'meia_vida' });
   const items = [item('90/90-18'), item('80/100-14')];
@@ -29,6 +30,8 @@ function fixturePayload(req, url, input) {
   if (!stores.has(token)) stores.set(token, initial(scenario));
   const data = stores.get(token);
   const pathname = url.pathname;
+  const store = storeFixture(req, url, input, data);
+  if (store) return store;
   const sales = salesFixture(url);
   if (sales) return sales;
   if (pathname.endsWith('/confirmacoes-estoque')) return { enabled: true, rows: data.waiting };

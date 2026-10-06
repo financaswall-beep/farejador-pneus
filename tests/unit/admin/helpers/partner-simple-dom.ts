@@ -17,15 +17,17 @@ export class TestNode {
   files: unknown[] = [];
   open = false;
   focus = vi.fn();
+  parentElement: TestNode | null = null;
+  remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); }
   showModal() { this.open = true; }
   close() { this.open = false; void this.fire('close'); }
   style: Record<string, any> = { removeProperty: vi.fn() };
   constructor(tagName = 'div') { this.tagName = tagName; }
   get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(''); }
   set textContent(value: string) { this.ownText = String(value); this.children = []; }
-  append(...nodes: TestNode[]) { this.children.push(...nodes); }
+  append(...nodes: TestNode[]) { nodes.forEach(node => { node.parentElement = this; }); this.children.push(...nodes); }
   prepend(...nodes: TestNode[]) { this.children.unshift(...nodes); }
-  appendChild(node: TestNode) { this.children.push(node); return node; }
+  appendChild(node: TestNode) { node.parentElement = this; this.children.push(node); return node; }
   replaceChildren(...nodes: TestNode[]) { this.ownText = ''; this.children = nodes; }
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   removeAttribute(name: string) { delete this.attributes[name]; }
@@ -80,7 +82,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-extras', 'partner-replenishment', 'partner-home']) {
+  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-replenishment', 'partner-home']) {
     runInNewContext(readFileSync('painel/public/caixa-' + file + '.js', 'utf8'), context);
   }
   C.showTab = (tab: string) => C.partnerHome.sync(C.authorizedOperationTab(tab));
