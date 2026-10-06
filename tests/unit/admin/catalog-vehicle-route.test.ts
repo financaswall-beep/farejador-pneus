@@ -11,6 +11,9 @@ vi.mock('../../../src/admin/painel/route-helpers.js', () => ({ operatorLabel: ()
 vi.mock('../../../src/admin/painel/queries-catalogo.js', () => ({
   getCatalogOverview: svc.read, getCatalogPriceHistory: vi.fn(), setCatalogPrice: vi.fn(),
 }));
+vi.mock('../../../src/admin/painel/queries-catalogo-wholesale.js', () => ({
+  getMatrixCatalogWithWholesale: svc.read, getCatalogWholesaleHistory: vi.fn(), setCatalogWholesalePrice: vi.fn(),
+}));
 vi.mock('../../../src/admin/painel/queries-catalogo-create.js', () => ({
   createCatalogProduct: svc.create, createCatalogProductFromStock: svc.create,
 }));

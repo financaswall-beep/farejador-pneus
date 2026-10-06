@@ -151,7 +151,7 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoOpen(row) {
-      if (this.adminUser?.role !== 'owner') return;
+      if (this.adminUser?.role !== 'owner' || this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving) return;
       if (row?.measure_draft) {
         this.catalogoCreateNew();
         this.catalogoCadastro.row = row;
@@ -169,6 +169,7 @@ window.PAINEL_MODULES.catalogo = function () {
         return;
       }
       this.catalogoSelecionado = row;
+      this.catalogoAtacadoInit?.(row);
       this.catalogoPriceForm = {
         price: row.price_amount == null ? '' : Number(row.price_amount).toFixed(2),
         reason: '',
@@ -190,7 +191,7 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     catalogoClose() {
-      if (this.catalogoSaving || this.catalogoSpecSaving) return;
+      if (this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving) return;
       this.catalogoSelecionado = null;
       this.catalogoHistory = [];
       this.catalogoMessage = null;
@@ -235,6 +236,7 @@ window.PAINEL_MODULES.catalogo = function () {
     catalogoPodeSalvar() {
       const price = this.catalogoNovoPreco();
       return this.adminUser?.role === 'owner' && !this.catalogoSaving
+        && !this.catalogoAtacadoSaving
         && price > 0 && Math.abs(price * 100 - Math.round(price * 100)) < 1e-7
         && String(this.catalogoPriceForm.reason || '').trim().length >= 2;
     },

@@ -2,7 +2,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.catalogoFicha = function () {
   return {
     catalogoPodeSalvarSpec() {
-      return this.adminUser?.role === 'owner' && !this.catalogoSpecSaving
+      return this.adminUser?.role === 'owner' && !this.catalogoSpecSaving && !this.catalogoAtacadoSaving
         && this.catalogoSelecionado?.product_type === 'tire'
         && String(this.catalogoSpecForm?.reason || '').trim().length >= 2;
     },

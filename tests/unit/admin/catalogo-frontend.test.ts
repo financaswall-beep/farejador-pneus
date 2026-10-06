@@ -270,7 +270,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
-    expect(html.includes('app.catalogo.js?v=20260916-vehicle-ui1')).toBe(true);
+    expect(html.includes('app.catalogo.js?v=20261006-atacado1')).toBe(true);
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');

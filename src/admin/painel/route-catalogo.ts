@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
-import { getCatalogOverview, getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
+import { getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
+import { getMatrixCatalogWithWholesale } from './queries-catalogo-wholesale.js';
+import { registerCatalogWholesale } from './route-catalogo-wholesale.js';
 import {
   addCatalogCompatibility,
   createCatalogFitmentDiscovery,
@@ -34,10 +36,11 @@ import {
 } from './route-catalogo-schemas.js';
 
 export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<void> {
+  await registerCatalogWholesale(fastify);
   fastify.get('/admin/api/catalog', { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = z.object({ vehicle_type: tireVehicleFilterSchema.default('all') }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_vehicle_type' });
-    return reply.status(200).send(await getCatalogOverview(undefined, undefined, query.data.vehicle_type));
+    return reply.status(200).send(await getMatrixCatalogWithWholesale(undefined, undefined, query.data.vehicle_type));
   });
 
   fastify.get('/admin/api/catalog/vehicle-inventory', { preHandler: requireAdminOwner }, async (_request, reply) => {

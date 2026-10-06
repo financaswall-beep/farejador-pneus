@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260930-results1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260923-comments1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261006-atacado1" />
 <style>
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -280,10 +280,11 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260916-vehicle-ui1"></script>
-<script src="/admin/painel/app.catalogo.ficha.js?v=20260916-vehicle1"></script>
+<script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
-  <script src="/admin/painel/app.catalogo.js?v=20260916-vehicle-ui1"></script>
+  <script src="/admin/painel/app.catalogo.js?v=20261006-atacado1"></script>
+<script src="/admin/painel/app.catalogo.atacado.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260916-vehicle-ui1"></script>
@@ -296,7 +297,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261003-logistica-conciliacao1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/app.js?v=20261002-audit2"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
@@ -10393,7 +10394,7 @@
         <div x-show="!catalogoLoading && !catalogoError" class="overflow-x-auto">
           <table class="w-full min-w-[1180px] text-left">
             <thead class="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              <tr><th class="px-5 py-3">Produto</th><th class="px-4 py-3">Estoque</th><th class="px-4 py-3">Custo no estoque</th><th class="px-4 py-3">Preço varejo</th><th class="px-4 py-3">Lucro bruto</th><th class="px-4 py-3">Margem</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Compatibilidade</th><th class="px-5 py-3 text-right">Ações</th></tr>
+              <tr><th class="px-5 py-3">Produto</th><th class="px-4 py-3">Estoque</th><th class="px-4 py-3">Custo no estoque</th><th class="px-4 py-3">Preço varejo</th><th class="bg-emerald-50 px-4 py-3 text-emerald-800">Preço atacado</th><th class="px-4 py-3">Lucro bruto</th><th class="px-4 py-3">Margem</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Compatibilidade</th><th class="px-5 py-3 text-right">Ações</th></tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
               <template x-for="row in catalogoPaginaRows()" :key="row.row_key || row.product_id">
@@ -10426,6 +10427,7 @@
                   <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="row.measure_draft ? '—' : (row.product_type === 'service' ? 'Não se aplica' : Number(row.official_quantity_on_hand || 0) + ' un.')"></p><p class="text-[10px] text-gray-400" x-text="row.measure_draft ? 'Sem produto comercial' : (row.product_type === 'service' ? 'Serviço' : 'Galpão central')"></p></td>
                   <td class="px-4 py-3.5"><p class="text-sm font-medium" x-text="row.product_type === 'service' ? 'Não se aplica' : (row.official_unit_cost == null ? '—' : formatCurrency(Number(row.official_unit_cost)))"></p><p class="flex items-center gap-1 text-[10px] text-gray-400"><i data-lucide="lock" class="h-2.5 w-2.5"></i>Somente leitura</p></td>
                   <td class="px-4 py-3.5"><p class="text-base font-bold text-gray-950" x-text="Number(row.price_amount) > 0 ? formatCurrency(Number(row.price_amount)) : '—'"></p><p class="text-[10px] text-gray-400" x-text="Number(row.price_amount) > 0 ? 'oficial da Matriz' : 'sem preço'"></p></td>
+                  <td class="bg-emerald-50/50 px-4 py-3.5"><p class="text-base font-bold text-emerald-800" x-text="row.product_type !== 'tire' || !row.product_id ? '—' : (row.wholesale_price_amount == null ? 'Não definido' : formatCurrency(Number(row.wholesale_price_amount)))"></p><p x-show="row.product_type === 'tire' && row.product_id" class="text-[10px] text-emerald-700">Preço para parceiro</p></td>
                   <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400" x-text="row.product_type === 'service' ? 'Custo não configurado' : 'por pneu'"></p></td>
                   <td class="px-4 py-3.5 text-sm font-medium" x-text="catalogoPercent(row.margin_percent)"></td>
                   <td class="px-4 py-3.5">
@@ -10445,7 +10447,7 @@
                   <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.measure_draft ? 'Completar cadastro' : (row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.product_type === 'tire' && !row.tire_position ? 'Completar ficha' : (Number(row.price_amount) > 0 ? 'Editar produto' : 'Definir preço'))))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
                 </tr>
               </template>
-              <tr x-show="catalogoPaginaRows().length === 0"><td colspan="9" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
+              <tr x-show="catalogoPaginaRows().length === 0"><td colspan="10" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
             </tbody>
           </table>
         </div>
@@ -10811,8 +10813,11 @@
 
           <div x-show="catalogoMessage" :class="catalogoMessage?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoMessage?.text"></div>
 
+          <button type="button" @click="catalogoSavePrice()" :disabled="!catalogoPodeSalvar()" class="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="save" class="h-4 w-4"></i><span x-text="catalogoSaving ? 'Salvando...' : 'Salvar preço de varejo'"></span></button>
+          <p class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"><i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>Depois de salvar o varejo, bot e Vendas usarão o novo preço somente na Matriz. Parceiros e vendas antigas não mudam.</p>
+
           <section class="border-t border-gray-100 pt-5">
-            <div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-gray-950">Histórico de preços</h3><span class="text-[10px] text-gray-400">últimas 20 alterações</span></div>
+            <div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-gray-950">Histórico do varejo</h3><span class="text-[10px] text-gray-400">últimas 20 alterações</span></div>
             <div class="mt-3 divide-y divide-gray-100">
               <template x-for="item in catalogoHistory.slice(0,5)" :key="item.id">
                 <div class="flex items-start justify-between gap-3 py-3 text-xs">
@@ -10823,11 +10828,22 @@
               <p x-show="catalogoHistory.length === 0" class="py-5 text-center text-xs text-gray-400">Nenhuma alteração anterior.</p>
             </div>
           </section>
+
+          <section x-show="catalogoSelecionado?.product_type === 'tire'" data-testid="catalog-wholesale-editor" class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <h3 class="text-sm font-semibold text-emerald-900">Preço de atacado</h3>
+            <p class="mt-1 text-xs leading-5 text-gray-600">É o valor que o parceiro paga para comprar da 2W.</p>
+            <label class="mt-4 block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Preço para parceiro</span><div class="flex rounded-lg border border-emerald-700 bg-white focus-within:ring-2 focus-within:ring-emerald-100"><span class="border-r border-gray-100 px-3 py-2 text-sm text-gray-400">R$</span><input x-model="catalogoAtacadoForm.price" type="text" inputmode="decimal" placeholder="Não definido" class="min-w-0 flex-1 rounded-r-lg px-3 py-2 text-sm font-semibold outline-none"></div></label>
+            <p class="mt-2 text-[11px] leading-5 text-gray-500">Deixe vazio para retirar a oferta do atacado. Este valor não é usado pelo bot.</p>
+            <label class="mt-4 block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Motivo da alteração do atacado *</span><textarea x-model="catalogoAtacadoForm.reason" maxlength="500" rows="2" placeholder="Ex.: tabela de preço para parceiros" class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-700"></textarea></label>
+            <div x-show="catalogoAtacadoMessage" :class="catalogoAtacadoMessage?.ok ? 'text-emerald-800' : 'text-rose-700'" class="mt-3 text-xs" role="status" x-text="catalogoAtacadoMessage?.text"></div>
+            <button type="button" @click="catalogoAtacadoSave()" :disabled="!catalogoAtacadoCanSave()" class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="save" class="h-4 w-4"></i><span x-text="catalogoAtacadoSaving ? 'Salvando atacado...' : 'Salvar preço de atacado'"></span></button>
+            <details class="mt-4 border-t border-emerald-100 pt-3"><summary class="cursor-pointer text-xs font-semibold text-emerald-900">Histórico do atacado</summary><div class="mt-2 divide-y divide-emerald-100"><template x-for="item in catalogoAtacadoHistory" :key="item.id"><div class="py-2 text-xs"><div class="flex justify-between gap-3"><span x-text="catalogoDate(item.valid_from)"></span><strong x-text="item.price_amount == null ? 'Oferta retirada' : formatCurrency(Number(item.price_amount))"></strong></div><p class="mt-1 text-[10px] text-gray-500" x-text="[item.actor_label,item.reason].filter(Boolean).join(' · ')"></p></div></template><p x-show="!catalogoAtacadoHistoryError && catalogoAtacadoHistory.length === 0" class="py-3 text-xs text-gray-500">Nenhuma alteração de atacado.</p><button x-show="catalogoAtacadoHistoryError" type="button" @click="catalogoAtacadoLoadHistory(catalogoSelecionado.product_id)" class="py-3 text-xs text-rose-700 underline">Histórico indisponível. Tentar novamente</button></div></details>
+          </section>
         </div>
 
         <div class="border-t border-gray-100 bg-white px-6 py-4">
-          <p class="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"><i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>Depois de salvar, bot e Vendas usarão o novo preço somente na Matriz. Parceiros e vendas antigas não mudam.</p>
-          <button type="button" @click="catalogoSavePrice()" :disabled="!catalogoPodeSalvar()" class="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="save" class="h-4 w-4"></i><span x-text="catalogoSaving ? 'Salvando...' : 'Salvar novo preço'"></span></button>
+          <p class="mb-3 text-xs text-gray-500">Varejo e atacado têm salvamento independente.</p>
+          <button type="button" @click="catalogoClose()" :disabled="catalogoSaving || catalogoSpecSaving || catalogoAtacadoSaving" class="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">Fechar</button>
         </div>
       </aside>
     </div>
