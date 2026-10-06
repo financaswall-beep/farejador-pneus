@@ -84,7 +84,6 @@
 }
 .is-partner-home .ps-store--home .ps-store-logout > svg { width: 35px; height: 35px; }
 .caixa-app.is-partner-home:has(.ps-store--home) .ph-store { font-family: 'Partner Condensed',Arial,sans-serif; font-size: clamp(19px,5.5vw,24px); font-weight: 900; }
-.caixa-app.is-partner-home:has(.ps-store--home) .ph-nav { border-top: 3px solid #08663b; box-shadow: 0 -1px 0 #dcece2,0 -3px 6px #16281e66,inset 0 2px 1px #fff; }
 @media (max-width: 360px) {
   .is-partner-home .ps-store-row { grid-template-columns: 59px minmax(0,1fr) 18px; gap: 8px; padding: 8px 12px; min-height: 80px; }
   .is-partner-home .ps-store-row .ps-store-art-icon { width: 59px; height: 59px; }

@@ -44,30 +44,6 @@
   font-size: clamp(19px, 5.4vw, 24px);
   letter-spacing: -.025em;
 }
-.is-partner-home:has(.ps-home--idle) .ph-nav {
-  border-top: 3px solid #08613c;
-  box-shadow: 0 -2px 3px #13372b45, inset 0 1px 0 #fff;
-}
-.is-partner-home:has(.ps-home--idle) .ph-nav button {
-  font-family: 'Partner Condensed', 'Arial Narrow', Arial, sans-serif;
-  font-size: clamp(14px, 3.8vw, 18px);
-  font-weight: 700;
-}
-.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] .ph-nav-icon {
-  border-color: transparent;
-  color: #07552d;
-  background: none;
-  box-shadow: none;
-}
-.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] svg {
-  width: 24px;
-  height: 24px;
-}
-.is-partner-home:has(.ps-home--idle) .ph-nav button[aria-current='page'] .ph-nav-icon::after {
-  height: 2px;
-  background: #07552d;
-  box-shadow: 0 1px 0 #ffffffa6;
-}
 @media (max-height: 650px) {
   .is-partner-home .ps-home--idle { padding: 24px 12px 36px; }
   .is-partner-home .ps-home--idle .ps-home-status { gap: 14px; }
