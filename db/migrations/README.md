@@ -366,3 +366,5 @@ Zera PII do contato, mantém agregados, registra em `ops.erasure_log`.
 ### Reposição com várias medidas
 
 `0265_partner_replenishment_multiple_measures.sql` amplia a projeção existente para todas as medidas com falta registrada na própria loja e saldo livre na 2W. Mantém a janela de 7 dias, isolamento de ambiente/unidade, condições, marcas e bloqueio de simulações; ordena pela procura sem expor clientes ou custos.
+
+`0266_partner_replenishment_demo.sql` preserva esse motor em `commerce.partner_replenishment_live_offers()` e permite demonstrar o card somente na unidade `teste-app-parceiro-0410`, com dono `parceiro.teste`, comissão zero e pedidos da rede desativados. Sem procura real, lê o último evento `partner_replenishment_demo_created` de `audit.events`, com `simulation: true` e lista `measures` (`measure`, `tire_condition`, `demand_count`). O exemplo dura duas horas e usa apenas o saldo real disponível no galpão para medidas ausentes na loja. Não cria conversas, buscas, classificações, reservas ou vendas. Um evento novo com lista vazia encerra a demonstração.
