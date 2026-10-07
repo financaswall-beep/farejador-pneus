@@ -16,6 +16,13 @@ function calcularFrete(...ids: string[]): ChatMessage[] {
 }
 
 describe('extractRecentProductIds', () => {
+  it('preserva os dois pneus fotografados nas próximas consultas', () => {
+    const photos: ChatMessage[] = [{ role: 'assistant', content: null, tool_calls: [{
+      id: 'fotos', type: 'function', function: { name: 'pedir_foto', arguments: JSON.stringify({ product_ids: ['A', 'B'] }) },
+    }] }];
+    expect(extractRecentProductIds([photos, buscarProduto('TOP', 'A', 'B')])).toEqual(['A', 'B']);
+    expect(extractRecentProductIds([calcularFrete('C'), photos])).toEqual(['C']);
+  });
   it('mantém o produto da busca automática após aplicação por medida', () => {
     const actions = buscarProduto('NMAX-SKU');
     actions[0]!.tool_calls![0]!.function.name = 'buscar_compatibilidade';

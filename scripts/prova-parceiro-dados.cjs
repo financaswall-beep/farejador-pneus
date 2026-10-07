@@ -12,7 +12,10 @@ function initial(scenario) {
   return {
     pickups: ['avisos', 'retirada'].includes(scenario) ? [pickup] : [],
     deliveries: ['avisos', 'entrega'].includes(scenario) ? [delivery('22222222-2222-4222-8222-222222222222', 'Maria', 'pending', null), delivery('33333333-3333-4333-8333-333333333333', 'Pedro', 'dispatched', 'João Meier')] : [],
-    photos: ['avisos', 'foto'].includes(scenario) ? [photo] : [],
+    photos: scenario === 'fotos-duas' ? [
+      { ...photo, photo_group_id: '66666666-6666-4666-8666-666666666666', customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null },
+      { ...photo, id: '77777777-7777-4777-8777-777777777777', tire_size: '80/100-14', photo_group_id: '66666666-6666-4666-8666-666666666666', customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null },
+    ] : ['avisos', 'foto'].includes(scenario) ? [{ ...photo, customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null }] : [],
     waiting: ['esperando', 'fila'].includes(scenario) ? Array.from({ length: scenario === 'fila' ? 3 : 1 }, (_, index) => ({
       id: '55555555-5555-4555-8555-' + String(index + 1).padStart(12, '5'), revision: index + 1,
       items: index === 0 ? items : [item(index === 1 ? '100/90-18' : '110/90-17')],

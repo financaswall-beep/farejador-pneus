@@ -4115,6 +4115,8 @@ export async function upsertPartnerPermissions(
 
 export interface PartnerPhotoQueueItem {
   id: string;
+  photo_group_id: string;
+  tire_condition: string | null;
   tire_size: string;
   brand: string | null;
   note: string | null;
@@ -4140,7 +4142,7 @@ export async function getPartnerPhotoQueue(ctx: PartnerContext): Promise<Partner
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const res = await client.query<PartnerPhotoQueueItem>(
       `SELECT id, tire_size, brand, note, status, was_late, has_photo, photo_count,
-              expires_at, answered_at, created_at, customer_name
+              expires_at, answered_at, created_at, customer_name, photo_group_id, tire_condition
          FROM commerce.partner_photo_queue
         WHERE status IN ('pending', 'answered')
            OR created_at > now() - interval '2 hours'

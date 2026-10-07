@@ -12,7 +12,7 @@ import { activeToolDefinitions, executeTool } from './tools.js';
 import { sealStockRequestAndGuardText,publishStockRequest } from './stock-confirmation.js';
 import { sendFinalAgentText } from './final-send.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
-import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
+import { photoRequestNudge } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
 import { buildProductSearchNudge } from './product-search-nudge.js';
 import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
@@ -144,7 +144,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const lastAssistantText =
       reversedHistory.find((m) => m.role === 'assistant' && m.content)?.content ?? null;
     const photoNudge =
-      env.PHOTO_REQUESTS && customerWantsPhoto(latestCustomerText, lastAssistantText) ? PHOTO_NUDGE : '';
+      env.PHOTO_REQUESTS ? photoRequestNudge(latestCustomerText, lastAssistantText) : '';
     // Empurrão de localização-EM-TEXTO (gêmeo do pino): quando o bot acabou de pedir
     // a localização e o cliente respondeu em texto (sem pino), o LLM às vezes regride —
     // recita o pneu de novo em vez de reconhecer a loja e avançar (conversa 668, 06-16).

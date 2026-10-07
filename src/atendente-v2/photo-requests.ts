@@ -37,6 +37,7 @@ export interface CreatePhotoRequestInput {
   /** O que o card mostra em destaque (nome/medida do pneu). */
   tireSize: string;
   brand: string | null;
+  tireCondition?: string | null;
   /**
    * Nome do cliente pro card de Avisos (decisão do dono 2026-06-15): SÓ o nome,
    * pra o borracheiro diferenciar as pessoas. NUNCA telefone/contato (só o nome
@@ -92,8 +93,11 @@ export async function createPhotoRequest(
   const ins = await client.query<{ id: string }>(
     `INSERT INTO commerce.photo_requests
        (environment, unit_id, conversation_id, tire_size, brand, customer_label,
-        expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(mins => $7))
+        expires_at, photo_group_id, tire_condition)
+     VALUES ($1::public.env_t, $2, $3, $4, $5, $6, now() + make_interval(mins => $7),
+       COALESCE((SELECT photo_group_id FROM commerce.photo_requests
+         WHERE environment=$1::public.env_t AND conversation_id=$3 AND unit_id=$2
+           AND status IN ('pending','answered') ORDER BY created_at DESC, id LIMIT 1), gen_random_uuid()), $8)
      RETURNING id`,
     [
       environment,
@@ -103,6 +107,7 @@ export async function createPhotoRequest(
       input.brand,
       input.customerLabel ?? null,
       PHOTO_REQUEST_TTL_MINUTES,
+      input.tireCondition ?? null,
     ],
   );
   const photoRequestId = ins.rows[0]!.id;

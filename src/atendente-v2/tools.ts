@@ -68,6 +68,7 @@ import { STOCK_INTEREST_TOOL, registerStockInterest } from './stock-interest.js'
 import { audioNeedsConfirmation } from './audio-transcription.js';
 import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRouteOptions,cancelStockConfirmation,CANCEL_STOCK_CONFIRMATION_TOOL } from './stock-confirmation.js';
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
+import { requestPhotoBatch } from './photo-batch.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -271,6 +272,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             type: 'string',
             description: 'UUID do pneu que o cliente quer ver (de buscar_produto/buscar_compatibilidade). Se omitir, uso o último pneu buscado na conversa.',
           },
+          product_ids: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 2, uniqueItems: true,
+            description: 'Para foto dos dois pneus escolhidos, passe os dois UUIDs consultados aqui. Não passe product_id junto. Não use duas alternativas da mesma medida sem o cliente escolher.' },
           bairro: { type: 'string', description: 'Bairro do cliente, se informado — acha a loja que TEM o pneu.' },
           municipio: { type: 'string', description: 'Cidade (opcional).' },
         },
@@ -977,6 +980,9 @@ async function executeToolInternal(
           return JSON.stringify({ status: 'indisponivel' });
         }
 
+        if (Object.prototype.hasOwnProperty.call(args, 'product_ids')) return await requestPhotoBatch(
+          client, environment, args, single => executeToolInternal(client, environment, conversationId, 'pedir_foto', single));
+
         // Produto: o que o LLM passou, senão o último pneu buscado na conversa.
         let productId = typeof args.product_id === 'string' ? args.product_id : null;
         if (!productId) {
@@ -1033,9 +1039,9 @@ async function executeToolInternal(
         }
 
         // Rótulo do card (medida em destaque) — snapshot do produto.
-        const prod = await client.query<{ product_name: string; brand: string | null }>(
-          'SELECT product_name, brand FROM commerce.products WHERE id = $1 LIMIT 1',
-          [productId],
+        const prod = await client.query<{ product_name: string; brand: string | null; tire_condition: string | null }>(
+          'SELECT product_name, brand, tire_condition FROM commerce.products WHERE id = $1 AND environment=$2 LIMIT 1',
+          [productId, environment],
         );
         const nomePneu = prod.rows[0]?.product_name ?? 'pneu';
         const marca = prod.rows[0]?.brand ?? null;
@@ -1065,6 +1071,7 @@ async function executeToolInternal(
           chatwootConversationId: chatwootConvId,
           tireSize: nomePneu,
           brand: marca,
+          tireCondition: prod.rows[0]?.tire_condition,
           customerLabel,
         });
         if (created.status === 'limit') {

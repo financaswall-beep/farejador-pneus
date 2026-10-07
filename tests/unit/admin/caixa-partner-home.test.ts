@@ -127,7 +127,7 @@ describe('Operação simples exclusiva do parceiro', () => {
     C.partnerPhoto.open('photo-a'); const input = root.querySelectorAll('input')[0]; input.files = [{ name: 'foto.jpg' }];
     await input.fire('change'); await vi.waitFor(() => expect(root.textContent).toContain('ENVIAR'));
     C.authenticatedFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ attached: true }) });
-    await button('ENVIAR').click(); await vi.waitFor(() => expect(C.loadPhotoRequests).toHaveBeenCalled());
+    await button('ENVIAR FOTO').click(); await vi.waitFor(() => expect(C.loadPhotoRequests).toHaveBeenCalled());
     expect(C.compressPhoto).toHaveBeenCalledOnce();
     expect(C.authenticatedFetch.mock.calls[0][0]).toContain('/operacao/pedidos-foto/photo-a/foto');
     expect(C.authenticatedFetch.mock.calls[0][1].headers['Content-Type']).toBe('image/jpeg');

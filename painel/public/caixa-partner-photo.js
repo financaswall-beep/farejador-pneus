@@ -1,93 +1,119 @@
 (function () {
   'use strict';
-  const C = window.Caixa;
-  const U = C.partnerUI;
-  let selected = '';
-  let previews = [];
-  let busy = false;
-  let error = '';
+  const C = window.Caixa, V = C.partnerPhotoUI;
+  let items = [], index = 0, reviewing = false, busy = false, error = '', timer = 0;
+  function leave() { if (timer) window.clearInterval(timer); timer = 0; }
   function clear() {
-    previews.forEach(item => URL.revokeObjectURL(item.url)); previews = [];
+    leave(); items.forEach(item => item.photos.forEach(photo => URL.revokeObjectURL(photo.url)));
+    items = []; index = 0; reviewing = false; error = '';
   }
-  function list() {
-    const page = U.section('Pedidos de foto', () => C.partnerHome.open('partner-home'));
-    const rows = C.state.photoRequests || [];
-    if (!rows.length) page.appendChild(U.node('p', 'Nenhuma foto para enviar.', 'ps-copy'));
-    rows.forEach(item => {
-      const row = U.node('article', null, 'ps-order-row');
-      row.append(U.node('h4', item.tire_size), U.node('p', item.brand || 'Cliente aguardando foto'));
-      row.appendChild(U.button('TIRAR FOTO', () => {
-        clear(); selected = item.id; error = ''; C.partnerHome.open('partner-photo');
-      }, 'primary', 'camera')); page.appendChild(row);
+  function groups() {
+    const result = new Map();
+    (C.state.photoRequests || []).forEach(item => {
+      const key = item.photo_group_id || item.id;
+      if (!result.has(key)) result.set(key, []);
+      result.get(key).push(item);
     });
-    U.mount(page, 'photos');
+    return [...result.values()].map(rows => rows.sort((a, b) => String(a.created_at || a.id).localeCompare(String(b.created_at || b.id))));
   }
-  async function take(file) {
+  function startTimer(el, rows) {
+    const deadlines = rows.map(row => Date.parse(row.expires_at)).filter(Number.isFinite);
+    if (!el || !deadlines.length) return;
+    const deadline = Math.min(...deadlines);
+    function tick() {
+      const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      el.textContent = seconds ? 'Enviar em ' + Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') : 'Prazo encerrado';
+      el.setAttribute('aria-label', el.textContent);
+      if (!seconds) leave();
+      return seconds;
+    }
+    if (tick()) timer = window.setInterval(tick, 1000);
+  }
+  function list() { leave(); V.list(groups(), open); }
+  function open(id) {
+    if (busy) return;
+    const group = groups().find(rows => rows.some(row => row.id === id));
+    clear();
+    if (group) items = group.map(row => ({ ...row, photos: [], sent: 0 }));
+    C.partnerHome.open('partner-photo');
+  }
+  async function take(file, itemId, replaceIndex) {
     if (!file || busy) return;
+    const item = items.find(row => row.id === itemId);
+    if (!item || item.sent || (replaceIndex == null && item.photos.length + Number(item.photo_count || 0) >= 3)) return;
     busy = true; error = ''; render();
-    const session = C.sessionFingerprint(); const itemId = selected;
+    const session = C.sessionFingerprint();
     try {
       const blob = await C.compressPhoto(file);
-      if (session !== C.sessionFingerprint() || selected !== itemId) return;
-      previews.push({ blob, url: URL.createObjectURL(blob) });
+      if (session !== C.sessionFingerprint() || !items.includes(item)) return;
+      const photo = { blob, url: URL.createObjectURL(blob) };
+      if (replaceIndex != null && item.photos[replaceIndex]) {
+        URL.revokeObjectURL(item.photos[replaceIndex].url); item.photos[replaceIndex] = photo;
+      } else item.photos.push(photo);
     } catch (_) { if (session === C.sessionFingerprint()) error = 'Não consegui ler essa foto. Tente outra.'; }
     finally { if (session === C.sessionFingerprint()) { busy = false; C.partnerHome.render(); } }
   }
+  function remove(itemId, photoIndex) {
+    if (busy) return;
+    const item = items.find(row => row.id === itemId);
+    if (!item || item.sent || !item.photos[photoIndex]) return;
+    URL.revokeObjectURL(item.photos[photoIndex].url); item.photos.splice(photoIndex, 1); render();
+  }
+  function ready() { return items.length > 0 && items.every(item => item.photos.length || item.sent); }
   async function send() {
-    if (busy || !previews.length) return;
+    if (busy || !ready() || !items.some(item => item.photos.length)) return;
     busy = true; error = ''; render();
-    const session = C.sessionFingerprint(); const itemId = selected;
+    const session = C.sessionFingerprint();
     try {
-      // Mesmo upload validado: reencodificação, RLS e envio ao cliente.
-      while (previews.length) {
-        const preview = previews[0];
-        const response = await C.authenticatedFetch(C.photoUploadPath(itemId), {
-          method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: preview.blob,
-        });
-        const payload = await C.json(response);
-        if (session !== C.sessionFingerprint()) return;
-        if (!response.ok) throw new Error(payload.error || 'request_failed');
-        if (payload.attached === false) throw new Error('photo_request_not_found');
-        URL.revokeObjectURL(preview.url); previews.shift();
+      // Cada imagem mantém o UUID da sua solicitação. Sucessos saem da fila antes do próximo upload.
+      for (const item of items) {
+        while (item.photos.length) {
+          const photo = item.photos[0];
+          const response = await C.authenticatedFetch(C.photoUploadPath(item.id), {
+            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: photo.blob,
+          });
+          const payload = await C.json(response);
+          if (session !== C.sessionFingerprint()) return;
+          if (!response.ok) throw new Error(payload.error || 'request_failed');
+          if (payload.attached === false) throw new Error('photo_request_not_found');
+          URL.revokeObjectURL(photo.url); item.photos.shift(); item.sent += 1;
+        }
       }
       await C.loadPhotoRequests();
       if (session !== C.sessionFingerprint()) return;
-      selected = ''; C.showToast('Foto enviada ao cliente.'); C.partnerHome.open('partner-home', true);
+      const plural = items.length > 1;
+      clear(); C.showToast(plural ? 'Fotos encaminhadas ao cliente.' : 'Foto encaminhada ao cliente.');
+      C.partnerHome.open('partner-home', true);
     } catch (failure) {
-      if (session === C.sessionFingerprint()) error = failure?.message === 'photo_request_not_found' ? 'Este pedido de foto não está mais disponível.' : 'Não consegui enviar. Tente novamente.';
+      if (session === C.sessionFingerprint()) {
+        reviewing = items.length > 1;
+        const partial = items.some(item => item.sent);
+        error = failure?.message === 'photo_request_not_found'
+          ? 'Esta solicitação não aceita mais fotos. As fotos já encaminhadas não serão reenviadas.'
+          : (partial ? 'Parte das fotos foi encaminhada. Tente enviar as restantes.' : 'Não consegui enviar. Tente novamente.');
+      }
     } finally { if (session === C.sessionFingerprint()) { busy = false; C.partnerHome.render(); } }
   }
   function render() {
-    const item = (C.state.photoRequests || []).find(row => row.id === selected);
-    if (!item) { clear(); return list(); }
-    const page = U.section('Foto do pneu', () => {
-      if (busy) return; clear(); selected = ''; C.partnerHome.open('partner-photos');
-    });
-    page.append(U.node('strong', item.tire_size, 'ps-size'), U.node('p', item.brand || '', 'ps-copy'));
-    if (item.note) page.appendChild(U.node('p', item.note, 'ps-copy'));
-    const gallery = U.node('div', null, 'ps-photo-gallery');
-    previews.forEach((preview, index) => {
-      const remove = U.node('button', null, 'ps-photo-preview'); remove.type = 'button'; remove.disabled = busy;
-      remove.setAttribute('aria-label', 'Apagar foto ' + (index + 1));
-      const image = U.node('img'); image.src = preview.url; image.alt = 'Prévia da foto ' + (index + 1);
-      remove.append(image, U.node('span', '×'));
-      remove.addEventListener('click', () => { URL.revokeObjectURL(preview.url); previews.splice(index, 1); render(); });
-      gallery.appendChild(remove);
-    });
-    page.appendChild(gallery);
-    const remaining = Math.max(0, 3 - Number(item.photo_count || 0) - previews.length);
-    const input = U.node('input'); input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment'; input.hidden = true; input.disabled = busy;
-    input.addEventListener('change', () => { const file = input.files?.[0]; input.value = ''; void take(file); });
-    if (previews.length) page.appendChild(U.button(busy ? 'ENVIANDO…' : 'ENVIAR', () => void send(), 'primary', 'check'));
-    if (remaining > 0) page.appendChild(U.button(previews.length ? '+ OUTRA FOTO' : 'TIRAR FOTO', () => input.click(), previews.length ? 'secondary' : 'primary', 'camera'));
-    page.appendChild(input);
-    if (!previews.length && remaining === 0) page.appendChild(U.node('p', 'Este pedido já recebeu 3 fotos.', 'ps-copy'));
-    if (previews.length) page.appendChild(U.node('p', 'Toque na foto para apagar.', 'ps-copy'));
-    if (error) { const el = U.node('p', error, 'ps-error'); el.setAttribute('role', 'alert'); page.appendChild(el); }
-    page.querySelectorAll('button').forEach(el => { el.disabled = busy; });
-    U.mount(page, 'photo');
+    leave();
+    if (!items.length) return list();
+    const handlers = {
+      back: () => {
+        if (busy) return;
+        if (reviewing) { reviewing = false; index = items.length - 1; render(); }
+        else if (index > 0) { index -= 1; render(); }
+        else C.partnerHome.open('partner-photos');
+      }, take, remove, send,
+      next: () => {
+        if (busy || !items[index].photos.length) return;
+        if (index < items.length - 1) index += 1;
+        else if (ready()) reviewing = true;
+        render();
+      },
+    };
+    const el = V.render({ items, index, reviewing, busy, error }, handlers);
+    startTimer(el, items.filter(item => item.photos.length || !item.sent));
   }
-  function reset() { clear(); selected = ''; busy = false; error = ''; }
-  function open(id) { clear(); selected = id; error = ''; C.partnerHome.open('partner-photo'); }
-  C.partnerPhoto = { list, render, reset, open, busy: () => busy };
+  function reset() { clear(); busy = false; }
+  C.partnerPhoto = { list, render, reset, open, leave, busy: () => busy };
 }());

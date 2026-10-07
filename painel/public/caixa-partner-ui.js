@@ -3,6 +3,7 @@
   const C = window.Caixa;
   const root = document.getElementById('partner-home-screen');
   const paths = {
+    send: 'm3 3 18 9-18 9 4-9-4-9Zm4 9h14',
     check: 'm5 12 4 4L19 6', close: 'm6 6 12 12M6 18 18 6',
     camera: 'M9 5h6l2 3h4v12H3V8h4l2-3ZM12 11a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
     pickup: 'M3 5h18l-1 6H4L3 5ZM5 11v10h14V11M9 21v-7h6v7M8 5v6m8-6v6',

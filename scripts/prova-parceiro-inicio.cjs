@@ -38,7 +38,7 @@ const server = createServer(async (req, res) => {
     let content = await readFile(target);
     if (fixture) {
       const partner = url.pathname === '/_preview/parceiro';
-      const scenario = ['avisos','foto','retirada','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
+      const scenario = ['avisos','foto','fotos-duas','retirada','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
       // Reabrir a prévia começa uma simulação nova, sem renovar prazos de pedidos reais.
       const values = { '2w_caixa_token': 'preview-only-' + scenario + ':' + randomUUID(), '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
         '2w_caixa_escopo': partner ? 'partner' : 'matrix', '2w_caixa_unidade_slug': partner ? 'meier' : '',

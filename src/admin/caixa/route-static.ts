@@ -52,6 +52,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-partner-replenishment.js', 'caixa-partner-replenishment.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-home.css', 'caixa-partner-home.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-screens.css', 'caixa-partner-screens.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-partner-photo.css', 'caixa-partner-photo.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-partner-photo-ui.js', 'caixa-partner-photo-ui.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-buy.css', 'caixa-partner-buy.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-partner-idle.css', 'caixa-partner-idle.css', 'text/css; charset=utf-8');
   text('/operacao/assets/partner-idle-emblem-v1.webp', 'assets/partner-idle-emblem-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
@@ -77,6 +79,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/assets/partner-steel-v3.webp', 'assets/partner-steel-v3.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/fonts/roboto-condensed-latin-v1.woff2', 'assets/fonts/roboto-condensed-latin-v1.woff2', 'font/woff2', 'public, max-age=31536000, immutable');
   text('/operacao/assets/fonts/roboto-latin-v1.woff2', 'assets/fonts/roboto-latin-v1.woff2', 'font/woff2', 'public, max-age=31536000, immutable');
+  text('/operacao/assets/fonts/oswald-latin-v1.woff2', 'assets/fonts/oswald-latin-v1.woff2', 'font/woff2', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-status-v2.webp', 'assets/partner-status-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/caixa-brand-catalog.js', 'caixa-brand-catalog.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-catalog.js', 'caixa-catalog.js', 'text/javascript; charset=utf-8');

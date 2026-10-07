@@ -68,7 +68,7 @@
       }
       page.appendChild(row);
     }
-    const photoLabel = photos.length === 1 ? (photos[0].order_number || photos[0].tire_size || 'Cliente aguardando') : photos.length + ' clientes aguardando';
+    const photoLabel = photos.length === 1 ? (photos[0].order_number || photos[0].tire_size || 'Cliente aguardando') : photos.length + ' pneus aguardando foto';
     notice('camera', photos.length, photos.length === 1 ? 'Cliente pediu foto' : 'Pedidos de foto', photoLabel, 'ENVIAR FOTO', () => C.partnerHome.open('partner-photos'));
     const day = value => new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const today = rows => rows.length && rows.every(row => row.created_at && day(row.created_at) === day(Date.now()));

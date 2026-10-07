@@ -363,6 +363,10 @@ SELECT ops.anonymize_contact(
 
 Zera PII do contato, mantém agregados, registra em `ops.erasure_log`.
 
+### Fotos de dois pneus
+
+`0269_partner_photo_groups.sql` adiciona um UUID opaco para agrupar solicitações de foto da mesma conversa e unidade, mais o estado do pneu do catálogo. Pedidos ativos antigos recebem backfill isolado por ambiente/unidade. A fila mantém `security_invoker`, RLS e grants por coluna; nenhum ID do Chatwoot ou telefone é exposto. Aplicar antes de publicar a versão que envia fotos de dois pneus.
+
 ### Reposição com várias medidas
 
 `0265_partner_replenishment_multiple_measures.sql` amplia a projeção existente para todas as medidas com falta registrada na própria loja e saldo livre na 2W. Mantém a janela de 7 dias, isolamento de ambiente/unidade, condições, marcas e bloqueio de simulações; ordena pela procura sem expor clientes ou custos.

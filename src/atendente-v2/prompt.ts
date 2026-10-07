@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_waitlist_contact_phone_2026-10-06';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_photo_batch_2026-10-07';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)

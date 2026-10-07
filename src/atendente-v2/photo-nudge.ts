@@ -60,3 +60,9 @@ export function customerWantsPhoto(
  * e proíbe NOMINALMENTE as frases que o bot usou pra enrolar.
  */
 export const PHOTO_NUDGE = `\n\n[CLIENTE PEDIU FOTO 📸] O cliente acabou de pedir pra VER o pneu. A ÚNICA forma de a loja ser avisada e a foto chegar até ele é você CHAMAR a ferramenta pedir_foto AGORA, neste mesmo turno. É TERMINANTEMENTE PROIBIDO dizer "vou pedir pro pessoal", "já pedi", "vou chamar a loja" ou "assim que mandarem te envio" SEM ter chamado a ferramenta — sem a chamada NADA acontece, nenhuma loja é avisada, e o cliente espera à toa (isso é mentira). Então CHAME pedir_foto já. Se ela retornar precisa_produto ou sem_loja, SÓ AÍ pergunte o que falta. Fale da foto pro cliente SOMENTE depois de ter chamado a ferramenta.`;
+
+/** Reforça a regra de conjunto no turno, sem inferir UUIDs a partir de texto livre. */
+export function photoRequestNudge(text: string | null | undefined, lastAssistantText?: string | null): string {
+  if (!customerWantsPhoto(text, lastAssistantText)) return '';
+  return PHOTO_NUDGE + '\nSe o pedido é foto DOS DOIS pneus escolhidos, use product_ids com os dois UUIDs já consultados na mesma chamada pedir_foto. Não solicite só o último pneu. Se não estiver claro quais são os dois, pergunte quais; não escolha duas alternativas por conta própria. Leia o resultado de cada pneu antes de confirmar.';
+}
