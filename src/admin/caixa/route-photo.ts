@@ -1,3 +1,4 @@
+import { compactTirePhoto } from '../../photos/codec.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { dispatchPhotoToCustomer } from '../../atendente-v2/photo-requests.js';
@@ -8,7 +9,6 @@ import { acquirePartnerSseSlot } from '../../parceiro/sse-limit.js';
 import {
   PHOTO_MAX_UPLOAD_BYTES,
   PhotoRejectedError,
-  reencodePhoto,
 } from '../../parceiro/photo-upload.js';
 import type { CaixaAuth } from './queries.js';
 import { attachCaixaPhoto, getCaixaMainUnitId, getCaixaPhotoQueue } from './photo.js';
@@ -57,7 +57,7 @@ export function registerCaixaPhotoRoutes(
     }
     let photo;
     try {
-      photo = await reencodePhoto(request.body);
+      photo = await compactTirePhoto(request.body);
     } catch (error) {
       if (error instanceof PhotoRejectedError) return reply.status(415).send({ error: error.reason });
       throw error;

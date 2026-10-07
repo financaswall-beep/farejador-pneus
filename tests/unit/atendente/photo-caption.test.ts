@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   query: vi.fn(), enqueuePhotoAttachment: vi.fn(), env: { BOT_OUTBOX: true },
 }));
-vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: mocks.query } }));
+vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: mocks.query,
+  connect: async () => ({ query: mocks.query, release: () => undefined }) } }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: mocks.env }));
 vi.mock('../../../src/atendente-v2/outbox-accessory.js', () => ({
   enqueueAccessoryText: vi.fn(), enqueuePhotoAttachment: mocks.enqueuePhotoAttachment,
@@ -15,7 +16,8 @@ describe('legenda da foto sem anúncio automático da marca', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.env.BOT_OUTBOX = true; });
 
   it.each([false, true])('preserva destino e foto solicitada, inclusive com atraso=%s', async wasLate => {
-    mocks.query.mockResolvedValue({ rowCount: 1, rows: [{
+    mocks.query.mockImplementation(async (sql: string) => sql.includes('FROM ops.outbound_messages') ? {rows:[],rowCount:0}
+      : sql.includes('photo_request_blobs') ? { rows:[{ id:'arquivo-1' }],rowCount:1 } : { rowCount: 1, rows: [{
       // Pedidos de foto já existentes podem ter o nome comercial no tire_size.
       environment: 'test', conversation_id: '123', tire_size: 'Pneu Pirelli 90/90-12', brand: 'Pirelli', status: 'pending',
     }] });

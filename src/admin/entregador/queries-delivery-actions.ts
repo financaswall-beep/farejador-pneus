@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { readStoredTirePhoto, type StoredTirePhoto } from '../../photos/storage.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import {
@@ -87,8 +88,8 @@ export async function getEntregadorProductPhotoImage(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<{ bytes: Buffer; mime: string } | null> {
-  const r = await dbPool.query<{ bytes: Buffer; mime: string }>(
-    `SELECT b.photo_bytes AS bytes, b.photo_mime AS mime
+  const r = await dbPool.query<StoredTirePhoto>(
+    `SELECT b.photo_bytes AS bytes, b.photo_mime AS mime, b.storage_path
        FROM commerce.photo_request_blobs b
        JOIN commerce.photo_requests pr
          ON pr.id = b.photo_request_id AND pr.environment = b.environment
@@ -99,7 +100,7 @@ export async function getEntregadorProductPhotoImage(
          ON o.environment = cv.environment AND o.source_conversation_id = cv.id
        JOIN commerce.matriz_delivery_trips t
          ON t.id = o.trip_id AND t.environment = o.environment
-      WHERE b.photo_request_id = $1 AND b.environment = $2
+      WHERE b.photo_request_id = $1 AND b.environment = $2 AND b.deleted_at IS NULL
         AND t.courier_collaborator_id = $3
         AND t.status = 'open' AND t.deleted_at IS NULL
         AND o.status <> 'cancelled'
@@ -117,5 +118,5 @@ export async function getEntregadorProductPhotoImage(
       LIMIT 1`,
     [photoRequestId, environment, auth.collaboratorId],
   );
-  return r.rows[0] ?? null;
+  return readStoredTirePhoto(r.rows[0]);
 }

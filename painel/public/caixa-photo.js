@@ -96,6 +96,7 @@
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.photoLoadState = 'ready';
       state.photoEnabled = payload.enabled !== false;
+      state.photoDirectUpload = payload.direct_upload === true;
       const items = Array.isArray(payload.photo_requests) ? payload.photo_requests : [];
       state.photoRequests = items.filter(function (item) { return !item.status || item.status === 'pending'; });
       state.photoResolved = items.filter(function (item) { return item.status && item.status !== 'pending' && item.has_photo; });
@@ -177,6 +178,7 @@
     if (state.photoPreview) URL.revokeObjectURL(state.photoPreview.url);
     state.photoPreview = null;
     state.photoRequests = []; state.photoResolved = []; state.photoLastCount = 0;
+    state.photoDirectUpload = false;
     state.photoSelectedId = '';
     state.photoLoadState = 'idle';
     alertButton.classList.add('hidden');
@@ -187,7 +189,7 @@
 
   async function compressPhoto(file) {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);

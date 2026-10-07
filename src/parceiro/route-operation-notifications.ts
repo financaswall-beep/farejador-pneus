@@ -8,12 +8,16 @@ import {
   type PartnerAuthedRequest,
 } from './auth.js';
 import { getPartnerOperationNotifications } from './operation-notifications.js';
-import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError, reencodePhoto } from './photo-upload.js';
+import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError } from './photo-upload.js';
 import { attachPartnerPhoto, getPartnerPhotoQueue } from './queries.js';
+import { compactTirePhoto } from '../photos/codec.js';
+import { photoStorageConfigured } from '../photos/storage.js';
+import { registerPartnerPhotoStorageRoutes } from './route-photo-storage.js';
 
 const photoParams = z.object({ photoRequestId: z.string().uuid() });
 
 export function registerPartnerOperationNotificationRoutes(fastify: FastifyInstance): void {
+  registerPartnerPhotoStorageRoutes(fastify);
   for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
     if (!fastify.hasContentTypeParser(mime)) {
       fastify.addContentTypeParser(mime, { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
@@ -27,6 +31,7 @@ export function registerPartnerOperationNotificationRoutes(fastify: FastifyInsta
     if (!env.PHOTO_REQUESTS) return reply.status(200).send({ enabled: false, photo_requests: [] });
     return reply.status(200).send({
       enabled: true,
+      direct_upload: photoStorageConfigured(),
       photo_requests: await getPartnerPhotoQueue(getPartnerContext(request)),
     });
   });
@@ -46,7 +51,7 @@ export function registerPartnerOperationNotificationRoutes(fastify: FastifyInsta
       return reply.status(415).send({ error: 'not_an_image' });
     }
     try {
-      const photo = await reencodePhoto(request.body);
+      const photo = await compactTirePhoto(request.body);
       const result = await attachPartnerPhoto(ctx, parsed.data.photoRequestId, {
         bytes: photo.bytes, mime: photo.mime, sizeBytes: photo.bytes.length,
       });

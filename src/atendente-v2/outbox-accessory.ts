@@ -37,9 +37,10 @@ export async function enqueueAccessoryText(
 export async function enqueuePhotoAttachment(
   db: Queryable,
   input: { environment: Environment; chatwootConversationId: number;
-    photoRequestId: string; caption: string },
+    photoRequestId: string; photoBlobId?: string; caption: string },
 ): Promise<boolean> {
-  const body = JSON.stringify({ photo_request_id: input.photoRequestId, caption: input.caption });
+  const body = JSON.stringify({ photo_request_id: input.photoRequestId,
+    ...(input.photoBlobId ? { photo_blob_id: input.photoBlobId } : {}), caption: input.caption });
   const result = await db.query(
     `INSERT INTO ops.outbound_messages (
        environment,conversation_id,chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
@@ -52,7 +53,7 @@ export async function enqueuePhotoAttachment(
         AND ($6::boolean OR c.id::text = ANY($7::text[]))
      ON CONFLICT (environment,echo_id) WHERE echo_id IS NOT NULL DO NOTHING`,
     [input.environment, input.chatwootConversationId,
-      `photo:${input.photoRequestId}`, body, hash(body),
+      `photo:${input.photoBlobId ?? input.photoRequestId}`, body, hash(body),
       hasAgentV2Wildcard(env.AGENT_V2_CONVERSATION_IDS),
       env.AGENT_V2_CONVERSATION_IDS.filter((id) => id !== '*')],
   );

@@ -191,7 +191,7 @@ const CARD_SELECT = `
          AND cv.environment = o.environment
          AND EXISTS (
            SELECT 1 FROM commerce.photo_request_blobs b
-            WHERE b.environment = prq.environment AND b.photo_request_id = prq.id
+            WHERE b.environment = prq.environment AND b.photo_request_id = prq.id AND b.deleted_at IS NULL
          )
          AND EXISTS (
            SELECT 1

@@ -21,7 +21,8 @@ import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import type { Environment } from '../shared/types/chatwoot.js';
-import { enqueueAccessoryText, enqueuePhotoAttachment } from './outbox-accessory.js';
+import { enqueueStoredPhoto } from '../photos/dispatch.js';
+import { enqueueAccessoryText } from './outbox-accessory.js';
 
 const PHOTO_REQUEST_TTL_MINUTES = 10;
 const MAX_ACTIVE_PER_CONVERSATION = 2;
@@ -186,47 +187,22 @@ export async function dispatchPhotoToCustomer(
   _photo: { bytes: Buffer; mime: string },
   wasLate: boolean,
 ): Promise<void> {
-  const res = await pool.query<{
-    environment: Environment;
-    conversation_id: string;
-    status: string;
-  }>(
-    `SELECT environment, conversation_id, status
-       FROM commerce.photo_requests
-      WHERE id = $1`,
-    [photoRequestId],
-  );
-  if (res.rowCount !== 1) {
-    logger.warn({ photoRequestId }, 'photo dispatch: pedido nao encontrado');
-    return;
-  }
-  const row = res.rows[0]!;
-  // Multi-foto (até 3 por card): despacha enquanto o card não estiver cancelado. O
-  // route só chama o dispatch quando uma foto NOVA foi anexada (attached=true), então
-  // cada chamada = uma foto a mandar (o status já pode ser 'sent' das anteriores).
-  if (row.status === 'cancelled') {
-    logger.info({ photoRequestId, status: row.status }, 'photo dispatch: cancelado (no-op)');
-    return;
-  }
-
-  // Legenda OBRIGATÓRIA (vira o content do eco → o LLM "lembra" que mandou).
-  // A marca continua no pedido da foto para a loja; não é anunciada ao cliente.
-  // tire_size de pedidos antigos pode conter o nome comercial inteiro, com marca.
-  // Diz "do que temos" — NUNCA promete unicidade que o estoque não garante.
-  const caption = wasLate
-    ? 'Chegou! 📸 A foto do pneu que você pediu — dá uma olhada no estado.'
-    : 'Ó ele aqui 📸 Foto real do que temos na loja. Dá uma olhada no estado!';
-
-  if (!env.BOT_OUTBOX) {
-    logger.warn({ photoRequestId }, 'photo dispatch: envio externo bloqueado (BOT_OUTBOX=false)');
-    return;
-  }
-  await enqueuePhotoAttachment(pool, {
-    environment: row.environment,
-    chatwootConversationId: Number(row.conversation_id),
-    photoRequestId,
-    caption,
-  });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const request = await client.query<{ environment: Environment; conversation_id: string; status: string }>(
+      'SELECT environment,conversation_id,status FROM commerce.photo_requests WHERE id=$1 FOR UPDATE', [photoRequestId]);
+    const row = request.rows[0];
+    if (row && row.status !== 'cancelled') {
+      const files = await client.query<{ id: string }>(
+        'SELECT id FROM commerce.photo_request_blobs WHERE photo_request_id=$1 AND environment=$2 AND deleted_at IS NULL ORDER BY created_at,id',
+        [photoRequestId,row.environment]);
+      for (const file of files.rows) await enqueueStoredPhoto(client, { environment:row.environment,
+        conversationId:Number(row.conversation_id),requestId:photoRequestId,blobId:file.id,wasLate });
+    }
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 // ─── Expiração + fallback honesto ────────────────────────────────────────────

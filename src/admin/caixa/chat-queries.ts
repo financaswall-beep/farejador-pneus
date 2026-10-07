@@ -75,7 +75,7 @@ export async function getOperationConversation(id: string, db: Pool = pool) {
     loadCustomerLeadLocations(env.FAREJADOR_ENV,[conversation.contact_id],db),
     loadCustomerLeadInterests(env.FAREJADOR_ENV,[id],db),
     db.query(`SELECT p.id,p.tire_size,p.status,p.created_at,p.sent_to_customer_at,
-      EXISTS(SELECT 1 FROM commerce.photo_request_blobs b WHERE b.environment=p.environment AND b.photo_request_id=p.id) AS has_photo
+      EXISTS(SELECT 1 FROM commerce.photo_request_blobs b WHERE b.environment=p.environment AND b.photo_request_id=p.id AND b.deleted_at IS NULL) AS has_photo
       FROM commerce.photo_requests p JOIN core.units u ON u.environment=p.environment AND u.id=p.unit_id AND u.slug='main'
       WHERE p.environment=$1 AND p.conversation_id=$2 AND (p.status='answered' OR
       (p.status='pending' AND p.expires_at>now()) OR p.sent_to_customer_at>now()-interval '1 day') ORDER BY p.created_at DESC`,[env.FAREJADOR_ENV,conversation.chatwoot_conversation_id]),

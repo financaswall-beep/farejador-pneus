@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg';
 import { resolveConversationOnce, sendAttachmentOnce, sendMessageOnce, type SendMessageResult } from './sender.js';
 import type { OutboundRow } from './outbound-worker.js';
+import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js';
+import { tirePhotoForWhatsApp } from '../photos/codec.js';
 
 export async function deliverOutboundRow(
   client: PoolClient,
@@ -23,21 +25,24 @@ export async function deliverOutboundRow(
   if (row.kind !== 'photo_attachment') {
     return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
   }
-  const parsed = JSON.parse(row.body) as { photo_request_id?: unknown; caption?: unknown };
+  const parsed = JSON.parse(row.body) as { photo_request_id?: unknown; photo_blob_id?: unknown; caption?: unknown };
   if (typeof parsed.photo_request_id !== 'string' || typeof parsed.caption !== 'string') {
     throw new Error('invalid photo attachment outbox payload');
   }
-  const blob = await client.query<{ photo_bytes: Buffer; photo_mime: string }>(
-    `SELECT photo_bytes,photo_mime FROM commerce.photo_request_blobs
-      WHERE environment=$1 AND photo_request_id=$2`,
-    [row.environment, parsed.photo_request_id],
+  if (parsed.photo_blob_id !== undefined && typeof parsed.photo_blob_id !== 'string') throw Error('invalid photo blob id');
+  const blob = await client.query<StoredTirePhoto>(
+    `SELECT photo_bytes AS bytes,photo_mime AS mime,storage_path FROM commerce.photo_request_blobs
+      WHERE environment=$1 AND photo_request_id=$2 AND deleted_at IS NULL
+        AND ($3::uuid IS NULL OR id=$3) ORDER BY created_at,id LIMIT 1`,
+    [row.environment, parsed.photo_request_id, parsed.photo_blob_id ?? null],
   );
-  const photo = blob.rows[0];
+  const photo = await readStoredTirePhoto(blob.rows[0]);
   if (!photo) throw new Error('photo attachment blob missing');
+  const jpeg = await tirePhotoForWhatsApp(photo.bytes,photo.mime);
   return sendAttachmentOnce(Number(row.chatwoot_conversation_id), {
-    buffer: photo.photo_bytes,
+    buffer: jpeg.bytes,
     filename: `pneu-${parsed.photo_request_id.slice(0, 8)}.jpg`,
-    contentType: photo.photo_mime,
+    contentType: jpeg.mime,
   }, parsed.caption, row.echo_id ?? undefined);
 }
 

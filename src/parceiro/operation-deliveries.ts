@@ -1,4 +1,5 @@
 import { withPartnerContext } from './db.js';
+import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js';
 import type { PartnerContext } from './auth.js';
 
 export interface OperationDeliveryItem {
@@ -98,7 +99,7 @@ export async function getPartnerOperationDeliveries(
               AND EXISTS (
                 SELECT 1 FROM commerce.photo_request_blobs blob
                  WHERE blob.environment = pr.environment
-                   AND blob.photo_request_id = pr.id
+                   AND blob.photo_request_id = pr.id AND blob.deleted_at IS NULL
               )
             ORDER BY pr.created_at DESC
             LIMIT 1
@@ -151,8 +152,8 @@ export async function getPartnerOperationDeliveryPhoto(
   photoRequestId: string,
 ): Promise<{ bytes: Buffer; mime: string } | null> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query<{ bytes: Buffer; mime: string }>(
-      `SELECT blob.photo_bytes AS bytes, blob.photo_mime AS mime
+    const result = await client.query<StoredTirePhoto>(
+      `SELECT blob.photo_bytes AS bytes, blob.photo_mime AS mime, blob.storage_path
          FROM commerce.photo_request_blobs blob
          JOIN commerce.photo_requests pr
            ON pr.id = blob.photo_request_id AND pr.environment = blob.environment
@@ -160,13 +161,13 @@ export async function getPartnerOperationDeliveryPhoto(
            ON poi.id = pr.order_item_id AND poi.environment = pr.environment
          JOIN commerce.partner_orders po
            ON po.id = poi.order_id AND po.environment = poi.environment
-        WHERE blob.photo_request_id = $1
+        WHERE blob.photo_request_id = $1 AND blob.deleted_at IS NULL
           AND blob.environment = $2 AND po.unit_id = $3
           AND po.fulfillment_mode = 'delivery' AND po.deleted_at IS NULL
         ORDER BY blob.created_at DESC
         LIMIT 1`,
       [photoRequestId, ctx.environment, ctx.unitId],
     );
-    return result.rows[0] ?? null;
+    return readStoredTirePhoto(result.rows[0]);
   });
 }

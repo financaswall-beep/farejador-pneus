@@ -69,12 +69,8 @@
       for (const item of items) {
         while (item.photos.length) {
           const photo = item.photos[0];
-          const response = await C.authenticatedFetch(C.photoUploadPath(item.id), {
-            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: photo.blob,
-          });
-          const payload = await C.json(response);
+          const payload = await C.uploadPartnerTirePhoto(item.id, photo, session);
           if (session !== C.sessionFingerprint()) return;
-          if (!response.ok) throw new Error(payload.error || 'request_failed');
           if (payload.attached === false) throw new Error('photo_request_not_found');
           URL.revokeObjectURL(photo.url); item.photos.shift(); item.sent += 1;
         }

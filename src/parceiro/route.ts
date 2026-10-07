@@ -1,3 +1,4 @@
+import { compactTirePhoto } from '../photos/codec.js';
 import { cancelPartnerPickup } from './cancel-pickup.js';
 import { registerPartnerSaleRecovery } from './route-sale-recovery.js';
 import { readFile } from 'node:fs/promises';
@@ -17,7 +18,7 @@ export { partnerSaleSchema } from './sale-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
 import { pickupServicesSchema, pickupServicesPublicCatalog } from '../shared/pickup-services.js';
-import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
+import { PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
 // as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
@@ -1078,7 +1079,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
     let photo;
     try {
-      photo = await reencodePhoto(body);
+      photo = await compactTirePhoto(body);
     } catch (err) {
       if (err instanceof PhotoRejectedError) {
         return reply.status(415).send({ error: err.reason });

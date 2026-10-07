@@ -1,4 +1,5 @@
 import { partnerActor } from './actor.js';
+import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js';
 /**
  * Queries do Portal Parceiro — V2 da Etapa 5 (pos-Codex).
  *
@@ -4201,16 +4202,14 @@ export async function getPartnerPhotoImage(
   photoRequestId: string,
 ): Promise<{ bytes: Buffer; mime: string } | null> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const res = await client.query<{ photo_bytes: Buffer; photo_mime: string }>(
-      `SELECT photo_bytes, photo_mime
+    const res = await client.query<StoredTirePhoto>(
+      `SELECT photo_bytes AS bytes, photo_mime AS mime, storage_path
          FROM commerce.photo_request_blobs
-        WHERE photo_request_id = $1
+        WHERE photo_request_id = $1 AND deleted_at IS NULL
         ORDER BY created_at
         LIMIT 1`,
       [photoRequestId],
     );
-    const row = res.rows[0];
-    if (!row) return null;
-    return { bytes: row.photo_bytes, mime: row.photo_mime };
+    return readStoredTirePhoto(res.rows[0]);
   });
 }

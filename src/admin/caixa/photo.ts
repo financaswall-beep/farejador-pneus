@@ -36,9 +36,9 @@ export async function getCaixaPhotoQueue(
     `SELECT pr.id,pr.tire_size,pr.brand,pr.note,
             pr.customer_label AS customer_name,pr.status,pr.was_late,
             EXISTS (SELECT 1 FROM commerce.photo_request_blobs b
-                     WHERE b.environment=pr.environment AND b.photo_request_id=pr.id) AS has_photo,
+                     WHERE b.environment=pr.environment AND b.photo_request_id=pr.id AND b.deleted_at IS NULL) AS has_photo,
             (SELECT count(*)::int FROM commerce.photo_request_blobs b
-              WHERE b.environment=pr.environment AND b.photo_request_id=pr.id) AS photo_count,
+              WHERE b.environment=pr.environment AND b.photo_request_id=pr.id AND b.deleted_at IS NULL AND b.deleted_at IS NULL) AS photo_count,
             pr.expires_at,pr.answered_at,pr.created_at
        FROM commerce.photo_requests pr
        JOIN core.units u

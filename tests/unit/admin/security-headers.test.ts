@@ -88,10 +88,10 @@ describe('security response headers', () => {
     }
   });
 
-  it('does not grant Storage access to login, APIs, static assets or the operation app', async () => {
+  it('does not grant Storage access to login, APIs or static assets', async () => {
     const server = Fastify();
     registerSecurityHeaders(server, false, 'https://publisher-project.supabase.co');
-    const paths = ['/admin/login', '/operacao', '/caixa', '/admin/api/marketing/publisher',
+    const paths = ['/admin/login', '/caixa', '/admin/api/marketing/publisher',
       '/admin/painel/app.js', '/admin/painel-externo'];
     paths.forEach(path => server.get(path, async () => 'ok'));
     try {
@@ -105,6 +105,17 @@ describe('security response headers', () => {
     } finally {
       await server.close();
     }
+  });
+
+  it('allows only the configured Storage origin for the photo upload app', async () => {
+    const server=Fastify(); registerSecurityHeaders(server,false,'https://photos.supabase.co');
+    server.get('/operacao',async ()=>'ok');
+    try {
+      const reply=await server.inject('/operacao');
+      expect(reply.headers['content-security-policy']).toContain("connect-src 'self' https://photos.supabase.co;");
+      expect(reply.headers['content-security-policy']).not.toContain('maps.googleapis.com');
+      expect(reply.headers['referrer-policy']).toBe('no-referrer');
+    } finally { await server.close(); }
   });
 
   it.each([

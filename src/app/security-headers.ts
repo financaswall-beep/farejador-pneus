@@ -30,12 +30,12 @@ function storageOrigin(storageUrl?: string): string | undefined {
 }
 
 export function applySecurityHeaders(
-  reply: FastifyReply, production: boolean, mapsPanel = false, publisherStorageUrl?: string,
+  reply: FastifyReply, production: boolean, mapsPanel = false, publisherStorageUrl?: string, photoUploadApp = false,
 ): void {
   let policy = mapsPanel ? CONTENT_SECURITY_POLICY
     .replace("https://cdn.jsdelivr.net", "https://cdn.jsdelivr.net https://maps.googleapis.com https://maps.gstatic.com")
     .replace("connect-src 'self'", "connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com") : CONTENT_SECURITY_POLICY;
-  const origin = mapsPanel ? storageOrigin(publisherStorageUrl) : undefined;
+  const origin = (mapsPanel || photoUploadApp) ? storageOrigin(publisherStorageUrl) : undefined;
   if (origin) {
     policy = policy.replace("connect-src 'self'", `connect-src 'self' ${origin}`)
       .replace("media-src 'self' blob:", `media-src 'self' blob: ${origin}`);
@@ -57,7 +57,8 @@ export function registerSecurityHeaders(
   fastify: FastifyInstance, production: boolean, publisherStorageUrl?: string,
 ): void {
   fastify.addHook('onSend', async (request, reply, payload) => {
-    applySecurityHeaders(reply, production, /^\/admin\/painel\/?(?:\?|$)/.test(request.url), publisherStorageUrl);
+    applySecurityHeaders(reply, production, /^\/admin\/painel\/?(?:\?|$)/.test(request.url), publisherStorageUrl,
+      /^\/(?:operacao\/?|parceiro\/[^/]+\/?)(?:\?|$)/.test(request.url));
     return payload;
   });
 }
