@@ -4,6 +4,7 @@ const { readFile } = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { fixturePayload } = require('./prova-parceiro-dados.cjs');
+const { pickupPreviewCss } = require('./prova-parceiro-retiradas-dados.cjs');
 const root = path.resolve(__dirname, '../painel/public');
 const port = Number(process.env.PARTNER_PREVIEW_PORT || 8765);
 const extensions = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg' };
@@ -13,6 +14,10 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:' + port);
   const fixture = url.pathname.startsWith('/_preview/');
   try {
+    if (url.pathname === '/_preview-assets/pickup-demo.webp' || /\/operacao\/retiradas\/[^/]+\/itens\/[^/]+\/foto$/.test(url.pathname)) {
+      const image = await readFile(path.resolve(__dirname, 'fixtures/partner-pickup-demo.webp'));
+      res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'no-store' }); res.end(image); return;
+    }
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/parceiro/')) {
       let input = {};
       if (req.method !== 'GET') {
@@ -38,7 +43,7 @@ const server = createServer(async (req, res) => {
     let content = await readFile(target);
     if (fixture) {
       const partner = url.pathname === '/_preview/parceiro';
-      const scenario = ['avisos','foto','fotos-duas','retirada','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
+      const scenario = ['avisos','foto','fotos-duas','retirada','retirada-uma','retiradas','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
       // Reabrir a prévia começa uma simulação nova, sem renovar prazos de pedidos reais.
       const values = { '2w_caixa_token': 'preview-only-' + scenario + ':' + randomUUID(), '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
         '2w_caixa_escopo': partner ? 'partner' : 'matrix', '2w_caixa_unidade_slug': partner ? 'meier' : '',
@@ -46,6 +51,7 @@ const server = createServer(async (req, res) => {
         '2w_caixa_modulos': JSON.stringify({ vendas: true, estoque: true, retiradas: true, entregas: true, financeiro: true }) };
       const setup = '<script>for(const [key,value] of Object.entries(' + JSON.stringify(values) + '))sessionStorage.setItem(key,value);</script>';
       content = content.toString().replace('<head>', '<head>' + setup);
+      content = content.replace('</head>', pickupPreviewCss + '</head>');
     }
     res.writeHead(200, { 'Content-Type': extensions[path.extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(content);

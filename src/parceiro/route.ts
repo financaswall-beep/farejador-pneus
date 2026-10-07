@@ -1,6 +1,7 @@
 import { compactTirePhoto } from '../photos/codec.js';
 import { cancelPartnerPickup } from './cancel-pickup.js';
 import { registerPartnerSaleRecovery } from './route-sale-recovery.js';
+import { registerPartnerOperationPickupRoutes } from './route-operation-pickups.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -478,6 +479,7 @@ function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boole
 
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
   registerPartnerSaleRecovery(fastify);
+  registerPartnerOperationPickupRoutes(fastify);
   registerPartnerCoverageRoute(fastify);
   registerPartnerCreditRoutes(fastify);
   registerPartnerPanelCanaryRoutes(fastify);

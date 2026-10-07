@@ -15,6 +15,7 @@ export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[
               po.source_tag,po.status,po.payment_method,po.total_amount,
               po.awaiting_pickup,po.retrieved_at,po.pickup_arrived_at,
               po.pickup_installation_started_at,po.pickup_services,
+              customer.customer_avatar_url,
               COALESCE(items.rows,'[]'::jsonb) items,
               (SELECT request.id FROM commerce.photo_requests request
                 JOIN commerce.partner_order_items request_item
@@ -24,12 +25,36 @@ export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[
                ORDER BY request.created_at DESC LIMIT 1) photo_request_id
          FROM commerce.partner_orders po
          LEFT JOIN LATERAL (
+           SELECT pc.customer_avatar_url
+             FROM commerce.partner_conversations pc
+            WHERE pc.environment=po.environment AND pc.unit_id=po.unit_id
+              AND NULLIF(pc.customer_avatar_url,'') IS NOT NULL
+              AND ((po.customer_id IS NOT NULL AND pc.customer_id=po.customer_id)
+                OR ((po.customer_id IS NULL OR pc.customer_id IS NULL) AND NULLIF(po.customer_phone,'') IS NOT NULL
+                  AND regexp_replace(pc.customer_identifier,'[^0-9]','','g')
+                    = regexp_replace(po.customer_phone,'[^0-9]','','g')))
+            ORDER BY pc.last_message_at DESC NULLS LAST,pc.created_at DESC LIMIT 1
+         ) customer ON true
+         LEFT JOIN LATERAL (
            SELECT jsonb_agg(jsonb_build_object(
+             'order_item_id',item.id,
              'item_name',item.item_name,'tire_size',item.tire_size,'brand',item.brand,
              'quantity',item.quantity,'unit_price',item.unit_price,
+             'tire_condition',COALESCE(photo.tire_condition,stock.tire_condition),
+             'photo_request_id',photo.id,
              'pickup_service_code',item.pickup_service_code
            ) ORDER BY item.created_at) rows
              FROM commerce.partner_order_items item
+             LEFT JOIN commerce.partner_stock_levels stock ON stock.id=item.partner_stock_id
+               AND stock.environment=item.environment AND stock.unit_id=po.unit_id
+             LEFT JOIN LATERAL (
+               SELECT pr.id,pr.tire_condition FROM commerce.photo_requests pr
+                WHERE pr.environment=item.environment AND pr.order_item_id=item.id AND pr.unit_id=po.unit_id
+                  AND EXISTS (SELECT 1 FROM commerce.photo_request_blobs blob
+                    WHERE blob.environment=pr.environment AND blob.photo_request_id=pr.id
+                      AND blob.deleted_at IS NULL)
+                ORDER BY pr.created_at DESC LIMIT 1
+             ) photo ON true
             WHERE item.environment=po.environment AND item.order_id=po.id
          ) items ON true
         WHERE po.environment=$1 AND po.unit_id=$2
@@ -88,7 +113,8 @@ export class PickupAlreadyRetrievedError extends Error {
 }
 
 export interface MarkPickupRetrievedInput {
-  payment_method: string;
+  // A operação simples preserva a forma já registrada; nunca presume Pix/dinheiro.
+  payment_method?: string;
   services?: PickupService[];
 }
 
@@ -101,9 +127,10 @@ export async function markPartnerPickupRetrieved(
     const existing = await client.query<{
       awaiting_pickup: boolean; status: string; total_amount: string;
       customer_id: string | null; customer_name: string | null;
+      payment_method: string | null;
       pickup_services: PickupService[];
     }>(
-      `SELECT awaiting_pickup,status,total_amount,customer_id,customer_name,pickup_services
+      `SELECT awaiting_pickup,status,total_amount,customer_id,customer_name,payment_method,pickup_services
          FROM commerce.partner_orders
         WHERE id=$1 AND environment=$2 AND unit_id=$3
           AND fulfillment_mode='pickup' AND deleted_at IS NULL
@@ -115,6 +142,7 @@ export async function markPartnerPickupRetrieved(
     }
     const row = existing.rows[0]!;
     if (!row.awaiting_pickup) throw new PickupAlreadyRetrievedError();
+    const paymentMethod = normalizePartnerText(input.payment_method ?? row.payment_method);
 
     const services = input.services ?? row.pickup_services ?? [];
     await client.query(
@@ -155,7 +183,7 @@ export async function markPartnerPickupRetrieved(
       [ctx.environment, ctx.unitId, row.customer_id, row.customer_name,
        `Retirada ${orderId.slice(0, 8)}`,
        (moneyCents(Number(row.total_amount)) + insertedServiceCents) / 100,
-       normalizePartnerText(input.payment_method),
+       paymentMethod,
        `Retirada paga no balcão — pedido ${orderId.slice(0, 8)}`,
        partnerActor(ctx), `order:${orderId}:pickup-receivable`, orderId],
     );
@@ -165,7 +193,7 @@ export async function markPartnerPickupRetrieved(
        ) VALUES ($1,'partner_orders','commerce.partner_orders',$2,
                  'partner_pickup_retrieved',$3,$4::jsonb)`,
       [ctx.environment, orderId, partnerActor(ctx), JSON.stringify({
-        unit_id: ctx.unitId, payment_method: normalizePartnerText(input.payment_method),
+        unit_id: ctx.unitId, payment_method: paymentMethod,
         service_codes: services.map((service) => service.code),
         service_total_cents: pickupServicesTotalCents(services),
       })],

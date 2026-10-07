@@ -3,14 +3,14 @@ const stores = new Map();
 const { salesFixture } = require('./prova-parceiro-vendas.cjs');
 const { storeFixture } = require('./prova-parceiro-loja.cjs');
 const { buyFixture } = require('./prova-parceiro-comprar.cjs');
+const { pickupFixtures } = require('./prova-parceiro-retiradas-dados.cjs');
 function initial(scenario) {
   const item = (size, qty = 1) => ({ tire_size: size, label: size, quantity: qty, tire_condition: 'meia_vida' });
   const items = [item('90/90-18'), item('80/100-14')];
-  const pickup = { order_id: '11111111-1111-4111-8111-111111111111', order_number: 'PED-0248', awaiting_pickup: true, customer_name: 'Carlos', status: 'confirmed', payment_method: null, total_amount: 180, created_at: new Date().toISOString(), items };
   const delivery = (id, name, status, courier) => ({ order_id: id, order_status: 'confirmed', order_number: name === 'Maria' ? 'PED-0249' : 'PED-0250', customer_name: name, delivery_address: 'Rua dos Pneus, 100 — Méier, Rio de Janeiro', delivery_status: status, delivery_courier: courier, total_amount: 120, items: [item('90/90-18')], created_at: new Date().toISOString() });
   const photo = { id: '44444444-4444-4444-8444-444444444444', order_number: 'PED-0248', tire_size: '90/90-18', brand: null, photo_count: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 282000).toISOString(), status: 'pending' };
   return {
-    pickups: ['avisos', 'retirada'].includes(scenario) ? [pickup] : [],
+    pickups: pickupFixtures(scenario),
     deliveries: ['avisos', 'entrega'].includes(scenario) ? [delivery('22222222-2222-4222-8222-222222222222', 'Maria', 'pending', null), delivery('33333333-3333-4333-8333-333333333333', 'Pedro', 'dispatched', 'João Meier')] : [],
     photos: scenario === 'fotos-duas' ? [
       { ...photo, photo_group_id: '66666666-6666-4666-8666-666666666666', customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null },
@@ -54,7 +54,7 @@ function fixturePayload(req, url, input) {
   }
   if (pathname.endsWith('/retiradas')) return { rows: data.pickups, service_catalog: [] };
   if (pathname.includes('/retiradas/') && ['POST', 'DELETE'].includes(req.method)) {
-    data.pickups = data.pickups.filter(row => row.order_id !== pathname.split('/').at(-1));
+    data.pickups = data.pickups.filter(row => row.order_id !== pathname.split('/retiradas/')[1].split('/')[0]);
     return req.method === 'DELETE' ? { cancelled: true } : { retrieved: true };
   }
   if (pathname.endsWith('/operacao/entregas')) return { rows: data.deliveries, summary: {} };

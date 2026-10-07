@@ -96,22 +96,23 @@ describe('Operação simples exclusiva do parceiro', () => {
     expect(C.authenticatedFetch).toHaveBeenCalledTimes(1);
     expect(C.authenticatedFetch.mock.calls[0][0]).toContain('/parceiro/meier/api/retiradas');
   });
-  it('preserva o pagamento escolhido e não repete conclusão com clique duplo', async () => {
+  it('confirma no motor simplificado sem inventar pagamento e bloqueia clique duplo', async () => {
     const { C, ready, button, root } = partnerScreen(); C.partnerData.state.pickups = [pickup]; ready();
-    C.partnerHome.open('partner-pickups'); await button('CLIENTE CHEGOU').click();
-    const select = root.querySelectorAll('select')[0]; select.value = 'Dinheiro'; await select.fire('change');
+    C.partnerHome.open('partner-pickups'); await button('VER RETIRADA').click();
+    expect(root.querySelectorAll('select')).toHaveLength(0);
     let done: (value: any) => void = () => {};
     C.partnerData.api = vi.fn(() => new Promise(resolve => { done = resolve; }));
     C.partnerData.load = vi.fn(async () => {});
-    await button('ENTREGUEI E RECEBI').click(); await button('CONCLUINDO…').click();
+    await button('CONFIRMAR RETIRADA').click(); await button('CONFIRMANDO…').click();
     expect(C.partnerData.api).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(C.partnerData.api.mock.calls[0][1].body).payment_method).toBe('Dinheiro');
+    expect(C.partnerData.api.mock.calls[0][0]).toBe('operacao/retiradas/pickup-a/confirmar');
+    expect(JSON.parse(C.partnerData.api.mock.calls[0][1].body)).toEqual({});
     done({ retrieved: true }); await vi.waitFor(() => expect(C.partnerHome.currentTab()).toBe('partner-home'));
   });
   it('cancelar retirada exige um segundo toque antes de liberar a reserva', async () => {
     const { C, ready, button, root } = partnerScreen(); C.partnerData.state.pickups = [pickup]; ready();
     C.partnerData.api = vi.fn(async () => ({ cancelled: true })); C.partnerData.load = vi.fn(async () => {});
-    C.partnerHome.open('partner-pickups'); await button('CLIENTE CHEGOU').click(); await button('Cliente não veio').click();
+    C.partnerHome.open('partner-pickups'); await button('VER RETIRADA').click(); await button('Cliente não veio').click();
     expect(C.partnerData.api).not.toHaveBeenCalled(); expect(root.textContent).toContain('Cancelar este pedido');
     await button('SIM, CANCELAR').click(); await vi.waitFor(() => expect(C.partnerData.api).toHaveBeenCalledOnce());
     expect(C.partnerData.api.mock.calls[0][1].method).toBe('DELETE');

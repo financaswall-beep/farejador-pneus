@@ -2,40 +2,127 @@
   'use strict';
   const C = window.Caixa;
   const U = C.partnerUI;
-  let selected = '';
-  let payment = '';
-  let cancel = false;
-  let busy = false;
-  let error = '';
-  function list() {
-    const page = U.section('Retiradas', () => C.partnerHome.open('partner-home'));
-    const rows = C.partnerData.pendingPickups();
-    if (!rows.length) page.appendChild(U.node('p', 'Nenhuma retirada pendente.', 'ps-copy'));
-    rows.forEach(row => {
-      const item = U.node('article', null, 'ps-order-row');
-      item.append(U.node('h4', U.orderLabel(row)), U.node('p', row.customer_name || 'Cliente'), U.items(row.items));
-      item.appendChild(U.button('CLIENTE CHEGOU', () => {
-        selected = row.order_id; payment = ''; cancel = false; error = ''; C.partnerHome.open('partner-pickup');
-      }, 'primary', 'pickup'));
-      page.appendChild(item);
+  let selected = '', error = '';
+  let cancel = false, busy = false, generation = 0;
+  const photos = new Map();
+  const tires = row => (row.items || []).filter(item => !item.pickup_service_code);
+  const quantity = value => Number(value || 0) + (Number(value) === 1 ? ' pneu' : ' pneus');
+  const size = item => item.tire_size || item.label || item.item_name || 'Pneu';
+  function plate(className) {
+    const el = U.node('article', null, 'pu-plate ' + className);
+    ['tl', 'tr', 'bl', 'br'].forEach(corner => {
+      const screw = U.node('i', null, 'pu-screw pu-screw--' + corner);
+      screw.setAttribute('aria-hidden', 'true'); el.appendChild(screw);
     });
-    U.mount(page, 'pickups');
+    return el;
+  }
+  function avatar(row) {
+    const frame = U.node('div', null, 'pu-avatar');
+    const initials = String(row.customer_name || 'Cliente').trim().split(/\s+/).map(name => name[0]).slice(0, 2).join('');
+    frame.appendChild(U.node('span', initials));
+    if (typeof row.customer_avatar_url === 'string' && /^(https:\/\/|\/(?!\/))/.test(row.customer_avatar_url)) {
+      const image = U.node('img'); image.alt = 'Foto de ' + (row.customer_name || 'cliente');
+      image.referrerPolicy = 'no-referrer'; image.decoding = 'async';
+      image.addEventListener('error', () => image.remove());
+      image.src = row.customer_avatar_url; frame.appendChild(image);
+    }
+    return frame;
+  }
+  function identity(row, compact) {
+    const el = U.node('div', null, 'pu-identity');
+    const copy = U.node('div', null, 'pu-person');
+    copy.append(U.node('strong', row.customer_name || 'Cliente'), U.node('p', U.orderLabel(row)));
+    el.append(avatar(row), copy);
+    if (compact) el.appendChild(U.node('span', quantity(tires(row).reduce((sum, item) => sum + Number(item.quantity || 0), 0)), 'pu-quantity-badge'));
+    return el;
+  }
+  function section(title, back, type) {
+    const page = U.section(title, back);
+    page.classList.add('pu-screen', 'pu-screen--' + type); return page;
+  }
+  function mount(page, mode) {
+    const scroll = U.root.scrollTop;
+    const same = U.root.dataset.view === mode && U.root.dataset.pickup === selected;
+    U.mount(page, mode); U.root.dataset.pickup = selected;
+    U.root.scrollTop = same ? scroll : 0;
+  }
+  function list() {
+    const page = section('Retiradas', () => C.partnerHome.open('partner-home'), 'list');
+    const rows = C.partnerData.pendingPickups();
+    const summary = U.node('div', null, 'pu-summary');
+    summary.append(U.node('strong', rows.length === 1 ? '1 pedido aguardando retirada' : rows.length + ' pedidos aguardando retirada'),
+      U.node('p', rows.length ? 'Toque no pedido de quem chegou.' : 'Nenhuma retirada pendente.'));
+    page.appendChild(summary);
+    if (C.partnerData.state.errors.includes('pickups')) {
+      page.appendChild(U.node('p', 'Não consegui atualizar as retiradas.', 'ps-error'));
+      page.appendChild(U.button('TENTAR DE NOVO', () => void C.partnerData.load(), 'secondary'));
+    }
+    rows.forEach(row => {
+      const card = plate('pu-order'); card.appendChild(identity(row, true));
+      const items = U.node('div', null, 'pu-order-items');
+      tires(row).forEach(item => items.appendChild(U.node('p', size(item) + ' • ' + quantity(item.quantity))));
+      card.appendChild(items);
+      const button = U.button('VER RETIRADA', () => {
+        leave(); selected = row.order_id; cancel = false; error = ''; C.partnerHome.open('partner-pickup');
+      });
+      button.appendChild(C.createSvg([{ d: 'M4 12h16m-6-6 6 6-6 6' }]));
+      card.appendChild(button); page.appendChild(card);
+    });
+    mount(page, 'pickups');
+  }
+  function photoFrame(row, item) {
+    const frame = U.node('div', null, 'pu-tire-photo');
+    frame.append(U.icon('camera'), U.node('span', 'Sem foto do pneu'));
+    if (!item.photo_request_id || !item.order_item_id) return frame;
+    const key = row.order_id + '/' + item.order_item_id + '/' + item.photo_request_id;
+    let entry = photos.get(key);
+    if (!entry) {
+      entry = { url: '', failed: false, controller: new AbortController() }; photos.set(key, entry);
+      const session = C.sessionFingerprint(), current = generation;
+      const path = 'operacao/retiradas/' + encodeURIComponent(row.order_id) + '/itens/' + encodeURIComponent(item.order_item_id) + '/foto';
+      void (async () => {
+        try {
+          const response = await C.authenticatedFetch(C.operationPath(path), { signal: entry.controller.signal });
+          if (!response.ok) throw new Error('photo_unavailable');
+          const blob = await response.blob();
+          if (!/^image\/(jpeg|png|webp)$/.test(blob.type)) throw new Error('photo_unavailable');
+          if (current !== generation || session !== C.sessionFingerprint()) return;
+          entry.url = URL.createObjectURL(blob);
+        } catch { entry.failed = true; }
+        if (current === generation && session === C.sessionFingerprint() && C.partnerHome.currentTab() === 'partner-pickup') render();
+      })();
+    }
+    if (entry.url) {
+      const image = U.node('img'); image.alt = 'Foto do pneu ' + size(item); image.src = entry.url;
+      image.addEventListener('error', () => { URL.revokeObjectURL(entry.url); entry.url = ''; entry.failed = true; render(); });
+      frame.replaceChildren(image);
+    } else if (!entry.failed) frame.replaceChildren(U.node('span', 'Carregando foto…'));
+    return frame;
+  }
+  function serviceLabel(row) {
+    const labels = { mounting: 'Montagem do pneu', valve_change: 'Troca de bico', balancing: 'Balanceamento' };
+    const codes = [...new Set([...(row.pickup_services || []).map(service => service.code),
+      ...(row.items || []).map(item => item.pickup_service_code).filter(Boolean)])];
+    return codes.length ? codes.map(code => labels[code] || 'Serviço combinado').join(' • ') : 'Só retirada';
   }
   async function save(row, cancelling) {
-    if (busy || (!cancelling && !payment)) { error = 'Escolha como recebeu.'; return render(); }
+    if (busy) return;
     busy = true; error = ''; render();
     const session = C.sessionFingerprint();
     try {
-      const result = await C.partnerData.api('retiradas/' + encodeURIComponent(row.order_id), {
+      const path = cancelling ? 'retiradas/' + encodeURIComponent(row.order_id)
+        : 'operacao/retiradas/' + encodeURIComponent(row.order_id) + '/confirmar';
+      const result = await C.partnerData.api(path, {
         method: cancelling ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cancelling ? { reason: 'Cliente não veio — cancelamento confirmado na Operação simples' } : { payment_method: payment }),
+        body: JSON.stringify(cancelling ? { reason: 'Cliente não veio — cancelamento confirmado na Operação simples' } : {}),
       });
       if (session !== C.sessionFingerprint()) return;
-      if (cancelling && !result.cancelled) throw new Error('pickup_not_found');
-      C.showToast(cancelling ? 'Reserva liberada.' : 'Venda concluída.');
-      selected = ''; cancel = false;
+      if (cancelling ? !result.cancelled : !result.retrieved) throw new Error('pickup_not_found');
+      C.showToast(cancelling ? 'Reserva liberada.' : 'Retirada confirmada.');
+      C.partnerData.state.pickups = C.partnerData.state.pickups.filter(item => item.order_id !== row.order_id);
+      selected = ''; cancel = false; leave();
       await C.partnerData.load();
-      if (session === C.sessionFingerprint()) C.partnerHome.open('partner-home', true);
+      if (session === C.sessionFingerprint()) C.partnerHome.open(C.partnerData.pendingPickups().length ? 'partner-pickups' : 'partner-home', true);
     } catch (failure) {
       if (session !== C.sessionFingerprint()) return;
       error = U.errorMessage(failure);
@@ -44,28 +131,40 @@
   function render() {
     const row = C.partnerData.pendingPickups().find(item => item.order_id === selected);
     if (!row) return list();
-    const page = U.section(cancel ? 'Cliente não veio?' : 'Cliente chegou', () => {
+    const page = section(cancel ? 'Cliente não veio?' : 'Retirada', () => {
       if (busy) return;
       if (cancel) { cancel = false; render(); } else C.partnerHome.open('partner-pickups');
-    });
-    page.append(U.node('strong', U.orderLabel(row), 'ps-order-code'), U.node('p', row.customer_name || 'Cliente', 'ps-customer'), U.items(row.items));
-    const services = Array.isArray(row.pickup_services) ? row.pickup_services : [];
-    const serviceTotal = services.reduce((sum, item) => sum + Number(item.amount_cents || 0), 0) / 100;
-    page.appendChild(U.info('Total a receber', C.currency.format(Number(row.total_amount || 0) + serviceTotal)));
-    if (services.length) page.appendChild(U.node('p', 'Inclui os serviços já registrados no pedido.', 'ps-copy'));
+    }, 'detail');
+    page.appendChild(U.node('h4', 'Quem veio buscar', 'pu-label'));
+    const customer = plate('pu-customer'); customer.appendChild(identity(row, false)); page.appendChild(customer);
     if (cancel) {
       page.appendChild(U.node('p', 'Cancelar este pedido e liberar os pneus?', 'ps-copy'));
-      page.appendChild(U.button('SIM, CANCELAR', () => void save(row, true), 'danger', 'close'));
+      page.appendChild(U.button(busy ? 'CANCELANDO…' : 'SIM, CANCELAR', () => void save(row, true), 'danger', 'close'));
       page.appendChild(U.button('MANTER PEDIDO', () => { cancel = false; render(); }, 'secondary'));
     } else {
-      page.appendChild(U.payment(payment || row.payment_method, value => { payment = value; }));
-      page.appendChild(U.button(busy ? 'CONCLUINDO…' : 'ENTREGUEI E RECEBI', () => void save(row, false), 'primary', 'check'));
-      page.appendChild(U.button('Cliente não veio', () => { cancel = true; error = ''; render(); }, 'secondary'));
+      const items = tires(row);
+      page.appendChild(U.node('h4', items.length > 1 ? 'Quais pneus entregar' : 'Qual pneu entregar', 'pu-label'));
+      items.forEach(item => {
+        const card = plate('pu-tire'); const content = U.node('div', null, 'pu-tire-main');
+        const copy = U.node('div', null, 'pu-tire-copy');
+        copy.append(U.node('strong', size(item), 'pu-size'), U.node('b', quantity(item.quantity), 'pu-tire-quantity'),
+          U.node('p', [item.brand, U.condition(item.tire_condition)].filter(Boolean).join(' • '), 'pu-tire-brand'));
+        content.append(photoFrame(row, item), copy); card.appendChild(content);
+        const service = U.node('div', null, 'pu-service'); service.append(U.icon('pickup-solid'), U.node('span', serviceLabel(row)));
+        card.appendChild(service); page.appendChild(card);
+      });
+      page.appendChild(U.node('p', items.length > 1 ? 'Confira os pneus antes de entregar.' : 'Confira o pneu antes de entregar.', 'pu-helper'));
+      page.appendChild(U.button(busy ? 'CONFIRMANDO…' : 'CONFIRMAR RETIRADA', () => void save(row, false), 'primary', 'check'));
+      const absent = U.button('Cliente não veio', () => { cancel = true; error = ''; render(); }, 'secondary');
+      absent.prepend(C.createSvg([{ d: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6h5' }])); page.appendChild(absent);
     }
     if (error) { const el = U.node('p', error, 'ps-error'); el.setAttribute('role', 'alert'); page.appendChild(el); }
-    page.querySelectorAll('button,select').forEach(el => { el.disabled = busy; });
-    U.mount(page, 'pickup');
+    page.querySelectorAll('button').forEach(el => { el.disabled = busy; });
+    mount(page, 'pickup');
   }
-  function reset() { selected = ''; payment = ''; cancel = false; busy = false; error = ''; }
-  C.partnerPickups = { list, render, reset, busy: () => busy };
+  function leave() {
+    ++generation; photos.forEach(entry => { entry.controller.abort(); if (entry.url) URL.revokeObjectURL(entry.url); }); photos.clear();
+  }
+  function reset() { leave(); selected = ''; cancel = false; busy = false; error = ''; }
+  C.partnerPickups = { list, render, reset, leave, busy: () => busy };
 }());
