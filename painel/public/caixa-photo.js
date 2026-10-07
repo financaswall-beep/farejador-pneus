@@ -12,57 +12,7 @@
     photoSseRetry: 0, photoGeneration: 0, photoPreview: null, photoSending: false,
     photoEnabled: true, photoSelectedId: '', photoLoadState: 'idle',
   });
-  let alertAudio = null;
-  let audioContext = null;
-  let audioUnlocked = false;
   const originalTitle = document.title;
-
-  function notificationsEnabled() {
-    const saved = localStorage.getItem(Caixa.keys.notifications);
-    return saved === null || saved === 'true';
-  }
-
-  function unlockAudio() {
-    if (audioUnlocked) return;
-    try {
-      alertAudio = new Audio('/operacao/som-pedido-novo.mp3');
-      alertAudio.preload = 'auto';
-      alertAudio.muted = true;
-      const primed = alertAudio.play();
-      if (primed && primed.then) {
-        primed.then(function () {
-          alertAudio.pause(); alertAudio.currentTime = 0; alertAudio.muted = false;
-        }).catch(function () { alertAudio.muted = false; });
-      }
-      const Context = window.AudioContext || window.webkitAudioContext;
-      if (Context) { audioContext = audioContext || new Context(); void audioContext.resume(); }
-      audioUnlocked = true;
-    } catch (_) { /* o alerta visual permanece */ }
-  }
-
-  function synthBeep() {
-    if (!audioContext) return;
-    [880, 1320].forEach(function (frequency, index) {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      const start = audioContext.currentTime + index * 0.22;
-      oscillator.frequency.value = frequency;
-      oscillator.type = 'square';
-      gain.gain.setValueAtTime(0.18, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.2);
-      oscillator.connect(gain).connect(audioContext.destination);
-      oscillator.start(start); oscillator.stop(start + 0.22);
-    });
-  }
-
-  function photoBeep() {
-    if (!notificationsEnabled() || !audioUnlocked) return;
-    try {
-      alertAudio.currentTime = 0;
-      const played = alertAudio.play();
-      if (played && played.catch) played.catch(synthBeep);
-    } catch (_) { synthBeep(); }
-  }
 
   function renderAlert() {
     const count = state.photoRequests.length;
@@ -97,6 +47,7 @@
       state.photoLoadState = 'ready';
       state.photoEnabled = payload.enabled !== false;
       state.photoDirectUpload = payload.direct_upload === true;
+      const previousIds = new Set(state.photoRequests.map(function (item) { return item.id; }));
       const items = Array.isArray(payload.photo_requests) ? payload.photo_requests : [];
       state.photoRequests = items.filter(function (item) { return !item.status || item.status === 'pending'; });
       state.photoResolved = items.filter(function (item) { return item.status && item.status !== 'pending' && item.has_photo; });
@@ -106,8 +57,8 @@
         URL.revokeObjectURL(state.photoPreview.url);
         state.photoPreview = null;
       }
-      if (state.photoRequests.length > state.photoLastCount) {
-        photoBeep();
+      if (state.photoRequests.some(function (item) { return !previousIds.has(item.id); })) {
+        Caixa.playPartnerAlert();
         Caixa.showToast('📷 Cliente esperando foto de pneu. Toque no aviso para atender.');
       }
       state.photoLastCount = state.photoRequests.length;
@@ -169,6 +120,7 @@
   }
 
   function stopPhotoNotifications() {
+    Caixa.clearPartnerAlert();
     state.photoGeneration += 1;
     window.clearInterval(state.photoPoll);
     window.clearTimeout(state.photoSseRetry);
@@ -269,16 +221,14 @@
     modal.classList.remove('hidden'); renderModal();
   }
   function closeModal() { state.photoSelectedId = ''; modal.classList.add('hidden'); }
-  function setPhotoSoundEnabled(enabled) { if (enabled) unlockAudio(); }
 
   Object.assign(Caixa, {
-    startPhotoNotifications, stopPhotoNotifications, setPhotoSoundEnabled,
-    loadPhotoRequests, openPhotoRequest: openModal, compressPhoto, photoUploadPath: uploadPath, playPartnerAlert: photoBeep,
+    startPhotoNotifications, stopPhotoNotifications,
+    loadPhotoRequests, openPhotoRequest: openModal, compressPhoto, photoUploadPath: uploadPath,
   });
   alertButton.addEventListener('click', function () {
     if (Caixa.openNotifications) Caixa.openNotifications('photo');
     else openModal();
   });
   document.querySelectorAll('[data-close-photo]').forEach(function (button) { button.addEventListener('click', closeModal); });
-  document.addEventListener('pointerdown', unlockAudio, { once: true });
 }());
