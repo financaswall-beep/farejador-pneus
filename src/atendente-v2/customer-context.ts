@@ -46,7 +46,7 @@ export function formatCustomerContext(row: CustomerContextRow): string {
 
   const hasPhone = row.phone_e164 !== undefined ? normalizeCheckoutPhone(row.phone_e164) !== null : row.has_phone;
   parts.push(hasPhone
-    ? 'Telefone já cadastrado neste contato. NÃO peça telefone ou WhatsApp novamente.'
+    ? 'Telefone já cadastrado neste contato. NÃO peça telefone ou WhatsApp novamente. Na lista de espera do WhatsApp, omita registrar_interesse_reposicao.telefone: o código usa o cadastro. Se faltar quantidade, pergunte só quantos pneus deseja.'
     : 'Telefone válido ainda não cadastrado. Se o cliente já informou um número completo nesta conversa, passe-o em telefone_cliente; caso contrário, peça telefone/WhatsApp com DDD antes de criar o pedido.');
 
   if (purchases > 0) {

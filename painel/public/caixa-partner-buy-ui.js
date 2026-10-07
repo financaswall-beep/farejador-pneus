@@ -59,7 +59,7 @@
   function money(cents) { return C.currency.format(cents / 100); }
   function product(row, options) {
     const cart = options.quantity != null;
-    const el = U.node('article', null, 'ps-buy-item' + (cart ? ' ps-buy-item--cart' : ''));
+    const el = U.node('article', null, 'ps-buy-item' + (cart ? ' ps-buy-item--cart' : options.demand ? ' ps-buy-item--demand' : ''));
     el.dataset.offer = row.offer_key;
     const image = U.node('img', null, 'ps-buy-tire');
     image.src = row.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/assets/partner-replenishment-tire-v1.webp';
@@ -88,7 +88,8 @@
       }
       const available = U.node('p');
       available.append(U.node('b', row.quantity_available), U.node('span', ' disponíveis' + (options.demand ? ' no galpão' : '')));
-      availability.appendChild(available); copy.appendChild(availability);
+      availability.appendChild(available);
+      if (options.demand) el.appendChild(availability); else copy.appendChild(availability);
       const add = control('ADICIONAR', options.add, 'primary', 'cart'); add.disabled = options.busy || row.quantity_available <= options.inCart;
       el.appendChild(add);
     }

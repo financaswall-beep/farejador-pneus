@@ -6,22 +6,22 @@ import type { ToolDefinition } from './types.js';
 
 export const STOCK_INTEREST_TOOL: ToolDefinition = { type: 'function', function: {
   name: 'registrar_interesse_reposicao',
-  description: 'Lista de espera quando falta pneu. Primeiro ofereça aviso pelo WhatsApp; após o aceite, peça o número com DDD no Instagram/Facebook ou use o número da conversa WhatsApp. Confirme medida, condição, tipo e quantidade desejados. consentimento copia exatamente a resposta que autorizou o aviso (inclusive sim, após sua oferta). Nunca invente consentimento, telefone, quantidade ou tipo. Não reserva nem envia aviso automaticamente. Para revogar use acao cancelar.',
+  description: 'Lista de espera quando falta pneu. Primeiro ofereça aviso pelo WhatsApp; após o aceite, peça o número com DDD no Instagram/Facebook. No WhatsApp com telefone cadastrado, OMITA telefone: o código recupera o número do contato; nunca peça novamente nem invente o número. Confirme medida, condição, tipo e quantidade desejados; pergunte somente o que falta. consentimento copia exatamente a resposta que autorizou o aviso (inclusive sim ou pode ser de boa, após sua oferta). Nunca invente consentimento, telefone, quantidade ou tipo. Não reserva nem envia aviso automaticamente. Para revogar use acao cancelar.',
   parameters: { type: 'object', additionalProperties: false,
     properties: { acao: { type: 'string', enum: ['registrar','cancelar'] }, medida: { type:'string' },
-      condicao: { type:'string', enum:['novo','meia_vida','remold'] }, telefone:{type:'string'}, consentimento:{type:'string'},
+      condicao: { type:'string', enum:['novo','meia_vida','remold'] }, telefone:{type:'string',description:'Opcional no WhatsApp: omita para usar o telefone cadastrado do contato. Em outros canais, informe somente o número confirmado por texto pelo cliente.'}, consentimento:{type:'string'},
       quantidade:{type:'integer',minimum:1,maximum:999}, tipo_veiculo:{type:'string',enum:['car','motorcycle']} },
-    required:['acao','medida','condicao','telefone','consentimento','quantidade','tipo_veiculo'] },
+    required:['acao','medida','condicao','consentimento','quantidade','tipo_veiculo'] },
 } };
 const schema = z.object({ acao:z.enum(['registrar','cancelar']), medida:z.string().max(40),
-  condicao:z.enum(['novo','meia_vida','remold']), telefone:z.string().max(40), consentimento:z.string().min(1).max(2000),
+  condicao:z.enum(['novo','meia_vida','remold']), telefone:z.string().max(40).optional(), consentimento:z.string().min(1).max(2000),
   quantidade:z.number().int().min(1).max(999).optional(), tipo_veiculo:z.enum(['car','motorcycle']).optional() }).strict();
 
 export function contextualRestockConsent(text:string, offer:string):boolean {
   const normalized=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
   const offered=/\b(avis\w*|notific\w*)\b/i.test(offer) && /\b(cheg\w*|reposi\w*|estoque)\b/i.test(offer)
     && /whats/i.test(offer);
-  return offered && (explicitRestockConsent(text) || /^(sim|pode|pode sim|quero|quero sim|claro|beleza|blz|ok|pode ser)[\s!.😊👍]*$/.test(normalized));
+  return offered && (explicitRestockConsent(text) || /^(sim|pode(?: sim| ser)?|quero(?: sim)?|claro|beleza|blz|ok)(?:[,\s]+(?:de boa|por favor|obrigad[oa]))?[\s!.😊👍]*$/.test(normalized));
 }
 
 export function explicitRestockConsent(text: string): boolean {
@@ -57,7 +57,7 @@ export async function registerStockInterest(client: PoolClient, environment: str
     LEFT JOIN core.contacts ct ON ct.id=c.contact_id AND ct.environment=c.environment AND ct.deleted_at IS NULL
     WHERE c.id=$1 AND c.environment=$2 AND c.deleted_at IS NULL`,[conversationId,environment])).rows[0];
   const known=/whatsapp/i.test(contact?.channel_type??'')?normalizeCheckoutPhone(contact?.phone_e164):null;
-  const phone=normalizeCheckoutPhone(a.telefone||known);
+  const phone=normalizeCheckoutPhone(a.telefone?.trim()||known);
   const revoked=recent.rows.some(m=>Number(m.chatwoot_message_id)>Number(consent.chatwoot_message_id)
     && /\b(n[aã]o\s+(?:me\s+)?avis\w*|n[aã]o\s+preciso|cancel\w*\s+(?:o\s+)?aviso|pare\s+de\s+(?:me\s+)?avis\w*)\b/i.test(m.content));
   if(revoked)return {erro:'novo_consentimento_necessario',orientacao:'O cliente desistiu do aviso. Não o inclua usando a autorização anterior.'};

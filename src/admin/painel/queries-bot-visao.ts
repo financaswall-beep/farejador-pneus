@@ -1,9 +1,9 @@
 import { BOT_COST_TOTALS_SQL } from './bot-cost-select.js';
 import type { VehicleReportFilter } from '../../shared/tire-vehicle-type.js';
 import { getBotVehicleDemand } from './bot-vehicle-demand.js';
-// Visão do Bot: agregadores somente leitura, exclusivos do painel da matriz.
+import { botDemandLocationSql } from './bot-demand-location-sql.js';
 // Facts, classificações e sinais vêm do analytics determinístico (0102–0104/0218).
-// O mapa também lê municípios de pinos já geocodificados; não expõe coordenadas.
+// O mapa também lê cidades de pinos e buscas já resolvidas; não expõe coordenadas.
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -180,7 +180,7 @@ export async function getBotVisao(
     // A procura permanece no histórico; pedidos e entregas usam pedidos válidos.
     // pedido_criado é uma etapa passada, não comprova um pedido ainda vigente.
     const r = await dbPool.query<BotVisaoMapaRow>(
-      `WITH conv AS (
+      `WITH locations AS (${botDemandLocationSql}), conv AS (
          SELECT cf.conversation_id,
                 bool_or(cf.fact_key = 'faltou_estoque') AS faltou
          FROM analytics.conversation_facts cf
@@ -190,7 +190,7 @@ export async function getBotVisao(
        ), demand AS (
          SELECT l.conversation_id, l.municipio,
                 COALESCE(c.faltou, false) AS faltou
-         FROM analytics.v_bot_demand_location l
+         FROM locations l
          LEFT JOIN conv c ON c.conversation_id = l.conversation_id
          WHERE l.environment = $1 AND l.municipio IS NOT NULL
            AND (l.observed_at >= ${sinceSql} OR c.conversation_id IS NOT NULL OR EXISTS (
@@ -223,7 +223,7 @@ export async function getBotVisao(
 
   try {
     const r = await dbPool.query<{ sem_regiao: number }>(
-      `WITH handled AS (
+      `WITH locations AS (${botDemandLocationSql}), handled AS (
          SELECT DISTINCT t.conversation_id
          FROM agent.turns t
          WHERE t.environment = $1 AND t.agent_version = 'v2'
@@ -233,7 +233,7 @@ export async function getBotVisao(
        SELECT count(*)::int AS sem_regiao
        FROM handled h
        WHERE NOT EXISTS (
-         SELECT 1 FROM analytics.v_bot_demand_location l
+         SELECT 1 FROM locations l
          WHERE l.environment = $1 AND l.conversation_id = h.conversation_id
            AND l.municipio IS NOT NULL
        )`,

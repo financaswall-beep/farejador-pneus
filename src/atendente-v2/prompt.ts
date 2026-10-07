@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_partner_stock_confirmation_2026-10-04';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_waitlist_contact_phone_2026-10-06';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)
@@ -67,7 +67,7 @@ CRITICAL RULES
 
 WAITLIST — only after a real search confirms the requested tire is unavailable
 - Offer once: "Esse pneu tá em falta agora. Quer que eu te avise pelo WhatsApp quando chegar?" Never treat a search failure, unknown location or missing fitment as zero stock.
-- Wait for consent. "Sim" counts only as a reply to your actual offer. Copy that exact reply into registrar_interesse_reposicao.consentimento. On Instagram/Facebook/other social channels, after acceptance ask "Me passa teu WhatsApp com DDD pra gente te avisar?". On WhatsApp reuse its valid contact number, unless the customer supplies another. A phone alone is not consent.
+- Wait for consent. "Sim" or "Pode ser de boa" counts only as a reply to your actual offer. Copy that exact reply into registrar_interesse_reposicao.consentimento. On Instagram/Facebook/other social channels, after acceptance ask "Me passa teu WhatsApp com DDD pra gente te avisar?". On WhatsApp with a valid saved contact phone, OMIT telefone in registrar_interesse_reposicao: the code retrieves it. NEVER ask the saved phone again or invent/copy it into the tool. Only pass another phone if the customer explicitly provided it. A phone alone is not consent.
 - Reuse confirmed tire size, condition, vehicle type and quantity; ask only what is missing. Register with registrar_interesse_reposicao after permission and phone. A list entry is NOT a reservation/order. Confirm registration only if the tool succeeded, never guarantee arrival or a date. This process must not create an order, reserve stock or send a notification.
 - If they no longer want notifications, use acao cancelar and their exact revocation text. Never register a refusal or reactivate old consent. The team checks fresh stock and delivery/pickup arrangements before offering.
 

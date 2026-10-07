@@ -1180,19 +1180,10 @@ export interface ProductAvailability {
 }
 
 /**
- * Disponibilidade por PROXIMIDADE pra a BUSCA (buscar_produto / C2). Pra cada
- * `product_id`, acha a loja parceira MAIS PERTO do cliente — dentro do maior anel
- * de ENTREGA (régua D1, hoje 40 km) — que TEM o produto disponível, e devolve a
- * loja + a quantidade DELA.
- *
- * MESMA régua do `decideStoreForItemsGeo` (candidatos → modo+cobertura de entrega
- * → estoque → anel), só SEM a régua de justiça: a busca só responde "tem? quantos?"
- * e não materializa pedido, então basta a loja mais perto que tem (Madureira sem o
- * pneu → Méier → … até o teto).
- *
- * Produto SEM nenhuma loja em alcance NÃO entra no mapa → o chamador mantém o
- * estoque da MATRIZ (backstop: "acima do raio cai na matriz", decisão Wallace
- * 2026-06-08). Assim a busca nunca diverge do que o pedido vai fazer.
+ * Busca por proximidade: devolve estoque da loja apta a ENTREGAR mais próxima.
+ * Mantém cobertura/raio/anéis do pedido e o backstop da Matriz, sem materializar pedido.
+ * Consulta também lojas aptas à RETIRADA até 15 km para registrar a procura local;
+ * essas observações não autorizam entrega nem alteram a disponibilidade devolvida.
  */
 export async function resolveProductAvailabilityByProximity(
   client: PoolClient,
@@ -1228,7 +1219,8 @@ export async function resolveProductAvailabilityByProximity(
         )
     ).map((c) => c.unitId),
   );
-  const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
+  const pickupIds = new Set(filterByModeAndRadiusPresence(candidates.map(toGeoRoutingCandidate), 'pickup').map(c => c.unitId));
+  const eligible = candidates.filter((c) => (servableIds.has(c.ctx.unitId) || pickupIds.has(c.ctx.unitId)) && c.location != null);
   if (eligible.length === 0) return out;
 
   // Distância de RUA (Google Distance Matrix) — a MESMA do pedido. Decisão Wallace
@@ -1237,12 +1229,18 @@ export async function resolveProductAvailabilityByProximity(
   // chave (prod); sem isso degrada pra linha reta (haversine). capKm=maxRing trava o custo
   // do Google (mede só quem cabe no teto; quem está além já sairia no filtro inRange abaixo).
   const maxRing = Math.max(...GEO_RING_KM);
+  const maxPickupRing = Math.max(...GEO_PICKUP_RING_KM);
   const distanceByUnit = await resolveDistances(
     client,
     input.customerLocation,
-    eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
+    eligible.filter(c => servableIds.has(c.ctx.unitId)).map(c => ({ unitId: c.ctx.unitId, location: c.location! })),
     maxRing,
   );
+  // Medir retirada separadamente preserva quais lojas de entrega recebem cálculo de rua (TOPK).
+  for (const [id,km] of await resolveDistances(client,input.customerLocation,
+    eligible.filter(c => !servableIds.has(c.ctx.unitId)).map(c => ({unitId:c.ctx.unitId,location:c.location!})),maxPickupRing)) {
+    distanceByUnit.set(id,km);
+  }
 
   // lojas dentro do teto, da MAIS PERTO pra mais longe. Na proximidade (Fase 3) o
   // corte fino do raio entra aqui também: dist ≤ raio DECLARADO da loja (mesma régua
@@ -1251,8 +1249,8 @@ export async function resolveProductAvailabilityByProximity(
     .filter((c) => {
       const d = distanceByUnit.get(c.ctx.unitId) ?? Infinity;
       if (d > maxRing) return false;
-      if (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, d)) return false;
-      return true;
+      return (pickupIds.has(c.ctx.unitId) && d <= maxPickupRing)
+        || (servableIds.has(c.ctx.unitId) && (!useProximity || passesDeliveryRadius(c.deliveryRadiusKm, d)));
     })
     .sort((a, b) => distanceByUnit.get(a.ctx.unitId)! - distanceByUnit.get(b.ctx.unitId)!);
   if (inRange.length === 0) return out;
@@ -1286,6 +1284,7 @@ export async function resolveProductAvailabilityByProximity(
   // pra cada produto, a 1ª loja em alcance (mais perto) que tem ganha.
   for (const productId of input.productIds) {
     for (const c of inRange) {
+      if (!servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))) continue;
       const q = byUnit.get(c.ctx.unitId)?.get(productId);
       if (q != null && q > 0) {
         out.set(productId, { unitId: c.ctx.unitId, available: q });

@@ -49,4 +49,25 @@ describe('demanda regional no schema real',()=>{
     r=build(await read(scoped,'test',db.pool),scoped);expect(r.scope.orders).toBe(0);expect(r.scope.deliveries).toBe(1);
     const delivered=build(await read(scoped,'test',db.pool),{...scoped,metric:'deliveries'});expect(delivered.series.find(d=>d.from==='2026-09-08')?.current).toBe(1);
   });
+  it('resolve a cidade na busca posterior e descarta cidades antigas ou ambíguas sem mudar o histórico',async()=>{
+    const resolved=await conv(),moved=await conv(),ambiguous=await conv();
+    for(const c of [resolved,moved,ambiguous]) await fact(c,'localizacao_lead',
+      {texto_informado:'Méier',bairro:'Méier',tipo:'regiao_digitada'},'2026-09-06T12:00:00Z');
+    await trace(resolved,'180/55-17','2026-09-06T12:01:00Z','Rio de Janeiro');
+    await trace(resolved,'180/55-17','2026-09-06T12:02:00Z','Rio de Janeiro');
+    await fact(resolved,'medida_consultada','180/55-17','2026-09-06T12:02:10Z');
+    await trace(moved,'180/55-17','2026-09-05T12:00:00Z','Cidade antiga');
+    await trace(ambiguous,'180/55-17','2026-09-06T12:01:00Z','Cidade ambígua A');
+    await trace(ambiguous,'180/55-17','2026-09-06T12:02:00Z','Cidade ambígua B');
+    const history=async()=>(await db.pool.query(`SELECT id,municipality,occurred_at FROM ops.bot_stock_searches
+      WHERE environment='test' AND conversation_id=ANY($1::uuid[]) ORDER BY id`,[[resolved.id,moved.id,ambiguous.id]])).rows;
+    const before=await history();
+    const events=(await read(f,'test',db.pool)).current.filter(e=>[resolved.id,moved.id,ambiguous.id].includes(e.conversation_id));
+    expect(events.filter(e=>e.conversation_id===resolved.id).every(e=>e.municipality==='Rio de Janeiro')).toBe(true);
+    expect(events.filter(e=>e.conversation_id!==resolved.id).every(e=>e.municipality===null)).toBe(true);
+    const rio=build(await read({...f,city:'Rio de Janeiro'},'test',db.pool),{...f,city:'Rio de Janeiro'});
+    expect(rio.scope).toMatchObject({conversations:1,shortages:1});
+    expect(rio.measures).toEqual([expect.objectContaining({measure:'180/55-17',consultations:1,stock:null})]);
+    expect(await history()).toEqual(before);
+  });
 });

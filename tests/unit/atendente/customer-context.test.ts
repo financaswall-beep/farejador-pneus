@@ -37,6 +37,16 @@ describe('contexto permanente do cadastro do cliente',() => {
     expect(text).not.toContain('NÃO peça telefone');
   });
 
+  it('orienta a usar o cadastro na lista de espera sem enviar o número ao modelo', () => {
+    const text = formatCustomerContext({ name: 'Ana', has_phone: true, phone_e164: '+5521988887777',
+      purchase_count: 0, partial_ltv_brl: null, last_purchase_at: null, last_purchase_item: null,
+      has_previous_delivery_address: false });
+    expect(text).toContain('NÃO peça telefone ou WhatsApp novamente');
+    expect(text).toContain('omita registrar_interesse_reposicao.telefone');
+    expect(text).toContain('pergunte só quantos pneus deseja');
+    expect(text).not.toContain('+5521988887777');
+  });
+
   it('consulta cadastro e pedidos pelo contact_id exato da conversa',async () => {
     const query = vi.fn().mockResolvedValue({ rows:[] });
     await expect(loadCustomerContext({ query } as never,'conv-1')).resolves.toBeNull();

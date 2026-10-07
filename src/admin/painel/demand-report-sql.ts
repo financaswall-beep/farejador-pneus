@@ -1,8 +1,9 @@
+import { botDemandLocationSql } from './bot-demand-location-sql.js';
 // All sources are bounded by environment and business dates before aggregation.
 export const demandEventsSql=`WITH bounds AS (
   SELECT $2::date::timestamp AT TIME ZONE 'America/Sao_Paulo' AS lo,
     ($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo' AS hi
-), events AS (
+), locations AS (${botDemandLocationSql}), events AS (
   SELECT t.conversation_id,t.created_at AS at,'activity'::text AS kind,NULL::text AS measure,NULL::text AS vehicle_type
   FROM agent.turns t,bounds b WHERE t.environment=$1 AND t.agent_version='v2'
     AND t.status IN ('sent_api_ack','delivered') AND t.created_at>=b.lo AND t.created_at<b.hi
@@ -48,9 +49,6 @@ export const demandEventsSql=`WITH bounds AS (
     AND ($4='all' OR ($4='unknown' AND e.resolved_type IS NULL) OR e.resolved_type=$4) AND ($4='all' OR e.kind<>'activity')
   GROUP BY e.conversation_id,e.kind,CASE WHEN e.kind='measure' THEN e.measure END
 )
-SELECT g.*,COALESCE(NULLIF(btrim(l.municipio),''),fallback.municipality) AS municipality
-FROM grouped g LEFT JOIN analytics.v_bot_demand_location l ON l.environment=$1 AND l.conversation_id=g.conversation_id
-LEFT JOIN LATERAL(SELECT NULLIF(btrim(s.municipality),'') AS municipality FROM ops.bot_stock_searches s
-  WHERE s.environment=$1 AND s.conversation_id=g.conversation_id AND NULLIF(btrim(s.municipality),'') IS NOT NULL
-  ORDER BY s.occurred_at DESC,s.id DESC LIMIT 1) fallback ON NULLIF(btrim(l.municipio),'') IS NULL
+SELECT g.*,l.municipio AS municipality
+FROM grouped g LEFT JOIN locations l ON l.environment=$1 AND l.conversation_id=g.conversation_id
 ORDER BY g.conversation_id,g.kind,g.measure LIMIT 50001`;

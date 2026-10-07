@@ -76,7 +76,7 @@
 .is-partner-home .ps-buy-message { margin: 18px 3px; font-size: 18px; }
 .is-partner-home .ps-buy-error { color: #8d271d; }
 /* Catálogo: proporções da referência, sem alterar o cabeçalho/menu compartilhados. */
-.is-partner-home .ps-buy--catalog { background-image: url('/operacao/assets/partner-buy-tread-v1.svg'),url('/operacao/assets/partner-buy-tread-v1.svg'); background-position: right -28px top -49px,left -36px bottom -65px; background-size: 124px 199px; background-repeat: no-repeat; }
+.is-partner-home .ps-buy--catalog,.is-partner-home .ps-buy--replenishment { background-image: url('/operacao/assets/partner-buy-tread-v1.svg'),url('/operacao/assets/partner-buy-tread-v1.svg'); background-position: right -28px top -49px,left -36px bottom -65px; background-size: 124px 199px; background-repeat: no-repeat; }
 .is-partner-home .ps-buy--catalog .ps-buy-heading { margin: 4px 0 12px; }
 .is-partner-home .ps-buy-heading h3 { margin: 0; line-height: 1.08; }
 .is-partner-home .ps-buy--catalog .ps-buy-heading h3 { font-size: clamp(27px,7.7vw,35px); }
@@ -97,6 +97,26 @@
 .is-partner-home .ps-buy--catalog .ps-buy-control--primary { min-height: 36px; margin-top: 4px; padding: 6px 10px; font-size: 20px; }
 .is-partner-home .ps-buy--catalog .ps-buy-item::after { bottom: 35px; }
 .is-partner-home .ps-buy--catalog .ps-buy-list { gap: 8px; }
+/* Reposição: a procura fica abaixo da medida, com espaço livre sob o preço. */
+.is-partner-home .ps-buy--replenishment .ps-buy-heading { margin: 4px 0 10px; }
+.is-partner-home .ps-buy--replenishment .ps-buy-heading h3 { font-size: clamp(23px,6.6vw,31px); }
+.is-partner-home .ps-buy--replenishment .ps-buy-intro { gap: 11px; padding: 6px 1px 10px; }
+.is-partner-home .ps-buy--replenishment .ps-buy-intro > svg { width: 43px; height: 43px; }
+.is-partner-home .ps-buy--replenishment .ps-buy-intro h4 { font-size: clamp(22px,6.35vw,29px); }
+.is-partner-home .ps-buy--replenishment .ps-buy-intro p { font-size: 18px; }
+.is-partner-home .ps-buy--replenishment .ps-buy-list { gap: 9px; }
+.is-partner-home .ps-buy-item--demand { grid-template-columns: 78px minmax(0,1fr) auto; column-gap: 9px; row-gap: 0; min-height: 157px; padding: 12px 9px 8px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-tire { grid-row: 1 / span 2; width: 78px; height: 103px; filter: drop-shadow(0 4px 3px #18251f65); }
+.is-partner-home .ps-buy-item--demand h4 { font-size: clamp(27px,7.4vw,35px); }
+.is-partner-home .ps-buy-item--demand .ps-buy-condition { display: inline; font-size: 18px; line-height: 1.2; }
+.is-partner-home .ps-buy-item--demand .ps-buy-item-brand { display: inline; margin-left: 5px; font-size: 11px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-price { font-size: clamp(25px,6.7vw,32px); padding-top: 6px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-availability { grid-column: 2 / -1; margin-top: 5px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-demand { gap: 5px; font-size: 19px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-demand > svg { width: 20px; height: 20px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-demand + p { padding-left: 25px; }
+.is-partner-home .ps-buy-item--demand .ps-buy-control--primary { min-height: 36px; margin-top: 5px; padding: 6px 10px; font-size: 21px; }
+.is-partner-home .ps-buy-item--demand::after { bottom: 36px; }
 @media (max-width: 360px) {
   .is-partner-home #partner-home-screen:has(.ps-buy) { padding-right: 9px; padding-left: 9px; }
   .is-partner-home .ps-buy-heading--replenishment { grid-template-columns: 30px minmax(0,1fr) 74px; gap: 5px; }
@@ -118,4 +138,17 @@
   .is-partner-home .ps-buy--catalog .ps-buy-availability p { font-size: 15px; }
   .is-partner-home .ps-buy--catalog .ps-buy-tire-badge { flex-basis: 35px; width: 35px; height: 35px; }
   .is-partner-home .ps-buy--catalog .ps-buy-intro { gap: 8px; }
+  .is-partner-home .ps-buy--replenishment .ps-buy-heading h3 { font-size: 22px; }
+  .is-partner-home .ps-buy--replenishment .ps-buy-control--back { width: 30px; }
+  .is-partner-home .ps-buy--replenishment .ps-buy-intro { gap: 8px; }
+  .is-partner-home .ps-buy--replenishment .ps-buy-intro > svg { width: 36px; height: 36px; }
+  .is-partner-home .ps-buy--replenishment .ps-buy-intro h4 { font-size: 21px; }
+  .is-partner-home .ps-buy-item--demand { grid-template-columns: 59px minmax(0,1fr) auto; column-gap: 7px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-tire { width: 59px; }
+  .is-partner-home .ps-buy-item--demand h4 { font-size: 24px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-price { font-size: 23px; padding-left: 6px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-condition { font-size: 17px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-item-brand { font-size: 10px; margin-left: 3px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-demand { font-size: 18px; }
+  .is-partner-home .ps-buy-item--demand .ps-buy-demand + p { font-size: 15px; }
 }

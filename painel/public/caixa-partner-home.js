@@ -96,13 +96,14 @@
     syncViewport(active);
     panel.classList.toggle('hidden', !active);
     if (!active) return;
-    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : ['partner-buy', 'partner-cart'].includes(next) ? 'buy' : 'orders';
+    const current = next === 'partner-sales' ? 'sales' : next === 'partner-stock' ? 'stock' : next === 'partner-profile' ? '' : ['partner-buy', 'partner-cart', 'partner-replenishment'].includes(next) ? 'buy' : 'orders';
     ['orders', 'sales', 'stock', 'buy'].forEach(name => {
       if (name === current) id(name).setAttribute('aria-current', 'page');
       else id(name).removeAttribute('aria-current');
     });
     render();
     if (next === 'partner-sales') void C.partnerSales.load();
+    else if (next === 'partner-replenishment') void C.partnerReplenishment.refresh();
     else if (['partner-buy', 'partner-cart'].includes(next)) void C.partnerBuy.load();
     else if (next === 'partner-stock' || next === 'partner-profile') void C.partnerExtras.load(next);
   }

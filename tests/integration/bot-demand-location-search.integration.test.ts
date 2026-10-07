@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { applyMigrationFile, startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
+import { botDemandLocationSql } from '../../src/admin/painel/bot-demand-location-sql.js';
 
 const migration = '0227_demand_location_from_stock_search.sql';
 const partialAddressMigration = '0236_demand_location_partial_address.sql';
@@ -88,6 +89,13 @@ async function location(c: Conversation) {
   )).rows[0];
 }
 
+async function panelLocation(c: Conversation) {
+  return (await db.pool.query(
+    `SELECT municipio FROM (${botDemandLocationSql}) locations WHERE conversation_id=$2`,
+    [c.environment,c.id],
+  )).rows[0]?.municipio;
+}
+
 async function history(c: Conversation) {
   const facts = (await db.pool.query(
     'SELECT * FROM analytics.conversation_facts WHERE environment=$1 AND conversation_id=$2 ORDER BY id',
@@ -148,6 +156,7 @@ describe('município já resolvido na busca do bot', () => {
     await search(c,next,'Rio de Janeiro');
     await lead(c,next,'Maricá','Centro');
     expect((await location(c)).municipio).toBe('Maricá');
+    expect(await panelLocation(c)).toBe('Maricá');
   });
 
   it('mantém a cidade resolvida quando uma rua posterior apenas completa o endereço', async () => {
@@ -171,6 +180,7 @@ describe('município já resolvido na busca do bot', () => {
     await lead(c,await message(c),undefined,'Bairro novo');
     await partialAddress(c,await message(c),'Rua sem cidade confirmada');
     expect((await location(c)).municipio).toBeNull();
+    expect(await panelLocation(c)).toBeNull();
   });
 
   it('não associa busca de outra mensagem ou conversa a uma região nova ainda desconhecida', async () => {
@@ -179,9 +189,11 @@ describe('município já resolvido na busca do bot', () => {
     await lead(c,old);
     await lead(c,await message(c),undefined,'Outro bairro');
     expect((await location(c)).municipio).toBeNull();
+    expect(await panelLocation(c)).toBeNull();
     const other = await conversation();
     await lead(other,await message(other));
     expect((await location(other)).municipio).toBeNull();
+    expect(await panelLocation(other)).toBeNull();
   });
 
   it('um pino mais recente sem geocodificação continua desconhecido até ser resolvido', async () => {
@@ -195,6 +207,7 @@ describe('município já resolvido na busca do bot', () => {
        VALUES ($1,$2,$3,$4,'location',-22.2,-42.2)`, [c.environment,++serial,pinMsg,c.id],
     );
     expect((await location(c)).municipio).toBeNull();
+    expect(await panelLocation(c)).toBeNull();
     await db.pool.query(
       `INSERT INTO commerce.geo_cache(cache_key,kind,value)
        VALUES ('r:-22.2000,-42.2000','reverse','{"municipio":"Itaboraí"}')`,
@@ -208,6 +221,7 @@ describe('município já resolvido na busca do bot', () => {
     await search(c,msg,'Maricá');
     await lead(c,msg);
     expect((await location(c)).municipio).toBeNull();
+    expect(await panelLocation(c)).toBeNull();
   });
 
   it('não transforma busca sem cidade em localização e mantém produção separada dos testes', async () => {
@@ -222,5 +236,39 @@ describe('município já resolvido na busca do bot', () => {
     expect((await getBotVisao('today','prod',db.pool)).mapa).toEqual([
       { municipio:'Cidade isolada',chamou:1,pediu:0,efetivou:0,faltou:0 },
     ]);
+  });
+
+  it('liga a busca posterior do 180/55-17 ao Méier sem editar fatos nem contar a conversa duas vezes', async () => {
+    const c = await conversation();
+    await lead(c,await message(c),undefined,'Méier');
+    const lookup = await message(c);
+    for (let i=0;i<2;i++) await db.pool.query(
+      `INSERT INTO ops.bot_stock_searches(environment,conversation_id,trigger_message_id,search_key,
+         tool_name,measure,municipality,stores,occurred_at)
+       VALUES ($1,$2,$3,$4,'buscar_produto','180/55-17','Rio de Janeiro',
+         '[{"id":"matriz","name":"Matriz","available":false}]',now())`,
+      [c.environment,c.id,lookup,randomUUID()],
+    );
+    for (const [key,value] of [['medida_consultada','180/55-17'],
+      ['faltou_estoque',{ medida:'180/55-17',motivo:'sem_estoque_perto' }]]) await db.pool.query(
+      `INSERT INTO analytics.conversation_facts(environment,conversation_id,message_id,fact_key,
+         fact_value,observed_at,truth_type,source,extractor_version)
+       VALUES ($1,$2,$3,$4,$5::jsonb,now(),'observed','test',$6)`,
+      [c.environment,c.id,lookup,key,JSON.stringify(value),randomUUID()],
+    );
+    expect((await location(c)).municipio).toBeNull();
+    // Rua/número posteriores completam o bairro; não invalidam a busca entre as mensagens.
+    await partialAddress(c,await message(c));
+    await partialNumber(c,await message(c));
+    expect((await location(c)).municipio).toBeNull();
+    const before = await history(c);
+    const panel = await getBotVisao('today','test',db.pool);
+    expect(panel.demanda_disponivel).toBe(true);
+    expect(panel.medidas_por_municipio?.find(row => row.municipio==='Rio de Janeiro' && row.medida==='180/55-17'))
+      .toEqual({ municipio:'Rio de Janeiro',medida:'180/55-17',consultas:1,galpao_qty:null });
+    expect(panel.mapa.find(row => row.municipio==='Rio de Janeiro')?.faltou).toBe(1);
+    expect(await panelLocation(c)).toBe('Rio de Janeiro');
+    await getBotVisao('today','test',db.pool);
+    expect(await history(c)).toEqual(before);
   });
 });

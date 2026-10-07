@@ -13,6 +13,11 @@
   let key = '';
   let origin = 'partner-buy';
   const identity = row => row.offer_key || JSON.stringify([row.measure, row.brand || 'Sem marca', row.tire_condition]);
+  const measureKey = value => String(value || '').replace(/[^\d]/g, '');
+  function variantKey(row) {
+    const brand = String(row.brand || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return JSON.stringify([measureKey(row.measure), brand === 'semmarca' ? '' : brand, row.tire_condition]);
+  }
   const allowed = () => C.isPartner() && C.token() && C.canModule('estoque');
   function canSend() { return state.checkoutEnabled && (C.stored(C.keys.role) === 'owner' || C.canModule('compras')); }
   function checkAccount() {
@@ -28,7 +33,7 @@
     return { ...row, offer_key: identity(row), quantity_available: available, price_cents: cents };
   }
   function currentMode() {
-    return ({ 'partner-buy': 'catalog', 'partner-cart': 'cart' })[C.partnerHome.currentTab()];
+    return ({ 'partner-buy': 'catalog', 'partner-cart': 'cart', 'partner-replenishment': 'replenishment' })[C.partnerHome.currentTab()];
   }
   async function load() {
     if (!allowed()) return;
@@ -54,6 +59,18 @@
     }
   }
   function entries() { return [...state.cart.values()]; }
+  function replenishmentRows() {
+    const eligible = C.partnerData.state.offers.filter(row => row.quantity_available > 0);
+    const seen = new Set();
+    // A reposição identifica a variante; preço, saldo e chave do carrinho vêm do catálogo publicado.
+    return C.partnerData.opportunities().flatMap(demand => state.rows.filter(row =>
+      measureKey(row.measure) === measureKey(demand.measure) && eligible.some(offer =>
+        variantKey(offer) === variantKey(row) && (!offer.vehicle_type || offer.vehicle_type === row.vehicle_type))
+    ).filter(row => {
+      if (seen.has(row.offer_key)) return false;
+      seen.add(row.offer_key); return true;
+    }).map(row => ({ ...row, demand_count: Number(demand.demand_count) })));
+  }
   function count() { return entries().reduce((total, entry) => total + entry.quantity, 0); }
   function add(row) {
     if (!allowed() || !state.loaded || state.sending) return;
@@ -99,25 +116,30 @@
   function draw(mode) {
     notice.replaceChildren(); list.replaceChildren();
     const header = page.children[0]; header.replaceWith?.(V.heading(mode, count(), { back: () => C.partnerHome.open(mode === 'cart' ? origin : 'partner-home'), cart }));
-    if (state.error) notice.append(message(state.error, true), V.control('TENTAR DE NOVO', load));
+    const refresh = mode === 'replenishment' ? C.partnerReplenishment.refresh : load;
+    if (state.error) notice.append(message(state.error, true), V.control('TENTAR DE NOVO', refresh));
     if (mode === 'cart') { drawCart(); return; }
-    if (state.loading && !state.loaded && mode === 'catalog') { notice.appendChild(message('Conferindo disponibilidade…')); return; }
+    if (state.error) return;
     let rows = state.rows;
     if (mode === 'replenishment') {
-      const opportunities = C.partnerData.opportunities();
-      rows = opportunities.flatMap(demand => C.partnerData.state.offers.filter(offer => offer.measure === demand.measure)
-        .map(offer => ({ ...sanitize(offer), ...(state.rows.find(row => identity(row) === identity(offer)) || {}), demand_count: demand.demand_count })));
-      if (C.partnerData.state.errors.includes('replenishment')) notice.append(message('Não consegui atualizar a 2W.', true), V.control('ATUALIZAR', C.partnerHome.refresh));
+      if (C.partnerData.state.errors.includes('replenishment')) {
+        notice.append(message('Não consegui atualizar a reposição. Tente novamente.', true), V.control('TENTAR DE NOVO', refresh)); return;
+      }
+      if (!state.loaded || !C.partnerData.state.ready) { notice.appendChild(message('Conferindo disponibilidade…')); return; }
+      rows = replenishmentRows();
     } else {
+      if (state.loading && !state.loaded) { notice.appendChild(message('Conferindo disponibilidade…')); return; }
       const query = state.query.replace(/[^\d]/g, '');
       rows = rows.filter(row => row.vehicle_type === state.vehicle && (!query || row.measure.replace(/[^\d]/g, '').includes(query)));
     }
     rows.filter(row => row.measure && row.quantity_available > 0).forEach(row => list.appendChild(V.product(row, {
       demand: mode === 'replenishment' ? row.demand_count : null,
-      inCart: state.cart.get(row.offer_key)?.quantity || 0, busy: !state.loaded || state.sending,
+      inCart: state.cart.get(row.offer_key)?.quantity || 0, busy: !state.loaded || state.loading || state.sending || (mode === 'replenishment' && C.partnerReplenishment.loading()),
       add: () => add(row),
     })));
-    if (!list.children.length && !state.error) notice.appendChild(message(mode === 'replenishment' ? 'Nenhuma oportunidade de reposição agora.' : 'Nenhum pneu disponível para essa busca.'));
+    if (!list.children.length) notice.appendChild(message(mode === 'replenishment'
+      ? C.partnerData.opportunities().length ? 'Essas medidas ainda não estão disponíveis para compra na 2W.' : 'Nenhuma oportunidade de reposição agora.'
+      : 'Nenhum pneu disponível para essa busca.'));
   }
   function drawCart() {
     page.querySelectorAll('.ps-buy-summary,.ps-buy-cart-count-copy,.ps-buy-cart-note,.ps-buy-send,.ps-buy-continue').forEach(el => el.remove());

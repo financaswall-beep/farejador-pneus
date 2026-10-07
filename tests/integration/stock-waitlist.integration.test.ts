@@ -110,3 +110,24 @@ it('não usa autorização antiga depois de uma recusa mais recente',async()=>{
   expect(await call(c,{...args,medida:'80/100-18'})).toMatchObject({erro:'novo_consentimento_necessario'});
   expect((await db.pool.query(`SELECT id FROM ops.stock_interests WHERE tire_size='80-100-18'`)).rowCount).toBe(0);
 });
+
+it('aceite informal pelo WhatsApp usa o telefone do contato mesmo quando a tool omite telefone',async()=>{
+  const c=await conversation('whatsapp');
+  await message(c,'O 180/55-17 tá em falta. Quer que eu te avise pelo WhatsApp quando chegar?',1,20);
+  await message(c,'Pode ser de boa',0,19);
+  const {telefone:_,...input}=args;
+  expect(await call(c,{...input,medida:'180/55-17',consentimento:'Pode ser de boa',quantidade:1})).toMatchObject({registrado:true});
+  const rows=await db.pool.query(`SELECT phone_e164,consent_text,quantity FROM ops.stock_interests WHERE environment='test' AND conversation_id=$1`,[c.id]);
+  expect(rows.rows).toEqual([{phone_e164:'+5521988887777',consent_text:'Pode ser de boa',quantity:1}]);
+  expect((await db.pool.query(`SELECT id FROM commerce.orders WHERE environment='test'`)).rowCount).toBe(0);
+});
+
+it('telefone omitido em canal social ou número inválido explícito não usa fallback para registrar',async()=>{
+  const {telefone:_,...input}=args;
+  for(const channel of ['instagram','facebook','whatsapp']){
+    const c=await conversation(channel);await message(c,'Quer que eu te avise pelo WhatsApp quando chegar?',1,20);await message(c,'Pode ser de boa',0,19);
+    const a={...input,medida:'180/55-17',consentimento:'Pode ser de boa',...(channel==='whatsapp'?{telefone:'2198765565'}:{})};
+    expect(await call(c,a)).toMatchObject({erro:'consentimento_ou_telefone_pendente'});
+    expect((await db.pool.query(`SELECT id FROM ops.stock_interests WHERE environment='test' AND conversation_id=$1`,[c.id])).rowCount).toBe(0);
+  }
+});

@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { botDemandLocationSql } from './bot-demand-location-sql.js';
 
 export interface BotVisaoMapaRow {
   municipio: string;
@@ -29,11 +30,11 @@ export async function getBotMedidasMunicipio(
   db: Pool, environment: 'prod' | 'test', sinceSql: string,
 ): Promise<BotMedidaMunicipio[]> {
   const result = await db.query<BotMedidaMunicipio>(
-    `WITH procura AS (
+    `WITH locations AS (${botDemandLocationSql}), procura AS (
        SELECT l.municipio, upper(btrim(cf.fact_value #>> '{}')) AS medida,
               count(DISTINCT cf.conversation_id)::int AS consultas
        FROM analytics.conversation_facts cf
-       JOIN analytics.v_bot_demand_location l
+       JOIN locations l
          ON l.environment = cf.environment AND l.conversation_id = cf.conversation_id
        WHERE cf.environment = $1 AND cf.fact_key = 'medida_consultada'
          AND cf.superseded_by IS NULL AND l.municipio IS NOT NULL

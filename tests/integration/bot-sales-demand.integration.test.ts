@@ -311,7 +311,7 @@ describe('medidas por município e saldo atual', () => {
   it('mantém o mapa e sinaliza medidas indisponíveis quando a consulta falha', async () => {
     const query = db.pool.query.bind(db.pool);
     vi.spyOn(db.pool, 'query').mockImplementation(((sql: string, ...args: unknown[]) => {
-      if (sql.includes('WITH procura AS')) return Promise.reject(new Error('indisponível'));
+      if (sql.includes('procura AS (')) return Promise.reject(new Error('indisponível'));
       return (query as (...a: unknown[]) => unknown)(sql, ...args);
     }) as typeof db.pool.query);
     const panel = await getBotVisao('7d', 'test', db.pool);
