@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-10-03T04:23:22.291Z",
-  "total": 537,
+  "geradoEm": "2026-10-08T03:39:17.442Z",
+  "total": 539,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -335,6 +335,8 @@
     "GET /admin/painel/assets/estoque-hero.webp PUBLICA",
     "GET /admin/painel/assets/financeiro-fechamento.webp PUBLICA",
     "GET /admin/painel/assets/financeiro-hero.webp PUBLICA",
+    "GET /admin/painel/assets/fonts/roboto-condensed-latin-v1.woff2 PUBLICA",
+    "GET /admin/painel/assets/fonts/roboto-latin-v1.woff2 PUBLICA",
     "GET /admin/painel/assets/google-chatwoot.js PUBLICA",
     "GET /admin/painel/assets/google-contact.css PUBLICA",
     "GET /admin/painel/assets/google-contact.js PUBLICA",
