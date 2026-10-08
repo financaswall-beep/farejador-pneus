@@ -6,6 +6,10 @@ export interface OperationDeliveryItem {
   quantity: number;
   label: string;
   tire_condition: string | null;
+  order_item_id?: string;
+  tire_size?: string | null;
+  brand?: string | null;
+  photo_request_id?: string | null;
 }
 
 export interface OperationDeliveryCard {
@@ -13,6 +17,7 @@ export interface OperationDeliveryCard {
   order_status: string;
   created_at: string;
   customer_name: string | null;
+  customer_avatar_url?: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
   delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
@@ -45,6 +50,8 @@ type DeliveryRow = Omit<OperationDeliveryCard, 'total_amount' | 'items'> & {
   total_delivered: string | number;
   total_returns: string | number;
   items: Array<{
+    order_item_id?: string;
+    photo_request_id?: string | null;
     quantity?: number | string;
     item_name?: string | null;
     tire_size?: string | null;
@@ -76,7 +83,7 @@ export async function getPartnerOperationDeliveries(
               pof.contact_phone AS customer_phone, pof.delivery_address,
               pof.delivery_status, pof.delivery_courier, pof.payment_method,
               pof.total_amount::text, pof.dispatched_at, pof.delivered_at,
-              pof.items, approved_photo.photo_request_id,
+              delivery_items.items, approved_photo.photo_request_id, customer.customer_avatar_url,
               count(*) OVER() AS total_count,
               count(*) FILTER (WHERE pof.delivery_status = 'pending')
                 OVER() AS total_preparing,
@@ -89,6 +96,35 @@ export async function getPartnerOperationDeliveries(
                 OVER() AS total_returns
          FROM commerce.partner_orders_full pof
          LEFT JOIN LATERAL (
+           SELECT pc.customer_avatar_url FROM commerce.partner_conversations pc
+            WHERE pc.environment=pof.environment AND pc.unit_id=pof.unit_id
+              AND NULLIF(pc.customer_avatar_url,'') IS NOT NULL
+              AND ((pof.customer_id IS NOT NULL AND pc.customer_id=pof.customer_id)
+                OR ((pof.customer_id IS NULL OR pc.customer_id IS NULL) AND NULLIF(pof.contact_phone,'') IS NOT NULL
+                  AND regexp_replace(pc.customer_identifier,'[^0-9]','','g')
+                    = regexp_replace(pof.contact_phone,'[^0-9]','','g')))
+            ORDER BY pc.last_message_at DESC NULLS LAST,pc.created_at DESC LIMIT 1
+         ) customer ON true
+         LEFT JOIN LATERAL (
+           SELECT jsonb_agg(jsonb_build_object(
+             'order_item_id',item.id,'item_name',item.item_name,'tire_size',item.tire_size,
+             'brand',item.brand,'quantity',item.quantity,
+             'tire_condition',COALESCE(item.tire_condition,photo.tire_condition),
+             'photo_request_id',photo.id
+           ) ORDER BY item.created_at,item.id) AS items
+             FROM commerce.partner_order_items item
+             LEFT JOIN LATERAL (
+               SELECT pr.id,pr.tire_condition FROM commerce.photo_requests pr
+                WHERE pr.environment=item.environment AND pr.order_item_id=item.id AND pr.unit_id=pof.unit_id
+                  AND EXISTS (SELECT 1 FROM commerce.photo_request_blobs blob
+                    WHERE blob.environment=pr.environment AND blob.photo_request_id=pr.id
+                      AND blob.unit_id=pof.unit_id AND blob.deleted_at IS NULL)
+                ORDER BY pr.created_at DESC LIMIT 1
+             ) photo ON true
+            WHERE item.environment=pof.environment AND item.order_id=pof.order_id
+              AND item.pickup_service_code IS NULL
+         ) delivery_items ON true
+         LEFT JOIN LATERAL (
            SELECT pr.id AS photo_request_id
              FROM commerce.photo_requests pr
              JOIN commerce.partner_order_items poi_photo
@@ -96,6 +132,7 @@ export async function getPartnerOperationDeliveries(
               AND poi_photo.environment = pr.environment
             WHERE poi_photo.order_id = pof.order_id
               AND pr.environment = pof.environment
+              AND pr.unit_id = pof.unit_id
               AND EXISTS (
                 SELECT 1 FROM commerce.photo_request_blobs blob
                  WHERE blob.environment = pr.environment
@@ -136,6 +173,10 @@ export async function getPartnerOperationDeliveries(
         quantity: Number(item.quantity ?? 0),
         label: itemLabel(item),
         tire_condition: item.tire_condition ?? null,
+        order_item_id: item.order_item_id,
+        tire_size: item.tire_size ?? null,
+        brand: item.brand ?? null,
+        photo_request_id: item.photo_request_id ?? null,
       })),
     }));
     return {
@@ -151,7 +192,7 @@ export async function getPartnerOperationDeliveryPhoto(
   ctx: PartnerContext,
   photoRequestId: string,
 ): Promise<{ bytes: Buffer; mime: string } | null> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+  const photo = await withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query<StoredTirePhoto>(
       `SELECT blob.photo_bytes AS bytes, blob.photo_mime AS mime, blob.storage_path
          FROM commerce.photo_request_blobs blob
@@ -163,11 +204,13 @@ export async function getPartnerOperationDeliveryPhoto(
            ON po.id = poi.order_id AND po.environment = poi.environment
         WHERE blob.photo_request_id = $1 AND blob.deleted_at IS NULL
           AND blob.environment = $2 AND po.unit_id = $3
+          AND pr.unit_id = po.unit_id AND blob.unit_id = po.unit_id
           AND po.fulfillment_mode = 'delivery' AND po.deleted_at IS NULL
         ORDER BY blob.created_at DESC
         LIMIT 1`,
       [photoRequestId, ctx.environment, ctx.unitId],
     );
-    return readStoredTirePhoto(result.rows[0]);
+    return result.rows[0];
   });
+  return readStoredTirePhoto(photo);
 }

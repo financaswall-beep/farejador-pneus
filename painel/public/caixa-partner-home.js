@@ -88,6 +88,7 @@
     C.partnerOrders.stop();
     C.partnerPhoto.leave();
     if (next !== 'partner-pickup') C.partnerPickups.leave();
+    if (next !== 'partner-delivery') C.partnerDeliveries.leave();
     C.partnerReplenishment.reset();
     active = C.isPartner() && Boolean(C.token());
     tab = next;

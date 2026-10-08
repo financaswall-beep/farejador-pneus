@@ -100,5 +100,25 @@
     if (error?.status === 403) return 'Seu acesso não permite essa ação.';
     return 'Não consegui concluir. Tente novamente.';
   }
-  C.partnerUI = { root, node, icon, button, section, mount, condition, orderLabel, items, info, message, payment, errorMessage };
+  function plate(className) {
+    const el = node('article', null, 'pu-plate ' + className);
+    ['tl', 'tr', 'bl', 'br'].forEach(corner => {
+      const screw = node('i', null, 'pu-screw pu-screw--' + corner);
+      screw.setAttribute('aria-hidden', 'true'); el.appendChild(screw);
+    });
+    return el;
+  }
+  function avatar(row) {
+    const frame = node('div', null, 'pu-avatar');
+    const initials = String(row.customer_name || 'Cliente').trim().split(/\s+/).map(name => name[0]).slice(0, 2).join('');
+    frame.appendChild(node('span', initials));
+    if (typeof row.customer_avatar_url === 'string' && /^(https:\/\/|\/(?!\/))/.test(row.customer_avatar_url)) {
+      const image = node('img'); image.alt = 'Foto de ' + (row.customer_name || 'cliente');
+      image.referrerPolicy = 'no-referrer'; image.decoding = 'async';
+      image.addEventListener('error', () => image.remove());
+      image.src = row.customer_avatar_url; frame.appendChild(image);
+    }
+    return frame;
+  }
+  C.partnerUI = { root, node, icon, button, section, mount, condition, orderLabel, items, info, message, payment, errorMessage, plate, avatar };
 }());

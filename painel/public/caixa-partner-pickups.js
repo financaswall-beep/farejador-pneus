@@ -9,24 +9,10 @@
   const quantity = value => Number(value || 0) + (Number(value) === 1 ? ' pneu' : ' pneus');
   const size = item => item.tire_size || item.label || item.item_name || 'Pneu';
   function plate(className) {
-    const el = U.node('article', null, 'pu-plate ' + className);
-    ['tl', 'tr', 'bl', 'br'].forEach(corner => {
-      const screw = U.node('i', null, 'pu-screw pu-screw--' + corner);
-      screw.setAttribute('aria-hidden', 'true'); el.appendChild(screw);
-    });
-    return el;
+    return U.plate(className);
   }
   function avatar(row) {
-    const frame = U.node('div', null, 'pu-avatar');
-    const initials = String(row.customer_name || 'Cliente').trim().split(/\s+/).map(name => name[0]).slice(0, 2).join('');
-    frame.appendChild(U.node('span', initials));
-    if (typeof row.customer_avatar_url === 'string' && /^(https:\/\/|\/(?!\/))/.test(row.customer_avatar_url)) {
-      const image = U.node('img'); image.alt = 'Foto de ' + (row.customer_name || 'cliente');
-      image.referrerPolicy = 'no-referrer'; image.decoding = 'async';
-      image.addEventListener('error', () => image.remove());
-      image.src = row.customer_avatar_url; frame.appendChild(image);
-    }
-    return frame;
+    return U.avatar(row);
   }
   function identity(row, compact) {
     const el = U.node('div', null, 'pu-identity');

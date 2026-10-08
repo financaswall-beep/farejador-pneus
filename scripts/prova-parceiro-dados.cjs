@@ -4,14 +4,14 @@ const { salesFixture } = require('./prova-parceiro-vendas.cjs');
 const { storeFixture } = require('./prova-parceiro-loja.cjs');
 const { buyFixture } = require('./prova-parceiro-comprar.cjs');
 const { pickupFixtures } = require('./prova-parceiro-retiradas-dados.cjs');
+const { deliveryFixtures } = require('./prova-parceiro-entregas-dados.cjs');
 function initial(scenario) {
   const item = (size, qty = 1) => ({ tire_size: size, label: size, quantity: qty, tire_condition: 'meia_vida' });
   const items = [item('90/90-18'), item('80/100-14')];
-  const delivery = (id, name, status, courier) => ({ order_id: id, order_status: 'confirmed', order_number: name === 'Maria' ? 'PED-0249' : 'PED-0250', customer_name: name, delivery_address: 'Rua dos Pneus, 100 — Méier, Rio de Janeiro', delivery_status: status, delivery_courier: courier, total_amount: 120, items: [item('90/90-18')], created_at: new Date().toISOString() });
   const photo = { id: '44444444-4444-4444-8444-444444444444', order_number: 'PED-0248', tire_size: '90/90-18', brand: null, photo_count: 0, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 282000).toISOString(), status: 'pending' };
   return {
     pickups: pickupFixtures(scenario),
-    deliveries: ['avisos', 'entrega'].includes(scenario) ? [delivery('22222222-2222-4222-8222-222222222222', 'Maria', 'pending', null), delivery('33333333-3333-4333-8333-333333333333', 'Pedro', 'dispatched', 'João Meier')] : [],
+    deliveries: deliveryFixtures(scenario),
     photos: scenario === 'fotos-duas' ? [
       { ...photo, photo_group_id: '66666666-6666-4666-8666-666666666666', customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null },
       { ...photo, id: '77777777-7777-4777-8777-777777777777', tire_size: '80/100-14', photo_group_id: '66666666-6666-4666-8666-666666666666', customer_name: 'Carlos', tire_condition: 'meia_vida', brand: null },
@@ -69,7 +69,7 @@ function fixturePayload(req, url, input) {
   if (pathname.includes('/api/entregas/') && req.method === 'POST') {
     const row = data.deliveries.find(item => item.order_id === pathname.split('/').at(-1));
     if (row) { row.delivery_status = input.delivery_status; row.delivery_courier = input.delivery_courier; }
-    return { ok: true };
+    return row ? { order_id: row.order_id, delivery_status: row.delivery_status } : { error: 'delivery_not_found' };
   }
   if (pathname.endsWith('/operacao/estoque')) return { rows: data.stock };
   if (pathname.includes('/operacao/estoque/') && pathname.endsWith('/saldo') && req.method === 'POST') {

@@ -14,7 +14,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:' + port);
   const fixture = url.pathname.startsWith('/_preview/');
   try {
-    if (url.pathname === '/_preview-assets/pickup-demo.webp' || /\/operacao\/retiradas\/[^/]+\/itens\/[^/]+\/foto$/.test(url.pathname)) {
+    if (url.pathname === '/_preview-assets/pickup-demo.webp' || /\/operacao\/retiradas\/[^/]+\/itens\/[^/]+\/foto$/.test(url.pathname) || /\/operacao\/entregas\/fotos\/[^/]+$/.test(url.pathname)) {
       const image = await readFile(path.resolve(__dirname, 'fixtures/partner-pickup-demo.webp'));
       res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'no-store' }); res.end(image); return;
     }
@@ -43,7 +43,7 @@ const server = createServer(async (req, res) => {
     let content = await readFile(target);
     if (fixture) {
       const partner = url.pathname === '/_preview/parceiro';
-      const scenario = ['avisos','foto','fotos-duas','retirada','retirada-uma','retiradas','entrega','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
+      const scenario = ['avisos','foto','fotos-duas','retirada','retirada-uma','retiradas','entrega','entregas','esperando','fila'].includes(url.searchParams.get('cenario')) ? url.searchParams.get('cenario') : 'vazio';
       // Reabrir a prévia começa uma simulação nova, sem renovar prazos de pedidos reais.
       const values = { '2w_caixa_token': 'preview-only-' + scenario + ':' + randomUUID(), '2w_caixa_nome': 'João Meier', '2w_caixa_usuario': 'joao',
         '2w_caixa_escopo': partner ? 'partner' : 'matrix', '2w_caixa_unidade_slug': partner ? 'meier' : '',

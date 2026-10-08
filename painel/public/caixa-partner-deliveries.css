@@ -1,0 +1,66 @@
+/* Entregas: mesmo aço e componentes das retiradas, composição compacta própria. */
+.is-partner-home .pd-screen .ps-screen-heading { gap: 13px; }
+.is-partner-home .pd-screen .ps-screen-heading h3 { flex: 1; min-width: 0; }
+.is-partner-home .pd-badge { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 76px; max-width: 100px; padding: 7px 9px; border: 1px solid #2e3732; outline: 1px solid #d5dbd6; border-radius: 6px; font-size: 17px; font-weight: 500; line-height: 1.1; text-align: center; color: white; background: linear-gradient(150deg,#7a807b,#353b37); box-shadow: inset 0 1px #e7eee5aa,inset 0 -1px #101a1699,0 2px 2px #16221bb3,0 4px 5px #15231a66; }
+.is-partner-home .pd-badge--dispatched { background: linear-gradient(145deg,#006b43,#004328); border-color: #00371f; }
+.is-partner-home .pd-badge--failed { background: linear-gradient(145deg,#845933,#553c25); }
+.is-partner-home .pd-order { padding: 12px 15px; margin-bottom: 12px; }
+.is-partner-home .pd-order .pu-avatar { flex-basis: 64px; width: 64px; height: 64px; }
+.is-partner-home .pd-order .pu-identity { gap: 11px; align-items: center; }
+.is-partner-home .pd-order .pu-person strong { font-size: 24px; }
+.is-partner-home .pd-order .pu-person p { font-size: 19px; }
+.is-partner-home .pd-order-items { margin: 4px 0 9px 75px; }
+.is-partner-home .pd-order-items p { margin: 0; font-size: clamp(20px,5.9vw,25px); font-weight: 700; line-height: 1.18; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.is-partner-home .pd-screen .pu-label { margin: 8px 0 6px; font-size: 23px; }
+.is-partner-home .pd-screen .pd-customer + .pu-label,
+.is-partner-home .pd-screen .pd-products + .pu-label { margin-top: 20px; margin-bottom: 8px; }
+.is-partner-home .pd-customer { padding: 12px 17px; margin-bottom: 8px; }
+.is-partner-home .pd-customer .pu-avatar { width: 70px; height: 70px; flex-basis: 70px; }
+.is-partner-home .pd-customer .pu-identity { gap: 19px; }
+.is-partner-home .pd-customer .pu-person strong { font-size: clamp(27px,7.5vw,33px); }
+.is-partner-home .pd-customer .pu-person p { font-size: 22px; }
+.is-partner-home .pd-products { padding: 13px 14px; }
+.is-partner-home .pd-product { display: grid; grid-template-columns: 65px minmax(0,1fr); align-items: center; gap: 13px; }
+.is-partner-home .pd-product + .pd-product { margin-top: 8px; padding-top: 8px; border-top: 1px solid #859089; box-shadow: inset 0 1px #fffc; }
+.is-partner-home .pd-photo { min-height: 0; height: 60px; aspect-ratio: auto; gap: 0; }
+.is-partner-home .pd-photo > svg { width: 24px; height: 24px; }
+.is-partner-home .pd-photo > span { font-size: 12px; padding: 2px; }
+.is-partner-home .pd-product:only-of-type { grid-template-columns: 100px minmax(0,1fr); }
+.is-partner-home .pd-product:only-of-type .pd-photo { height: 110px; }
+.is-partner-home .pd-product-copy { min-width: 0; }
+.is-partner-home .pd-product-copy strong { display: block; font-size: clamp(22px,6vw,27px); font-weight: 700; line-height: 1.15; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.is-partner-home .pd-product-copy p { font-size: 17px; line-height: 1.2; margin: 6px 0 0; }
+.is-partner-home .pd-address { padding: 12px 14px 10px; }
+.is-partner-home .pd-address-copy { display: flex; align-items: center; gap: 14px; padding: 0 4px; }
+.is-partner-home .pd-address-copy > svg { flex: 0 0 30px; width: 30px; height: 39px; }
+.is-partner-home .pd-address-copy strong { font-size: 23px; line-height: 1.23; font-weight: 500; overflow-wrap: anywhere; white-space: pre-line; }
+.is-partner-home .pd-screen .pd-route { min-height: 38px; margin-top: 11px; padding: 5px 10px; font-size: 21px; text-decoration: none; }
+.is-partner-home .pd-route svg { width: 22px; height: 22px; }
+.is-partner-home .pd-charge { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px 12px; padding: 8px 12px; margin: 12px 0 0; }
+.is-partner-home .pd-charge span { font-size: 21px; font-weight: 600; line-height: 1.2; }
+.is-partner-home .pd-charge strong { color: #004c2d; font-size: 26px; line-height: 1.2; font-weight: 700; text-shadow: 0 1px #fff; }
+.is-partner-home .pd-screen > .ps-button { font-size: 23px; min-height: 47px; }
+.is-partner-home .pd-payment { padding: 10px 14px; margin-top: 18px; }
+.is-partner-home .pd-payment .pu-label { margin-top: 0; }
+.is-partner-home .pd-payment-choices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.is-partner-home .pd-payment-choices .ps-button { padding: 9px 3px; min-height: 44px; font-size: 19px; }
+.is-partner-home .pd-screen .ps-info { margin-top: 14px; }
+.is-partner-home .pd-screen .pd-problem-button { margin-top: 12px; font-size: 21px; color: #fff; background-image: linear-gradient(180deg,#ffffff1c,transparent 42%,#26060966),linear-gradient(105deg,#872c32ed,#701c24f2 52%,#4f1019f7),var(--ph-metal); background-size: 100% 100%,100% 100%,540px 540px; outline-color: #62343a; box-shadow: inset 0 1px 1px #e2afb2,inset 0 -2px 2px #28070dc9,0 2px 1px #4b2c32c9,0 4px 4px #2e0e1675,1px 7px 8px #241b1d38; text-shadow: 0 1px 1px #28070d; }
+.is-partner-home .pd-screen .pd-problem-button::before { border-color: #d7a4aa73; }
+.is-partner-home .pd-problem-button > svg { color: #fff; stroke-width: 2.2; }
+.is-partner-home .pd-screen--problem .ps-screen-heading h3 { font-size: 28px; }
+.is-partner-home .pd-problem-form { padding: 20px 15px 12px; margin: 18px 0; }
+.is-partner-home .pd-problem-field { display: flex; flex-direction: column; gap: 10px; font-size: 23px; font-weight: 600; }
+.is-partner-home .pd-problem-field textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 125px; border: 1px solid #7e8881; border-radius: 6px; padding: 11px; color: #101713; background: #f0f2f0d9; box-shadow: inset 0 2px 5px #25312b40,0 1px #fff; font: 400 19px/1.35 'Partner Photo','Partner Condensed',Arial,sans-serif; }
+.is-partner-home .pd-problem-field textarea:focus { outline: 2px solid #006442; outline-offset: 2px; }
+@media (max-width: 360px) {
+  .is-partner-home .pd-order .pu-avatar { width: 59px; height: 59px; flex-basis: 59px; }
+  .is-partner-home .pd-order .pu-person strong { font-size: 21px; }
+  .is-partner-home .pd-order .pu-person p { font-size: 17px; }
+  .is-partner-home .pd-badge { min-width: 62px; max-width: 78px; padding: 6px; font-size: 15px; }
+  .is-partner-home .pd-order-items { margin-left: 70px; }
+  .is-partner-home .pd-customer .pu-identity { gap: 15px; }
+  .is-partner-home .pd-product { grid-template-columns: 58px minmax(0,1fr); gap: 10px; }
+  .is-partner-home .pd-product:only-of-type { grid-template-columns: 80px minmax(0,1fr); }
+  .is-partner-home .pd-address-copy strong { font-size: 21px; }
+}
