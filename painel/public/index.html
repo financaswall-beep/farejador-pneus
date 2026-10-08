@@ -173,7 +173,7 @@
 <script src="/admin/painel/app.bot.waitlist.js?v=20260927-1"></script>
 <link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20260927-1">
 <script src="/admin/painel/app.bot.js?v=20260927-waitlist1"></script>
-<script src="/admin/painel/app.bot.faltas.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.bot.faltas.js?v=20261008-legibilidade3"></script>
 <script src="/admin/painel/app.relatorios.demanda.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.view.js?v=20260911-demanda3"></script>
 <script src="/admin/painel/app.relatorios.demanda.charts.js?v=20260911-demanda3"></script>
@@ -307,7 +307,7 @@
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
 <link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-faltas-metal1" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
-<link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20261008-prancheta2" />
+<link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20261008-legibilidade3" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
 <link rel="stylesheet" href="/admin/painel/relatorios-demanda.css?v=20260911-demanda3">
 <link rel="stylesheet" href="/admin/painel/relatorios-faltas.css?v=20260911-faltas1">
@@ -7714,31 +7714,36 @@
                 <button class="bf-chip" x-show="bf.store" @click="bfFilter('')" aria-label="Remover filtro de loja"><span x-text="bfStoreName"></span><span>×</span></button>
                 <div class="bf-list">
                   <template x-for="(item,index) in bfMeasures" :key="item.measure"><button class="bf-row" @click="bfChooseMeasure(item.measure)" :aria-pressed="bf.measure===item.measure">
-                    <span x-text="index+1"></span><div><b x-text="item.measure"></b><small x-text="item.stores.join(' · ')"></small><div class="bf-bar"><i :style="'width:'+Math.round(item.count/(bfMeasures[0]?.count||1)*100)+'%'"></i></div></div><em x-text="item.count+' faltas'"></em><span>›</span>
+                    <span x-text="index+1"></span><div><b x-text="item.measure"></b><small x-text="item.stores.length+' '+(item.stores.length===1?'loja com falta':'lojas com falta')"></small><div class="bf-bar"><i :style="'width:'+Math.round(item.count/(bfMeasures[0]?.count||1)*100)+'%'"></i></div></div><em x-text="item.count+' faltas'"></em><span>›</span>
                   </button></template>
                   <p class="bf-empty" x-show="!bfMeasures.length" x-text="bf.search?'Nenhuma medida corresponde à busca.':'Nenhuma falta com loja identificada neste período.'"></p>
                 </div><p class="bf-foot" x-show="bfMeasures.length" x-text="bfMeasures.length+' medida(s) com falta'+(bf.store?' nesta loja.':' no período.')"></p>
               </article>
               <article class="bf-card bf-shops"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span><header><div><h2><i data-lucide="store" aria-hidden="true"></i>Faltas por loja</h2><p>Selecione uma loja para ver as medidas que faltaram.</p></div><button class="bf-btn" @click="bfFilter('')" :disabled="!bf.store">Todas as lojas</button></header>
                 <div class="bf-list"><template x-for="(store,index) in bfStores" :key="store.id"><button class="bf-row" @click="bfFilter(store.id)" :aria-pressed="bf.store===store.id">
-                  <span x-text="bf.store===store.id?'✓':index+1"></span><div><b x-text="store.name"></b><div class="bf-bar"><i :style="'width:'+Math.round(store.count/(bfStores[0]?.count||1)*100)+'%'"></i></div></div><em x-text="store.count"></em><span>›</span>
+                  <span x-text="bf.store===store.id?'✓':index+1"></span><div><b x-text="store.name"></b><div class="bf-bar"><i :style="'width:'+Math.round(store.count/(bfStores[0]?.count||1)*100)+'%'"></i></div></div><em x-text="store.count+' faltas'"></em><span>›</span>
                 </button></template><p class="bf-empty" x-show="!bfStores.length">As lojas aparecerão conforme as buscas registrarem faltas.</p></div>
               </article>
             </div>
             <article class="bf-card bf-detail" :aria-busy="bf.detailLoading"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-              <small class="bf-file-tab">MEDIDA SELECIONADA</small><div class="bf-detail-title"><span class="bf-tire" x-show="bf.measure" aria-hidden="true"></span><div><h2 x-text="bf.measure||'Selecione uma medida'"></h2><span class="bf-badge" x-show="bf.measure" x-text="(bfMeasures.find(m=>m.measure===bf.measure)?.count||0)+' faltas registradas'"></span></div></div>
+              <small class="bf-file-tab">MEDIDA SELECIONADA</small><div class="bf-detail-title"><span class="bf-tire" x-show="bf.measure" aria-hidden="true"></span><div><h2 x-text="bf.measure||'Selecione uma medida'"></h2><span class="bf-badge" x-show="bf.measure" x-text="(bfMeasures.find(m=>m.measure===bf.measure)?.count||0)+' faltas '+(bf.store?'nesta loja':'nas lojas')"></span></div></div>
               <div class="bf-scope" x-show="bf.store">Loja selecionada: <b x-text="bfStoreName"></b></div>
+              <section class="bf-inset bf-measure-panel" x-show="bf.measure && bfMeasureStores.length" aria-labelledby="bf-measure-stores-heading">
+                <h3 id="bf-measure-stores-heading"><i data-lucide="store" aria-hidden="true"></i>Faltas desta medida por loja</h3>
+                <div class="bf-measure-stores"><template x-for="store in bfMeasureStores" :key="store.store_id"><div class="bf-measure-store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 3-1 6a3 3 0 0 0 5 2 3 3 0 0 0 5 0 3 3 0 0 0 5-2l-1-6Z M3 13v8h18v-8 M9 21v-6h6v6"/></svg><div><b x-text="store.store_name"></b><strong x-text="store.shortages+' '+(store.shortages===1?'falta':'faltas')"></strong></div></div></template></div>
+                <p class="bf-foot" x-text="'No período: '+bfPeriodLabel+'. Uma falta por conversa, medida e loja.'"></p>
+              </section>
               <p class="bf-empty" x-show="bf.detailLoading" role="status">Carregando consultas…</p>
               <p x-show="bf.detailError" class="bf-error" role="alert"><span x-text="bf.detailError"></span><button @click="bfLoadDetails(bf.offset)">Tentar novamente</button></p>
               <div x-show="!bf.detailLoading && !bf.detailError && bf.selected">
-                <section class="bf-inset bf-search-panel"><h3><i data-lucide="search" aria-hidden="true"></i>Como foi a busca</h3><p><span x-text="bf.selected?.municipality||'Município não identificado'"></span> · <span x-text="bfDate(bf.selected?.occurred_at)"></span></p>
-                  <p class="bf-foot" x-show="bfScope">Filtro da busca: <span x-text="bfScope"></span></p>
+                <section class="bf-inset bf-search-panel"><h3><i data-lucide="search" aria-hidden="true"></i>Como foi a busca</h3><p class="bf-search-location"><span x-text="bf.selected?.municipality||'Município não identificado'"></span> · <span x-text="bfDate(bf.selected?.occurred_at)"></span></p>
+                  <div class="bf-search-meta"><span class="bf-search-filters" x-show="bfScope">Filtro da busca: <b x-text="bfScope"></b></span><span class="bf-search-count" x-text="(bf.selected?.searches||1)+' '+((bf.selected?.searches||1)===1?'busca nesta conversa':'buscas nesta conversa')"></span><span class="bf-search-stores" x-text="(bf.selected?.stores?.length||0)+' '+(bf.selected?.stores?.length===1?'loja consultada':'lojas consultadas')"></span></div>
                   <div class="bf-timeline"><template x-for="(store,index) in bf.selected?.stores||[]" :key="store.id"><div class="bf-step"><span x-text="index+1"></span><div><b x-text="store.name"></b><span class="bf-badge" :class="{'is-available':store.available}" x-text="store.available?'Tinha disponível':'Não tinha disponível'"></span></div></div></template></div>
                   <div class="bf-result" :class="{'is-available':bf.selected?.stores.some(s=>s.available)}"><span x-text="bfOutcome"></span><button class="bf-link" x-show="chatwootConvUrl(bf.selected?.chatwoot_id)" @click="abrirNoChatwoot(bf.selected?.chatwoot_id)">Ver conversa ↗</button></div>
                   <p class="bf-foot">Disponibilidade dos produtos consultados, respeitando os filtros da busca. Parceiros ordenados por proximidade quando há localização; estoques consultados em conjunto. Matriz ao final.</p>
                 </section>
                 <section class="bf-inset bf-history-panel"><h3><i data-lucide="history" aria-hidden="true"></i>Histórico de buscas desta medida</h3><p x-text="bf.store?'Registros que tiveram falta em '+bfStoreName+'.':'Selecione uma consulta para ver as lojas.'"></p>
-                  <div class="bf-consultations"><template x-for="row in bf.details.slice(0,bf.showAll?20:3)" :key="row.id"><button class="bf-consultation" @click="bf.selected=row" :aria-pressed="bf.selected?.id===row.id"><span><span x-text="bfDate(row.occurred_at)"></span><small class="block" x-show="row.searches>1" x-text="row.searches+' buscas nesta conversa'"></small></span><small x-text="row.municipality||'Sem município'"></small><span>›</span></button></template></div>
+                  <div class="bf-consultations"><template x-for="row in bf.details.slice(0,bf.showAll?20:3)" :key="row.id"><button class="bf-consultation" @click="bf.selected=row" :aria-pressed="bf.selected?.id===row.id"><span class="bf-consultation-info"><b class="bf-consultation-date" x-text="bfDate(row.occurred_at)"></b><small x-text="(row.searches||1)+' '+((row.searches||1)===1?'busca nesta conversa':'buscas nesta conversa')"></small></span><span class="bf-consultation-city" x-text="row.municipality||'Sem município'"></span><span>›</span></button></template></div>
                   <button class="bf-link" style="margin-top:12px" x-show="!bf.showAll && bf.total>3" @click="bf.showAll=true">Ver histórico completo →</button>
                   <div class="bf-pages" x-show="bf.showAll"><button class="bf-btn" @click="bfLoadDetails(bf.offset-20)" :disabled="bf.offset===0">Anterior</button><span x-text="(bf.offset+1)+'–'+(bf.offset+bf.details.length)+' de '+bf.total"></span><button class="bf-btn" @click="bfLoadDetails(bf.offset+20)" :disabled="bf.offset+20>=bf.total">Próximas</button></div>
                 </section>

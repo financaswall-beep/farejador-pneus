@@ -62,6 +62,12 @@ window.PAINEL_MODULES.botFaltas = function () {
       }
       return [...grouped.values()].sort((a,b)=>b.count-a.count||a.measure.localeCompare(b.measure));
     },
+    // Apresentação dos totais existentes, respeitando o recorte de medida e loja.
+    get bfMeasureStores() {
+      return (this.bf.data?.counts||[])
+        .filter(row=>row.measure===this.bf.measure&&(!this.bf.store||row.store_id===this.bf.store))
+        .sort((a,b)=>b.shortages-a.shortages||a.store_name.localeCompare(b.store_name));
+    },
     get bfStoreName() {return this.bfStores.find(s=>s.id===this.bf.store)?.name||'Todas as lojas';},
     bfFilter(store=this.bf.store) {
       this.bf.store=store;

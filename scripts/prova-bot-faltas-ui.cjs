@@ -24,7 +24,7 @@ const server=http.createServer((req,res)=>{
   if(url.pathname.endsWith('consultas')){
    const measure=url.searchParams.get('measure'),offset=Number(url.searchParams.get('offset')||0),store=url.searchParams.get('store');
    const total=store===a?8:25;
-   const rows=Array.from({length:Math.min(20,total-offset)},(_,i)=>({id:measure+'-'+(i+offset),measure,searches:i+offset<3?3:1,chatwoot_id:'12345',occurred_at:'2026-09-10T13:'+String(42-i).padStart(2,'0')+':00Z',municipality:'São Gonçalo',filters:{},stores:[{id:a,name:'Parceiro Alcântara',available:false},{id:'matriz',name:'Matriz',available:false}]}));
+   const rows=Array.from({length:Math.min(20,total-offset)},(_,i)=>({id:measure+'-'+(i+offset),measure,searches:i+offset===1?2:i+offset===0?3:1,chatwoot_id:'12345',occurred_at:'2026-09-10T13:'+String(42-i).padStart(2,'0')+':00Z',municipality:i+offset===1?'Niterói':'São Gonçalo',filters:i+offset===1?{marca:'Pirelli',condicao_pneu:'novo',posicao_pneu:'rear'}:{condicao_pneu:'meia_vida'},stores:i+offset===1?[{id:a,name:'Parceiro Alcântara',available:false}]:[{id:a,name:'Parceiro Alcântara',available:false},{id:'matriz',name:'Matriz',available:false}]}));
    const send=()=>res.end(JSON.stringify({rows,total,stock:mode==='unknownStock'?[]:[{store_id:'matriz',quantity:0},{store_id:a,quantity:6}]}));
    if(store===b)return setTimeout(send,250);return send();
   }
@@ -44,11 +44,17 @@ try{
  const layout=await page.evaluate(()=>{const stock=document.querySelector('.bf-stock').getBoundingClientRect(),panels=document.querySelector('.bf-layout').getBoundingClientRect();return{stockBelow:stock.top>=panels.bottom,overflow:document.documentElement.scrollWidth>innerWidth,engraved:getComputedStyle(document.querySelector('.bf-bar')).boxShadow.includes('inset'),innerStock:!!document.querySelector('.bf-detail .bf-current')}});
  assert.equal(layout.stockBelow,true);assert.equal(layout.overflow,false);assert.equal(layout.engraved,true);assert.equal(layout.innerStock,false);
  assert.equal(await page.getByRole('navigation',{name:'Seções do Bot'}).getByRole('button',{name:'Faltas por loja',exact:true}).getAttribute('aria-current'),'page');
+ assert.equal(await page.locator('.bf-measure-store').count(),2);assert.match(await page.locator('.bf-measure-store').first().innerText(),/Matriz\s+12 faltas/);assert.match(await page.locator('.bf-measure-store').last().innerText(),/Parceiro Alcântara\s+8 faltas/);
+ assert.match(await page.locator('.bf-search-meta').innerText(),/3 buscas nesta conversa/);assert.match(await page.locator('.bf-search-meta').innerText(),/2 lojas consultadas/);assert.match(await page.locator('.bf-search-filters').innerText(),/meia vida/);
+ await page.locator('.bf-consultation').nth(1).click();await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.selected?.municipality==='Niterói');
+ assert.match(await page.locator('.bf-search-meta').innerText(),/2 buscas nesta conversa/);assert.match(await page.locator('.bf-search-meta').innerText(),/1 loja consultada/);assert.match(await page.locator('.bf-search-filters').innerText(),/Pirelli · novo · traseiro/);
+ assert.equal(await page.locator('.bf-step').count(),1);assert.equal(await page.locator('.bf-measure-store').count(),2,'Totais do período independem da consulta escolhida');
+ await page.locator('.bf-consultation').first().click();await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.selected?.municipality==='São Gonçalo');
  await page.screenshot({path:path.join(out,'desktop-visao-geral.png'),fullPage:true});
  const boardClip=await page.locator('.bf-detail').evaluate(el=>{const r=el.getBoundingClientRect();return{x:r.left-8,y:r.top+scrollY-35,width:r.width+16,height:r.height+45}});
  await page.screenshot({path:path.join(out,'prancheta.png'),fullPage:true,clip:boardClip});
  await page.locator('.bf-measures .bf-row').nth(1).click();await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.measure==='180/55-17'&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
- assert.equal(await page.locator('.bf-measures .bf-row[aria-pressed=true]').count(),1);assert.match(await page.locator('.bf-detail-title').innerText(),/180\/55-17/);
+ assert.equal(await page.locator('.bf-measures .bf-row[aria-pressed=true]').count(),1);assert.match(await page.locator('.bf-detail-title').innerText(),/180\/55-17/);assert.match(await page.locator('.bf-measure-stores').innerText(),/Parceiro Fonseca/);assert.doesNotMatch(await page.locator('.bf-measure-stores').innerText(),/Alcântara/);
  await page.locator('.bf-measures .bf-row').first().focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.measure==='90/90-12'&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
  assert.equal(await page.locator('.bf-measures .bf-row').first().getAttribute('aria-pressed'),'true');
  await page.locator('.bf-measures').screenshot({path:path.join(out,'medida-selecionada.png')});
@@ -57,12 +63,12 @@ try{
  mode='normal';await page.locator('.bf-measures .bf-row').first().click();await page.getByText('6 un',{exact:true}).waitFor();
  await page.locator('.bf-shops .bf-row').filter({hasText:'Parceiro Alcântara'}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===1&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
- assert.match(await page.locator('.bf-measures .bf-row').innerText(),/8 faltas/);assert.equal(await page.locator('.bf-step').count(),2);
+ assert.match(await page.locator('.bf-measures .bf-row').innerText(),/8 faltas/);assert.equal(await page.locator('.bf-step').count(),2);assert.equal(await page.locator('.bf-measure-store').count(),1);assert.match(await page.locator('.bf-measure-stores').innerText(),/Parceiro Alcântara\s+8 faltas/);assert.match(await page.locator('.bf-detail-title').innerText(),/8 faltas nesta loja/);
  assert.match(await page.locator('.bf-current').innerText(),/6 un/);assert.equal(await page.locator('.bf-consultation').count(),3);
  assert.match(await page.locator('.bf-summary').innerText(),/Conversas com falta/);
  assert.match(await page.locator('.bf-consultation').first().innerText(),/3 buscas nesta conversa/);
  await page.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
- await page.getByRole('button',{name:'Ver histórico completo →'}).click();assert.equal(await page.locator('.bf-consultation').count(),8);
+ await page.getByRole('button',{name:'Ver histórico completo →'}).click();assert.equal(await page.locator('.bf-consultation').count(),8);await page.locator('.bf-consultation').nth(3).click();await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.selected?.searches===1);assert.match(await page.locator('.bf-search-meta').innerText(),/1 busca nesta conversa/);
  await page.getByLabel('Buscar medida nas faltas').fill('180/55-17');await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===0);
  await page.getByLabel('Remover filtro de loja').click();await page.waitForFunction(()=>document.querySelectorAll('.bf-measures .bf-row').length===1);
  assert.match(await page.locator('.bf-detail-title').innerText(),/180\/55-17/);
@@ -73,10 +79,10 @@ try{
  await page.getByRole('button',{name:'Personalizado',exact:true}).click();await page.getByLabel('Início das faltas').fill('2026-09-10');await page.getByLabel('Fim das faltas').fill('2026-09-01');
  await page.getByRole('button',{name:'Aplicar período'}).click();await page.getByText('Selecione um período válido',{exact:false}).waitFor();
  mode='error';await page.getByRole('button',{name:'Mês',exact:true}).click();await page.getByText('Não foi possível carregar as faltas.',{exact:false}).waitFor();
- mode='empty';await page.getByRole('button',{name:'Tentar novamente',exact:true}).first().click();await page.getByText('As lojas aparecerão conforme as buscas registrarem faltas.').waitFor();
+ mode='empty';await page.getByRole('button',{name:'Tentar novamente',exact:true}).first().click();await page.getByText('As lojas aparecerão conforme as buscas registrarem faltas.').waitFor();assert.equal(await page.locator('.bf-measure-panel').isVisible(),false);
  mode='normal';await page.getByRole('button',{name:'Semana',exact:true}).click();await page.locator('.bf-measures .bf-row').first().waitFor();
  mode='detailError';await page.locator('.bf-shops .bf-row').filter({hasText:'Parceiro Alcântara'}).click();await page.getByText('Não foi possível carregar estas consultas.').waitFor();
  mode='normal';await page.getByRole('button',{name:'Tentar novamente',exact:true}).last().click();await page.locator('.bf-step').first().waitFor();
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'mobile.png'),fullPage:true});
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Sem overflow no celular');assert.deepEqual(errors,[]);process.stdout.write('PASS: loja, medida, sequência, filtros, concorrência, CSV, link de conversa, estoque desconhecido, card separado, gráficos entalhados, erro, vazio e celular.\n');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Sem overflow no celular');assert.deepEqual(errors,[]);process.stdout.write('PASS: loja, medida, sequência, filtros, concorrência, CSV, link de conversa, estoque desconhecido, card separado, gráficos entalhados, distribuição da medida, resumo histórico, teclado, erro, vazio e celular.\n');
 }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1;});
