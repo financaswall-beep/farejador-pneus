@@ -13,6 +13,25 @@ window.PAINEL_MODULES.botEntrega = function () {
     botLojaEditarPorDia:false,
     botEntregaSeletorAberto:false,
     botEntregaDias:[{id:1,label:'Seg'},{id:2,label:'Ter'},{id:3,label:'Qua'},{id:4,label:'Qui'},{id:5,label:'Sex'},{id:6,label:'Sáb'},{id:0,label:'Dom'}],
+    get botLojaResumo(){
+      if(!this.botLojaHorarioConfigurado)return [{label:'Horários',hours:'Não cadastrados'}];
+      const groups=[];
+      for(const day of this.botEntregaForm.store_hours){
+        if(!day.enabled)continue;
+        const hours=day.opens_at&&day.closes_at?day.opens_at+' – '+day.closes_at:'Preencher horário';
+        const label=this.botEntregaDias.find(d=>d.id===day.day).label;
+        const previous=groups[groups.length-1];
+        if(previous&&previous.lastDay+1===day.day&&previous.hours===hours){previous.lastDay=day.day;previous.label=previous.firstLabel+'–'+label;}
+        else groups.push({label,firstLabel:label,lastDay:day.day,hours});
+      }
+      return groups;
+    },
+    botEntregaDescartar(){
+      if(this.botEntregaBusy||!this.botEntregaOriginal)return;
+      this.botEntregaForm=JSON.parse(this.botEntregaOriginal);
+      this.botEntregaErro='';this.botEntregaMensagem='';this.botEntregaOrigemEditando=false;
+      this.$nextTick(()=>this.botEntregaMapaAtualizar());
+    },
     get botEntregaDirty(){return JSON.stringify(this.botEntregaForm)!==this.botEntregaOriginal;},
     get botLojaHorarioConfigurado(){return this.botEntregaForm.store_hours.some(day=>day.enabled);},
     get botLojaHorariosDiferentes(){
@@ -179,5 +198,35 @@ window.PAINEL_MODULES.botEntrega = function () {
       only_far:'Só há opção distante; exige consulta ao cliente',unavailable:'Nenhuma loja apta',matriz_closer:'A Matriz está mais perto que os parceiros aptos do anel.',
       matriz_fallback:'A Matriz pode atender e não há parceiro apto no anel.',partner_fairness:'Parceiro escolhido pela distribuição atual entre as lojas aptas do anel mais próximo.'})[reason]||reason;},
     botEntregaKm(km){return km==null?'—':Number(km).toLocaleString('pt-BR',{maximumFractionDigits:1})+' km';},
+  };
+};
+
+// Rascunho local do painel lateral; persistência continua em botEntregaSalvar.
+window.PAINEL_MODULES.botEntregaHorarios = function () {
+  return {
+    draft: [], hoursError: '',
+    dayNames: ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],
+    openHours() {
+      this.draft = JSON.parse(JSON.stringify(this.botEntregaForm.store_hours));
+      this.hoursError = '';
+      this.$refs.hoursDialog.showModal();
+    },
+    copyMonday() {
+      this.hoursError = '';
+      const monday = this.draft.find(day => day.day === 1);
+      for (const day of this.draft.filter(day => day.day >= 2 && day.day <= 5)) {
+        Object.assign(day, {enabled:monday.enabled, opens_at:monday.opens_at, closes_at:monday.closes_at});
+      }
+    },
+    applyHours() {
+      const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const invalid = this.draft.find(day => day.enabled && (!clock.test(day.opens_at) || !clock.test(day.closes_at) || day.opens_at >= day.closes_at));
+      if (invalid) {
+        this.hoursError = this.dayNames[invalid.day] + ': informe a abertura e o fechamento, com o fechamento depois da abertura.';
+        return;
+      }
+      this.botEntregaForm.store_hours = JSON.parse(JSON.stringify(this.draft));
+      this.$refs.hoursDialog.close();
+    },
   };
 };

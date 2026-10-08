@@ -210,7 +210,7 @@
 <script src="/admin/painel/app.relatorios.export.js?v=20260910-1"></script>
 <script src="/admin/painel/app.relatorios.pdf.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.bot.controle.js?v=20260912-kanban-controls1"></script>
-<script src="/admin/painel/app.bot.entrega.js?v=20260915-layout3"></script>
+<script src="/admin/painel/app.bot.entrega.js?v=20261008-metal2"></script>
 <script src="/admin/painel/app.bot.entrega.mapa.js?v=20260909-1"></script>
 <script src="/admin/painel/app.bot.movimento.js?v=20260822-bot-movement1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260910-demanda3"></script>
@@ -304,7 +304,7 @@
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
 <link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20260915-layout3" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-metal2" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
@@ -7054,12 +7054,6 @@
         <div><small>Bot / Relatórios</small><h1>Relatório de faltas</h1><p>Entenda o que faltou e por onde o bot procurou.</p></div>
         <button type="button" class="bf-btn" @click="bfExport()" :disabled="bf.loading || !bf.data?.shortages || bf.exporting"><i data-lucide="download"></i><span x-text="bf.exporting?'Exportando…':'Exportar relatório'"></span></button>
       </header>
-      <div x-show="botTab === 'entrega'" class="bot-delivery bd-page-heading" x-cloak>
-        <header class="bd-heading">
-          <div><p class="bd-eyebrow">MATRIZ / BOT</p><h1 id="bot-delivery-heading">Entrega e atendimento</h1><p>Defina a cobertura, os horários e as regras da Matriz.</p></div>
-          <div class="bd-actions"><span class="bd-badge" x-text="botEntregaDirty ? '● Rascunho' : botEntregaConfig?.configured ? '● Configuração salva' : '● Cadastro inicial'"></span><button class="bd-primary" @click="botEntregaSalvar()" :disabled="botEntregaBusy || !botEntregaConfig || (!botEntregaDirty && botEntregaConfig.configured)"><i data-lucide="save"></i>Salvar alterações</button></div>
-        </header>
-      </div>
       <div class="mb-5 mt-4 border-b border-gray-200 bg-transparent">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <nav aria-label="Seções do Bot" class="flex items-center gap-1 overflow-x-auto">
@@ -7094,32 +7088,33 @@
 
       <section x-show="botTab === 'espera'" x-effect="syncBotWaitlist(currentPage === 'bot' && botTab === 'espera' && adminAuthenticated && adminUser?.role === 'owner')" x-cloak aria-label="Lista de espera"><div id="bot-waitlist" x-ignore></div></section>
       <section x-show="botTab === 'entrega'" class="bot-delivery" aria-labelledby="bot-delivery-heading">
-        <div x-show="botEntregaErro" class="bd-alert bd-error" role="alert"><span x-text="botEntregaErro"></span><button @click="botEntregaCarregar()" :disabled="botEntregaBusy">Recarregar cadastro</button></div>
-        <p x-show="botEntregaMensagem" class="bd-alert bd-success" role="status" x-text="botEntregaMensagem"></p>
-        <p x-show="!botEntregaConfig?.configured && botEntregaConfig" class="bd-alert">As regras atuais continuam valendo até o primeiro salvamento. Preencha o limite real da Matriz.</p>
-        <p x-show="botEntregaBusy && !botEntregaConfig" role="status">Carregando configuração…</p>
-        <fieldset class="bd-layout" x-show="botEntregaConfig" :disabled="botEntregaBusy" aria-label="Configuração de atendimento e entrega">
-          <article class="bd-card bd-coverage" aria-labelledby="bd-coverage-heading">
-            <h2 id="bd-coverage-heading"><i data-lucide="truck"></i>Atendimento<span class="bd-badge" x-text="botEntregaForm.delivery_enabled ? '● Entrega ativa' : 'Entrega pausada'"></span></h2>
-            <div class="bd-service-options"><label class="bd-check"><input type="checkbox" x-model="botEntregaForm.delivery_enabled">Entregar pela Matriz</label><label class="bd-check"><input type="checkbox" x-model="botEntregaForm.pickup_enabled">Permitir retirada na loja</label></div>
-            <div class="bd-radius-section">
-              <label class="bd-label" for="bd-radius">Até onde a Matriz entrega</label>
-              <div class="bd-radius"><input id="bd-radius" type="number" min="0.1" max="55" step="0.1" x-model.number="botEntregaForm.radius_km" @change="botEntregaMapaAtualizar()" placeholder="Informe"><span>km</span></div>
-              <input aria-label="Ajustar limite de entrega em quilômetros" class="bd-range" type="range" min="0.5" max="55" step="0.5" :value="botEntregaForm.radius_km || 0.5" @input="botEntregaForm.radius_km = Number($event.target.value)" @change="botEntregaMapaAtualizar()">
-              <div class="bd-scale"><span>0,5 km</span><span>55 km</span></div>
-              <p class="bd-help">A distância final é conferida na simulação.</p>
-            </div>
-            <div class="bd-origin"><i data-lucide="map-pin"></i><div><strong>Origem da entrega</strong><p x-text="botEntregaForm.address"></p></div><button type="button" class="bd-link" @click="botEntregaOrigemTexto=botEntregaForm.address; botEntregaOrigemEditando=true">Ajustar</button></div>
-            <div x-show="botEntregaOrigemEditando" class="bd-origin-edit"><label class="bd-label" for="bd-origin-address">Endereço completo da Matriz</label><input id="bd-origin-address" x-model="botEntregaOrigemTexto" maxlength="350" placeholder="Rua, número, cidade e estado"><div class="bd-actions"><button type="button" class="bd-secondary" @click="botEntregaOrigemEditando=false">Cancelar</button><button type="button" class="bd-primary" @click="botEntregaLocalizar()" :disabled="botEntregaLocalizando" x-text="botEntregaLocalizando ? 'Localizando…' : 'Localizar'"></button></div></div>
-            <details class="bd-routing"><summary><i data-lucide="chevron-right"></i>Como a loja é escolhida</summary><div class="bd-rule"><p>Parceiros com o pedido completo e cobertura válida, no anel mais próximo. A distribuição entre eles segue a regra de justiça.</p><p x-text="botEntregaConfig?.routing.matriz_competes ? 'A Matriz participa quando está mais perto que todos os parceiros aptos desse anel.' : 'A Matriz entra quando não há parceiro apto no anel.'"></p><p>O círculo mostra a área em linha reta. Quando disponível, o bot confere a distância por trajeto.</p></div></details>
-          </article>
-
-          <article class="bd-card bd-simulation" aria-labelledby="bd-map-heading">
-            <div class="bd-simulation-head"><i data-lucide="map"></i><div><h2 id="bd-map-heading">Cobertura da Matriz</h2><p>Visualize a área e simule um atendimento.</p></div></div>
-            <div class="bd-map-frame"><div id="bot-entrega-map" class="bd-map" aria-label="Mapa da cobertura da Matriz"></div><div x-show="!botEntregaMapaPronto || botEntregaMapaErro" class="bd-map-empty"><i data-lucide="map"></i><strong>Cobertura da Matriz</strong><p x-text="botEntregaMapaErro || 'Carregando Google Maps…'"></p></div><span x-show="botEntregaMapaPronto && !botEntregaMapaErro" class="bd-map-label" x-text="'Limite da Matriz · ' + botEntregaKm(botEntregaForm.radius_km)"></span></div>
-            <form class="bd-simulator-bar" novalidate @submit.prevent="botEntregaSimular()">
-              <label class="bd-address-field"><i data-lucide="map-pin"></i><input id="bd-customer-address" aria-label="Endereço do cliente" x-model="botEntregaAddress" maxlength="350" placeholder="Endereço do cliente"></label>
-              <div class="bd-product-picker" @click.outside="botEntregaSeletorAberto=false" @keydown.escape.window="botEntregaSeletorAberto=false">
+  <header class="bd-heading">
+    <h1 id="bot-delivery-heading">Entrega e cobertura</h1>
+    <p class="bd-breadcrumb"><i data-lucide="house"></i>Matriz / Bot</p>
+  </header>
+  <div x-show="botEntregaErro" class="bd-alert bd-error" role="alert"><span x-text="botEntregaErro"></span><button @click="botEntregaCarregar()" :disabled="botEntregaBusy">Recarregar cadastro</button></div>
+  <p x-show="botEntregaMensagem" class="bd-alert bd-success" role="status" x-text="botEntregaMensagem"></p>
+  <p x-show="!botEntregaConfig?.configured && botEntregaConfig" class="bd-alert">As regras atuais continuam valendo até o primeiro salvamento. Preencha o limite real da Matriz.</p>
+  <p x-show="botEntregaBusy && !botEntregaConfig" role="status">Carregando configuração…</p>
+  <div class="bd-status-strip" x-show="botEntregaConfig" aria-label="Resumo do atendimento">
+    <div><span class="bd-status-light" :class="{'bd-off': !botEntregaForm.delivery_enabled}" aria-hidden="true"></span><span><strong x-text="botEntregaForm.delivery_enabled ? 'Entrega ativa' : 'Entrega pausada'"></strong><small x-text="botEntregaForm.delivery_enabled ? 'Pedidos podem ser entregues pela Matriz' : 'Entregas pela Matriz estão desabilitadas'"></small></span></div>
+    <div><i data-lucide="store"></i><span><strong x-text="botEntregaForm.pickup_enabled ? 'Retirada liberada' : 'Retirada desabilitada'"></strong><small x-text="botEntregaForm.pickup_enabled ? 'Clientes podem retirar na loja' : 'Retirada na loja está desabilitada'"></small></span></div>
+    <div><i data-lucide="map-pin"></i><span><strong x-text="'Cobertura · ' + botEntregaKm(botEntregaForm.radius_km)"></strong><small>Raio de atendimento da Matriz</small></span></div>
+  </div>
+  <fieldset class="bd-layout" x-show="botEntregaConfig" :disabled="botEntregaBusy" aria-label="Configuração de atendimento e entrega">
+    <article class="bd-card bd-simulation" aria-labelledby="bd-map-heading">
+      <span class="bd-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <h2 id="bd-map-heading"><i data-lucide="map"></i>Onde a Matriz atende</h2>
+      <div class="bd-map-frame">
+        <div id="bot-entrega-map" class="bd-map" aria-label="Mapa da cobertura da Matriz"></div>
+        <div x-show="!botEntregaMapaPronto || botEntregaMapaErro" class="bd-map-empty"><i data-lucide="map"></i><strong>Cobertura da Matriz</strong><p x-text="botEntregaMapaErro || 'Carregando Google Maps…'"></p></div>
+        <span x-show="botEntregaMapaPronto && !botEntregaMapaErro" class="bd-map-label" x-text="'Raio de cobertura · ' + botEntregaKm(botEntregaForm.radius_km)"></span>
+        <span class="bd-map-caption">Área em linha reta. Distância conferida na simulação.</span>
+      </div>
+      <div class="bd-test-head"><i data-lucide="map-pin"></i><h3>Teste um atendimento</h3></div>
+      <form class="bd-simulator-bar" novalidate @submit.prevent="botEntregaSimular()">
+        <label class="bd-address-field"><i data-lucide="search"></i><input id="bd-customer-address" aria-label="Endereço do cliente" x-model="botEntregaAddress" maxlength="350" placeholder="Endereço do cliente"></label>
+        <div class="bd-product-picker" @click.outside="botEntregaSeletorAberto=false" @keydown.escape.window="botEntregaSeletorAberto=false">
                 <button class="bd-product-toggle" type="button" @click="botEntregaSeletorAberto=!botEntregaSeletorAberto" :aria-expanded="botEntregaSeletorAberto" aria-controls="bd-product-panel"><i data-lucide="circle-dot"></i><span x-text="botEntregaSelecaoLabel"></span><i data-lucide="chevron-down"></i></button>
                 <div id="bd-product-panel" class="bd-product-panel" x-cloak x-show="botEntregaSeletorAberto" role="group" aria-label="Pneus do pedido">
                   <label class="bd-label" for="bd-products">Pneus do pedido</label><input id="bd-products" x-model="botEntregaBusca" @input.debounce.300ms="botEntregaBuscar()" @keydown.enter.prevent="botEntregaBuscar()" placeholder="Buscar medida, nome ou código" autocomplete="off">
@@ -7129,44 +7124,83 @@
                   <p class="bd-help" x-show="!botEntregaItems.length">Adicione os pneus que deseja consultar.</p><button type="button" class="bd-secondary bd-picker-done" @click="botEntregaSeletorAberto=false">Concluir seleção</button>
                 </div>
               </div>
-              <button class="bd-primary" type="submit" :disabled="botEntregaBusy"><i data-lucide="search"></i><span x-text="botEntregaBusy ? 'Aguarde…' : 'Simular'"></span></button>
-            </form>
-            <p class="bd-help bd-simulation-note">Simulação não cria pedido nem reserva estoque.</p>
-            <p x-show="botEntregaStale" class="bd-alert">Você alterou os dados. Simule novamente para atualizar o resultado.</p>
-            <template x-if="botEntregaResult"><details open class="bd-result" :class="botEntregaStale ? 'bd-stale' : ''"><summary>Resultado da simulação</summary><div class="bd-result-body"><h3 x-text="botEntregaResult.selected ? botEntregaResult.store + ' atende esse endereço' : 'Nenhuma entrega automática disponível'"></h3><p x-text="botEntregaMotivo(botEntregaResult.reason)"></p><p x-show="botEntregaResult.approximate" class="bd-alert">Endereço aproximado. Confirme a localização exata do cliente antes de combinar a entrega.</p>
-              <div class="bd-table-wrap"><table><thead><tr><th>Opção</th><th>Distância</th><th>Situação</th></tr></thead><tbody><template x-for="row in botEntregaResult.diagnostics" :key="row.unitId"><tr :class="row.selected ? 'bd-selected' : ''"><td><strong x-text="row.name"></strong><span x-show="row.selected" class="bd-badge">Selecionada</span></td><td x-text="botEntregaKm(row.distanceKm)"></td><td x-text="botEntregaMotivo(row.reason)"></td></tr></template></tbody></table></div>
-              <div x-show="botEntregaResult.selected" class="bd-totals"><div><span>Frete</span><strong x-text="botEntregaResult.freight == null ? 'A confirmar' : Number(botEntregaResult.freight).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})"></strong></div><div><span>Prazo</span><strong x-text="botEntregaResult.delivery_days == null ? 'Confirmar no atendimento' : botEntregaResult.delivery_days === 0 ? 'Próximo dia de entrega' : 'Até ' + botEntregaResult.delivery_days + ' dia(s) de entrega'"></strong></div></div>
-              <p class="bd-help">Resultado no momento da consulta. O bot confere novamente a cobertura e o estoque ao criar o pedido.</p>
-            </div></details></template>
-          </article>
-
-          <article class="bd-card bd-delivery-rules" aria-labelledby="bd-delivery-rules-heading">
-            <h2 id="bd-delivery-rules-heading"><i data-lucide="calendar-days"></i>Regras da entrega</h2>
-            <span class="bd-label">Dias de entrega</span><div class="bd-days" role="group" aria-label="Dias de entrega"><template x-for="d in botEntregaDias" :key="d.id"><button type="button" @click="botEntregaDia(d.id)" :class="botEntregaForm.days.includes(d.id) ? 'active' : ''" :aria-pressed="botEntregaForm.days.includes(d.id)" x-text="d.label"></button></template></div>
-            <div class="bd-time"><label>Das<input type="time" aria-label="Início das entregas" x-model="botEntregaForm.opens_at"></label><label>Até<input type="time" aria-label="Fim das entregas" x-model="botEntregaForm.closes_at"></label></div>
-            <label class="bd-label" for="bd-prazo">Prazo da Matriz</label><select id="bd-prazo" class="bd-deadline" x-model.number="botEntregaForm.delivery_days"><option :value="null">Confirmar no atendimento</option><option :value="0">Próximo dia de entrega disponível</option><option :value="1">Até 1 dia de entrega</option><option :value="2">Até 2 dias de entrega</option><option :value="3">Até 3 dias de entrega</option><option :value="5">Até 5 dias de entrega</option><option :value="7">Até 7 dias de entrega</option></select>
-            <div class="bd-freight" role="group" aria-label="Frete da Matriz por distância"><h3>Frete por distância</h3><div class="bd-freight-grid">
-              <span class="bd-freight-label">Distância</span><span class="bd-freight-label">Valor</span>
-              <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da primeira faixa em km" x-model.number="botEntregaForm.freight.first_limit_km"><span>km</span></span></label><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da primeira faixa" x-model="botEntregaForm.freight.first_price_brl"></label>
-              <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da segunda faixa em km" x-model.number="botEntregaForm.freight.second_limit_km"><span>km</span></span></label><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da segunda faixa" x-model="botEntregaForm.freight.second_price_brl"></label>
-              <span class="bd-freight-above" x-text="'Acima de ' + botEntregaKm(botEntregaForm.freight.second_limit_km)"></span><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor acima da segunda faixa" x-model="botEntregaForm.freight.above_price_brl"></label>
-            </div></div>
-            <div class="bd-rules-footer"><p class="bd-help">A última faixa vale somente dentro da cobertura.</p><button type="button" class="bd-secondary bd-pause" @click="botEntregaForm.delivery_enabled=!botEntregaForm.delivery_enabled" x-text="botEntregaForm.delivery_enabled ? 'Ⅱ Pausar entregas' : '▶ Retomar entregas'"></button></div>
-          </article>
-
-          <article class="bd-card bd-store-card" aria-labelledby="bd-store-hours-heading">
-            <h2 id="bd-store-hours-heading"><i data-lucide="store"></i>Funcionamento da loja</h2>
-            <span class="bd-label">Dias de funcionamento</span><div class="bd-days" role="group" aria-label="Dias de funcionamento da loja"><template x-for="day in botEntregaForm.store_hours" :key="'store-day-'+day.day"><button type="button" @click="botLojaDia(day.day)" :class="day.enabled ? 'active' : ''" :aria-pressed="day.enabled" :aria-label="'Funcionamento: '+botEntregaDias.find(d=>d.id===day.day).label" x-text="botEntregaDias.find(d=>d.id===day.day).label"></button></template></div>
-            <div x-show="!botLojaMostrarPorDia" class="bd-time"><label>Das<input type="time" :value="botLojaHoraComum('opens_at')" @input="botLojaAplicarHora('opens_at',$event.target.value)" :disabled="!botLojaHorarioConfigurado" aria-label="Abertura da loja nos dias selecionados"></label><label>Até<input type="time" :value="botLojaHoraComum('closes_at')" @input="botLojaAplicarHora('closes_at',$event.target.value)" :disabled="!botLojaHorarioConfigurado" aria-label="Fechamento da loja nos dias selecionados"></label></div>
-            <p class="bd-help" x-show="!botLojaMostrarPorDia">O mesmo horário vale para os dias selecionados.</p>
-            <div x-show="botLojaMostrarPorDia" class="bd-store-hours"><div class="bd-store-hours-head" aria-hidden="true"><span>Dia</span><span>Das</span><span>Até</span></div><template x-for="day in botEntregaForm.store_hours" :key="'store-hours-'+day.day"><div class="bd-store-hours-row" x-show="day.enabled"><span x-text="botEntregaDias.find(d=>d.id===day.day).label"></span><template x-if="day.enabled"><div class="bd-store-hours-inputs"><input type="time" x-model="day.opens_at" :aria-label="'Abertura da loja: '+botEntregaDias.find(d=>d.id===day.day).label"><input type="time" x-model="day.closes_at" :aria-label="'Fechamento da loja: '+botEntregaDias.find(d=>d.id===day.day).label"></div></template></div></template></div>
-            <div><button type="button" class="bd-secondary bd-store-adjust" x-show="!botLojaMostrarPorDia" :disabled="!botLojaHorarioConfigurado" @click="botLojaEditarPorDia=true"><i data-lucide="clock-3"></i>Ajustar horários por dia</button><button type="button" class="bd-link bd-store-adjust" x-show="botLojaMostrarPorDia" @click="botLojaUsarMesmoHorario()">Usar o horário do primeiro dia em todos</button></div>
-            <p class="bd-help" x-show="!botLojaMostrarPorDia">Use quando o sábado ou outro dia tiver horário diferente.</p><p class="bd-help" x-show="!botLojaHorarioConfigurado">Horário não cadastrado. Marque os dias de funcionamento e preencha os horários.</p>
-            <div class="bd-store-info"><div class="bd-store-info-heading"><i data-lucide="store"></i><div><strong>Atendimento presencial e retirada</strong><p>Este é o horário que o bot informa ao cliente.</p></div></div><dl><div><dt>Domingo</dt><dd x-text="botLojaHorarioDia(0)"></dd></div><div><dt>Feriados</dt><dd>Confirmar atendimento</dd></div></dl></div>
-            <p class="bd-help bd-store-note">Horário de Brasília · Entregas seguem as regras ao lado.</p>
-          </article>
-        </fieldset>
-      </section>
+        <button class="bd-primary" type="submit" :disabled="botEntregaBusy"><span x-text="botEntregaBusy ? 'Aguarde…' : 'Simular'"></span></button>
+      </form>
+      <p x-show="botEntregaStale" class="bd-alert" role="status">Você alterou os dados. Simule novamente para atualizar o resultado.</p>
+      <template x-if="botEntregaResult">
+        <div class="bd-result-wrap" x-data="{optionsOpen:false}">
+          <div class="bd-result" :class="{'bd-stale': botEntregaStale, 'bd-unavailable': !botEntregaResult.selected}" role="status">
+            <div class="bd-result-title"><span class="bd-result-check" aria-hidden="true" x-text="botEntregaResult.selected ? '✓' : '!' "></span><h3 x-text="botEntregaResult.selected ? botEntregaResult.store + ' atende' : 'Entrega indisponível'"></h3></div>
+            <div class="bd-result-metric" x-show="botEntregaResult.selected"><strong x-text="botEntregaKm(botEntregaResult.diagnostics.find(d=>d.selected)?.distanceKm)"></strong><span>Distância estimada</span></div>
+            <div class="bd-result-metric" x-show="botEntregaResult.selected"><strong x-text="botEntregaResult.freight == null ? 'A confirmar' : Number(botEntregaResult.freight).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})"></strong><span>de frete</span></div>
+            <div class="bd-result-metric" x-show="botEntregaResult.selected"><strong x-text="botEntregaResult.delivery_days == null ? 'A confirmar' : botEntregaResult.delivery_days === 0 ? 'Próximo dia' : 'Até ' + botEntregaResult.delivery_days + ' dia' + (botEntregaResult.delivery_days > 1 ? 's' : '')"></strong><span>de entrega</span></div>
+            <button type="button" class="bd-result-options" @click="optionsOpen=!optionsOpen" :aria-expanded="optionsOpen" aria-controls="bd-diagnostics">Ver opções de lojas <span aria-hidden="true">›</span></button>
+          </div>
+          <p x-show="botEntregaResult.approximate" class="bd-alert">Endereço aproximado. Confirme a localização exata do cliente antes de combinar a entrega.</p>
+          <div id="bd-diagnostics" class="bd-diagnostics" x-show="optionsOpen || !botEntregaResult.selected" x-cloak>
+            <p x-text="botEntregaMotivo(botEntregaResult.reason)"></p>
+            <div class="bd-table-wrap"><table><thead><tr><th>Opção</th><th>Distância</th><th>Situação</th></tr></thead><tbody><template x-for="row in botEntregaResult.diagnostics" :key="row.unitId"><tr :class="row.selected ? 'bd-selected' : ''"><td><strong x-text="row.name"></strong><span x-show="row.selected" class="bd-badge">Selecionada</span></td><td x-text="botEntregaKm(row.distanceKm)"></td><td x-text="botEntregaMotivo(row.reason)"></td></tr></template></tbody></table></div>
+            <p class="bd-help">Resultado no momento da consulta. O bot confere novamente a cobertura e o estoque ao criar o pedido.</p>
+          </div>
+        </div>
+      </template>
+      <p class="bd-help bd-simulation-note">Simulação não cria pedido nem reserva estoque.</p>
+    </article>
+    <article class="bd-card bd-coverage" aria-labelledby="bd-coverage-heading">
+      <span class="bd-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <h2 id="bd-coverage-heading"><i data-lucide="locate-fixed"></i>Área de entrega</h2>
+      <div class="bd-service-options">
+        <label class="bd-check"><i data-lucide="store"></i><span><strong>Entregar pela Matriz</strong><small>Realizar entregas para clientes na sua área.</small></span><input type="checkbox" aria-label="Entregar pela Matriz" x-model="botEntregaForm.delivery_enabled"></label>
+        <label class="bd-check"><i data-lucide="locate-fixed"></i><span><strong>Permitir retirada</strong><small>Permitir que clientes retirem os pedidos na loja.</small></span><input type="checkbox" aria-label="Permitir retirada na loja" x-model="botEntregaForm.pickup_enabled"></label>
+      </div>
+      <div class="bd-radius-section">
+        <div class="bd-radius-row"><label class="bd-label" for="bd-radius">Raio de cobertura</label><div class="bd-radius"><input id="bd-radius" type="number" min="0.1" max="55" step="0.1" x-model.number="botEntregaForm.radius_km" @change="botEntregaMapaAtualizar()" placeholder="Informe"><span>km</span></div><small>Máximo: 55 km</small></div>
+        <input aria-label="Ajustar limite de entrega em quilômetros" class="bd-range" type="range" min="0.5" max="55" step="0.5" :style="{'--bd-progress': Math.max(0,Math.min(100,(Number(botEntregaForm.radius_km || 0.5)-0.5)/54.5*100))+'%'}" :value="botEntregaForm.radius_km || 0.5" @input="botEntregaForm.radius_km = Number($event.target.value)" @change="botEntregaMapaAtualizar()">
+        <div class="bd-scale"><span>0,5 km</span><span>55 km</span></div>
+      </div>
+      <div class="bd-origin"><i data-lucide="map-pin"></i><div><strong>Endereço da Matriz</strong><p x-text="botEntregaForm.address || 'Endereço não cadastrado'"></p></div><button type="button" class="bd-link" @click="botEntregaOrigemTexto=botEntregaForm.address; botEntregaOrigemEditando=true">Ajustar endereço ›</button></div>
+      <div x-show="botEntregaOrigemEditando" class="bd-origin-edit"><label class="bd-label" for="bd-origin-address">Endereço completo da Matriz</label><input id="bd-origin-address" x-model="botEntregaOrigemTexto" maxlength="350" placeholder="Rua, número, cidade e estado"><div class="bd-actions"><button type="button" class="bd-secondary" @click="botEntregaOrigemEditando=false">Cancelar</button><button type="button" class="bd-primary" @click="botEntregaLocalizar()" :disabled="botEntregaLocalizando" x-text="botEntregaLocalizando ? 'Localizando…' : 'Localizar'"></button></div></div>
+    </article>
+    <article class="bd-card bd-delivery-rules" aria-labelledby="bd-delivery-rules-heading">
+      <span class="bd-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <h2 id="bd-delivery-rules-heading"><i data-lucide="clock-3"></i>Horários e frete</h2>
+      <div class="bd-rule-inset">
+        <span class="bd-label">Dias de funcionamento (entrega)</span><div class="bd-days" role="group" aria-label="Dias de entrega"><template x-for="d in botEntregaDias" :key="d.id"><button type="button" @click="botEntregaDia(d.id)" :class="botEntregaForm.days.includes(d.id) ? 'active' : ''" :aria-pressed="botEntregaForm.days.includes(d.id)" x-text="d.label"></button></template></div>
+        <div class="bd-schedule"><div class="bd-time"><strong>Entrega:</strong><input type="time" aria-label="Início das entregas" x-model="botEntregaForm.opens_at"><span>às</span><input type="time" aria-label="Fim das entregas" x-model="botEntregaForm.closes_at"></div><label class="bd-deadline-label" for="bd-prazo"><strong>Prazo:</strong><select id="bd-prazo" class="bd-deadline" x-model.number="botEntregaForm.delivery_days"><option :value="null">Confirmar no atendimento</option><option :value="0">Próximo dia de entrega disponível</option><option :value="1">Até 1 dia de entrega</option><option :value="2">Até 2 dias de entrega</option><option :value="3">Até 3 dias de entrega</option><option :value="5">Até 5 dias de entrega</option><option :value="7">Até 7 dias de entrega</option></select></label></div>
+        <div class="bd-freight" role="group" aria-label="Frete da Matriz por distância"><h3>Tabela de frete (por distância)</h3><div class="bd-freight-grid">
+          <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da primeira faixa em km" x-model.number="botEntregaForm.freight.first_limit_km"><span>km</span></span></label><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da primeira faixa" x-model="botEntregaForm.freight.first_price_brl"></label>
+          <label class="bd-freight-distance">Até<span class="bd-freight-field"><input type="number" min="0.1" max="55" step="0.1" aria-label="Limite da segunda faixa em km" x-model.number="botEntregaForm.freight.second_limit_km"><span>km</span></span></label><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor da segunda faixa" x-model="botEntregaForm.freight.second_price_brl"></label>
+          <span class="bd-freight-above" x-text="'Acima de ' + botEntregaKm(botEntregaForm.freight.second_limit_km)"></span><label class="bd-freight-field"><span>R$</span><input type="text" inputmode="decimal" aria-label="Valor acima da segunda faixa" x-model="botEntregaForm.freight.above_price_brl"></label>
+        </div></div>
+      </div>
+      <div class="bd-rules-footer"><p class="bd-help"><i data-lucide="info"></i>Sempre dentro do limite de cobertura.</p><button type="button" class="bd-secondary bd-pause" @click="botEntregaForm.delivery_enabled=!botEntregaForm.delivery_enabled" x-text="botEntregaForm.delivery_enabled ? 'Ⅱ Pausar entregas' : '▶ Retomar entregas'"></button></div>
+    </article>
+    <article class="bd-card bd-store-card" aria-labelledby="bd-store-hours-heading" x-data="PAINEL_MODULES.botEntregaHorarios()">
+      <span class="bd-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div class="bd-store-summary">
+        <h2 id="bd-store-hours-heading"><i data-lucide="store"></i>Funcionamento da loja</h2>
+        <div class="bd-week-summary"><template x-for="group in botLojaResumo" :key="group.label"><div><strong x-text="group.label"></strong><span x-text="group.hours"></span></div></template></div>
+        <button type="button" class="bd-secondary" @click="openHours()" aria-haspopup="dialog"><i data-lucide="calendar-days"></i>Ajustar por dia</button>
+        <p class="bd-store-note">Presencial e retirada. Feriados: confirmar</p>
+      </div>
+      <dialog x-ref="hoursDialog" class="bd-hours-drawer" aria-labelledby="bd-hours-title" @click="if ($event.target === $refs.hoursDialog && $event.clientX < $refs.hoursDialog.getBoundingClientRect().left) $refs.hoursDialog.close()">
+              <header class="bd-drawer-head"><i data-lucide="clock-3"></i><div><h2 id="bd-hours-title">Horários da loja</h2><p>Ajustar por dia</p></div><button type="button" @click="$refs.hoursDialog.close()" aria-label="Fechar horários" autofocus>×</button></header>
+              <div class="bd-drawer-body">
+                <h3>Atendimento presencial e retirada</h3><p>Defina a abertura e o fechamento de cada dia.</p>
+                <div class="bd-hours-table"><div class="bd-hours-row bd-hours-labels" aria-hidden="true"><span>Dia</span><span>Aberto</span><span>Das</span><span>Até</span></div>
+                  <template x-for="day in draft" :key="day.day"><div class="bd-hours-row"><strong x-text="dayNames[day.day]"></strong><input type="checkbox" role="switch" x-model="day.enabled" :aria-label="dayNames[day.day] + ': loja aberta'"><input type="time" x-model="day.opens_at" :disabled="!day.enabled" :aria-label="'Abertura: ' + dayNames[day.day]"><input type="time" x-model="day.closes_at" :disabled="!day.enabled" :aria-label="'Fechamento: ' + dayNames[day.day]"></div></template>
+                </div>
+                <button type="button" class="bd-secondary bd-hours-copy" @click="copyMonday()"><i data-lucide="copy"></i>Copiar segunda para terça a sexta</button>
+                <div class="bd-drawer-info"><p>Horário de Brasília</p><p>Feriados: confirmar atendimento</p></div><p class="bd-help">Entregas seguem os horários definidos em Regras da entrega.</p>
+                <p x-show="hoursError" x-text="hoursError" class="bd-alert bd-error" role="alert"></p>
+              </div>
+              <footer class="bd-drawer-footer"><p>Depois, salve as alterações na tela principal.</p><div class="bd-actions"><button type="button" class="bd-secondary" @click="$refs.hoursDialog.close()">Cancelar</button><button type="button" class="bd-primary" @click="applyHours()">Aplicar horários</button></div></footer>
+            </dialog>
+    </article>
+  </fieldset>
+  <footer class="bd-save-bar"><p><i data-lucide="info"></i>Alterações valem após salvar.</p><div class="bd-actions"><span class="bd-badge" x-text="botEntregaDirty ? '● Rascunho' : botEntregaConfig?.configured ? '● Configuração salva' : '● Cadastro inicial'"></span><button type="button" class="bd-secondary" @click="botEntregaDescartar()" :disabled="botEntregaBusy || !botEntregaDirty">Descartar</button><button class="bd-primary" @click="botEntregaSalvar()" :disabled="botEntregaBusy || !botEntregaConfig || (!botEntregaDirty && botEntregaConfig.configured)"><i data-lucide="check"></i>Salvar alterações</button></div></footer>
+  <details class="bd-routing"><summary><i data-lucide="chevron-right"></i>Como a loja é escolhida</summary><div class="bd-rule"><p>Parceiros com o pedido completo e cobertura válida, no anel mais próximo. A distribuição entre eles segue a regra de justiça.</p><p x-text="botEntregaConfig?.routing.matriz_competes ? 'A Matriz participa quando está mais perto que todos os parceiros aptos desse anel.' : 'A Matriz entra quando não há parceiro apto no anel.'"></p><p>O círculo mostra a área em linha reta. Quando disponível, o bot confere a distância por trajeto.</p></div></details>
+</section>
 
       <!-- VISÃO GERAL: cockpit leve do Bot -->
       <div x-show="botTab === 'visao'" class="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">

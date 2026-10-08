@@ -114,6 +114,11 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/marketing-geography.css', async (_request, reply) => sendStatic(reply, 'marketing-geography.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/clientes-lead.css', async (_request, reply) => sendStatic(reply, 'clientes-lead.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-entrega.css', async (_request, reply) => sendStatic(reply, 'bot-entrega.css', 'text/css; charset=utf-8'));
+  // Fontes locais usadas no conteúdo da subaba de entrega.
+  for (const font of ['roboto-latin-v1.woff2', 'roboto-condensed-latin-v1.woff2']) {
+    fastify.get('/admin/painel/assets/fonts/' + font, async (_request, reply) =>
+      sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/fonts/' + font, 'font/woff2'));
+  }
   fastify.get('/admin/painel/bot-demanda.css', async (_request, reply) => sendStatic(reply, 'bot-demanda.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/stock-waitlist.css', async (_request, reply) => sendStatic(reply, 'stock-waitlist.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-faltas.css', async (_request, reply) => sendStatic(reply, 'bot-faltas.css', 'text/css; charset=utf-8'));
