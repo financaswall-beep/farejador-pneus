@@ -45,6 +45,13 @@ try{
  assert.equal(layout.stockBelow,true);assert.equal(layout.overflow,false);assert.equal(layout.engraved,true);assert.equal(layout.innerStock,false);
  assert.equal(await page.getByRole('navigation',{name:'Seções do Bot'}).getByRole('button',{name:'Faltas por loja',exact:true}).getAttribute('aria-current'),'page');
  await page.screenshot({path:path.join(out,'desktop-visao-geral.png'),fullPage:true});
+ const boardClip=await page.locator('.bf-detail').evaluate(el=>{const r=el.getBoundingClientRect();return{x:r.left-8,y:r.top+scrollY-35,width:r.width+16,height:r.height+45}});
+ await page.screenshot({path:path.join(out,'prancheta.png'),fullPage:true,clip:boardClip});
+ await page.locator('.bf-measures .bf-row').nth(1).click();await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.measure==='180/55-17'&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
+ assert.equal(await page.locator('.bf-measures .bf-row[aria-pressed=true]').count(),1);assert.match(await page.locator('.bf-detail-title').innerText(),/180\/55-17/);
+ await page.locator('.bf-measures .bf-row').first().focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>Alpine.$data(document.querySelector('main')).bf.measure==='90/90-12'&&!Alpine.$data(document.querySelector('main')).bf.detailLoading);
+ assert.equal(await page.locator('.bf-measures .bf-row').first().getAttribute('aria-pressed'),'true');
+ await page.locator('.bf-measures').screenshot({path:path.join(out,'medida-selecionada.png')});
  await page.getByRole('button',{name:'Ver conversa ↗',exact:true}).click();assert.equal(await page.evaluate(()=>Alpine.$data(document.querySelector('main')).openedConversation),'12345');
  mode='unknownStock';await page.locator('.bf-measures .bf-row').first().click();await page.getByText('Sem registro',{exact:true}).first().waitFor();assert(!/Zerado/.test(await page.locator('.bf-current').innerText()));
  mode='normal';await page.locator('.bf-measures .bf-row').first().click();await page.getByText('6 un',{exact:true}).waitFor();
