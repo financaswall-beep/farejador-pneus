@@ -305,7 +305,7 @@
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
 <link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-metal2" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-fullarea1" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
@@ -7035,7 +7035,7 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda' }">
+    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega' }">
       <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
       <header x-show="botTab === 'espera'" class="wl-heading" x-cloak>
         <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome vendas quando o pneu chegar e acompanhe a procura.</p></div>

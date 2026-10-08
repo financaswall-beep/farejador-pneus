@@ -10,12 +10,13 @@ const start=html.indexOf('<section x-show="botTab === \'entrega\'"');
 const end=html.indexOf('<!-- VISÃO GERAL: cockpit leve do Bot -->',start);
 assert(start>0&&end>start);
 const section=html.slice(start,end);
+const botHostTag=html.match(/<div x-show="currentPage === 'bot'"[^>]+>/)?.[0];assert(botHostTag);
 let version=0;
 let settings={delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'Matriz · endereço de teste',latitude:-22.8777701,longitude:-42.9900824,
   days:[],opens_at:null,closes_at:null,delivery_days:null,
   freight:{first_limit_km:15,first_price_brl:9.9,second_limit_km:25,second_price_brl:13,above_price_brl:19}};
 const boot=`window.deliveryTest=()=>{
- const state={botTab:'entrega',adminUser:{role:'owner'},
+ const state={currentPage:'bot',botTab:'entrega',adminUser:{role:'owner'},
  apiGet:async url=>(await fetch(url)).json(),
  apiPost:async(url,body)=>(await fetch(url,{method:'POST',body:JSON.stringify(body)})).json(),
  apiPut:async(url,body)=>(await fetch(url,{method:'PUT',body:JSON.stringify(body)})).json()};
@@ -24,9 +25,9 @@ const boot=`window.deliveryTest=()=>{
 };`;
 const pageHtml=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/admin/painel/tailwind.css"><link rel="stylesheet" href="/admin/painel/bot-entrega.css">
-<style>body{margin:0;background:#f7f9f7;font-family:Arial,sans-serif}.preview-side{position:fixed;inset:0 auto 0 0;width:195px;background:#064b40;color:white;padding:28px 22px}.preview-side b{font-size:40px}.preview-side p{margin-top:34px}.preview-main{margin-left:195px;padding:20px 28px}.preview-tag{font-size:10px;color:#9a651a;margin-bottom:8px}[x-cloak]{display:none!important}@media(max-width:650px){.preview-side{display:none}.preview-main{margin:0;padding:14px}}</style>
+<style>body{margin:0;background:#f7f9f7;font-family:Arial,sans-serif}.preview-side{position:fixed;inset:0 auto 0 0;width:195px;background:#064b40;color:white;padding:28px 22px}.preview-side b{font-size:40px}.preview-side p{margin-top:34px}.preview-main{margin-left:195px;padding:0}.preview-top{height:84px;padding:12px 12px 8px;background:#f9fafb}.preview-top>div{height:64px;display:flex;align-items:center;gap:20px;padding:0 20px;border-radius:16px;background:#022c22;color:#fff}.preview-top input{flex:1;max-width:500px;border:1px solid #356a59;border-radius:8px;background:#214539;padding:10px;color:#fff}.preview-bot-nav{display:flex;gap:20px;align-items:center;margin:16px 0 20px;padding:8px 0;border-bottom:1px solid #8c9d96;color:#234c3e;font-size:12px}.preview-bot-nav b{border-bottom:2px solid #065f46;padding-bottom:8px}.preview-tag{font-size:10px;color:#9a651a;margin-bottom:8px}[x-cloak]{display:none!important}@media(max-width:650px){.preview-side{display:none}.preview-main{margin:0;padding:0}.preview-top{display:none}}</style>
 <script src="/admin/painel/app.bot.entrega.js"></script><script src="/admin/painel/app.bot.entrega.mapa.js"></script><script>${boot}</script>
-<script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head><body><aside class="preview-side"><b>2W</b><div>P N E U S</div><p>Visão geral</p><p>● Bot</p><p>Vendas</p><p>Compras</p><p>Estoque</p><p>Logística</p><p>Rede</p><p>Financeiro</p></aside><main class="preview-main" x-data="deliveryTest()" x-init="botEntregaCarregar(); lucide.createIcons()"><div class="preview-tag">AMBIENTE DE TESTE · sem alteração no banco</div>${section}</main></body></html>`;
+<script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head><body><aside class="preview-side"><b>2W</b><div>P N E U S</div><p>Visão geral</p><p>● Bot</p><p>Vendas</p><p>Compras</p><p>Estoque</p><p>Logística</p><p>Rede</p><p>Financeiro</p></aside><main class="preview-main" x-data="deliveryTest()" x-init="botEntregaCarregar(); lucide.createIcons()"><div class="preview-top"><div><strong>CENTRAL DE REDE</strong><input aria-label="Busca ilustrativa do painel" placeholder="Buscar parceiro, pedido, produto…" disabled><span>Matriz</span></div></div>${botHostTag}<div class="preview-tag">AMBIENTE DE TESTE · sem alteração no banco</div><nav class="preview-bot-nav"><span>Visão geral</span><span>Atendimento</span><b>Entrega e cobertura</b><span>Relatórios</span></nav>${section}</div></main></body></html>`;
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(pageHtml);}
@@ -159,6 +160,11 @@ const server=http.createServer(async(req,res)=>{
     await page.keyboard.press('Escape');
     assert.equal(await drawer.isVisible(),false);
     assert.equal(await page.getByRole('button',{name:'Ajustar por dia',exact:true}).evaluate(el=>el===document.activeElement),true);
+    // A área metálica preenche a página inteira, inclusive em monitor largo.
+    await page.setViewportSize({width:2560,height:1440});
+    const area=await page.evaluate(()=>{const host=document.querySelector('.bot-delivery-page');const content=document.querySelector('section.bot-delivery');const main=document.querySelector('.preview-main');const h=host.getBoundingClientRect(),c=content.getBoundingClientRect(),m=main.getBoundingClientRect(),style=getComputedStyle(host);return {hostWidth:h.width,mainWidth:m.width,contentWidth:c.width,expectedContent:h.width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),hostHeight:h.height,viewport:innerHeight,border:getComputedStyle(content).borderTopWidth,metal:style.backgroundImage!=='none',overflow:document.documentElement.scrollWidth>innerWidth};});
+    assert.equal(area.hostWidth,area.mainWidth);assert(Math.abs(area.contentWidth-area.expectedContent)<1);assert(area.hostHeight>=area.viewport-84);assert.equal(area.border,'0px');assert.equal(area.metal,true);assert.equal(area.overflow,false);
+    await page.screenshot({path:path.join(output,'desktop-area-inteira.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     await page.screenshot({path:path.join(output,'mobile.png'),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
