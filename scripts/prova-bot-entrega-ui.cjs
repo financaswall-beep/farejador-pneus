@@ -10,6 +10,11 @@ const start=html.indexOf('<section x-show="botTab === \'entrega\'"');
 const end=html.indexOf('<!-- VISÃO GERAL: cockpit leve do Bot -->',start);
 assert(start>0&&end>start);
 const section=html.slice(start,end);
+const navStart=html.indexOf('      <div class="bot-section-navigation');
+const navEnd=html.indexOf('      <section x-show="botTab === \'espera\'"',navStart);
+assert(navStart>0&&navEnd>navStart);
+const navigation=html.slice(navStart,navEnd);
+const heading=html.match(/<header x-show="botTab === 'entrega'" class="bd-heading"[\s\S]*?<\/header>/)?.[0];assert(heading);
 const botHostTag=html.match(/<div x-show="currentPage === 'bot'"[^>]+>/)?.[0];assert(botHostTag);
 let version=0;
 let settings={delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'Matriz · endereço de teste',latitude:-22.8777701,longitude:-42.9900824,
@@ -17,6 +22,7 @@ let settings={delivery_enabled:true,pickup_enabled:true,radius_km:null,address:'
   freight:{first_limit_km:15,first_price_brl:9.9,second_limit_km:25,second_price_brl:13,above_price_brl:19}};
 const boot=`window.deliveryTest=()=>{
  const state={currentPage:'bot',botTab:'entrega',adminUser:{role:'owner'},
+ redePeriods:[],botPeriodo:'today',bfOpen(){this.botTab='faltas';},renderBotMapa(){},
  apiGet:async url=>(await fetch(url)).json(),
  apiPost:async(url,body)=>(await fetch(url,{method:'POST',body:JSON.stringify(body)})).json(),
  apiPut:async(url,body)=>(await fetch(url,{method:'PUT',body:JSON.stringify(body)})).json()};
@@ -27,7 +33,7 @@ const pageHtml=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><m
 <link rel="stylesheet" href="/admin/painel/tailwind.css"><link rel="stylesheet" href="/admin/painel/bot-entrega.css">
 <style>body{margin:0;background:#f7f9f7;font-family:Arial,sans-serif}.preview-side{position:fixed;inset:0 auto 0 0;width:195px;background:#064b40;color:white;padding:28px 22px}.preview-side b{font-size:40px}.preview-side p{margin-top:34px}.preview-main{margin-left:195px;padding:0}.preview-top{height:84px;padding:12px 12px 8px;background:#f9fafb}.preview-top>div{height:64px;display:flex;align-items:center;gap:20px;padding:0 20px;border-radius:16px;background:#022c22;color:#fff}.preview-top input{flex:1;max-width:500px;border:1px solid #356a59;border-radius:8px;background:#214539;padding:10px;color:#fff}.preview-bot-nav{display:flex;gap:20px;align-items:center;margin:16px 0 20px;padding:8px 0;border-bottom:1px solid #8c9d96;color:#234c3e;font-size:12px}.preview-bot-nav b{border-bottom:2px solid #065f46;padding-bottom:8px}.preview-tag{font-size:10px;color:#9a651a;margin-bottom:8px}[x-cloak]{display:none!important}@media(max-width:650px){.preview-side{display:none}.preview-main{margin:0;padding:0}.preview-top{display:none}}</style>
 <script src="/admin/painel/app.bot.entrega.js"></script><script src="/admin/painel/app.bot.entrega.mapa.js"></script><script>${boot}</script>
-<script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head><body><aside class="preview-side"><b>2W</b><div>P N E U S</div><p>Visão geral</p><p>● Bot</p><p>Vendas</p><p>Compras</p><p>Estoque</p><p>Logística</p><p>Rede</p><p>Financeiro</p></aside><main class="preview-main" x-data="deliveryTest()" x-init="botEntregaCarregar(); lucide.createIcons()"><div class="preview-top"><div><strong>CENTRAL DE REDE</strong><input aria-label="Busca ilustrativa do painel" placeholder="Buscar parceiro, pedido, produto…" disabled><span>Matriz</span></div></div>${botHostTag}<div class="preview-tag">AMBIENTE DE TESTE · sem alteração no banco</div><nav class="preview-bot-nav"><span>Visão geral</span><span>Atendimento</span><b>Entrega e cobertura</b><span>Relatórios</span></nav>${section}</div></main></body></html>`;
+<script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script><script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script></head><body><aside class="preview-side"><b>2W</b><div>P N E U S</div><p>Visão geral</p><p>● Bot</p><p>Vendas</p><p>Compras</p><p>Estoque</p><p>Logística</p><p>Rede</p><p>Financeiro</p></aside><main class="preview-main" x-data="deliveryTest()" x-init="botEntregaCarregar(); lucide.createIcons()"><div class="preview-top"><div><strong>CENTRAL DE REDE</strong><input aria-label="Busca ilustrativa do painel" placeholder="Buscar parceiro, pedido, produto…" disabled><span>Matriz</span></div></div>${botHostTag}<div class="preview-tag">AMBIENTE DE TESTE · sem alteração no banco</div>${heading}${navigation}${section}</div></main></body></html>`;
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(pageHtml);}
@@ -61,6 +67,24 @@ const server=http.createServer(async(req,res)=>{
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:'+server.address().port);
     await page.getByText('As regras atuais continuam valendo', {exact:false}).waitFor();
+    const nav=page.getByRole('navigation',{name:'Seções do Bot'});
+    assert.equal(await nav.getByRole('button').count(),7);
+    assert.equal(await nav.getByRole('button',{name:'Entrega e cobertura',exact:true}).getAttribute('aria-current'),'page');
+    const menu=await nav.evaluate(el=>Array.from(el.querySelectorAll('button')).map(button=>({height:button.getBoundingClientRect().height,top:button.getBoundingClientRect().top,icon:getComputedStyle(button.querySelector('svg')).display})));
+    assert(menu.every(button=>button.height>=40&&button.height<=44&&button.icon!=='none'));assert.equal(new Set(menu.map(button=>button.top)).size,1);
+    assert(await page.locator('#bot-delivery-heading').evaluate(el=>el.getBoundingClientRect().bottom<document.querySelector('.bot-section-nav').getBoundingClientRect().top));
+    const statusLights=page.locator('.bd-status-strip .bd-status-light');assert.equal(await statusLights.count(),2);
+    assert.equal(await statusLights.nth(1).evaluate(el=>el.classList.contains('bd-off')),false);
+    await page.getByLabel('Permitir retirada na loja',{exact:true}).uncheck();
+    await page.getByText('Retirada desabilitada',{exact:true}).waitFor();
+    assert.equal(await statusLights.nth(1).evaluate(el=>el.classList.contains('bd-off')),true);
+    await page.getByLabel('Permitir retirada na loja',{exact:true}).check();
+    await page.getByText('Retirada liberada',{exact:true}).waitFor();
+    assert.equal(await statusLights.nth(1).evaluate(el=>el.classList.contains('bd-off')),false);
+    await nav.getByRole('button',{name:'Conversas',exact:true}).focus();await page.keyboard.press('Enter');
+    assert.equal(await nav.getByRole('button',{name:'Conversas',exact:true}).getAttribute('aria-current'),'page');
+    assert.equal(await page.locator('.bot-delivery-page').count(),0);
+    await nav.getByRole('button',{name:'Entrega e cobertura',exact:true}).click();await page.locator('#bd-radius').waitFor();
     assert.equal(await page.locator('#bd-radius').getAttribute('max'),'55');
     assert.equal(await page.getByRole('slider').getAttribute('max'),'55');
     await page.locator('#bd-radius').fill('56');
@@ -121,6 +145,7 @@ const server=http.createServer(async(req,res)=>{
 
     await page.evaluate(()=>window.scrollTo(0,0));
     await page.screenshot({path:path.join(output,'desktop.png'),fullPage:true});
+    await page.locator('.bot-delivery-page').screenshot({path:path.join(output,'menu-estampado-aplicado.png')});
     const card=page.locator('.bd-card').filter({has:page.getByRole('heading',{name:'Horários e frete',exact:true})});
     await card.screenshot({path:path.join(output,'regras-frete-editavel.png')});
     await page.getByLabel('Valor acima da segunda faixa',{exact:true}).fill('33,00');
@@ -173,6 +198,6 @@ const server=http.createServer(async(req,res)=>{
     assert.equal(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
     await page.getByRole('button',{name:'Fechar horários',exact:true}).click();
     assert.deepEqual(errors,[]);
-    console.log('OK: raio até 55 km, faixas editáveis, valores em reais, validação, salvamento/releitura, pausa/retirada, simulação, frete alterado invalida resultado e layout móvel. Capturas: '+output);
+    console.log('OK: raio até 55 km, faixas editáveis, valores em reais, validação, salvamento/releitura, pausa/retirada, simulação, frete alterado invalida resultado e layout móvel, menu compacto e luz de retirada. Capturas: '+output);
   }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
