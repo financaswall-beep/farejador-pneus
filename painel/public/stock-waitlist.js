@@ -3,7 +3,7 @@
   const W=window.StockWaitlist;
   W.create=function(root,options){
     const s={data:null,detail:null,search:'',vehicle:'',region:'',status:'all',offset:0,filters:false,busy:false,
-      avatars:new Map(),drafts:new Map(),assets:options.assets,seq:0,active:false,selected:false,epoch:0,demandAll:false};
+      avatars:new Map(),drafts:new Map(),assets:options.assets,metal:!!options.metal,seq:0,active:false,selected:false,epoch:0,demandAll:false};
     let timer,debounce;const api=(path='',body)=>options.api(options.prefix+path,body);
     root.classList.add('stock-waitlist');if(options.mobile)root.classList.add('wl-app');
     const notice=document.createElement('div');notice.className='wl-notice';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');root.before(notice);
@@ -15,7 +15,9 @@
       const focused=root.contains(document.activeElement)?document.activeElement:null;
       const kind=focused?.hasAttribute('data-wl-search')?'search':focused?.hasAttribute('data-wl-draft')?'draft':null;
       const cursor=focused?.selectionStart;
+      const queueScroll=root.querySelector('.wl-queue-rows')?.scrollTop;
       root.innerHTML=W.render(s);
+      const queue=root.querySelector('.wl-queue-rows');if(queue&&queueScroll!=null)queue.scrollTop=queueScroll;
       if(kind){const next=root.querySelector('[data-wl-'+kind+']');next?.focus();if(cursor!=null&&next?.type!=='search')next?.setSelectionRange(cursor,cursor);}
       root.querySelectorAll('img').forEach(img=>img.onerror=()=>img.remove());
       options.onDetail?.(!!s.detail);void avatars();

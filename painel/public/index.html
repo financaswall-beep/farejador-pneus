@@ -168,10 +168,10 @@
 <link rel="stylesheet" href="/admin/painel/chat-channel-alerts.css?v=20260923-2">
 <script src="/admin/painel/chat-channel-alerts.js?v=20260923-2"></script>
 <script src="/admin/painel/app.bot.channels.js?v=20260923-1"></script>
-<script src="/admin/painel/stock-waitlist-view.js?v=20260927-1"></script>
-<script src="/admin/painel/stock-waitlist.js?v=20260927-1"></script>
-<script src="/admin/painel/app.bot.waitlist.js?v=20260927-1"></script>
-<link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20260927-1">
+<script src="/admin/painel/stock-waitlist-view.js?v=20261008-metal1"></script>
+<script src="/admin/painel/stock-waitlist.js?v=20261008-metal1"></script>
+<script src="/admin/painel/app.bot.waitlist.js?v=20261008-metal1"></script>
+<link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20261008-metal1">
 <script src="/admin/painel/app.bot.js?v=20260927-waitlist1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20261008-legibilidade3"></script>
 <script src="/admin/painel/app.relatorios.demanda.js?v=20260916-vehicle-ui1"></script>
@@ -305,7 +305,7 @@
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
 <link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-faltas-metal1" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-waitlist-metal1" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
 <link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20261008-legibilidade3" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
@@ -7035,11 +7035,11 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega', 'bot-shortage-page': botTab === 'faltas' }">
+    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega', 'bot-shortage-page': botTab === 'faltas', 'bot-waitlist-page': botTab === 'espera' }">
       <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
       <header x-show="botTab === 'espera'" class="wl-heading" x-cloak>
-        <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome vendas quando o pneu chegar e acompanhe a procura.</p></div>
-        <div class="wl-toolbar"><button @click="exportBotWaitlist()"><i data-lucide="upload"></i>Exportar</button><button @click="refreshBotWaitlist()" aria-label="Atualizar lista de espera"><i data-lucide="refresh-cw"></i></button></div>
+        <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome a conversa quando o pneu chegar.</p></div>
+        <div class="wl-toolbar"><button @click="exportBotWaitlist()"><i data-lucide="download"></i>Exportar lista</button><button @click="refreshBotWaitlist()" aria-label="Atualizar lista de espera"><i data-lucide="refresh-cw"></i></button></div>
       </header>
       <section aria-labelledby="bot-heading" x-show="!['entrega','demanda','faltas','espera'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
