@@ -305,9 +305,9 @@
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
 <link rel="stylesheet" href="/admin/painel/logistica-entregas.css?v=20260917-entregas1" />
 <link rel="stylesheet" href="/admin/painel/logistica-operacao.css?v=20260917-sidebar1" />
-<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-stamped1" />
+<link rel="stylesheet" href="/admin/painel/bot-entrega.css?v=20261008-faltas-metal1" />
 <link rel="stylesheet" href="/admin/painel/bot-demanda.css?v=20260910-3" />
-<link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20260910-1" />
+<link rel="stylesheet" href="/admin/painel/bot-faltas.css?v=20261008-metal1" />
 <link rel="stylesheet" href="/admin/painel/relatorios-compras.css?v=20260910-1">
 <link rel="stylesheet" href="/admin/painel/relatorios-demanda.css?v=20260911-demanda3">
 <link rel="stylesheet" href="/admin/painel/relatorios-faltas.css?v=20260911-faltas1">
@@ -7035,7 +7035,7 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega' }">
+    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega', 'bot-shortage-page': botTab === 'faltas' }">
       <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
       <header x-show="botTab === 'espera'" class="wl-heading" x-cloak>
         <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome vendas quando o pneu chegar e acompanhe a procura.</p></div>
@@ -7074,7 +7074,7 @@
 
       <!-- NAVEGAÇÃO INTERNA: operação, vendas, demanda e entrega -->
       <header x-show="botTab === 'faltas'" class="bf-heading" x-cloak>
-        <div><small>Bot / Relatórios</small><h1>Relatório de faltas</h1><p>Entenda o que faltou e por onde o bot procurou.</p></div>
+        <div><h1>Faltas por loja</h1><small class="bf-breadcrumb"><i data-lucide="house" aria-hidden="true"></i>Matriz / Bot</small><p>Entenda o que faltou e por onde o bot procurou.</p></div>
         <button type="button" class="bf-btn" @click="bfExport()" :disabled="bf.loading || !bf.data?.shortages || bf.exporting"><i data-lucide="download"></i><span x-text="bf.exporting?'Exportando…':'Exportar relatório'"></span></button>
       </header>
   <header x-show="botTab === 'entrega'" class="bd-heading" x-cloak>
@@ -7690,7 +7690,7 @@
 
       <!-- RELATÓRIO DE FALTAS: consultas históricas por medida e loja -->
       <section x-show="botTab === 'faltas'" class="bf-page" aria-label="Relatório de faltas" :aria-busy="bf.loading" x-cloak>
-        <div class="bf-toolbar">
+        <div class="bf-toolbar"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
           <div class="bf-segments" role="group" aria-label="Período das faltas"><button @click="bfPeriod('week')" :aria-pressed="bf.mode==='week'">Semana</button><button @click="bfPeriod('month')" :aria-pressed="bf.mode==='month'">Mês</button><button @click="bfPeriod('custom')" :aria-pressed="bf.mode==='custom'">Personalizado</button></div>
           <div class="bf-calendar" x-show="bf.mode!=='custom'"><button class="bf-btn" aria-label="Período anterior de faltas" @click="bfPeriod(bf.mode,-1)">‹</button><strong x-text="bfPeriodLabel"></strong><button class="bf-btn" aria-label="Próximo período de faltas" @click="bfPeriod(bf.mode,1)" :disabled="bf.to >= new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date())">›</button></div>
           <label class="vehicle-filter">Tipo de veículo<select x-model="bf.vehicle_type" @change="bfLoad()"><option value="all">Todos os pneus</option><option value="motorcycle">Moto</option><option value="car">Carro</option><option value="unknown">Não identificado</option></select></label><input type="search" aria-label="Buscar medida nas faltas" placeholder="Buscar medida" x-model="bf.search" @input.debounce.250ms="bfFilter()">
@@ -7700,17 +7700,17 @@
         <div x-show="bf.loading" class="bf-empty" role="status">Carregando o relatório de faltas…</div>
         <div x-show="bf.error" class="bf-error" role="alert"><span x-text="bf.error"></span><button @click="bfLoad()">Tentar novamente</button></div>
         <div x-show="!bf.loading && !bf.error && bf.data">
-          <div class="bf-summary">
-            <div><h2>RESUMO GERAL DO PERÍODO</h2><p>Uma falta por conversa, medida e loja. Repetir a busca não aumenta o total.</p></div>
-            <div><strong x-text="bf.data?.consultations??'—'"></strong><span>conversas<br>com falta</span></div>
-            <div><strong x-text="bf.data?.shortages??'—'"></strong><span>faltas<br>nas lojas</span></div>
-            <div><strong x-text="bf.data?.store_count??'—'"></strong><span>lojas<br>com falta</span></div>
-            <div><strong x-text="bf.data?.measure_count??'—'"></strong><span>medidas<br>com falta</span></div>
+          <div class="bf-summary"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <div class="bf-summary-note"><h2 class="sr-only">Resumo geral do período</h2><p>Uma falta por conversa, medida e loja. Repetir a busca não aumenta o total.</p></div>
+            <div class="bf-summary-metric"><strong x-text="bf.data?.consultations??'—'"></strong><span>Conversas com falta</span></div>
+            <div class="bf-summary-metric"><strong x-text="bf.data?.shortages??'—'"></strong><span>Faltas nas lojas</span></div>
+            <div class="bf-summary-metric"><strong x-text="bf.data?.store_count??'—'"></strong><span>Lojas com falta</span></div>
+            <div class="bf-summary-metric"><strong x-text="bf.data?.measure_count??'—'"></strong><span>Medidas com falta</span></div>
           </div>
           <p class="bf-notice" x-show="bf.data?.legacy_records"><b x-text="bf.data?.legacy_records"></b> registros de falta neste período não têm detalhamento por loja. Eles não entram nos números acima.</p>
           <div class="bf-layout">
             <div class="bf-left">
-              <article class="bf-card bf-measures"><h2>Medidas que faltaram</h2><p x-text="bf.store?'Faltas nesta loja · '+bfPeriodLabel:'Selecione uma medida para investigar.'"></p>
+              <article class="bf-card bf-measures"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span><h2><i data-lucide="circle-dot" aria-hidden="true"></i>Medidas que faltaram</h2><p x-text="bf.store?'Faltas nesta loja · '+bfPeriodLabel:'Selecione uma medida para investigar.'"></p>
                 <button class="bf-chip" x-show="bf.store" @click="bfFilter('')" aria-label="Remover filtro de loja"><span x-text="bfStoreName"></span><span>×</span></button>
                 <div class="bf-list">
                   <template x-for="(item,index) in bfMeasures" :key="item.measure"><button class="bf-row" @click="bfChooseMeasure(item.measure)" :aria-pressed="bf.measure===item.measure">
@@ -7719,39 +7719,46 @@
                   <p class="bf-empty" x-show="!bfMeasures.length" x-text="bf.search?'Nenhuma medida corresponde à busca.':'Nenhuma falta com loja identificada neste período.'"></p>
                 </div><p class="bf-foot" x-show="bfMeasures.length" x-text="bfMeasures.length+' medida(s) com falta'+(bf.store?' nesta loja.':' no período.')"></p>
               </article>
-              <article class="bf-card bf-shops"><header><div><h2>Faltas por loja</h2><p>Selecione uma loja para ver as medidas que faltaram.</p></div><button class="bf-btn" @click="bfFilter('')" :disabled="!bf.store">Todas as lojas</button></header>
+              <article class="bf-card bf-shops"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span><header><div><h2><i data-lucide="store" aria-hidden="true"></i>Faltas por loja</h2><p>Selecione uma loja para ver as medidas que faltaram.</p></div><button class="bf-btn" @click="bfFilter('')" :disabled="!bf.store">Todas as lojas</button></header>
                 <div class="bf-list"><template x-for="(store,index) in bfStores" :key="store.id"><button class="bf-row" @click="bfFilter(store.id)" :aria-pressed="bf.store===store.id">
                   <span x-text="bf.store===store.id?'✓':index+1"></span><div><b x-text="store.name"></b><div class="bf-bar"><i :style="'width:'+Math.round(store.count/(bfStores[0]?.count||1)*100)+'%'"></i></div></div><em x-text="store.count"></em><span>›</span>
                 </button></template><p class="bf-empty" x-show="!bfStores.length">As lojas aparecerão conforme as buscas registrarem faltas.</p></div>
               </article>
             </div>
-            <article class="bf-card bf-detail" :aria-busy="bf.detailLoading">
-              <small>MEDIDA SELECIONADA</small><div class="bf-detail-title"><h2 x-text="bf.measure||'Selecione uma medida'"></h2><span class="bf-badge" x-show="bf.measure" x-text="(bfMeasures.find(m=>m.measure===bf.measure)?.count||0)+' faltas registradas'"></span></div>
+            <article class="bf-card bf-detail" :aria-busy="bf.detailLoading"><span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <small class="bf-file-tab">MEDIDA SELECIONADA</small><div class="bf-detail-title"><span class="bf-tire" x-show="bf.measure" aria-hidden="true"></span><div><h2 x-text="bf.measure||'Selecione uma medida'"></h2><span class="bf-badge" x-show="bf.measure" x-text="(bfMeasures.find(m=>m.measure===bf.measure)?.count||0)+' faltas registradas'"></span></div></div>
               <div class="bf-scope" x-show="bf.store">Loja selecionada: <b x-text="bfStoreName"></b></div>
               <p class="bf-empty" x-show="bf.detailLoading" role="status">Carregando consultas…</p>
               <p x-show="bf.detailError" class="bf-error" role="alert"><span x-text="bf.detailError"></span><button @click="bfLoadDetails(bf.offset)">Tentar novamente</button></p>
               <div x-show="!bf.detailLoading && !bf.detailError && bf.selected">
-                <section><h3>Como foi a busca</h3><p><span x-text="bf.selected?.municipality||'Município não identificado'"></span> · <span x-text="bfDate(bf.selected?.occurred_at)"></span></p>
+                <section class="bf-inset bf-search-panel"><h3><i data-lucide="search" aria-hidden="true"></i>Como foi a busca</h3><p><span x-text="bf.selected?.municipality||'Município não identificado'"></span> · <span x-text="bfDate(bf.selected?.occurred_at)"></span></p>
                   <p class="bf-foot" x-show="bfScope">Filtro da busca: <span x-text="bfScope"></span></p>
                   <div class="bf-timeline"><template x-for="(store,index) in bf.selected?.stores||[]" :key="store.id"><div class="bf-step"><span x-text="index+1"></span><div><b x-text="store.name"></b><span class="bf-badge" :class="{'is-available':store.available}" x-text="store.available?'Tinha disponível':'Não tinha disponível'"></span></div></div></template></div>
                   <div class="bf-result" :class="{'is-available':bf.selected?.stores.some(s=>s.available)}"><span x-text="bfOutcome"></span><button class="bf-link" x-show="chatwootConvUrl(bf.selected?.chatwoot_id)" @click="abrirNoChatwoot(bf.selected?.chatwoot_id)">Ver conversa ↗</button></div>
                   <p class="bf-foot">Disponibilidade dos produtos consultados, respeitando os filtros da busca. Parceiros ordenados por proximidade quando há localização; estoques consultados em conjunto. Matriz ao final.</p>
                 </section>
-                <section><h3>Histórico de buscas desta medida</h3><p x-text="bf.store?'Registros que tiveram falta em '+bfStoreName+'.':'Selecione uma consulta para ver as lojas.'"></p>
+                <section class="bf-inset bf-history-panel"><h3><i data-lucide="history" aria-hidden="true"></i>Histórico de buscas desta medida</h3><p x-text="bf.store?'Registros que tiveram falta em '+bfStoreName+'.':'Selecione uma consulta para ver as lojas.'"></p>
                   <div class="bf-consultations"><template x-for="row in bf.details.slice(0,bf.showAll?20:3)" :key="row.id"><button class="bf-consultation" @click="bf.selected=row" :aria-pressed="bf.selected?.id===row.id"><span><span x-text="bfDate(row.occurred_at)"></span><small class="block" x-show="row.searches>1" x-text="row.searches+' buscas nesta conversa'"></small></span><small x-text="row.municipality||'Sem município'"></small><span>›</span></button></template></div>
                   <button class="bf-link" style="margin-top:12px" x-show="!bf.showAll && bf.total>3" @click="bf.showAll=true">Ver histórico completo →</button>
                   <div class="bf-pages" x-show="bf.showAll"><button class="bf-btn" @click="bfLoadDetails(bf.offset-20)" :disabled="bf.offset===0">Anterior</button><span x-text="(bf.offset+1)+'–'+(bf.offset+bf.details.length)+' de '+bf.total"></span><button class="bf-btn" @click="bfLoadDetails(bf.offset+20)" :disabled="bf.offset+20>=bf.total">Próximas</button></div>
                 </section>
-                <section><h3>Estoque agora</h3><div class="bf-current"><template x-for="store in bf.selected?.stores||[]" :key="store.id"><span class="bf-badge" :class="{'is-available':bf.stock.some(s=>s.store_id===store.id&&s.quantity>0)}"><span x-text="store.name"></span>: <span x-text="bfStock(store.id)"></span></span></template></div><p class="bf-foot">Saldo físico atual por medida, somando marcas e condições. Pode diferir do encontrado na consulta; não desconta reservas.</p></section>
+
               </div>
               <p class="bf-empty" x-show="!bf.selected && !bf.detailLoading && !bf.detailError">Selecione uma medida com falta para explorar as consultas registradas.</p>
             </article>
           </div>
+          <article class="bf-card bf-stock" x-show="!bf.detailLoading && !bf.detailError && bf.selected" aria-labelledby="bf-stock-heading">
+            <span class="bf-screws" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <h2 id="bf-stock-heading"><i data-lucide="package" aria-hidden="true"></i>Estoque agora</h2>
+            <p x-text="bf.measure+' · Saldo físico atual das lojas consultadas'"></p>
+            <div class="bf-current"><template x-for="store in bf.selected?.stores||[]" :key="store.id"><div class="bf-stock-item" :class="{'is-available':bf.stock.some(s=>s.store_id===store.id&&s.quantity>0)}"><span class="bf-stock-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 3-1 6a3 3 0 0 0 5 2 3 3 0 0 0 5 0 3 3 0 0 0 5 0 3 3 0 0 0 5-2l-1-6Z M3 13v8h18v-8 M9 21v-6h6v6"/></svg><span x-text="store.name"></span></span><strong x-text="bfStock(store.id)"></strong></div></template></div>
+            <p class="bf-foot">Saldo físico atual por medida, somando marcas e condições. Pode diferir do encontrado na consulta; não desconta reservas.</p>
+          </article>
           <p class="bf-foot">O detalhamento por loja é registrado nas novas buscas. <span x-show="bf.data?.tracking_since">Primeiro registro: <span x-text="bfDate(bf.data?.tracking_since)"></span>.</span> Falta significa ausência de oferta disponível na consulta, inclusive quando o estoque estava reservado.</p>
         </div>
       </section>
 
-      <!-- MAPA por município -->
+<!-- MAPA por município -->
       <section x-show="botTab === 'demanda'" class="bot-demand" aria-label="Demanda por município" :aria-busy="botLoading" x-cloak>
         <div class="bot-demand-notice" role="status" x-show="botLoading">Atualizando a procura no período…</div>
         <div class="bot-demand-notice bot-demand-error" role="alert" x-show="!botLoading && (botVisaoErro || !botDemandaDisponivel)">
