@@ -12,15 +12,15 @@ interface StockItem {
   quantity: number;
 }
 
-function aggregateItems(items: StockItem[]): Map<string, {
+function aggregateItems(items: StockItem[], preserveIdentity = false): Map<string, {
   measure: string; brand: string; tire_condition: TireCondition; quantity: number;
 }> {
   const variants = new Map<string, {
     measure: string; brand: string; tire_condition: TireCondition; quantity: number;
   }>();
   for (const item of items) {
-    const measure = item.measure.trim();
-    const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
+    const measure = preserveIdentity ? item.measure : item.measure.trim();
+    const brand = preserveIdentity ? item.brand ?? 'Sem marca' : canonicalCatalogBrand(item.brand) ?? 'Sem marca';
     const tireCondition = requireTireCondition(item.tire_condition ?? 'meia_vida');
     if (!measure) continue;
     const key = `${measure}\u0000${brand}\u0000${tireCondition}`;
@@ -44,9 +44,10 @@ export async function applyWholesaleStockDecrement(
   items: StockItem[],
   enabled: boolean,
   ref?: string,
+  preserveIdentity = false,
 ): Promise<void> {
   if (!enabled) return;
-  const variants = aggregateItems(items);
+  const variants = aggregateItems(items, preserveIdentity);
   if (variants.size === 0) return;
 
   await client.query(
@@ -91,9 +92,10 @@ export async function applyWholesaleStockReturn(
   enabled: boolean,
   ref?: string,
   source = 'cancelamento_venda',
+  preserveIdentity = false,
 ): Promise<void> {
   if (!enabled) return;
-  const variants = aggregateItems(items);
+  const variants = aggregateItems(items, preserveIdentity);
   if (variants.size === 0) return;
 
   await client.query(

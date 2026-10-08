@@ -137,6 +137,7 @@
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260915-lotsale1"></script>
+<script src="/admin/painel/app.atacado.requests.js?v=20261007-wholesale-requests1"></script>
 <script src="/admin/painel/app.vendas.lotes.js?v=20260915-lotsale1"></script>
 <script src="/admin/painel/app.compras.lotes.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.estoque.custos.js?v=20260916-vehicle-ui1"></script>
@@ -2904,6 +2905,28 @@
 
       <!-- ─── ATACADO ─── -->
       <div x-show="vendasTab === 'atacado'" class="space-y-4">
+        <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm" x-effect="if (currentPage === 'vendas' && vendasTab === 'atacado' && !partnerRequestsLoaded && !partnerRequestsLoading && !partnerRequestsError) loadPartnerRequests()">
+          <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-semibold text-lg">Pedidos dos parceiros</h3><p class="text-sm text-gray-500">Reserve na aprovação. Registre a saída quando os pneus saírem do galpão.</p></div><button @click="loadPartnerRequests()" :disabled="partnerRequestsLoading || !!partnerRequestsBusy" class="px-4 py-2 rounded-lg border border-gray-300 text-sm">Atualizar</button></div>
+          <div class="flex flex-wrap gap-2 mt-4"><template x-for="filter in [{id:'requested',text:'Novos'},{id:'approved',text:'Em separação'},{id:'dispatched',text:'Enviados'},{id:'rejected',text:'Recusados'},{id:'',text:'Todos'}]" :key="filter.id"><button @click="partnerRequestsFilter=filter.id" :class="partnerRequestsFilter===filter.id?'bg-emerald-700 text-white':'bg-gray-100 text-gray-700'" class="px-3 py-2 rounded-lg text-sm" x-text="filter.text"></button></template></div>
+          <p x-show="partnerRequestsError" class="text-sm text-rose-700 mt-3" role="alert" x-text="partnerRequestsError"></p>
+          <p x-show="partnerRequestsLoading" class="text-sm text-gray-500 mt-3">Atualizando pedidos…</p>
+          <p x-show="partnerRequestsLoaded && !partnerRequestsVisible().length" class="text-sm text-gray-500 mt-3">Nenhum pedido neste grupo.</p>
+          <div class="grid gap-3 mt-4"><template x-for="row in partnerRequestsVisible()" :key="row.id"><article class="border border-gray-200 rounded-xl p-4">
+            <div class="flex flex-wrap justify-between gap-2"><div><h4 class="font-semibold" x-text="row.partner_name"></h4><span class="text-xs text-gray-500" x-text="row.request_number"></span></div><strong class="text-emerald-800 text-sm" x-text="partnerRequestStatus(row)"></strong></div>
+            <div class="grid gap-2 mt-3"><template x-for="item in row.items" :key="item.item_id"><div class="flex justify-between gap-3 text-sm"><span x-text="item.quantity+'× '+item.measure+' · '+item.brand+' · '+catalogoConditionLabel(item.tire_condition)"></span><span x-text="formatCurrency(Number(item.unit_price_cents)/100)+' cada'"></span></div></template></div>
+            <p class="font-semibold mt-3" x-text="'Total cotado: '+formatCurrency(Number(row.total_cents)/100)"></p>
+            <p x-show="row.settled_total_cents!=null" class="font-semibold text-emerald-800 mt-2" x-text="'Total aceito: '+formatCurrency(Number(row.settled_total_cents)/100)"></p>
+            <p x-show="row.rejection_reason" class="text-sm text-gray-500 mt-2" x-text="row.rejection_reason"></p>
+            <div x-show="adminUser?.role==='owner' && ['requested','approved'].includes(row.status)" class="flex flex-wrap items-end gap-3 mt-4">
+              <button x-show="row.status==='requested'" @click="decidePartnerRequest(row,'approve')" :disabled="!!partnerRequestsBusy" class="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm font-semibold">Confirmar e separar</button>
+              <label x-show="row.status==='approved'" class="text-sm text-gray-600">Vencimento da cobrança<input type="date" x-model="row.due_date" :disabled="!!partnerRequestsBusy" class="block border border-gray-300 rounded-lg px-3 py-2 mt-1"></label>
+              <button x-show="row.status==='approved'" @click="decidePartnerRequest(row,'dispatch')" :disabled="!!partnerRequestsBusy" class="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm font-semibold">Registrar saída do galpão</button>
+              <label class="text-sm text-gray-600">Motivo da recusa<input type="text" x-model="row.reason" :disabled="!!partnerRequestsBusy" maxlength="500" class="block border border-gray-300 rounded-lg px-3 py-2 mt-1"></label>
+              <button @click="decidePartnerRequest(row,'reject')" :disabled="!!partnerRequestsBusy" class="px-4 py-2 border border-rose-300 text-rose-700 rounded-lg text-sm">Recusar / cancelar</button>
+            </div>
+            <p x-show="row.status==='dispatched'" class="text-sm text-gray-500 mt-3">O parceiro confirma as quantidades no app. A cobrança permanece no Financeiro → Contas a receber.</p>
+          </article></template></div>
+        </section>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="users-round" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Vendas no período</p><p class="text-2xl font-bold num" x-text="atacadoResumoKpis().vendas"></p><p class="text-xs text-gray-400 mt-1">borracheiros e parceiros</p></div></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">valor comercial</p></div></div>

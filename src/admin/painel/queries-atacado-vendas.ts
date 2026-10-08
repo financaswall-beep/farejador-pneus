@@ -136,9 +136,10 @@ async function insertSaleHeader(
   return result.rows[0]!.id;
 }
 
-export async function registerWholesaleSale(
+export async function registerWholesaleSaleOnClient(
+  client: PoolClient,
   input: RegisterWholesaleSaleInput,
-  dbPool: Pool = defaultPool,
+  preserveStockIdentity = false,
 ): Promise<RegisterWholesaleSaleResult> {
   const rawItems = input.items ?? [];
   assertWholesaleSaleMoney(rawItems);
@@ -154,137 +155,144 @@ export async function registerWholesaleSale(
     ),
     paid_at: normalizeSameDayFutureInstant(input.paid_at, requestNow, 'paid_at_future'),
   };
+
+  const fingerprint = operationFingerprint({
+    customer_id: input.customer_id ?? null, partner_id: input.partner_id ?? null,
+    new_customer: input.new_customer ? { name: input.new_customer.name.trim(),
+      phone: input.new_customer.phone ? normalizeBrazilianPhone(input.new_customer.phone) : null } : null,
+    sold_at: input.sold_at ?? null, paid_at: input.paid_at ?? null,
+    notes: input.notes?.trim() || null,
+    payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
+    seller_collaborator_id: input.seller_collaborator_id ?? null,
+    parent_order_id: input.parent_order_id ?? null,
+    partner_unit_id: input.partner_unit_id ?? null,
+    items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
+      tire_condition: item.tire_condition,
+      quantity: item.quantity, unit_price_cents: moneyCents(item.unit_price) })),
+  });
+  const operation = { environment, domain: 'wholesale_sale.create',
+    idempotencyKey: input.idempotency_key, fingerprint };
+  const started = await beginIntegrityOperation<RegisterWholesaleSaleResult>(client, operation);
+  if (started.replayed) {
+    return started.result;
+  }
+
+  // Origem aprovada preserva a identidade exata do saldo reservado.
+  const items = preserveStockIdentity ? rawItems : await canonicalSaleItems(client, environment, rawItems);
+  let buyer: { id: string; name: string; partner_id: string | null };
+  let requestedPartnerUnitId = input.partner_unit_id ?? null;
+  if (input.parent_order_id) {
+    const parent = await resolveAdditionBuyer(client, environment, input.parent_order_id);
+    buyer = { id: parent.id, name: parent.name, partner_id: parent.partner_id };
+    if (parent.partner_unit_id && requestedPartnerUnitId
+        && parent.partner_unit_id !== requestedPartnerUnitId) {
+      throw new Error('wholesale_addition_partner_unit_mismatch');
+    }
+    requestedPartnerUnitId = parent.partner_unit_id ?? requestedPartnerUnitId;
+  } else {
+    buyer = await resolveWholesaleBuyer(client, environment, input);
+  }
+  const partnerUnit = await resolveWholesalePartnerUnit(
+    client, environment, buyer.partner_id, requestedPartnerUnitId,
+  );
+  const orderId = await insertSaleHeader(
+    client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, writeInput,
+  );
+  const requested = new Map<string, {
+    measure: string; brand: string; tire_condition: TireCondition; quantity: number;
+  }>();
+  for (const item of items) {
+    const brand = item.brand!;
+    const tireCondition = requireTireCondition(item.tire_condition);
+    const key = `${item.measure}\u0000${brand}\u0000${tireCondition}`;
+    const current = requested.get(key) ?? {
+      measure: item.measure, brand, tire_condition: tireCondition, quantity: 0,
+    };
+    current.quantity += item.quantity;
+    requested.set(key, current);
+  }
+  const costs = new Map<string, number>();
+  const short: Array<{ measure: string; brand: string; tire_condition: TireCondition;
+    available: number; requested: number }> = [];
+  for (const [key, variant] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
+    const stock = await client.query<{ quantity_on_hand: number; quantity_reserved: number; unit_cost: string }>(
+      `SELECT quantity_on_hand,quantity_reserved,unit_cost FROM commerce.wholesale_stock
+        WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
+        FOR UPDATE`,
+      [environment, variant.measure, variant.brand, variant.tire_condition]);
+    const available = Number(stock.rows[0]?.quantity_on_hand ?? 0)
+      - Number(stock.rows[0]?.quantity_reserved ?? 0);
+    if (available < variant.quantity) short.push({
+      measure: variant.measure, brand: variant.brand,
+      tire_condition: variant.tire_condition,
+      available, requested: variant.quantity,
+    });
+    costs.set(key, Number(stock.rows[0]?.unit_cost ?? 0));
+  }
+  if (short.length) throw new Error('oversell:' + JSON.stringify(short));
+
+  for (const item of items) {
+    await client.query(
+      `INSERT INTO commerce.wholesale_order_items
+         (environment,order_id,measure,brand,tire_condition,quantity,unit_price,unit_cost)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [environment, orderId, item.measure, item.brand ?? null, item.tire_condition,
+       item.quantity, item.unit_price,
+       costs.get(`${item.measure}\u0000${item.brand}\u0000${item.tire_condition}`) ?? 0],
+    );
+  }
+  await applyWholesaleStockDecrement(client, environment, items, true, orderId, preserveStockIdentity);
+  const total = await client.query<{ total_amount: string }>(
+    `UPDATE commerce.wholesale_orders SET total_amount=COALESCE(
+       (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0),
+       dispatched_total_amount=CASE WHEN partner_unit_id IS NULL THEN NULL ELSE COALESCE(
+         (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0) END
+     WHERE id=$1 RETURNING total_amount`, [orderId]);
+  const linkedPurchase = partnerUnit
+    ? await createLinkedPartnerPurchase(client, environment, orderId, input.created_by)
+    : null;
+  if (env.MATRIZ_CENTRAL_LEDGER) {
+    if (partnerUnit) {
+      await postPartnerTransferDispatchLedger(
+        client, environment, orderId, input.created_by,
+      );
+    } else {
+      const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
+      await ensureWholesaleSaleRevenue(client, ledgerState);
+      await ensureWholesaleSaleCogs(client, ledgerState);
+    }
+  }
+  const result = { order_id: orderId, buyer_id: buyer.id, buyer_name: buyer.name,
+    total_amount: total.rows[0]!.total_amount, items_count: items.length,
+    parent_order_id: input.parent_order_id ?? null,
+    partner_unit_id: partnerUnit?.partner_unit_id ?? null,
+    linked_partner_purchase_id: linkedPurchase?.purchase_id ?? null,
+    status: partnerUnit ? 'pending' as const : 'confirmed' as const,
+    payment_status: partnerUnit || writeInput.payment_status === 'pending'
+      ? 'pending' as const : 'paid' as const,
+    partner_payment_terms: partnerUnit
+      ? (writeInput.payment_status === 'pending' ? 'credit' as const : 'cash_on_arrival' as const)
+      : null };
+  await recordIntegrityEvent(client, { environment, domain: 'wholesale_sale',
+    entityTable: 'commerce.wholesale_orders', entityId: orderId, eventType: 'created',
+    actorLabel: input.created_by, idempotencyKey: operation.idempotencyKey,
+    after: result });
+  await completeIntegrityOperation(client, operation, 'commerce.wholesale_orders', orderId, result);
+  return result;
+}
+
+export async function registerWholesaleSale(
+  input: RegisterWholesaleSaleInput, dbPool: Pool = defaultPool,
+): Promise<RegisterWholesaleSaleResult> {
+  assertWholesaleSaleMoney(input.items ?? []);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const fingerprint = operationFingerprint({
-      customer_id: input.customer_id ?? null, partner_id: input.partner_id ?? null,
-      new_customer: input.new_customer ? { name: input.new_customer.name.trim(),
-        phone: input.new_customer.phone ? normalizeBrazilianPhone(input.new_customer.phone) : null } : null,
-      sold_at: input.sold_at ?? null, paid_at: input.paid_at ?? null,
-      notes: input.notes?.trim() || null,
-      payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
-      seller_collaborator_id: input.seller_collaborator_id ?? null,
-      parent_order_id: input.parent_order_id ?? null,
-      partner_unit_id: input.partner_unit_id ?? null,
-      items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
-        tire_condition: item.tire_condition,
-        quantity: item.quantity, unit_price_cents: moneyCents(item.unit_price) })),
-    });
-    const operation = { environment, domain: 'wholesale_sale.create',
-      idempotencyKey: input.idempotency_key, fingerprint };
-    const started = await beginIntegrityOperation<RegisterWholesaleSaleResult>(client, operation);
-    if (started.replayed) {
-      await client.query('COMMIT');
-      return started.result;
-    }
-
-    const items = await canonicalSaleItems(client, environment, rawItems);
-    let buyer: { id: string; name: string; partner_id: string | null };
-    let requestedPartnerUnitId = input.partner_unit_id ?? null;
-    if (input.parent_order_id) {
-      const parent = await resolveAdditionBuyer(client, environment, input.parent_order_id);
-      buyer = { id: parent.id, name: parent.name, partner_id: parent.partner_id };
-      if (parent.partner_unit_id && requestedPartnerUnitId
-          && parent.partner_unit_id !== requestedPartnerUnitId) {
-        throw new Error('wholesale_addition_partner_unit_mismatch');
-      }
-      requestedPartnerUnitId = parent.partner_unit_id ?? requestedPartnerUnitId;
-    } else {
-      buyer = await resolveWholesaleBuyer(client, environment, input);
-    }
-    const partnerUnit = await resolveWholesalePartnerUnit(
-      client, environment, buyer.partner_id, requestedPartnerUnitId,
-    );
-    const orderId = await insertSaleHeader(
-      client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, writeInput,
-    );
-    const requested = new Map<string, {
-      measure: string; brand: string; tire_condition: TireCondition; quantity: number;
-    }>();
-    for (const item of items) {
-      const brand = item.brand!;
-      const tireCondition = requireTireCondition(item.tire_condition);
-      const key = `${item.measure}\u0000${brand}\u0000${tireCondition}`;
-      const current = requested.get(key) ?? {
-        measure: item.measure, brand, tire_condition: tireCondition, quantity: 0,
-      };
-      current.quantity += item.quantity;
-      requested.set(key, current);
-    }
-    const costs = new Map<string, number>();
-    const short: Array<{ measure: string; brand: string; tire_condition: TireCondition;
-      available: number; requested: number }> = [];
-    for (const [key, variant] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
-      const stock = await client.query<{ quantity_on_hand: number; quantity_reserved: number; unit_cost: string }>(
-        `SELECT quantity_on_hand,quantity_reserved,unit_cost FROM commerce.wholesale_stock
-          WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
-          FOR UPDATE`,
-        [environment, variant.measure, variant.brand, variant.tire_condition]);
-      const available = Number(stock.rows[0]?.quantity_on_hand ?? 0)
-        - Number(stock.rows[0]?.quantity_reserved ?? 0);
-      if (available < variant.quantity) short.push({
-        measure: variant.measure, brand: variant.brand,
-        tire_condition: variant.tire_condition,
-        available, requested: variant.quantity,
-      });
-      costs.set(key, Number(stock.rows[0]?.unit_cost ?? 0));
-    }
-    if (short.length) throw new Error('oversell:' + JSON.stringify(short));
-
-    for (const item of items) {
-      await client.query(
-        `INSERT INTO commerce.wholesale_order_items
-           (environment,order_id,measure,brand,tire_condition,quantity,unit_price,unit_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [environment, orderId, item.measure, item.brand ?? null, item.tire_condition,
-         item.quantity, item.unit_price,
-         costs.get(`${item.measure}\u0000${item.brand}\u0000${item.tire_condition}`) ?? 0],
-      );
-    }
-    await applyWholesaleStockDecrement(client, environment, items, true, orderId);
-    const total = await client.query<{ total_amount: string }>(
-      `UPDATE commerce.wholesale_orders SET total_amount=COALESCE(
-         (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0),
-         dispatched_total_amount=CASE WHEN partner_unit_id IS NULL THEN NULL ELSE COALESCE(
-           (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0) END
-       WHERE id=$1 RETURNING total_amount`, [orderId]);
-    const linkedPurchase = partnerUnit
-      ? await createLinkedPartnerPurchase(client, environment, orderId, input.created_by)
-      : null;
-    if (env.MATRIZ_CENTRAL_LEDGER) {
-      if (partnerUnit) {
-        await postPartnerTransferDispatchLedger(
-          client, environment, orderId, input.created_by,
-        );
-      } else {
-        const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
-        await ensureWholesaleSaleRevenue(client, ledgerState);
-        await ensureWholesaleSaleCogs(client, ledgerState);
-      }
-    }
-    const result = { order_id: orderId, buyer_id: buyer.id, buyer_name: buyer.name,
-      total_amount: total.rows[0]!.total_amount, items_count: items.length,
-      parent_order_id: input.parent_order_id ?? null,
-      partner_unit_id: partnerUnit?.partner_unit_id ?? null,
-      linked_partner_purchase_id: linkedPurchase?.purchase_id ?? null,
-      status: partnerUnit ? 'pending' as const : 'confirmed' as const,
-      payment_status: partnerUnit || writeInput.payment_status === 'pending'
-        ? 'pending' as const : 'paid' as const,
-      partner_payment_terms: partnerUnit
-        ? (writeInput.payment_status === 'pending' ? 'credit' as const : 'cash_on_arrival' as const)
-        : null };
-    await recordIntegrityEvent(client, { environment, domain: 'wholesale_sale',
-      entityTable: 'commerce.wholesale_orders', entityId: orderId, eventType: 'created',
-      actorLabel: input.created_by, idempotencyKey: operation.idempotencyKey,
-      after: result });
-    await completeIntegrityOperation(client, operation, 'commerce.wholesale_orders', orderId, result);
+    const result = await registerWholesaleSaleOnClient(client, input);
     await client.query('COMMIT');
     return result;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
 }

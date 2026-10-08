@@ -51,6 +51,7 @@ export class TestNode {
     const tags = selector.split(',');
     return this.children.flatMap(child => [...(tags.some(tag => tag.startsWith('.') ? child.classList.contains(tag.slice(1)) : tag === child.tagName) ? [child] : []), ...child.querySelectorAll(selector)]);
   }
+  querySelector(selector: string): TestNode | null { return this.querySelectorAll(selector)[0] ?? null; }
   classList = {
     add: (...names: string[]) => { this.className = [...new Set(this.className.split(' ').concat(names))].join(' ').trim(); },
     remove: (...names: string[]) => { this.className = this.className.split(' ').filter(name => !names.includes(name)).join(' '); },
@@ -95,7 +96,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-buy-ui', 'partner-buy', 'partner-replenishment', 'partner-home']) {
+  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-buy-ui', 'partner-buy-orders', 'partner-buy', 'partner-replenishment', 'partner-home']) {
     if (file === 'partner-photo') {
       runInNewContext(readFileSync('painel/public/caixa-partner-photo-ui.js', 'utf8'), context);
       runInNewContext(readFileSync('painel/public/caixa-partner-photo-upload.js', 'utf8'), context);

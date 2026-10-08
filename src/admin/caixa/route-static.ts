@@ -59,6 +59,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-alert-sound.js', 'caixa-alert-sound.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-photo-upload.js', 'caixa-partner-photo-upload.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-buy.css', 'caixa-partner-buy.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-partner-buy-orders.js', 'caixa-partner-buy-orders.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-partner-idle.css', 'caixa-partner-idle.css', 'text/css; charset=utf-8');
   text('/operacao/assets/partner-idle-emblem-v1.webp', 'assets/partner-idle-emblem-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/assets/partner-idle-background-v1.webp', 'assets/partner-idle-background-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');

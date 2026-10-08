@@ -152,3 +152,10 @@
   .is-partner-home .ps-buy-item--demand .ps-buy-demand { font-size: 18px; }
   .is-partner-home .ps-buy-item--demand .ps-buy-demand + p { font-size: 15px; }
 }
+.ps-buy-orders{display:grid;gap:12px;margin-top:20px}
+.ps-buy-order{padding:16px;border:1px solid #f3f5f3;border-radius:12px;background:linear-gradient(120deg,#d2d6d5,#f5f6f4 48%,#b6bdbc);box-shadow:0 3px 6px #0004,inset 0 1px 1px #fff;color:#101514}
+.ps-buy-order h4{font-size:22px;margin:0 0 6px}.ps-buy-order-status{color:#07553d}
+.ps-buy-order-item{display:grid;gap:4px;padding:12px 0;border-bottom:1px solid #707a7a55}
+.ps-buy-order-item b{font-size:24px}.ps-buy-order-item label{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px}
+.ps-buy-order-item input{width:76px;min-height:44px;border:1px solid #879690;border-radius:6px;background:#f8faf8;text-align:center;font-size:22px}
+.ps-buy-order-total{font-size:22px;font-weight:700}

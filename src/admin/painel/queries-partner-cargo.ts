@@ -83,7 +83,7 @@ export async function returnPartnerCargoToMatrix(
     await applyWholesaleStockReturn(client, environment, [{
       measure: row.measure, brand: row.brand,
       tire_condition: row.tire_condition, quantity,
-    }], true, row.id, 'retorno_carga_parceiro');
+    }], true, row.id, 'retorno_carga_parceiro', true);
     await client.query(
       `UPDATE commerce.matrix_partner_cargo_lots
           SET quantity_available=0,status='returned'

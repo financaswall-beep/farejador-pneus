@@ -146,6 +146,7 @@
     if (state.sent) {
       notice.appendChild(V.intro('Pedido enviado', 'A 2W vai confirmar seu pedido.', 'check'));
       if (state.sent.request_number) notice.appendChild(message(state.sent.request_number));
+      page.appendChild(V.control('ACOMPANHAR PEDIDO', () => C.partnerBuyOrders.open(), 'primary'));
       page.appendChild(V.control('Continuar comprando', () => C.partnerHome.open(origin), 'continue')); return;
     }
     if (!state.cart.size) {
@@ -183,7 +184,7 @@
       state.sent = result; state.cart.clear(); key = ''; C.showToast('Pedido enviado para a 2W.');
     } catch (error) {
       if (version !== generation || session !== C.sessionFingerprint()) return;
-      state.error = ({ stock_changed: 'O estoque mudou. Atualize e confira as quantidades.', price_changed: 'O preço mudou. Atualize e confira o novo total.', idempotency_conflict: 'Esse envio já mudou. Atualize antes de tentar novamente.' })[error?.message] || 'Não consegui enviar. Seu carrinho foi mantido. Tente novamente.';
+      state.error = ({ offer_changed: 'A oferta mudou. Atualize o galpão e confira o carrinho.', stock_changed: 'O estoque mudou. Atualize e confira as quantidades.', price_changed: 'O preço mudou. Atualize e confira o novo total.', idempotency_conflict: 'Esse envio já mudou. Atualize antes de tentar novamente.' })[error?.message] || 'Não consegui enviar. Seu carrinho foi mantido. Tente novamente.';
     } finally {
       if (version === generation && session === C.sessionFingerprint()) { state.sending = false; render(currentMode()); }
     }
@@ -192,10 +193,16 @@
     if (!allowed() || !mode) return;
     checkAccount(); if (!page || mountedMode !== mode || U.root.dataset.view !== 'buy-' + mode) setup(mode);
     draw(mode);
+    if (mode === 'catalog' && C.partnerBuyOrders) {
+      let orders=page.querySelector('.ps-buy-orders');
+      if (!orders) { orders=U.node('section',null,'ps-buy-orders');page.children[0].after(orders); }
+      C.partnerBuyOrders.render(orders);
+    }
   }
   function reset() {
+    C.partnerBuyOrders?.reset();
     ++generation; account = ''; page = list = notice = null; key = ''; mountedMode = ''; origin = 'partner-buy';
     Object.assign(state, { rows: [], loaded: false, loading: false, error: '', query: '', vehicle: 'motorcycle', sending: false, sent: null, checkoutEnabled: false }); state.cart.clear();
   }
-  C.partnerBuy = { load, render, reset, state, count, busy: () => state.sending };
+  C.partnerBuy = { load, render, reset, state, count, busy: () => state.sending || !!C.partnerBuyOrders?.busy() };
 }());

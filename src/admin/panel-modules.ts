@@ -71,6 +71,7 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   if (/^\/admin\/api\/wholesale\/measures(\/|$)/.test(path)) return ['vendas', 'compras', 'estoque', 'catalogo'];
   if (/^\/admin\/api\/wholesale\/(buyers|ranking|resumo)(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/wholesale\/cargo(\/|$)/.test(path)) return ['logistica'];
+  if (/^\/admin\/api\/wholesale\/partner-requests(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/varejo\/resumo(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/sales\/(brands|history-data)(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/(partner-applications|partner-units)(\/|$)/.test(path)) return ['rede'];

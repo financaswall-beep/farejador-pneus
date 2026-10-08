@@ -11,10 +11,12 @@ import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
 import { registerSalesReportRoutes } from './route-sales-report.js';
 import { registerLotSaleRoutes } from './route-lot-sales.js';
+import { registerWholesaleRequestRoutes } from './route-partner-wholesale-requests.js';
 
 export async function registerPainelAtacado(fastify: FastifyInstance): Promise<void> {
   await registerSalesReportRoutes(fastify);
   await registerLotSaleRoutes(fastify);
+  registerWholesaleRequestRoutes(fastify);
   const reconcilePartnerCostSchema = z.object({
     item_id: z.string().uuid(),
     unit_cost: z.number().nonnegative(),
