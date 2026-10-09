@@ -2,7 +2,7 @@
   'use strict';
   const C = window.Caixa;
   const U = C.partnerUI;
-  const state = { rows: [], loaded: false, loading: false, saving: false, query: '', error: '', undo: null, lastLoad: 0 };
+  const state = { rows: [], prices: new Map(), priceError: false, loaded: false, loading: false, saving: false, query: '', error: '', undo: null, lastLoad: 0 };
   let generation = 0;
   let page = null;
   let list = null;
@@ -35,6 +35,25 @@
     });
     return area;
   }
+  function price(row) {
+    const area = U.node('div', null, 'ps-stock-price-row');
+    const copy = U.node('div', null, 'ps-stock-price-copy');
+    const amount = state.prices.get(row.stock_id);
+    copy.append(U.node('span', 'Preço de venda'), U.node('strong', state.priceError ? 'Preço indisponível'
+      : amount == null ? 'Não definido' : C.currency.format(amount)));
+    area.appendChild(copy);
+    if (C.stored(C.keys.role) === 'owner') {
+      const edit = U.button('Editar preço', () => {
+        if (!allowed() || state.loading || state.saving || state.priceError || !state.loaded) return;
+        C.openStockPrice({ ...row, sale_price: amount ?? null });
+      }, 'secondary');
+      edit.classList.add('ps-stock-price-edit');
+      edit.disabled = state.loading || state.saving || state.priceError || !state.loaded || !C.openStockPrice;
+      const pencil = C.createSvg([{ d: 'm15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 5Z' }]);
+      pencil.setAttribute('aria-hidden', 'true'); edit.prepend(pencil); area.appendChild(edit);
+    }
+    return area;
+  }
   function card(row) {
     const el = U.node('article', null, 'ps-stock-card'); screw(el);
     const heading = U.node('div', null, 'ps-stock-card-head');
@@ -54,7 +73,7 @@
       icon.setAttribute('aria-hidden', 'true'); lock.append(icon, U.node('span', reserved + (reserved === 1 ? ' separado' : ' separados')));
       availability.appendChild(lock);
     }
-    bottom.append(availability, controls(row)); el.append(heading, bottom); return el;
+    bottom.append(availability, controls(row)); el.append(heading, price(row), bottom); return el;
   }
   function draw() {
     if (!list) return;
@@ -65,6 +84,10 @@
     if (state.error) {
       const error = U.node('p', state.error, 'ps-error'); error.setAttribute('role', 'alert'); notice.appendChild(error);
       notice.appendChild(U.button('ATUALIZAR LISTA', () => load()));
+    }
+    if (state.priceError && state.loaded && !state.error) {
+      notice.appendChild(U.node('p', 'Não consegui consultar os preços.', 'ps-error'));
+      notice.appendChild(U.button('ATUALIZAR PREÇOS', () => load()));
     }
     if (state.undo && !state.error) {
       notice.appendChild(U.node('span', 'Saldo atualizado.'));
@@ -81,9 +104,16 @@
     const session = C.sessionFingerprint(); const version = generation;
     state.loading = true; state.error = ''; draw();
     try {
-      const payload = await C.partnerData.api('operacao/estoque');
+      const [stock, prices] = await Promise.allSettled([
+        C.partnerData.api('operacao/estoque'), C.partnerData.api('operacao/estoque-valores'),
+      ]);
       if (!current(session, version)) return;
-      state.rows = payload.rows || []; state.loaded = true; state.lastLoad = Date.now();
+      if (stock.status === 'rejected') throw stock.reason;
+      state.rows = stock.value.rows || [];
+      state.priceError = prices.status === 'rejected';
+      state.prices = new Map(prices.status === 'fulfilled'
+        ? (prices.value.rows || []).map(row => [row.stock_id, row.sale_price]) : []);
+      state.loaded = true; state.lastLoad = Date.now();
     } catch (error) {
       if (!current(session, version)) return;
       state.loaded = false; state.error = 'Não consegui atualizar o estoque.';
@@ -142,8 +172,9 @@
   }
   function reset() {
     ++generation; page = list = notice = add = null;
-    Object.assign(state, { rows: [], loaded: false, loading: false, saving: false, query: '', error: '', undo: null, lastLoad: 0 });
+    Object.assign(state, { rows: [], prices: new Map(), priceError: false, loaded: false, loading: false, saving: false, query: '', error: '', undo: null, lastLoad: 0 });
     C.partnerStockForm?.reset();
+    C.resetStockPrice?.();
   }
-  C.partnerStock = { load, render, reset, busy: () => state.saving || C.partnerStockForm.busy() };
+  C.partnerStock = { load, render, reset, busy: () => state.saving || C.partnerStockForm.busy() || Boolean(C.stockPriceBusy?.()) };
 }());

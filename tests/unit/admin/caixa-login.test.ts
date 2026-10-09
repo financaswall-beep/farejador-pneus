@@ -35,6 +35,7 @@ const scriptFiles = [
   'caixa-team-commission.js',
   'caixa-team-permissions.js',
   'caixa-profile.js',
+  'caixa-alert-sound.js',
   'caixa-photo.js',
   'caixa.js',
 ];

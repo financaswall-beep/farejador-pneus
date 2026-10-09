@@ -208,7 +208,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(matrixRoute).toContain('requireOwner');
     expect(matrixBackend).toContain('setCatalogPrice');
     expect(matrixBackend).not.toMatch(/UPDATE\s+commerce\.wholesale_stock/);
-    expect(partnerPriceRoute).toContain("preHandler: [requirePartnerAuth, requireScreen('estoque')]");
+    expect(partnerPriceRoute).toContain("preHandler: [requirePartnerAuth, requireOwner, requireScreen('estoque')]");
     expect(partnerPriceBackend).toContain("'partner_stock_sale_price_changed'");
     expect(partnerPriceBackend).not.toMatch(/quantity_on_hand\s*=/);
     expect(partnerPriceBackend).not.toMatch(/average_cost\s*=/);

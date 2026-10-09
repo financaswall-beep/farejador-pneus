@@ -32,6 +32,16 @@
 .is-partner-home .ps-stock-copy { min-width: 0; }
 .is-partner-home .ps-stock-copy h4 { margin: 0; font-family: 'Partner Condensed',Arial,sans-serif; font-size: clamp(31px,10.6vw,51px); font-weight: 900; line-height: 1.03; letter-spacing: -.03em; overflow-wrap: anywhere; }
 .is-partner-home .ps-stock-copy p { margin: 3px 0 0; font-family: 'Partner Condensed',Arial,sans-serif; font-size: 20px; line-height: 1.1; overflow-wrap: anywhere; }
+.is-partner-home .ps-stock-price-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 12px; }
+.is-partner-home .ps-stock-price-copy { min-width: 0; font-family: 'Partner Condensed',Arial,sans-serif; }
+.is-partner-home .ps-stock-price-copy span { display: block; color: #3d4b43; font-size: 16px; line-height: 1.2; }
+.is-partner-home .ps-stock-price-copy strong { display: block; color: #0b3825; font-size: 27px; line-height: 1.15; overflow-wrap: anywhere; }
+.is-partner-home .ps-stock .ps-stock-price-edit { flex: 0 0 auto; width: auto; min-height: 44px; margin: 0; padding: 7px 10px; gap: 6px; border: 1px solid #87958d; border-radius: 7px; color: #123d2b; background-image: linear-gradient(180deg,#ffffffa3,#ffffff24 48%,#52685b18),var(--ph-metal); background-size: 100% 100%,540px 540px; box-shadow: inset 0 1px 0 #fff,inset 0 -1px 1px #4c615840,0 2px 3px #263d302e; font: 800 18px/1.2 'Partner Condensed',Arial,sans-serif; text-shadow: 0 1px 0 #fff; }
+.is-partner-home .ps-stock-price-edit > svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.is-partner-home .ps-stock-price-edit > span::before,.is-partner-home .ps-stock-price-edit > span::after { display: none; }
+.is-partner-home .ps-stock-price-edit:disabled { opacity: .45; cursor: default; }
+.is-partner-home .ps-stock-price-edit:focus-visible { outline: 2px solid #00652e; outline-offset: 3px; }
+.is-partner-home .ps-stock-price-edit:active { transform: translateY(1px); }
 .is-partner-home .ps-stock-total { display: flex; flex-direction: column; align-items: center; min-width: 0; padding-left: 12px; border-left: 1px solid #899491; box-shadow: -1px 0 #ffffff99; font-family: 'Partner Condensed',Arial,sans-serif; }
 .is-partner-home .ps-stock-total span { font-size: 14px; font-weight: 700; line-height: 1.1; }
 .is-partner-home .ps-stock-total strong { max-width: 100%; color: #262d2a; font-size: 54px; line-height: 1.02; font-weight: 900; overflow-wrap: anywhere; text-shadow: 0 -1px 1px #0006,0 1px 0 #ffffffe0; }
