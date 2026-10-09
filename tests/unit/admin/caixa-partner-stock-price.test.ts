@@ -41,7 +41,7 @@ describe('editar o preço de venda em Meus pneus', () => {
     expect(view.node('stock-price-product').textContent).toContain('Pirelli');
     expect(view.node('stock-price-product').textContent).toContain('90/90-18');
     expect(view.node('stock-price-value').value).toBe('89,00');
-    expect(view.node('stock-price-submit').textContent).toBe('Salvar preço de venda');
+    expect(view.node('stock-price-submit').textContent).toBe('Salvar preço');
   });
 
   it('salva somente preço e motivo, recarrega a lista e preserva saldo e reservas', async () => {

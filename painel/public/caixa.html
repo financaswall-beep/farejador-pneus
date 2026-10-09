@@ -30,7 +30,8 @@
   <script defer src="/operacao/caixa-sales-view.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-stock-price.js?v=20261009-partner-price1"></script>
+  <script defer src="/operacao/caixa-stock-price.js?v=20261009-price-metal1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-stock-price.css?v=20261009-price-metal1" />
   <script defer src="/operacao/caixa-catalog.js?v=20260918-catalog3"></script>
   <script defer src="/operacao/caixa-catalog-view.js?v=20260918-catalog2"></script>
   <script defer src="/operacao/catalog-create-utils.js?v=20260918-catalog3"></script>
@@ -1684,22 +1685,38 @@
       <div id="stock-price-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-price-title">
         <button class="account-modal-backdrop" type="button" data-close-stock-price aria-label="Fechar alteração de preço"></button>
         <article class="account-modal-sheet stock-modal-sheet stock-price-sheet">
+          <i class="stock-price-screw stock-price-screw--tl" aria-hidden="true"></i>
+          <i class="stock-price-screw stock-price-screw--tr" aria-hidden="true"></i>
+          <i class="stock-price-screw stock-price-screw--bl" aria-hidden="true"></i>
+          <i class="stock-price-screw stock-price-screw--br" aria-hidden="true"></i>
           <header>
             <div><p id="stock-price-unit">Preço oficial</p><h2 id="stock-price-title">Alterar preço de venda</h2></div>
             <button type="button" data-close-stock-price aria-label="Fechar">×</button>
           </header>
           <form id="stock-price-form" novalidate>
-            <div class="stock-form-notice">
-              <strong id="stock-price-product">Produto selecionado</strong>
-              <span>Somente o proprietário pode mudar este valor. O novo preço será usado pelo caixa apenas nas próximas vendas; vendas antigas não mudam.</span>
+            <div class="stock-form-notice stock-price-product-card">
+              <div id="stock-price-illustration" class="stock-price-model-only stock-price-illustration" aria-hidden="true">
+                <img src="/operacao/assets/partner-replenishment-tire-v1.webp" alt="" width="74" height="88" />
+              </div>
+              <div class="stock-price-product-copy">
+                <strong id="stock-price-product">Produto selecionado</strong>
+                <strong id="stock-price-size" class="stock-price-model-only"></strong>
+                <span id="stock-price-meta" class="stock-price-model-only"></span>
+                <span class="stock-price-legacy-note">Somente o proprietário pode mudar este valor. O novo preço será usado pelo caixa apenas nas próximas vendas; vendas antigas não mudam.</span>
+              </div>
             </div>
             <label>Preço atual<div id="stock-price-current" class="stock-price-current">Não definido</div></label>
             <label>Novo preço de venda
               <span class="stock-price-input"><b>R$</b><input id="stock-price-value" type="text" inputmode="decimal" maxlength="18" autocomplete="off" placeholder="0,00" required /></span>
             </label>
             <label>Motivo da alteração<textarea id="stock-price-reason" maxlength="500" rows="3" placeholder="Ex.: ajuste da tabela comercial" required></textarea></label>
+            <div class="stock-price-model-only stock-price-info">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg>
+              <p><strong>Vale para novas vendas.</strong><span>Alteração registrada no histórico.</span></p>
+            </div>
             <p id="stock-price-error" class="account-modal-error" role="alert"></p>
             <button id="stock-price-submit" class="account-modal-primary" type="submit">Salvar novo preço oficial</button>
+            <button class="stock-price-model-only stock-price-cancel" type="button" data-close-stock-price>Cancelar</button>
           </form>
         </article>
       </div>

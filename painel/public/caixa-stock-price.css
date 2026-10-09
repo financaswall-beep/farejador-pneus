@@ -1,0 +1,104 @@
+/* Editor de preço do parceiro: os controles e o salvamento são compartilhados com a Matriz. */
+#stock-price-modal .stock-price-model-only,
+#stock-price-modal .stock-price-screw { display: none; }
+#stock-price-modal .stock-price-legacy-note { display: block; }
+#stock-price-modal.stock-price-metal {
+  --sp-steel: url('/operacao/assets/partner-steel-v3.webp');
+  --sp-type: 'Partner Condensed',Arial,sans-serif;
+  --sp-inset: inset 0 2px 3px #263b363b,inset 1px 0 1px #52615b26,0 1px 0 #fffffff0;
+}
+#stock-price-modal.stock-price-metal .account-modal-backdrop { background: #14211fc2; backdrop-filter: blur(4px); }
+#stock-price-modal.stock-price-metal .stock-price-sheet {
+  width: min(calc(100% - 12px),452px); max-height: calc(100svh - 18px); max-height: calc(100dvh - 18px);
+  margin: 0 0 max(6px,env(safe-area-inset-bottom)); border: 1px solid #737f7b; border-radius: 17px;
+  color: #0b1510; font-family: var(--sp-type); scrollbar-width: thin; scrollbar-color: #718077 #c8cecb;
+  background-image: linear-gradient(105deg,#ffffffe0,#ffffff52 32%,#70807812 65%,#ffffff80),var(--sp-steel);
+  background-size: 100% 100%,540px 540px;
+  box-shadow: inset 0 0 0 2px #e9eeea,inset 0 0 0 3px #7e8c875e,inset 0 5px 7px #ffffff88,0 -4px 7px #14201c47,0 -15px 48px #101b185e;
+}
+#stock-price-modal.stock-price-metal .stock-price-screw {
+  display: block; position: absolute; z-index: 3; width: 12px; height: 12px;
+  background: url('/operacao/assets/partner-screw.svg') center/contain no-repeat;
+  filter: drop-shadow(0 1px 1px #0008); pointer-events: none;
+}
+#stock-price-modal.stock-price-metal .stock-price-screw--tl { top: 8px; left: 8px; }
+#stock-price-modal.stock-price-metal .stock-price-screw--tr { top: 8px; right: 8px; transform: rotate(23deg); }
+#stock-price-modal.stock-price-metal .stock-price-screw--bl { bottom: 8px; left: 8px; transform: rotate(-17deg); }
+#stock-price-modal.stock-price-metal .stock-price-screw--br { bottom: 8px; right: 8px; }
+#stock-price-modal.stock-price-metal .stock-price-sheet > header { position: relative; isolation: isolate; gap: 10px; padding: 24px 22px 10px; border: 0; }
+#stock-price-modal.stock-price-metal .stock-price-sheet > header::before {
+  content: ''; position: absolute; z-index: -1; inset: 0 0 -70px auto; width: 155px;
+  background: url('/operacao/assets/partner-buy-tread-v1.svg') right top/155px 248px no-repeat;
+  filter: drop-shadow(0 1px 0 #fff); pointer-events: none;
+}
+#stock-price-modal.stock-price-metal .stock-price-sheet > header > div { min-width: 0; }
+#stock-price-modal.stock-price-metal .stock-price-sheet > header p { color: #143d2a; font: 800 13px/1.15 var(--sp-type); letter-spacing: .045em; overflow-wrap: anywhere; text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal .stock-price-sheet > header h2 { color: #080e0b; font: 900 clamp(25px,7.3vw,30px)/1.05 var(--sp-type); letter-spacing: -.02em; text-shadow: 0 1px 0 #ffffffde; }
+#stock-price-modal.stock-price-metal .stock-price-sheet > header button {
+  flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid #77857f; color: #102f22;
+  background-image: linear-gradient(140deg,#ffffffe0,#ffffff20 50%,#4c5e5426),var(--sp-steel); background-size: 100% 100%,320px 320px;
+  box-shadow: inset 0 0 0 2px #e7ece9,inset 0 -1px 2px #39473e55,0 2px 3px #18251e55; font: 400 33px/1 Arial,sans-serif;
+}
+#stock-price-modal.stock-price-metal .stock-price-sheet form { gap: 12px; padding: 6px 18px 23px; }
+#stock-price-modal.stock-price-metal .stock-price-product-card {
+  position: relative; display: flex; align-items: center; gap: 13px; min-height: 91px; padding: 8px 12px;
+  border: 1px solid #929e98; border-radius: 9px; color: #0c1510;
+  background-image: linear-gradient(105deg,#ffffff75,#ffffff24 65%,#63746a12),var(--sp-steel); background-size: 100% 100%,540px 540px;
+  box-shadow: var(--sp-inset),inset 0 0 0 1px #ffffff75;
+}
+#stock-price-modal.stock-price-metal .stock-price-product-card::before,
+#stock-price-modal.stock-price-metal .stock-price-product-card::after { content: ''; position: absolute; top: 5px; width: 9px; height: 9px; background: url('/operacao/assets/partner-screw.svg') center/contain no-repeat; filter: drop-shadow(0 1px 1px #0005); pointer-events: none; }
+#stock-price-modal.stock-price-metal .stock-price-product-card::before { left: 5px; }
+#stock-price-modal.stock-price-metal .stock-price-product-card::after { right: 5px; }
+#stock-price-modal.stock-price-metal .stock-price-illustration { display: grid; align-items: end; flex: 0 0 66px; height: 75px; overflow: hidden; border-right: 1px solid #9ca69d; box-shadow: 1px 0 0 #ffffffe0; }
+#stock-price-modal.stock-price-metal .stock-price-illustration[hidden] { display: none; }
+#stock-price-modal.stock-price-metal .stock-price-illustration img { display: block; width: 62px; height: 91px; object-fit: contain; object-position: center top; filter: drop-shadow(1px 2px 2px #10231947); }
+#stock-price-modal.stock-price-metal .stock-price-product-copy { min-width: 0; }
+#stock-price-modal.stock-price-metal #stock-price-product,
+#stock-price-modal.stock-price-metal .stock-price-legacy-note { display: none; }
+#stock-price-modal.stock-price-metal #stock-price-size { display: block; color: #080e0b; font: 900 clamp(32px,10vw,42px)/1.02 var(--sp-type); letter-spacing: -.025em; overflow-wrap: anywhere; text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal #stock-price-meta { display: block; margin-top: 4px; color: #111c15; font: 400 21px/1.1 var(--sp-type); overflow-wrap: anywhere; }
+#stock-price-modal.stock-price-metal .stock-price-sheet form label { gap: 6px; color: #112a1c; font: 800 21px/1.08 var(--sp-type); text-shadow: 0 1px 0 #ffffffe0; }
+#stock-price-modal.stock-price-metal .stock-price-current,
+#stock-price-modal.stock-price-metal .stock-price-input,
+#stock-price-modal.stock-price-metal .stock-price-sheet textarea {
+  border: 1px solid #86958b; border-radius: 8px; color: #0f3221;
+  background-image: linear-gradient(180deg,#455a4924,#ffffff18 37%,#ffffff73),var(--sp-steel); background-size: 100% 100%,540px 540px;
+  box-shadow: var(--sp-inset);
+}
+#stock-price-modal.stock-price-metal .stock-price-current { min-height: 44px; padding: 5px 12px; font: 900 30px/1.1 var(--sp-type); overflow-wrap: anywhere; text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal .stock-price-input { min-width: 0; border-color: #2c5e40; box-shadow: var(--sp-inset),inset 0 0 0 1px #f4fffacc,0 0 0 1px #42634e80; }
+#stock-price-modal.stock-price-metal .stock-price-input b { padding: 0 13px; border-right-color: #a1b2a4; color: #153d29; font: 900 30px/1 var(--sp-type); text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal .stock-price-input input { height: 64px; padding: 0 12px; border-radius: 0; color: #0c3e27; background: none; font-family: var(--sp-type); font-size: clamp(34px,11vw,46px) !important; font-weight: 900; letter-spacing: -.02em; text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal .stock-price-input:focus-within { outline: 2px solid #176340; outline-offset: 2px; box-shadow: var(--sp-inset),inset 0 0 0 1px #f4fffacc; }
+#stock-price-modal.stock-price-metal .stock-price-sheet textarea { min-height: 77px; padding: 10px 12px; color: #132d20; font: 400 20px/1.2 var(--sp-type); text-shadow: 0 1px 0 #ffffff94; }
+#stock-price-modal.stock-price-metal .stock-price-sheet textarea::placeholder { color: #4b5c50; opacity: 1; }
+#stock-price-modal.stock-price-metal .stock-price-sheet textarea:focus { outline: 2px solid #176340; outline-offset: 2px; box-shadow: var(--sp-inset); }
+#stock-price-modal.stock-price-metal .stock-price-info { display: flex; align-items: center; gap: 10px; padding: 0 2px; color: #1a412b; }
+#stock-price-modal.stock-price-metal .stock-price-info > svg { flex: 0 0 25px; width: 25px; height: 25px; filter: drop-shadow(0 1px 0 #fff); }
+#stock-price-modal.stock-price-metal .stock-price-info p { min-width: 0; margin: 0; }
+#stock-price-modal.stock-price-metal .stock-price-info strong { display: block; color: #102d1e; font: 800 18px/1.2 var(--sp-type); }
+#stock-price-modal.stock-price-metal .stock-price-info span { display: block; color: #344c3c; font: 400 16px/1.2 var(--sp-type); }
+#stock-price-modal.stock-price-metal .account-modal-error { min-height: 0; margin: 0; color: #8b182b; font: 700 16px/1.2 var(--sp-type); }
+#stock-price-modal.stock-price-metal .account-modal-error:empty { display: none; }
+#stock-price-modal.stock-price-metal .account-modal-primary,
+#stock-price-modal.stock-price-metal .stock-price-cancel {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; height: auto; padding: 9px 12px;
+  border: 1px solid #405b4c; border-radius: 8px; font: 800 23px/1.1 var(--sp-type); cursor: pointer;
+  box-shadow: inset 0 0 0 1px #e3f2e3a6,inset 0 1px 0 #ffffff7a,inset 0 -2px 2px #18382e75,0 2px 3px #142b234d;
+}
+#stock-price-modal.stock-price-metal .account-modal-primary { color: #fff; text-transform: uppercase; text-shadow: 0 1px 2px #012b19; background-color: #07583b; background-image: linear-gradient(180deg,#ffffff12,transparent 37%,#00190c44),var(--sp-steel); background-blend-mode: normal,soft-light; background-size: 100% 100%,540px 540px; }
+#stock-price-modal.stock-price-metal .account-modal-primary::before { content: ''; flex: 0 0 25px; width: 25px; height: 25px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m4 12 5 5L20 6' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; filter: drop-shadow(0 1px 1px #002b20); }
+#stock-price-modal.stock-price-metal .stock-price-cancel { min-height: 44px; color: #143726; border-color: #8b9990; background-image: linear-gradient(180deg,#ffffffb8,#ffffff24 55%,#415b4b12),var(--sp-steel); background-size: 100% 100%,540px 540px; text-shadow: 0 1px 0 #fff; }
+#stock-price-modal.stock-price-metal button:focus-visible { outline: 2px solid #075b36; outline-offset: 3px; }
+#stock-price-modal.stock-price-metal .account-modal-primary:disabled { cursor: wait; opacity: .6; }
+#stock-price-modal.stock-price-metal .account-modal-primary:active,
+#stock-price-modal.stock-price-metal .stock-price-cancel:active { transform: translateY(1px); box-shadow: inset 0 2px 4px #17362d50; }
+@media (max-width: 350px) {
+  #stock-price-modal.stock-price-metal .stock-price-sheet > header { padding-right: 17px; padding-left: 17px; }
+  #stock-price-modal.stock-price-metal .stock-price-sheet form { padding-right: 13px; padding-left: 13px; }
+  #stock-price-modal.stock-price-metal .stock-price-product-card { gap: 10px; }
+  #stock-price-modal.stock-price-metal .stock-price-illustration { flex-basis: 54px; }
+  #stock-price-modal.stock-price-metal .stock-price-illustration img { width: 50px; }
+  #stock-price-modal.stock-price-metal .stock-price-sheet form label { font-size: 20px; }
+}

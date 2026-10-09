@@ -38,9 +38,15 @@
     state.row = row;
     state.session = Caixa.sessionFingerprint();
     form.reset();
+    const partner = Caixa.isPartner();
+    modal.classList.toggle('stock-price-metal', partner);
+    byId('stock-price-title').textContent = partner ? 'Editar preço de venda' : 'Alterar preço de venda';
+    byId('stock-price-size').textContent = row.tire_size || row.item_name || 'Produto selecionado';
+    byId('stock-price-meta').textContent = [row.brand, Caixa.partnerUI?.condition(row.tire_condition)].filter(Boolean).join(' · ');
+    byId('stock-price-illustration').hidden = !row.tire_size;
     const identity = [row.brand, row.tire_size || row.item_name,
       Caixa.isPartner() ? Caixa.partnerUI?.condition(row.tire_condition) : null].filter(Boolean).join(' · ') || 'Produto selecionado';
-    byId('stock-price-submit').textContent = Caixa.isPartner() ? 'Salvar preço de venda' : 'Salvar novo preço oficial';
+    byId('stock-price-submit').textContent = partner ? 'Salvar preço' : 'Salvar novo preço oficial';
     byId('stock-price-unit').textContent = Caixa.stored(Caixa.keys.store) || 'Unidade logada';
     byId('stock-price-product').textContent = identity;
     byId('stock-price-current').textContent = row.sale_price == null
