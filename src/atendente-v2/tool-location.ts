@@ -4,7 +4,7 @@ import { chooseNeighborhoodCity, findNeighborhoodCandidates, normalizePlace } fr
 import { fillCityFromPin } from './delivery-quote-routing.js';
 import { locationFreshnessHours } from './location-freshness.js';
 
-const LOCATION_TOOLS = new Set(['buscar_produto', 'buscar_compatibilidade', 'calcular_frete', 'localizacao_loja', 'pedir_foto', 'criar_pedido']);
+const LOCATION_TOOLS = new Set(['buscar_produto', 'buscar_compatibilidade', 'calcular_frete', 'localizacao_loja', 'pedir_foto', 'criar_pedido', 'consultar_horario_loja']);
 
 /** Usa somente a última localização da mesma conversa. O município extraído
  * precisa estar escrito na mensagem original, não apenas inferido pelo LLM. */

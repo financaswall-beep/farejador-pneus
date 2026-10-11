@@ -69,6 +69,7 @@ import { audioNeedsConfirmation } from './audio-transcription.js';
 import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRouteOptions,cancelStockConfirmation,CANCEL_STOCK_CONFIRMATION_TOOL } from './stock-confirmation.js';
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
+import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -83,7 +84,7 @@ export function activeToolDefinitions(): ToolDefinition[] {
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
-  return [...defs,STOCK_INTEREST_TOOL,...(env.PARTNER_STOCK_CONFIRMATION?[CANCEL_STOCK_CONFIRMATION_TOOL]:[])];
+  return [...defs,STOCK_INTEREST_TOOL,STORE_HOURS_TOOL,...(env.PARTNER_STOCK_CONFIRMATION?[CANCEL_STOCK_CONFIRMATION_TOOL]:[])];
 }
 
 // Variante do calcular_frete com bairro OPCIONAL (frete pelo pino). Derivada do schema
@@ -429,6 +430,7 @@ async function executeToolInternal(
         erro:'audio_precisa_confirmacao',orientacao:'Os dados do áudio ainda precisam de confirmação para mudar o pedido. Apresente o resumo e peça confirmação por texto. Se não for possível, ofereça atendente.' });
     args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
+      case 'consultar_horario_loja': return JSON.stringify(await consultStoreHours(client,environment,conversationId,args));
       case 'cancelar_consulta_estoque': return cancelStockConfirmation(client,environment,conversationId);
       case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));
       case 'buscar_compatibilidade': {
@@ -796,12 +798,20 @@ async function executeToolInternal(
       }
 
       case 'buscar_politica': {
+        const keys = Array.isArray(args.policy_keys) ? args.policy_keys : [];
+        const asksHours = keys.some(key => key === 'horario' || key === 'horario_funcionamento');
+        if (asksHours && keys.every(key => key === 'horario' || key === 'horario_funcionamento')) {
+          return JSON.stringify({ politicas: [], horario_loja: await consultStoreHours(client,environment,conversationId,args) });
+        }
         const result = await buscarPoliticaComercial(client, {
           environment,
           policy_keys: args.policy_keys as string[] | undefined,
         });
         const saved=await readDeliverySettings(client,environment);
-        return JSON.stringify({ politicas: saved?applyMatrizDeliveryPolicies(result,saved):result });
+        const policies = (saved ? applyMatrizDeliveryPolicies(result,saved) : result)
+          .filter(policy => policy.policy_key !== 'horario_funcionamento');
+        return JSON.stringify({ politicas: policies,
+          ...(asksHours ? { horario_loja: await consultStoreHours(client,environment,conversationId,args) } : {}) });
       }
 
       case 'registrar_localizacao_lead': {

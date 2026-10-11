@@ -71,7 +71,7 @@
     if (owner()) {
       const loja = config?.loja;
       const list = U.node('div', null, 'ps-store-menu');
-      list.append(row('Horário da loja', loja?.opening_hours_text || (loading ? 'Carregando…' : 'Informe seus horários'), 'clock', () => C.partnerStoreForm.hours(), !loja));
+      list.append(row('Horário da loja', loja ? 'Dias de abertura e fechamento' : (loading ? 'Carregando…' : 'Informe seus horários'), 'clock', () => C.partnerStoreForm.hours(), !loja));
       list.append(row('Funcionários', 'Gerencie sua equipe', 'people', () => C.partnerTeam.open()));
       const radius = Number(loja?.delivery_radius_km);
       const delivery = loja?.faz_entrega ? (radius > 0 ? 'Entrega até ' + radius.toLocaleString('pt-BR') + ' km' : 'Entrega disponível') : 'Somente retirada';

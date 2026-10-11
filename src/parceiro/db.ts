@@ -56,8 +56,9 @@ partnerPool.on('error', (err) => {
 export async function withPartnerContext<T>(
   partnerUnitId: string,
   callback: (client: PoolClient) => Promise<T>,
+  db: Pool = partnerPool,
 ): Promise<T> {
-  const client = await partnerPool.connect();
+  const client = await db.connect();
   try {
     await client.query('BEGIN');
     // set_config com terceiro arg true = is_local (equivalente ao SET LOCAL)

@@ -25,6 +25,7 @@ import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
 import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
 import { registerPartnerCoverageRoute } from './route-coverage.js';
+import { registerPartnerStoreHoursRoutes } from './route-store-hours.js';
 import { registerPartnerCreditRoutes } from './route-finance-credit.js';
 import { getPartnerModernPanelEnabled } from './panel-canary.js';
 import { registerPartnerPanelCanaryRoutes } from './route-panel-canary.js';
@@ -119,7 +120,6 @@ import {
   revokePartnerSession,
   PartnerUsernameConflictError,
   PartnerCredentialsAlreadySetError,
-  getPartnerConfiguracoes,
   updatePartnerLoja,
   updatePartnerAtendimento,
   updatePartnerArea,
@@ -481,6 +481,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   registerPartnerSaleRecovery(fastify);
   registerPartnerOperationPickupRoutes(fastify);
   registerPartnerCoverageRoute(fastify);
+  registerPartnerStoreHoursRoutes(fastify);
   registerPartnerCreditRoutes(fastify);
   registerPartnerPanelCanaryRoutes(fastify);
   registerPartnerPanelCatalogRoutes(fastify);
@@ -755,11 +756,6 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // liberável por permissão; funcionário leva 403 aqui (gate §5.2). Tudo escopado
   // por ctx.partnerUnitId/ctx.unitId nas queries (isolamento entre parceiros, §5.4).
   // ─────────────────────────────────────────────────────────────────────────
-
-  // Lê TUDO: dados da loja + service_mode + cobertura/área + permissões efetivas.
-  fastify.get('/parceiro/:slug/api/configuracoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send(await getPartnerConfiguracoes(getPartnerContext(request)));
-  });
 
   // Dados da loja: nome de exibição, endereço estruturado, horário (texto).
   fastify.put('/parceiro/:slug/api/configuracoes/loja', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {

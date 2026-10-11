@@ -40,6 +40,7 @@ import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { getMatrizWholesaleStockQty } from './wholesale-stock-read.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
+import { storeHoursForCustomer } from '../shared/weekly-store-hours.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
 import {
@@ -517,13 +518,13 @@ export async function getUnitMapsUrl(
   }
   const m = normalizeRegion(municipio);
   const cols =
-    'pu.unit_id AS unit_id, COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours, pu.latitude, pu.longitude';
+    'pu.unit_id AS unit_id, COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours, to_jsonb(pu)->\'opening_hours_weekly\' weekly_hours, pu.latitude, pu.longitude';
   type MapsRow = {
     unit_id: string;
     nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null;
-    latitude: string | number | null; longitude: string | number | null;
+    latitude: string | number | null; longitude: string | number | null; weekly_hours: unknown;
   };
-  const strip = (r: MapsRow) => ({ nome_loja: r.nome_loja, maps_url: r.maps_url, address: r.address, opening_hours: r.opening_hours });
+  const strip = (r: MapsRow) => ({ nome_loja: r.nome_loja, maps_url: r.maps_url, address: r.address, opening_hours: storeHoursForCustomer(r.weekly_hours, r.opening_hours) });
 
   if (m) {
     // TODAS as lojas ativas que cobrem o município (não LIMIT 1 pela mais antiga).
@@ -615,9 +616,9 @@ export async function getUnitDisplayById(
   environment: Environment,
   unitId: string,
 ): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null; installation_fee: number | null } | null> {
-  const r = await client.query<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null; installation_fee_brl: string | null }>(
+  const r = await client.query<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null; installation_fee_brl: string | null; weekly_hours: unknown }>(
     `SELECT COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours,
-            pu.installation_fee_brl
+            pu.installation_fee_brl,to_jsonb(pu)->'opening_hours_weekly' weekly_hours
        FROM network.partner_units pu
        JOIN core.units u ON u.id = pu.unit_id
       WHERE pu.environment = $1 AND pu.unit_id = $2 AND pu.deleted_at IS NULL
@@ -631,7 +632,7 @@ export async function getUnitDisplayById(
     nome_loja: row.nome_loja,
     maps_url: row.maps_url,
     address: row.address,
-    opening_hours: row.opening_hours,
+    opening_hours: storeHoursForCustomer(row.weekly_hours, row.opening_hours),
     installation_fee: row.installation_fee_brl == null ? null : Number(row.installation_fee_brl),
   };
 }

@@ -16,26 +16,7 @@
     form.append(content, notice, save); page.appendChild(form); return { page, form, content, notice };
   }
   function hours() {
-    if (!S().owner() || !S().snapshot()) return;
-    const { page, form, content, notice } = setup('Horário da loja');
-    const input = field(content, 'Quando sua loja abre?', 'text', S().snapshot().opening_hours_text);
-    input.maxLength = 500; input.required = true; input.placeholder = 'Seg. a sáb. • 8h às 18h';
-    const help = U.node('p', 'Esse horário aparece para o cliente.', 'ps-store-help'); content.appendChild(help);
-    form.addEventListener('submit', event => {
-      event.preventDefault(); if (!form.reportValidity()) return;
-      const hoursText = input.value.trim(); if (!hoursText) { notice.textContent = 'Informe o horário da loja.'; return; }
-      void S().run(page, async current => {
-        // Esta API substitui o cadastro: conservar TODOS os dados do endereço.
-        const fresh = await C.partnerData.api('configuracoes');
-        if (!current()) return;
-        if (!fresh.loja) throw new Error('unit_not_found');
-        const keys = ['display_name', 'address_street', 'address_number', 'address_neighborhood', 'address_city', 'address_complement', 'cep', 'maps_url'];
-        const data = Object.fromEntries(keys.map(key => [key, fresh.loja[key] ?? null]));
-        data.opening_hours_text = hoursText;
-        return C.partnerData.api('configuracoes/loja', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      }, async () => { C.showToast('Horário salvo.'); S().back(); await S().load(true); }, notice);
-    });
-    S().show('hours', page);
+    C.partnerHours.open();
   }
   function toggle(parent, label, enabled) {
     const wrap = U.node('label', null, 'ps-store-option');
