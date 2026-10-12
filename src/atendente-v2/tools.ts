@@ -71,6 +71,7 @@ import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
+import { withStoreOpeningScope, matrixStoreIsOpen } from './routing-store-hours.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -410,11 +411,13 @@ export async function executeTool(
   client:PoolClient,environment:Environment,conversationId:string,name:string,args:Record<string,unknown>,
   handoffContext?:HumanHandoffContext,execution?:BotOrderExecution,
 ):Promise<string> {
+  return withStoreOpeningScope(client,environment,name,async()=>{
   const result=await executeToolInternal(client,environment,conversationId,name,args,handoffContext,execution);
   try { return await gatePartnerSearch(client,environment,conversationId,name,args,result); }
   catch(error){logger.error({err:error,environment,conversationId},'stock confirmation: consulta não confirmada');
     return JSON.stringify({erro:'falha_confirmacao_estoque',disponibilidade_confirmada:false,
       mensagem:'Não foi possível confirmar com a loja. Não prometa disponibilidade, preço nem reserva.'});}
+  });
 }
 async function executeToolInternal(
   client: PoolClient,
@@ -1567,6 +1570,7 @@ async function criarPedido(
     );
   } else {
     // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
+    if(!await matrixStoreIsOpen(client,environment,true))return JSON.stringify({erro:'store_closed'});
     // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
     // Parceiros usam o sale_price da borracharia, sem alterar o preço da Matriz.
     const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);

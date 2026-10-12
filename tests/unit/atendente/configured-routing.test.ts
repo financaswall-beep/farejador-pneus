@@ -1,5 +1,5 @@
 import type { Pool,PoolClient } from 'pg';
-import { beforeEach,describe,expect,it,vi } from 'vitest';
+import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 const mocks=vi.hoisted(()=>({stock:vi.fn(),shortfall:vi.fn(),location:vi.fn(),env:{FAREJADOR_ENV:'test',ROUTING_MATRIZ_AS_STORE:true,ROUTING_MATRIZ_COMPETES:true,
   ROUTING_PROXIMITY_FIRST:true,ROUTING_GEO_ROAD_DISTANCE:false,WHOLESALE_UNIFIED_STOCK:true}}));
 vi.mock('../../../src/shared/config/env.js',()=>({env:mocks.env}));
@@ -18,13 +18,15 @@ import { DEFAULT_MATRIZ_FREIGHT } from '../../../src/atendente-v2/matriz-freight
 import { decideStoreGeoOrFallback } from '../../../src/atendente-v2/delivery-quote-routing.js';
 import { simulateBotDelivery } from '../../../src/admin/painel/bot-delivery-simulation.js';
 const settings:DeliverySettings={delivery_enabled:true,pickup_enabled:true,radius_km:12,address:'Loja teste',latitude:0,longitude:0,
-  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT}};
+  days:[1,2,3,4,5],opens_at:'08:00',closes_at:'18:00',delivery_days:1,freight:{...DEFAULT_MATRIZ_FREIGHT},
+  store_hours:[{day:1,opens_at:'08:00',closes_at:'18:00'}]};
 const input={municipio:'Outra cidade',items:[{product_id:'p1',quantity:2}],modalidade:'delivery' as 'delivery'|'pickup',
   customerLocation:{lat:0,lng:0},clientNeighborhoodCanonical:null};
 function clientFor(partners:{id:string;lng:number;radius?:number;stock?:boolean;leads?:number}[],saved?:DeliverySettings){
   return {release:vi.fn(),query:vi.fn(async(sql:string,values:unknown[])=>{
     let rows:unknown[]=[];
-    if(sql.includes('FROM network.partner_units pu')&&sql.includes('COALESCE(pu.display_name'))rows=partners.map(p=>({
+    if(sql.includes('opening_hours_weekly'))rows=partners.map(p=>({unit_id:p.id,hours:[{day:1,opens_at:'08:00',closes_at:'18:00'}]}));
+    else if(sql.includes('FROM network.partner_units pu')&&sql.includes('COALESCE(pu.display_name'))rows=partners.map(p=>({
       unit_id:p.id,partner_id:p.id,partner_unit_id:p.id,slug:p.id,partner_name:p.id,unit_name:p.id,
       service_mode:'both',latitude:'0',longitude:String(p.lng),delivery_radius_km:String(p.radius??40),has_city_coverage:false,neighborhoods:[]}));
     else if(sql.includes('FROM commerce.partner_stock_levels')){
@@ -38,8 +40,10 @@ function clientFor(partners:{id:string;lng:number;radius?:number;stock?:boolean;
     return {rows,rowCount:rows.length};
   })} as unknown as PoolClient;
 }
-beforeEach(()=>{mocks.stock.mockReset().mockResolvedValue(10);mocks.shortfall.mockReset().mockResolvedValue([]);
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-12T15:00:00Z'));
+  mocks.stock.mockReset().mockResolvedValue(10);mocks.shortfall.mockReset().mockResolvedValue([]);
   mocks.location.mockReset().mockResolvedValue({...input.customerLocation,confidence:'ROOFTOP'});});
+afterEach(()=>vi.useRealTimers());
 describe('cadastro de entrega sobre o motor real de distribuição',()=>{
   it('confirmação exclui a loja que negou e mantém a próxima dentro da mesma cobertura e distância',async()=>{
     const result=await decideConfiguredStore(clientFor([{id:'a',lng:.02},{id:'b',lng:.05}]),'test',

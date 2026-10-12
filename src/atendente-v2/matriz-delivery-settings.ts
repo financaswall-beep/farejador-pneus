@@ -36,7 +36,7 @@ export const deliverySettingsSchema = z.object({
 });
 export type DeliverySettings = z.infer<typeof deliverySettingsSchema>;
 export interface SavedDeliverySettings { settings:DeliverySettings; version:number; updated_at:string; }
-export type DeliveryBlock = 'delivery_paused'|'pickup_disabled'|'needs_location'|'outside_radius'|'insufficient_stock';
+export type DeliveryBlock = 'delivery_paused'|'pickup_disabled'|'needs_location'|'outside_radius'|'insufficient_stock'|'store_closed'|'store_hours_unknown';
 
 /** Ausência de cadastro preserva a configuração anterior; nunca semeia o exemplo da imagem. */
 export async function readDeliverySettings(client:Pick<PoolClient,'query'>, environment:Environment):Promise<SavedDeliverySettings|null> {
@@ -65,6 +65,8 @@ export function deliveryBlockResponse(reason:DeliveryBlock) {
     needs_location:'Não foi possível confirmar a distância. Peça a localização ou o endereço completo antes de oferecer entrega.',
     outside_radius:'O endereço está fora do limite da Matriz e não há parceiro apto nesta decisão. Consulte retirada; não confirme entrega.',
     insufficient_stock:'Nenhuma loja selecionada consegue atender o pedido completo. Informe a falta e consulte alternativas; não feche o pedido.',
+    store_closed:'A loja está fechada agora. Informe a próxima abertura antes de continuar; não confirme atendimento imediato.',
+    store_hours_unknown:'O horário da loja não está cadastrado. Confirme com o atendimento antes de prometer atendimento imediato.',
   };
   return { encontrado:false,disponivel:false,erro:reason,motivo:reason,
     precisa_localizacao:reason==='needs_location',mensagem:messages[reason],orientacao:messages[reason] };

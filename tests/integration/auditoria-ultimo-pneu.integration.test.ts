@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours } from './helpers/store-opening-fixtures.js';
 // AUDITORIA 02/10/2026 - REGRESSAO (ja passa): ultimo pneu disputado.
 // Mover para tests/integration/ JUNTO com o conserto do item (ver docs/PLANO_CORRECOES_AUDITORIA_2026-10-02.md).
 // balcao x balcao, reserva do bot x balcao, reserva x reserva — tudo ao mesmo tempo.
@@ -12,6 +13,7 @@ let serial = 881000;
 
 beforeAll(async () => {
   db = await startPostgres();
+  await configureTestOpeningHours(db.pool);
   Object.assign(process.env, {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin-token',
@@ -48,8 +50,8 @@ async function bot(p: string) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const r = JSON.parse(await tools.executeTool(client, 'test', conv, 'criar_pedido', { nome_cliente: 'Joao Cliente',
-      modalidade: 'pickup', forma_pagamento: 'pix', itens: [{ product_id: p, quantidade: 1, preco_unitario: 99 }] }));
+    const r = JSON.parse(await atOpenStoreTime(() => tools.executeTool(client, 'test', conv, 'criar_pedido', { nome_cliente: 'Joao Cliente',
+      modalidade: 'pickup', forma_pagamento: 'pix', itens: [{ product_id: p, quantidade: 1, preco_unitario: 99 }] }), 'test'));
     await client.query('COMMIT');
     return r.ok ? 'reservou' : `recusou: ${r.erro}`;
   } catch (e) { await client.query('ROLLBACK').catch(() => undefined); return `recusou: ${(e as Error).message}`; }

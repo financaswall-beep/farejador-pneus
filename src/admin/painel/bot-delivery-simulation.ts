@@ -10,6 +10,7 @@ import { resolveUnitCandidatesByProximity,resolveDistances,mapProductToPartnerSt
   toGeoRoutingCandidate,FRETE_PADRAO_BRL,matrizFreightForKm } from '../../atendente-v2/fulfillment.js';
 import { filterByModeAndRadiusPresence } from '../../atendente-v2/geo-routing.js';
 import type { RoutingDiagnostic } from '../../atendente-v2/geo-delivery-trace.js';
+import { withStoreOpeningContext, filterOpeningCandidates, openingStatusForStore } from '../../atendente-v2/routing-store-hours.js';
 
 export async function deliveryProducts(search:string,db:Pool=pool) {
   const result=await db.query(`SELECT p.id,p.product_name,p.brand,p.tire_condition,
@@ -27,6 +28,7 @@ export async function geocodeDeliveryAddress(address:string) {
 }
 export async function simulateBotDelivery(input:{address:string;settings:DeliverySettings;
   items:{product_id:string;quantity:number}[]},db:Pool=pool) {
+  return withStoreOpeningContext(env.FAREJADOR_ENV,async()=>{
   const location=await geocodeDeliveryAddress(input.address);
   const items=Array.from(input.items.reduce((m,i)=>m.set(i.product_id,(m.get(i.product_id)??0)+i.quantity),
     new Map<string,number>()),([product_id,quantity])=>({product_id,quantity}));
@@ -39,6 +41,7 @@ export async function simulateBotDelivery(input:{address:string;settings:Deliver
     if (valid.rows.length!==items.length) throw new Error('delivery_product_not_found');
     const matrix=await evaluateMatrizDelivery(client,env.FAREJADOR_ENV,{items,modalidade:'delivery',customerLocation:location,settings:input.settings});
     const candidates=await resolveUnitCandidatesByProximity(client,env.FAREJADOR_ENV);
+    const openIds=new Set((await filterOpeningCandidates(client,env.FAREJADOR_ENV,candidates)).map(c=>c.ctx.unitId));
     const eligibleIds=new Set(filterByModeAndRadiusPresence(candidates.map(toGeoRoutingCandidate),'delivery').map(c=>c.unitId));
     const distances=await resolveDistances(client,location,candidates.filter(c=>c.location&&eligibleIds.has(c.ctx.unitId)).map(c=>({unitId:c.ctx.unitId,location:c.location!})),40);
     const diagnostics:RoutingDiagnostic[]=[];
@@ -46,6 +49,9 @@ export async function simulateBotDelivery(input:{address:string;settings:Deliver
       const km=distances.get(c.ctx.unitId)??(c.location?haversineKm(location,c.location):null);
       let reason=c.serviceMode==='pickup'?'pickup_only':km==null?'needs_location':c.deliveryRadiusKm==null?'radius_missing':
         km>c.deliveryRadiusKm?'outside_radius':km>40?'outside_ring':'apt';
+      if(reason==='apt') {
+        if(!openIds.has(c.ctx.unitId))reason=openingStatusForStore(c.ctx.unitId)?.state==='unknown'?'store_hours_unknown':'store_closed';
+      }
       if(reason==='apt') {
         const stock=await Promise.all(items.map(i=>mapProductToPartnerStock(client,env.FAREJADOR_ENV,c.ctx.unitId,i.product_id,i.quantity)));
         if(stock.some(s=>!s)) reason='insufficient_stock';
@@ -71,4 +77,5 @@ export async function simulateBotDelivery(input:{address:string;settings:Deliver
       approximate:location.confidence!=='ROOFTOP'&&location.confidence!=='RANGE_INTERPOLATED',
       draft:true,matriz_competes:env.ROUTING_MATRIZ_COMPETES};
   } finally {try {await client.query('ROLLBACK');} finally {client.release();}}
+  });
 }

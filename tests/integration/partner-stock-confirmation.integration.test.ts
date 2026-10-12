@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours, testOpeningHours } from './helpers/store-opening-fixtures.js';
 import { afterAll,beforeAll,beforeEach,describe,expect,it,vi } from 'vitest';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
@@ -9,6 +10,7 @@ const mocks=vi.hoisted(()=>({db:null as any,route:vi.fn(),closing:vi.fn()}));
 vi.mock('../../src/shared/config/env.js',()=>({env:{PARTNER_STOCK_CONFIRMATION:true,BOT_OUTBOX:true,
   AGENT_V2_WORKER_ENABLED:true,FAREJADOR_ENV:'test',AGENT_V2_CONVERSATION_IDS:['*']}}));
 vi.mock('../../src/persistence/db.js',()=>({pool:{query:(...args:any[])=>mocks.db.query(...args),connect:()=>mocks.db.connect()}}));
+vi.mock('../../src/parceiro/db.js',()=>({partnerPool:{query:(...args:any[])=>mocks.db.query(...args),connect:()=>mocks.db.connect()}}));
 vi.mock('../../src/atendente-v2/tools.js',()=>({executeTool:(...args:any[])=>mocks.closing(...args)}));
 vi.mock('../../src/atendente-v2/conversation-control.js',()=>({syncHumanIntervention:async()=>({mode:'bot',resumed_at:null})}));
 vi.mock('../../src/atendente-v2/stock-confirmation-routing.js',()=>({
@@ -27,10 +29,12 @@ let db:IntegrationDb;let restricted:Pool;let a:PartnerFixture;let b:PartnerFixtu
 const productA=randomUUID();const productB=randomUUID();let conversation:string;let message:string;let native=890000000;
 const secondStocks=new Map<string,string>();
 beforeAll(async()=>{
-  db=await startPostgres();mocks.db=db.pool;
+  db=await startPostgres();
+  await configureTestOpeningHours(db.pool);mocks.db=db.pool;
   restricted=new Pool({connectionString:buildRestrictedConnectionString(db.connectionString),max:3});
   a=await createPartnerFixture(db.pool);b=await createPartnerFixture(db.pool);
   for(const unit of [a,b]) {
+    await configureTestOpeningHours(db.pool,unit.unitId);
     await db.pool.query("UPDATE commerce.partner_stock_levels SET tire_size='90/90-18',tire_condition='meia_vida',sale_price=90 WHERE id=$1",[unit.stockId]);
     const second=(await db.pool.query(`INSERT INTO commerce.partner_stock_levels
       (environment,unit_id,item_name,tire_size,tire_condition,is_tracked,quantity_on_hand,sale_price)
@@ -110,14 +114,14 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
   it('rejeita resposta vencida e manda a consulta para outra loja, sem dividir o conjunto',async()=>{
     await search();await search(productB);await publishStockRequest(awaitClient,'test',conversation);const row=await request();
     await db.pool.query("UPDATE commerce.partner_stock_requests SET expires_at=now()-interval '1 second' WHERE id=$1",[row.id]);
-    expect(await answer(a,row.id,true)).toBe('expired');await processStockConfirmations();
+    expect(await answer(a,row.id,true)).toBe('expired');await atOpenStoreTime(() => processStockConfirmations());
     const next=await request();expect(next.id).not.toBe(row.id);expect(next.unit_id).toBe(b.unitId);
     expect(next.routing.items).toHaveLength(2);expect(next.excluded_unit_ids).toContain(a.unitId);expect(next.sealed).toBe(true);
   });
   it('NÃO TENHO procura a segunda loja; TENHO notifica o cliente uma vez pela outbox',async()=>{
     await search();await publishStockRequest(awaitClient,'test',conversation);const first=await request();
-    await answer(a,first.id,false);await processStockConfirmations();const next=await request();
-    expect(next.unit_id).toBe(b.unitId);await answer(b,next.id,true);await processStockConfirmations();await processStockConfirmations();
+    await answer(a,first.id,false);await atOpenStoreTime(() => processStockConfirmations());const next=await request();
+    expect(next.unit_id).toBe(b.unitId);await answer(b,next.id,true);await atOpenStoreTime(() => processStockConfirmations());await atOpenStoreTime(() => processStockConfirmations());
     const outbound=(await db.pool.query("SELECT * FROM ops.outbound_messages WHERE conversation_id=$1 AND kind='stock_text'",[conversation])).rows;
     expect(outbound).toHaveLength(1);expect(outbound[0].body).toContain('A loja confirmou');
     expect(await validateStockConfirmationOutbound(awaitClient,outbound[0])).toBe(true);
@@ -140,7 +144,7 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     await db.pool.query('UPDATE commerce.partner_stock_requests SET closing_args=$2::jsonb WHERE id=$1',
       [row.id,JSON.stringify({nome_cliente:'Cliente teste',modalidade:'pickup',forma_pagamento:'pix'})]);
     mocks.closing.mockResolvedValue(JSON.stringify({ok:true,order_number:'PED-TESTE',total:'90',retirada:{nome_loja:'Loja teste'}}));
-    await answer(a,row.id,true);await processStockConfirmations();
+    await answer(a,row.id,true);await atOpenStoreTime(() => processStockConfirmations());
     expect(mocks.closing).toHaveBeenCalledTimes(1);expect((await request()).status).toBe('completed');
     expect((await db.pool.query('SELECT body FROM ops.outbound_messages WHERE conversation_id=$1',[conversation])).rows[0].body).toContain('PED-TESTE');
   });
@@ -156,11 +160,11 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     await db.pool.query(`INSERT INTO core.messages
       (environment,conversation_id,chatwoot_conversation_id,chatwoot_message_id,sender_type,message_type,is_private,content,sent_at)
       VALUES('test',$1,$2,$3,'contact',0,false,'Mudei de ideia',clock_timestamp()+interval '1 second')`,[conversation,native,++native]);
-    await answer(a,row.id,true);await processStockConfirmations();expect(mocks.closing).not.toHaveBeenCalled();
+    await answer(a,row.id,true);await atOpenStoreTime(() => processStockConfirmations());expect(mocks.closing).not.toHaveBeenCalled();
   });
   it('nega revisão antiga, retira confirmação vencida da outbox e cancela consulta sem tocar no estoque',async()=>{
     await search();await publishStockRequest(awaitClient,'test',conversation);const row=await request();
-    expect(await answer(a,row.id,true,2)).toBe('changed');await answer(a,row.id,true);await processStockConfirmations();
+    expect(await answer(a,row.id,true,2)).toBe('changed');await answer(a,row.id,true);await atOpenStoreTime(() => processStockConfirmations());
     const outbound=(await db.pool.query("SELECT * FROM ops.outbound_messages WHERE conversation_id=$1 AND kind='stock_text'",[conversation])).rows[0];
     await db.pool.query("UPDATE commerce.partner_stock_requests SET valid_until=now()-interval '1 second' WHERE id=$1",[row.id]);
     expect(await validateStockConfirmationOutbound(awaitClient,outbound)).toBe(false);
@@ -172,8 +176,8 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     expect(await getRecentProductIds(awaitClient,conversation,'test')).toEqual([productA,productB]);
     expect(JSON.parse((await deferPhotoUntilStockConfirmed(awaitClient,'test',conversation,productA))!).foto_solicitada).toBe(true);
     expect((await db.pool.query('SELECT id FROM commerce.photo_requests WHERE conversation_id=$1',[native-1])).rows).toHaveLength(0);
-    await answer(a,original.id,false);await processStockConfirmations();const next=await request();
-    expect(next.routing.photoProductIds).toContain(productA);await answer(b,next.id,true);await processStockConfirmations();
+    await answer(a,original.id,false);await atOpenStoreTime(() => processStockConfirmations());const next=await request();
+    expect(next.routing.photoProductIds).toContain(productA);await answer(b,next.id,true);await atOpenStoreTime(() => processStockConfirmations());
     const photos=(await db.pool.query(`SELECT unit_id FROM commerce.photo_requests WHERE conversation_id=
       (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1)`,[conversation])).rows;
     expect(photos).toHaveLength(1);expect(photos[0].unit_id).toBe(b.unitId);
@@ -191,7 +195,23 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     }finally{client.release();}
     const updated=await request();expect(updated.request_message_id).toBe(latest);expect(updated.expires_at).toEqual(row.expires_at);
     mocks.closing.mockResolvedValue(JSON.stringify({ok:true,order_number:'PED-FECHAMENTO',total:90}));
-    await answer(a,row.id,true);await processStockConfirmations();expect(mocks.closing).toHaveBeenCalledTimes(1);
+    await answer(a,row.id,true);await atOpenStoreTime(() => processStockConfirmations());expect(mocks.closing).toHaveBeenCalledTimes(1);
+  });
+  it('TENHO após fechar reroteia antes de oferecer foto ou fechar venda',async()=>{
+    env.PHOTO_REQUESTS=true;
+    await search();await publishStockRequest(awaitClient,'test',conversation);const row=await request();
+    await deferPhotoUntilStockConfirmed(awaitClient,'test',conversation,productA);
+    await answer(a,row.id,true);
+    await db.pool.query(`UPDATE network.partner_units SET opening_hours_weekly=$2::jsonb WHERE environment='test' AND unit_id=$1`,
+      [a.unitId,JSON.stringify(testOpeningHours.map(day=>({...day,closes_at:'11:00'})))]);
+    try{
+      await atOpenStoreTime(() => processStockConfirmations());const next=await request();
+      expect(next).toMatchObject({unit_id:b.unitId,status:'pending'});
+      expect((await db.pool.query('SELECT status FROM commerce.partner_stock_requests WHERE id=$1',[row.id])).rows[0].status).toBe('cancelled');
+      expect(mocks.closing).not.toHaveBeenCalled();
+      expect((await db.pool.query(`SELECT id FROM commerce.photo_requests WHERE conversation_id=
+        (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1)`,[conversation])).rows).toHaveLength(0);
+    }finally{await configureTestOpeningHours(db.pool,a.unitId);}
   });
   it('não oferece as duas medidas separadas quando nenhuma loja atende o conjunto',async()=>{
     await search();mocks.route.mockResolvedValue({kind:'matriz',canFulfill:false});

@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours } from './helpers/store-opening-fixtures.js';
 // Regressão encontrada pelo Opus, ampliada com política única, lotes e falhas repetidas.
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -8,6 +9,7 @@ import { waitForDatabaseBlock } from './helpers/database-barrier.js';
 let db: IntegrationDb;
 beforeAll(async () => {
   db = await startPostgres();
+  await configureTestOpeningHours(db.pool);
   Object.assign(process.env, {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin-token',
@@ -103,9 +105,9 @@ describe('verificacao: fila da expiracao de 24h', () => {
     let created: { ok?: boolean; order_number?: string; erro?: string };
     try {
       await client.query('BEGIN');
-      created = JSON.parse(await tools.executeTool(client, 'test', conv, 'criar_pedido', { nome_cliente: 'Joao Real',
+      created = JSON.parse(await atOpenStoreTime(() => tools.executeTool(client, 'test', conv, 'criar_pedido', { nome_cliente: 'Joao Real',
         modalidade: 'pickup', forma_pagamento: 'pix', itens: [{ product_id: product, quantidade: 2, preco_unitario: 89 }] },
-        undefined, { triggerMessageId: randomUUID() }));
+        undefined, { triggerMessageId: randomUUID() }), 'test'));
       await client.query('COMMIT');
     } finally { client.release(); }
     expect(created.ok).toBe(true);

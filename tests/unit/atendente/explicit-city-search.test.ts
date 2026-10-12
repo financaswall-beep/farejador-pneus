@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks=vi.hoisted(()=>({
   config:{FAREJADOR_ENV:'test',WHOLESALE_UNIFIED_STOCK:true,ROUTING_GEO:false,
@@ -26,13 +26,15 @@ const query=vi.fn(async(sql:string)=>{
 });
 const client={query} as unknown as PoolClient;
 beforeEach(()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-12T15:00:00Z'));
   vi.clearAllMocks();
   mocks.search.mockResolvedValue([{product_id:'p1',tire_size:'90/90-12',total_stock_available:1,price_amount:'89.00'}]);
   mocks.freight.mockResolvedValue({encontrado:false,disponivel:false,motivo:'bairro_nao_encontrado'});
-  mocks.settings.mockResolvedValue({settings:{delivery_enabled:true}});
+  mocks.settings.mockResolvedValue({settings:{delivery_enabled:true,store_hours:[{day:1,opens_at:'08:00',closes_at:'18:00'}]}});
   mocks.route.mockResolvedValue({routing:null,matrizFreight:19.90});
   mocks.pinQuote.mockResolvedValue(null);
 });
+afterEach(()=>vi.useRealTimers());
 describe('localização explícita sem combinação no dicionário',()=>{
   it('buscar_produto preserva Itaboraí e não pede novamente a localização',async()=>{
     const result=JSON.parse(await executeTool(client,'test','conv','buscar_produto',{

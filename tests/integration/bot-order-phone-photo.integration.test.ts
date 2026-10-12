@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours } from './helpers/store-opening-fixtures.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 import { loadHistory } from '../../src/atendente-v2/history.js';
@@ -7,13 +8,15 @@ let db: IntegrationDb, unit: string, product: string, seq = 991000;
 let execute: typeof import('../../src/atendente-v2/tools.js').executeTool;
 beforeAll(async () => {
   db = await startPostgres();
+  await configureTestOpeningHours(db.pool);
   Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
     CHATWOOT_HMAC_SECRET: 'test', ADMIN_AUTH_TOKEN: 'test', PICKUP_TO_PARTNER: 'false',
     PHOTO_REQUESTS: 'true', BOT_AUDIO_ENABLED: 'false', MATRIZ_CENTRAL_LEDGER: 'true',
     WHOLESALE_UNIFIED_STOCK: 'true', WHOLESALE_MATRIZ_DECREMENT: 'true',
     WHOLESALE_MATRIZ_RETAIL_COST: 'true', WHOLESALE_MATRIZ_OVERSELL_GUARD: 'true' });
   vi.stubGlobal('fetch', vi.fn(() => { throw Error('Rede externa proibida neste teste'); }));
-  execute = (await import('../../src/atendente-v2/tools.js')).executeTool;
+  const actualExecute = (await import('../../src/atendente-v2/tools.js')).executeTool;
+  execute = (...args) => atOpenStoreTime(() => actualExecute(...args),args[1]);
   unit = (await db.pool.query(`INSERT INTO core.units(environment,slug,name,is_active) VALUES('test','main','Matriz',true)
     ON CONFLICT(environment,slug) DO UPDATE SET is_active=true RETURNING id`)).rows[0].id;
   product = (await db.pool.query(`INSERT INTO commerce.products(environment,product_code,product_name,product_type,brand,tire_condition)

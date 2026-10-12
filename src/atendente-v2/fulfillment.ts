@@ -42,6 +42,7 @@ import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { storeHoursForCustomer } from '../shared/weekly-store-hours.js';
 import { lockAndValidatePartnerSalePrices } from '../parceiro/partner-sale-pricing.js';
+import { filterOpeningCandidates, openingFilteringEnabled, matrixStoreIsOpen, partnerStoreIsOpen } from './routing-store-hours.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
 import {
@@ -635,7 +636,10 @@ export async function getPartnerStockMap(
 ): Promise<Map<string, ProductAvailability>> {
   observeSearchMunicipality(municipio);
   if (!municipio) return new Map();
-  const partner = await resolveUnitForMunicipio(client, environment, municipio);
+  const candidates=openingFilteringEnabled()?await resolveUnitCandidates(client,environment,municipio):[];
+  if(candidates[0])observeSearchStore(candidates[0].ctx.unitId,candidates[0].ctx.unitName,await readPartnerAvailableStock(client,environment,candidates[0].ctx.unitId));
+  const partner = openingFilteringEnabled() ? (await filterOpeningCandidates(client,environment,candidates))[0]?.ctx
+    : await resolveUnitForMunicipio(client, environment, municipio);
   if (!partner) return new Map();
   const map = await readPartnerAvailableStock(client, environment, partner.unitId);
   observeSearchStore(partner.unitId, partner.unitName, map);
@@ -741,8 +745,8 @@ export async function decideStoreForItems(
 ): Promise<PartnerOrderRouting | null> {
   if (!input.municipio || input.items.length === 0) return null;
 
-  // Fase 2: motor multi-parceiro (flag). DESLIGADA = caminho de hoje (abaixo), intocado.
-  if (env.ROUTING_MULTI_CANDIDATE || input.excludedUnitIds?.length || input.onlyUnitId) {
+  // Atendimento agora examina alternativas abertas; fora desse escopo, mantém a flag multi-parceiro.
+  if (openingFilteringEnabled() || env.ROUTING_MULTI_CANDIDATE || input.excludedUnitIds?.length || input.onlyUnitId) {
     return decideStoreForItemsMulti(client, environment, {
       municipio: input.municipio,
       items: input.items,
@@ -801,8 +805,8 @@ async function decideStoreForItemsMulti(
   // delivery — pickup ainda cai na matriz antes daqui). Loja só-retirada não atende
   // entrega → filtra. O fio do `intent` genérico + a flag ROUTING_MODE_FILTER vêm
   // no próximo tijolo; este filtro é o default seguro pra não escolher pickup-only.
-  const eligible = candidates.filter((c) => c.serviceMode !== 'pickup' && !input.excludedUnitIds?.includes(c.ctx.unitId)
-    && (!input.onlyUnitId || c.ctx.unitId===input.onlyUnitId));
+  const eligible = await filterOpeningCandidates(client,environment,candidates.filter((c) => c.serviceMode !== 'pickup' && !input.excludedUnitIds?.includes(c.ctx.unitId)
+    && (!input.onlyUnitId || c.ctx.unitId===input.onlyUnitId)));
   if (eligible.length === 0) return null;
 
   const byUnit = new Map(eligible.map((c) => [c.ctx.unitId, c]));
@@ -978,6 +982,8 @@ export async function decideStoreForItemsGeo(
   const matrizLimit = input.modalidade==='delivery' && input.matrizPolicy?.deliveryRadiusKm!=null
     ? input.matrizPolicy.deliveryRadiusKm : Math.max(...rings);
   const matrizCanFulfill = async (): Promise<boolean> => {
+    if(input.matrizPolicy&&!input.matrizPolicy.canFulfill)return false;
+    if (!await matrixStoreIsOpen(client,environment)) return false;
     if (input.matrizPolicy) return input.matrizPolicy.canFulfill
       && haversineKm(input.customerLocation,matrizLocation)<=matrizLimit;
     if (!env.ROUTING_MATRIZ_AS_STORE || !env.WHOLESALE_UNIFIED_STOCK) return false;
@@ -1039,7 +1045,7 @@ export async function decideStoreForItemsGeo(
       : eligible;
   if (inRadius.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
-  for (const cand of inRadius) {
+  for (const cand of await filterOpeningCandidates(client,environment,inRadius)) {
     const mappings = await Promise.all(
       input.items.map((i) => mapProductToPartnerStock(client, environment, cand.ctx.unitId, i.product_id, i.quantity)),
     );
@@ -1272,11 +1278,12 @@ export async function resolveProductAvailabilityByProximity(
 
   // A consulta SQL acima observou todas estas lojas; preservar também as sem oferta disponível.
   for (const c of inRange) observeSearchStore(c.ctx.unitId, c.ctx.unitName, byUnit.get(c.ctx.unitId) ?? new Map());
+  const openIds=new Set((await filterOpeningCandidates(client,environment,inRange)).map(c=>c.ctx.unitId));
 
   // pra cada produto, a 1ª loja em alcance (mais perto) que tem ganha.
   for (const productId of input.productIds) {
     for (const c of inRange) {
-      if (!servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))) continue;
+      if (!openIds.has(c.ctx.unitId) || !servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))) continue;
       const q = pricedByUnit.get(c.ctx.unitId)?.get(productId);
       if (q != null && q > 0) {
         out.set(productId, { unitId: c.ctx.unitId, available: q });
@@ -1329,6 +1336,7 @@ export async function materializePartnerOrder(
   ctx: PartnerContext,
   input: BotPartnerOrderInput,
 ): Promise<{ partner_order_id: string; total_amount: string }> {
+  if(!await partnerStoreIsOpen(client,ctx.environment,ctx.unitId,ctx.unitName))throw new Error('store_closed');
   await lockAndValidatePartnerSalePrices(client, ctx, input.items.map(item => ({
     partner_stock_id: item.partner_stock_id, reference_unit_price: item.unit_price,
   })));

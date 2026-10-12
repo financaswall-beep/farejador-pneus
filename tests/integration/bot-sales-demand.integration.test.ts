@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours } from './helpers/store-opening-fixtures.js';
 import { readdir } from 'node:fs/promises';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startPostgres, stopPostgres, applyMigrationFile, type IntegrationDb } from './helpers/postgres.js';
@@ -120,6 +121,7 @@ beforeAll(async () => {
   for (const file of migrations.filter(f => f.endsWith('.sql') && f > '0216_conversation_bot_control.sql').sort()) {
     await applyMigrationFile(db.pool, file);
   }
+  await configureTestOpeningHours(db.pool);
 }, 180_000);
 
 afterEach(() => vi.restoreAllMocks());
@@ -347,13 +349,12 @@ describe('fechamento real pelo Bot V2', () => {
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
-      const result = JSON.parse(await tools.executeTool(client, 'test', c.id, 'criar_pedido', {
+      const result = JSON.parse(await atOpenStoreTime(() => tools.executeTool(client, 'test', c.id, 'criar_pedido', {
         nome_cliente: 'Nome informado no fechamento', modalidade: 'pickup', forma_pagamento: 'pix',
         confirma_retirada_distante: true,
         itens: [{ product_id: id, quantidade: 1, preco_unitario: 89 }],
-      }));
-      expect(result.erro).toBeUndefined();
-      expect(result.ok).toBe(true);
+      }), 'test'));
+      expect(result).toMatchObject({ok:true});
       await client.query('COMMIT');
       return result;
     } catch (e) {
@@ -382,7 +383,7 @@ describe('fechamento real pelo Bot V2', () => {
     expect(stock).toMatchObject({ quantity_on_hand: 5, quantity_reserved: 1 });
     const client = await db.pool.connect();
     try {
-      const result = JSON.parse(await tools.executeTool(client, 'test', c.id, 'consultar_pedido', { order_number: first.order_number }));
+      const result = JSON.parse(await atOpenStoreTime(() => tools.executeTool(client, 'test', c.id, 'consultar_pedido', { order_number: first.order_number }), 'test'));
       expect(result.encontrado).toBe(true);
       expect(JSON.stringify(result)).toContain('Nome informado no fechamento');
     } finally { client.release(); }
@@ -392,6 +393,7 @@ describe('fechamento real pelo Bot V2', () => {
     const c = await conversation();
     const p = await product();
     const partner = await createPartnerFixture(db.pool, { initialStockQty: 5 });
+    await configureTestOpeningHours(db.pool,partner.unitId);
     await db.pool.query(`UPDATE commerce.partner_stock_levels SET product_id=$1,sale_price=89 WHERE id=$2`, [p, partner.stockId]);
     await pin(c);
     // Apenas a decisão geográfica é simulada. Pedido, espelho, estoque e consultas

@@ -11,6 +11,7 @@ import { publishStockRequest } from './stock-confirmation.js';
 import { createConfirmedStockPhotos } from './stock-confirmation-photo.js';
 import { routeStockConfirmation } from './stock-confirmation-routing.js';
 import { createStockRequest,latestStockRequest,lockStockConversation,refreshStockRequestPrices,type StockRequest } from './stock-confirmation-store.js';
+import { partnerStoreIsOpen, withStoreOpeningContext, storeOpeningBlockResponse, storeOpeningBlocked } from './routing-store-hours.js';
 
 const money=(value:unknown)=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function stockConfirmedText(request:StockRequest):string {
@@ -61,6 +62,10 @@ async function handleRequest(client:PoolClient,request:StockRequest) {
   if(request.status==='pending') {
     await client.query("UPDATE commerce.partner_stock_requests SET status='expired' WHERE id=$1",[request.id]);request.status='expired';
   }
+  if(request.status==='confirmed'&&!await partnerStoreIsOpen(client,request.environment,request.unit_id)) {
+    request.status='cancelled';
+    await client.query("UPDATE commerce.partner_stock_requests SET status='cancelled' WHERE id=$1",[request.id]);
+  }
   if(request.status==='confirmed') {
     if(!request.valid_until||new Date(request.valid_until).getTime()<=Date.now()||!await refreshStockRequestPrices(client,request)) {
       await client.query("UPDATE commerce.partner_stock_requests SET status='expired' WHERE id=$1",[request.id]);request.status='expired';
@@ -101,7 +106,8 @@ async function handleRequest(client:PoolClient,request:StockRequest) {
     [request.id,found?'matrix':'exhausted',excluded]);
   await notify(client,request,found
     ?'Essa loja não conseguiu confirmar. Encontrei disponibilidade na matriz. Quer que eu confira a opção para você?'
-    :'As lojas que consultei não confirmaram esses pneus. Posso procurar outra opção para você?');
+    :storeOpeningBlocked()?String(storeOpeningBlockResponse().mensagem)+' Quer deixar a solicitação com o atendimento para a abertura?'
+      :'As lojas que consultei não confirmaram esses pneus. Posso procurar outra opção para você?');
 }
 export async function processStockConfirmations():Promise<void> {
   if(!env.PARTNER_STOCK_CONFIRMATION||!env.BOT_OUTBOX)return;
@@ -117,7 +123,8 @@ export async function processStockConfirmations():Promise<void> {
       await lockStockConversation(client,candidate.environment,candidate.conversation_id);
       const locked=await client.query<StockRequest>('SELECT * FROM commerce.partner_stock_requests WHERE id=$1 FOR UPDATE',[candidate.id]);
       const request=locked.rows[0];
-      if(request&&request.notified_at===null&&['pending','confirmed','rejected','expired'].includes(request.status))await handleRequest(client,request);
+      if(request&&request.notified_at===null&&['pending','confirmed','rejected','expired'].includes(request.status))
+        await withStoreOpeningContext(candidate.environment,()=>handleRequest(client,request));
       await client.query('COMMIT');
     } catch(error) {
       await client.query('ROLLBACK').catch(()=>undefined);

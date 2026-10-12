@@ -1,3 +1,4 @@
+import { atOpenStoreTime, configureTestOpeningHours } from './helpers/store-opening-fixtures.js';
 // AUDITORIA 02/10/2026 - F1.2 bot devolve pedido antigo + F3.1 bot cancela na hora da retirada.
 // Mover para tests/integration/ JUNTO com o conserto do item (ver docs/PLANO_CORRECOES_AUDITORIA_2026-10-02.md).
 // Cenarios: pedir de novo apos cancelar; pedir de novo apos retirar; bot cancela no instante da retirada.
@@ -12,6 +13,7 @@ let serial = 771000;
 
 beforeAll(async () => {
   db = await startPostgres();
+  await configureTestOpeningHours(db.pool);
   Object.assign(process.env, {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin-token',
@@ -46,7 +48,7 @@ async function tool(conversationId: string, name: string, args: Record<string, u
   const client = await db.pool.connect();
   try {
     if (name === 'criar_pedido') await client.query('BEGIN');
-    const result = JSON.parse(await tools.executeTool(client, 'test', conversationId, name, args, undefined, { triggerMessageId: requestId }));
+    const result = JSON.parse(await atOpenStoreTime(() => tools.executeTool(client, 'test', conversationId, name, args, undefined, { triggerMessageId: requestId }), 'test'));
     if (name === 'criar_pedido') await client.query('COMMIT');
     return result;
   } catch (e) { await client.query('ROLLBACK').catch(() => undefined); throw e; } finally { client.release(); }

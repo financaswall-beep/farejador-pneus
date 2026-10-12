@@ -23,6 +23,7 @@ import { logger } from '../shared/logger.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { enqueueStoredPhoto } from '../photos/dispatch.js';
 import { enqueueAccessoryText } from './outbox-accessory.js';
+import { selectedStoreIsOpen } from './routing-store-hours.js';
 
 const PHOTO_REQUEST_TTL_MINUTES = 10;
 const MAX_ACTIVE_PER_CONVERSATION = 2;
@@ -64,6 +65,7 @@ export async function createPhotoRequest(
   environment: Environment,
   input: CreatePhotoRequestInput,
 ): Promise<CreatePhotoRequestResult> {
+  if(!await selectedStoreIsOpen(client,environment,input.unitId))throw new Error('store_closed');
   // Dedup: o LLM chamando 2x (ou cliente repetindo) não vira 2 cards iguais.
   const dup = await client.query<{ id: string; expires_at: Date }>(
     `SELECT id, expires_at FROM commerce.photo_requests

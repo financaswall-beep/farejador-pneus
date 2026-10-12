@@ -195,6 +195,7 @@ window.PAINEL_MODULES.botEntrega = function () {
     },
     botEntregaMotivo(reason){return ({apt:'Pedido completo',insufficient_stock:'Estoque insuficiente',outside_radius:'Fora do limite',outside_ring:'Além da busca automática',
       radius_missing:'Sem raio cadastrado',needs_location:'Localização não confirmada',pickup_only:'Somente retirada',delivery_paused:'Entrega pausada',pickup_disabled:'Retirada desabilitada',
+      store_closed:'Loja fechada agora',store_hours_unknown:'Horário da loja a confirmar',
       only_far:'Só há opção distante; exige consulta ao cliente',unavailable:'Nenhuma loja apta',matriz_closer:'A Matriz está mais perto que os parceiros aptos do anel.',
       matriz_fallback:'A Matriz pode atender e não há parceiro apto no anel.',partner_fairness:'Parceiro escolhido pela distribuição atual entre as lojas aptas do anel mais próximo.'})[reason]||reason;},
     botEntregaKm(km){return km==null?'—':Number(km).toLocaleString('pt-BR',{maximumFractionDigits:1})+' km';},
