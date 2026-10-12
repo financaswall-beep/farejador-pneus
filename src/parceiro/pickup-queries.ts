@@ -170,9 +170,10 @@ export async function markPartnerPickupRetrieved(
     await client.query(
       `UPDATE commerce.partner_orders
           SET awaiting_pickup=false,retrieved_at=now(),status='paid',updated_at=now(),
+              payment_method=COALESCE($5,payment_method),
               operator_token_id=COALESCE(operator_token_id,$4)
         WHERE id=$1 AND environment=$2 AND unit_id=$3`,
-      [orderId, ctx.environment, ctx.unitId, ctx.tokenId],
+      [orderId, ctx.environment, ctx.unitId, ctx.tokenId, paymentMethod],
     );
     await client.query(
       `INSERT INTO finance.partner_receivables (

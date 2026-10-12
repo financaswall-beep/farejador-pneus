@@ -1304,6 +1304,7 @@ export interface BotPartnerOrderInput {
   customer_name: string | null;
   customer_phone: string | null;
   items: BotPartnerOrderItem[];
+  payment_method?: string | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address: string | null;
   freight_amount: number;
@@ -1356,7 +1357,7 @@ export async function materializePartnerOrder(
       input.customer_name,
       input.customer_phone,
       JSON.stringify(input.items),
-      'A receber', // COD — pago na entrega (ou no balcão, na retirada reservada)
+      input.payment_method ?? 'A receber', // forma combinada; realização depende da entrega/retirada
       input.fulfillment_mode,
       input.delivery_address,
       `bot:${ctx.slug}`,

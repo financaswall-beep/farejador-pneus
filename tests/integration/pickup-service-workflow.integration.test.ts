@@ -17,7 +17,11 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  if (db) await stopPostgres(db);
+  if (db) {
+    const { partnerPool } = await import('../../src/parceiro/db.js');
+    await partnerPool.end();
+    await stopPostgres(db);
+  }
 });
 
 async function transaction(work: (client: PoolClient) => Promise<void>) {
@@ -70,7 +74,7 @@ describe('retirada com serviços na mesma verdade comercial', () => {
       payment_method: 'Pix',
     });
     const completed = await db.pool.query(
-      `SELECT order_row.total_amount,order_row.status,order_row.awaiting_pickup,
+      `SELECT order_row.total_amount,order_row.status,order_row.awaiting_pickup,order_row.payment_method,
               stock.quantity_on_hand,stock.quantity_reserved,
               (SELECT count(*)::int FROM commerce.partner_order_items item
                 WHERE item.order_id=order_row.id AND item.pickup_service_code IS NOT NULL) services,
@@ -80,16 +84,18 @@ describe('retirada com serviços na mesma verdade comercial', () => {
                 WHERE item.order_id=order_row.id AND item.cost_status='known'
                   AND item.pickup_service_code IS NOT NULL) known_cost_services,
               (SELECT amount::text FROM finance.partner_receivables receivable
-                WHERE receivable.source_order_id=order_row.id) receipt_amount
+                WHERE receivable.source_order_id=order_row.id) receipt_amount,
+              (SELECT payment_method FROM finance.partner_receivables receivable
+                WHERE receivable.source_order_id=order_row.id) receipt_method
          FROM commerce.partner_orders order_row
          JOIN commerce.partner_stock_levels stock ON stock.id=$2
         WHERE order_row.id=$1`,
       [orderId, fixture.stockId],
     );
     expect(completed.rows[0]).toMatchObject({
-      total_amount: '100.00', status: 'paid', awaiting_pickup: false,
+      total_amount: '100.00', status: 'paid', awaiting_pickup: false, payment_method: 'Pix',
       quantity_on_hand: 4, quantity_reserved: 0, services: 2,
-      service_total: '20.00', known_cost_services: 2, receipt_amount: '100.00',
+      service_total: '20.00', known_cost_services: 2, receipt_amount: '100.00', receipt_method: 'Pix',
     });
     const tireRanking = await queries.getPartnerRelatorioPneus(fixture.ctx);
     expect(tireRanking).toHaveLength(1);

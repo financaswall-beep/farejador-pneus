@@ -80,6 +80,14 @@ describe('TENHO ligado ao fechamento real do bot e à reserva existente',()=>{
     const retry=await close(conversation,trigger);expect(retry.order_number).toBe(sale.order_number);
     const orders=(await db.pool.query('SELECT partner_order_id FROM commerce.orders WHERE source_conversation_id=$1',[conversation])).rows;
     expect(orders).toHaveLength(1);expect(orders[0].partner_order_id).toBeTruthy();
+    const payment=(await db.pool.query(`SELECT o.payment_method mirror_payment,po.payment_method partner_payment
+      FROM commerce.orders o JOIN commerce.partner_orders po ON po.id=o.partner_order_id AND po.environment=o.environment
+      WHERE o.environment='test' AND o.source_conversation_id=$1`,[conversation])).rows[0];
+    expect(payment).toEqual({mirror_payment:'pix',partner_payment:'pix'});
+    expect((await db.pool.query(`SELECT id FROM finance.partner_receivables WHERE environment='test' AND source_order_id=$1`,
+      [orders[0].partner_order_id])).rows).toHaveLength(0);
+    expect(Number((await db.pool.query(`SELECT cash_in_month FROM network.partner_unit_summary
+      WHERE environment='test' AND unit_id=$1`,[unit.unitId])).rows[0].cash_in_month)).toBe(0);
     expect(Number((await db.pool.query('SELECT quantity_reserved FROM commerce.partner_stock_levels WHERE id=$1',[unit.stockId])).rows[0].quantity_reserved)).toBe(1);
   });
   it('fecha a venda da Matriz sem exigir TENHO mesmo com a flag ligada',async()=>{

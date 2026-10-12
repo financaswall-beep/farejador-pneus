@@ -72,6 +72,7 @@ import { requestPhotoBatch } from './photo-batch.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 import { withStoreOpeningScope, matrixStoreIsOpen } from './routing-store-hours.js';
+import { partnerOrderPresentation } from './partner-order-state.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -1499,6 +1500,7 @@ async function criarPedido(
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,
       customer_phone: effectivePhone,
+      payment_method: formaPagamento,
       items: partner.items.map((it) => ({
         partner_stock_id: it.partner_stock_id,
         quantity: it.quantity,
@@ -1529,7 +1531,7 @@ async function criarPedido(
       conversationId,
       totalAmount: mat.total_amount,
       fulfillmentMode: modalidade,
-      paymentMethod: 'A receber',
+      paymentMethod: formaPagamento,
       deliveryAddress,
       geoResolutionId,
       customerName,
@@ -1694,6 +1696,9 @@ interface OrderRow {
   partner_order_id: string | null;
   partner_delivery_status: string | null;
   partner_status: string | null;
+  partner_payment_method: string | null;
+  partner_retrieved_at: Date | null;
+  partner_delivered_at: Date | null;
 }
 
 interface OrderItemRow {
@@ -1710,22 +1715,6 @@ interface OrderItemRow {
  * sempre 'open' pra pedido de parceiro (quem avança o estado é a máquina do
  * parceiro), então o bot tem que ler daqui pra responder "cadê meu pedido" certo.
  */
-function situacaoParceiro(deliveryStatus: string | null, partnerStatus: string | null): string {
-  if (partnerStatus === 'cancelled') return 'cancelado';
-  switch (deliveryStatus) {
-    case 'pending':
-      return 'em separação';
-    case 'dispatched':
-      return 'saiu para entrega';
-    case 'delivered':
-      return 'entregue';
-    case 'failed':
-      return 'entrega não concluída';
-    default:
-      return 'em separação';
-  }
-}
-
 async function consultarPedido(
   client: PoolClient,
   environment: Environment,
@@ -1757,9 +1746,10 @@ async function consultarPedido(
     const result = await client.query<OrderRow>(
       `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
               o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
-              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status
+              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status,
+              po.payment_method AS partner_payment_method, po.retrieved_at AS partner_retrieved_at, po.delivered_at AS partner_delivered_at
        FROM commerce.orders o
-       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
+       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id AND po.environment = o.environment
        WHERE o.environment = $1
          AND o.order_number = $2
          AND o.contact_id = $3
@@ -1785,9 +1775,10 @@ async function consultarPedido(
     const result = await client.query<OrderRow>(
       `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
               o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
-              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status
+              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status,
+              po.payment_method AS partner_payment_method, po.retrieved_at AS partner_retrieved_at, po.delivered_at AS partner_delivered_at
        FROM commerce.orders o
-       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
+       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id AND po.environment = o.environment
        WHERE o.environment = $1
          AND o.contact_id = $2
        ORDER BY o.created_at DESC
@@ -1816,24 +1807,25 @@ async function consultarPedido(
          ORDER BY p.product_name`,
         [o.id],
       );
+      const partnerState = o.partner_order_id ? partnerOrderPresentation(o) : null;
       return {
         order_number: o.order_number,
-        status: o.status,
-        // C6: pedido de parceiro → situação REAL (em separação/saiu/entregue),
-        // já em linguagem de cliente. O `status` do espelho fica sempre 'open'.
+        status: partnerState?.status ?? o.status,
+        // Pedido parceiro usa estado operacional, incluindo a retirada.
+        // O espelho pode continuar 'open' depois da conclusão no app.
         ...(o.partner_order_id
           ? {
               eh_parceiro: true,
-              situacao_parceiro: situacaoParceiro(o.partner_delivery_status, o.partner_status),
+              situacao_parceiro: partnerState!.situation,
             }
           : {}),
         total: o.total_amount,
         modalidade: o.fulfillment_mode,
-        pagamento: o.payment_method,
+        pagamento: o.partner_order_id ? o.partner_payment_method ?? o.payment_method : o.payment_method,
         endereco_entrega: o.delivery_address,
         cliente_nome: o.customer_name,
         criado_em: o.created_at.toISOString(),
-        fechado_em: o.closed_at?.toISOString() ?? null,
+        fechado_em: (partnerState?.closedAt ?? o.closed_at)?.toISOString() ?? null,
         itens: itensResult.rows.map((i) => ({
           product_id: i.product_id,
           produto: i.product_name,

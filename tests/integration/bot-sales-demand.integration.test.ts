@@ -127,7 +127,10 @@ beforeAll(async () => {
 afterEach(() => vi.restoreAllMocks());
 afterAll(async () => {
   vi.unstubAllGlobals();
-  if (db) await stopPostgres(db);
+  if (db) {
+    const {partnerPool}=await import('../../src/parceiro/db.js');await partnerPool.end();
+    await stopPostgres(db);
+  }
 });
 
 describe('cotação e mapa de demanda', () => {
@@ -407,16 +410,44 @@ describe('fechamento real pelo Bot V2', () => {
     const first = await order(c, p);
     expect((await order(c, p)).order_number).toBe(first.order_number);
     const mirrors = (await db.pool.query(
-      `SELECT o.customer_name,o.unit_id,po.awaiting_pickup,po.total_amount
+      `SELECT o.customer_name,o.unit_id,po.awaiting_pickup,po.total_amount,
+        o.payment_method mirror_payment,po.payment_method partner_payment
        FROM commerce.orders o JOIN commerce.partner_orders po ON po.id=o.partner_order_id
        WHERE o.environment='test' AND o.source_conversation_id=$1`, [c.id],
     )).rows;
     expect(mirrors).toEqual([{
       customer_name: 'Nome informado no fechamento', unit_id: partner.unitId,
-      awaiting_pickup: true, total_amount: '89.00',
+      awaiting_pickup: true, total_amount: '89.00',mirror_payment:'pix',partner_payment:'pix',
     }]);
     expect((await db.pool.query(
       `SELECT quantity_on_hand,quantity_reserved FROM commerce.partner_stock_levels WHERE id=$1`, [partner.stockId],
     )).rows[0]).toMatchObject({ quantity_on_hand: 5, quantity_reserved: 1 });
+    const poId=(await db.pool.query(`SELECT partner_order_id FROM commerce.orders
+      WHERE environment='test' AND source_conversation_id=$1`,[c.id])).rows[0].partner_order_id;
+    const cash=async()=>Number((await db.pool.query(`SELECT cash_in_month FROM network.partner_unit_summary
+      WHERE environment='test' AND unit_id=$1`,[partner.unitId])).rows[0].cash_in_month);
+    const receipts=()=>db.pool.query(`SELECT amount,status,payment_method FROM finance.partner_receivables
+      WHERE environment='test' AND unit_id=$1 AND source_order_id=$2`,[partner.unitId,poId]);
+    // Forma Pix combinada não é recebimento: caixa e recebível ficam vazios até retirar.
+    expect((await receipts()).rows).toEqual([]);expect(await cash()).toBe(0);
+    const {markPartnerPickupRetrieved}=await import('../../src/parceiro/pickup-queries.js');
+    expect(await markPartnerPickupRetrieved(partner.ctx,poId,{})).toMatchObject({retrieved:true});
+    expect((await receipts()).rows).toEqual([{amount:'89.00',status:'received',payment_method:'pix'}]);
+    expect(await cash()).toBe(89);
+    await expect(markPartnerPickupRetrieved(partner.ctx,poId,{})).rejects.toThrow('pickup_already_retrieved');
+    expect((await receipts()).rows).toHaveLength(1);expect(await cash()).toBe(89);
+    const events=await db.pool.query(`SELECT e.amount,e.payment_method FROM finance.partner_receivable_events e
+      JOIN finance.partner_receivables r ON r.id=e.receivable_id AND r.environment=e.environment
+      WHERE r.environment='test' AND r.unit_id=$1 AND r.source_order_id=$2 AND e.event_kind='receipt'`,[partner.unitId,poId]);
+    expect(events.rows).toEqual([{amount:'89.00',payment_method:'pix'}]);
+    expect((await db.pool.query(`SELECT quantity_on_hand,quantity_reserved FROM commerce.partner_stock_levels WHERE id=$1`,
+      [partner.stockId])).rows[0]).toMatchObject({quantity_on_hand:4,quantity_reserved:0});
+    const client=await db.pool.connect();try{
+      for(const args of [{order_number:first.order_number},{}]){
+        const result=JSON.parse(await tools.executeTool(client,'test',c.id,'consultar_pedido',args));
+        expect(result.pedidos).toHaveLength(1);
+        expect(result.pedidos[0]).toMatchObject({status:'paid',situacao_parceiro:'retirado',pagamento:'pix',fechado_em:expect.any(String)});
+      }
+    }finally{client.release();}
   });
 });
