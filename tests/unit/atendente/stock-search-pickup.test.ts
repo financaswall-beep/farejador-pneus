@@ -8,7 +8,7 @@ vi.mock('../../../src/shared/geo/geo-cache.js',()=>({cachedRoadDistanceKm:mocks.
 import { resolveProductAvailabilityByProximity } from '../../../src/atendente-v2/fulfillment.js';
 import { observeSearchProducts,withStockSearchTrace } from '../../../src/atendente-v2/stock-search-trace.js';
 
-type Store={id:string;mode:'pickup'|'delivery'|'both';lng:number|null;radius:number|null;stock:number;coverage?:boolean};
+type Store={id:string;mode:'pickup'|'delivery'|'both';lng:number|null;radius:number|null;stock:number;coverage?:boolean;price?:number|null};
 async function search(stores:Store[]){
   const query=vi.fn(async(sql:string,values:unknown[])=>{
     if(sql.includes('FROM network.partner_units pu')||sql.includes('FROM network.unit_coverage uc'))return {rows:stores.map(s=>({
@@ -17,7 +17,7 @@ async function search(stores:Store[]){
       delivery_radius_km:s.radius===null?null:String(s.radius),has_city_coverage:s.coverage??false,neighborhoods:[],
     }))};
     if(sql.includes('FROM commerce.partner_stock_levels'))return {rows:stores.filter(s=>(values[1] as string[]).includes(s.id)&&s.stock>0)
-      .map(s=>({unit_id:s.id,product_id:'p1',disponivel:String(s.stock)}))};
+      .map(s=>({unit_id:s.id,product_id:'p1',disponivel:String(s.stock),sale_price:s.price===null?null:String(s.price??100)}))};
     if(sql.includes('INSERT INTO ops.bot_stock_searches'))return {rows:[]};
     throw new Error('Consulta inesperada');
   });
@@ -34,6 +34,12 @@ async function search(stores:Store[]){
 }
 beforeEach(()=>{mocks.env.ROUTING_PROXIMITY_FIRST=true;mocks.env.ROUTING_GEO_ROAD_DISTANCE=false;mocks.road.mockReset();});
 describe('procura local em lojas aptas à retirada',()=>{
+  it('oferece a próxima loja com preço válido e preserva o estoque observado da loja sem preço',async()=>{
+    const result=await search([{id:'sem-preco',mode:'both',lng:.02,radius:40,stock:9,price:null},
+      {id:'com-preco',mode:'both',lng:.04,radius:40,stock:3,price:179.9}]);
+    expect(result.availability.get('p1')).toEqual({unitId:'com-preco',available:3});
+    expect(result.observations.find((s:{id:string})=>s.id==='sem-preco')).toMatchObject({available:true});
+  });
   it('observa a falta na loja both sem raio e a disponibilidade da pickup sem prometer entrega delas',async()=>{
     const result=await search([{id:'teste',mode:'both',lng:.02,radius:null,stock:0},
       {id:'retirada',mode:'pickup',lng:.03,radius:null,stock:2}]);

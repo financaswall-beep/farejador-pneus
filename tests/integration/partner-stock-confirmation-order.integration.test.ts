@@ -29,7 +29,7 @@ beforeAll(async()=>{
     VALUES('test',$1,90,'regular',now()-interval '1 day')`,[product]);
   await db.pool.query(`INSERT INTO commerce.matriz_product_prices(environment,product_id,price_amount) VALUES('test',$1,90)`,[product]);
   await db.pool.query(`UPDATE commerce.partner_stock_levels SET product_id=$2,tire_size='90/90-18',
-    tire_condition='meia_vida',quantity_on_hand=3 WHERE id=$1`,[unit.stockId,product]);
+    tire_condition='meia_vida',quantity_on_hand=3,sale_price=90 WHERE id=$1`,[unit.stockId,product]);
   await db.pool.query(`INSERT INTO core.units(environment,slug,name) VALUES('test','main','Matriz') ON CONFLICT DO NOTHING`);
 },180_000);
 afterAll(async()=>{vi.unstubAllGlobals();for(const p of pools)await p.end();if(db)await stopPostgres(db);});
@@ -40,18 +40,18 @@ async function customer() {
     (environment,chatwoot_conversation_id,chatwoot_account_id,current_status,contact_id,started_at)
     VALUES('test',$1,2,'open',$2,now()) RETURNING id`,[++serial,contact])).rows[0].id as string;
 }
-async function close(conversation:string,requestId:string) {
+async function close(conversation:string,requestId:string,price=90) {
   const client=await db.pool.connect();
   try{await client.query('BEGIN');const result=JSON.parse(await tools.executeTool(client,'test',conversation,'criar_pedido',{
     nome_cliente:'Joao Cliente',modalidade:'delivery',forma_pagamento:'pix',municipio:'rio de janeiro',bairro:'Méier',
     endereco_entrega:'Rua Teste, 100, Méier, Rio de Janeiro',valor_frete:9.9,
-    itens:[{product_id:product,quantidade:1,preco_unitario:90}],
+    itens:[{product_id:product,quantidade:1,preco_unitario:price}],
   },undefined,{triggerMessageId:requestId}));await client.query('COMMIT');return result;}
   catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
 describe('TENHO ligado ao fechamento real do bot e à reserva existente',()=>{
   it('não cria venda antes do TENHO; depois cria e reserva uma única vez',async()=>{
-    mocked.routing={unitId:unit.unitId,ctx:unit.ctx,items:[{product_id:product,partner_stock_id:unit.stockId,quantity:1,central_price:90}]};
+    mocked.routing={unitId:unit.unitId,ctx:unit.ctx,items:[{product_id:product,partner_stock_id:unit.stockId,quantity:1,unit_price:90}]};
     const conversation=await customer();const trigger=randomUUID();
     const waiting=await close(conversation,trigger);expect(waiting.aguardando_parceiro).toBe(true);
     expect((await db.pool.query('SELECT id FROM commerce.orders WHERE source_conversation_id=$1',[conversation])).rows).toHaveLength(0);
@@ -73,5 +73,28 @@ describe('TENHO ligado ao fechamento real do bot e à reserva existente',()=>{
     expect(result.ok).toBe(true);expect(result.aguardando_parceiro).toBeUndefined();
     expect((await db.pool.query('SELECT id FROM commerce.partner_stock_requests WHERE conversation_id=$1',[conversation])).rows).toHaveLength(0);
     expect((await db.pool.query('SELECT partner_order_id FROM commerce.orders WHERE source_conversation_id=$1',[conversation])).rows[0].partner_order_id).toBeNull();
+  });
+  it('preço editado exige nova mensagem e o pedido/espelho usam o preço da loja após TENHO',async()=>{
+    await db.pool.query('UPDATE commerce.partner_stock_levels SET sale_price=189.90 WHERE id=$1',[unit.stockId]);
+    mocked.routing={unitId:unit.unitId,ctx:unit.ctx,items:[{product_id:product,partner_stock_id:unit.stockId,quantity:1,unit_price:189.9}]};
+    const conversation=await customer(), oldTrigger=randomUUID();
+    expect(await close(conversation,oldTrigger,90)).toMatchObject({preco_alterado:true});
+    expect(await close(conversation,oldTrigger,189.9)).toMatchObject({nova_confirmacao_obrigatoria:true});
+    expect((await db.pool.query('SELECT id FROM commerce.orders WHERE source_conversation_id=$1',[conversation])).rows).toHaveLength(0);
+    const trigger=randomUUID(), waiting=await close(conversation,trigger,189.9);
+    expect(waiting.aguardando_parceiro).toBe(true);
+    const client=await db.pool.connect();try{
+      await publish(client,'test',conversation);await client.query('BEGIN');
+      await client.query("SELECT set_config('app.partner_unit_id',$1,true)",[unit.partnerUnitId]);
+      await client.query('SELECT commerce.answer_partner_stock_request($1,1,true)',[waiting.solicitacao_id]);
+      await client.query('COMMIT');
+    }finally{client.release();}
+    const sale=await close(conversation,trigger,189.9);
+    expect(sale).toMatchObject({ok:true,total:199.8});
+    const item=(await db.pool.query(`SELECT oi.unit_price,poi.unit_price partner_price
+      FROM commerce.orders o JOIN commerce.order_items oi ON oi.order_id=o.id
+      JOIN commerce.partner_order_items poi ON poi.order_id=o.partner_order_id
+      WHERE o.environment='test' AND o.source_conversation_id=$1`,[conversation])).rows[0];
+    expect(item).toEqual({unit_price:'189.90',partner_price:'189.90'});
   });
 });

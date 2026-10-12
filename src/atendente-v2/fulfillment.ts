@@ -11,9 +11,9 @@
  *     a regra interna, sem mexer em quem chama.
  *
  *  2. mapProductToPartnerStock() — casa o produto do catálogo central com a
- *     linha de estoque DA LOJA (partner_stock_levels) + o preço CENTRAL tabelado
- *     (commerce.product_prices). Decisão de negócio (Wallace, 2026-06-02):
- *     estoque = da loja; preço = tabelado central igual pra todas as unidades.
+ *     linha de estoque DA LOJA (partner_stock_levels) + seu preço de venda.
+ *     Decisão Wallace 2026-10-11: cada borracharia define o preço ao cliente.
+ *     Compra na Matriz e tabela central não substituem o sale_price da loja.
  *
  * Nada aqui escreve. A materialização do partner_order (com reserva de estoque)
  * é feita no criar_pedido reusando commerce.register_partner_local_order.
@@ -41,6 +41,7 @@ import { getMatrizWholesaleStockQty } from './wholesale-stock-read.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { storeHoursForCustomer } from '../shared/weekly-store-hours.js';
+import { lockAndValidatePartnerSalePrices } from '../parceiro/partner-sale-pricing.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
 import {
@@ -383,8 +384,8 @@ export async function resolveMunicipioFromGeo(
 export interface PartnerStockMapping {
   /** commerce.partner_stock_levels.id da unidade — alvo da reserva de estoque. */
   partner_stock_id: string;
-  /** Preço CENTRAL tabelado (commerce.product_prices), não o sale_price da loja. */
-  central_price: number;
+  /** Preço de venda da linha de estoque da borracharia escolhida. */
+  unit_price: number;
   /** Nome do item no estoque da loja (pra logs/itens). */
   item_name: string;
 }
@@ -392,10 +393,10 @@ export interface PartnerStockMapping {
 /**
  * Mapeia um produto do catálogo central (commerce.products.id) para:
  *  - a linha de estoque DA LOJA (commerce.partner_stock_levels) daquela unidade;
- *  - o preço CENTRAL tabelado vigente (commerce.product_prices, price_type='regular').
+ *  - o preço de venda da própria linha (sale_price).
  *
  * Retorna null se a unidade NÃO estoca o produto (item indisponível na loja) ou
- * se não houver preço central vigente. A validação de quantidade suficiente fica
+ * se não houver preço local válido. A validação de quantidade suficiente fica
  * a cargo de commerce.register_partner_local_order (levanta 'Estoque insuficiente').
  */
 export async function mapProductToPartnerStock(
@@ -408,8 +409,8 @@ export async function mapProductToPartnerStock(
   // H5 (revisão multi-agente): só casa estoque RASTREADO e com DISPONÍVEL suficiente
   // (disponível = quantity_on_hand − quantity_reserved, igual à máquina em 0076). Linha
   // não-rastreada / on_hand NULL = "vende no escuro" → NÃO roteia pro parceiro (vai matriz).
-  const stock = await client.query<{ id: string; item_name: string }>(
-    `SELECT id, item_name
+  const stock = await client.query<{ id: string; item_name: string; sale_price: string | null }>(
+    `SELECT id, item_name, sale_price::text
      FROM commerce.partner_stock_levels
      WHERE environment = $1
        AND unit_id = $2
@@ -419,33 +420,17 @@ export async function mapProductToPartnerStock(
        AND is_tracked = true
        AND quantity_on_hand IS NOT NULL
        AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) >= $4
-     ORDER BY (quantity_on_hand - COALESCE(quantity_reserved, 0)) DESC
+       AND sale_price > 0
+     ORDER BY (quantity_on_hand - COALESCE(quantity_reserved, 0)) DESC,id
      LIMIT 1`,
     [environment, unitId, productId, neededQty],
   );
-  if (stock.rowCount === 0) return null;
-
-  const price = await client.query<{ price_amount: string }>(
-    `SELECT price_amount
-     FROM commerce.product_prices
-     WHERE environment = $1
-       AND product_id = $2
-       AND price_type = 'regular'
-       AND valid_from <= now()
-       AND (valid_until IS NULL OR valid_until > now())
-     ORDER BY valid_from DESC
-     LIMIT 1`,
-    [environment, productId],
-  );
-  if (price.rowCount === 0) {
-    logger.warn({ environment, unitId, productId }, 'mapProductToPartnerStock: estoque ok mas SEM preço central vigente — fallback matriz');
-    return null;
-  }
-
+  const row = stock.rows[0], price = row?.sale_price == null ? null : Number(row.sale_price);
+  if (!row || price === null || !Number.isFinite(price) || price <= 0) return null;
   return {
-    partner_stock_id: stock.rows[0]!.id,
-    central_price: Number(price.rows[0]!.price_amount),
-    item_name: stock.rows[0]!.item_name,
+    partner_stock_id: row.id,
+    unit_price: price,
+    item_name: row.item_name,
   };
 }
 
@@ -455,9 +440,9 @@ export interface StoreDecision {
   unit_label: string;
   /** Presente só quando store==='partner' — contexto pronto pra materializar o partner_order. */
   partner?: PartnerContext;
-  /** Presente só quando store==='partner' — alvo da reserva + preço central. */
+  /** Presente só quando store==='partner' — alvo da reserva + preço de venda da loja. */
   partner_stock_id?: string;
-  central_price?: number;
+  unit_price?: number;
   /** A loja escolhida tem o produto em estoque? */
   has_stock: boolean;
   /** Explicação legível da decisão (pra logs/depuração/prova). */
@@ -647,14 +632,14 @@ export async function getPartnerStockMap(
   client: PoolClient,
   environment: Environment,
   municipio: string | null,
-): Promise<Map<string, number>> {
+): Promise<Map<string, ProductAvailability>> {
   observeSearchMunicipality(municipio);
   if (!municipio) return new Map();
   const partner = await resolveUnitForMunicipio(client, environment, municipio);
   if (!partner) return new Map();
   const map = await readPartnerAvailableStock(client, environment, partner.unitId);
   observeSearchStore(partner.unitId, partner.unitName, map);
-  return map;
+  return new Map([...map].map(([id, available]) => [id, { unitId: partner.unitId, available }]));
 }
 
 /**
@@ -717,7 +702,7 @@ export async function decideStoreForOrder(
         unit_label: partner.unitName,
         partner,
         partner_stock_id: mapping.partner_stock_id,
-        central_price: mapping.central_price,
+        unit_price: mapping.unit_price,
         has_stock: true,
         reason: `região do parceiro (${input.municipio}) + parceiro tem o produto`,
       };
@@ -739,7 +724,7 @@ export interface ItemForDecision {
 export interface PartnerOrderRouting {
   ctx: NonNullable<StoreDecision['partner']>;
   unitId: string;
-  items: { product_id: string; partner_stock_id: string; quantity: number; central_price: number }[];
+  items: { product_id: string; partner_stock_id: string; quantity: number; unit_price: number }[];
 }
 
 /**
@@ -777,7 +762,7 @@ export async function decideStoreForItems(
   );
 
   const allPartner = decisions.every(
-    (d) => d.store === 'partner' && d.partner && d.partner_stock_id && d.central_price != null,
+    (d) => d.store === 'partner' && d.partner && d.partner_stock_id && d.unit_price != null,
   );
   const oneUnit = new Set(decisions.map((d) => d.unit_id)).size === 1;
   if (!allPartner || !oneUnit) return null;
@@ -789,7 +774,7 @@ export async function decideStoreForItems(
       product_id: i.product_id,
       partner_stock_id: decisions[idx]!.partner_stock_id!,
       quantity: i.quantity,
-      central_price: decisions[idx]!.central_price!,
+      unit_price: decisions[idx]!.unit_price!,
     })),
   };
 }
@@ -845,7 +830,7 @@ async function decideStoreForItemsMulti(
           product_id: i.product_id,
           partner_stock_id: mappings[idx]!.partner_stock_id,
           quantity: i.quantity,
-          central_price: mappings[idx]!.central_price,
+          unit_price: mappings[idx]!.unit_price,
         })),
       };
     }
@@ -1122,7 +1107,7 @@ export async function decideStoreForItemsGeo(
           product_id: i.product_id,
           partner_stock_id: win.mappings[idx]!.partner_stock_id,
           quantity: i.quantity,
-          central_price: win.mappings[idx]!.central_price,
+          unit_price: win.mappings[idx]!.unit_price,
         })),
       },
     };
@@ -1165,7 +1150,7 @@ export async function decideStoreForItemsGeo(
           product_id: i.product_id,
           partner_stock_id: nearestFar.mappings[idx]!.partner_stock_id,
           quantity: i.quantity,
-          central_price: nearestFar.mappings[idx]!.central_price,
+          unit_price: nearestFar.mappings[idx]!.unit_price,
         })),
       },
     };
@@ -1257,8 +1242,8 @@ export async function resolveProductAvailabilityByProximity(
   if (inRange.length === 0) return out;
 
   // estoque disponível por (unidade, produto) numa tacada (mesma régua do mapProductToPartnerStock).
-  const stock = await client.query<{ unit_id: string; product_id: string; disponivel: string }>(
-    `SELECT unit_id, product_id, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
+  const stock = await client.query<{ unit_id: string; product_id: string; disponivel: string; sale_price: string | null }>(
+    `SELECT unit_id, product_id, sale_price::text, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
      FROM commerce.partner_stock_levels
      WHERE environment = $1
        AND unit_id = ANY($2)
@@ -1271,12 +1256,18 @@ export async function resolveProductAvailabilityByProximity(
     [environment, inRange.map((c) => c.ctx.unitId), input.productIds],
   );
   const byUnit = new Map<string, Map<string, number>>();
+  const pricedByUnit = new Map<string, Map<string, number>>();
   for (const r of stock.rows) {
     let m = byUnit.get(r.unit_id);
     if (!m) byUnit.set(r.unit_id, (m = new Map()));
     // unidade pode ter +1 linha pro mesmo produto → fica com o MAIOR disponível
     // (mesma escolha do mapProductToPartnerStock: ORDER BY disponivel DESC LIMIT 1).
     m.set(r.product_id, Math.max(m.get(r.product_id) ?? 0, Number(r.disponivel)));
+    if(r.sale_price!==null&&Number.isFinite(Number(r.sale_price))&&Number(r.sale_price)>0) {
+      let priced=pricedByUnit.get(r.unit_id);
+      if(!priced)pricedByUnit.set(r.unit_id,(priced=new Map()));
+      priced.set(r.product_id,Math.max(priced.get(r.product_id)??0,Number(r.disponivel)));
+    }
   }
 
   // A consulta SQL acima observou todas estas lojas; preservar também as sem oferta disponível.
@@ -1286,7 +1277,7 @@ export async function resolveProductAvailabilityByProximity(
   for (const productId of input.productIds) {
     for (const c of inRange) {
       if (!servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))) continue;
-      const q = byUnit.get(c.ctx.unitId)?.get(productId);
+      const q = pricedByUnit.get(c.ctx.unitId)?.get(productId);
       if (q != null && q > 0) {
         out.set(productId, { unitId: c.ctx.unitId, available: q });
         break;
@@ -1338,6 +1329,9 @@ export async function materializePartnerOrder(
   ctx: PartnerContext,
   input: BotPartnerOrderInput,
 ): Promise<{ partner_order_id: string; total_amount: string }> {
+  await lockAndValidatePartnerSalePrices(client, ctx, input.items.map(item => ({
+    partner_stock_id: item.partner_stock_id, reference_unit_price: item.unit_price,
+  })));
   const customerId = await upsertPartnerCustomerWithClient(client, ctx, {
     name: input.customer_name ?? '',
     phone: input.customer_phone,

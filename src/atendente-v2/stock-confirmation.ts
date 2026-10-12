@@ -67,7 +67,10 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
       await client.query('COMMIT');
       const filter=(products:Product[])=>products.filter(product=>items.some(item=>item.product_id===product.product_id)).map(product=>{
         const quantity=prior!.routing.items.find(item=>item.product_id===product.product_id)!.quantity;
-        return {...product,...('total_stock_available' in product?{total_stock_available:quantity}:{}),...('total_stock' in product?{total_stock:quantity}:{})};
+        const price=decision.routing.items.find(item=>item.product_id===product.product_id)!.unit_price.toFixed(2);
+        return {...product,...('price_amount' in product?{price_amount:price,currency:'BRL',price_type:'partner_retail'}:{}),
+          ...('current_price' in product?{current_price:price}:{}),
+          ...('total_stock_available' in product?{total_stock_available:quantity}:{}),...('total_stock' in product?{total_stock:quantity}:{})};
       });
       return JSON.stringify({...result,...(Array.isArray(result.produtos)?{produtos:filter(result.produtos)}:{}),
         ...(Array.isArray(result.veiculos)?{veiculos:result.veiculos.map(vehicle=>({...vehicle,produtos:filter(vehicle.produtos??[])}))}:{}),disponibilidade_confirmada:true,

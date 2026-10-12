@@ -31,15 +31,19 @@ beforeAll(async()=>{
   restricted=new Pool({connectionString:buildRestrictedConnectionString(db.connectionString),max:3});
   a=await createPartnerFixture(db.pool);b=await createPartnerFixture(db.pool);
   for(const unit of [a,b]) {
-    await db.pool.query("UPDATE commerce.partner_stock_levels SET tire_size='90/90-18',tire_condition='meia_vida' WHERE id=$1",[unit.stockId]);
+    await db.pool.query("UPDATE commerce.partner_stock_levels SET tire_size='90/90-18',tire_condition='meia_vida',sale_price=90 WHERE id=$1",[unit.stockId]);
     const second=(await db.pool.query(`INSERT INTO commerce.partner_stock_levels
-      (environment,unit_id,item_name,tire_size,tire_condition,is_tracked,quantity_on_hand)
-      VALUES('test',$1,'Pneu 80/100-14','80/100-14','meia_vida',true,10) RETURNING id`,[unit.unitId])).rows[0].id;
+      (environment,unit_id,item_name,tire_size,tire_condition,is_tracked,quantity_on_hand,sale_price)
+      VALUES('test',$1,'Pneu 80/100-14','80/100-14','meia_vida',true,10,90) RETURNING id`,[unit.unitId])).rows[0].id;
     secondStocks.set(unit.unitId,second);
   }
   for(const [id,measure] of [[productA,'90/90-18'],[productB,'80/100-14']])await db.pool.query(`INSERT INTO commerce.products
     (id,environment,product_code,product_name,product_type,brand,tire_condition)
     VALUES($1,'test',$2,$3,'tire','Pirelli','meia_vida')`,[id,'CONF-'+id,'Pneu '+measure]);
+  for(const unit of [a,b]) {
+    await db.pool.query('UPDATE commerce.partner_stock_levels SET product_id=$2 WHERE id=$1',[unit.stockId,productA]);
+    await db.pool.query('UPDATE commerce.partner_stock_levels SET product_id=$2 WHERE id=$1',[secondStocks.get(unit.unitId),productB]);
+  }
 },180_000);
 afterAll(async()=>{if(restricted)await restricted.end();if(db)await stopPostgres(db);});
 beforeEach(async()=>{
@@ -55,7 +59,7 @@ beforeEach(async()=>{
     const unit=excluded.includes(a.unitId)?b:a;
     if(excluded.includes(b.unitId))return {kind:'matriz',canFulfill:false};
     return {kind:'partner',routing:{unitId:unit.unitId,ctx:unit.ctx,
-      items:items.map((item:any)=>({...item,partner_stock_id:item.product_id===productA?unit.stockId:secondStocks.get(unit.unitId),central_price:90}))}};
+      items:items.map((item:any)=>({...item,partner_stock_id:item.product_id===productA?unit.stockId:secondStocks.get(unit.unitId),unit_price:90}))}};
   });
 });
 async function withRestricted<T>(unit:PartnerFixture,action:(client:import('pg').PoolClient)=>Promise<T>) {

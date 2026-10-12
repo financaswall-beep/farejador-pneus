@@ -5,13 +5,12 @@ import type {
 } from '../atendente/tools/commerce-tools.js';
 import {
   loadCurrentCatalogPrices,
-  loadCurrentPartnerPrices,
   moneyCents,
 } from '../shared/catalog-pricing.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { loadPartnerRetailOffers, type PartnerRetailAvailability } from './partner-retail-pricing.js';
 
-type Availability = number | { available: number };
-type AvailabilityMap = ReadonlyMap<string, Availability>;
+type AvailabilityMap = ReadonlyMap<string, PartnerRetailAvailability>;
 
 export async function applyMatrizPricesToCompatibility(
   client: PoolClient,
@@ -55,15 +54,14 @@ export async function applyPartnerPricesToCompatibility(
   result: CompatibilidadeResultado[],
   availability: AvailabilityMap,
 ): Promise<boolean> {
-  const prices = await loadCurrentPartnerPrices(client, environment, [...availability.keys()]);
+  const prices = await loadPartnerRetailOffers(client, environment, availability);
   let applied = false;
   for (const vehicle of result) {
     for (const product of vehicle.produtos) {
-      const available = availabilityAmount(availability.get(product.product_id));
       const price = prices.get(product.product_id);
-      if (available === null || !price) continue;
-      product.total_stock = available;
-      product.current_price = price.price_amount.toFixed(2);
+      if (!price) continue;
+      product.total_stock = price.available;
+      product.current_price = price.unitPrice.toFixed(2);
       applied = true;
     }
   }
@@ -76,16 +74,15 @@ export async function applyPartnerPricesToProducts(
   result: ProdutoOferta[],
   availability: AvailabilityMap,
 ): Promise<boolean> {
-  const prices = await loadCurrentPartnerPrices(client, environment, [...availability.keys()]);
+  const prices = await loadPartnerRetailOffers(client, environment, availability);
   let applied = false;
   for (const product of result) {
-    const available = availabilityAmount(availability.get(product.product_id));
     const price = prices.get(product.product_id);
-    if (available === null || !price) continue;
-    product.total_stock_available = available;
-    product.price_amount = price.price_amount.toFixed(2);
-    product.currency = price.currency;
-    product.price_type = price.price_type;
+    if (!price) continue;
+    product.total_stock_available = price.available;
+    product.price_amount = price.unitPrice.toFixed(2);
+    product.currency = 'BRL';
+    product.price_type = 'partner_retail';
     applied = true;
   }
   return applied;
@@ -140,9 +137,4 @@ export async function repriceMatrizQuotedItems<T extends QuotedItem>(
       preco_unitario: prices.get(item.product_id)!.price_amount,
     })),
   };
-}
-
-function availabilityAmount(value: Availability | undefined): number | null {
-  if (typeof value === 'number') return value;
-  return value?.available ?? null;
 }

@@ -28,8 +28,8 @@ function clientFor(partners:{id:string;lng:number;radius?:number;stock?:boolean;
       unit_id:p.id,partner_id:p.id,partner_unit_id:p.id,slug:p.id,partner_name:p.id,unit_name:p.id,
       service_mode:'both',latitude:'0',longitude:String(p.lng),delivery_radius_km:String(p.radius??40),has_city_coverage:false,neighborhoods:[]}));
     else if(sql.includes('FROM commerce.partner_stock_levels')){
-      if(partners.find(p=>p.id===values[1])?.stock!==false)rows=[{id:'stock-'+values[1],item_name:'Pneu'}];
-    }else if(sql.includes('FROM commerce.product_prices'))rows=[{price_amount:'100'}];
+      if(partners.find(p=>p.id===values[1])?.stock!==false)rows=[{id:'stock-'+values[1],item_name:'Pneu',sale_price:'100'}];
+    }
     else if(sql.includes('AS lead_count'))rows=partners.map(p=>({unit_id:p.id,unit_created_at:new Date('2025-01-01'),lead_count:String(p.leads??0),last_lead_at:null}));
     else if(sql.includes('matriz_delivery_settings'))rows=saved?[{settings:saved,version:1,updated_at:new Date()}]:[];
     else if(sql.includes('SELECT id FROM commerce.products'))rows=[{id:'p1'}];

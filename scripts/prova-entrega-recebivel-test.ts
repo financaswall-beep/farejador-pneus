@@ -59,7 +59,7 @@ async function main(): Promise<void> {
          FROM commerce.partner_stock_levels WHERE id=$1`, [stockId])).rows[0]!;
       const mat = await materializePartnerOrder(client, geo.routing.ctx, {
         customer_name: name, customer_phone: null,
-        items: geo.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.central_price })),
+        items: geo.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.unit_price })),
         fulfillment_mode: 'delivery', delivery_address: 'Rua Teste, 100 — Copacabana',
         freight_amount: 0, idempotency_key: idem, reserve_for_pickup: false,
       });
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     if (geoP.kind !== 'partner') { check('4) setup retirada', false); } else {
       const matP = await materializePartnerOrder(client, geoP.routing.ctx, {
         customer_name: 'Retira C4', customer_phone: null,
-        items: geoP.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.central_price })),
+        items: geoP.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.unit_price })),
         fulfillment_mode: 'pickup', delivery_address: null, freight_amount: 0,
         idempotency_key: `prova-ret-c4-${Date.now()}`, reserve_for_pickup: true,
       });

@@ -77,7 +77,7 @@ async function main(): Promise<void> {
         items: geo.routing.items.map((it) => ({
           partner_stock_id: it.partner_stock_id,
           quantity: it.quantity,
-          unit_price: it.central_price,
+          unit_price: it.unit_price,
         })),
         fulfillment_mode: 'pickup',
         delivery_address: null,
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
         `SELECT quantity_on_hand AS on_hand, COALESCE(quantity_reserved,0) AS reserved FROM commerce.partner_stock_levels WHERE id=$1`, [stockId])).rows[0]!;
       const mat = await materializePartnerOrder(client, geo.routing.ctx, {
         customer_name: name, customer_phone: null,
-        items: geo.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.central_price })),
+        items: geo.routing.items.map((it) => ({ partner_stock_id: it.partner_stock_id, quantity: it.quantity, unit_price: it.unit_price })),
         fulfillment_mode: 'pickup', delivery_address: null, freight_amount: 0, idempotency_key: idem, reserve_for_pickup: true,
       });
       return { ctx: geo.routing.ctx, orderId: mat.partner_order_id, total: mat.total_amount, stockId, before };

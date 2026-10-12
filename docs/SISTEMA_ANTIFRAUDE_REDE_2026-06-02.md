@@ -120,14 +120,16 @@ uma unidade). Falta **aflorar esse `unit_id`** e passá-lo ao `criar_pedido`.
   > distribuição, sem mudar quem chama.
 - **Retirada:** unidade escolhida / mais próxima do cliente.
 
-**MODELO DE ESTOQUE/PREÇO — RESOLVIDO (Wallace, 2026-06-02):**
+**MODELO DE ESTOQUE/PREÇO — atualizado por Wallace em 2026-10-11:**
 - **Estoque = da loja (parceiro).** O bot vende o que a unidade roteada **fisicamente tem**
   (`commerce.partner_stock_levels`), reserva e baixa **na loja**. Coerente com a máquina COD atual.
-- **Preço = tabelado central.** Igual pra todas as unidades — vem da tabela central
-  (`commerce.product_prices`/`commerce.products`), **NÃO** do `partner_stock_levels.sale_price`.
+- **Preço = venda da borracharia escolhida**, em `partner_stock_levels.sale_price`.
+  Substitui a decisão de preço único de 2026-06-02. Preço de compra na Matriz não é preço ao cliente.
 - **Consequência:** o bot precisa (a) ofertar só o que a unidade tem em estoque e (b) cotar pelo
-  **preço central**. O item do pedido casa `commerce.products.product_id` → o
-  `partner_stock_levels.id` (`partner_stock_id`) daquela unidade; `unit_price` = preço central.
+  **preço local**. O item do pedido casa `commerce.products.product_id` → o
+  `partner_stock_levels.id` (`partner_stock_id`) daquela unidade; `unit_price` = seu preço de venda.
+  Sem preço válido, não oferece essa linha. Preço alterado exige nova confirmação do cliente;
+  a validação bloqueia a reserva e impede o modelo de fechar novamente no mesmo turno.
 - **Atribuição (correção):** a venda 2w é marcada por **`partner_orders.source_tag='2w'`**
   (enum existente), **não** por `commerce.orders.source='chatwoot_com_bot'`. A cobrança da matriz
   deve ler `source_tag='2w'`.

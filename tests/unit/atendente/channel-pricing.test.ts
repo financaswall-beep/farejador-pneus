@@ -45,14 +45,12 @@ describe('fronteira de preco Matriz x parceiros', () => {
     expect(String(query.mock.calls[0]?.[0])).toContain('commerce.matriz_current_prices');
   });
 
-  it('mantem a oferta do parceiro no preco regular que ja existia', async () => {
+  it('usa o preço local da mesma loja e linha cujo saldo foi escolhido', async () => {
     const item = product();
     const query = vi.fn().mockResolvedValue({
       rows: [{
         product_id: item.product_id,
-        price_amount: '149.90',
-        price_type: 'regular',
-        currency: 'BRL',
+        id: 'stock-1', unit_id: 'unit-1', sale_price: '179.90', disponivel: '3',
       }],
     });
 
@@ -60,17 +58,18 @@ describe('fronteira de preco Matriz x parceiros', () => {
       { query } as never,
       'prod',
       [item],
-      new Map([[item.product_id, { available: 3 }]]),
+      new Map([[item.product_id, { unitId: 'unit-1', available: 3 }]]),
     );
 
     expect(applied).toBe(true);
     expect(item).toMatchObject({
       total_stock_available: 3,
-      price_amount: '149.90',
-      price_type: 'regular',
+      price_amount: '179.90',
+      price_type: 'partner_retail',
     });
     const sql = String(query.mock.calls[0]?.[0]);
-    expect(sql).toContain('commerce.product_prices');
+    expect(sql).toContain('commerce.partner_stock_levels');
+    expect(sql).not.toContain('commerce.product_prices');
     expect(sql).not.toContain('matriz_current_prices');
   });
 

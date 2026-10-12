@@ -70,6 +70,7 @@ import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRout
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
+import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -1487,6 +1488,8 @@ async function criarPedido(
     }
     const idempotencyKey = resolved.key;
 
+    const priced = await validatePartnerRetailQuote(client, environment, partner, quotedItems, { conversationId, requestId });
+    if (!priced.ok) return JSON.stringify(priced.response);
     const waiting=await requirePartnerStockConfirmation(client,environment,conversationId,partner,args,requestId);
     if(waiting)return waiting;
 
@@ -1496,7 +1499,7 @@ async function criarPedido(
       items: partner.items.map((it) => ({
         partner_stock_id: it.partner_stock_id,
         quantity: it.quantity,
-        unit_price: it.central_price,
+        unit_price: it.unit_price,
       })),
       fulfillment_mode: modalidade as 'delivery' | 'pickup',
       delivery_address: deliveryAddress,
@@ -1517,7 +1520,7 @@ async function criarPedido(
     }
 
     // H1: o total do espelho é LIDO DE VOLTA do partner_order (uma fonte de número,
-    // nunca o que o LLM cotou) — e os itens vão a preço CENTRAL.
+    // nunca o que o LLM cotou) — e os itens vão a preço de venda da loja.
     order = await insertCommerceOrderMirror(client, environment, {
       contactId,
       conversationId,
@@ -1534,11 +1537,11 @@ async function criarPedido(
       items: partner.items.map((it) => ({
         product_id: it.product_id,
         quantity: it.quantity,
-        unit_price: it.central_price.toFixed(2),
+        unit_price: it.unit_price.toFixed(2),
       })),
     });
 
-    respSubtotal = partner.items.reduce((s, it) => s + it.central_price * it.quantity, 0);
+    respSubtotal = partner.items.reduce((s, it) => s + it.unit_price * it.quantity, 0);
     respFrete = modalidade === 'delivery' ? FRETE_PADRAO_BRL : 0;
     respTotal = Number(mat.total_amount);
 
@@ -1565,7 +1568,7 @@ async function criarPedido(
   } else {
     // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
     // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
-    // Parceiros continuam no preço regular que o fluxo da Rede já utilizava.
+    // Parceiros usam o sale_price da borracharia, sem alterar o preço da Matriz.
     const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);
     if (!repriced.ok) return JSON.stringify(repriced.response);
     itens = repriced.items;

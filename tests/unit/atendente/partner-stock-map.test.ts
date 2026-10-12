@@ -50,13 +50,13 @@ describe('saldo do parceiro exposto ao bot', () => {
     };
     const client = { query } as unknown as PoolClient;
     const result = await getPartnerStockMap(client, 'test', 'Itaboraí');
-    expect(result.get('product-a')).toBe(7);
+    expect(result.get('product-a')).toEqual({ unitId: 'unit-a', available: 7 });
   });
 
   it('consulta somente o produto e a unidade escolhida, descontando reservas', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('FROM commerce.partner_stock_levels')) {
-        return { rowCount: 1, rows: [{ id: 'stock-a', item_name: '90/90-18 Pirelli' }] };
+        return { rowCount: 1, rows: [{ id: 'stock-a', item_name: '90/90-18 Pirelli', sale_price: '179.90' }] };
       }
       if (sql.includes('FROM commerce.product_prices')) {
         return { rowCount: 1, rows: [{ price_amount: '149.90' }] };
@@ -70,7 +70,7 @@ describe('saldo do parceiro exposto ao bot', () => {
     );
 
     expect(result).toEqual({
-      partner_stock_id: 'stock-a', central_price: 149.9, item_name: '90/90-18 Pirelli',
+      partner_stock_id: 'stock-a', unit_price: 179.9, item_name: '90/90-18 Pirelli',
     });
     const [stockSql, stockParams] = query.mock.calls[0]!;
     expect(stockSql).toContain('unit_id = $2');
@@ -80,6 +80,8 @@ describe('saldo do parceiro exposto ao bot', () => {
     expect(stockSql).toContain('is_tracked = true');
     expect(stockSql).toContain('(quantity_on_hand - COALESCE(quantity_reserved, 0)) >= $4');
     expect(stockParams).toEqual(['test', 'unit-a', 'product-a', 3]);
+    expect(stockSql).toContain('sale_price > 0');
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('não oferece o pneu quando o disponível da unidade não cobre a quantidade', async () => {
@@ -89,6 +91,12 @@ describe('saldo do parceiro exposto ao bot', () => {
     await expect(mapProductToPartnerStock(
       client, 'test', 'unit-a', 'product-a', 2,
     )).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, '0', '-1', 'NaN'])('não substitui preço local inválido (%s) pelo central', async sale_price => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ id: 'stock-a', item_name: 'Pneu', sale_price }] });
+    expect(await mapProductToPartnerStock({ query } as never, 'prod', 'unit-a', 'product-a')).toBeNull();
     expect(query).toHaveBeenCalledTimes(1);
   });
 });

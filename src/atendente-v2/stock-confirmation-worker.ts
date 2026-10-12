@@ -10,12 +10,21 @@ import { botOrderRequestId } from './order-attempt.js';
 import { publishStockRequest } from './stock-confirmation.js';
 import { createConfirmedStockPhotos } from './stock-confirmation-photo.js';
 import { routeStockConfirmation } from './stock-confirmation-routing.js';
-import { createStockRequest,latestStockRequest,lockStockConversation,type StockRequest } from './stock-confirmation-store.js';
+import { createStockRequest,latestStockRequest,lockStockConversation,refreshStockRequestPrices,type StockRequest } from './stock-confirmation-store.js';
 
 const money=(value:unknown)=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function stockConfirmedText(request:StockRequest):string {
   const items=request.items.map(item=>`${item.quantity} × ${item.tire_size} — ${money(item.price)} cada`).join('\n');
   return `A loja confirmou esses pneus:\n${items}\nVocê prefere buscar ou receber?`;
+}
+export function stockPriceChangedText(request:StockRequest,result:Record<string,unknown>):string {
+  const changed=Array.isArray(result.itens)?result.itens as Array<{product_id:string;preco_atual:number|null}>:[];
+  const lines=changed.map(item=>{
+    const index=request.routing.items.findIndex(row=>row.product_id===item.product_id);
+    const measure=request.items[index]?.tire_size??'Pneu';
+    return `${measure}: ${item.preco_atual==null?'preço a confirmar':money(item.preco_atual)+' cada'}`;
+  });
+  return `O preço da loja mudou:\n${lines.join('\n')}\nConfirma os novos valores? O pedido ainda não foi fechado.`;
 }
 export function confirmedOrderText(request:StockRequest,result:Record<string,unknown>):string {
   const pickup=result.retirada as {nome_loja?:string;endereco?:string;maps_url?:string}|undefined;
@@ -53,7 +62,7 @@ async function handleRequest(client:PoolClient,request:StockRequest) {
     await client.query("UPDATE commerce.partner_stock_requests SET status='expired' WHERE id=$1",[request.id]);request.status='expired';
   }
   if(request.status==='confirmed') {
-    if(!request.valid_until||new Date(request.valid_until).getTime()<=Date.now()) {
+    if(!request.valid_until||new Date(request.valid_until).getTime()<=Date.now()||!await refreshStockRequestPrices(client,request)) {
       await client.query("UPDATE commerce.partner_stock_requests SET status='expired' WHERE id=$1",[request.id]);request.status='expired';
     } else {
       let body=stockConfirmedText(request);
@@ -71,7 +80,8 @@ async function handleRequest(client:PoolClient,request:StockRequest) {
         } else if(result.aguardando_parceiro) {
           await publishStockRequest(client,request.environment,request.conversation_id);
           await client.query('UPDATE commerce.partner_stock_requests SET notified_at=now() WHERE id=$1',[request.id]);return;
-        } else body='A loja respondeu, mas o pedido ainda não foi fechado. Vamos conferir os dados antes de continuar.';
+        } else if(result.preco_alterado) body=stockPriceChangedText(request,result);
+        else body='A loja respondeu, mas o pedido ainda não foi fechado. Vamos conferir os dados antes de continuar.';
       }
       await notify(client,request,body);return;
     }

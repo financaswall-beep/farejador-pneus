@@ -392,14 +392,14 @@ describe('fechamento real pelo Bot V2', () => {
     const c = await conversation();
     const p = await product();
     const partner = await createPartnerFixture(db.pool, { initialStockQty: 5 });
-    await db.pool.query(`UPDATE commerce.partner_stock_levels SET product_id=$1 WHERE id=$2`, [p, partner.stockId]);
+    await db.pool.query(`UPDATE commerce.partner_stock_levels SET product_id=$1,sale_price=89 WHERE id=$2`, [p, partner.stockId]);
     await pin(c);
     // Apenas a decisão geográfica é simulada. Pedido, espelho, estoque e consultas
     // usam o código real e todas as migrations, sem mocks de SQL nem chamadas externas.
     vi.spyOn(fulfillment, 'decideStoreForItemsGeo').mockResolvedValue({
       kind: 'partner', ringKm: 10, distanceKm: 2,
       routing: { unitId: partner.unitId, ctx: partner.ctx, items: [
-        { product_id: p, partner_stock_id: partner.stockId, quantity: 1, central_price: 89 },
+        { product_id: p, partner_stock_id: partner.stockId, quantity: 1, unit_price: 89 },
       ] },
     });
     const first = await order(c, p);

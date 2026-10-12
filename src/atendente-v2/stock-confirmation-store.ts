@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
-import type { PartnerOrderRouting } from './fulfillment.js';
+import { mapProductToPartnerStock, type PartnerOrderRouting } from './fulfillment.js';
 import type { StockConfirmationItem,StockConfirmationLocation } from './stock-confirmation-routing.js';
 
 export interface StockRequest {
@@ -36,15 +36,34 @@ export function requestConfirms(request:StockRequest|null,unitId:string,items:St
       confirmed=>confirmed.product_id===item.product_id && confirmed.quantity>=item.quantity)));
 }
 export async function requestPublicItems(client:PoolClient,environment:Environment,routing:PartnerOrderRouting) {
-  const stock=await client.query<{id:string;tire_size:string;item_name:string;tire_condition:string|null}>(
-    `SELECT id,tire_size,item_name,tire_condition FROM commerce.partner_stock_levels
-      WHERE environment=$1 AND unit_id=$2 AND id=ANY($3::uuid[])`,
+  const stock=await client.query<{id:string;tire_size:string;item_name:string;tire_condition:string|null;sale_price:string|null}>(
+    `SELECT id,tire_size,item_name,tire_condition,sale_price::text FROM commerce.partner_stock_levels
+      WHERE environment=$1 AND unit_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL`,
     [environment,routing.unitId,routing.items.map(item=>item.partner_stock_id)]);
   return routing.items.map(item=>{
     const row=stock.rows.find(s=>s.id===item.partner_stock_id);
     if(!row)throw new Error('confirmation_stock_changed');
-    return {tire_size:row.tire_size||row.item_name,tire_condition:row.tire_condition,quantity:item.quantity,price:item.central_price};
+    const price=row.sale_price==null?null:Number(row.sale_price);
+    if(price==null||!Number.isFinite(price)||price<=0)throw new Error('partner_sale_price_missing');
+    return {tire_size:row.tire_size||row.item_name,tire_condition:row.tire_condition,quantity:item.quantity,price};
   });
+}
+/** Uma resposta atrasada da loja não deve anunciar o preço anterior à edição. */
+export async function refreshStockRequestPrices(client:PoolClient,request:StockRequest):Promise<boolean> {
+  const updated=[];
+  for(let i=0;i<request.routing.items.length;i++) {
+    const item=request.routing.items[i]!,prior=request.items[i];
+    const current=await mapProductToPartnerStock(client,request.environment,request.unit_id,item.product_id,item.quantity);
+    if(!current||!prior)return false;
+    updated.push({...prior,price:current.unit_price});
+  }
+  if(!updated.length)return false;
+  if(updated.some((item,i)=>item.price!==request.items[i]!.price)) {
+    await client.query('UPDATE commerce.partner_stock_requests SET items=$2::jsonb WHERE environment=$1 AND id=$3',
+      [request.environment,JSON.stringify(updated),request.id]);
+    request.items=updated;
+  }
+  return true;
 }
 export async function createStockRequest(client:PoolClient,environment:Environment,conversationId:string,
   messageId:string|null,location:StockConfirmationLocation,routing:PartnerOrderRouting,excluded:string[]=[],closingArgs:Record<string,unknown>|null=null) {
