@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import {readdirSync} from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
@@ -29,8 +30,13 @@ describe('manifesto de migrations', () => {
     const result = auditMigrationManifest(resolve(process.cwd()));
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.files).toBe(261);
-    expect(result.latest).toBe('0260_logistics_lost_receipt_approval.sql');
+    const sqlFiles=readdirSync(resolve(process.cwd(),'db/migrations')).filter(file=>parseMigrationFilename(file));
+    sqlFiles.sort((a,b)=>{
+      const left=parseMigrationFilename(a)!,right=parseMigrationFilename(b)!;
+      return left.order-right.order||left.suffix.localeCompare(right.suffix);
+    });
+    expect(result.files).toBe(sqlFiles.length);
+    expect(result.latest).toBe(sqlFiles.at(-1));
     expect(result.documentedGaps).toEqual(['0071']);
   });
 });

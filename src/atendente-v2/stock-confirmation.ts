@@ -5,6 +5,8 @@ import type { PartnerOrderRouting } from './fulfillment.js';
 import { botOrderRequestId } from './order-attempt.js';
 import { confirmationLocation,routeStockConfirmation,type StockConfirmationItem } from './stock-confirmation-routing.js';
 import { basketKey,createStockRequest,latestStockRequest,lockStockConversation,requestConfirms,sameStockLocation,STOCK_WAIT_TEXT,type StockRequest } from './stock-confirmation-store.js';
+import {guardCurrentConfirmedStockReply} from './confirmed-stock-context.js';
+import type {ChatMessage} from './types.js';
 
 type Product=Record<string,unknown>;
 export function selectedConfirmationProducts(result:Record<string,unknown>):Product[] {
@@ -117,10 +119,10 @@ export async function stockConfirmationAtTurnStart(client:PoolClient,environment
 }
 /** Resposta determinística: avisa a mudança/andamento sem prometer disponibilidade. */
 export async function guardStockConfirmationReply(client:PoolClient,environment:Environment,conversationId:string,
-  body:string,before:StockRequest|null=null):Promise<{body:string;pending:boolean}> {
+  body:string,before:StockRequest|null=null,actions:ChatMessage[]=[]):Promise<{body:string;pending:boolean}> {
   if(!env.PARTNER_STOCK_CONFIRMATION)return {body,pending:false};
   const request=await latestStockRequest(client,environment,conversationId);
-  if(request?.status!=='pending')return {body,pending:false};
+  if(request?.status!=='pending')return {body:await guardCurrentConfirmedStockReply(client,environment,conversationId,body,actions),pending:false};
   let waiting=STOCK_WAIT_TEXT;
   if(before?.status==='pending'&&before.basket_key!==request.basket_key) {
     const items=request.items.map(item=>

@@ -29,16 +29,12 @@ import { loadCustomerMemory } from './customer-memory.js';
 import { loadCustomerContext } from './customer-context.js';
 import { withStockSearchTrace } from './stock-search-trace.js';
 import { recordBotModelUsage } from './model-usage.js';
+import {currentConfirmedStockPrompt,correctConfirmedStockHandoff} from './confirmed-stock-context.js';
+import {hasRepeatedEmptyGreetings,handoffEmptyGreetings} from './empty-greeting-limit.js';
 
 const MAX_TOOL_ROUNDS = 5;
 
-/**
- * Distância em LINHA RETA (haversine) do cliente até a loja ATIVA mais perto, em km.
- * Produto-agnóstico, barato e OFFLINE (não chama o Google) — é só pro gancho de calor
- * "você tá a ~X km". O roteamento real continua usando distância de RUA; aqui aproxima.
- * null se não há loja com coordenada. Loja "só sistema" (0165) fica FORA: o gancho
- * de calor não pode medir distância de uma loja que o bot nunca vai escolher.
- */
+/** Haversine da loja ativa mais próxima: aproximação offline para a fala, não para roteamento. */
 async function nearestStoreKm(
   client: PoolClient,
   environment: Environment,
@@ -95,6 +91,11 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       logger.warn(logCtx, 'agent_v2: chatwoot_conversation_id not found, aborting');
       return;
     }
+    if(hasRepeatedEmptyGreetings(history)) {
+      if(!await mayContinue())return;
+      await handoffEmptyGreetings(client,job,chatwootConvId,Date.now()-start);
+      return;
+    }
 
     // 1b. Pesquisa de satisfação (0105): se há pesquisa pendente nesta conversa e o
     // cliente respondeu uma NOTA, grava + agradece e PULA o LLM (é resposta de
@@ -135,11 +136,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         : `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Para estoque, preço na loja, retirada ou loja mais perto, CHAME buscar_produto / buscar_compatibilidade / localizacao_loja AGORA, SEM bairro. Para frete, siga o schema ativo de calcular_frete; se ele exigir bairro, peça-o apenas como fallback. Não peça o pino de novo.${proximidadeHook}`
       : '';
     const cityClarificationNudge = '\nSe qualquer ferramenta retornar precisa_municipio=true, pergunte somente a cidade do bairro. Essa confirmação pontual é permitida mesmo com pino já recebido quando ele não resolveu o município; não peça novamente o pino nem invente a cidade.';
-    // Empurrão determinístico da FOTO (gêmeo do pino): quando o cliente PEDE pra
-    // ver o pneu, o bot às vezes confabula ("já pedi pro pessoal") sem chamar a
-    // tool pedir_foto — aí nenhum photo_request nasce. Detecta por código e injeta
-    // a ordem que proíbe a promessa-sem-chamada. Só com a flag on (off = prompt
-    // byte a byte o de hoje, preserva o caching). Ver photo-nudge.ts.
+    // Foto só pode ser prometida após chamada da ferramenta; flag off preserva o prompt.
     const reversedHistory = [...history].reverse();
     const latestCustomerText = reversedHistory.find((m) => m.role === 'user')?.content ?? null;
     const lastAssistantText =
@@ -165,7 +162,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const systemPromptWithContext =
       basePrompt + (customerContext ?? '') + (customerMemory ?? '') + organicContext + (env.BOT_AUDIO_ENABLED?AUDIO_RULES:'')
       + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge
-      + buildPurchaseContext(history) + cityClarificationNudge;
+      + buildPurchaseContext(history) + cityClarificationNudge
+      + await currentConfirmedStockPrompt(client,environment as Environment,stockRequestBeforeTurn);
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },
@@ -214,6 +212,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         }
 
         if (toolCall.function.name === 'escalar_humano') {
+          const correction=await correctConfirmedStockHandoff(client,environment as Environment,conversationId,
+            toolArgs,latestCustomerText,turnActions);
+          if(correction) {
+            modelTurn.appendToolResult(toolCall.id,correction);
+            turnActions.push({role:'tool',tool_call_id:toolCall.id,content:correction});
+            continue;
+          }
           // Não executar ferramentas que o modelo colocou depois do encaminhamento.
           assistantToolMsg.tool_calls = response.tool_calls.slice(0,toolIndex+1);
           const result = JSON.parse(await executeTool(client,environment as Environment,
@@ -290,7 +295,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
     }
 
-    const stockReply=await guardStockConfirmationReply(client,environment as Environment,conversationId,finalBody,stockRequestBeforeTurn);
+    const stockReply=await guardStockConfirmationReply(client,environment as Environment,conversationId,finalBody,stockRequestBeforeTurn,turnActions);
     finalBody=stockReply.body;
     // Guarda anti-eco: se o bot está prestes a mandar o MESMO texto que mandou no
     // turno anterior desta conversa, descarta silenciosamente — o cliente mandou duas

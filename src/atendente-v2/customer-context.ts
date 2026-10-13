@@ -4,6 +4,7 @@ import { logger } from '../shared/logger.js';
 import { normalizeCheckoutPhone } from '../shared/phone.js';
 
 export interface CustomerContextRow {
+  channel_type?: string | null;
   name: string | null;
   has_phone: boolean;
   phone_e164?: string | null;
@@ -33,8 +34,9 @@ function formatDate(value: Date | string | null): string | null {
 }
 
 export function formatCustomerContext(row: CustomerContextRow): string {
-  const validName = !isPlaceholderCustomerName(row.name);
-  const firstName = validName ? safeInline(row.name).split(/\s+/)[0] : null;
+  const displayName=row.name?.replace(/^\[TESTE CMD\]\s*/i,'')??null;
+  const validName = !isPlaceholderCustomerName(displayName);
+  const firstName = validName ? safeInline(displayName).split(/\s+/)[0] : null;
   const purchases = Math.max(0, Number(row.purchase_count) || 0);
   const parts: string[] = ['\n[CONTEXTO CLIENTE]'];
 
@@ -45,7 +47,10 @@ export function formatCustomerContext(row: CustomerContextRow): string {
   }
 
   const hasPhone = row.phone_e164 !== undefined ? normalizeCheckoutPhone(row.phone_e164) !== null : row.has_phone;
-  parts.push(hasPhone
+  const whatsapp=row.channel_type===undefined||/whatsapp/i.test(row.channel_type??'');
+  parts.push(hasPhone && !whatsapp
+    ? 'Telefone válido cadastrado neste contato. Este canal não é WhatsApp: na lista de espera, use somente número informado por texto pelo cliente. Se ele já informou o WhatsApp completo na conversa, aproveite esse texto; senão peça o WhatsApp com DDD. Não use identificador de perfil como telefone.'
+    : hasPhone
     ? 'Telefone já cadastrado neste contato. NÃO peça telefone ou WhatsApp novamente. Na lista de espera do WhatsApp, omita registrar_interesse_reposicao.telefone: o código usa o cadastro. Se faltar quantidade, pergunte só quantos pneus deseja.'
     : 'Telefone válido ainda não cadastrado. Se o cliente já informou um número completo nesta conversa, passe-o em telefone_cliente; caso contrário, peça telefone/WhatsApp com DDD antes de criar o pedido.');
 
@@ -75,7 +80,7 @@ export async function loadCustomerContext(
   try {
     const result = await client.query<CustomerContextRow>(
       `WITH current_customer AS (
-         SELECT cv.environment,cv.contact_id,ct.name,ct.phone_e164
+         SELECT cv.environment,cv.contact_id,cv.channel_type,ct.name,ct.phone_e164
            FROM core.conversations cv
            JOIN core.contacts ct ON ct.id=cv.contact_id AND ct.environment=cv.environment
           WHERE cv.id=$1 AND cv.deleted_at IS NULL AND ct.deleted_at IS NULL
@@ -94,7 +99,7 @@ export async function loadCustomerContext(
            FROM completed_orders o
           ORDER BY COALESCE(o.delivered_at,o.retrieved_at,o.created_at) DESC,o.id DESC LIMIT 1
        )
-       SELECT cc.name,cc.phone_e164,(NULLIF(trim(cc.phone_e164),'') IS NOT NULL) AS has_phone,
+       SELECT cc.name,cc.phone_e164,cc.channel_type,(NULLIF(trim(cc.phone_e164),'') IS NOT NULL) AS has_phone,
               history.purchase_count,history.partial_ltv_brl,
               lp.occurred_at AS last_purchase_at,
               (SELECT COALESCE(ts.tire_size,p.product_name)

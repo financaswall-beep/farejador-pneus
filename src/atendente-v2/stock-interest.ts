@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { normalizeCheckoutPhone, containsCheckoutPhone } from '../shared/phone.js';
 import { tireSizeKey } from '../shared/tire-size.js';
 import type { ToolDefinition } from './types.js';
+import {explicitRestockPhone} from './restock-customer-input.js';
 
 export const STOCK_INTEREST_TOOL: ToolDefinition = { type: 'function', function: {
   name: 'registrar_interesse_reposicao',
@@ -38,7 +39,12 @@ export async function registerStockInterest(client: PoolClient, environment: str
   const recent=await client.query(`SELECT id,content,sent_at,chatwoot_message_id FROM core.messages WHERE environment=$1
     AND conversation_id=$2 AND sender_type='contact' AND NOT is_private AND deleted_at IS NULL
     ORDER BY sent_at DESC,id DESC LIMIT 20`,[environment,conversationId]);
-  const consent=recent.rows.find(m=>String(m.content).trim()===a.consentimento.trim());
+  let consent=recent.rows.find(m=>String(m.content).trim()===a.consentimento.trim());
+  if(!consent&&a.acao==='registrar'&&a.consentimento.trim().length>=12) {
+    consent=recent.rows.find(m=>String(m.content).includes(a.consentimento.trim())
+      &&explicitRestockConsent(String(m.content))&&/whats/i.test(String(m.content)));
+    if(consent)a.consentimento=String(consent.content).trim();
+  }
   if (!consent || Date.now()-new Date(consent.sent_at).getTime()>30*60000) return { erro:'autorizacao_nao_confirmada',
     orientacao:'Peça autorização explícita por texto para avisar no WhatsApp e copie a resposta sem alterar.' };
   if (a.acao==='cancelar') {
@@ -57,9 +63,11 @@ export async function registerStockInterest(client: PoolClient, environment: str
     LEFT JOIN core.contacts ct ON ct.id=c.contact_id AND ct.environment=c.environment AND ct.deleted_at IS NULL
     WHERE c.id=$1 AND c.environment=$2 AND c.deleted_at IS NULL`,[conversationId,environment])).rows[0];
   const known=/whatsapp/i.test(contact?.channel_type??'')?normalizeCheckoutPhone(contact?.phone_e164):null;
-  const phone=normalizeCheckoutPhone(a.telefone?.trim()||known);
+  const supplied=a.telefone?.trim();
+  const written=explicitRestockPhone(recent.rows);
+  const phone=supplied?normalizeCheckoutPhone(supplied):(written===undefined?known:written);
   const revoked=recent.rows.some(m=>Number(m.chatwoot_message_id)>Number(consent.chatwoot_message_id)
-    && /\b(n[aã]o\s+(?:me\s+)?avis\w*|n[aã]o\s+preciso|cancel\w*\s+(?:o\s+)?aviso|pare\s+de\s+(?:me\s+)?avis\w*)\b/i.test(m.content));
+    && /\b(n[aã]o\s+(?:me\s+)?avis\w*|n[aã]o\s+preciso|n[aã]o\s+quero\s+(?:mais\s+)?(?:receber|avisos?|ser avisad\w*)|cancel\w*\s+(?:(?:o|a|minha)\s+)?(?:aviso|lista|inscri\w*)|pare\s+de\s+(?:me\s+)?avis\w*)\b/i.test(m.content));
   if(revoked)return {erro:'novo_consentimento_necessario',orientacao:'O cliente desistiu do aviso. Não o inclua usando a autorização anterior.'};
   if (!phone || !(known===phone || recent.rows.some(m=>containsCheckoutPhone(String(m.content),phone))) || !confirmed) {
     return {erro:'consentimento_ou_telefone_pendente',orientacao:'Peça ao cliente confirmar por texto que pode avisar no WhatsApp e informar o número. Não diga que já registrou.'};

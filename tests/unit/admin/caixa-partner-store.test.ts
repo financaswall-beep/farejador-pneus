@@ -8,7 +8,8 @@ const loja = {
 };
 function setup() {
   const screen = partnerScreen();
-  screen.C.partnerData.api = vi.fn(async (resource: string) => resource === 'configuracoes' ? { loja: { ...loja } } : { rows: [] });
+  screen.C.partnerData.api = vi.fn(async (resource: string) => resource === 'configuracoes' ? { loja: { ...loja } }
+    : resource === 'configuracoes/horarios' ? { schema_ready: true, hours: [{ day: 1, opens_at: '08:00', closes_at: '18:00' }] } : { rows: [] });
   screen.C.partnerHome.sync('partner-profile');
   return screen;
 }
@@ -21,7 +22,7 @@ const settle = async () => { for (let i = 0; i < 12; i += 1) await Promise.resol
 describe('Minha loja do parceiro', () => {
   it('mostra ajustes reais, funcionários e som, sem uma aba do rodapé selecionada', async () => {
     const screen = await loaded();
-    expect(screen.root.textContent).toContain('8h às 18h');
+    expect(screen.root.textContent).toContain('Dias de abertura e fechamento');
     expect(screen.root.textContent).toContain('Funcionários');
     expect(screen.root.textContent).toContain('Entrega até 5 km');
     expect(screen.button('Som dos avisos').attributes['role']).toBe('switch');
@@ -36,32 +37,31 @@ describe('Minha loja do parceiro', () => {
     expect(screen.button('SAIR DA CONTA')).toBeDefined();
   });
   it('preserva nome e todo o endereço atual ao salvar somente o horário', async () => {
-    const screen = await loaded(); screen.C.partnerStoreForm.hours();
-    screen.root.querySelectorAll('input')[0].value = 'Segunda a sexta, 9h às 17h';
+    const screen = await loaded(); screen.C.partnerStoreForm.hours(); await settle();
+    const inputs = screen.root.querySelectorAll('input');
+    inputs.find(input => input.attributes['aria-label'] === 'Segunda: abertura')!.value = '09:00';
+    inputs.find(input => input.attributes['aria-label'] === 'Segunda: fechamento')!.value = '17:00';
     const fresh = { ...loja, address_street: 'Rua alterada em outra sessão', address_number: '99' };
     screen.C.partnerData.api.mockImplementation(async (resource: string) => resource === 'configuracoes' ? { loja: fresh } : { updated: true });
     await submit(screen); await settle();
-    const call = screen.C.partnerData.api.mock.calls.find(([resource]: any[]) => resource === 'configuracoes/loja');
-    expect(JSON.parse(call[1].body)).toEqual({
-      display_name: fresh.display_name, address_street: fresh.address_street, address_number: '99',
-      address_neighborhood: fresh.address_neighborhood, address_city: fresh.address_city,
-      address_complement: fresh.address_complement, cep: fresh.cep, maps_url: fresh.maps_url,
-      opening_hours_text: 'Segunda a sexta, 9h às 17h',
-    });
+    const call = screen.C.partnerData.api.mock.calls.find(([resource, options]: any[]) => resource === 'configuracoes/horarios' && options?.method === 'PUT');
+    expect(JSON.parse(call[1].body)).toEqual({ hours: [{ day: 1, opens_at: '09:00', closes_at: '17:00' }] });
+    expect(screen.C.partnerData.api.mock.calls.some(([resource]: any[]) => resource === 'configuracoes/loja')).toBe(false);
   });
   it('não faz PUT em outra sessão se o logout ocorrer durante a leitura do cadastro', async () => {
-    const screen = await loaded(); screen.C.partnerStoreForm.hours();
+    const screen = await loaded();
     let resolve: (value: any) => void = () => {};
     screen.C.partnerData.api.mockImplementation(() => new Promise(value => { resolve = value; }));
-    await submit(screen); screen.setSession('session-b'); screen.C.partnerStore.leave();
-    resolve({ loja }); await settle();
-    expect(screen.C.partnerData.api.mock.calls.filter(([resource]: any[]) => resource === 'configuracoes/loja')).toHaveLength(0);
+    screen.C.partnerStoreForm.hours(); await submit(screen); screen.setSession('session-b'); screen.C.partnerStore.leave();
+    resolve({ schema_ready: true, hours: [{ day: 1, opens_at: '08:00', closes_at: '18:00' }] }); await settle();
+    expect(screen.C.partnerData.api.mock.calls.filter(([, options]: any[]) => options?.method === 'PUT')).toHaveLength(0);
     expect(screen.C.showToast).not.toHaveBeenCalled();
   });
   it('mantém formulário e dados digitados durante atualização de avisos', async () => {
-    const screen = await loaded(); screen.C.partnerStoreForm.hours();
-    const page = screen.root.children[0]; const input = screen.root.querySelectorAll('input')[0]; input.value = 'Domingo 8h';
-    screen.C.partnerHome.render(); expect(screen.root.children[0]).toBe(page); expect(input.value).toBe('Domingo 8h');
+    const screen = await loaded(); screen.C.partnerStoreForm.hours(); await settle();
+    const page = screen.root.children[0]; const input = screen.root.querySelectorAll('input')[0]; input.value = '09:30';
+    await input.fire('input');
+    screen.C.partnerHome.render(); expect(screen.root.children[0]).toBe(page); expect(input.value).toBe('09:30');
   });
   it('valida retirada e entrega e zera o raio quando a loja deixa de entregar', async () => {
     const screen = await loaded(); screen.C.partnerStoreForm.service();
