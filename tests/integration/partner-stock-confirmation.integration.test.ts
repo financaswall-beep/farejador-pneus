@@ -17,7 +17,7 @@ vi.mock('../../src/atendente-v2/stock-confirmation-routing.js',()=>({
   confirmationLocation:async()=>({municipio:'rio de janeiro',customerLocation:{lat:-22.9,lng:-43.2},clientNeighborhoodCanonical:null,modalidade:'pickup'}),
   routeStockConfirmation:(...args:any[])=>mocks.route(...args),
 }));
-import { gatePartnerSearch,publishStockRequest,sealStockRequestAndGuardText,requirePartnerStockConfirmation,cancelStockConfirmation } from '../../src/atendente-v2/stock-confirmation.js';
+import { gatePartnerSearch,publishStockRequest,guardStockConfirmationReply,sealStockRequestAndGuardText,requirePartnerStockConfirmation,cancelStockConfirmation } from '../../src/atendente-v2/stock-confirmation.js';
 import { processStockConfirmations } from '../../src/atendente-v2/stock-confirmation-worker.js';
 import { requestConfirms } from '../../src/atendente-v2/stock-confirmation-store.js';
 import { validateStockConfirmationOutbound } from '../../src/atendente-v2/stock-confirmation-outbound.js';
@@ -218,6 +218,42 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     const result=await search(productB);expect(result).toMatchObject({encontrado:false,conjunto_nao_confirmado:true});
     expect((await request()).status).toBe('cancelled');
   });
+  it('responde andamento sem criar consulta, renovar prazo nem reservar',async()=>{
+    await search();await publishStockRequest(awaitClient,'test',conversation);const before=await request();
+    const reply=await guardStockConfirmationReply(awaitClient,'test',conversation,'Tenho sim!',before);
+    expect(reply).toEqual({body:'A loja ainda não respondeu. Já te aviso assim que ela responder.',pending:true});
+    expect(await guardStockConfirmationReply(awaitClient,'test',conversation,'Já reservei!',before)).toEqual(reply);
+    const after=await request();
+    expect(after.id).toBe(before.id);expect(after.expires_at).toEqual(before.expires_at);
+    expect(after.basket_key).toBe(before.basket_key);expect(after.status).toBe('pending');
+    expect((await db.pool.query(`SELECT id FROM commerce.partner_stock_requests
+      WHERE environment='test' AND conversation_id=$1`,[conversation])).rows).toHaveLength(1);
+    expect((await db.pool.query(`SELECT quantity_on_hand,quantity_reserved FROM commerce.partner_stock_levels
+      WHERE environment='test' AND id=$1`,[a.stockId])).rows[0]).toMatchObject({quantity_on_hand:10,quantity_reserved:0});
+  });
+  it('avisa a nova medida, mantendo a antiga cancelada e uma única consulta pendente',async()=>{
+    await search();await publishStockRequest(awaitClient,'test',conversation);const before=await request();
+    await db.pool.query(`INSERT INTO core.messages
+      (environment,conversation_id,chatwoot_conversation_id,chatwoot_message_id,sender_type,message_type,is_private,content,sent_at)
+      VALUES('test',$1,$2,$3,'contact',0,false,'Troque para 80/100-14',clock_timestamp()+interval '1 second')`,
+      [conversation,native,++native]);
+    await cancelStockConfirmation(awaitClient,'test',conversation);await search(productB);
+    const reply=await guardStockConfirmationReply(awaitClient,'test',conversation,'Tenho 90/90-18 e já reservei!',before);
+    expect(reply.pending).toBe(true);
+    expect(reply.body).toBe('Atualizei a consulta para 1 pneu 80/100-14. Estou confirmando com a loja.');
+    const after=await request();expect(after.id).not.toBe(before.id);expect(after.unit_id).toBe(before.unit_id);
+    expect(after.status).toBe('pending');expect(after.items[0]?.tire_size).toBe('80/100-14');
+    const rows=(await db.pool.query(`SELECT id,status FROM commerce.partner_stock_requests
+      WHERE environment='test' AND conversation_id=$1`,[conversation])).rows;
+    expect(rows).toHaveLength(2);expect(rows.find(row=>row.id===before.id)?.status).toBe('cancelled');
+    expect(rows.filter(row=>row.status==='pending')).toHaveLength(1);
+    expect((await db.pool.query(`SELECT id FROM commerce.orders
+      WHERE environment='test' AND source_conversation_id=$1`,[conversation])).rows).toHaveLength(0);
+    expect((await db.pool.query(`SELECT quantity_on_hand,quantity_reserved FROM commerce.partner_stock_levels
+      WHERE environment='test' AND id=ANY($1::uuid[])`,[[a.stockId,secondStocks.get(a.unitId)]] )).rows)
+      .toEqual(expect.arrayContaining([{quantity_on_hand:10,quantity_reserved:0},{quantity_on_hand:10,quantity_reserved:0}]));
+  });
+
 });
 // Queryable separado permite usar os helpers sem manter conexão reservada no teste.
 const awaitClient={query:(...args:any[])=>mocks.db.query(...args)} as import('pg').PoolClient;

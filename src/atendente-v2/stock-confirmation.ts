@@ -4,7 +4,7 @@ import { env } from '../shared/config/env.js';
 import type { PartnerOrderRouting } from './fulfillment.js';
 import { botOrderRequestId } from './order-attempt.js';
 import { confirmationLocation,routeStockConfirmation,type StockConfirmationItem } from './stock-confirmation-routing.js';
-import { basketKey,createStockRequest,latestStockRequest,lockStockConversation,requestConfirms,sameStockLocation,STOCK_WAIT_TEXT } from './stock-confirmation-store.js';
+import { basketKey,createStockRequest,latestStockRequest,lockStockConversation,requestConfirms,sameStockLocation,STOCK_WAIT_TEXT,type StockRequest } from './stock-confirmation-store.js';
 
 type Product=Record<string,unknown>;
 export function selectedConfirmationProducts(result:Record<string,unknown>):Product[] {
@@ -111,10 +111,28 @@ export async function stockConfirmationRouteOptions(client:PoolClient,environmen
   return covers?{excludedUnitIds:[...new Set([...request.excluded_unit_ids,...(stale?[request.unit_id]:[])])],
     ...(requestConfirms(request,request.unit_id,items)?{onlyUnitId:request.unit_id}:{})}:{};
 }
-export async function sealStockRequestAndGuardText(client:PoolClient,environment:Environment,conversationId:string,body:string) {
-  if(!env.PARTNER_STOCK_CONFIRMATION)return body;
+/** Snapshot anterior às ferramentas permite reconhecer mudança real do conjunto. */
+export async function stockConfirmationAtTurnStart(client:PoolClient,environment:Environment,conversationId:string) {
+  return env.PARTNER_STOCK_CONFIRMATION?latestStockRequest(client,environment,conversationId):null;
+}
+/** Resposta determinística: avisa a mudança/andamento sem prometer disponibilidade. */
+export async function guardStockConfirmationReply(client:PoolClient,environment:Environment,conversationId:string,
+  body:string,before:StockRequest|null=null):Promise<{body:string;pending:boolean}> {
+  if(!env.PARTNER_STOCK_CONFIRMATION)return {body,pending:false};
   const request=await latestStockRequest(client,environment,conversationId);
-  return request?.status==='pending'?STOCK_WAIT_TEXT:body;
+  if(request?.status!=='pending')return {body,pending:false};
+  let waiting=STOCK_WAIT_TEXT;
+  if(before?.status==='pending'&&before.basket_key!==request.basket_key) {
+    const items=request.items.map(item=>
+      `${item.quantity} ${item.quantity===1?'pneu':'pneus'} ${item.tire_size}`).join(' e ');
+    waiting=items?`Atualizei a consulta para ${items}. Estou confirmando com a loja.`:'Atualizei a consulta. Estou confirmando com a loja.';
+  } else if(before?.id===request.id&&before.sealed) {
+    waiting='A loja ainda não respondeu. Já te aviso assim que ela responder.';
+  }
+  return {body:waiting,pending:true};
+}
+export async function sealStockRequestAndGuardText(client:PoolClient,environment:Environment,conversationId:string,body:string) {
+  return (await guardStockConfirmationReply(client,environment,conversationId,body)).body;
 }
 export async function publishStockRequest(client:PoolClient,environment:Environment,conversationId:string) {
   if(!env.PARTNER_STOCK_CONFIRMATION)return;

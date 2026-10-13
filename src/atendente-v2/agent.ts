@@ -9,7 +9,7 @@ import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { activeToolDefinitions, executeTool } from './tools.js';
-import { sealStockRequestAndGuardText,publishStockRequest } from './stock-confirmation.js';
+import { guardStockConfirmationReply,stockConfirmationAtTurnStart,publishStockRequest } from './stock-confirmation.js';
 import { sendFinalAgentText } from './final-send.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
 import { photoRequestNudge } from './photo-nudge.js';
@@ -79,11 +79,12 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     await ensureOrganicContext(client,environment,conversationId,job.triggerMessageId);
     const organicContext=await loadOrganicContext(client,environment,conversationId);
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
-    const [history, chatwootConvId, customerContext, customerMemory, customerPin] = await Promise.all([
+    const [history, chatwootConvId, customerContext, customerMemory, stockRequestBeforeTurn, customerPin] = await Promise.all([
       loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO, includeAudio:env.BOT_AUDIO_ENABLED,includeOrganic:env.ORGANIC_ATTRIBUTION_ENABLED }),
       lookupChatwootConversationId(client, conversationId),
       loadCustomerContext(client, conversationId),
       loadCustomerMemory(client, conversationId, env.AGENT_V2_MEMORY_DAYS),
+      stockConfirmationAtTurnStart(client, environment as Environment, conversationId),
       // Determinístico: o cliente JÁ mandou o pino? Se sim, o nudge abaixo FORÇA o bot a
       // usar a tool (em vez de pedir o bairro). Pedir no prompt sozinho não bastava — o
       // LLM ignorava (não re-chamava a tool no turno do pino). Ver agent nudge abaixo.
@@ -289,7 +290,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
     }
 
-    finalBody=await sealStockRequestAndGuardText(client,environment as Environment,conversationId,finalBody);
+    const stockReply=await guardStockConfirmationReply(client,environment as Environment,conversationId,finalBody,stockRequestBeforeTurn);
+    finalBody=stockReply.body;
     // Guarda anti-eco: se o bot está prestes a mandar o MESMO texto que mandou no
     // turno anterior desta conversa, descarta silenciosamente — o cliente mandou duas
     // mensagens seguidas e os dois turnos convergiram para a mesma resposta.
@@ -298,7 +300,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       environment as Environment,
       conversationId,
     );
-    if (lastAcceptedText === finalBody) {
+    // Cada mensagem nova durante a espera merece retorno; outbox mantém idempotência por gatilho.
+    if (lastAcceptedText === finalBody && !stockReply.pending) {
       await publishStockRequest(client,environment as Environment,conversationId);
       logger.info(logCtx, 'agent_v2: resposta identica ao turno anterior, descartando (anti-eco)');
       return;
