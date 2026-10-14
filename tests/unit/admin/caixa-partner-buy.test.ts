@@ -93,6 +93,45 @@ describe('Comprar e carrinho simples do parceiro', () => {
     expect(view.root.textContent).toContain('Pedido enviado'); expect(view.C.partnerBuy.count()).toBe(0);
   });
 
+  it('mantém um único acompanhamento após atualizações dos avisos e do catálogo sem reenviar o pedido', async () => {
+    const view = await catalog(); await add(view.root).click(); await openCart(view);
+    view.C.authenticatedFetch.mockImplementation(async (url: string, options: any) => {
+      if (options?.method === 'POST') return reply({ request_id: 'request-1', request_number: 'CMP-0001' });
+      return reply(url.endsWith('/operacao/comprar') ? { rows: [offer()], checkout_enabled: true } : { rows: [] });
+    });
+    await view.button('ENVIAR PEDIDO').click();
+    const buttons = (label: string) => view.root.querySelectorAll('button').filter(button => button.textContent === label);
+    for (let update = 0; update < 10; update++) {
+      await view.C.partnerData.load();
+      await view.C.partnerBuy.load();
+      expect(buttons('ACOMPANHAR PEDIDO')).toHaveLength(1);
+      expect(buttons('Continuar comprando')).toHaveLength(1);
+      expect(view.root.textContent.match(/CMP-0001/g)).toHaveLength(1);
+      expect(view.button('ENVIAR PEDIDO')).toBeUndefined();
+    }
+    expect(view.C.authenticatedFetch.mock.calls.filter(([, options]: any) => options?.method === 'POST')).toHaveLength(1);
+    const open = vi.spyOn(view.C.partnerBuyOrders, 'open');
+    await view.button('ACOMPANHAR PEDIDO').click();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(view.location.hash).toBe('#comprar');
+  });
+
+  it('mantém um acompanhamento ao voltar ao pedido enviado e remove ao começar outro carrinho', async () => {
+    const view = await catalog(); await add(view.root).click(); await openCart(view);
+    view.C.authenticatedFetch.mockResolvedValueOnce(reply({ request_id: 'request-1', request_number: 'CMP-0001' }));
+    await view.button('ENVIAR PEDIDO').click();
+    await view.button('Continuar comprando').click();
+    await vi.waitFor(() => expect(view.C.partnerBuy.state.loading).toBe(false));
+    await openCart(view);
+    expect(view.root.querySelectorAll('button').filter(button => button.textContent === 'ACOMPANHAR PEDIDO')).toHaveLength(1);
+    await view.button('Continuar comprando').click();
+    await vi.waitFor(() => expect(view.C.partnerBuy.state.loading).toBe(false));
+    await add(view.root).click(); await openCart(view);
+    await view.C.partnerData.load();
+    expect(view.button('ACOMPANHAR PEDIDO')).toBeUndefined();
+    expect(view.root.textContent).not.toContain('CMP-0001');
+    expect(view.button('ENVIAR PEDIDO').disabled).toBe(false);
+  });
   it('impede envios duplicados e navegação enquanto o primeiro está em andamento', async () => {
     const view = await catalog(); await add(view.root).click(); await openCart(view);
     let finish!: (value: unknown) => void;

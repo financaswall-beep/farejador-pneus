@@ -142,11 +142,12 @@
       : 'Nenhum pneu disponível para essa busca.'));
   }
   function drawCart() {
-    page.querySelectorAll('.ps-buy-summary,.ps-buy-cart-count-copy,.ps-buy-cart-note,.ps-buy-send,.ps-buy-continue').forEach(el => el.remove());
+    page.querySelectorAll('.ps-buy-summary,.ps-buy-cart-count-copy,.ps-buy-cart-note,.ps-buy-send,.ps-buy-track,.ps-buy-continue').forEach(el => el.remove());
     if (state.sent) {
       notice.appendChild(V.intro('Pedido enviado', 'A 2W vai confirmar seu pedido.', 'check'));
       if (state.sent.request_number) notice.appendChild(message(state.sent.request_number));
-      page.appendChild(V.control('ACOMPANHAR PEDIDO', () => C.partnerBuyOrders.open(), 'primary'));
+      const track = V.control('ACOMPANHAR PEDIDO', () => C.partnerBuyOrders.open(), 'primary');
+      track.classList.add('ps-buy-track'); page.appendChild(track);
       page.appendChild(V.control('Continuar comprando', () => C.partnerHome.open(origin), 'continue')); return;
     }
     if (!state.cart.size) {
