@@ -17,12 +17,19 @@ export async function resolveCatalogProductForStock(
   row: StockCatalogCandidate,
 ): Promise<string | null> {
   if (row.item_type !== 'pneu' || !row.tire_size || !row.tire_condition) return null;
+  if (!row.brand?.trim() && row.tire_condition === 'meia_vida' && row.vehicle_type) {
+    const generic = await client.query<{ id: string }>(
+      'SELECT commerce.ensure_partner_used_product($1,$2) AS id', [row.tire_size, row.vehicle_type],
+    );
+    if (!generic.rows[0]?.id) throw new Error('partner_used_identity_missing');
+    return generic.rows[0].id;
+  }
   const result = await client.query<{ id: string; vehicle_type: TireVehicleType | null }>(
     `SELECT p.id,ts.vehicle_type
        FROM commerce.products p
        JOIN commerce.tire_specs ts
          ON ts.environment=p.environment AND ts.product_id=p.id
-      WHERE p.environment=$1 AND p.product_type='tire' AND p.deleted_at IS NULL
+      WHERE p.environment=$1 AND p.product_type='tire' AND p.deleted_at IS NULL AND NOT p.partner_generic
         AND commerce.catalog_measure_identity(ts.tire_size)
             =commerce.catalog_measure_identity($2)
         AND commerce.catalog_brand_identity(p.brand)

@@ -22,7 +22,7 @@ function mustMatch(label: string, content: string, pattern: RegExp): void {
 }
 
 const caixaCore = source('painel/public/caixa-core.js');
-const caixaCheckout = source('painel/public/caixa-checkout.js');
+const caixaCheckout = source('painel/public/caixa-checkout-submit.js');
 const caixaCatalog = source('painel/public/caixa-checkout-catalog.js');
 const operationLogin = source('src/admin/caixa/route-operation-login.ts');
 const caixaQueries = source('src/admin/caixa/queries.ts');
@@ -43,7 +43,7 @@ mustMatch(
 mustMatch(
   'o checkout escolhe vendas pelo escopo autenticado',
   caixaCheckout,
-  /Caixa\.operationPath\(\s*'vendas'\s*,\s*'\/api\/caixa\/vendas'\s*\)/,
+  /const C = window\.Caixa[\s\S]*?C\.operationPath\(\s*'vendas'\s*,\s*'\/api\/caixa\/vendas'\s*\)/,
 );
 mustMatch(
   'o login de parceiro emite ps_ e conserva slug/escopo',
@@ -79,7 +79,7 @@ mustMatch(
 mustMatch(
   'o contexto restrito planta app.partner_unit_id antes das queries',
   partnerDb,
-  /partnerPool\.connect\(\)[\s\S]*?set_config\('app\.partner_unit_id',\s*\$1,\s*true\)/,
+  /db:\s*Pool\s*=\s*partnerPool[\s\S]*?db\.connect\(\)[\s\S]*?set_config\('app\.partner_unit_id',\s*\$1,\s*true\)/,
 );
 mustMatch(
   'o desktop legado tambem usa /parceiro/:slug/api',

@@ -42,7 +42,7 @@
     });
     control.append(currency, input); wrap.appendChild(control); form.appendChild(wrap); return input;
   }
-  function conditionField(form) {
+  function conditionField(form, onChange) {
     const group = U.node('fieldset', null, 'ps-stock-condition');
     group.appendChild(U.node('legend', 'Condição'));
     const choices = U.node('div', null, 'ps-stock-condition-options');
@@ -50,6 +50,7 @@
       const label = U.node('label', null, 'ps-stock-condition-choice');
       const radio = U.node('input'); radio.type = 'radio'; radio.name = 'tire_condition'; radio.value = value;
       radio.checked = value === 'meia_vida'; radio.required = true;
+      radio.addEventListener('change', () => onChange(value));
       const check = C.createSvg([{ d: 'm5 12 4 4L19 6' }]); check.setAttribute('aria-hidden', 'true');
       label.append(radio, check, U.node('span', U.condition(value))); choices.appendChild(label); return radio;
     });
@@ -85,8 +86,9 @@
     size.classList.add('ps-stock-size-input'); size.autocomplete = 'off'; size.spellcheck = false;
     size.pattern = '[0-9]{2,3}/[0-9]{2,3}-[0-9]{2}'; size.maxLength = 10;
     const normalizeSize = C.partnerStockFields.measure(size, size.parentElement || identity);
-    const condition = conditionField(identity);
+    const condition = conditionField(identity, value => brandPicker.setOptional(value === 'meia_vida'));
     brandPicker = C.partnerStockFields.brand(identity, page);
+    brandPicker.setOptional(true);
     const brand = brandPicker.input;
     const balance = plate('ps-stock-entry--balance');
     const quantity = quantityField(balance);
@@ -99,7 +101,7 @@
       if (saving || !C.isPartner() || !C.canModule('estoque')) return;
       const validSize = normalizeSize();
       if (!form.reportValidity() || !validSize) return;
-      if (!brand.value) { error.textContent = 'Escolha a marca do pneu.'; brandPicker.open(); return; }
+      if (!brand.value && condition() !== 'meia_vida') { error.textContent = 'Escolha a marca do pneu.'; brandPicker.open(); return; }
       const amount = priceValue(price.value);
       if (amount == null) { error.textContent = 'Informe um preço maior que zero, como 180,00.'; return; }
       const session = C.sessionFingerprint(); const version = generation;
@@ -107,7 +109,7 @@
       const buttons = [...page.querySelectorAll('button,input,select')]; buttons.forEach(control => { control.disabled = true; });
       try {
         await C.partnerData.api('operacao/estoque/itens', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tire_size: size.value.trim(), vehicle_type: vehicle(), brand: brand.value, tire_condition: condition(),
+          body: JSON.stringify({ tire_size: size.value.trim(), vehicle_type: vehicle(), brand: brand.value || null, tire_condition: condition(),
             quantity_on_hand: Number(quantity.input.value), sale_price: amount }),
         });
         if (version !== generation || session !== C.sessionFingerprint()) return;

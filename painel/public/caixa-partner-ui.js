@@ -64,6 +64,7 @@
       line.appendChild(node('strong', item.tire_size || item.label || item.item_name || 'Pneu', 'ps-size'));
       const qty = Number(item.quantity || 0);
       line.appendChild(node('p', [condition(item.tire_condition), qty + (qty === 1 ? ' pneu' : ' pneus')].filter(Boolean).join(' • ')));
+      if (item.brand) line.appendChild(node('strong', (item.requested_brand ? 'Marca pedida: ' : '') + item.brand));
       list.appendChild(line);
     });
     return list;

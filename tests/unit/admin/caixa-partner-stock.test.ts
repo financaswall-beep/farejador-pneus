@@ -109,6 +109,31 @@ describe('Estoque simples do parceiro com reservas preservadas', () => {
     expect(quantity.value).toBe('0'); expect(button('Diminuir quantidade').disabled).toBe(true);
     expect(button('Aumentar quantidade').disabled).toBe(false);
   });
+  it('usado salva sem marca; trocar para novo exige escolher uma marca', async () => {
+    const { C, root, button } = await stockView();
+    await button('ADICIONAR PNEU').click();
+    expect(root.textContent).toContain('Marca (opcional)');
+    expect(button('Marca').textContent).toBe('Sem informar');
+    const inputs: any[] = root.querySelectorAll('input');
+    inputs.find(input => input.name === 'tire_size').value = '90/90-18';
+    inputs.find(input => input.name === 'sale_price').value = '55';
+    const form: any = root.querySelectorAll('form')[0]; form.reportValidity = () => true;
+    C.authenticatedFetch.mockClear(); C.authenticatedFetch.mockRejectedValueOnce(new Error('offline'));
+    await form.fire('submit');
+    expect(JSON.parse(C.authenticatedFetch.mock.calls[0][1].body)).toMatchObject({brand:null, tire_condition:'meia_vida',sale_price:55});
+    C.authenticatedFetch.mockClear();
+    const radios = inputs.filter(input => input.name === 'tire_condition');
+    radios.forEach(input => { input.checked = input.value === 'novo'; });
+    await radios.find(input => input.checked).fire('change');
+    expect(root.textContent).not.toContain('Marca (opcional)');
+    await form.fire('submit');
+    expect(C.authenticatedFetch).not.toHaveBeenCalled();
+    await button('Pirelli').click();
+    radios.forEach(input => { input.checked = input.value === 'meia_vida'; });
+    await radios.find(input => input.checked).fire('change');
+    await button('Marca').click(); await button('Sem informar').click();
+    expect(button('Marca').textContent).toBe('Sem informar');
+  });
   it('converte reais com vírgula sem alterar o valor e bloqueia preço inválido antes de enviar', async () => {
     const { C, root, button } = await stockView();
     await button('ADICIONAR PNEU').click();

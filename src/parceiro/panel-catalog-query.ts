@@ -11,7 +11,7 @@ function measureIdentity(expression: string): string {
 /** Liga estoque local sem product_id somente quando a variante canônica é exata. */
 export function catalogStockMatch(stockAlias: string): string {
   return `(${stockAlias}.product_id=p.id OR (
-    ${stockAlias}.product_id IS NULL AND p.product_type='tire'
+    ${stockAlias}.product_id IS NULL AND p.product_type='tire' AND NOT p.partner_generic
     AND COALESCE(${stockAlias}.item_type,'pneu')='pneu'
     AND ${measureIdentity(`${stockAlias}.tire_size`)}=${measureIdentity('ts.tire_size')}
     AND ${brandIdentity(`${stockAlias}.brand`)}=${brandIdentity('p.brand')}

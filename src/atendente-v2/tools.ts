@@ -1,4 +1,6 @@
 import { cancelOpenBotOrder } from './cancel-open-order.js';
+import { partnerUsedProducts, partnerUsedStock } from './partner-used-products.js';
+import { captureConfirmedUsedBrands } from './partner-used-order-brand.js';
 import type { PoolClient } from 'pg';
 import {
   buscarProduto,
@@ -589,6 +591,7 @@ async function executeToolInternal(
         let result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarProdutoMatriz(client, productInput, { deferAvailabilityFilter: true })
           : await buscarProduto(client, productInput);
+        result.push(...await partnerUsedProducts(client, productInput));
         observeSearchProducts(result.map(p => ({ id: p.product_id, measure: p.tire_size ?? '',
           matrixAvailable: env.WHOLESALE_UNIFIED_STOCK ? p.total_stock_available : null })));
         if (result.length === 0) {
@@ -789,6 +792,8 @@ async function executeToolInternal(
       }
 
       case 'verificar_estoque': {
+        const partnerUsed = await partnerUsedStock(client, environment, args.product_id as string | undefined, args.product_code as string | undefined);
+        if (partnerUsed) return JSON.stringify(partnerUsed);
         const stockInput = {
           environment,
           product_id: args.product_id as string | undefined,
@@ -1513,6 +1518,7 @@ async function criarPedido(
       // RETIRADA → reserva o pneu (segura até retirar), sem recebível. Entrega segue COD.
       reserve_for_pickup: modalidade === 'pickup',
     });
+    await captureConfirmedUsedBrands(client,environment,conversationId,mat.partner_order_id,partner);
 
     // FOTO SOB DEMANDA: o pedido fechou → gruda as fotos respondidas desta
     // conversa nos itens (card "Em separação" mostra a foto; guard de

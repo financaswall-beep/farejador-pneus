@@ -15,7 +15,7 @@ import { partnerStoreIsOpen, withStoreOpeningContext, storeOpeningBlockResponse,
 
 const money=(value:unknown)=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function stockConfirmedText(request:StockRequest):string {
-  const items=request.items.map(item=>`${item.quantity} × ${item.tire_size} — ${money(item.price)} cada`).join('\n');
+  const items=request.items.map(item=>`${item.quantity} × ${item.tire_size}${item.brand?' '+item.brand:''} — ${money(item.price)} cada`).join('\n');
   return `A loja confirmou esses pneus:\n${items}\nVocê prefere buscar ou receber?`;
 }
 export function stockPriceChangedText(request:StockRequest,result:Record<string,unknown>):string {

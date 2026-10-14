@@ -52,7 +52,7 @@ export async function prepareMatrizWalkinStock(
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts
          ON ts.product_id=p.id AND ts.environment=p.environment
-      WHERE p.environment = $1 AND p.id = ANY($2::uuid[]) AND p.deleted_at IS NULL`,
+      WHERE p.environment = $1 AND p.id = ANY($2::uuid[]) AND p.deleted_at IS NULL AND NOT p.partner_generic`,
     [environment, productIds],
   );
   if (specs.rows.length !== productIds.length) throw new Error('walkin_product_not_sellable');

@@ -88,7 +88,7 @@ export async function createCatalogProductFromStock(
          FROM commerce.products p
          JOIN commerce.tire_specs ts
            ON ts.product_id=p.id AND ts.environment=p.environment
-        WHERE p.environment=$1
+        WHERE p.environment=$1 AND NOT p.partner_generic
           AND regexp_replace(ts.tire_size,'[^0-9]+','','g')=$2
           AND lower(btrim(COALESCE(p.brand,'')))=lower(btrim($3))
           AND p.tire_condition=$4

@@ -34,7 +34,9 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
   const result=JSON.parse(raw) as Record<string,unknown>;
   if(result.erro||result.precisa_localizacao||result.aguardando_parceiro||result.encontrado===false||result.disponivel===false)return raw;
   const requestedQuantity=Number.isInteger(args.quantidade)&&Number(args.quantidade)>0&&Number(args.quantidade)<=20?Number(args.quantidade):1;
-  let items=selectedConfirmationProducts(result).map(product=>({product_id:String(product.product_id),quantity:requestedQuantity}));
+  let items:StockConfirmationItem[]=selectedConfirmationProducts(result).map(product=>({product_id:String(product.product_id),quantity:requestedQuantity,
+    ...(product.partner_generic && typeof args.marca==='string' && args.marca.trim()
+      ?{requested_brand:args.marca.trim().slice(0,120)}:{})}));
   if(!items.length&&['verificar_estoque','localizacao_loja'].includes(name)) {
     const ids=Array.isArray(args.product_ids)?args.product_ids:args.product_id?[args.product_id]:[];
     items=ids.filter((id):id is string=>typeof id==='string').map(product_id=>({product_id,quantity:requestedQuantity}));
@@ -70,7 +72,9 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
       const filter=(products:Product[])=>products.filter(product=>items.some(item=>item.product_id===product.product_id)).map(product=>{
         const quantity=prior!.routing.items.find(item=>item.product_id===product.product_id)!.quantity;
         const price=decision.routing.items.find(item=>item.product_id===product.product_id)!.unit_price.toFixed(2);
+        const confirmedBrand=prior!.routing.items.find(item=>item.product_id===product.product_id)?.requested_brand;
         return {...product,...('price_amount' in product?{price_amount:price,currency:'BRL',price_type:'partner_retail'}:{}),
+          ...(confirmedBrand?{marca_confirmada:confirmedBrand,marca_exige_confirmacao:false}:{}),
           ...('current_price' in product?{current_price:price}:{}),
           ...('total_stock_available' in product?{total_stock_available:quantity}:{}),...('total_stock' in product?{total_stock:quantity}:{})};
       });
@@ -82,7 +86,7 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
       &&prior.basket_key===basketKey(items)&&new Date(prior.expires_at).getTime()>Date.now()) {
       await client.query('COMMIT');return waitingResult(prior.id);
     }
-    const request=await createStockRequest(client,environment,conversationId,messageId,location,decision.routing,excluded);
+    const request=await createStockRequest(client,environment,conversationId,messageId,location,decision.routing,excluded,null,items);
     await client.query('COMMIT');return waitingResult(request.id);
   } catch(error) { await client.query('ROLLBACK');throw error; }
 }
@@ -90,7 +94,8 @@ export async function requirePartnerStockConfirmation(client:PoolClient,environm
   routing:PartnerOrderRouting,args:Record<string,unknown>,messageId:string|null):Promise<string|null> {
   if(!env.PARTNER_STOCK_CONFIRMATION)return null;
   const prior=await latestStockRequest(client,environment,conversationId);
-  const items=routing.items.map(({product_id,quantity})=>({product_id,quantity}));
+  const items=routing.items.map(({product_id,quantity})=>({product_id,quantity,
+    requested_brand:prior?.routing.items.find(item=>item.product_id===product_id)?.requested_brand}));
   if(requestConfirms(prior,routing.unitId,items))return null;
   if(prior?.status==='pending'&&prior.unit_id===routing.unitId&&new Date(prior.expires_at).getTime()>Date.now()
     &&prior.basket_key===basketKey(items)) {
@@ -126,7 +131,7 @@ export async function guardStockConfirmationReply(client:PoolClient,environment:
   let waiting=STOCK_WAIT_TEXT;
   if(before?.status==='pending'&&before.basket_key!==request.basket_key) {
     const items=request.items.map(item=>
-      `${item.quantity} ${item.quantity===1?'pneu':'pneus'} ${item.tire_size}`).join(' e ');
+      `${item.quantity} ${item.quantity===1?'pneu':'pneus'} ${item.tire_size}${item.brand?' '+item.brand:''}`).join(' e ');
     waiting=items?`Atualizei a consulta para ${items}. Estou confirmando com a loja.`:'Atualizei a consulta. Estou confirmando com a loja.';
   } else if(before?.id===request.id&&before.sealed) {
     waiting='A loja ainda não respondeu. Já te aviso assim que ela responder.';

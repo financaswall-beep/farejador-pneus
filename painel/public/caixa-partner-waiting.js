@@ -65,7 +65,7 @@
     const digits = U.node('strong', timerText()); digits.id = 'partner-waiting-time'; copy.appendChild(digits);
     timer.append(clock, copy); page.append(timer, U.items(request.items));
     if (remaining()) {
-      page.appendChild(U.node('h4', 'Tem esses pneus?', 'ps-question'));
+      page.appendChild(U.node('h4', request.items.some(item => item.requested_brand) ? 'Tem esses pneus nessa marca?' : 'Tem esses pneus?', 'ps-question'));
       const yes = U.button(busy ? 'ENVIANDO…' : 'TENHO', () => void answer(true), 'primary', 'check');
       const no = U.button('NÃO TENHO', () => void answer(false), 'danger', 'close');
       yes.disabled = no.disabled = busy || !respond;

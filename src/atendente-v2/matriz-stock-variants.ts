@@ -32,7 +32,7 @@ export async function loadMatrizProductStockSpecs(
     `SELECT ts.product_id,ts.tire_size,p.brand,p.tire_condition
        FROM commerce.tire_specs ts
        JOIN commerce.products p ON p.id=ts.product_id AND p.environment=ts.environment
-      WHERE ts.environment=$1 AND ts.product_id=ANY($2)`,
+      WHERE ts.environment=$1 AND ts.product_id=ANY($2) AND NOT p.partner_generic`,
     [environment, productIds],
   );
   return result.rows;

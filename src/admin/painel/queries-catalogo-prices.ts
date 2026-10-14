@@ -96,7 +96,7 @@ async function lockCatalogProduct(
 ): Promise<void> {
   const product = await client.query(
     `SELECT id FROM commerce.products
-      WHERE environment=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE`,
+      WHERE environment=$1 AND id=$2 AND deleted_at IS NULL AND NOT partner_generic FOR UPDATE`,
     [environment, productId],
   );
   if (!product.rows[0]) throw new Error('catalog_product_not_found');

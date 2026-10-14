@@ -67,7 +67,7 @@ export async function getCatalogOverview(
            ON ts.product_id=p.id AND ts.environment=p.environment
          LEFT JOIN commerce.matriz_current_prices cp
            ON cp.product_id=p.id AND cp.environment=p.environment
-        WHERE p.environment=$1 AND p.deleted_at IS NULL
+        WHERE p.environment=$1 AND p.deleted_at IS NULL AND NOT p.partner_generic
         ORDER BY p.brand NULLS LAST,p.product_name`,
       [environment],
     ),

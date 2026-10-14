@@ -6,14 +6,15 @@ import type { StockConfirmationItem,StockConfirmationLocation } from './stock-co
 
 export interface StockRequest {
   id:string;environment:Environment;conversation_id:string;request_message_id:string|null;unit_id:string;
-  status:string;items:Array<{tire_size:string;tire_condition:string|null;quantity:number;price:number}>;
+  status:string;items:Array<{tire_size:string;tire_condition:string|null;quantity:number;price:number;brand?:string;requested_brand?:string}>;
   routing:{location:StockConfirmationLocation;items:StockConfirmationItem[];photoProductIds?:string[]};
   basket_key:string;revision:number;sealed:boolean;expires_at:Date;valid_until:Date|null;
   created_at:Date;
   closing_args:Record<string,unknown>|null;excluded_unit_ids:string[];notified_at:Date|null;
 }
 export function basketKey(items:StockConfirmationItem[]):string {
-  const normalized=items.map(({product_id,quantity})=>({product_id,quantity})).sort((a,b)=>a.product_id.localeCompare(b.product_id));
+  const normalized=items.map(({product_id,quantity,requested_brand})=>({product_id,quantity,
+    ...(requested_brand?{requested_brand:brandKey(requested_brand)}:{})})).sort((a,b)=>a.product_id.localeCompare(b.product_id));
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 export function sameStockLocation(a:StockConfirmationLocation,b:StockConfirmationLocation):boolean {
@@ -33,11 +34,13 @@ export async function latestStockRequest(client:PoolClient,environment:Environme
 export function requestConfirms(request:StockRequest|null,unitId:string,items:StockConfirmationItem[],now=Date.now()):boolean {
   return Boolean(request?.status==='confirmed' && request.unit_id===unitId && request.valid_until
     && new Date(request.valid_until).getTime()>now && items.length>0 && items.every(item=>item.quantity>0&&request.routing.items.some(
-      confirmed=>confirmed.product_id===item.product_id && confirmed.quantity>=item.quantity)));
+      confirmed=>confirmed.product_id===item.product_id && confirmed.quantity>=item.quantity
+        && (!item.requested_brand || brandKey(confirmed.requested_brand)===brandKey(item.requested_brand)))));
 }
-export async function requestPublicItems(client:PoolClient,environment:Environment,routing:PartnerOrderRouting) {
-  const stock=await client.query<{id:string;tire_size:string;item_name:string;tire_condition:string|null;sale_price:string|null}>(
-    `SELECT id,tire_size,item_name,tire_condition,sale_price::text FROM commerce.partner_stock_levels
+const brandKey=(value?:string|null)=>(value??'').trim().toLocaleLowerCase('pt-BR');
+export async function requestPublicItems(client:PoolClient,environment:Environment,routing:PartnerOrderRouting,requested:StockConfirmationItem[]=[]) {
+  const stock=await client.query<{id:string;tire_size:string;item_name:string;tire_condition:string|null;brand:string|null;sale_price:string|null}>(
+    `SELECT id,tire_size,item_name,tire_condition,brand,sale_price::text FROM commerce.partner_stock_levels
       WHERE environment=$1 AND unit_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL`,
     [environment,routing.unitId,routing.items.map(item=>item.partner_stock_id)]);
   return routing.items.map(item=>{
@@ -45,7 +48,9 @@ export async function requestPublicItems(client:PoolClient,environment:Environme
     if(!row)throw new Error('confirmation_stock_changed');
     const price=row.sale_price==null?null:Number(row.sale_price);
     if(price==null||!Number.isFinite(price)||price<=0)throw new Error('partner_sale_price_missing');
-    return {tire_size:row.tire_size||row.item_name,tire_condition:row.tire_condition,quantity:item.quantity,price};
+    const requestedBrand=requested.find(candidate=>candidate.product_id===item.product_id)?.requested_brand;
+    return {tire_size:row.tire_size||row.item_name,tire_condition:row.tire_condition,quantity:item.quantity,price,
+      ...(requestedBrand?{brand:requestedBrand,requested_brand:requestedBrand}:row.brand?{brand:row.brand}:{})};
   });
 }
 /** Uma resposta atrasada da loja não deve anunciar o preço anterior à edição. */
@@ -66,16 +71,20 @@ export async function refreshStockRequestPrices(client:PoolClient,request:StockR
   return true;
 }
 export async function createStockRequest(client:PoolClient,environment:Environment,conversationId:string,
-  messageId:string|null,location:StockConfirmationLocation,routing:PartnerOrderRouting,excluded:string[]=[],closingArgs:Record<string,unknown>|null=null) {
-  const items=routing.items.map(({product_id,quantity})=>({product_id,quantity}));
+  messageId:string|null,location:StockConfirmationLocation,routing:PartnerOrderRouting,excluded:string[]=[],closingArgs:Record<string,unknown>|null=null,
+  requested?:StockConfirmationItem[]) {
   const prior=await latestStockRequest(client,environment,conversationId);
+  const items=routing.items.map(({product_id,quantity})=>{
+    const brand=(requested??prior?.routing.items??[]).find(item=>item.product_id===product_id)?.requested_brand;
+    return {product_id,quantity,...(brand?{requested_brand:brand}:{})};
+  });
   const photoProductIds=(prior?.routing.photoProductIds??[]).filter(id=>items.some(item=>item.product_id===id));
   await client.query(`UPDATE commerce.partner_stock_requests SET status='cancelled'
     WHERE environment=$1 AND conversation_id=$2 AND status='pending'`,[environment,conversationId]);
   const result=await client.query<StockRequest>(`INSERT INTO commerce.partner_stock_requests
     (environment,conversation_id,request_message_id,unit_id,basket_key,items,routing,excluded_unit_ids,closing_args)
     VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::uuid[],$9::jsonb) RETURNING *`,
-    [environment,conversationId,messageId,routing.unitId,basketKey(items),JSON.stringify(await requestPublicItems(client,environment,routing)),
+    [environment,conversationId,messageId,routing.unitId,basketKey(items),JSON.stringify(await requestPublicItems(client,environment,routing,items)),
       JSON.stringify({location,items,photoProductIds}),excluded,closingArgs?JSON.stringify(closingArgs):null]);
   return result.rows[0]!;
 }

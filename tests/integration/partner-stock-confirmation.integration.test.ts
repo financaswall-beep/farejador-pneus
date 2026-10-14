@@ -86,6 +86,26 @@ async function search(product=productA) {
   finally{client.release();}
 }
 describe('Confirmação do parceiro em PostgreSQL real',()=>{
+  it('marca específica chega à loja e trocar Pirelli por Michelin exige outro TENHO',async()=>{
+    const client=await db.pool.connect();
+    const raw=JSON.stringify({encontrado:true,produtos:[{product_id:productA,tire_size:'90/90-18',
+      partner_generic:true,brand:null,total_stock_available:3,price_amount:'90.00'}]});
+    try{
+      const check=async(marca:string)=>JSON.parse(await gatePartnerSearch(client,'test',conversation,'buscar_produto',{bairro:'méier',marca},raw));
+      expect((await check('Pirelli')).aguardando_parceiro).toBe(true);
+      const first=await request();
+      expect(first.routing.items[0]?.requested_brand).toBe('Pirelli');
+      expect(first.items[0]?.requested_brand).toBe('Pirelli');
+      await publishStockRequest(client,'test',conversation);await answer(a,first.id,true);
+      expect(await check('Pirelli')).toMatchObject({disponibilidade_confirmada:true,
+        produtos:[expect.objectContaining({marca_confirmada:'Pirelli',marca_exige_confirmacao:false})]});
+      expect((await check('Michelin')).aguardando_parceiro).toBe(true);
+      const second=await request();expect(second.id).not.toBe(first.id);
+      expect(second.routing.items[0]?.requested_brand).toBe('Michelin');
+      expect(second.items[0]?.requested_brand).toBe('Michelin');
+      expect(second.basket_key).not.toBe(first.basket_key);
+    }finally{client.release();}
+  });
   it('agrupa duas medidas, não publica antes do texto de espera e não reserva estoque',async()=>{
     expect((await search()).aguardando_parceiro).toBe(true);await search(productB);
     const row=await request();expect(row.routing.items).toHaveLength(2);expect(row.sealed).toBe(false);

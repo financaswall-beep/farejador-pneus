@@ -31,7 +31,7 @@ export async function getCatalogVehicleInventory(
         AND commerce.catalog_brand_identity(ws.brand)=commerce.catalog_brand_identity(p.brand)
         AND ws.tire_condition=p.tire_condition
     ) s
-    WHERE p.environment=$1 AND p.product_type='tire' AND p.deleted_at IS NULL
+    WHERE p.environment=$1 AND p.product_type='tire' AND p.deleted_at IS NULL AND NOT p.partner_generic
     ORDER BY ts.tire_size,p.brand,p.product_code`, [environment]);
   const rows = result.rows.map(row => ({ ...row,
     needs_review: row.vehicle_type === null || row.stock_variant_count > 1

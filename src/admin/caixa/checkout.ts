@@ -88,7 +88,7 @@ export async function getCaixaCatalog(
           ORDER BY pm.display_order,pm.created_at,pm.id
           LIMIT 1
        ) media ON true
-      WHERE p.environment=$1 AND p.deleted_at IS NULL
+      WHERE p.environment=$1 AND p.deleted_at IS NULL AND NOT p.partner_generic
         AND p.product_type IN ('tire','service')
         AND ($2::text IS NULL OR concat_ws(' ',p.product_code,p.product_name,p.brand,ts.tire_size)
               ILIKE $2 ESCAPE '\\')
@@ -175,7 +175,7 @@ export async function createCaixaSale(
   const products = await dbPool.query<{ id: string; product_type: string }>(
     `SELECT id,product_type
        FROM commerce.products
-      WHERE environment=$1 AND deleted_at IS NULL AND id=ANY($2::uuid[])
+      WHERE environment=$1 AND deleted_at IS NULL AND id=ANY($2::uuid[]) AND NOT partner_generic
         AND product_type IN ('tire','service')`,
     [environment, productIds],
   );

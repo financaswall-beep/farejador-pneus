@@ -22,13 +22,14 @@ export async function createConfirmedStockPhotos(client:PoolClient,request:Stock
     'SELECT chatwoot_conversation_id FROM core.conversations WHERE environment=$1 AND id=$2',
     [request.environment,request.conversation_id]);
   const cw=conversation.rows[0]?.chatwoot_conversation_id;if(!cw)return false;
-  const products=await client.query<{product_name:string;brand:string;tire_condition:string|null}>(
-    'SELECT product_name,brand,tire_condition FROM commerce.products WHERE environment=$1 AND id=ANY($2::uuid[])',
+  const products=await client.query<{id:string;product_name:string;brand:string|null;tire_condition:string|null}>(
+    'SELECT id,product_name,brand,tire_condition FROM commerce.products WHERE environment=$1 AND id=ANY($2::uuid[])',
     [request.environment,request.routing.photoProductIds]);
   let created=false;
   for(const product of products.rows) {
+    const confirmed=request.items[request.routing.items.findIndex(item=>item.product_id===product.id)];
     const photo=await createPhotoRequest(client,request.environment,{unitId:request.unit_id,
-      chatwootConversationId:Number(cw),tireSize:product.product_name,brand:product.brand,tireCondition:product.tire_condition});
+      chatwootConversationId:Number(cw),tireSize:product.product_name,brand:confirmed?.brand??product.brand,tireCondition:product.tire_condition});
     if(photo.status==='created'||photo.status==='dedup')created=true;
   }
   return created;

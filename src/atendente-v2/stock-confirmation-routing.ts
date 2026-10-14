@@ -7,7 +7,7 @@ import { fillCityFromPin } from './delivery-quote-routing.js';
 import { resolveCustomerLocation } from './customer-location.js';
 import { env } from '../shared/config/env.js';
 
-export interface StockConfirmationItem { product_id:string; quantity:number }
+export interface StockConfirmationItem { product_id:string; quantity:number; requested_brand?:string|null }
 export interface StockConfirmationLocation {
   municipio:string|null; modalidade:'pickup'|'delivery';
   customerLocation:GeoPoint|null; clientNeighborhoodCanonical:string|null;

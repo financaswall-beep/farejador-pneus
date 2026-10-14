@@ -22,7 +22,7 @@ export async function listWholesaleMeasures(
            FROM commerce.tire_specs ts
            JOIN commerce.products p
              ON p.id=ts.product_id AND p.environment=ts.environment
-          WHERE ts.environment=$1 AND ts.tire_size IS NOT NULL
+          WHERE ts.environment=$1 AND ts.tire_size IS NOT NULL AND NOT p.partner_generic
             AND p.deleted_at IS NULL AND p.product_type='tire'
          UNION
          SELECT measure,brand,tire_condition

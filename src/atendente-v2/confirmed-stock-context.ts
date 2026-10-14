@@ -9,7 +9,7 @@ import type {ChatMessage} from './types.js';
 
 export interface ConfirmedStockFacts {
   requestId:string;storeId:string;storeName:string;location:unknown;priceChanged:boolean;
-  items:Array<{productId:string;quantity:number;measure:string;price:number;confirmedPrice:number}>;
+  items:Array<{productId:string;quantity:number;measure:string;price:number;confirmedPrice:number;brand?:string|null;condition?:string|null}>;
 }
 /** Confirmação operacional atual; não reaproveita preço, saldo ou horário do histórico. */
 export async function loadConfirmedStockFacts(client:PoolClient,environment:Environment,
@@ -32,7 +32,7 @@ export async function loadConfirmedStockFacts(client:PoolClient,environment:Envi
       const snapshot=request.items[index];
       if(!stock||!snapshot||!Number.isFinite(stock.unit_price)||stock.unit_price<=0)return null;
       items.push({productId:item.product_id,quantity:item.quantity,measure:snapshot.tire_size,
-        price:stock.unit_price,confirmedPrice:Number(snapshot.price)});
+        price:stock.unit_price,confirmedPrice:Number(snapshot.price),brand:snapshot.brand??null,condition:snapshot.tire_condition});
     }
     return {requestId:request.id,storeId:request.unit_id,storeName:store.name,
       location:request.routing.location,items,priceChanged:items.some(i=>Math.round(i.price*100)!==Math.round(i.confirmedPrice*100))};

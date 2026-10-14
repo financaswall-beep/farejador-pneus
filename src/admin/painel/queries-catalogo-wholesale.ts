@@ -62,7 +62,7 @@ export async function setCatalogWholesalePrice(input: {
     await client.query('BEGIN');
     const product = await client.query<{ product_type: string }>(
       `SELECT product_type FROM commerce.products WHERE environment=$1 AND id=$2
-        AND deleted_at IS NULL FOR UPDATE`, [environment, input.productId],
+        AND deleted_at IS NULL AND NOT partner_generic FOR UPDATE`, [environment, input.productId],
     );
     if (!product.rows[0]) throw new Error('catalog_product_not_found');
     if (product.rows[0].product_type !== 'tire') throw new Error('catalog_wholesale_product_invalid');

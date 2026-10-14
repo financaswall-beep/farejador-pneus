@@ -57,6 +57,7 @@
     return () => radios.find(radio => radio.checked)?.value;
   }
   function brand(container, page) {
+    let optional = false;
     const wrap = U.node('div', null, 'ps-field'); const caption = U.node('span', 'Marca');
     const input = U.node('input'); input.type = 'hidden'; input.name = 'brand';
     const trigger = U.node('button', null, 'ps-stock-brand-trigger'); trigger.type = 'button';
@@ -81,11 +82,13 @@
       const brands = [...new Set([input.value, ...popular, ...C.catalogBrandOptions])]
         .filter(name => C.catalogBrandOptions.includes(name) && name.toLocaleLowerCase('pt-BR').includes(query));
       list.replaceChildren();
+      if (optional && (!query || 'sem informar'.includes(query))) brands.unshift('');
       brands.forEach(name => {
         const row = U.node('button', null, 'ps-brand-option'); row.type = 'button'; row.setAttribute('aria-label', name);
-        row.setAttribute('aria-pressed', String(input.value === name)); row.appendChild(U.node('span', name));
+        row.setAttribute('aria-label', name || 'Sem informar');
+        row.setAttribute('aria-pressed', String(input.value === name)); row.appendChild(U.node('span', name || 'Sem informar'));
         if (input.value === name) { const check = U.icon('check'); check.setAttribute('aria-hidden', 'true'); row.appendChild(check); }
-        row.addEventListener('click', () => { input.value = name; selected.textContent = name; dialog.close(); });
+        row.addEventListener('click', () => { input.value = name; selected.textContent = name || 'Sem informar'; dialog.close(); });
         list.appendChild(row);
       });
       if (!brands.length) list.appendChild(U.node('p', 'Nenhuma marca encontrada.', 'ps-brand-empty'));
@@ -100,7 +103,10 @@
     dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
     dialog.addEventListener('close', () => { trigger.setAttribute('aria-expanded', 'false'); trigger.focus(); });
     sheet.append(header, searchWrap, list); dialog.appendChild(sheet); page.appendChild(dialog);
-    return { input, open, close: () => { if (dialog.open) dialog.close(); } };
+    return { input, open, setOptional(value) {
+      optional = value; caption.textContent = value ? 'Marca (opcional)' : 'Marca';
+      selected.textContent = input.value || (value ? 'Sem informar' : 'Escolha a marca');
+    }, close: () => { if (dialog.open) dialog.close(); } };
   }
   C.partnerStockFields = { normalizeMeasure, measure, vehicle, brand };
 }());

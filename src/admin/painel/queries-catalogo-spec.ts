@@ -47,7 +47,7 @@ export async function updateCatalogTireSpec(
          FROM commerce.products p
          JOIN commerce.tire_specs ts
            ON ts.product_id=p.id AND ts.environment=p.environment
-        WHERE p.environment=$1 AND p.id=$2 AND p.product_type='tire'
+        WHERE p.environment=$1 AND p.id=$2 AND p.product_type='tire' AND NOT p.partner_generic
           AND p.deleted_at IS NULL
         FOR UPDATE OF p,ts`,
       [environment, input.productId],

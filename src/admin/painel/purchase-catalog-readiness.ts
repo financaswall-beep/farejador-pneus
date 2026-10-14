@@ -43,7 +43,7 @@ export async function getPurchaseCatalogBlockers(
          ON ts.environment=p.environment AND ts.product_id=p.id
        LEFT JOIN commerce.matriz_current_prices cp
          ON cp.environment=p.environment AND cp.product_id=p.id
-      WHERE p.environment=$1 AND p.deleted_at IS NULL
+      WHERE p.environment=$1 AND p.deleted_at IS NULL AND NOT p.partner_generic
         AND ts.tire_size=ANY($2::text[])`,
     [environment, measures],
   );

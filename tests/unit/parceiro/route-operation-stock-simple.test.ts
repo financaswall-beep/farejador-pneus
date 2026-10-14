@@ -14,6 +14,24 @@ vi.mock('../../../src/parceiro/operation-stock-simple.js', () => ({
 import { registerPartnerOperationStockSimpleRoutes } from '../../../src/parceiro/route-operation-stock-simple.js';
 
 describe('cadastro simples pela API', () => {
+  it('aceita usado sem marca, mas exige marca para novo e remold', async () => {
+    const app = Fastify(); registerPartnerOperationStockSimpleRoutes(app);
+    const body = { tire_size: '90/90-18', vehicle_type: 'motorcycle', tire_condition: 'meia_vida', quantity_on_hand: 5, sale_price: 55 };
+    try {
+      mocks.create.mockReset().mockResolvedValue({ stock_id: 'new-stock' });
+      for (const brand of [undefined, null, '', '  ']) {
+        const response = await app.inject({ method: 'POST', url: '/parceiro/loja/api/operacao/estoque/itens', payload: {...body, brand} });
+        expect(response.statusCode).toBe(201);
+        expect(mocks.create.mock.lastCall?.[2].brand).toBeNull();
+      }
+      mocks.create.mockClear();
+      for (const tire_condition of ['novo', 'remold']) {
+        const response = await app.inject({ method: 'POST', url: '/parceiro/loja/api/operacao/estoque/itens', payload: {...body, tire_condition} });
+        expect(response.statusCode).toBe(400);
+      }
+      expect(mocks.create).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
   it('normaliza os dígitos antes da gravação e mantém a escolha explícita Carro/Moto', async () => {
     const app = Fastify(); registerPartnerOperationStockSimpleRoutes(app);
     try {

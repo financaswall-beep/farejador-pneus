@@ -69,7 +69,7 @@ export async function getMatrizOperationStock(
          ON ts.product_id=p.id AND ts.environment=p.environment
        LEFT JOIN commerce.matriz_current_prices cp
          ON cp.product_id=p.id AND cp.environment=p.environment
-      WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.product_type='tire'`,
+      WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.product_type='tire' AND NOT p.partner_generic`,
     [env.FAREJADOR_ENV],
   )]);
   const productsByVariant = new Map<string, typeof catalog.rows>();

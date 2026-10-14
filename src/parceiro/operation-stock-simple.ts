@@ -13,7 +13,7 @@ export interface SimpleTireInput {
   tire_width_mm: number;
   tire_aspect_ratio: number;
   tire_rim_diameter: number;
-  brand: string;
+  brand: string | null;
   tire_condition: SimpleTireCondition;
   quantity_on_hand: number;
   minimum_quantity?: number | null;
@@ -77,20 +77,27 @@ export async function createSimpleOperationTire(
   actor: string,
   input: SimpleTireInput,
 ): Promise<{ stock_id: string; quantity_on_hand: number; sale_price: number }> {
-  const brand = input.brand.trim();
+  const brand = input.brand?.trim() || null;
+  if (!brand && input.tire_condition !== 'meia_vida') {
+    throw new OperationStockSimpleError('stock_brand_required', 400);
+  }
+  if (!brand && !input.vehicle_type) throw new OperationStockSimpleError('stock_vehicle_type_required', 400);
   const salePrice = normalizedPrice(input.sale_price);
   try {
     return await withPartnerContext(ctx.partnerUnitId, async (client) => {
+      if (!brand) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+        [`partner-used:${ctx.environment}:${ctx.unitId}:${input.tire_size}:${input.vehicle_type}`]);
       const duplicate = await client.query<{ id: string }>(
         `SELECT id
            FROM commerce.partner_stock_levels
           WHERE environment=$1 AND unit_id=$2 AND deleted_at IS NULL
             AND item_type='pneu'
             AND lower(trim(tire_size))=lower(trim($3))
-            AND lower(trim(COALESCE(brand,'')))=lower(trim($4))
+            AND lower(trim(COALESCE(brand,'')))=lower(trim(COALESCE($4,'')))
             AND tire_condition=$5
+            AND ($4::text IS NOT NULL OR vehicle_type IS NOT DISTINCT FROM $6)
           LIMIT 1 FOR UPDATE`,
-        [ctx.environment, ctx.unitId, input.tire_size, brand, input.tire_condition],
+        [ctx.environment, ctx.unitId, input.tire_size, brand, input.tire_condition, input.vehicle_type ?? null],
       );
       if (duplicate.rows[0]) {
         throw new OperationStockSimpleError('stock_item_already_exists', 409);

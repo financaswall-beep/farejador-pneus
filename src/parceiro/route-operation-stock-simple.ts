@@ -27,12 +27,15 @@ const newTireSchema = z.object({
   tire_size: z.string().max(30).transform(value => normalizePartnerTireMeasure(value) ?? '')
     .pipe(z.string().regex(tireSizePattern, 'invalid_tire_size')),
   vehicle_type: tireVehicleTypeSchema.optional(),
-  brand: z.string().trim().min(1).max(120),
+  brand: z.string().trim().max(120).nullish().transform(value => value || null),
   tire_condition: z.enum(['novo', 'meia_vida', 'remold']),
   quantity_on_hand: z.number().int().nonnegative().max(999_999),
   minimum_quantity: z.number().int().nonnegative().max(999_999).nullable().optional(),
   sale_price: moneySchema,
-}).strict();
+}).strict().refine(value => value.tire_condition === 'meia_vida' || Boolean(value.brand),
+  { message: 'stock_brand_required', path: ['brand'] })
+  .refine(value => Boolean(value.brand) || Boolean(value.vehicle_type),
+    { message: 'stock_vehicle_type_required', path: ['vehicle_type'] });
 
 const balanceSchema = z.object({
   quantity_on_hand: z.number().int().nonnegative().max(999_999),

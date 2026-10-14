@@ -257,7 +257,7 @@ function catalogSql(filters: string[]): string {
               ON ts.product_id = p.id AND ts.environment = p.environment
             LEFT JOIN commerce.matriz_current_prices cp
               ON cp.product_id = p.id AND cp.environment = p.environment
-           WHERE ${filters.join(' AND ')}`;
+           WHERE NOT p.partner_generic AND ${filters.join(' AND ')}`;
 }
 
 async function loadOfficialStock(client: PoolClient, environment: 'prod' | 'test'): Promise<OfficialStockRow[]> {

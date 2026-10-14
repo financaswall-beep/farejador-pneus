@@ -8,6 +8,14 @@ const item = (id: string, seconds: number, revision = 1) => ({
 });
 
 describe('Fila de confirmações do parceiro', () => {
+  it('destaca a marca solicitada antes de o parceiro tocar em TENHO', () => {
+    const { C, root, ready } = partnerScreen(); ready();
+    const request = item('marca',180);
+    C.partnerWaiting.sync([{...request,items:[{...request.items[0],brand:'Pirelli',requested_brand:'Pirelli'}]}]);
+    C.partnerHome.render();
+    expect(root.textContent).toContain('Marca pedida: Pirelli');
+    expect(root.textContent).toContain('Tem esses pneus nessa marca?');
+  });
   it('atende três pedidos por urgência, avança sozinho e preserva prazo e revisão de cada um', async () => {
     const { C, root, ready, button, node } = partnerScreen(); ready();
     C.partnerData.state.waiting = [item('terceiro', 290, 3), item('primeiro', 180, 1), item('segundo', 240, 2)];
