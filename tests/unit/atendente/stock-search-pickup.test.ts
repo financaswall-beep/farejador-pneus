@@ -9,7 +9,7 @@ import { resolveProductAvailabilityByProximity } from '../../../src/atendente-v2
 import { observeSearchProducts,withStockSearchTrace } from '../../../src/atendente-v2/stock-search-trace.js';
 
 type Store={id:string;mode:'pickup'|'delivery'|'both';lng:number|null;radius:number|null;stock:number;coverage?:boolean;price?:number|null};
-async function search(stores:Store[]){
+async function search(stores:Store[],modalidade?:'pickup'|'delivery'){
   const query=vi.fn(async(sql:string,values:unknown[])=>{
     if(sql.includes('FROM network.partner_units pu')||sql.includes('FROM network.unit_coverage uc'))return {rows:stores.map(s=>({
       unit_id:s.id,partner_id:s.id,partner_unit_id:s.id,slug:s.id,partner_name:s.id,unit_name:s.id,
@@ -26,7 +26,7 @@ async function search(stores:Store[]){
   await withStockSearchTrace(client,'test','conversation',{key:'job:0:0',tool:'buscar_produto',args:{}},async()=>{
     observeSearchProducts([{id:'p1',measure:'180/55-17',matrixAvailable:0}]);
     availability=await resolveProductAvailabilityByProximity(client,'test',{municipio:'Rio de Janeiro',
-      customerLocation:{lat:0,lng:0},clientNeighborhoodCanonical:'meier',productIds:['p1']});
+      customerLocation:{lat:0,lng:0},clientNeighborhoodCanonical:'meier',productIds:['p1'],modalidade});
     return JSON.stringify({encontrado:true});
   });
   const recorded=query.mock.calls.find(c=>c[0].includes('INSERT INTO ops.bot_stock_searches'))!;
@@ -34,6 +34,28 @@ async function search(stores:Store[]){
 }
 beforeEach(()=>{mocks.env.ROUTING_PROXIMITY_FIRST=true;mocks.env.ROUTING_GEO_ROAD_DISTANCE=false;mocks.road.mockReset();});
 describe('procura local em lojas aptas à retirada',()=>{
+  it('retirada encontra meia-vida de loja sem raio de entrega, mas não oferta loja exclusiva de entrega',async()=>{
+    const result=await search([{id:'so-entrega',mode:'delivery',lng:.01,radius:40,stock:10},
+      {id:'teste-sem-raio',mode:'both',lng:.02,radius:null,stock:2,price:63.5}],'pickup');
+    expect(result.availability.get('p1')).toEqual({unitId:'teste-sem-raio',available:2});
+  });
+  it('retirada respeita os 15 km e preço válido, sem aproveitar o raio maior de entrega',async()=>{
+    const result=await search([{id:'sem-preco',mode:'pickup',lng:.01,radius:null,stock:5,price:null},
+      {id:'longe',mode:'both',lng:.2,radius:40,stock:10}],'pickup');
+    expect([...result.availability]).toEqual([]);
+  });
+  it('retirada mede seu próprio TOPK e respeita distância de rua, mesmo se a loja também entrega',async()=>{
+    mocks.env.ROUTING_GEO_ROAD_DISTANCE=true;
+    mocks.road.mockResolvedValueOnce([16]);
+    const result=await search([{id:'so-entrega',mode:'delivery',lng:.001,radius:40,stock:5},
+      {id:'retirada',mode:'both',lng:.02,radius:null,stock:2}],'pickup');
+    expect([...result.availability]).toEqual([]);
+    expect(mocks.road.mock.calls[0]![2]).toEqual([{lat:0,lng:.02}]);
+  });
+  it('entrega explícita continua recusando loja sem raio e não herda disponibilidade de retirada',async()=>{
+    const result=await search([{id:'teste',mode:'both',lng:.02,radius:null,stock:2}],'delivery');
+    expect([...result.availability]).toEqual([]);
+  });
   it('oferece a próxima loja com preço válido e preserva o estoque observado da loja sem preço',async()=>{
     const result=await search([{id:'sem-preco',mode:'both',lng:.02,radius:40,stock:9,price:null},
       {id:'com-preco',mode:'both',lng:.04,radius:40,stock:3,price:179.9}]);

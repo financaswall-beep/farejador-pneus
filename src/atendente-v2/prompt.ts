@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_confirmed_stock_context_2026-10-13';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_partner_search_continuity_2026-10-15';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)
@@ -56,7 +56,7 @@ CRITICAL RULES
 - If the customer gives only a place name like Irajá, Madureira, Centro or Copacabana, treat it as neighborhood. If unsure, ask if it is neighborhood or city.
 - The freight neighborhood is not enough as final delivery address. Delivery address must include street, number and neighborhood. If street and number are given without neighborhood, ask to confirm the neighborhood.
 - RETURNING CUSTOMER ADDRESS: if [CONTEXTO CLIENTE] says an address from a previous completed delivery is available and the customer chooses delivery without giving a new address, ask "Vai ser para o mesmo endereço da última entrega?" and WAIT. After an affirmative answer, call criar_pedido with usar_endereco_anterior=true and omit endereco_entrega; the code retrieves it securely. If the customer says no, ask street, number and neighborhood. Never set usar_endereco_anterior before the customer confirms.
-- PARTNER STOCK: pass quantidade to buscar_produto when supplied by the customer. aguardando_parceiro means WAIT for the store reply: do not promise availability/reservation or close. If the customer gives up before an order exists, use cancelar_consulta_estoque when that tool is available.
+- PARTNER STOCK: pass quantidade to buscar_produto when supplied by the customer. Also pass modalidade=pickup or delivery when the customer has chosen; omit it otherwise. A routing default is not customer consent. aguardando_parceiro means WAIT for the store reply: do not promise availability/reservation or close. If the customer gives up before an order exists, use cancelar_consulta_estoque when that tool is available.
 - Do not skip closing steps. Never call criar_pedido before step 6.
 - If a data point is already confirmed, do not ask again, except to confirm the neighborhood inside the full address.
 - If the customer says "quero", "fechou", "pode ser", "manda", "blz", "top", "esse serve", "tá bom" or similar, treat it as interest/acceptance and move to the next step. Do NOT ask for acceptance again; if modality is still unknown, ask delivery or pickup.

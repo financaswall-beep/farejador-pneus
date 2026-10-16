@@ -19,6 +19,40 @@ import type { ChatMessage } from './types.js';
 
 const SEARCH_TOOLS = new Set(['buscar_produto', 'buscar_compatibilidade']);
 
+/** Preferências dos SKUs sem marca já consultados. Só lê pares chamada/resultado,
+ * nunca texto livre nem opções que o modelo ainda não executou. A busca mais nova
+ * substitui a marca anterior (inclusive quando passou a aceitar qualquer marca). */
+export function recentPartnerStockPreferences(history:ChatMessage[]):Map<string,{quantity:number;requested_brand?:string}> {
+  const calls=new Map<string,{name:string;args:Record<string,unknown>}>();
+  const preferences=new Map<string,{quantity:number;requested_brand?:string}>();
+  for(const message of history) {
+    if(message.role==='assistant')for(const call of message.tool_calls??[]) {
+      try { calls.set(call.id,{name:call.function.name,args:JSON.parse(call.function.arguments)}); } catch { /* chamada inválida não é evidência */ }
+    }
+    if(message.role!=='tool'||!message.tool_call_id)continue;
+    const call=calls.get(message.tool_call_id);if(!call)continue;
+    calls.delete(message.tool_call_id);
+    let result:Record<string,unknown>;
+    try { result=JSON.parse(message.content??'null'); } catch { continue; }
+    if(!result||!call.args||result.erro||result.error)continue;
+    // A consulta persistida mais recente prevalece sobre buscas antigas que não chegaram à loja.
+    if(result.aguardando_parceiro===true&&typeof result.solicitacao_id==='string') {
+      preferences.clear();continue;
+    }
+    if(result.ok===true&&['cancelar_consulta_estoque','cancelar_pedido','criar_pedido'].includes(call.name)) {
+      preferences.clear();continue;
+    }
+    if(call.name!=='buscar_produto'||!Array.isArray(result.produtos))continue;
+    for(const product of result.produtos) {
+      if(!product||product.partner_generic!==true||typeof product.product_id!=='string')continue;
+      const brand=typeof product.requested_brand==='string'?product.requested_brand.trim():'';
+      const quantity=Number.isInteger(call.args.quantidade)&&Number(call.args.quantidade)>0&&Number(call.args.quantidade)<=20?Number(call.args.quantidade):1;
+      preferences.set(product.product_id,{quantity,...(brand?{requested_brand:brand.slice(0,120)}:{})});
+    }
+  }
+  return preferences;
+}
+
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }

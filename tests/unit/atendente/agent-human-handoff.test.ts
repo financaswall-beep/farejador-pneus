@@ -8,7 +8,7 @@ vi.mock('../../../src/atendente-v2/conversation-control.js',() => ({ botMayProce
 vi.mock('../../../src/atendente-v2/history.js',() => ({
   loadHistory:mocks.history,lookupChatwootConversationId:async()=>12,
 }));
-vi.mock('../../../src/atendente-v2/tools.js',() => ({ activeToolDefinitions:()=>['criar_pedido','buscar_produto','escalar_humano'].map(name => ({
+vi.mock('../../../src/atendente-v2/tools.js',() => ({ activeToolDefinitions:()=>['criar_pedido','buscar_produto','localizacao_loja','escalar_humano'].map(name => ({
   type:'function',function:{ name,description:'fixture',parameters:{ type:'object',properties:{} } },
 })),executeTool:mocks.tool }));
 vi.mock('../../../src/shared/clientes-kanban.notify.js',() => ({ notifyClientesKanban:vi.fn() }));
@@ -157,7 +157,8 @@ describe('intervenção enquanto o bot prepara resposta',() => {
       .mockResolvedValueOnce(jsonResponse(responseBody([textItem('Temos duas unidades.\nOPCOES: Comprar | Ver mais')])));
     vi.stubGlobal('fetch',fetcher);
     const { runAgentV2 }=await import('../../../src/atendente-v2/agent.js');await runAgentV2(job);
-    expect(mocks.tool).toHaveBeenCalledWith(mocks.client,'test','conversation','buscar_produto',{});
+    expect(mocks.tool).toHaveBeenCalledWith(mocks.client,'test','conversation','buscar_produto',{},undefined,
+      expect.objectContaining({triggerMessageId:job.triggerMessageId,stockHistory:expect.any(Array)}));
     expect(mocks.send).toHaveBeenCalledTimes(1);
     const sent=mocks.send.mock.calls[0]?.[1];
     expect(sent).toMatchObject({ body:'Temos duas unidades.',inputTokens:200,outputTokens:50,environment:'test',
@@ -166,6 +167,22 @@ describe('intervenção enquanto o bot prepara resposta',() => {
     expect(JSON.stringify(sent)).not.toContain(reasoningItem.encrypted_content);
     const continuation=JSON.parse(fetcher.mock.calls[1]?.[1].body);
     expect(continuation.input).toContainEqual(reasoningItem);
+  });
+  it('entrega à consulta seguinte os resultados da busca atual e o histórico já carregado',async()=>{
+    const prior={role:'user',content:'Preciso de Pirelli meia-vida para retirar'};
+    mocks.history.mockResolvedValue([prior]);
+    const product=JSON.stringify({produtos:[{product_id:'generic',partner_generic:true,requested_brand:'Pirelli',total_stock_available:0}]});
+    mocks.tool.mockResolvedValueOnce(product).mockResolvedValueOnce('{"aguardando_parceiro":true}');
+    vi.stubGlobal('fetch',vi.fn()
+      .mockResolvedValueOnce(jsonResponse(responseBody([functionItem('search','buscar_produto','{"marca":"Pirelli","modalidade":"pickup"}')])))
+      .mockResolvedValueOnce(jsonResponse(responseBody([functionItem('store','localizacao_loja','{"product_ids":["generic"]}')])))
+      .mockResolvedValueOnce(jsonResponse(responseBody([textItem('Estou confirmando com a loja.')]))));
+    const {runAgentV2}=await import('../../../src/atendente-v2/agent.js');await runAgentV2(job);
+    expect(mocks.tool).toHaveBeenCalledTimes(2);
+    expect(mocks.tool.mock.calls[1]?.[6].stockHistory).toEqual(expect.arrayContaining([
+      prior,{role:'tool',tool_call_id:'search',content:product},
+    ]));
+    expect(mocks.tool.mock.calls[0]?.[6].stockHistory).not.toContainEqual({role:'tool',tool_call_id:'search',content:product});
   });
   it('mantém transação do pedido e revalida pausa antes do envio final',async () => {
     vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(jsonResponse(responseBody([functionItem('order','criar_pedido')])))

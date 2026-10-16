@@ -254,7 +254,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         } else {
           result = await withStockSearchTrace(client, environment as Environment, conversationId,
             { key: `${jobId}:${round}:${toolIndex}`, tool: toolCall.function.name, args: toolArgs, messageId: job.triggerMessageId },
-            () => executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs));
+            () => executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs,
+              undefined,{triggerMessageId:job.triggerMessageId,stockHistory:[...history,...turnActions]}));
           if (toolCall.function.name === 'editar_pedido' && JSON.parse(result).ok === true) {
             await notifyClientesKanban(client, environment, conversationId, 'order');
           }

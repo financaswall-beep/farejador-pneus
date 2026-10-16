@@ -86,6 +86,30 @@ async function search(product=productA) {
   finally{client.release();}
 }
 describe('Confirmação do parceiro em PostgreSQL real',()=>{
+  it('localizacao_loja preserva marca e quantidade da busca do mesmo turno; trocar marca exige outro TENHO',async()=>{
+    const client=await db.pool.connect();
+    const history=(brand:string|null):import('../../src/atendente-v2/types.js').ChatMessage[]=>[
+      {role:'assistant',content:null,tool_calls:[{id:'search',type:'function',function:{name:'buscar_produto',arguments:JSON.stringify({marca:brand,quantidade:2})}}]},
+      {role:'tool',tool_call_id:'search',content:JSON.stringify({encontrado:true,produtos:[{product_id:productA,partner_generic:true,
+        requested_brand:brand,total_stock_available:0}],sem_estoque_loja_perto:true})}];
+    const location=JSON.stringify({encontrado:true,nome_loja:'Loja teste'});
+    try{
+      const check=(brand:string|null)=>gatePartnerSearch(client,'test',conversation,'localizacao_loja',
+        {bairro:'méier',product_ids:[productA]},location,history(brand)).then(value=>JSON.parse(value));
+      expect((await check('Pirelli')).aguardando_parceiro).toBe(true);
+      const first=await request();
+      expect(first.routing.items).toEqual([{product_id:productA,quantity:2,requested_brand:'Pirelli'}]);
+      expect(first.items[0]).toMatchObject({brand:'Pirelli',requested_brand:'Pirelli',quantity:2,price:90});
+      await publishStockRequest(client,'test',conversation);await answer(a,first.id,true);
+      expect((await check('Pirelli')).disponibilidade_confirmada).toBe(true);
+      expect((await request()).id).toBe(first.id);
+      expect((await check('Michelin')).aguardando_parceiro).toBe(true);
+      const second=await request();expect(second.id).not.toBe(first.id);
+      expect(second.items[0]).toMatchObject({brand:'Michelin',requested_brand:'Michelin',quantity:2});
+      await check(null);expect((await request()).routing.items[0]).not.toHaveProperty('requested_brand');
+      expect((await client.query('SELECT quantity_reserved FROM commerce.partner_stock_levels WHERE id=$1',[a.stockId])).rows[0].quantity_reserved).toBe(0);
+    }finally{client.release();}
+  });
   it('marca específica chega à loja e trocar Pirelli por Michelin exige outro TENHO',async()=>{
     const client=await db.pool.connect();
     const raw=JSON.stringify({encontrado:true,produtos:[{product_id:productA,tire_size:'90/90-18',
@@ -201,6 +225,9 @@ describe('Confirmação do parceiro em PostgreSQL real',()=>{
     const photos=(await db.pool.query(`SELECT unit_id FROM commerce.photo_requests WHERE conversation_id=
       (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1)`,[conversation])).rows;
     expect(photos).toHaveLength(1);expect(photos[0].unit_id).toBe(b.unitId);
+    const notice=(await db.pool.query("SELECT body FROM ops.outbound_messages WHERE conversation_id=$1 AND kind='stock_text'",[conversation])).rows[0].body;
+    expect(notice).toContain('Pedi as fotos para você conferir.');
+    expect(notice).not.toContain('Você prefere buscar ou receber?');
   });
   it('usa a última autorização de fechamento sem reiniciar o prazo da consulta',async()=>{
     await search();await publishStockRequest(awaitClient,'test',conversation);const row=await request();

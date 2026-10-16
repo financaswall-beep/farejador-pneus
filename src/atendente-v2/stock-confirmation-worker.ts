@@ -12,11 +12,13 @@ import { createConfirmedStockPhotos } from './stock-confirmation-photo.js';
 import { routeStockConfirmation } from './stock-confirmation-routing.js';
 import { createStockRequest,latestStockRequest,lockStockConversation,refreshStockRequestPrices,type StockRequest } from './stock-confirmation-store.js';
 import { partnerStoreIsOpen, withStoreOpeningContext, storeOpeningBlockResponse, storeOpeningBlocked } from './routing-store-hours.js';
+import { tireConditionLabel } from '../shared/tire-condition.js';
 
 const money=(value:unknown)=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function stockConfirmedText(request:StockRequest):string {
-  const items=request.items.map(item=>`${item.quantity} × ${item.tire_size}${item.brand?' '+item.brand:''} — ${money(item.price)} cada`).join('\n');
-  return `A loja confirmou esses pneus:\n${items}\nVocê prefere buscar ou receber?`;
+  const items=request.items.map(item=>`${item.quantity} × ${item.tire_size}${item.brand?' '+item.brand:''}${item.tire_condition?' · '+tireConditionLabel(item.tire_condition):''} — ${money(item.price)} cada`).join('\n');
+  // O callback não tem a escolha atual do cliente. Confirma os fatos sem repetir perguntas nem inferir modalidade.
+  return `A loja confirmou esses pneus:\n${items}`;
 }
 export function stockPriceChangedText(request:StockRequest,result:Record<string,unknown>):string {
   const changed=Array.isArray(result.itens)?result.itens as Array<{product_id:string;preco_atual:number|null}>:[];
@@ -72,7 +74,7 @@ async function handleRequest(client:PoolClient,request:StockRequest) {
     } else {
       let body=stockConfirmedText(request);
       const photos=await createConfirmedStockPhotos(client,request);
-      if(photos)body=body.replace('Você prefere buscar ou receber?','Pedi as fotos para você conferir.');
+      if(photos)body+='\nPedi as fotos para você conferir.';
       // Fechamento já autorizado pelo cliente: reaproveita validações e dedup originais.
       // Uma mensagem nova pode mudar a compra; nesse caso não fecha automaticamente.
       const latest=await botOrderRequestId(client,request.environment,request.conversation_id);

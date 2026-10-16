@@ -1172,10 +1172,10 @@ export interface ProductAvailability {
 }
 
 /**
- * Busca por proximidade: devolve estoque da loja apta a ENTREGAR mais próxima.
+ * Busca por proximidade: devolve estoque da loja apta à modalidade consultada.
  * Mantém cobertura/raio/anéis do pedido e o backstop da Matriz, sem materializar pedido.
  * Consulta também lojas aptas à RETIRADA até 15 km para registrar a procura local;
- * essas observações não autorizam entrega nem alteram a disponibilidade devolvida.
+ * essas observações não autorizam entrega. Sem modalidade mantém a régua de entrega.
  */
 export async function resolveProductAvailabilityByProximity(
   client: PoolClient,
@@ -1185,15 +1185,16 @@ export async function resolveProductAvailabilityByProximity(
     customerLocation: GeoPoint;
     clientNeighborhoodCanonical: string | null;
     productIds: string[];
+    modalidade?: 'delivery' | 'pickup';
   },
 ): Promise<Map<string, ProductAvailability>> {
   const out = new Map<string, ProductAvailability>();
   if (input.productIds.length === 0) return out;
 
-  // PROXIMIDADE-PRIMEIRO (Fase 3): a BUSCA segue a MESMA régua do pedido de entrega —
-  // pool sem muro de cidade + raio declarado — senão a busca prometeria estoque de loja
-  // que o pedido depois recusaria (a fala e o registro nunca podem divergir).
+  // Busca e pedido usam a régua da modalidade: retirada até 15 km;
+  // entrega mantém cobertura/raio declarado, sem prometer retirada como entrega.
   const useProximity = env.ROUTING_PROXIMITY_FIRST;
+  const pickup = input.modalidade === 'pickup';
   const candidates = useProximity
     ? await resolveUnitCandidatesByProximity(client, environment)
     : await resolveUnitCandidates(client, environment, input.municipio);
@@ -1225,11 +1226,11 @@ export async function resolveProductAvailabilityByProximity(
   const distanceByUnit = await resolveDistances(
     client,
     input.customerLocation,
-    eligible.filter(c => servableIds.has(c.ctx.unitId)).map(c => ({ unitId: c.ctx.unitId, location: c.location! })),
-    maxRing,
+    eligible.filter(c => (pickup ? pickupIds : servableIds).has(c.ctx.unitId)).map(c => ({ unitId: c.ctx.unitId, location: c.location! })),
+    pickup ? maxPickupRing : maxRing,
   );
   // Medir retirada separadamente preserva quais lojas de entrega recebem cálculo de rua (TOPK).
-  for (const [id,km] of await resolveDistances(client,input.customerLocation,
+  if (!pickup) for (const [id,km] of await resolveDistances(client,input.customerLocation,
     eligible.filter(c => !servableIds.has(c.ctx.unitId)).map(c => ({unitId:c.ctx.unitId,location:c.location!})),maxPickupRing)) {
     distanceByUnit.set(id,km);
   }
@@ -1240,6 +1241,7 @@ export async function resolveProductAvailabilityByProximity(
   const inRange = eligible
     .filter((c) => {
       const d = distanceByUnit.get(c.ctx.unitId) ?? Infinity;
+      if (pickup) return pickupIds.has(c.ctx.unitId) && d <= maxPickupRing;
       if (d > maxRing) return false;
       return (pickupIds.has(c.ctx.unitId) && d <= maxPickupRing)
         || (servableIds.has(c.ctx.unitId) && (!useProximity || passesDeliveryRadius(c.deliveryRadiusKm, d)));
@@ -1283,7 +1285,8 @@ export async function resolveProductAvailabilityByProximity(
   // pra cada produto, a 1ª loja em alcance (mais perto) que tem ganha.
   for (const productId of input.productIds) {
     for (const c of inRange) {
-      if (!openIds.has(c.ctx.unitId) || !servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))) continue;
+      if (!openIds.has(c.ctx.unitId)) continue;
+      if (!pickup && (!servableIds.has(c.ctx.unitId) || (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!)))) continue;
       const q = pricedByUnit.get(c.ctx.unitId)?.get(productId);
       if (q != null && q > 0) {
         out.set(productId, { unitId: c.ctx.unitId, available: q });

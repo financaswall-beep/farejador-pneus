@@ -47,5 +47,7 @@ describe('usado do parceiro sem marca',()=>{
     expect(items[0]).toMatchObject({brand:'Pirelli',requested_brand:'Pirelli',quantity:2,price:55});
     expect(stockConfirmedText({items} as StockRequest)).toContain('2 × 90/90-18 Pirelli');
     expect(stockConfirmedText({items} as StockRequest)).toContain('55,00');
+    expect(stockConfirmedText({items} as StockRequest)).toContain('Meia-vida');
+    expect(stockConfirmedText({items} as StockRequest)).not.toMatch(/prefere|buscar|receber|\?/i);
   });
 });

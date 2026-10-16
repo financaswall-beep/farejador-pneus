@@ -12,6 +12,10 @@ export interface StockConfirmationLocation {
   municipio:string|null; modalidade:'pickup'|'delivery';
   customerLocation:GeoPoint|null; clientNeighborhoodCanonical:string|null;
 }
+/** Mesma modalidade na busca e na confirmação; o padrão de roteamento não é aceite do cliente. */
+export function confirmationModality(args:Record<string,unknown>):'pickup'|'delivery' {
+  return args.modalidade==='delivery'?'delivery':env.PICKUP_TO_PARTNER?'pickup':'delivery';
+}
 export async function confirmationLocation(client:PoolClient,environment:Environment,conversationId:string,
   args:Record<string,unknown>):Promise<StockConfirmationLocation> {
   const bairro=typeof args.bairro==='string'?args.bairro:null;
@@ -21,7 +25,7 @@ export async function confirmationLocation(client:PoolClient,environment:Environ
   const customerLocation=await resolveCustomerLocation(client,environment,conversationId,{
     municipio,bairro,fullAddress:args.endereco_entrega as string|undefined,apiKey:env.GOOGLE_MAPS_API_KEY});
   return {municipio,customerLocation,clientNeighborhoodCanonical:neighborhoodCanonical,
-    modalidade:args.modalidade==='delivery'?'delivery':env.PICKUP_TO_PARTNER?'pickup':'delivery'};
+    modalidade:confirmationModality(args)};
 }
 export async function routeStockConfirmation(client:PoolClient,environment:Environment,
   location:StockConfirmationLocation,items:StockConfirmationItem[],excludedUnitIds:string[]=[],onlyUnitId?:string) {

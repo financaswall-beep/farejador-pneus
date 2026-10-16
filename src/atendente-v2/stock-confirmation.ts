@@ -7,6 +7,7 @@ import { confirmationLocation,routeStockConfirmation,type StockConfirmationItem 
 import { basketKey,createStockRequest,latestStockRequest,lockStockConversation,requestConfirms,sameStockLocation,STOCK_WAIT_TEXT,type StockRequest } from './stock-confirmation-store.js';
 import {guardCurrentConfirmedStockReply} from './confirmed-stock-context.js';
 import type {ChatMessage} from './types.js';
+import {recentPartnerStockPreferences} from './conversation-products.js';
 
 type Product=Record<string,unknown>;
 export function selectedConfirmationProducts(result:Record<string,unknown>):Product[] {
@@ -29,7 +30,7 @@ const waitingResult=(id:string)=>JSON.stringify({encontrado:true,disponibilidade
 
 /** Busca continua determinística. Só a promessa do estoque do parceiro aguarda confirmação. */
 export async function gatePartnerSearch(client:PoolClient,environment:Environment,conversationId:string,
-  name:string,args:Record<string,unknown>,raw:string):Promise<string> {
+  name:string,args:Record<string,unknown>,raw:string,history:ChatMessage[]=[]):Promise<string> {
   if(!env.PARTNER_STOCK_CONFIRMATION||!['buscar_produto','buscar_compatibilidade','verificar_estoque','localizacao_loja'].includes(name))return raw;
   const result=JSON.parse(raw) as Record<string,unknown>;
   if(result.erro||result.precisa_localizacao||result.aguardando_parceiro||result.encontrado===false||result.disponivel===false)return raw;
@@ -37,7 +38,8 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
   let items:StockConfirmationItem[]=selectedConfirmationProducts(result).map(product=>({product_id:String(product.product_id),quantity:requestedQuantity,
     ...(product.partner_generic && typeof args.marca==='string' && args.marca.trim()
       ?{requested_brand:args.marca.trim().slice(0,120)}:{})}));
-  if(!items.length&&['verificar_estoque','localizacao_loja'].includes(name)) {
+  const fromIds=!items.length&&['verificar_estoque','localizacao_loja'].includes(name);
+  if(fromIds) {
     const ids=Array.isArray(args.product_ids)?args.product_ids:args.product_id?[args.product_id]:[];
     items=ids.filter((id):id is string=>typeof id==='string').map(product_id=>({product_id,quantity:requestedQuantity}));
   }
@@ -49,6 +51,15 @@ export async function gatePartnerSearch(client:PoolClient,environment:Environmen
   try {
     await lockStockConversation(client,environment,conversationId);
     const prior=await latestStockRequest(client,environment,conversationId);
+    if(fromIds) {
+      const preferences=recentPartnerStockPreferences(history);
+      items=items.map(item=>{
+        const saved=preferences.get(item.product_id)??(['pending','confirmed'].includes(prior?.status??'')
+          ?prior?.routing.items.find(row=>row.product_id===item.product_id):undefined);
+        return {...item,quantity:args.quantidade===undefined?(saved?.quantity??item.quantity):item.quantity,
+          ...(saved?.requested_brand?{requested_brand:saved.requested_brand}:{})};
+      });
+    }
     const messageId=await botOrderRequestId(client,environment,conversationId);
     if(prior?.status==='pending'&&!prior.sealed&&prior.request_message_id===messageId) {
       const merged=new Map(prior.routing.items.map(item=>[item.product_id,item]));

@@ -13,7 +13,7 @@ import { logger } from '../shared/logger.js';
 import { normalizeCustomerNameForOrder } from '../shared/customer-name.js';
 import { resolveOrderPhone } from './order-phone.js';
 import { loadConversationPhotoStatus } from './photo-status.js';
-import type { ToolDefinition } from './types.js';
+import type { ToolDefinition, ChatMessage } from './types.js';
 import { requestHumanHandoff, type HumanHandoffContext } from './human-handoff.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import {
@@ -41,6 +41,7 @@ import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-cat
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
+import { confirmationModality } from './stock-confirmation-routing.js';
 import { botOrderRequestId, previousBotOrderAttempt, resolveBotOrderKey,
   recordBotOrderAttempt, botOrderReplay, type BotOrderExecution } from './order-attempt.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
@@ -147,6 +148,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           medida_pneu: { type: 'string', description: 'Medida do pneu. Ex: "90/90-18"' },
           quantidade: { type: 'integer', minimum: 1, maximum: 20, description: 'Quantidade dessa medida pedida pelo cliente; omita se não informou.' },
+          modalidade: { type: 'string', enum: ['pickup','delivery'], description: 'Retirada ou entrega escolhida pelo cliente. Passe quando já informado; omita se ainda não escolheu.' },
           marca: { type: 'string', description: 'Marca. Ex: "Pirelli", "Levorin"' },
           condicao_pneu: {
             type: 'string',
@@ -412,11 +414,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 // ─── Tool executors ────────────────────────────────────────────────────────
 export async function executeTool(
   client:PoolClient,environment:Environment,conversationId:string,name:string,args:Record<string,unknown>,
-  handoffContext?:HumanHandoffContext,execution?:BotOrderExecution,
+  handoffContext?:HumanHandoffContext,execution?:BotOrderExecution & {stockHistory?:ChatMessage[]},
 ):Promise<string> {
   return withStoreOpeningScope(client,environment,name,async()=>{
   const result=await executeToolInternal(client,environment,conversationId,name,args,handoffContext,execution);
-  try { return await gatePartnerSearch(client,environment,conversationId,name,args,result); }
+  try { return await gatePartnerSearch(client,environment,conversationId,name,args,result,execution?.stockHistory); }
   catch(error){logger.error({err:error,environment,conversationId},'stock confirmation: consulta não confirmada');
     return JSON.stringify({erro:'falha_confirmacao_estoque',disponibilidade_confirmada:false,
       mensagem:'Não foi possível confirmar com a loja. Não prometa disponibilidade, preço nem reserva.'});}
@@ -651,6 +653,7 @@ async function executeToolInternal(
               customerLocation,
               clientNeighborhoodCanonical,
               productIds: result.map((p) => p.product_id),
+              ...(env.PARTNER_STOCK_CONFIRMATION?{modalidade:confirmationModality(args)}:{}),
             });
             estoqueLojaPerto = await applyPartnerPricesToProducts(
               client, environment, result, avail,
