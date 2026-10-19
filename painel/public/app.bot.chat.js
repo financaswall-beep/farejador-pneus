@@ -51,11 +51,17 @@
       requestAnimationFrame(H.resize);
     },
     resize(){
-      const root=document.getElementById(H.chatMountId);if(!root||!H.chat.state.active)return;
+      const root=document.getElementById(H.chatMountId);if(!root||!H.chat.state.active||!root.getClientRects().length)return;
       const viewport=window.visualViewport,nav=document.getElementById('farejador-sidebar')?.getBoundingClientRect();
+      const main=document.getElementById('farejador-main'),page=root.closest('.bot-chat-page');
       let bottom=viewport?viewport.offsetTop+viewport.height:window.innerHeight;
+      if(main)bottom=Math.min(bottom,main.getBoundingClientRect().bottom);
       if(nav&&nav.width>window.innerWidth*.8&&nav.top>0)bottom=Math.min(bottom,nav.top);
-      root.style.setProperty('--bot-chat-height',Math.max(300,bottom-root.getBoundingClientRect().top-16)+'px');
+      // A rolagem da página não deve aumentar o card a cada nova medição.
+      const top=root.getBoundingClientRect().top+(main?.scrollTop||0);
+      const gap=Math.max(16,page?parseFloat(getComputedStyle(page).paddingBottom)||0:0);
+      const height=Math.max(300,bottom-top-gap)+'px';
+      if(root.style.getPropertyValue('--bot-chat-height')!==height)root.style.setProperty('--bot-chat-height',height);
     },
     initialize(){
       H.initialized=true;const chat=H.chat,panel=chat.el('panel');
@@ -69,8 +75,12 @@
         });
         const toggle=chat.el('customer');if(toggle){toggle.textContent='Ficha do cliente';toggle.setAttribute('aria-controls','chat-sheet');toggle.setAttribute('aria-expanded',String(!chat.el('sheet').hidden));}
       };
-      window.addEventListener('resize',H.resize);
-      window.visualViewport?.addEventListener('resize',H.resize);
+      // Avisos, cabeçalhos e fontes podem mudar de altura depois de abrir a aba.
+      const scheduleResize=()=>{cancelAnimationFrame(H.resizeFrame);H.resizeFrame=requestAnimationFrame(H.resize);};
+      H.layoutObserver=new ResizeObserver(scheduleResize);
+      document.querySelectorAll('#farejador-main,#farejador-topbar-inner,#farejador-sidebar,#bot-channel-alerts,.bot-chat-heading,.bot-section-navigation,#bot-chat-notice').forEach(el=>H.layoutObserver.observe(el));
+      window.addEventListener('resize',scheduleResize);
+      window.visualViewport?.addEventListener('resize',scheduleResize);
       window.addEventListener('pagehide',()=>chat.reset());
     },
   };
