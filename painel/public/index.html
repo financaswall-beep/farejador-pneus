@@ -12,6 +12,10 @@
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261006-atacado1" />
 <style>
+  #sino-dropdown{display:flex;flex-direction:column;max-height:calc(100dvh - 6rem)}
+  #sino-dropdown>div{flex-shrink:0}
+  #sino-dropdown>.sino-list{flex-shrink:1;min-height:0;overflow-wrap:anywhere}
+  @media(max-width:639px){#sino-dropdown{position:fixed;left:1rem;right:1rem;top:4.5rem;margin-top:0}}
   [x-cloak]{display:none!important}
   #farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
   #farejador-sidebar-nav::-webkit-scrollbar{width:5px}
@@ -163,7 +167,7 @@
 <script src="/admin/painel/app.colaboradores.gestao.js?v=20260826-auditoria1"></script>
 <script src="/admin/painel/app.colaboradores.permissions.js?v=20260826-permissions2"></script>
 <script src="/admin/painel/app.colaboradores.finance.js?v=20260826-matriz-pay1"></script>
-<script src="/admin/painel/app.sino.js?v=20261019-sino1"></script>
+<script src="/admin/painel/app.sino.js?v=20261019-sino2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260910-continente1"></script>
 <link rel="stylesheet" href="/admin/painel/chat-channel-alerts.css?v=20260923-2">
 <script src="/admin/painel/chat-channel-alerts.js?v=20260923-2"></script>
@@ -520,7 +524,7 @@
            x-init="$watch('open', v => { if (v) { loadSino(); $nextTick(() => lucide.createIcons()) } })">
 
         <!-- Botão -->
-        <button @click="open = !open" aria-label="Abrir notificações" :aria-expanded="open" aria-controls="sino-dropdown"
+        <button x-ref="sinoTrigger" @click="open = !open" aria-label="Abrir notificações" :aria-expanded="open" aria-controls="sino-dropdown"
                 :class="mockTopbar
                           ? ('flex h-10 w-10 items-center justify-center rounded-xl border ' + (open ? 'border-emerald-400 bg-emerald-900 text-white' : 'border-emerald-700 bg-emerald-950 text-emerald-100 hover:border-emerald-500'))
                           : ('p-2 rounded-lg ' + (open ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'))"
@@ -536,7 +540,7 @@
         <div x-show="open" id="sino-dropdown"
              x-cloak
              @click.outside="open = false"
-             @keydown.escape.window="open = false"
+             @keydown.escape.window="if (open) { open = false; $refs.sinoTrigger.focus() }"
              x-transition:enter="transition ease-out duration-150"
              x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
@@ -565,7 +569,7 @@
           </div>
 
           <!-- Lista de notificações (derivada dos dados reais — clique abre a aba) -->
-          <div class="max-h-[440px] overflow-y-auto">
+          <div class="sino-list max-h-[440px] overflow-y-auto">
             <template x-for="notif in notificacoes" :key="notif.id">
               <button @click="sinoClick(notif); open = false"
                       class="block w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
@@ -4802,7 +4806,7 @@
       </div>
 
       <!-- REPOSIÇÃO: decisão sobre o estoque oficial; a compra continua no fluxo auditado de Compras. -->
-      <div x-show="stockTab === 'reposicao'" x-cloak
+      <div x-show="stockTab === 'reposicao'" x-cloak @sino-reposicao.window="repoFiltro = 'todos'; repoBusca = ''"
            x-data="{
              repoFiltro: 'todos',
              repoBusca: '',
@@ -7338,7 +7342,7 @@
       <section x-show="botTab === 'conversas'" x-effect="window.FarejadorBotChat.sync($data, currentPage === 'bot' && botTab === 'conversas' && adminAuthenticated && isMatrixPanel() && hasPanelModule('bot'))" aria-label="Conversas do Bot">
         <div id="bot-chat-notice" role="status" aria-live="polite" hidden></div>
         <div id="bot-chat-root" class="is-chat" x-ignore></div>
-        <details class="bot-chat-technical" x-show="botDeadLetters.length || botResilience?.api_ack_unconfirmed">
+        <details x-ref="sinoBotTechnical" class="bot-chat-technical" x-show="botDeadLetters.length || botResilience?.api_ack_unconfirmed">
           <summary>Envios que precisam de revisão <span x-text="botDeadLetters.length"></span></summary>
           <div x-show="botResilience && botResilience.enabled" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">

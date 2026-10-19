@@ -3,6 +3,7 @@
 // Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (mataria o getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.sino = function () {
+  let navigation = 0;
   return {
     sinoComissoes: null, sinoApplications: [], sinoLoading: false,
     sinoError: null, sinoUpdatedAt: null, sinoScope: null, sinoRequest: 0,
@@ -19,6 +20,7 @@ window.PAINEL_MODULES.sino = function () {
       return JSON.stringify([this.sinoReadKey(), this.adminUser?.role, [...(this.panelModules || [])].sort()]);
     },
     resetSino() {
+      navigation++;
       this.sinoRequest++;
       this.sino = null; this.sinoComissoes = null; this.sinoApplications = [];
       this.sinoLidas = []; this.sinoScope = null;
@@ -92,7 +94,7 @@ window.PAINEL_MODULES.sino = function () {
           icon: 'triangle-alert', iconBg: 'bg-rose-50', iconColor: 'text-rose-600',
           title: expiry.count + ' reserva(s) vencida(s) precisam de revisão',
           desc: 'A liberação falhou várias vezes. ' + expiry.orders.map(o => o.order_number + ' · ' + o.unit_name).join('; '),
-          page: 'bot', time: 'conferir pedidos do Bot →',
+          page: 'bot', section: 'vendas', time: 'conferir pedidos do Bot →',
         });
         const health = s.ledger_health;
         if (health && ['red','yellow','error'].includes(health.status)) itens.push({
@@ -125,7 +127,7 @@ window.PAINEL_MODULES.sino = function () {
             title: 'Bot precisa de revisão humana',
             desc: br.dead_letters + ' falha(s) final(is) e ' + br.api_ack_unconfirmed +
               ' envio(s) aceito(s) sem confirmação do webhook.',
-            page: 'bot', time: 'abrir Bot →',
+            page: 'bot', section: 'conversas', time: 'abrir revisão do Bot →',
           });
         }
         for (const e of s.entregas_falhadas || []) {
@@ -135,7 +137,7 @@ window.PAINEL_MODULES.sino = function () {
             title: 'Entrega não realizada — você decide',
             desc: (e.customer_name || 'Cliente') + (e.reason ? ' — "' + e.reason + '"' : '') +
               '. Recoloque na fila ou cancele.',
-            page: 'logistica', time: 'abrir Logística →',
+            page: 'logistica', orderId: e.order_id, time: 'revisar ocorrência →',
           });
         }
         const repor = s.galpao_repor || [];
@@ -203,14 +205,28 @@ window.PAINEL_MODULES.sino = function () {
         .map((n) => ({ ...n, read: this.sinoLidas.includes(n.id) }));
     },
 
-    sinoClick(notif) {
-      if (!this.notificacoes.some(n => n.id === notif.id)) return;
+    async sinoClick(notif) {
+      notif = this.notificacoes.find(n => n.id === notif?.id);
+      if (!notif) return;
+      const navigationRequest = ++navigation;
+      const scope = this.sinoContext();
       this.sinoMarcarLida(notif.id);
       // Candidatura abre o MODAL (não é uma página); o resto navega pela aba.
       if (notif.action === 'applications') this.openApplications();
       else if (notif.page) {
         this.currentPage = notif.page;
         if (notif.page === 'rede') this.redeSection = notif.section || 'visao';
+        if (notif.page === 'estoque') {
+          this.stockTab = 'reposicao'; this.stockVehicleType = 'all';
+          this.$dispatch?.('sino-reposicao');
+        }
+        if (notif.page === 'retiradas') {
+          this.partnerRetiradasFilter = 'waiting'; this.partnerRetiradasSearch = '';
+          this.partnerRetiradasSelectedId = '';
+        }
+        if (notif.page === 'bot') this.botTab = notif.section || 'visao';
+        if (notif.page === 'financeiro') this.finTab = notif.tab || 'visao';
+        if (notif.page === 'logistica') this.logisticaTab = 'visao';
         // Financeiro tem sub-abas: a notificação leva DIRETO na certa, já filtrada
         // (conta vencida → Contas a pagar/vencidas; fiado → Cobranças/vencidas).
         // O filtro aplicado é o da ABA DESTINO — o da outra fica como estava.
@@ -220,7 +236,18 @@ window.PAINEL_MODULES.sino = function () {
           if (notif.tab === 'pagar') this.pagarFiltro = notif.filter || '';
         }
       }
-      this.$nextTick(() => lucide.createIcons());
+      this.$nextTick(() => {
+        if (notif.section === 'conversas' && this.$refs?.sinoBotTechnical) this.$refs.sinoBotTechnical.open = true;
+        lucide.createIcons();
+      });
+      if (notif.orderId && this.loadLogistica) {
+        try { await this.loadLogistica({ propagate: true }); }
+        catch (_) { return; } // A própria Logística mostra a falha e preserva os dados.
+        if (navigationRequest !== navigation || scope !== this.sinoContext()
+            || !this.adminAuthenticated || this.currentPage !== 'logistica') return;
+        const order = this.logisticaTodasEntregas?.().find(d => d.order_id === notif.orderId);
+        if (order?.delivery_status === 'failed' && order.status !== 'cancelled') this.logOpAbrirDialog?.('pedido', notif.orderId);
+      }
     },
 
     sinoMarcarLida(id) {

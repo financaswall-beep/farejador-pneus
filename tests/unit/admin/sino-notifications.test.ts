@@ -104,13 +104,65 @@ describe('sino: atualizações e falhas',()=>{
 });
 
 describe('sino: leitura, identidade e destinos',()=>{
-  it('marca os 11 tipos sem resolver pendências e abre cada destino permitido',()=>{
+  it('marca os 11 tipos sem resolver pendências e abre cada destino permitido',async()=>{
     const m=frontend();allAlerts(m);m.openApplications=vi.fn();expect(m.notificacoes).toHaveLength(11);
-    for(const n of m.notificacoes){m.sinoClick(n);if(n.page)expect(m.currentPage).toBe(n.page);}
+    for(const n of m.notificacoes){await m.sinoClick(n);if(n.page)expect(m.currentPage).toBe(n.page);}
     expect(m.openApplications).toHaveBeenCalledOnce();expect(m.finTab).toBe('pagar');
     expect(m.cobrancaFiltro).toBe('vencida');expect(m.pagarFiltro).toBe('vencida');expect(m.redeSection).toBe('operacao');
     expect(m.notificacoes).toHaveLength(11);expect(m.notifBadgeCount()).toBe(0);
     m.sino={};m.sinoApplications=[];m.sinoComissoes=null;expect(m.notificacoes).toHaveLength(0);
+  });
+  it('abandona abas e filtros antigos para mostrar a pendência do alerta',async()=>{
+    const m=frontend();allAlerts(m);m.$dispatch=vi.fn();
+    m.stockTab='custos';m.stockVehicleType='car';
+    await m.sinoClick(m.notificacoes.find((n:any)=>n.page==='estoque'));
+    expect(m.stockTab).toBe('reposicao');expect(m.stockVehicleType).toBe('all');
+    expect(m.$dispatch).toHaveBeenCalledWith('sino-reposicao');
+    m.partnerRetiradasFilter='completed';m.partnerRetiradasSearch='outro cliente';m.partnerRetiradasSelectedId='old';
+    await m.sinoClick(m.notificacoes.find((n:any)=>n.page==='retiradas'));
+    expect(m.partnerRetiradasFilter).toBe('waiting');expect(m.partnerRetiradasSearch).toBe('');expect(m.partnerRetiradasSelectedId).toBe('');
+    m.finTab='extrato';await m.sinoClick(m.notificacoes.find((n:any)=>n.id.startsWith('ledger-health:')));
+    expect(m.finTab).toBe('visao');
+    m.botTab='demanda';await m.sinoClick(m.notificacoes.find((n:any)=>n.id.startsWith('bot-expiry-failed:')));
+    expect(m.botTab).toBe('vendas');
+    await m.sinoClick(m.notificacoes.find((n:any)=>n.id.startsWith('bot-resilience:')));
+    expect(m.botTab).toBe('conversas');
+  });
+  it('abre a ocorrência exata da entrega após atualizar a logística',async()=>{
+    const m=frontend();allAlerts(m);m.logisticaTab='historico';
+    m.loadLogistica=vi.fn(async()=>{});m.logisticaTodasEntregas=()=>[{order_id:'order-1',delivery_status:'failed'}];
+    m.logOpAbrirDialog=vi.fn();await m.sinoClick(m.notificacoes.find((n:any)=>n.page==='logistica'));
+    expect(m.logisticaTab).toBe('visao');expect(m.loadLogistica).toHaveBeenCalled();
+    expect(m.logOpAbrirDialog).toHaveBeenCalledWith('pedido','order-1');
+  });
+  it('não abre ocorrência atrasada se a pessoa navegar para outra tela',async()=>{
+    const m=frontend();allAlerts(m);const d=deferred();m.loadLogistica=()=>d.promise;
+    m.logisticaTodasEntregas=()=>[{order_id:'order-1',delivery_status:'failed'}];m.logOpAbrirDialog=vi.fn();
+    const click=m.sinoClick(m.notificacoes.find((n:any)=>n.page==='logistica'));
+    m.currentPage='estoque';d.resolve(undefined);await click;expect(m.logOpAbrirDialog).not.toHaveBeenCalled();
+  });
+  it('não abre ocorrência já resolvida nem um detalhe antigo após falha de atualização',async()=>{
+    const m=frontend();allAlerts(m);m.logOpAbrirDialog=vi.fn();
+    m.loadLogistica=async()=>{};m.logisticaTodasEntregas=()=>[{order_id:'order-1',delivery_status:'delivered'}];
+    await m.sinoClick(m.notificacoes.find((n:any)=>n.page==='logistica'));
+    m.logisticaTodasEntregas=()=>[{order_id:'order-1',delivery_status:'failed'}];
+    m.loadLogistica=async()=>{throw Error('offline');};
+    await m.sinoClick(m.notificacoes.find((n:any)=>n.page==='logistica'));
+    expect(m.logOpAbrirDialog).not.toHaveBeenCalled();
+  });
+  it('descarta abertura pendente após trocar de conta',async()=>{
+    const m=frontend();allAlerts(m);const d=deferred();m.loadLogistica=()=>d.promise;
+    m.logisticaTodasEntregas=()=>[{order_id:'order-1',delivery_status:'failed'}];m.logOpAbrirDialog=vi.fn();
+    const click=m.sinoClick(m.notificacoes.find((n:any)=>n.page==='logistica'));
+    m.adminUser={...m.adminUser,id:'user-b'};d.resolve(undefined);await click;expect(m.logOpAbrirDialog).not.toHaveBeenCalled();
+  });
+  it('o clique mais recente prevalece quando duas ocorrências carregam fora de ordem',async()=>{
+    const m=frontend();allAlerts(m);m.sino.entregas_falhadas.push({order_id:'order-2',reason:'avaria'});
+    const d=deferred();m.loadLogistica=vi.fn().mockImplementationOnce(()=>d.promise).mockResolvedValueOnce(undefined);
+    m.logisticaTodasEntregas=()=>['order-1','order-2'].map(order_id=>({order_id,delivery_status:'failed'}));
+    m.logOpAbrirDialog=vi.fn();const notices=m.notificacoes.filter((n:any)=>n.page==='logistica');
+    const first=m.sinoClick(notices[0]);await m.sinoClick(notices[1]);d.resolve(undefined);await first;
+    expect(m.logOpAbrirDialog.mock.calls).toEqual([['pedido','order-2']]);
   });
   it('troca de parceiro ou quantidade de lançamentos reavisa mesmo com o mesmo valor',()=>{
     const m=frontend();allAlerts(m);m.sinoMarcarTodas();
