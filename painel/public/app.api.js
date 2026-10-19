@@ -122,6 +122,7 @@ window.PAINEL_MODULES.api = function () {
     adminUnauthorized() {
       this.adminAuthenticated = false;
       this.adminUser = null;
+      this.resetSino?.();
       location.replace('/admin/login');
     },
 
@@ -196,6 +197,8 @@ window.PAINEL_MODULES.api = function () {
         });
       } finally {
         this.adminAuthenticated = false;
+        this.adminUser = null;
+        this.resetSino?.();
         location.replace('/admin/login');
       }
     },

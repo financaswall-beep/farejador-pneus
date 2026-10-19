@@ -222,6 +222,7 @@ export async function registerAdminLoginRoute(fastify: FastifyInstance): Promise
       && item.collaboratorId === context.collaboratorId);
     return reply.status(200).send({
       user: {
+        id: context.personId,
         display_name: context.displayName,
         username: context.username,
         role: context.role,

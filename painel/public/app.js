@@ -246,7 +246,7 @@ function painelApp() {
     // SINO (2026-07-06): payload do servidor + assinaturas lidas (localStorage).
     // `notificacoes` virou GETTER derivado no módulo app.sino.js — não é mais estado.
     sino: null,
-    sinoLidas: JSON.parse(localStorage.getItem('farejador_sino_lidas') || '[]'),
+    sinoLidas: [], // O módulo do sino carrega as leituras da conta autenticada.
     // TELA DO BOT (2026-07-06): campainha (cliente esperando) + visão (cards/mapa/radar).
     botCampainha: null,
     botVisao: null,

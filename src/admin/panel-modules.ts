@@ -87,7 +87,7 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   if (/^\/admin\/api\/wholesale\/(sales|sale|commission|comissoes)/.test(path)) {
     return ['vendas', 'financeiro'];
   }
-  if (/^\/admin\/api\/matriz\/notificacoes/.test(path)) return ['resumo'];
+  if (/^\/admin\/api\/matriz\/notificacoes/.test(path)) return [...MATRIX_PANEL_MODULES];
   // Uma API nova não mapeada exige dono até ter seu contrato de acesso definido.
   return path.startsWith('/admin/api/') ? [] : null;
 }

@@ -13,6 +13,10 @@ function bell(failures?: object) {
   const window: any = {};
   vm.runInNewContext(script, { window });
   const model = window.PAINEL_MODULES.sino();
+  model.adminAuthenticated = true;
+  model.adminUser = { id: 'owner-test', role: 'owner', auth_type: 'session' };
+  model.panelModules = ['bot'];
+  model.sinoScope = model.sinoContext();
   model.sino = { bot_reservation_expiry_failures: failures };
   model.sinoLidas = [];
   return model;

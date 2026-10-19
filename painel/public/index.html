@@ -111,7 +111,7 @@
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260916-vehicle-ui1"></script>
-<script src="/admin/painel/app.api.js?v=20260823-partner-summary1"></script>
+<script src="/admin/painel/app.api.js?v=20261019-sino1"></script>
 <script src="/admin/painel/app.partner-api.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.partner-resumo.js?v=20260828-partner-resumo1"></script>
 <script src="/admin/painel/app.partner-retiradas.js?v=20260824-pickup-cards1"></script>
@@ -163,7 +163,7 @@
 <script src="/admin/painel/app.colaboradores.gestao.js?v=20260826-auditoria1"></script>
 <script src="/admin/painel/app.colaboradores.permissions.js?v=20260826-permissions2"></script>
 <script src="/admin/painel/app.colaboradores.finance.js?v=20260826-matriz-pay1"></script>
-<script src="/admin/painel/app.sino.js?v=20261002-audit2"></script>
+<script src="/admin/painel/app.sino.js?v=20261019-sino1"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260910-continente1"></script>
 <link rel="stylesheet" href="/admin/painel/chat-channel-alerts.css?v=20260923-2">
 <script src="/admin/painel/chat-channel-alerts.js?v=20260923-2"></script>
@@ -299,7 +299,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.montagem.js?v=20261006-atacado1"></script>
-<script src="/admin/painel/app.js?v=20261002-audit2"></script>
+<script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
 <script defer src="/admin/painel/caixa-chat-view.js?v=20261019-chat1"></script>
@@ -517,10 +517,10 @@
       <!-- Notificações -->
       <div x-show="isMatrixPanel()" class="relative"
            x-data="{ open: false }"
-           x-init="$watch('open', v => { if (v) $nextTick(() => lucide.createIcons()) })">
+           x-init="$watch('open', v => { if (v) { loadSino(); $nextTick(() => lucide.createIcons()) } })">
 
         <!-- Botão -->
-        <button @click="open = !open" aria-label="Abrir notificações"
+        <button @click="open = !open" aria-label="Abrir notificações" :aria-expanded="open" aria-controls="sino-dropdown"
                 :class="mockTopbar
                           ? ('flex h-10 w-10 items-center justify-center rounded-xl border ' + (open ? 'border-emerald-400 bg-emerald-900 text-white' : 'border-emerald-700 bg-emerald-950 text-emerald-100 hover:border-emerald-500'))
                           : ('p-2 rounded-lg ' + (open ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'))"
@@ -533,7 +533,7 @@
         </button>
 
         <!-- Dropdown -->
-        <div x-show="open"
+        <div x-show="open" id="sino-dropdown"
              x-cloak
              @click.outside="open = false"
              @keydown.escape.window="open = false"
@@ -543,7 +543,8 @@
              x-transition:leave="transition ease-in duration-100"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute top-full right-0 mt-2 w-[400px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+             style="width:min(400px,calc(100vw - 2rem))"
+             class="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
 
           <!-- Header da dropdown -->
           <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
@@ -555,6 +556,12 @@
                     class="text-xs text-gray-500 hover:text-gray-900 font-medium">
               Marcar todas
             </button>
+          </div>
+
+          <div class="px-5 py-3 border-b border-gray-100 text-xs" aria-live="polite" :aria-busy="sinoLoading">
+            <p :class="sinoError ? 'text-amber-700' : 'text-gray-500'" x-text="sinoStatus"></p>
+            <p x-show="sinoUpdatedAt" class="text-gray-400 mt-1" x-text="sinoUpdatedAt ? 'Última atualização completa: ' + new Date(sinoUpdatedAt).toLocaleString('pt-BR') : ''"></p>
+            <button x-show="sinoError && !sinoLoading" @click="loadSino()" class="mt-2 font-medium text-brand-600">Tentar novamente</button>
           </div>
 
           <!-- Lista de notificações (derivada dos dados reais — clique abre a aba) -->
@@ -579,9 +586,9 @@
                 </div>
               </button>
             </template>
-            <div x-show="notificacoes.length === 0" class="px-5 py-8 text-center">
+            <div x-show="sinoEmpty" class="px-5 py-8 text-center">
               <p class="text-sm text-gray-500">Tudo em dia por aqui. 👌</p>
-              <p class="text-[11px] text-gray-400 mt-1">Entrega falhada, fiado vencido, conta a pagar,<br>galpão pra repor e comissão no alarme aparecem aqui.</p>
+              <p class="text-[11px] text-gray-400 mt-1">Nenhuma pendência nos alertas disponíveis para seu acesso.</p>
             </div>
           </div>
         </div>
