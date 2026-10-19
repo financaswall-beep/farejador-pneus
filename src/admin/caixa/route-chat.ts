@@ -34,14 +34,25 @@ export function canAccessOperationChat(auth?:CaixaAuth):boolean {
 }
 export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guard) {
   const access:Guard=async(req,reply)=>{if(!canAccessOperationChat((req as Request).caixa)) await reply.code(403).send({error:'forbidden'});};
+  registerStockWaitlistRoutes(app,'/api/caixa/waitlist',[flag,auth,access],r=>`caixa:${(r as Request).caixa!.personId}`);
+  registerOperatorChatRoutes(app,{
+    prefix:'/api/caixa/chat',guards:[flag,auth,access],
+    actor:req=>`caixa:${(req as Request).caixa!.personId}`,
+    principal:req=>(req as Request).caixa!.personId,
+  });
+}
+
+export function registerOperatorChatRoutes(app:FastifyInstance,options:{
+  prefix:string;guards:Guard[];actor:(request:FastifyRequest)=>string;principal:(request:FastifyRequest)=>string;
+}) {
+  const {prefix,actor,principal}=options;
   const ready:Guard=async(_req,reply)=>{
     reply.header('Cache-Control','private, no-store');
     const result=await pool.query(`SELECT to_regclass('ops.operator_messages') IS NOT NULL AS ready`);
     if(!result.rows[0]?.ready) await reply.code(503).send({error:'chat_migration_required'});
   };
-  const guards=[flag,auth,access,ready];
-  registerStockWaitlistRoutes(app,'/api/caixa/waitlist',[flag,auth,access],r=>`caixa:${(r as Request).caixa!.personId}`);
-  app.get('/api/caixa/chat/channels',{preHandler:[flag,auth,access]},async(_req,reply)=>{
+  const guards=[...options.guards,ready];
+  app.get(prefix+'/channels',{preHandler:options.guards},async(_req,reply)=>{
     reply.header('Cache-Control','private, no-store');
     return getChatwootChannelHealth();
   });
@@ -54,50 +65,50 @@ export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guar
       return reply.code(code).send({error:code===500?'chat_unavailable':message});
     }
   };
-  app.get('/api/caixa/chat/conversations',{preHandler:guards},async(req,reply)=>{
+  app.get(prefix+'/conversations',{preHandler:guards},async(req,reply)=>{
     const query=listQuery.safeParse(req.query);if(!query.success)return reply.code(400).send({error:'invalid_query'});
     return respond(reply,()=>listOperationConversations(query.data));
   });
-  app.get('/api/caixa/chat/conversations/:id',{preHandler:guards},async(req,reply)=>{
+  app.get(prefix+'/conversations/:id',{preHandler:guards},async(req,reply)=>{
     const parsed=params.safeParse(req.params);if(!parsed.success)return reply.code(400).send({error:'invalid_id'});
     return respond(reply,()=>getOperationConversation(parsed.data.id));
   });
-  app.get('/api/caixa/chat/conversations/:id/messages',{preHandler:guards},async(req,reply)=>{
+  app.get(prefix+'/conversations/:id/messages',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params),q=z.object({at:z.string().datetime({offset:true}).optional(),before:z.string().uuid().optional()}).safeParse(req.query);
     if(!p.success||!q.success||Boolean(q.data.at)!==Boolean(q.data.before))return reply.code(400).send({error:'invalid_query'});
     return respond(reply,()=>getOperationMessages(p.data.id,q.data.at?{at:q.data.at,id:q.data.before!}:undefined));
   });
-  app.post('/api/caixa/chat/conversations/:id/messages',{preHandler:guards,bodyLimit:Math.ceil(CHAT_MEDIA_MAX*1.4)+10000},async(req:Request,reply)=>{
+  app.post(prefix+'/conversations/:id/messages',{preHandler:guards,bodyLimit:Math.ceil(CHAT_MEDIA_MAX*1.4)+10000},async(req,reply)=>{
     const p=params.safeParse(req.params),body=sendBody.safeParse(req.body);
     if(!p.success||!body.success)return reply.code(400).send({error:'invalid_message'});
-    if(rateLimitHit(`operator-chat:${req.caixa!.personId}`,30,60000))return reply.code(429).send({error:'rate_limited'});
+    if(rateLimitHit(`operator-chat:${principal(req)}`,30,60000))return reply.code(429).send({error:'rate_limited'});
     return respond(reply,async()=>{
       await requireChatConversation(p.data.id);
       const file=body.data.file?await parseOperatorMedia(body.data.file):undefined;
       const result=await queueOperatorMessage({conversationId:p.data.id,clientToken:body.data.client_token,
-        actor:`caixa:${req.caixa!.personId}`,content:body.data.content,file,photoRequestId:body.data.photo_request_id});
+        actor:actor(req),content:body.data.content,file,photoRequestId:body.data.photo_request_id});
       // A fila continua sendo a dona do envio. Este wake-up apenas evita esperar o próximo poll.
       void pollBotOutbox().catch(error=>app.log.error({err:error},'operator outbox wake failed'));
       return reply.code(202).send(result);
     });
   });
-  app.post('/api/caixa/chat/conversations/:id/messages/:messageId/retry',{preHandler:guards},async(req:Request,reply)=>{
+  app.post(prefix+'/conversations/:id/messages/:messageId/retry',{preHandler:guards},async(req,reply)=>{
     const p=z.object({id:z.string().uuid(),messageId:z.string().uuid()}).safeParse(req.params);
     if(!p.success)return reply.code(400).send({error:'invalid_id'});
-    if(rateLimitHit(`operator-chat:${req.caixa!.personId}`,30,60000))return reply.code(429).send({error:'rate_limited'});
+    if(rateLimitHit(`operator-chat:${principal(req)}`,30,60000))return reply.code(429).send({error:'rate_limited'});
     return respond(reply,async()=>{
-      const result=await retryOperatorMessage(p.data.id,p.data.messageId,`caixa:${req.caixa!.personId}`);
+      const result=await retryOperatorMessage(p.data.id,p.data.messageId,actor(req));
       void pollBotOutbox().catch(error=>app.log.error({err:error},'operator outbox wake failed'));
       return reply.code(202).send(result);
     });
   });
-  app.post('/api/caixa/chat/conversations/:id/control',{preHandler:guards},async(req:Request,reply)=>{
+  app.post(prefix+'/conversations/:id/control',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params),b=z.object({action:z.enum(['takeover','resume']),expected_version:z.number().int().min(0)}).strict().safeParse(req.body);
     if(!p.success||!b.success)return reply.code(400).send({error:'invalid_control'});
     return respond(reply,async()=>{await requireChatConversation(p.data.id);return changeBotConversationControl({
-      conversationId:p.data.id,action:b.data.action,expectedVersion:b.data.expected_version,actor:`caixa:${req.caixa!.personId}`});});
+      conversationId:p.data.id,action:b.data.action,expectedVersion:b.data.expected_version,actor:actor(req)});});
   });
-  app.get('/api/caixa/chat/conversations/:id/customer',{preHandler:guards},async(req,reply)=>{
+  app.get(prefix+'/conversations/:id/customer',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params);if(!p.success)return reply.code(400).send({error:'invalid_id'});
     const q=z.object({offset:z.coerce.number().int().min(0).max(10000).default(0)}).safeParse(req.query);
     if(!q.success)return reply.code(400).send({error:'invalid_query'});
@@ -109,13 +120,13 @@ export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guar
       reply.header('Cache-Control','private, no-store');
       return {...data,...(interests?{interests}:{})};});
   });
-  app.get('/api/caixa/chat/conversations/:id/avatar',{preHandler:guards},async(req,reply)=>{
+  app.get(prefix+'/conversations/:id/avatar',{preHandler:guards},async(req,reply)=>{
     const p=params.safeParse(req.params);if(!p.success)return reply.code(400).send({error:'invalid_id'});
     return respond(reply,async()=>{await requireChatConversation(p.data.id);return {url:await getCustomerLeadAvatar(p.data.id,env.FAREJADOR_ENV)};});
   });
   // Fetch streaming com Authorization: sem token na URL e nova autenticação a cada reconexão.
-  app.get('/api/caixa/chat/stream',{preHandler:guards},async(req:Request,reply)=>{
-    const release=acquirePartnerSseSlot(req.ip,`operator-chat:${req.caixa!.personId}`);
+  app.get(prefix+'/stream',{preHandler:guards},async(req,reply)=>{
+    const release=acquirePartnerSseSlot(req.ip,`operator-chat:${principal(req)}`);
     if(!release)return reply.code(429).send({error:'too_many_connections'});
     reply.hijack();const raw=reply.raw;
     raw.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});

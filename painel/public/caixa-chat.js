@@ -1,11 +1,12 @@
 (function () {
   'use strict';
-  const C=window.Caixa, chat=C.chat={};
+  const C=window.FarejadorBotChat||window.Caixa, chat=C.chat={};
   const s=chat.state={active:false,id:null,rows:[],detail:null,messages:new Map(),pending:new Map(),drafts:new Map(),avatars:new Map(),avatarExpiry:new Map(),avatarJobs:new Map(),
     filter:'needs',channel:'',search:'',closed:false,offset:0,hasMore:false,next:null,generation:0,listSeq:0,threadSeq:0,
     session:'',loading:false,error:'',threadError:'',connected:false,sending:false,stream:null,poll:0,retry:0,controls:new Map()};
   chat.el=id=>document.getElementById('chat-'+id);
-  chat.path=id=>'/api/caixa/chat/conversations'+(id?'/'+encodeURIComponent(id):'');
+  chat.prefix=C.chatPrefix||'/api/caixa/chat';
+  chat.path=id=>chat.prefix+'/conversations'+(id?'/'+encodeURIComponent(id):'');
   chat.api=async function(path,options){
     const response=await C.authenticatedFetch(path,Object.assign({signal:AbortSignal.timeout(20000)},options));
     const data=await C.json(response);
@@ -28,8 +29,10 @@
     s.pending.forEach(m=>{if(m.preview)URL.revokeObjectURL(m.preview);});
     s.drafts.clear();s.pending.clear();s.messages.clear();s.avatars.clear();s.avatarExpiry.clear();s.avatarJobs.clear();s.controls.clear();
     s.sending=false;s.listBusy=false;s.threadBusy=false;s.listSeq++;s.threadSeq++;s.filter='needs';s.search='';s.channel='';s.closed=false;
-    chat.el('panel')?.classList.add('hidden');chat.el('sheet')?.close();document.body.classList.remove('chat-open');
+    s.offset=0;s.hasMore=false;s.next=null;s.error='';s.threadError='';s.needsTotal=0;s.total=0;
+    chat.el('panel')?.classList.add('hidden');if(!C.chatCustomerInline)chat.el('sheet')?.close();chat.resetCustomer?.();document.body.classList.remove('chat-open');
     if(chat.el('input'))chat.el('input').value='';
+    for(const id of ['messages','contact','context','list'])chat.el(id)?.replaceChildren?.();
   };
   chat.start=function(){
     const session=C.sessionFingerprint();if(s.session!==session){chat.reset();s.session=session;}
@@ -76,7 +79,7 @@
     if(s.id===id)return;
     if(s.id)s.drafts.set(s.id,chat.el('input').value);
     if(chat.resetMedia)chat.resetMedia();s.id=id;s.detail=null;s.next=null;s.messages.clear();s.threadError='';s.threadSeq++;s.threadBusy=false;
-    chat.el('input').value=s.drafts.get(id)||'';document.body.classList.add('chat-open');
+    chat.el('input').value=s.drafts.get(id)||'';if(!C.chatMountId)document.body.classList.add('chat-open');
     chat.renderThread();chat.renderQueue();void chat.loadThread();void chat.loadAvatar(id);
   };
   chat.back=function(){
@@ -161,11 +164,11 @@
     finally{if(session===s.session){s.sending=false;chat.renderThread();}}
   };
   chat.connect=async function(generation){
-    if(!s.active||generation!==s.generation||!C.token())return;
+    if(!s.active||generation!==s.generation||!(C.isAuthenticated?C.isAuthenticated():C.token()))return;
     const controller=new AbortController();s.stream=controller;let watchdog;
     const heartbeat=()=>{clearTimeout(watchdog);watchdog=setTimeout(()=>controller.abort(),25000);};
     try{
-      heartbeat();const response=await C.authenticatedFetch('/api/caixa/chat/stream',{signal:controller.signal});
+      heartbeat();const response=await C.authenticatedFetch(chat.prefix+'/stream',{signal:controller.signal});
       if(!response.ok||!response.body)throw Error('stream_unavailable');
       s.connected=true;chat.renderConnection();
       const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';

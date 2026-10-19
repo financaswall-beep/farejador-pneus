@@ -300,6 +300,12 @@
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.montagem.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/app.js?v=20261002-audit2"></script>
+<script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat1"></script>
+<script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
+<script defer src="/admin/painel/caixa-chat-view.js?v=20261019-chat1"></script>
+<script defer src="/admin/painel/caixa-chat-channels.js?v=20261019-chat1"></script>
+<script defer src="/admin/painel/caixa-chat-media.js?v=20261019-chat1"></script>
+<script defer src="/admin/painel/caixa-chat-customer.js?v=20261019-chat1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
@@ -326,6 +332,9 @@
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
 <link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20260915-finance1">
+<link rel="stylesheet" href="/admin/painel/caixa-chat.css?v=20261019-chat1" />
+<link rel="stylesheet" href="/admin/painel/caixa-chat-customer.css?v=20261019-chat1" />
+<link rel="stylesheet" href="/admin/painel/bot-chat.css?v=20261019-chat1" />
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
@@ -7035,13 +7044,13 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega', 'bot-shortage-page': botTab === 'faltas', 'bot-waitlist-page': botTab === 'espera' }">
+    <div x-show="currentPage === 'bot'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" :class="{ 'bot-chat-page': botTab === 'conversas', 'bot-demand-page': botTab === 'demanda', 'bot-delivery-page': botTab === 'entrega', 'bot-shortage-page': botTab === 'faltas', 'bot-waitlist-page': botTab === 'espera' }">
       <div id="bot-channel-alerts" class="channel-alerts bot-channel-alerts" role="status" aria-live="polite" hidden></div>
       <header x-show="botTab === 'espera'" class="wl-heading" x-cloak>
         <div><small>Matriz / Bot</small><h1>Lista de espera</h1><p>Retome a conversa quando o pneu chegar.</p></div>
         <div class="wl-toolbar"><button @click="exportBotWaitlist()"><i data-lucide="download"></i>Exportar lista</button><button @click="refreshBotWaitlist()" aria-label="Atualizar lista de espera"><i data-lucide="refresh-cw"></i></button></div>
       </header>
-      <section aria-labelledby="bot-heading" x-show="!['entrega','demanda','faltas','espera'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
+      <section aria-labelledby="bot-heading" x-show="!['conversas','entrega','demanda','faltas','espera'].includes(botTab)" class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <div class="flex min-h-[132px] flex-col justify-center px-1">
           <h1 id="bot-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Bot</h1>
           <p class="mt-2 max-w-sm text-sm text-slate-500">Conversas, pedidos e desempenho do atendimento automático</p>
@@ -7072,6 +7081,7 @@
       </header>
       <div x-show="botTab === 'demanda'" class="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-3" x-cloak><label class="vehicle-filter">Tipo de veículo<select x-model="botVehicleType" @change="loadBotVisao()"><option value="all">Todos os pneus</option><option value="motorcycle">Moto</option><option value="car">Carro</option><option value="unknown">Não identificado</option></select></label><p class="text-xs text-gray-500">Uma conversa com carro e moto pode aparecer nos dois filtros.</p></div>
 
+      <header x-show="botTab === 'conversas'" class="bot-chat-heading"><small>Matriz / Bot</small><h1>Bot</h1><p>Conversas, pedidos e desempenho do atendimento automático</p></header>
       <!-- NAVEGAÇÃO INTERNA: operação, vendas, demanda e entrega -->
       <header x-show="botTab === 'faltas'" class="bf-heading" x-cloak>
         <div><h1>Faltas por loja</h1><small class="bf-breadcrumb"><i data-lucide="house" aria-hidden="true"></i>Matriz / Bot</small><p>Entenda o que faltou e por onde o bot procurou.</p></div>
@@ -7102,7 +7112,7 @@
                     :class="botTab === 'entrega' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-900'"
                     class="bot-section-tab whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium"><i data-lucide="map-pin" class="bot-section-icon" aria-hidden="true"></i><span>Entrega e cobertura</span></button>
           </nav>
-          <div x-show="!['visao','entrega','demanda','faltas','espera'].includes(botTab)" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
+          <div x-show="!['visao','conversas','entrega','demanda','faltas','espera'].includes(botTab)" aria-label="Período do Bot" class="mb-3 flex shrink-0 items-center self-start overflow-hidden rounded-lg border border-gray-200 lg:mb-0 lg:self-auto">
             <template x-for="p in redePeriods" :key="'botp-' + p.id">
               <button @click="setBotPeriodo(p.id)"
                       :class="botPeriodo === p.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-emerald-50'"
@@ -7317,47 +7327,13 @@
         </aside>
       </div>
 
-      <!-- CONVERSAS: fila operacional do Bot -->
-      <div x-show="botTab === 'conversas'" class="space-y-4">
-        <div class="bg-white border border-gray-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div class="flex items-center gap-5 min-w-0">
-            <div class="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0 relative">
-              <i data-lucide="message-circle-more" class="w-12 h-12 text-emerald-700"></i>
-              <span x-show="botConversasFila.length" class="absolute right-1 bottom-2 w-6 h-6 rounded-full bg-rose-500 text-white text-[11px] font-semibold flex items-center justify-center" x-text="botConversasFila.length"></span>
-            </div>
-            <div>
-              <h2 class="text-xl font-semibold text-emerald-800" x-text="botConversasFila.length ? (botConversasFila.length + ' conversa(s) precisam de atenção') : 'Tudo sob controle'"></h2>
-              <p class="text-sm text-gray-700 mt-1">
-                <span x-text="botMudas.length + ' esperando resposta'"></span>
-                <span class="text-gray-300 mx-2">·</span>
-                <span x-text="botEscalados.length + ' pediram atendimento humano'"></span>
-              </p>
-              <p class="text-xs text-gray-400 mt-2">Última atualização <span class="text-emerald-700 font-medium">agora</span></p>
-            </div>
-          </div>
-          <button @click="atualizarBotFila()" class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-            <i data-lucide="refresh-cw" class="w-4 h-4"></i>Atualizar fila
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center relative">
-              <i data-lucide="message-circle" class="w-7 h-7 text-emerald-700"></i>
-              <span x-show="botMudas.length > 0" x-cloak class="absolute -right-1 bottom-0 w-5 h-5 rounded-full bg-rose-500 border-2 border-white text-white text-[10px] font-semibold flex items-center justify-center">!</span>
-            </div>
-            <div><p class="text-sm text-gray-500">Clientes esperando resposta</p><p class="text-2xl font-semibold" x-text="botMudas.length"></p></div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center relative">
-              <i data-lucide="users" class="w-7 h-7 text-emerald-700"></i>
-              <span x-show="botEscalados.length > 0" x-cloak class="absolute -right-1 bottom-0 w-5 h-5 rounded-full bg-amber-400 border-2 border-white text-white text-[10px] font-semibold flex items-center justify-center">!</span>
-            </div>
-            <div><p class="text-sm text-gray-500">Pediram pra falar com gente <span class="text-xs">(48h)</span></p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div>
-          </div>
-        </div>
-
-        <div x-show="botResilience && botResilience.enabled" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <!-- CONVERSAS: mesmo chat da Operação, com sessão e ficha lateral da Matriz. -->
+      <section x-show="botTab === 'conversas'" x-effect="window.FarejadorBotChat.sync($data, currentPage === 'bot' && botTab === 'conversas' && adminAuthenticated && isMatrixPanel() && hasPanelModule('bot'))" aria-label="Conversas do Bot">
+        <div id="bot-chat-notice" role="status" aria-live="polite" hidden></div>
+        <div id="bot-chat-root" class="is-chat" x-ignore></div>
+        <details class="bot-chat-technical" x-show="botDeadLetters.length || botResilience?.api_ack_unconfirmed">
+          <summary>Envios que precisam de revisão <span x-text="botDeadLetters.length"></span></summary>
+          <div x-show="botResilience && botResilience.enabled" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
             <div><h3 class="font-semibold">Fila técnica e revisão humana</h3>
               <p class="text-xs text-gray-500 mt-1"><span x-text="(botResilience?.pending || 0) + ' aguardando envio'"></span> · <span x-text="(botResilience?.api_ack_unconfirmed || 0) + ' aceitos sem eco em 10 min'"></span></p></div>
@@ -7374,136 +7350,8 @@
           </template>
           <div x-show="botDeadLetters.length === 0" class="px-5 py-6 text-sm text-gray-500">Nenhuma falha final aguardando revisão.</div>
         </div>
-
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <label class="relative block w-full lg:max-w-sm">
-            <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-            <input type="search" x-model="botConversaBusca" @input="botFilaPagina = 1" placeholder="Buscar cliente ou conversa" aria-label="Buscar cliente ou conversa"
-                   class="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200">
-          </label>
-          <div class="grid grid-cols-3 bg-white border border-gray-200 rounded-lg overflow-hidden w-full lg:w-auto">
-            <button @click="botConversaFiltro = 'todos'; botFilaPagina = 1" :class="botConversaFiltro === 'todos' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium transition-colors">Todos</button>
-            <button @click="botConversaFiltro = 'esperando'; botFilaPagina = 1" :class="botConversaFiltro === 'esperando' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium border-l border-gray-200 transition-colors whitespace-nowrap">Esperando resposta</button>
-            <button @click="botConversaFiltro = 'humano'; botFilaPagina = 1" :class="botConversaFiltro === 'humano' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium border-l border-gray-200 transition-colors whitespace-nowrap">Atendimento humano</button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr),320px] gap-4 items-start">
-          <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div class="px-5 pt-5 pb-3 space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div><h3 class="text-base font-semibold">Fila de atenção</h3><p class="text-xs text-gray-500 mt-1" x-text="botConversasFiltradas.length + ' neste filtro · ' + botConversasFila.length + ' pendentes no total'"></p></div>
-                <label class="flex items-center gap-2 text-xs text-gray-600">Período
-                  <select :value="botFilaPeriodo" @change="setBotFilaPeriodo($event.target.value)" aria-label="Período da fila de atenção" class="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                    <option value="todos">Todas as pendentes</option><option value="7">Últimos 7 dias</option><option value="15">Últimos 15 dias</option><option value="30">Últimos 30 dias</option>
-                  </select>
-                </label>
-              </div>
-              <p class="text-xs text-gray-500">Período pela última mensagem do cliente ou atualização do atendimento. Filtrar não encerra conversas; as pendências mais antigas aparecem primeiro.</p>
-              <div x-show="botFilaForaPeriodo > 0" role="status" class="flex flex-wrap items-center justify-between gap-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 text-xs">
-                <span x-text="botFilaForaPeriodo + ' pendência(s) fora do período escolhido. Elas continuam na fila.'"></span>
-                <button type="button" @click="setBotFilaPeriodo('todos')" class="underline font-semibold">Ver todas as pendentes</button>
-              </div>
-              <p x-show="botFilaErro" role="alert" class="text-xs text-rose-700">Não foi possível atualizar a fila. Os últimos dados confirmados foram mantidos; tente atualizar novamente.</p>
-            </div>
-            <div class="overflow-x-auto">
-              <table id="bot-fila-atencao" aria-label="Fila de atenção" class="w-full min-w-[900px] text-sm">
-                <thead><tr class="text-left text-xs text-gray-400 border-b border-gray-100"><th class="px-5 py-3 font-medium">Cliente</th><th class="px-3 py-3 font-medium">Origem</th><th class="px-3 py-3 font-medium">Última mensagem</th><th class="px-3 py-3 font-medium">Situação</th><th class="px-3 py-3 font-medium">Espera</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
-                <tbody>
-                  <template x-for="c in botConversasPaginadas" :key="c.conversation_id">
-                    <tr :id="'bot-fila-'+c.conversation_id" x-effect="if(currentPage==='bot') carregarClienteLeadFoto(c,'bot')" class="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
-                      <td class="px-5 py-3"><div class="flex items-center gap-2.5"><span class="w-10 h-10 shrink-0 rounded-full bg-blue-50 text-blue-800 overflow-hidden flex items-center justify-center text-xs font-semibold"><template x-if="clienteLeadFoto(c)"><img :src="clienteLeadFoto(c)" alt="" @error="clienteLeadFotoFalhou(c)" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="w-full h-full object-cover"></template><span x-show="!clienteLeadFoto(c)" x-text="initials(c.nome)"></span></span><span class="font-medium text-gray-800 max-w-[180px] truncate" :title="c.nome" x-text="c.nome"></span></div></td>
-                      <td class="px-3 py-3"><span class="inline-flex items-center gap-2 whitespace-nowrap text-xs text-gray-600"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-4 h-4 shrink-0"></template><span x-text="clienteLeadCanal(c)==='chatwoot'?'Não informada':clienteLeadCanalLabel(c)"></span></span></td>
-                      <td class="px-3 py-3 text-gray-600 max-w-xs"><p class="truncate" x-text="c.mensagem"></p></td>
-                      <td class="px-3 py-3"><span class="inline-flex text-[11px] px-2 py-1 rounded-md font-medium" :class="c.tipo === 'esperando' ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-amber-50 text-amber-700 border border-amber-100'" x-text="c.tipo === 'esperando' ? 'Esperando resposta' : 'Atendimento humano'"></span></td>
-                      <td class="px-3 py-3 text-gray-600 whitespace-nowrap" x-text="botMinutosLabel(c.minutos)"></td>
-                      <td class="px-5 py-3 text-right"><div class="flex items-center justify-end gap-2"><button type="button" @click="abrirControleBot(c.conversation_id,c.nome)" :disabled="!c.conversation_id" :class="botControleClasse(botControleModo(c.conversation_id,c.bot_mode))" class="text-xs font-medium border rounded-lg px-3 py-1.5 disabled:opacity-40 whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-blue-300">Controle do bot</button><button @click="abrirNoChatwoot(c.chatwoot_id)" :disabled="!c.chatwoot_id" class="inline-flex items-center gap-1.5 text-xs border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium disabled:opacity-40 whitespace-nowrap">Abrir no Chatwoot<i data-lucide="external-link" class="w-3.5 h-3.5"></i></button></div></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-            <div x-show="botCampainha && !botConversasFiltradas.length" class="px-5 py-10 text-center text-sm text-gray-400">Nenhuma conversa encontrada neste filtro.</div>
-            <div x-show="!botCampainha && !botFilaErro" class="px-5 py-10 text-center text-sm text-gray-400">Carregando fila…</div>
-            <div x-show="botFilaTotalPaginas > 1" class="px-5 py-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
-              <span x-text="'Página ' + botFilaPaginaAtual + ' de ' + botFilaTotalPaginas + ' · ' + botConversasFiltradas.length + ' conversas'"></span>
-              <div class="flex gap-2"><button type="button" @click="botFilaPagina = botFilaPaginaAtual - 1" :disabled="botFilaPaginaAtual <= 1" class="px-3 py-2 border border-gray-200 rounded-lg disabled:opacity-40">Anterior</button><button type="button" @click="botFilaPagina = botFilaPaginaAtual + 1" :disabled="botFilaPaginaAtual >= botFilaTotalPaginas" class="px-3 py-2 border border-gray-200 rounded-lg disabled:opacity-40">Próxima</button></div>
-            </div>
-          </div>
-
-          <aside class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-5">Resumo do atendimento</h3>
-            <div class="space-y-6">
-              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="chart-no-axes-column-increasing" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Respondidos pelo bot · últimas 48h</p><p class="text-2xl font-semibold" x-text="botRespondidas48h"></p></div></div>
-              <div class="border-t border-gray-100"></div>
-              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Encaminhamentos pendentes</p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div></div>
-              <div class="border-t border-gray-100"></div>
-              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Espera média da fila agora</p><p class="text-2xl font-semibold" x-text="Math.floor(botEsperaMediaSeg / 3600) ? (Math.floor(botEsperaMediaSeg / 3600) + 'h ' + Math.round((botEsperaMediaSeg % 3600) / 60) + 'min') : (Math.round(botEsperaMediaSeg / 60) + 'min')"></p></div></div>
-            </div>
-          </aside>
-        </div>
-      </div>
-
-      <!-- Campainha anterior removida: a fila operacional acima passa a ser a interface oficial. -->
-      <div x-show="false" class="hidden">
-        <div class="bg-white border rounded-xl p-5" :class="botMudas.length ? 'border-rose-200' : 'border-gray-200'">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="botMudas.length ? 'bg-rose-50' : 'bg-emerald-50'">
-                <i data-lucide="bell-ring" class="w-4 h-4" :class="botMudas.length ? 'text-rose-600' : 'text-emerald-600'"></i>
-              </div>
-              <h3 class="text-base font-semibold">Cliente esperando resposta</h3>
-            </div>
-            <span x-show="botMudas.length" class="text-xs font-semibold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full" x-text="botMudas.length"></span>
-          </div>
-          <template x-for="m in botMudas" :key="m.conversation_id">
-            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm">
-              <div class="min-w-0">
-                <span class="font-medium text-gray-800" x-text="m.contact_name || 'Cliente'"></span>
-                <span class="text-xs text-rose-600 font-semibold ml-2" x-text="'mudo há ' + botMinutosLabel(m.minutos)"></span>
-                <p class="text-xs text-gray-500 truncate mt-0.5" x-text="'“' + m.preview + '”'"></p>
-              </div>
-              <button @click="abrirNoChatwoot(m.chatwoot_conversation_id)"
-                      class="text-xs px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium whitespace-nowrap flex-shrink-0">
-                Abrir no Chatwoot
-              </button>
-            </div>
-          </template>
-          <div x-show="botCampainha && !botMudas.length" class="text-sm text-emerald-700 py-1.5">
-            Ninguém esperando — o bot está em dia. ✓
-          </div>
-          <div x-show="!botCampainha" class="text-sm text-gray-400 py-1.5">Carregando…</div>
-        </div>
-
-        <div class="bg-white border rounded-xl p-5" :class="botEscalados.length ? 'border-amber-200' : 'border-gray-200'">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                <i data-lucide="hand" class="w-4 h-4 text-amber-600"></i>
-              </div>
-              <h3 class="text-base font-semibold">Pediu pra falar com gente</h3>
-            </div>
-            <span x-show="botEscalados.length" class="text-xs font-semibold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full" x-text="botEscalados.length"></span>
-          </div>
-          <template x-for="e in botEscalados" :key="'esc-' + e.conversation_id">
-            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm">
-              <div class="min-w-0">
-                <span class="font-medium text-gray-800" x-text="e.contact_name || 'Cliente'"></span>
-                <span class="text-xs text-gray-400 ml-2" x-text="botQuandoLabel(e.quando)"></span>
-                <p class="text-xs text-gray-500 truncate mt-0.5" x-text="e.motivo || 'sem motivo registrado'"></p>
-              </div>
-              <button @click="abrirNoChatwoot(e.chatwoot_conversation_id)"
-                      class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium whitespace-nowrap flex-shrink-0">
-                Abrir no Chatwoot
-              </button>
-            </div>
-          </template>
-          <div x-show="botCampainha && !botEscalados.length" class="text-sm text-gray-400 py-1.5">
-            Nenhum encaminhamento pendente para atendimento humano.
-          </div>
-          <div x-show="!botCampainha" class="text-sm text-gray-400 py-1.5">Carregando…</div>
-        </div>
-      </div>
+        </details>
+      </section>
 
       <!-- VENDAS: leitura comercial do funil, preservando o menu e a navegação do painel -->
       <div x-show="botTab === 'vendas'" class="space-y-4">

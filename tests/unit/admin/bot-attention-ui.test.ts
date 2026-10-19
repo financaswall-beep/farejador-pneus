@@ -71,14 +71,11 @@ describe('fila de atenção e controle azul',() => {
     ui.apiPost.mockRejectedValue(new Error('offline'));await ui.alterarControleBot('resume');
     expect(ui.botControleModo('a')).toBeNull();expect(ui.botControleDialog.state).toBeNull();
   });
-  it('mantém os atalhos de controle da fila e do modal, com foto e coluna Origem',() => {
+  it('monta o chat compartilhado e mantém o controle usado pelo Kanban',() => {
     const html=readFileSync('painel/public/index.html','utf8');
-    const table=html.slice(html.indexOf('id="bot-fila-atencao"'),html.indexOf('</table>',html.indexOf('id="bot-fila-atencao"')));
-    expect(table).toContain('>Origem</th>');expect(table).toContain('clienteOrigemIcone(c)');
-    expect(table).toContain("carregarClienteLeadFoto(c,'bot')");expect(table).toContain('clienteLeadFotoFalhou(c)');
-    expect(table).toContain(':key="c.conversation_id"');
-    expect(table).toContain(':class="botControleClasse(');
-    expect(html).toContain('id="bot-controle-fechar"');
+    expect(html.includes('id="bot-chat-root"')).toBe(true);
+    expect(html.includes('id="bot-fila-atencao"')).toBe(false);
+    expect(html.includes('id="bot-controle-fechar"')).toBe(true);
   });
   it('abre com todas as pendências e ordena as mais antigas primeiro, inclusive acima de 30 dias',() => {
     const ui=fixtureFila();
@@ -150,12 +147,11 @@ describe('fila de atenção e controle azul',() => {
     expect(ui.botCampainha).toBe(original);expect(ui.botFilaErro).toBe(true);expect(ui.menuBadges.bot).toBe('8');
     ui.apiGet.mockResolvedValueOnce(original);await ui.loadBotCampainha();expect(ui.botFilaErro).toBe(false);
   });
-  it('expõe períodos, aviso, paginação e cache atualizado sem mudar o controle do bot',() => {
+  it('ativa o chat apenas com sessão da matriz e conserva a revisão de envios',() => {
     const html=readFileSync('painel/public/index.html','utf8');
-    for(const periodo of ['Todas as pendentes','Últimos 7 dias','Últimos 15 dias','Últimos 30 dias']) expect(html).toContain(periodo);
-    expect(html).toContain('aria-label="Período da fila de atenção"');
-    expect(html).toContain('botFilaForaPeriodo > 0');expect(html).toContain('c in botConversasPaginadas');
-    expect(html).toContain('app.bot.controle.js?v=20260912-kanban-controls1');
+    expect(html.includes("botTab === 'conversas' && adminAuthenticated && isMatrixPanel() && hasPanelModule('bot')")).toBe(true);
+    expect(html.includes('Envios que precisam de revisão')).toBe(true);
+    expect(html.includes('app.bot.controle.js?v=20260912-kanban-controls1')).toBe(true);
   });
 });
 

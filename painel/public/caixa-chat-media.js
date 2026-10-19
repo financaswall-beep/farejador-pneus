@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const C=window.Caixa,ch=C.chat;
+  const C=window.FarejadorBotChat||window.Caixa,ch=C.chat;
   let recorder=null,stream=null,timer=null,mediaVersion=0,requesting=false;
   ch.media=null;ch.recording=false;
   const input=document.createElement('input');input.type='file';input.hidden=true;input.accept='image/jpeg,image/png,image/webp,audio/*,video/mp4,application/pdf';document.body.append(input);

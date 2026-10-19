@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const C=window.Caixa,ch=C.chat,s=ch.state;
+  const C=window.FarejadorBotChat||window.Caixa,ch=C.chat,s=ch.state;
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const paths={human:'M16 21H4v-2a6 6 0 0 1 12 0v2ZM14 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
     bot:'M12 3v3m-2-3h4M6 7h12a2 2 0 0 1 2 2v10H4V9a2 2 0 0 1 2-2Zm2 5h1m6 0h1m-8 4h8M1 12v4m22-4v4',
@@ -49,8 +49,12 @@
     <div id="chat-timeline" class="chat-timeline" role="log" aria-label="Mensagens da conversa"><button id="chat-older" class="chat-more hidden">Carregar mensagens anteriores</button><div id="chat-messages"></div><div id="chat-photo-card"></div></div>
     <div id="chat-media-preview" class="chat-media-preview hidden"></div>
     <form id="chat-compose" class="chat-compose"><button type="button" id="chat-attach" class="chat-icon" aria-label="Anexar arquivo">${ch.icon('paperclip')}</button><textarea id="chat-input" rows="1" maxlength="4000" placeholder="Mensagem…" aria-label="Mensagem"></textarea><button type="button" id="chat-mic" class="chat-mic" aria-label="Gravar áudio">${ch.icon('mic')}</button><button type="submit" id="chat-send" class="chat-send" aria-label="Enviar mensagem">${ch.icon('send')}</button><small id="chat-compose-hint">Ao digitar, você assume o atendimento.</small></form></div></section>`;
-  document.getElementById('cash-panel').before(panel);
-  const sheet=document.createElement('dialog');sheet.id='chat-sheet';sheet.className='chat-sheet';sheet.setAttribute('aria-label','Ficha do cliente');document.body.append(sheet);
+  if(C.chatMountId)document.getElementById(C.chatMountId).append(panel);
+  else document.getElementById('cash-panel').before(panel);
+  const sheet=document.createElement(C.chatCustomerInline?'aside':'dialog');sheet.id='chat-sheet';sheet.className='chat-sheet';sheet.setAttribute('aria-label','Ficha do cliente');
+  if(C.chatCustomerInline){sheet.hidden=true;panel.classList.add('customer-collapsed');panel.append(sheet);}
+  else document.body.append(sheet);
+  if(!C.chatMountId){
   const nav=document.querySelector('.bottom-nav'),more=document.createElement('button');
   more.id='nav-chat-more';more.className='chat-nav-more';more.type='button';more.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>Mais</span>';nav.append(more);
   more.onclick=()=>{
@@ -60,6 +64,7 @@
     sheet.showModal();
   };
   sheet.addEventListener('click',event=>{const button=event.target.closest('[data-shortcut]');if(button){sheet.close();document.getElementById(button.dataset.shortcut)?.click();}});
+  }
   ch.renderConnection=()=>{ch.el('connection').textContent=s.connected?'Atualização ao vivo':'Atualização automática • reconectando';};
   ch.renderQueue=function(){
     ch.channels?.render();
@@ -92,7 +97,7 @@
   ch.renderThread=function(){
     ch.channels?.render();
     ch.el('no-selection').classList.toggle('hidden',!!s.id);ch.el('conversation').classList.toggle('hidden',!s.id);
-    panel.classList.toggle('has-conversation',!!s.id);if(!s.id)return;
+    panel.classList.toggle('has-conversation',!!s.id);if(!s.id){ch.resetCustomer?.();return;}
     const row=s.detail||s.rows.find(r=>r.id===s.id)||{id:s.id,name:'Carregando…',mode:'auto'};
     ch.el('contact').innerHTML=`<button id="chat-back" class="chat-icon" aria-label="Voltar às conversas">${ch.icon('back')}</button>${avatar(row)}<div><h3>${esc(row.name||'Cliente')}</h3><small>${esc(channel(row))}${row.location?.label?' · '+esc(row.location.label):''}</small></div><div class="chat-top-controls">${controls(row)}</div>`;
     ch.updateAvatars(s.id);
@@ -116,6 +121,7 @@
     const photo=row.photos?.find(p=>['pending','answered'].includes(p.status));
     ch.el('photo-card').innerHTML=photo?`<section class="chat-photo-task"><div>${ch.icon('camera')}<div><h3>${photo.status==='pending'?'Enviar foto do pneu':'Foto aguardando envio'}</h3><p>${esc(photo.tire_size)} · ${photo.status==='pending'?'solicitação pendente':'a confirmação aparecerá aqui'}</p></div></div>${photo.status==='pending'?`<footer><button data-photo="camera" data-photo-id="${esc(photo.id)}">${ch.icon('camera')}Tirar foto</button><button data-photo="gallery" data-photo-id="${esc(photo.id)}">${ch.icon('photo')}Galeria</button></footer>`:''}</section>`:'';
     ch.el('send').disabled=s.sending;ch.el('input').disabled=!s.detail;
+    ch.syncCustomer?.();
     if(nearBottom)requestAnimationFrame(()=>{timeline.scrollTop=timeline.scrollHeight;});
   };
   ch.render=function(){ch.renderQueue();ch.renderThread();ch.renderConnection();};

@@ -13,6 +13,7 @@ import { getBotCampainha, getBotMovement, getBotResilience, getBotVisao,
 import { operatorLabel } from './route-helpers.js';
 import type { PainelRedePeriod } from './queries-pedidos.js';
 import { registerBotControlRoutes } from './route-bot-control.js';
+import { registerBotChatRoutes } from './route-bot-chat.js';
 import { registerBotDeliveryRoutes } from './route-bot-delivery.js';
 import { registerBotShortageRoutes } from './route-bot-faltas.js';
 import { registerDemandReportRoutes } from './route-demand-report.js';
@@ -37,6 +38,7 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
     return getChatwootChannelHealth();
   });
   await registerBotControlRoutes(fastify);
+  registerBotChatRoutes(fastify);
   await registerBotDeliveryRoutes(fastify);
   await registerBotShortageRoutes(fastify);
   await registerShortageReportRoutes(fastify);

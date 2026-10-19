@@ -1,7 +1,8 @@
 (function(){
   'use strict';
-  const C=window.Caixa,ch=C.chat,esc=ch.escape,s=ch.state,sheet=ch.el('sheet');
-  let current=null;
+  const C=window.FarejadorBotChat||window.Caixa,ch=C.chat,esc=ch.escape,s=ch.state,sheet=ch.el('sheet');
+  const inline=!!C.chatCustomerInline;
+  let current=null,collapsed=false;
   const paths={crown:'m3 6 4 4 5-7 5 7 4-4-2 13H5L3 6Zm3 9h12',
     phone:'M6 3H3v3c0 8 7 15 15 15h3v-5l-5-2-2 3a15 15 0 0 1-7-7l3-2-2-5H6Z',
     copy:'M9 9h12v12H9V9ZM5 15H3V3h12v2',mail:'M3 5h18v14H3V5Zm0 1 9 7 9-7',
@@ -18,14 +19,22 @@
     if(!/^[+\d\s().-]+$/.test(raw)||(raw.startsWith('+')&&!country)||![10,11].includes(local.length))return raw;
     return `${country?'+55 ':''}(${local.slice(0,2)}) ${local.slice(2,-4)}-${local.slice(-4)}`;
   }
-  const alive=ctx=>current===ctx&&s.id===ctx.id&&s.session===ctx.session&&sheet.open;
-  const header=()=>`<header class="chat-customer-header"><h2>Ficha do cliente</h2><button type="button" data-close aria-label="Fechar ficha">${icon('close')}</button></header>`;
+  const alive=ctx=>current===ctx&&s.id===ctx.id&&s.session===ctx.session&&(inline?s.active&&!sheet.hidden:sheet.open);
+  const header=()=>`<header class="chat-customer-header"><h2>Ficha do cliente</h2><button type="button" data-close aria-label="${inline?'Recolher ficha':'Fechar ficha'}">${icon(inline?'arrow':'close')}</button></header>`;
+  function close(){
+    if(!inline){sheet.close();return;}
+    collapsed=true;sheet.hidden=true;ch.el('panel').classList.add('customer-collapsed');ch.el('customer')?.focus();
+  }
+  function footer(){
+    if(!inline)return `<button type="button" class="chat-primary" data-close>${icon('chat')}Voltar à conversa</button><small class="chat-sheet-note">Seu rascunho continua na conversa.</small>`;
+    return `<div class="bot-chat-customer-actions">${C.canOpenStock?.()?'<button type="button" data-customer-stock>Ver estoque</button>':''}${C.canOpenSale?.()?'<button type="button" class="chat-primary" data-customer-sale>Abrir venda</button>':''}</div>`;
+  }
   function interestHtml(interest){
     const type=interest.vehicle_type,known=['car','motorcycle'].includes(type);
     const image=type==='car'?'catalog-tire-car.png':'catalog-tire.webp';
     const label=type==='car'?'Carro':type==='motorcycle'?'Moto':'Tipo não identificado';
     const conditions=[...new Set((interest.variants||[]).map(v=>({novo:'Novo',meia_vida:'Meia-vida',remold:'Remold'})[v.condition]).filter(Boolean))];
-    return `<div class="chat-customer-interest">${known?`<img src="/operacao/${image}" alt="Pneu de ${type==='car'?'carro':'moto'}" width="42" height="48">`:`<span class="chat-customer-tire-unknown">${icon('tire')}</span>`}
+    return `<div class="chat-customer-interest">${known?`<img src="${C.chatAssetBase||'/operacao'}/${image}" alt="Pneu de ${type==='car'?'carro':'moto'}" width="42" height="48">`:`<span class="chat-customer-tire-unknown">${icon('tire')}</span>`}
       <div><strong>${esc(interest.measure)}</strong><small>${label}</small></div><div class="chat-customer-conditions">${conditions.map(c=>`<span>${c}</span>`).join('')}</div></div>`;
   }
   function orderHtml(order){
@@ -34,6 +43,7 @@
     return `<article class="chat-customer-order">${icon('receipt')}<div><strong>${esc(order.order_number||'Pedido')}</strong><small>${esc(status)} · ${esc(when)}</small></div><b>${ch.currency(order.total_amount)}</b></article>`;
   }
   function render(ctx){
+    const scroll=sheet.scrollTop;
     const data=ctx.data,customer=data.customer||{},summary=data.summary||{},row=ctx.row;
     const location=customer.shared_location||row.location,orders=data.orders||[],purchases=Number(summary.purchases||0);
     const vip=customer.is_vip===true,classification=typeof customer.is_vip==='boolean';
@@ -54,18 +64,49 @@
       ${(ctx.expanded?orders:orders.slice(0,3)).map(orderHtml).join('')||'<p>Ainda não há compras registradas.</p>'}
       ${(!ctx.expanded&&orders.length>3)||data.next_offset!=null?`<button type="button" class="chat-customer-history" data-customer-history ${ctx.busy?'disabled':''}>${ctx.busy?'Carregando…':ctx.expanded?'Carregar mais compras':'Ver histórico completo'}${icon('arrow')}</button>`:''}
       ${ctx.historyError?'<p role="alert">Não foi possível carregar mais compras. Tente novamente.</p>':''}</section></div>
-      <footer class="chat-customer-footer"><button type="button" class="chat-primary" data-close>${icon('chat')}Voltar à conversa</button><small class="chat-sheet-note">Seu rascunho continua na conversa.</small><span class="chat-customer-copy-status" role="status" aria-live="polite"></span></footer>`;
+      <footer class="chat-customer-footer">${footer()}<span class="chat-customer-copy-status" role="status" aria-live="polite"></span></footer>`;
     ch.updateAvatars(ctx.id);
+    if(inline)sheet.scrollTop=scroll;
   }
   ch.openCustomer=async function(){
     const id=s.id;if(!id)return;
+    if(inline){
+      collapsed=false;sheet.hidden=false;ch.el('panel').classList.remove('customer-collapsed');
+      if(current?.id===id){await refreshInline(current,true);return;}
+    }
     const ctx=current={id,session:s.session,row:s.detail||s.rows.find(r=>r.id===id)||{id},data:{},expanded:false,busy:false};
     sheet.classList.add('chat-customer-sheet');sheet.setAttribute('aria-label','Ficha do cliente');
     sheet.innerHTML=header()+'<p class="chat-customer-loading" role="status">Carregando dados…</p>';
+    if(inline){await refreshInline(ctx,true);return;}
     if(!sheet.open)sheet.showModal();
     try{const data=await ch.api(ch.path(id)+'/customer');if(!alive(ctx))return;ctx.data=data||{};render(ctx);}
     catch(error){if(alive(ctx))sheet.innerHTML=header()+`<p class="chat-customer-loading" role="alert">${esc(ch.errorText(error))}</p>`;}
   };
+  async function refreshInline(ctx,force=false){
+    if(!alive(ctx)||ctx.busy||(!force&&Date.now()-(ctx.refreshedAt||0)<15000))return;
+    ctx.busy=true;ctx.refreshedAt=Date.now();
+    try{
+      const data=await ch.api(ch.path(ctx.id)+'/customer');if(!alive(ctx))return;
+      ctx.row=s.detail||s.rows.find(r=>r.id===ctx.id)||ctx.row;
+      if(ctx.expanded){data.orders=[...new Map([...(ctx.data.orders||[]),...(data.orders||[])].map(o=>[o.id,o])).values()];data.next_offset=ctx.data.next_offset;}
+      const signature=JSON.stringify([data,ctx.row.photos]);ctx.data=data||{};
+      if(signature!==ctx.signature){ctx.signature=signature;render(ctx);}
+    }catch(error){
+      if(alive(ctx)&&!ctx.signature)sheet.innerHTML=header()+`<p class="chat-customer-loading" role="alert">${esc(ch.errorText(error))}</p><button type="button" class="chat-primary" data-customer-refresh>Tentar novamente</button>`;
+    }finally{ctx.busy=false;}
+  }
+  ch.syncCustomer=function(){
+    if(!inline)return;
+    if(current?.id!==s.id){
+      current=null;sheet.replaceChildren();
+      if(!collapsed&&s.id){
+        if(ch.el('panel').clientWidth<=1040){collapsed=true;sheet.hidden=true;ch.el('panel').classList.add('customer-collapsed');}
+        else void ch.openCustomer();
+      }
+    }
+    else if(current&&!collapsed)void refreshInline(current);
+  };
+  ch.resetCustomer=function(){if(inline){current=null;collapsed=false;sheet.hidden=true;sheet.replaceChildren();ch.el('panel').classList.add('customer-collapsed');}};
   async function history(ctx){
     if(ctx.busy)return;
     if(!ctx.expanded&&(ctx.data.orders||[]).length>3){ctx.expanded=true;render(ctx);return;}
@@ -79,10 +120,13 @@
     finally{if(alive(ctx)){ctx.busy=false;render(ctx);}}
   }
   sheet.addEventListener('click',async event=>{
-    if(event.target.closest('[data-close]')||event.target===sheet){sheet.close();return;}
+    if(event.target.closest('[data-close]')||(!inline&&event.target===sheet)){close();return;}
     const ctx=current;if(!ctx||!alive(ctx))return;
     if(event.target.closest('[data-customer-history]'))void history(ctx);
-    if(event.target.closest('[data-customer-photo]')){sheet.close();ch.el('photo-card')?.scrollIntoView({block:'end'});}
+    if(event.target.closest('[data-customer-photo]')){if(!inline||matchMedia('(max-width: 1199px)').matches)close();ch.el('photo-card')?.scrollIntoView({block:'nearest'});}
+    if(event.target.closest('[data-customer-refresh]'))void refreshInline(ctx,true);
+    if(event.target.closest('[data-customer-stock]'))C.openChatStock?.(ctx.data);
+    if(event.target.closest('[data-customer-sale]'))void C.openChatSale?.(ctx.row,ctx.data);
     if(event.target.closest('[data-customer-copy]')&&ctx.phone){
       let message='Telefone copiado.';try{await navigator.clipboard.writeText(ctx.phone);}catch(_){message='Não foi possível copiar. Selecione o telefone e copie.';}
       if(alive(ctx))sheet.querySelector('.chat-customer-copy-status').textContent=message;
