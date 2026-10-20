@@ -4,6 +4,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.sino = function () {
   let navigation = 0;
+  let refreshPending = false;
   return {
     sinoComissoes: null, sinoApplications: [], sinoLoading: false,
     sinoError: null, sinoUpdatedAt: null, sinoScope: null, sinoRequest: 0,
@@ -21,6 +22,7 @@ window.PAINEL_MODULES.sino = function () {
     },
     resetSino() {
       navigation++;
+      refreshPending = false;
       this.sinoRequest++;
       this.sino = null; this.sinoComissoes = null; this.sinoApplications = [];
       this.sinoLidas = []; this.sinoScope = null;
@@ -34,7 +36,7 @@ window.PAINEL_MODULES.sino = function () {
     get sinoEmpty() {
       return !!this.sinoUpdatedAt && !this.sinoLoading && !this.sinoError && this.notificacoes.length === 0;
     },
-    async loadSino() {
+    async loadSino({ invalidate = false } = {}) {
       if (!this.adminAuthenticated || this.panelScope !== 'matrix'
           || !location.pathname.startsWith('/admin/painel')) { this.resetSino(); return; }
       const scope = this.sinoContext();
@@ -46,7 +48,7 @@ window.PAINEL_MODULES.sino = function () {
           this.sinoLidas = Array.isArray(saved) ? saved.filter(id => typeof id === 'string').slice(-100) : [];
         } catch (_) { this.sinoLidas = []; }
       }
-      if (this.sinoLoading) return;
+      if (this.sinoLoading) { refreshPending ||= invalidate; return; }
       const request = ++this.sinoRequest;
       this.sinoLoading = true; this.sinoError = null;
       const sources = [{ key: 'sino', path: '/admin/api/matriz/notificacoes' }];
@@ -68,6 +70,11 @@ window.PAINEL_MODULES.sino = function () {
       if (request !== this.sinoRequest) return;
       if (!this.adminAuthenticated || scope !== this.sinoContext() || this.panelScope !== 'matrix') {
         this.resetSino(); return;
+      }
+      // Uma gravação terminou durante a consulta: só aplicar uma leitura posterior.
+      if (refreshPending) {
+        refreshPending = false; this.sinoLoading = false;
+        return this.loadSino();
       }
       results.forEach((result, i) => {
         if (result.status === 'fulfilled') this[sources[i].key] = result.value;

@@ -10,16 +10,17 @@ function read(name: string) {
 const modules = ['resumo','bot','retiradas','logistica','financeiro','estoque','rede'];
 function frontend(storage = new Map<string,string>()) {
   const context: any = { window: {}, location: { pathname: '/admin/painel' }, document: { hidden: false },
-    setTimeout, clearTimeout, setInterval, clearInterval,
+    setTimeout, clearTimeout, setInterval, clearInterval, fetch: vi.fn(),
+    sessionStorage: { getItem: () => null, setItem() {} },
     localStorage: { getItem: (k: string) => storage.get(k), setItem: (k: string,v: string) => storage.set(k,v) },
     lucide: { createIcons() {} } };
-  for (const name of ['sino','core','comissoes','nav']) vm.runInNewContext(read(`app.${name}.js`),context);
+  for (const name of ['sino','core','comissoes','nav','api']) vm.runInNewContext(read(`app.${name}.js`),context);
   const state: any = { sino: null, sinoLidas: [], adminAuthenticated: true,
     adminUser: { id:'user-a',username:'test-a',role:'owner',auth_type:'session' },
     panelScope:'matrix',panelModules:modules,currentPage:'financeiro',loadBotCampainha:vi.fn(),
     $nextTick:(fn: () => void)=>fn(),catalogoConditionLabel:(v: string)=>v,formatCurrency:String,
     ...context };
-  for (const name of ['sino','core','comissoes','nav'])
+  for (const name of ['sino','core','comissoes','nav','api'])
     Object.defineProperties(state,Object.getOwnPropertyDescriptors(context.window.PAINEL_MODULES[name]()));
   state.sinoScope=state.sinoContext();
   return state;
@@ -43,6 +44,33 @@ const deferred = () => { let resolve!: (v: any)=>void; const promise=new Promise
 afterEach(()=>vi.useRealTimers());
 
 describe('sino: atualizações e falhas',()=>{
+  it.each(['apiPost','apiPut','apiDelete'])('remove pendências após %s sem aguardar o intervalo',async method=>{
+    const m=frontend();allAlerts(m);responses(m);
+    m.fetch.mockResolvedValue({ok:true,status:200,json:async()=>({ok:true})});
+    expect(await m[method]('/admin/api/matriz/teste',{})).toEqual({ok:true});
+    await vi.waitFor(()=>expect(m.notificacoes).toHaveLength(0));
+    expect(m.apiGet).toHaveBeenCalledTimes(3);
+  });
+  it('refaz consulta iniciada antes de salvar, sem aplicar a resposta antiga',async()=>{
+    const m=frontend(),d=deferred();allAlerts(m);m.apiGet=vi.fn(()=>d.promise);
+    const old=m.loadSino();
+    m.fetch.mockResolvedValue({ok:true,status:200,json:async()=>({ok:true})});
+    await m.apiPost('/admin/api/matriz/teste',{});
+    responses(m);d.resolve({fiado_vencido:{count:1,total:'100'}});await old;
+    expect(m.apiGet).toHaveBeenCalledTimes(3);
+    expect(m.notificacoes).toHaveLength(0);expect(m.sinoEmpty).toBe(true);
+  });
+  it('não apaga pendências quando a gravação é recusada',async()=>{
+    const m=frontend();allAlerts(m);responses(m);
+    m.fetch.mockResolvedValue({ok:false,status:500,json:async()=>({error:'failed'})});
+    await expect(m.apiPost('/admin/api/matriz/teste',{})).rejects.toThrow('failed');
+    expect(m.apiGet).not.toHaveBeenCalled();expect(m.notificacoes).toHaveLength(11);
+  });
+  it('atualiza o sino mesmo enquanto outra tela aguarda sua resposta',async()=>{
+    const m=frontend();allAlerts(m);responses(m);m.liveRefreshing=true;
+    await m.liveRefresh();await vi.waitFor(()=>expect(m.notificacoes).toHaveLength(0));
+    expect(m.liveRefreshing).toBe(true);
+  });
   it('conserva alertas na falha, sinaliza erro e permite recuperar sem falso Tudo em dia',async()=>{
     const m=frontend();allAlerts(m);const before=m.notificacoes.map((n: any)=>n.id);
     m.apiGet=vi.fn(async()=>{throw Error('offline');});await m.loadSino();

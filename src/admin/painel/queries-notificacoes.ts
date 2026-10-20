@@ -15,7 +15,7 @@ import { env } from '../../shared/config/env.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica.js';
 import { getBotResilienceCounts } from './queries-bot-resilience.js';
 import { botReservationWarnings, botReservationExpiryFailures } from '../../operation/bot-reservations.js';
-import { latestLedgerHealth, type DailyLedgerHealth } from '../../operation/daily-ledger-health.js';
+import { currentLedgerHealth, type DailyLedgerHealth } from '../../operation/daily-ledger-health.js';
 
 export interface MatrizNotificacoesPayload {
   /** Entregas da MAIN com delivery_status='failed' e pedido NÃO cancelado —
@@ -34,7 +34,7 @@ export interface MatrizNotificacoesPayload {
   ledger_health: DailyLedgerHealth | null;
 }
 
-/** Consultas leves de contagem — roda no load e no refresh de 15s. */
+/** Contagens e conferência financeira atual — roda no load e no refresh de 15s. */
 export async function getMatrizNotificacoes(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
@@ -121,6 +121,6 @@ export async function getMatrizNotificacoes(
     bot_reservations_expiring: reservations,
     bot_reservation_expiry_failures: await botReservationExpiryFailures(environment, dbPool),
     normalization_failed: failures.rows[0]?.n ?? 0,
-    ledger_health: await latestLedgerHealth(environment, dbPool),
+    ledger_health: await currentLedgerHealth(environment, dbPool),
   };
 }

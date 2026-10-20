@@ -149,7 +149,9 @@ window.PAINEL_MODULES.api = function () {
         e.payload = payload; e.status = response.status; // detalhe do erro (ex.: oversell)
         throw e;
       }
-      return response.json();
+      const result = await response.json();
+      if (this.panelScope === 'matrix') void this.loadSino?.({ invalidate: true });
+      return result;
     },
 
     async apiDelete(path, body) {
@@ -167,7 +169,9 @@ window.PAINEL_MODULES.api = function () {
         e.payload = payload; e.status = response.status;
         throw e;
       }
-      return response.json();
+      const result = await response.json();
+      if (this.panelScope === 'matrix') void this.loadSino?.({ invalidate: true });
+      return result;
     },
 
     async apiPut(path, body) {
@@ -183,7 +187,9 @@ window.PAINEL_MODULES.api = function () {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || `api_${response.status}`);
       }
-      return response.json();
+      const result = await response.json();
+      if (this.panelScope === 'matrix') void this.loadSino?.({ invalidate: true });
+      return result;
     },
 
     async logoutAdmin() {

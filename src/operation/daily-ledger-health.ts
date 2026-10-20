@@ -57,11 +57,15 @@ export async function checkDailyLedgerHealth(
   } finally { client.release(); }
 }
 
-export async function latestLedgerHealth(environment: 'prod' | 'test', db: Pool) {
+/** O sino acompanha resoluções no mesmo dia; o snapshot diário serve ao monitor. */
+export async function currentLedgerHealth(environment: 'prod' | 'test', db: Pool): Promise<DailyLedgerHealth | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
-  const result = await db.query<DailyLedgerHealth>(`SELECT status,checked_at::text,error_signals,pending_signals
-    FROM ops.matriz_ledger_health_checks WHERE environment=$1`, [environment]);
-  return result.rows[0] ?? null;
+  const health = await getMatrizLedgerIntegrationHealth(environment, db);
+  return {
+    status: health.status, checked_at: health.checked_at,
+    error_signals: health.global.total_error_signals,
+    pending_signals: Object.values(health.modules).reduce((sum, module) => sum + module.pending, 0),
+  };
 }
 
 export function startDailyLedgerHealth(): () => void {

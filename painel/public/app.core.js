@@ -154,11 +154,12 @@ window.PAINEL_MODULES.core = function () {
     },
 
     async liveRefresh() {
-      if (this.liveRefreshing || document.hidden) return;
+      if (document.hidden) return;
       if (!this.adminAuthenticated || !this.isMatrixPanel()
         || !location.pathname.startsWith('/admin/painel')) return;
       // Sino atualiza em QUALQUER página (aviso é aviso); tem try/catch próprio.
       void this.loadSino();
+      if (this.liveRefreshing) return;
       // Campainha do bot idem: cliente esperando não pode depender da aba aberta.
       if (this.hasPanelModule('bot')) void this.loadBotCampainha();
       if (this.currentPage === 'bot' && this.hasPanelModule('bot')) {
