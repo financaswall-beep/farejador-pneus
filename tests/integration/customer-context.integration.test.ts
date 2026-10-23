@@ -30,7 +30,9 @@ describe('memória permanente e endereço anterior do cliente',() => {
   it('lembra cadastro e compra antiga sem depender da janela de 11 dias nem expor o endereço',async()=>{
     const context=await loadContext(db.pool as never,currentConversationId);
     expect(context).toContain('Ana');
-    expect(context).toContain('Telefone já cadastrado');
+    expect(context).toContain('Telefone válido cadastrado neste contato');
+    expect(context).toContain('Este canal não é WhatsApp');
+    expect(context).toContain('Não use identificador de perfil como telefone');
     expect(context).toContain('Cliente recorrente: 1 compra(s)');
     expect(context).toContain('90/90-18');
     expect(context).toContain('ENDEREÇO ANTERIOR DISPONÍVEL');

@@ -1,5 +1,7 @@
 import type { PoolClient } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
+vi.hoisted(()=>Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',
+  DATABASE_SSL:'false',CHATWOOT_HMAC_SECRET:'unit-test',ADMIN_AUTH_TOKEN:'unit-test'}));
 vi.mock('../../../src/parceiro/queries.js', () => ({ upsertPartnerCustomerWithClient: vi.fn() }));
 import { requestPublicItems, refreshStockRequestPrices, type StockRequest } from '../../../src/atendente-v2/stock-confirmation-store.js';
 import { materializePartnerOrder, type PartnerOrderRouting } from '../../../src/atendente-v2/fulfillment.js';

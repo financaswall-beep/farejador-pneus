@@ -27,6 +27,10 @@ beforeAll(async () => {
   const after = await db.pool.query(`SELECT viewname,definition FROM pg_views
     WHERE schemaname='commerce' AND viewname=ANY($1::text[]) ORDER BY viewname`, [botViews]);
   expect(after.rows).toEqual(before.rows);
+  // Keep the 0267 view-invariance proof, then run today's adapter on today's schema.
+  for (const file of ['0268_partner_wholesale_catalog.sql','0269_partner_photo_groups.sql',
+    '0270_tire_photo_storage_retention.sql','0271_partner_wholesale_requests.sql',
+    '0272_partner_weekly_store_hours.sql','0273_partner_used_tires.sql']) await applyMigrationFile(db.pool,file);
   ({ pool: defaultPool } = await import('../../src/persistence/db.js'));
   wholesale = await import('../../src/admin/painel/queries-catalogo-wholesale.js');
   pricing = await import('../../src/shared/catalog-pricing.js');
