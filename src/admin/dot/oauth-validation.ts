@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { DOT_SCOPE, type DotConfig } from './config.js';
 
+// OAuth (RFC 6749 §3.1): ignore client extensions; never persist or echo them.
 const authorization = z.object({
   response_type: z.literal('code'), client_id: z.string().max(120),
   redirect_uri: z.string().url().max(2048), resource: z.string().url().max(2048),
   scope: z.literal(DOT_SCOPE), state: z.string().min(1).max(512),
   code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/), code_challenge_method: z.literal('S256'),
-}).strict();
+}).strip();
 export type DotAuthorization = z.infer<typeof authorization>;
 export function parseAuthorization(config: DotConfig, input: unknown): DotAuthorization | null {
   const parsed = authorization.safeParse(input);

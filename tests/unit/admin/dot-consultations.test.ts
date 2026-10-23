@@ -36,6 +36,23 @@ describe('consultas do Dot',()=>{
     expect(parseAuthorization(config,{...input,redirect_uri:'https://chatgpt.com/callback/other'})).toBeNull();
     expect(parseAuthorization(config,{...input,scope:'farejador.write'})).toBeNull();
   });
+  it('ignora extensões OAuth do cliente sem preservar dados extras ou afrouxar campos conhecidos',()=>{
+    const config={origin:'https://app.example',resource:'https://app.example/admin/dot/mcp',clientId:'farejador-dot',redirects:['https://chatgpt.com/callback']};
+    const input={client_id:'farejador-dot',resource:config.resource,redirect_uri:config.redirects[0],scope:'farejador.read',
+      response_type:'code',state:'state',code_challenge:'a'.repeat(43),code_challenge_method:'S256'};
+    const extensions={ui_locales:'pt-BR',login_hint:'IGNORED-HINT',environment:'prod'};
+    expect(parseAuthorization(config,{...input,...extensions})).toEqual(input);
+    for(const key of Object.keys(input)) {
+      const missing:Record<string,unknown>={...input,...extensions}; delete missing[key];
+      expect(parseAuthorization(config,missing),`ausente: ${key}`).toBeNull();
+      expect(parseAuthorization(config,{...input,...extensions,[key]:[input[key as keyof typeof input],input[key as keyof typeof input]]}),`repetido: ${key}`).toBeNull();
+    }
+    for(const invalid of [{client_id:'outro-cliente'},{resource:config.origin},{redirect_uri:'https://evil.example'},
+      {scope:'farejador.write'},{code_challenge_method:'plain'},{code_challenge:'a'.repeat(42)},
+      {response_type:'token'},{state:''}]) {
+      expect(parseAuthorization(config,{...input,...extensions,...invalid})).toBeNull();
+    }
+  });
   it('limita estoque a 50 e projeta campos, sem repassar PII de queries futuras',async()=>{
     mocks.stock.mockResolvedValue({as_of:'now',summary:{available:60},groups:Array.from({length:60},()=>({measure:'110/90-17',
       physical:1,reserved:0,available:1,incoming:0,customer_name:'PII-SENTINEL',phone:'PII-SENTINEL',extra:'PII-SENTINEL'}))});
