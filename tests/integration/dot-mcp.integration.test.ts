@@ -111,6 +111,33 @@ it('recusa redirects, recursos, escopos e PKCE adulterados antes de redirecionar
   const response = await app.inject({url:authorization()});
   expect(response.statusCode).toBe(303);
   expect(response.headers.location).toMatch(/^\/admin\/login\?dot_return=/);
+  const duplicate=await app.inject({url:authorization({ui_locales:'pt-BR'})+'&client_id=farejador-dot',headers:headers()});
+  expect(duplicate.statusCode).toBe(400);
+  expect(duplicate.headers.location).toBeUndefined();
+});
+
+it('aceita ui_locales do ChatGPT e descarta extensões antes do consentimento e callback', async () => {
+  const url=authorization({ui_locales:'pt-BR',login_hint:'IGNORED-HINT'});
+  const login=await app.inject({url});
+  expect(login.statusCode).toBe(303);
+  const page=await app.inject({url,headers:headers()});
+  expect(page.statusCode).toBe(200);
+  const nonce=page.body.match(/name="dot-request" content="([a-f0-9]{64})"/)![1];
+  const stored=await db.pool.query('SELECT request_params FROM network.dot_oauth_requests WHERE request_hash=$1',
+    [createHash('sha256').update(nonce).digest('hex')]);
+  expect(stored.rows[0].request_params).not.toHaveProperty('ui_locales');
+  expect(stored.rows[0].request_params).not.toHaveProperty('login_hint');
+  const accepted=await app.inject({method:'POST',url:'/admin/dot/authorize',headers:headers(),
+    payload:{request_token:nonce,decision:'allow'}});
+  expect(accepted.statusCode).toBe(200);
+  const redirect=new URL(accepted.json().redirect);
+  expect(redirect.origin+redirect.pathname).toBe(callback);
+  expect([...redirect.searchParams.keys()].sort()).toEqual(['code','iss','state']);
+  expect(redirect.searchParams.get('iss')).toBe(origin);
+  expect(redirect.searchParams.get('state')).toBe('state-test');
+  const exchanged=await exchange(redirect.searchParams.get('code')!);
+  expect(exchanged.statusCode).toBe(200);
+  expect((await rpc(exchanged.json().access_token)).statusCode).toBe(200);
 });
 
 it('consentimento exige proprietário humano, origem correta e token único ligado à sessão', async () => {
