@@ -15,6 +15,7 @@ import {
   addEntregadorReceipt,
   closeEntregadorTrip,
   getEntregadorProductPhotoImage,
+  getEntregadorReceiptImage,
   openEntregadorTrip,
   reportEntregadorFail,
   setEntregadorDeliveryStatus,
@@ -44,6 +45,7 @@ const closeSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 const photoSchema = z.object({ photoRequestId: z.string().uuid() });
+const receiptSchema = z.object({ receiptId: z.string().uuid() });
 
 function authOf(request: FastifyRequest): CaixaAuth {
   return (request as CaixaRequest).caixa!;
@@ -193,6 +195,14 @@ export function registerCaixaDeliveryRoutes(
     return reply.status(receipt.duplicate ? 200 : 201).send({
       ok: true, receipt_id: receipt.receipt_id, duplicate: receipt.duplicate, ...ai,
     });
+  });
+
+  fastify.get('/api/caixa/entregas/rota/comprovantes/:receiptId', { preHandler: guarded }, async (request, reply) => {
+    const parsed = receiptSchema.safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'receipt_not_found' });
+    const photo = await getEntregadorReceiptImage(caixaCourierAuth(authOf(request)), parsed.data.receiptId);
+    if (!photo) return reply.status(404).send({ error: 'receipt_not_found' });
+    return reply.header('Content-Type', photo.mime).header('Cache-Control', 'private, no-store').send(photo.bytes);
   });
 
   fastify.get('/api/caixa/entregas/fotos/:photoRequestId', {

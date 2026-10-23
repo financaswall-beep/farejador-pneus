@@ -5,6 +5,7 @@ import {
   type EntregadorDeliveryCard,
 } from '../entregador/queries.js';
 import type { CaixaAuth } from './queries.js';
+import { getCaixaDeliveryReceipts } from './delivery-receipts.js';
 
 export interface CaixaDeliveryRow {
   order_id: string;
@@ -56,6 +57,8 @@ function mapDelivery(
  */
 export async function getCaixaDeliveries(auth: CaixaAuth) {
   const rota = await getEntregadorRota(courierAuth(auth), env.FAREJADOR_ENV);
+  const receipts = rota.rota_aberta
+    ? await getCaixaDeliveryReceipts(auth, rota.rota_aberta.trip_id, env.FAREJADOR_ENV) : [];
   const routeRows = rota.rota_aberta?.entregas.map(
     (row) => mapDelivery(row, auth, true),
   ) ?? [];
@@ -80,6 +83,7 @@ export async function getCaixaDeliveries(auth: CaixaAuth) {
       completed: routeRows.filter((row) => row.delivery_status === 'delivered').length,
       unresolved,
       reported: routeRows.filter((row) => row.delivery_status === 'failed').length,
+      receipts,
     } : null,
   };
 }

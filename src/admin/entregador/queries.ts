@@ -351,8 +351,8 @@ export async function getEntregadorReceiptImage(
   const r = await dbPool.query<{ bytes: Buffer; mime: string }>(
     `SELECT b.bytes, m.mime
        FROM commerce.matriz_trip_receipt_blobs b
-       JOIN commerce.matriz_trip_receipts m ON m.id = b.receipt_id
-       JOIN commerce.matriz_delivery_trips t ON t.id = m.trip_id
+       JOIN commerce.matriz_trip_receipts m ON m.id = b.receipt_id AND m.environment=b.environment
+       JOIN commerce.matriz_delivery_trips t ON t.id = m.trip_id AND t.environment=m.environment
       WHERE b.receipt_id = $1 AND b.environment = $2
         AND t.environment = $2 AND t.courier_collaborator_id = $3`,
     [receiptId, environment, auth.collaboratorId],

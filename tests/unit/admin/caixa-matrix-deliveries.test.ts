@@ -4,11 +4,13 @@ import type { Pool } from 'pg';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getEntregadorRota } from '../../../src/admin/entregador/queries.js';
 import { getCaixaDeliveries } from '../../../src/admin/caixa/deliveries.js';
+import { getCaixaDeliveryReceipts } from '../../../src/admin/caixa/delivery-receipts.js';
 import { validateCaixaSession, type CaixaAuth } from '../../../src/admin/caixa/queries.js';
 
 vi.mock('../../../src/admin/entregador/queries.js', () => ({
   getEntregadorRota: vi.fn(),
 }));
+vi.mock('../../../src/admin/caixa/delivery-receipts.js', () => ({ getCaixaDeliveryReceipts: vi.fn(async () => []) }));
 vi.mock('../../../src/shared/config/env.js', () => ({
   env: {
     FAREJADOR_ENV: 'test',
@@ -65,6 +67,7 @@ describe('logística da Matriz dentro da Operação da Loja', () => {
     ]));
     expect(payload.summary).toEqual({ preparing: 1, dispatched: 1, delivered: 0 });
     expect(payload.matrix_route).toMatchObject({ trip_number: 'ROTA-1048', unresolved: 1 });
+    expect(getCaixaDeliveryReceipts).toHaveBeenCalledWith(courier, 'trip-1', 'test');
   });
 
   it('a sessão cs_ reconhece entregador e não libera os módulos de venda', async () => {
