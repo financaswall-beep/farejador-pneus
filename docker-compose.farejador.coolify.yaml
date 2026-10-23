@@ -26,6 +26,11 @@ services:
       CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:?CHATWOOT_ACCOUNT_ID is required}
       ADMIN_AUTH_TOKEN: ${ADMIN_AUTH_TOKEN:?ADMIN_AUTH_TOKEN is required}
       ADMIN_BEARER_FALLBACK_ENABLED: ${ADMIN_BEARER_FALLBACK_ENABLED:-false}
+      # Consultas do Dot: ativar apenas após aplicar 0274 e configurar OAuth no ChatGPT/Work.
+      DOT_MCP_ENABLED: ${DOT_MCP_ENABLED:-false}
+      DOT_MCP_PUBLIC_ORIGIN: ${DOT_MCP_PUBLIC_ORIGIN:-}
+      DOT_MCP_CLIENT_ID: ${DOT_MCP_CLIENT_ID:-farejador-dot}
+      DOT_MCP_REDIRECT_URIS: ${DOT_MCP_REDIRECT_URIS:-https://chatgpt.com/connector_platform_oauth_redirect}
       # Frente de Caixa e foto sob demanda. Defaults OFF preservam rollout/rollback;
       # o Coolify deve definir ambas como true para publicar esta entrega.
       MATRIZ_CAIXA_PORTAL: ${MATRIZ_CAIXA_PORTAL:-false}
