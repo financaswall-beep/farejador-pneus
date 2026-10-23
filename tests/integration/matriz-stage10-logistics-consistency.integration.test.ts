@@ -14,6 +14,9 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
   let approveReceipt: typeof import('../../src/admin/painel/queries-logistica-comprovantes-decision.js').approveMatrizTripReceipt;
   let confirmDivergence: typeof import('../../src/admin/painel/queries-logistica-rotas.js').confirmMatrizTripFuelDivergence;
   let getLogistics: typeof import('../../src/admin/painel/queries-logistica-read.js').getMatrizLogistica;
+  let listReceipts: typeof import('../../src/admin/caixa/delivery-receipts.js').getCaixaDeliveryReceipts;
+  let uploadReceipt: typeof import('../../src/admin/entregador/queries.js').addEntregadorReceipt;
+  let receiptImage: typeof import('../../src/admin/entregador/queries.js').getEntregadorReceiptImage;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -34,6 +37,8 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
       await import('../../src/admin/painel/queries-logistica-comprovantes-decision.js'));
     ({ getEntregadorRota: getCourierRoute } =
       await import('../../src/admin/entregador/queries.js'));
+    ({ addEntregadorReceipt: uploadReceipt, getEntregadorReceiptImage: receiptImage } = await import('../../src/admin/entregador/queries.js'));
+    ({ getCaixaDeliveryReceipts: listReceipts } = await import('../../src/admin/caixa/delivery-receipts.js'));
     const unit = await db.pool.query<{ id: string }>(
       `INSERT INTO core.units (environment,slug,name)
        VALUES ('test','main','Matriz Etapa 10') RETURNING id`,
@@ -120,6 +125,34 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
     expect(route.rota_aberta?.entregas[0]).toMatchObject({
       customer_name: 'Cliente Balcao Rota', customer_phone: '+5521999999999',
     });
+  });
+
+  it('recarrega notas persistidas, isola dono/ambiente e não lança despesa ao anexar', async () => {
+    const orderId = await seedDelivery('notas-app'); const tripId = await createTrip('notas-app', orderId);
+    const courier = (await db.pool.query<{ courier_collaborator_id: string; courier_name: string }>(
+      `SELECT courier_collaborator_id,courier_name FROM commerce.matriz_delivery_trips WHERE id=$1`, [tripId],
+    )).rows[0]!;
+    const auth = { personId: 'fixture-person', collaboratorId: courier.courier_collaborator_id, displayName: courier.courier_name,
+      username: 'fixture', job: 'entregador', modules: { vendas: false, estoque: false, entregas: true, retiradas: false, financeiro: false } } as const;
+    const ledgerBefore = (await db.pool.query(`SELECT count(*)::int AS n FROM finance.matriz_ledger_transactions WHERE environment='test'`)).rows[0].n;
+    const bytes = Buffer.from('nota ficticia para prova de persistencia');
+    const receipt = await uploadReceipt(auth, { bytes, mime: 'image/jpeg' }, 'test', db.pool);
+    const first = await listReceipts(auth, tripId, 'test', db.pool);
+    const reloaded = await listReceipts(auth, tripId, 'test', db.pool);
+    expect(reloaded).toEqual(first);
+    expect(first).toEqual([expect.objectContaining({ receipt_id: receipt.receipt_id, has_image: true })]);
+    expect((await receiptImage(auth, receipt.receipt_id, 'test', db.pool))?.bytes).toEqual(bytes);
+    const stranger = { ...auth, collaboratorId: '00000000-0000-4000-8000-000000000099' };
+    expect(await listReceipts(stranger, tripId, 'test', db.pool)).toEqual([]);
+    expect(await listReceipts(auth, tripId, 'prod', db.pool)).toEqual([]);
+    expect(await receiptImage(stranger, receipt.receipt_id, 'test', db.pool)).toBeNull();
+    expect(await receiptImage(auth, receipt.receipt_id, 'prod', db.pool)).toBeNull();
+    const duplicate = await uploadReceipt(auth, { bytes, mime: 'image/jpeg' }, 'test', db.pool);
+    expect(duplicate.duplicate).toBe(true); expect(await listReceipts(auth, tripId, 'test', db.pool)).toHaveLength(1);
+    expect((await db.pool.query(`SELECT count(*)::int AS n FROM finance.matriz_ledger_transactions WHERE environment='test'`)).rows[0].n).toBe(ledgerBefore);
+    await db.pool.query(`UPDATE commerce.orders SET delivery_status='failed',delivery_failure_reason='Teste' WHERE id=$1`, [orderId]);
+    await closeTrip({ trip_id: tripId, environment: 'test' }, db.pool);
+    expect(await listReceipts(auth, tripId, 'test', db.pool)).toEqual([]);
   });
 
   it('reentrega limpa o entregador anterior e herda o nome da nova rota', async () => {

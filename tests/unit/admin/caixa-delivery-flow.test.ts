@@ -16,8 +16,8 @@ function setup() {
     json: (response: any) => response.json(),
   };
   const reload = vi.fn(async () => C.matrixDeliveries.sync(payload, reload));
-  const response = (data = {}, ok = true) => ({ ok, json: async () => data });
-  C.authenticatedFetch = vi.fn(async (url: string, options: any) => {
+  const response = (data = {}, ok = true) => ({ ok, json: async () => data, blob: async () => ({}) });
+  C.authenticatedFetch = vi.fn(async (url: string, options: any = {}) => {
     const body = options.headers?.['Content-Type'] === 'application/json' ? JSON.parse(options.body) : {};
     if (url.endsWith('rota/abrir')) {
       payload = { rows: rows.map(row => ({ ...row, in_route: body.order_ids.includes(row.order_id) })),
@@ -30,9 +30,12 @@ function setup() {
       payload.rows = payload.rows.map((row: any) => row.order_id === body.order_id ? { ...row, delivery_status: 'failed' } : row);
       payload.matrix_route.unresolved = 0; payload.matrix_route.reported = 1;
     } else if (url.endsWith('rota/fechar')) payload = { rows: [], matrix_route: null };
+    else if (url.endsWith('rota/comprovante')) return response({ receipt_id: 'receipt-a', workflow_status: 'review_required' });
     return response();
   });
-  const context = { window: { Caixa: C }, document: { activeElement: null, querySelectorAll: () => [] }, console };
+  const context = { window: { Caixa: C }, document: { activeElement: null, querySelectorAll: () => [], createElement: (tag: string) => new TestNode(tag) },
+    URL: { createObjectURL: vi.fn(() => 'blob:receipt'), revokeObjectURL: vi.fn() }, console };
+  runInNewContext(readFileSync('painel/public/caixa-deliveries-flow-receipts.js', 'utf8'), context);
   runInNewContext(readFileSync('painel/public/caixa-deliveries-flow-actions.js', 'utf8'), context);
   const factory = C.createMatrixDeliveryActions;
   C.createMatrixDeliveryActions = (current: any, ...rest: any[]) => { state = current; return factory(current, ...rest); };
@@ -62,6 +65,20 @@ describe('quatro etapas das entregas da Matriz', () => {
     const s = setup(); s.inRoute('pending'); await s.action('dispatch', 'a');
     expect(JSON.parse(s.C.authenticatedFetch.mock.calls[0][1].body)).toEqual({ order_id: 'a', status: 'dispatched', payment_method: null });
     expect(s.state.rows[0].delivery_status).toBe('dispatched');
+    expect(s.state.view).toBe('detail'); expect(s.state.detailOrderId).toBe('a');
+  });
+  it('abre só a entrega da própria rota e volta da confirmação sem gravar', async () => {
+    const s = setup(); expect(await s.action('detail', 'a')).toBe(false); s.inRoute();
+    expect(await s.action('detail', 'a')).toBe(true); expect(s.state.view).toBe('detail');
+    await s.action('payment', 'a'); s.state.paymentMethod = 'pix'; s.state.received = true;
+    await s.action('back'); expect(s.state.view).toBe('detail'); expect(s.state.received).toBe(false);
+    expect(s.C.authenticatedFetch).not.toHaveBeenCalled();
+  });
+  it('exige nova conferência se o valor mudar com a confirmação aberta', async () => {
+    const s = setup(); s.inRoute(); await s.action('payment', 'a'); s.state.paymentMethod = 'pix'; s.state.received = true;
+    s.state.rows[0].total_amount = 179.9; await s.reload();
+    expect(s.state.received).toBe(false); expect(s.state.paymentMethod).toBeNull(); expect(s.state.error).toContain('O valor mudou');
+    await s.el('mdf-payment-confirm').fire('click'); expect(s.C.authenticatedFetch).not.toHaveBeenCalled();
   });
   it('não oferece pagamento para pedido que ainda não saiu', async () => {
     const s = setup(); s.inRoute('pending'); expect(await s.action('payment', 'a')).toBe(false);
@@ -95,14 +112,43 @@ describe('quatro etapas das entregas da Matriz', () => {
     const upload = s.el('matrix-route-receipt').fire('change');
     await s.el('matrix-route-close-button').fire('click');
     expect(s.C.authenticatedFetch).toHaveBeenCalledTimes(1); expect(s.state.busy).toBe(true);
-    done(s.response()); await upload;
-    expect(s.state.busy).toBe(false); expect(s.el('matrix-route-receipt-status').textContent).toContain('enviado para conferência');
+    done(s.response({ receipt_id: 'receipt-a', workflow_status: 'review_required' })); await upload;
+    expect(s.state.busy).toBe(false); expect(s.el('matrix-route-receipt-status').textContent).toContain('enviada para conferência');
   });
   it('mantém a confirmação aberta e informa erro se o servidor recusar', async () => {
     const s = setup(); s.inRoute(); await s.action('payment', 'a'); s.state.paymentMethod = 'cartao'; s.state.received = true;
     s.C.authenticatedFetch.mockResolvedValueOnce(s.response({ error: 'delivery_not_found' }, false));
     await s.el('mdf-payment-confirm').fire('click');
     expect(s.state.view).toBe('payment'); expect(s.state.error).toContain('O pedido mudou'); expect(s.C.showToast).not.toHaveBeenCalled();
+  });
+  it('preserva a nota anterior quando falha o envio de outra pela galeria', async () => {
+    const s = setup(); s.inRoute('delivered', 0); await s.action('close');
+    s.state.route.receipts = [{ receipt_id: 'receipt-old', workflow_status: 'review_required', has_image: false }];
+    s.el('mdf-receipt-gallery').files = [{ type: 'image/png' }];
+    s.C.authenticatedFetch.mockResolvedValueOnce(s.response({ error: 'receipt_exact_duplicate' }, false));
+    await s.el('mdf-receipt-gallery').fire('change');
+    expect(s.state.route.receipts).toHaveLength(1); expect(s.state.error).toContain('outro comprovante');
+    expect(s.el('mdf-receipts').textContent).toContain('Aguardando conferência');
+    expect(s.el('matrix-route-receipt-status').textContent).toContain('Não consegui confirmar o envio');
+  });
+  it('não duplica uma nota já anexada nem confunde anexo com aprovação', async () => {
+    const s = setup(); s.inRoute('delivered', 0); await s.action('close');
+    s.state.route.receipts = [{ receipt_id: 'receipt-a', workflow_status: 'review_required', has_image: true }];
+    s.el('mdf-receipt-gallery').files = [{ type: 'image/png' }];
+    s.C.authenticatedFetch.mockImplementation(async (url: string) => s.response(url.endsWith('/comprovante')
+      ? { receipt_id: 'receipt-a', workflow_status: 'review_required', duplicate: true } : {}));
+    await s.el('mdf-receipt-gallery').fire('change');
+    expect(s.state.route.receipts).toHaveLength(1); expect(s.el('matrix-route-receipt-status').textContent).toContain('já estava anexada');
+    expect(s.el('mdf-receipts').textContent).toContain('Aguardando conferência');
+  });
+  it('descarta confirmação de envio de nota após trocar de sessão', async () => {
+    const s = setup(); s.inRoute('delivered', 0); await s.action('close'); let done!: (value: any) => void;
+    s.el('matrix-route-receipt').files = [{ type: 'image/png' }];
+    s.C.authenticatedFetch.mockImplementationOnce(() => new Promise(resolve => { done = resolve; }));
+    const pending = s.el('matrix-route-receipt').fire('change'); s.changeSession(); s.setPayload({ rows: [], matrix_route: null }); await s.reload();
+    done(s.response({ receipt_id: 'old-session-receipt' })); await pending;
+    expect(s.state.route).toBeNull(); expect(s.el('mdf-receipts').textContent).toBe('');
+    expect(s.el('matrix-route-receipt-status').textContent).toBe('');
   });
   it('não permite encerrar rota com entrega pendente', async () => {
     const s = setup(); s.inRoute(); await s.action('close'); await s.el('matrix-route-close-button').fire('click');
