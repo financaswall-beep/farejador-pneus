@@ -13,6 +13,7 @@ let seq = 921000000, pools: Pool[] = [];
 let execute: typeof import('../../src/atendente-v2/tools.js')['executeTool'];
 let create: typeof import('../../src/atendente-v2/photo-requests.js')['createPhotoRequest'];
 let confirmed: typeof import('../../src/atendente-v2/stock-confirmation-photo.js')['createConfirmedStockPhotos'];
+let withOpening: typeof import('../../src/atendente-v2/routing-store-hours.js')['withStoreOpeningContext'];
 beforeAll(async () => {
   db = await startPostgres();
   Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: db.connectionString,
@@ -22,8 +23,11 @@ beforeAll(async () => {
   ({ executeTool: execute } = await import('../../src/atendente-v2/tools.js'));
   ({ createPhotoRequest: create } = await import('../../src/atendente-v2/photo-requests.js'));
   ({ createConfirmedStockPhotos: confirmed } = await import('../../src/atendente-v2/stock-confirmation-photo.js'));
+  ({ withStoreOpeningContext: withOpening } = await import('../../src/atendente-v2/routing-store-hours.js'));
   pools = [(await import('../../src/persistence/db.js')).pool, (await import('../../src/parceiro/db.js')).partnerPool];
   own = await createPartnerFixture(db.pool); other = await createPartnerFixture(db.pool); route.unitId = own.unitId;
+  await db.pool.query(`UPDATE network.partner_units SET opening_hours_weekly=$2::jsonb WHERE id=$1`,
+    [own.partnerUnitId,JSON.stringify([{day:5,opens_at:'08:00',closes_at:'18:00'}])]);
   prodUnit = (await db.pool.query(`INSERT INTO core.units(environment,slug,name) VALUES('prod','photo-prod','Prod') RETURNING id`)).rows[0].id;
   products = [];
   for (const measure of ['90/90-18', '80/100-14']) products.push((await db.pool.query(`INSERT INTO commerce.products
@@ -51,12 +55,14 @@ const queueSql = 'SELECT id,tire_size,tire_condition,photo_group_id,customer_nam
 describe('Fotos correlacionadas no banco e no bot', () => {
   it('a ferramenta cria dois cards no mesmo grupo e repetir não duplica', async () => {
     const cv = await conversation(), args = { product_ids: products, municipio: 'Rio de Janeiro' };
-    const result = JSON.parse(await execute(client, 'test', cv.id, 'pedir_foto', args));
+    const request = () => withOpening('test', () => execute(client, 'test', cv.id, 'pedir_foto', args),
+      new Date('2026-10-23T15:00:00Z'));
+    const result = JSON.parse(await request());
     expect(result).toMatchObject({ status: 'fotos_solicitadas', total_solicitado: 2 });
     const rows = await restricted(queueSql); expect(rows).toHaveLength(2);
     expect(new Set(rows.map(row => row.photo_group_id)).size).toBe(1);
     expect(rows.every(row => row.tire_condition === 'meia_vida')).toBe(true);
-    expect(JSON.parse(await execute(client, 'test', cv.id, 'pedir_foto', args)).solicitacoes.every((row: any) => row.ja_pedida)).toBe(true);
+    expect(JSON.parse(await request()).solicitacoes.every((row: any) => row.ja_pedida)).toBe(true);
     expect(await restricted(queueSql)).toHaveLength(2);
   });
   it('não mistura unidade, cliente homônimo ou ambiente e mantém dados Chatwoot ocultos', async () => {
