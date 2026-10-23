@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { validateProductionEnv } from './env-production-validation.js';
 import { marketingEnvShape } from './env-marketing.js';
 import { aiEnvShape } from './env-ai.js';
+import { dotEnvShape } from './env-dot.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 const optionalNonEmptyStringSchema = z.preprocess(
   (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -43,6 +44,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   ...aiEnvShape,
+  ...dotEnvShape,
   SKIP_EVENT_TYPES: z
     .string()
     .default('')
@@ -281,7 +283,6 @@ const envSchema = z.object({
 }).superRefine(validateProductionEnv);
 
 export type Env = z.infer<typeof envSchema>;
-
 export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const normalizedSource = {
     ...source,
@@ -296,5 +297,4 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
 
   return parsed.data;
 }
-
 export const env = parseEnv();

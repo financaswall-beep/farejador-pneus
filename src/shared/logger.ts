@@ -8,6 +8,14 @@ const logLevel = ['trace', 'debug', 'info', 'warn', 'error'].includes(process.en
 
 export const loggerOptions: LoggerOptions = {
   level: logLevel,
+  serializers: {
+    req(request) {
+      const url = String(request.url ?? '');
+      const oauthUrl=url.startsWith('/admin/dot/') || /^\/admin\/login\?/.test(url);
+      return { method:request.method, url:oauthUrl?url.split('?')[0]:url,
+        hostname:request.hostname,remoteAddress:request.ip };
+    },
+  },
   mixin() {
     const requestId = currentRequestId();
     return {
@@ -32,6 +40,17 @@ export const loggerOptions: LoggerOptions = {
       '*.phone_e164',
       '*.email',
       '*.hmac_secret',
+      '*.access_token',
+      '*.refresh_token',
+      '*.code_verifier',
+      '*.client_secret',
+      '*.request_token',
+      'access_token',
+      'refresh_token',
+      'code_verifier',
+      'client_secret',
+      'request_token',
+      'code',
     ],
     censor: '[REDACTED]',
   },

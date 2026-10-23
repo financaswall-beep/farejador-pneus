@@ -10,6 +10,17 @@
   const workplaceError = document.getElementById('workplace-error');
   const workplaceBack = document.getElementById('workplace-back');
   let workplaceTicket = null;
+  function matrixDestination() {
+    const target = new URLSearchParams(location.search).get('dot_return');
+    if (target && target.length < 6000) {
+      try {
+        const url = new URL(target, location.origin);
+        if (url.origin === location.origin && !url.hash
+          && ['/admin/dot/authorize', '/admin/dot/connections'].includes(url.pathname)) return url.pathname + url.search;
+      } catch { /* Login continua no painel quando o retorno é inválido. */ }
+    }
+    return '/admin/painel';
+  }
 
   function setButtonBusy(button, busy, busyLabel) {
     const label = button.querySelector('.button-label');
@@ -63,7 +74,7 @@
       return;
     }
     sessionStorage.removeItem('farejador_panel_workplace');
-    location.replace('/admin/painel');
+    location.replace(matrixDestination());
   }
 
   function showWorkplaces(payload) {
@@ -167,7 +178,7 @@
       const payload = await json(response);
       if (!response.ok) throw new Error(payload.error || `api_${response.status}`);
       bootstrapForm.reset();
-      location.replace('/admin/painel');
+      location.replace(matrixDestination());
     } catch (failure) {
       error.textContent = message(failure instanceof Error ? failure.message : 'unknown');
       setButtonBusy(button, false, 'Criando conta…');
@@ -177,7 +188,7 @@
   async function start() {
     try {
       const me = await fetch('/admin/api/auth/me', { credentials: 'same-origin' });
-      if (me.ok) { location.replace('/admin/painel'); return; }
+      if (me.ok) { location.replace(matrixDestination()); return; }
       const status = await fetch('/admin/api/auth/status', { credentials: 'same-origin' });
       const payload = await json(status);
       if (!status.ok) throw new Error('status_failed');
