@@ -1,4 +1,6 @@
-import {describe,expect,it} from 'vitest';
+import {describe,expect,it,vi} from 'vitest';
+vi.hoisted(()=>Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',
+  DATABASE_SSL:'false',CHATWOOT_HMAC_SECRET:'unit-test',ADMIN_AUTH_TOKEN:'unit-test'}));
 import {isEmptyGreeting,hasRepeatedEmptyGreetings} from '../../../src/atendente-v2/empty-greeting-limit.js';
 describe('cumprimentos repetidos sem intenção',()=>{
   it.each(['Oi!','Bom dia!','Boa noite!','Opa, tudo bem?','Olá 👋','E aí, beleza?'])('reconhece %s',text=>expect(isEmptyGreeting(text)).toBe(true));

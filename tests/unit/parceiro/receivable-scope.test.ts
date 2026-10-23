@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.hoisted(()=>Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',
+  DATABASE_SSL:'false',CHATWOOT_HMAC_SECRET:'unit-test',ADMIN_AUTH_TOKEN:'unit-test'}));
 import type { PartnerContext } from '../../../src/parceiro/auth.js';
 
 const mocks = vi.hoisted(() => ({
