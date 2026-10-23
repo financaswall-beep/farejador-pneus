@@ -165,7 +165,7 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
     expect(logistics.rotas_recentes.filter((row) => tripIdsSet.has(row.id))).toHaveLength(12);
   });
 
-  it('fecha com failed reportado, despendura sem cancelar e preserva trilha imutavel', async () => {
+  it('mostra failed na rota, fecha sem cancelar e preserva trilha imutavel', async () => {
     const orderId = await seedDelivery('failed');
     const tripId = await createTrip('failed', orderId);
     await db.pool.query(
@@ -173,6 +173,17 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
           SET delivery_status='failed',delivery_failure_reason='Cliente ausente'
         WHERE id=$1`, [orderId],
     );
+
+    const courier = await db.pool.query<{ courier_collaborator_id: string; courier_name: string }>(
+      `SELECT courier_collaborator_id,courier_name FROM commerce.matriz_delivery_trips WHERE id=$1`, [tripId],
+    );
+    const route = await getCourierRoute({
+      personId: 'fixture-person', collaboratorId: courier.rows[0]!.courier_collaborator_id,
+      displayName: courier.rows[0]!.courier_name,
+    }, 'test', db.pool);
+    const reported = route.rota_aberta?.entregas.find(row => row.order_id === orderId);
+    expect(reported).toMatchObject({ order_id: orderId, delivery_status: 'failed' });
+    expect(reported?.order_number).toMatch(/^PED-/);
 
     await closeTrip({
       trip_id: tripId, environment: 'test', actor_label: 'owner-stage10',

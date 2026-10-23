@@ -8,6 +8,7 @@ import type { CaixaAuth } from './queries.js';
 
 export interface CaixaDeliveryRow {
   order_id: string;
+  order_number: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
@@ -35,6 +36,7 @@ function mapDelivery(
 ): CaixaDeliveryRow {
   return {
     order_id: row.order_id,
+    order_number: row.order_number || null,
     customer_name: row.customer_name,
     customer_phone: row.customer_phone,
     delivery_address: row.delivery_address,
@@ -77,6 +79,7 @@ export async function getCaixaDeliveries(auth: CaixaAuth) {
       total: routeRows.length,
       completed: routeRows.filter((row) => row.delivery_status === 'delivered').length,
       unresolved,
+      reported: routeRows.filter((row) => row.delivery_status === 'failed').length,
     } : null,
   };
 }

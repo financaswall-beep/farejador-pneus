@@ -44,7 +44,7 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261002-audit1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261023-delivery-flow1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261005-partner-receipt1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
@@ -56,8 +56,11 @@
   <script defer src="/operacao/caixa-purchase-prices.js?v=20260918-prices1"></script>
   <script defer src="/operacao/caixa-purchase-prices-detail.js?v=20260918-prices1"></script>
   <link rel="stylesheet" href="/operacao/caixa-purchase-prices.css?v=20260918-prices1" />
-  <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-deliveries-flow.css?v=20261023-delivery-flow1" />
+  <script defer src="/operacao/caixa-deliveries-flow-view.js?v=20261023-delivery-flow1"></script>
+  <script defer src="/operacao/caixa-deliveries-flow-actions.js?v=20261023-delivery-flow1"></script>
+  <script defer src="/operacao/caixa-deliveries-matrix.js?v=20261023-delivery-flow1"></script>
+  <script defer src="/operacao/caixa-deliveries.js?v=20261023-delivery-flow1"></script>
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
@@ -559,21 +562,49 @@
         </div>
 
         <div id="deliveries-panel" class="app-panel deliveries-panel hidden">
+          <section id="matrix-delivery-flow" class="mdf hidden" aria-label="Entregas da Matriz">
+            <header class="mdf-heading"><div><small id="mdf-step">Etapa 1 de 4</small><h2 id="mdf-title" tabindex="-1">O que vai sair?</h2></div><button type="button" class="mdf-refresh" data-mdf-action="refresh" aria-label="Atualizar entregas">↻</button></header>
+            <ol class="mdf-progress" aria-label="Etapas da entrega"><li data-mdf-step="prepare">Preparar</li><li data-mdf-step="route">Minha rota</li><li data-mdf-step="payment">Receber</li><li data-mdf-step="close">Fechar rota</li></ol>
+            <button id="mdf-back" type="button" class="mdf-back" data-mdf-action="back" hidden>← Voltar</button>
+            <p id="mdf-error" class="mdf-error" role="alert" hidden></p><p id="mdf-notice" class="mdf-success" role="status" hidden></p>
+            <nav class="mdf-tabs" aria-label="Ver entregas"><button type="button" data-mdf-action="prepare">Preparar saída <b id="mdf-queue-count">0</b></button><button id="mdf-route-tab" type="button" data-mdf-action="route">Minha rota</button></nav>
+            <section data-mdf-view="prepare">
+              <p class="mdf-intro">Selecione as entregas desta saída.</p>
+              <label class="mdf-search"><span class="sr-only">Buscar cliente ou pedido</span><input id="mdf-search" type="search" maxlength="80" placeholder="Buscar cliente ou pedido" autocomplete="off" /></label>
+              <div id="mdf-queue" class="mdf-cards"></div><p id="mdf-queue-empty" class="mdf-empty">Nenhuma entrega para sair. Atualize para conferir novos pedidos.</p>
+              <section id="matrix-route-start" class="mdf-footer">
+                <strong id="matrix-route-selected">Nenhuma entrega selecionada</strong>
+                <label class="mdf-field">KM inicial <small>(opcional)</small><input id="matrix-route-km-start" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45210" /></label>
+                <button id="matrix-route-open" type="button" class="mdf-button mdf-primary" disabled>Montar minha rota</button><p id="mdf-open-hint" class="mdf-hint">Confira os pedidos antes de sair.</p>
+              </section>
+            </section>
+            <section data-mdf-view="route" hidden>
+              <section id="matrix-route-summary" class="mdf-route-summary"><strong id="matrix-route-number">Minha rota</strong><span id="matrix-route-progress-label">Nenhuma rota aberta</span></section>
+              <p id="mdf-route-empty" class="mdf-empty">Sua rota está vazia. Selecione as entregas em Preparar saída.</p><div id="mdf-route-list" class="mdf-cards"></div>
+              <div class="mdf-footer"><button id="mdf-go-close" type="button" class="mdf-button mdf-primary" data-mdf-action="close">Finalizar minha rota</button><p id="mdf-close-hint" class="mdf-hint"></p></div>
+            </section>
+            <section data-mdf-view="payment" hidden>
+              <p id="mdf-payment-order" class="mdf-intro"></p><div class="mdf-payment-value"><span>Valor a receber</span><strong id="mdf-payment-total">—</strong></div>
+              <fieldset class="mdf-methods"><legend>Como o cliente pagou?</legend><label><input type="radio" name="mdf-payment" value="pix" /><span>Pix</span></label><label><input type="radio" name="mdf-payment" value="cartao" /><span>Cartão</span></label><label><input type="radio" name="mdf-payment" value="dinheiro" /><span>Dinheiro</span></label></fieldset>
+              <label class="mdf-confirm-check"><input id="mdf-received" type="checkbox" />Conferi o recebimento</label>
+              <button id="mdf-payment-confirm" type="button" class="mdf-button mdf-primary" disabled>Confirmar entrega e pagamento</button><p class="mdf-hint">Confira o pagamento antes de confirmar.</p><button type="button" class="mdf-back" data-mdf-action="route">Voltar sem concluir</button>
+            </section>
+            <section data-mdf-view="close" hidden>
+              <div class="mdf-success"><strong id="mdf-close-summary">Entregas concluídas</strong><span id="mdf-close-reported">Nenhuma entrega pendente.</span></div>
+              <section id="matrix-route-close" class="mdf-close-fields">
+                <label class="mdf-field">KM final<input id="matrix-route-km-end" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45245" /></label>
+                <fieldset><legend>Combustível e comprovante</legend><label class="mdf-field">Valor gasto<input id="matrix-route-fuel" type="number" min="0" max="99999" step="0.01" inputmode="decimal" placeholder="R$ 0,00" /></label><label class="mdf-receipt">Fotografar comprovante<input id="matrix-route-receipt" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label><p id="matrix-route-receipt-status" role="status"></p></fieldset>
+                <button id="matrix-route-close-button" type="button" class="mdf-button mdf-primary">Encerrar rota</button><p class="mdf-hint">Revise as informações antes de encerrar.</p>
+              </section>
+            </section>
+          </section>
+          <div class="legacy-delivery-ui">
           <header class="deliveries-title">
             <div><h3>Pedidos de hoje</h3><p>Pendências anteriores continuam visíveis</p></div>
             <button id="deliveries-refresh" type="button" aria-label="Atualizar entregas">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 6.5L4 9m16 6-2 2.5A7 7 0 0 1 5.5 15"/></svg>
             </button>
           </header>
-          <section id="matrix-route-summary" class="matrix-route-summary hidden" aria-label="Minha rota atual">
-            <div>
-              <small>MINHA ROTA</small>
-              <strong id="matrix-route-number">Rota em andamento</strong>
-              <span id="matrix-route-started">Iniciada agora</span>
-            </div>
-            <p><strong id="matrix-route-progress-label">0/0</strong><small>entregues</small></p>
-            <span class="matrix-route-progress"><i id="matrix-route-progress-bar"></i></span>
-          </section>
           <nav class="delivery-status-tabs" aria-label="Filtrar entregas por status">
             <button type="button" data-delivery-filter="pending" aria-pressed="false"><span>A preparar</span><strong id="delivery-count-pending">0</strong></button>
             <button class="active" type="button" data-delivery-filter="dispatched" aria-pressed="true"><span>Em rota</span><strong id="delivery-count-dispatched">0</strong></button>
@@ -588,11 +619,6 @@
               <input id="delivery-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar cliente ou pedido" />
             </label>
           </div>
-          <section id="matrix-route-start" class="matrix-route-operation hidden">
-            <div><strong>Monte sua rota</strong><span id="matrix-route-selected">Nenhuma entrega selecionada</span></div>
-            <label>Km inicial (opcional)<input id="matrix-route-km-start" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45210" /></label>
-            <button id="matrix-route-open" type="button" disabled>Começar rota</button>
-          </section>
           <div id="deliveries-loading" class="delivery-message" role="status">Carregando entregas…</div>
           <div id="deliveries-error" class="delivery-message delivery-message--error hidden" role="alert">
             <strong>Não foi possível carregar as entregas.</strong><button id="deliveries-retry" type="button">Tentar novamente</button>
@@ -601,26 +627,13 @@
             <strong>Nenhuma entrega neste status</strong><span>Quando houver pedidos, eles aparecerão aqui.</span>
           </div>
           <div id="deliveries-list" class="deliveries-list hidden" aria-live="polite"></div>
-          <section id="matrix-route-close" class="matrix-route-operation matrix-route-close hidden">
-            <div><strong>Finalizar rota</strong><span>Finalize ou informe todas as paradas antes de encerrar.</span></div>
-            <div class="matrix-route-close-fields">
-              <label>Km final<input id="matrix-route-km-end" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45245" /></label>
-              <label>Combustível<input id="matrix-route-fuel" type="number" min="0" max="99999" step="0.01" inputmode="decimal" placeholder="R$ 0,00" /></label>
-            </div>
-            <label class="matrix-route-receipt">Fotografar comprovante<input id="matrix-route-receipt" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label>
-            <span id="matrix-route-receipt-status"></span>
-            <p id="matrix-route-error" role="alert"></p>
-            <button id="matrix-route-close-button" type="button">Encerrar minha rota</button>
-          </section>
-          <div id="delivery-failure-modal" class="delivery-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="delivery-failure-title">
-            <button class="delivery-dialog-backdrop" type="button" data-close-delivery-failure aria-label="Fechar"></button>
-            <article>
-              <header><div><small>REGISTRO OPERACIONAL</small><h3 id="delivery-failure-title">Não consegui entregar</h3></div><button type="button" data-close-delivery-failure aria-label="Fechar">×</button></header>
-              <label>Conte o motivo<textarea id="delivery-failure-reason" maxlength="500" rows="4" placeholder="Ex.: cliente ausente"></textarea></label>
-              <p id="delivery-failure-error" role="alert"></p>
-              <button id="delivery-failure-submit" type="button">Registrar ocorrência</button>
-            </article>
           </div>
+          <dialog id="delivery-failure-modal" class="delivery-dialog mdf-dialog hidden" aria-labelledby="delivery-failure-title">
+            <article><header><div><small>REGISTRO OPERACIONAL</small><h3 id="delivery-failure-title">Não consegui entregar</h3></div><button type="button" data-close-delivery-failure aria-label="Fechar">×</button></header>
+              <p id="mdf-failure-order"></p><label>O que aconteceu?<textarea id="delivery-failure-reason" maxlength="500" rows="3" placeholder="Ex.: cliente ausente"></textarea></label><p id="delivery-failure-error" role="alert"></p>
+              <div class="mdf-dialog-actions"><button type="button" class="mdf-button mdf-secondary" data-close-delivery-failure>Voltar</button><button id="delivery-failure-submit" type="button" class="mdf-button mdf-primary">Registrar problema</button></div><p class="mdf-hint">O escritório avalia a próxima ação.</p>
+            </article>
+          </dialog>
         </div>
 
         <div id="operation-catalog-panel" class="app-panel operation-catalog-panel hidden" aria-labelledby="operation-catalog-title">

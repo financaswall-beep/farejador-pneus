@@ -20,6 +20,7 @@
     const stockDetail = tab === 'stock-detail';
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
+    if (!deliveries && Caixa.matrixDeliveries) Caixa.matrixDeliveries.leave();
     const finance = tab === 'finance';
     const financeEntries = ['finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-expense', 'finance-reports'].includes(tab);
     const matrixFinance = !Caixa.isPartner() && (finance || financeEntries || tab === 'finance-commissions');
