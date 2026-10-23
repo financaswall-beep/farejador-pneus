@@ -62,8 +62,15 @@ describe('seguranca de inicializacao do painel', () => {
 
     expect(html).not.toContain('data-lucide="package-clock"');
     expect(missingIcons).toEqual([]);
-    expect(html).toContain('<span x-show="botMudas.length > 0" x-cloak');
-    expect(html).toContain('<span x-show="botEscalados.length > 0" x-cloak');
+    const statusIcons = [...html.matchAll(/<i x-show="([^"]+)" data-lucide="(shield-check|bell-ring)"/g)];
+    expect(statusIcons).toHaveLength(2);
+    for (const [waiting, escalated] of [[0, 0], [1, 0], [0, 1]]) {
+      const state = { botMudas: Array(waiting), botEscalados: Array(escalated) };
+      const visible = statusIcons.filter(match => vm.runInNewContext(match[1], state)).map(match => match[2]);
+      expect(visible).toEqual([waiting + escalated > 0 ? 'bell-ring' : 'shield-check']);
+    }
+    expect(html).toContain('<button x-show="botMudas.length"');
+    expect(html).toContain('<button x-show="botEscalados.length"');
   });
 
   it('mantem os graficos ocultos de compras seguros sem dados carregados', () => {
@@ -116,7 +123,9 @@ describe('seguranca de inicializacao do painel', () => {
 
     expect(html).toContain('aria-label="Buscar no painel"');
     expect(html).toContain('aria-label="Abrir notificações"');
-    expect(html).toContain('aria-label="Buscar cliente ou conversa"');
+    const chatView = readFileSync('painel/public/caixa-chat-view.js', 'utf8');
+    expect(html).toContain('id="bot-chat-root"');
+    expect(chatView).toMatch(/<input[^>]+id="chat-search"[^>]+aria-label="Buscar cliente ou medida"/);
   });
 
   it('protege o detalhe financeiro de Marketing antes do carregamento', () => {
