@@ -140,6 +140,7 @@ export async function revokeEntregadorSession(
 
 export interface EntregadorDeliveryCard {
   order_id: string;
+  order_number?: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
@@ -165,7 +166,7 @@ export interface EntregadorRota {
 
 // SELECT do card — só campo operacional. NADA de custo/lucro/despesa/frete.
 const CARD_SELECT = `
-  SELECT o.id AS order_id, COALESCE(c.name,cu.name) AS customer_name,
+  SELECT o.id AS order_id, o.order_number, COALESCE(c.name,cu.name) AS customer_name,
          COALESCE(o.customer_phone,c.phone_e164,cu.phone_e164) AS customer_phone,
          o.delivery_address, o.total_amount::text AS cobrar, o.payment_method, o.delivery_status,
          o.scheduled_delivery_date::text AS scheduled_raw,
@@ -225,7 +226,7 @@ export async function getEntregadorRota(
     openTrip
       ? dbPool.query<EntregadorDeliveryCard>(
           `${CARD_SELECT} AND o.trip_id = $2 AND o.status <> 'cancelled'
-             AND o.delivery_status IN ('pending','dispatched','delivered')
+             AND o.delivery_status IN ('pending','dispatched','delivered','failed')
            ORDER BY o.delivery_status ASC, o.created_at ASC`,
           [environment, openTrip.id])
       : Promise.resolve({ rows: [] as EntregadorDeliveryCard[] }),

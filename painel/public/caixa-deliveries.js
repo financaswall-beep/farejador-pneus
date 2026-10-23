@@ -198,6 +198,7 @@
   }
 
   function render() {
+    if (!Caixa.isPartner() && Caixa.matrixDeliveries) { Caixa.matrixDeliveries.render(); return; }
     const query = normalize(state.query);
     const rows = state.rows.filter(function (row) {
       const status = !Caixa.isPartner() && Caixa.matrixDeliveries
@@ -234,20 +235,26 @@
   async function loadDeliveries() {
     if (!Caixa.canModule('entregas')) return;
     if (state.request) state.request.abort(); state.request = new AbortController();
+    const request = state.request; const session = Caixa.sessionFingerprint();
+    if (Caixa.isPartner()) Caixa.matrixDeliveries?.reset(); else Caixa.matrixDeliveries?.loading();
     els.loading.classList.remove('hidden'); els.error.classList.add('hidden'); els.empty.classList.add('hidden'); els.list.classList.add('hidden');
     try {
       const feedPath = Caixa.operationPath('operacao/entregas', '/api/caixa/entregas');
-      const response = await Caixa.authenticatedFetch(feedPath, { signal: state.request.signal });
-      const payload = await Caixa.json(response); if (!response.ok) throw new Error(payload.error || 'request_failed');
+      const response = await Caixa.authenticatedFetch(feedPath, { signal: request.signal });
+      const payload = await Caixa.json(response);
+      if (session !== Caixa.sessionFingerprint() || state.request !== request) return;
+      if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.rows = Array.isArray(payload.rows) ? payload.rows : [];
       els.pending.textContent = payload.summary?.preparing ?? 0; els.dispatched.textContent = payload.summary?.dispatched ?? 0; els.delivered.textContent = payload.summary?.delivered ?? 0;
       if (!Caixa.isPartner() && Caixa.matrixDeliveries) Caixa.matrixDeliveries.sync(payload, loadDeliveries);
       if (state.filter === 'dispatched' && !payload.summary?.dispatched && payload.summary?.preparing) selectFilter('pending'); else render();
     } catch (failure) {
+      if (session !== Caixa.sessionFingerprint() || state.request !== request) return;
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
+      if (!Caixa.isPartner()) Caixa.matrixDeliveries?.loadFailed();
       els.error.classList.remove('hidden');
-    } finally { els.loading.classList.add('hidden'); state.request = null; }
+    } finally { if (state.request === request) { els.loading.classList.add('hidden'); state.request = null; } }
   }
 
   document.querySelectorAll('[data-delivery-filter]').forEach(function (button) { button.addEventListener('click', function () { selectFilter(button.dataset.deliveryFilter); }); });
