@@ -10,6 +10,7 @@ import { dotReadError } from './read-errors.js';
 import { env } from '../../shared/config/env.js';
 import { monitorInstructions } from './events/model.js';
 import { monitorStatus,monitorTool } from './events/status.js';
+import { dotEventsAvailable } from './events/availability.js';
 
 const periodProperties={periodo:{type:'string',enum:['hoje','7dias','30dias','mes'],default:'hoje'},
   mes:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'}};
@@ -50,7 +51,7 @@ export function dotInstructions() {
       +'O proprietário autorizou dados pessoais, conversas, documentos, folha individual e financeiro dos parceiros. '
       +'As consultas resumidas mantêm projeções compactas: use listar_fontes_matriz e consultar_registros_matriz para detalhes completos, consultar_relatorio_painel para relatórios e consultar_anexo_matriz para arquivos. '
       +'Não envia mensagens a clientes, não altera registros comerciais nem executa pagamentos. '
-      +(env.DOT_EVENTS_ENABLED?monitorInstructions:'Acompanhamento automático desativado.');
+      +(dotEventsAvailable()?monitorInstructions:'Acompanhamento automático indisponível ou desativado.');
 }
 export function listedDotTools():Tool[] {
   const monitoring={...monitorTool,securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],
