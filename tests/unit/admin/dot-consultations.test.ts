@@ -86,4 +86,14 @@ describe('consultas do Dot',()=>{
     mocks.financial.mockRejectedValue(new Error('database unavailable'));
     await expect(runDotConsultation('consultar_financeiro_matriz',{})).rejects.toThrow('database unavailable');
   });
+  it('lista saldos e vencimentos por código e omite pagamento individual de folha',async()=>{
+    mocks.financial.mockResolvedValue({source:'central_ledger',integration_status:'green',truth:{competencia:{},caixa:{},
+      conciliacao:{status:'ok',custo_pendente:{itens:0},qualidade:{registros_teste_suspeitos:0}}}});
+    mocks.open.mockResolvedValue({a_receber:{itens:[]},a_pagar:{itens:[
+      {id:'expense-code',tipo:'despesa',valor:'50.00',due_date:'2026-10-25',overdue:false,nome:'PII-SENTINEL',phone:'PII-SENTINEL'},
+      {id:'salary-code',tipo:'folha',valor:'4321.00',due_date:'2026-10-25',overdue:false,nome:'PII-SENTINEL'}]}});
+    const result=await runDotConsultation('consultar_financeiro_matriz',{visao:'a_pagar'});
+    expect(result.rows).toEqual([{id:'expense-code',tipo:'despesa',valor:'50.00',due_date:'2026-10-25',overdue:false}]);
+    expect(JSON.stringify(result)).not.toMatch(/PII-SENTINEL|salary-code|4321/);
+  });
 });

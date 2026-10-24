@@ -8,8 +8,12 @@ export function dotPage(requestToken?:string) {
     button.secondary{background:white;color:#006044}button:disabled{opacity:.5;cursor:wait}.connection{padding:16px 0;border-top:1px solid #d8e4df}.error{color:#a3132a}
     @media(max-width:640px){main{margin:16px;padding:20px}}a{color:#006044}</style></head><body>
     <header>2W &nbsp; Matriz</header><main>${requestToken?`<h1>Conectar ao Dot</h1><p>Autorizar <strong>ChatGPT / Work</strong> a consultar os dados da sua Matriz:</p>
-    <ul><li>Vendas realizadas e pendências</li><li>Estoque e reposição</li><li>Entregas e notas aguardando conferência</li><li>Resumo financeiro e contas pendentes</li></ul>
-    <p><strong>Acesso somente para consulta.</strong> As respostas não incluem nomes, telefones, endereços ou conversas dos clientes.</p>
+    <ul><li>Visão geral, varejo, atacado e relatórios</li><li>Estoque, lotes, catálogo, preços, compras, fornecedores e reposição</li>
+    <li>Financeiro, caixa, despesas e situação dos comprovantes</li><li>Entregas, rotas e retiradas</li>
+    <li>Relacionamento comercial da Rede e candidaturas</li><li>Indicadores de clientes, atendimento, bot e marketing</li>
+    <li>Desempenho e totais da equipe, notificações e saúde do sistema</li></ul>
+    <p><strong>Acesso somente para consulta.</strong> As respostas não incluem contatos, endereços, conversas, documentos ou fotos dos clientes,
+    salários individuais, senhas ou financeiro privado das lojas parceiras. Cadastros pessoais usam códigos e a folha fica agregada.</p>
     <p>A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
     <button id="allow" type="button">Autorizar consultas</button><button id="deny" class="secondary" type="button">Agora não</button>`:
     `<h1>Conexões do Dot</h1><p>Acesso de consulta autorizado para o ChatGPT / Work.</p><div id="connections"></div><a href="/admin/painel">Voltar à Matriz</a>`}

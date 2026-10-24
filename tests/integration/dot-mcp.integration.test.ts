@@ -161,10 +161,10 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
   expect(stored.rows).toHaveLength(1);
 });
 
-it('expõe exatamente cinco consultas; tentativas de escrita e argumentos extras são recusados', async () => {
+it('expõe somente as 24 consultas permitidas; tentativas de escrita e argumentos extras são recusados', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(5);
+  expect(listing.result.tools).toHaveLength(24);
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(true);
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
@@ -288,7 +288,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(5);
+    expect((await client.listTools()).tools).toHaveLength(24);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
