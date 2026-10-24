@@ -9,7 +9,8 @@ export async function readDotFinanceDetails(db:Pool,month:string,view:'resumo'|'
   if(view==='resumo'||!finance.available)return finance;
   const open=await getMatrizLedgerOpenItems(env.FAREJADOR_ENV,db);
   const source=view==='a_receber'?open.a_receber.itens:open.a_pagar.itens;
-  const rows=source.filter(row=>row.tipo!=='folha').map(row=>project(row,['id','tipo','valor','due_date','overdue','count']))
+  const rows=source.filter(row=>row.tipo!=='folha'&&row.categoria!=='funcionario')
+    .map(row=>project(row,['id','tipo','valor','due_date','overdue','count']))
     .sort((a,b)=>String(a.due_date??'9999').localeCompare(String(b.due_date??'9999'))||String(a.id).localeCompare(String(b.id)));
   return {available:true,month,view,position_as_of:finance.position_as_of,source:finance.source,
     monetary_unit:'BRL',reconciliation:finance.reconciliation,...pageRows(rows,page),
