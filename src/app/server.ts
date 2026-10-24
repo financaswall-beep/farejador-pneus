@@ -29,6 +29,7 @@ import { startOrganicMetricCollector } from '../marketing/organic/metric-collect
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
 import { assertRequiredSchema } from '../persistence/required-schema.js';
 import { startConversationAutoResolveWorker } from '../atendente-v2/auto-resolve.js';
+import { assertDotEventsSchema,startDotEventsWorker } from '../admin/dot/events/worker.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -57,6 +58,7 @@ let stopPublisher: (() => void) | null = null;
 let stopOrganicMetrics: (() => void) | null = null;
 let stopMonthlyContinuity: (() => void) | null = null;
 let stopConversationAutoResolve: (() => void) | null = null;
+let stopDotEvents: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -76,9 +78,11 @@ async function start(): Promise<void> {
   await assertRequiredSchema(pool);
   await assertStockConfirmationSchema(pool);
   await assertTirePhotoSchema(pool);
+  await assertDotEventsSchema(pool);
   await registerRoutes(fastify);
 
   stopWorker = startWorker();
+  stopDotEvents = startDotEventsWorker();
   stopAgentV2 = startAgentV2Worker();
   stopBotOutbox = startBotOutboxWorker();
   stopConversationAutoResolve = startConversationAutoResolveWorker();
@@ -126,6 +130,7 @@ async function start(): Promise<void> {
 async function shutdown(signal: string): Promise<void> {
   fastify.log.info({ signal }, 'shutting down gracefully');
   stopWorker?.();
+  stopDotEvents?.();
   stopAgentV2?.();
   stopBotOutbox?.();
   stopConversationAutoResolve?.();

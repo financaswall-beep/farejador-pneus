@@ -7,6 +7,7 @@ import { registerDotOAuth } from './route-oauth.js';
 import { validateDotAccess } from './token-store.js';
 import { createDotMcpServer } from './mcp-server.js';
 import { acquireDotRequest } from './request-limit.js';
+import { handleModernDot } from './protocol-v2.js';
 
 export async function registerDotRoutes(fastify:FastifyInstance) {
   const config=dotConfig();
@@ -32,6 +33,8 @@ export async function registerDotRoutes(fastify:FastifyInstance) {
       if(rateLimitHit(`dot-mcp-grant:${identity.grant_id}`,60,60_000))return reply.code(429).header('Retry-After','60').send({error:'too_many_requests'});
       const release=acquireDotRequest(identity.grant_id);
       if(!release)return reply.code(429).header('Retry-After','2').send({error:'queries_busy'});
+      try { if(await handleModernDot(request,reply,identity)){release();return reply;} }
+      catch(error){release();throw error;}
       // A fresh server/transport per HTTP request avoids cross-user result/session reuse.
       const server=createDotMcpServer(identity);
       const transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true});
