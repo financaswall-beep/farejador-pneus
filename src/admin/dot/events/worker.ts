@@ -6,10 +6,11 @@ import { collectEvents } from './queue.js';
 import { deliverEvents } from './delivery.js';
 import { seal } from './crypto.js';
 import { sendWebhook,type WebhookSender } from './https.js';
+import { dotEventsAvailable,dotEventsState,setDotEventsAvailability,type DotEventsFailure } from './availability.js';
 
 /** Transaction-scoped lock works through Supabase transaction pooling as well as direct connections. */
 export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook) {
-  if(!env.DOT_EVENTS_ENABLED||!env.DOT_MCP_ENABLED)return;
+  if(!dotEventsAvailable()||!env.DOT_MCP_ENABLED)return;
   const lock=await db.connect();let held=false;
   try {
     await lock.query('BEGIN');
@@ -36,8 +37,27 @@ export async function assertDotEventsSchema(db:Pool=pool) {
   await db.query('SELECT id FROM ops.dot_event_deliveries LIMIT 0');
   await db.query('SELECT revision FROM ops.dot_monitor_targets LIMIT 0');
 }
+/** Fail closed for the optional monitor, without taking the commercial application offline. */
+export async function initializeDotEvents(db:Pool=pool) {
+  if(!env.DOT_EVENTS_ENABLED)return dotEventsState();
+  try {
+    await assertDotEventsSchema(db);
+    setDotEventsAvailability(null);
+  }catch(error) {
+    const message=error instanceof Error?error.message:'';
+    const code=(error as {code?:string}|null)?.code;
+    const reason:DotEventsFailure=message==='dot_events_key_missing'?'invalid_encryption_key'
+      :message==='DOT_EVENTS_ENABLED requires DOT_MCP_ENABLED'?'mcp_disabled'
+      :message==='DOT_EVENTS_ENABLED requires DATABASE_POOL_MAX >= 2'?'pool_too_small'
+      :code==='42P01'||code==='42703'||code==='42501'?'schema_unavailable':'initialization_failed';
+    setDotEventsAvailability(reason);
+    logger.error({operational_alert:'dot_events_disabled',reason},
+      'Acompanhamento do Dot indisponível. Corrija a configuração e reinicie. O restante do Farejador continua funcionando.');
+  }
+  return dotEventsState();
+}
 export function startDotEventsWorker() {
-  if(!env.DOT_EVENTS_ENABLED)return ()=>{};
+  if(!dotEventsAvailable())return ()=>{};
   let stopped=false,timer:NodeJS.Timeout;
   async function loop() {
     try { await runEventCycle(); }catch { logger.warn({code:'dot_event_cycle_failed'},'dot events unavailable'); }

@@ -54,7 +54,10 @@ Variáveis novas, já encaminhadas pelo Compose:
 Horas iguais desligam o silêncio. Esses valores são pontos de partida ajustáveis, não foram apresentados como regra comercial existente.
 A chave deve ser gerada no ambiente seguro e guardada nos secrets do Coolify, nunca no Git, logs ou conversa.
 Preservar a chave entre deploys. Trocar a chave exige desligar eventos e refazer assinaturas, ou uma migração de recifragem.
-O boot com eventos ativos valida chave e tabelas; configuração incompleta falha explicitamente.
+O boot com eventos solicitados valida chave e tabelas. Configuração incompleta bloqueia apenas os eventos:
+o servidor continua disponível, registra `dot_events_disabled` com motivo seguro e não anuncia a capacidade de eventos.
+`consultar_acompanhamento_matriz` permanece disponível quando a flag foi solicitada e informa a indisponibilidade,
+sem expor segredos nem inventar contadores. Corrigir as variáveis exige redeploy/reinício para uma nova validação.
 `DATABASE_POOL_MAX` deve ser pelo menos 2 (padrão do projeto: 10), pois uma conexão mantém o bloqueio do worker.
 
 ## Ativação e prova real

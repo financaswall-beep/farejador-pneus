@@ -6,6 +6,7 @@ import { signedHeaders,unseal } from './crypto.js';
 import { readSnapshot } from './snapshots.js';
 import { matches,type TargetKind } from './model.js';
 import { quietUntil,retryDelay,retryable } from './policy.js';
+import { dotEventsAvailable } from './availability.js';
 
 interface Delivery {id:string;subscription_id:string;activation_id:string;kind:TargetKind;entity_id:string;fingerprint:string;
   payload:{data:Record<string,unknown>};attempts:number;created_at:Date}
@@ -13,7 +14,7 @@ export async function deliverEvents(db:Pool,send:WebhookSender=sendWebhook,now=n
   const rows=await db.query<Delivery>(`SELECT * FROM ops.dot_event_deliveries
     WHERE environment=$1 AND status='pending' AND not_before<=$2 ORDER BY not_before,id LIMIT 10`,[env.FAREJADOR_ENV,now]);
   for(const item of rows.rows) {
-    if(!env.DOT_EVENTS_ENABLED)return;
+    if(!dotEventsAvailable())return;
     await checkLock();
     let sub=(await db.query<Subscription>(activeSubscriptionsSql+' AND s.id=$4 AND s.activation_id=$5',
       [...subscriptionParams(),item.subscription_id,item.activation_id])).rows[0];

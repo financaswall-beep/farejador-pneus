@@ -6,6 +6,7 @@ import type { DotIdentity } from './token-store.js';
 import { dotInstructions,invokeDotTool,listedDotTools } from './mcp-server.js';
 import { eventDefinitions } from './events/model.js';
 import { subscribe,unsubscribe } from './events/subscriptions.js';
+import { dotEventsAvailable } from './events/availability.js';
 
 const VERSION='2026-07-28';
 const requestSchema=z.object({jsonrpc:z.literal('2.0'),id:z.union([z.string(),z.number().int().safe()]),
@@ -42,18 +43,18 @@ export async function handleModernDot(request:FastifyRequest,reply:FastifyReply,
   try {
     if(method==='server/discover') {
       z.object({}).strict().parse(args);
-      result={supportedVersions:[VERSION],capabilities:{tools:{},...(env.DOT_EVENTS_ENABLED?{events:{}}:{})},
+      result={supportedVersions:[VERSION],capabilities:{tools:{},...(dotEventsAvailable()?{events:{}}:{})},
         instructions:dotInstructions(),ttlMs:0,cacheScope:'private',
         _meta:{'io.modelcontextprotocol/serverInfo':{name:'Farejador — Matriz',version:'1.3.0'}}};
     }else if(method==='tools/list'||method==='events/list') {
       const list=emptyParams.parse(args);
       if(list.cursor)throw new Error('invalid_cursor');
-      if(method==='events/list'&&!env.DOT_EVENTS_ENABLED)return error(404,-32601,'Eventos desativados',id);
+      if(method==='events/list'&&!dotEventsAvailable())return error(404,-32601,'Eventos indisponíveis',id);
       result={...(method==='tools/list'?{tools:listedDotTools()}:{events:eventDefinitions}),ttlMs:0,cacheScope:'private'};
     }else if(method==='tools/call') {
       const tool=z.object({name:z.string(),arguments:z.record(z.unknown()).optional()}).strict().parse(args);
       result=await invokeDotTool(identity,tool.name,tool.arguments);
-    }else if(method==='events/subscribe'&&env.DOT_EVENTS_ENABLED)result=await subscribe(identity,args);
+    }else if(method==='events/subscribe'&&dotEventsAvailable())result=await subscribe(identity,args);
     else if(method==='events/unsubscribe'&&env.DOT_EVENTS_ENABLED)result=await unsubscribe(identity,args);
     else if(method==='ping'){z.object({}).strict().parse(args);result={};}
     else return error(404,-32601,'Método não disponível',id);

@@ -29,7 +29,7 @@ import { startOrganicMetricCollector } from '../marketing/organic/metric-collect
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
 import { assertRequiredSchema } from '../persistence/required-schema.js';
 import { startConversationAutoResolveWorker } from '../atendente-v2/auto-resolve.js';
-import { assertDotEventsSchema,startDotEventsWorker } from '../admin/dot/events/worker.js';
+import { initializeDotEvents,startDotEventsWorker } from '../admin/dot/events/worker.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -78,7 +78,7 @@ async function start(): Promise<void> {
   await assertRequiredSchema(pool);
   await assertStockConfirmationSchema(pool);
   await assertTirePhotoSchema(pool);
-  await assertDotEventsSchema(pool);
+  await initializeDotEvents(pool);
   await registerRoutes(fastify);
 
   stopWorker = startWorker();

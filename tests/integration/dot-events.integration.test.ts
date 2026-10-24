@@ -36,6 +36,7 @@ beforeAll(async()=>{
   subscriptions=await import('../../src/admin/dot/events/subscriptions.js');
   queue=await import('../../src/admin/dot/events/queue.js');delivery=await import('../../src/admin/dot/events/delivery.js');
   snapshots=await import('../../src/admin/dot/events/snapshots.js');
+  await(await import('../../src/admin/dot/events/worker.js')).initializeDotEvents(db.pool);
   app=Fastify();await(await import('../../src/admin/dot/route.js')).registerDotRoutes(app);await app.ready();
 },240000);
 beforeEach(async()=>{
@@ -288,4 +289,32 @@ it('flag desligada mantém consultas e não anuncia eventos',async()=>{
     expect((await rpc('tools/list')).json().result.tools).toHaveLength(30);
     expect((await rpc('events/list')).statusCode).toBe(404);
   }finally{config.DOT_EVENTS_ENABLED=previous;}
+});
+
+it('chave inválida preserva HTTP e consultas, mas bloqueia descoberta, assinatura e envio de eventos',async()=>{
+  const config=(await import('../../src/shared/config/env.js')).env;
+  const worker=await import('../../src/admin/dot/events/worker.js');
+  const network=await import('../../src/admin/dot/events/https.js');
+  const spy=vi.spyOn(network,'sendWebhook').mockImplementation(echo);
+  const valid=config.DOT_EVENTS_ENCRYPTION_KEY,fresh=Fastify();
+  try {
+    config.DOT_EVENTS_ENCRYPTION_KEY='';
+    await expect(worker.initializeDotEvents(db.pool)).resolves.toMatchObject({enabled:false,reason:'invalid_encryption_key'});
+    await(await import('../../src/admin/health.route.js')).registerHealthRoute(fresh);
+    await fresh.ready();
+    expect((await fresh.inject({method:'GET',url:'/livez'})).statusCode).toBe(200);
+    expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
+    expect((await rpc('tools/list')).json().result.tools).toHaveLength(31);
+    expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);
+    const status=(await rpc('tools/call',{name:'consultar_acompanhamento_matriz',arguments:{}})).json().result.structuredContent;
+    expect(status).toMatchObject({enabled:false,reason:'invalid_encryption_key',subscriptions:null,last_24h:null});
+    expect((await rpc('events/list')).statusCode).toBe(404);
+    expect((await rpc('events/subscribe',input())).statusCode).toBe(404);
+    await worker.runEventCycle(db.pool,spy);
+    expect(spy).not.toHaveBeenCalled();
+    config.DOT_EVENTS_ENCRYPTION_KEY=valid;await worker.initializeDotEvents(db.pool);
+    expect((await rpc('server/discover')).json().result.capabilities.events).toEqual({});
+    expect((await rpc('events/subscribe',input())).json().result.id).toMatch(/^sub_/);
+    expect(spy).toHaveBeenCalledTimes(1);
+  }finally{config.DOT_EVENTS_ENCRYPTION_KEY=valid;await worker.initializeDotEvents(db.pool);spy.mockRestore();await fresh.close();}
 });
