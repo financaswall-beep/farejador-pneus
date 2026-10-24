@@ -161,10 +161,10 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
   expect(stored.rows).toHaveLength(1);
 });
 
-it('expõe somente as 24 consultas permitidas; tentativas de escrita e argumentos extras são recusados', async () => {
+it('expõe somente as 30 consultas permitidas; tentativas de escrita e argumentos extras são recusados', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(24);
+  expect(listing.result.tools).toHaveLength(30);
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(true);
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
@@ -177,6 +177,11 @@ it('expõe somente as 24 consultas permitidas; tentativas de escrita e argumento
   expect(sales.result.isError).not.toBe(true);
   expect(sales.result.structuredContent).toMatchObject({environment:'test',currency:'BRL',timezone:'America/Sao_Paulo'});
   expect(JSON.stringify(sales)).not.toMatch(/hash-fixture|Dono teste|password_hash|phone|customer_name/);
+  const detailed=(await rpc(access,'tools/call',{name:'consultar_registros_matriz',arguments:{fonte:'network.matriz_collaborators'}})).json();
+  expect(detailed.result.isError).not.toBe(true);
+  expect(detailed.result.structuredContent.registros).toEqual(expect.arrayContaining([expect.objectContaining({display_name:'Dono teste'})]));
+  const credential=(await rpc(access,'tools/call',{name:'consultar_registros_matriz',arguments:{fonte:'network.dot_oauth_tokens'}})).json();
+  expect(credential.result.isError).toBe(true);
 });
 
 it('refresh gira a credencial e reutilização revoga toda a conexão', async () => {
@@ -288,7 +293,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(24);
+    expect((await client.listTools()).tools).toHaveLength(30);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}

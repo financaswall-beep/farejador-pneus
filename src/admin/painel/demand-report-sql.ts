@@ -45,7 +45,7 @@ export const demandEventsSql=`WITH bounds AS (
 ), grouped AS (
   SELECT e.conversation_id,e.kind,CASE WHEN e.kind='measure' THEN e.measure END AS measure,to_char(min(e.at) AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') AS day
   FROM classified e JOIN core.conversations c ON c.id=e.conversation_id AND c.environment=$1 AND c.deleted_at IS NULL
-  WHERE (e.kind<>'measure' OR e.measure IS NOT NULL)
+  WHERE (e.kind<>'measure' OR e.measure IS NOT NULL) AND ($5::bigint IS NULL OR c.chatwoot_account_id=$5)
     AND ($4='all' OR ($4='unknown' AND e.resolved_type IS NULL) OR e.resolved_type=$4) AND ($4='all' OR e.kind<>'activity')
   GROUP BY e.conversation_id,e.kind,CASE WHEN e.kind='measure' THEN e.measure END
 )

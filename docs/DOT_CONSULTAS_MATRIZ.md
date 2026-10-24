@@ -30,12 +30,29 @@ Conector MCP dentro do Farejador, exclusivamente para consultas autorizadas pelo
 | `consultar_relatorios_matriz` | Relatórios JSON paginados de vendas, compras, estoque, financeiro, demanda, Rede e rotas |
 | `consultar_notificacoes_matriz` | Pendências atuais; não envia nem marca notificações como lidas |
 | `consultar_saude_matriz` | Estado registrado da ingestão, filas, sincronização e conferência financeira |
+| `listar_fontes_matriz` | Catálogo de 199 fontes e seus campos/filtros, incluindo dados pessoais e operação dos parceiros |
+| `consultar_registros_matriz` | Registros completos, por fonte, campos, filtros e datas; inclui nomes, contatos, documentos, conversas e remuneração individual |
+| `consultar_relatorio_painel` | Os oito relatórios do painel com filtros originais, custos, seções e exportação CSV paginada |
+| `consultar_extrato_matriz` | Extrato por lançamento em caixa/competência, com descrições, responsáveis, estornos e conciliação |
+| `consultar_anexo_matriz` | Notas da rota/despesa, fotos de pneus, evidência de estoque, anexos de mensagens e mídia cadastrada; bytes autenticados |
+| `consultar_criativo_matriz` | Texto, título, formato e imagem de anúncio Meta próprio, com consulta de leitura ao provedor |
 
 Vendas vêm da mesma régua do resumo da Matriz: entrega só realizada após entregar; transferência do atacado precisa estar aceita. Valores de vendas são **centavos**; valores financeiros em campos `_brl` são strings em **reais**. Todas as respostas informam ambiente, fuso São Paulo e horário da leitura. O financeiro indisponível ou divergente não vira zero.
 
-São **24 ferramentas para as 21 áreas operacionais autorizadas**. Dados comerciais da Matriz e do seu relacionamento com a Rede. Sem nomes/telefones/endereços de clientes, conversas, fotos, dados bancários, SQL arbitrário, ferramentas de escrita ou despesas/lucro privado dos parceiros. Listas limitadas a 50, com total, página e indicação de truncamento; use `pagina` para continuar quando disponível. Pedidos com mais de 50 itens informam o total e limitam o detalhe. Alertas e resumos automáticos dependem de configuração posterior no Dot; o servidor MCP não inicia notificações.
+São **30 ferramentas**. Em 24/10/2026 o proprietário autorizou explicitamente a ampliação para todos os dados de negócio, incluindo dados pessoais, conversas, documentos, remuneração individual e financeiro privado dos parceiros. As 24 ferramentas resumidas mantêm suas projeções compactas; os seis acessos novos fornecem os detalhes. Credenciais, hashes de senha, tokens, sessões, payloads técnicos e SQL arbitrário continuam indisponíveis. Alertas automáticos dependem de configuração no assistente.
 
-### Filtros e significado dos dados
+### Acesso detalhado autorizado em 24/10/2026
+
+- Comece por `listar_fontes_matriz`; percorra `proxima_pagina` e consulte uma `fonte` para obter campos, filtros e campos de data. O catálogo é explícito no código: novas tabelas/colunas não são publicadas automaticamente.
+- `consultar_registros_matriz` recebe `fonte`, `campos`, `filtros`, `campo_data`, `de`, `ate`, `ordenar_por`, `ordem`, `pagina` e `limite` (1–50). Sem data, consulta todo o histórico disponível; para itens acima do limite das consultas antigas, filtre `order_id` na fonte de itens. IDs relacionam clientes, pedidos, rotas, colaboradores e parceiros. Ambiente e SQL vêm exclusivamente do servidor.
+- Nomes, telefones, e-mails, CPF/documentos, endereços, notas, conteúdo de mensagens, salários, benefícios e cálculos de folha podem ser lidos nas fontes correspondentes. Registros apagados por privacidade não são recuperados. Conversas, mensagens e anexos respeitam a conta Chatwoot configurada e seus vínculos.
+- Relatórios: `consultar_relatorio_painel` com `descrever=true` informa filtros do painel. JSON lista todas as seções; `secao` escolhe uma e `formato=csv` exporta listas em páginas de 50. As seções `export_*` abrangem o conjunto completo quando o painel possui uma lista interna já paginada. Mantêm as mesmas regras de custo, realização e conciliação.
+- Anexos: fornecer somente tipo e ID cadastrados. O servidor resolve ambiente/vínculo/retenção, encerra a transação e então lê o arquivo. Não cria URL pública/assinada, não processa nota fiscal nem gera despesa. Imagens retornam como conteúdo MCP; demais arquivos como recurso binário. Limite de 16 MiB; vídeos de marketing retornam miniatura. Arquivo remoto exige host configurado e HTTPS, com redirecionamentos limitados e revalidados, sem envio de credenciais.
+- Texto/imagem de anúncio Meta são consultados por `consultar_criativo_matriz`; exige anúncio próprio de conta verificada e faz somente GET. Publicações, comentários, legendas e Google Ads constam no catálogo. Campanhas de terceiros permanecem fora.
+- Listas de registros e seções de relatório limitam a resposta a 2 MiB e pedem redução de campos/página quando necessário. Não representam um dump irrestrito. Registro financeiro bruto informa que não foi conciliado: para totais use extrato/relatório financeiro.
+- Apenas o proprietário global da Matriz pode autorizar/usar o MCP. Revogação, PKCE, expiração, autorização por requisição e transações físicas `READ ONLY` continuam valendo também para os acessos detalhados. Nada pode cadastrar, editar, apagar, pagar, publicar ou enviar mensagem.
+
+### Filtros das 24 consultas resumidas
 
 - Consultas novas usam `periodo=hoje|7dias|30dias|mes`, `mes=AAAA-MM`, `pagina` e, onde aplicável, `referencia` (UUID) e `medida`. `visao` escolhe o assunto enumerado pela ferramenta. Mês explícito exige `periodo=mes`; mês futuro é recusado. Campos extras, ambiente, SQL e URLs são rejeitados. Filtro incompatível com a visão produz erro, sem inventar uma lista vazia.
 - Financeiro usa `mes` e `visao=resumo|a_receber|a_pagar`. Resumo é mensal; contas são a posição atual, com saldo após pagamentos parciais, parcelas e vencimentos, sem beneficiário. A lista de contas a pagar omite a folha individual e preserva o bloqueio de conciliação.

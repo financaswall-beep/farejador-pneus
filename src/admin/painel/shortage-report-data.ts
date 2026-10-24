@@ -5,25 +5,29 @@ import { ShortageReportLimitError,type ShortageReportFilter } from './shortage-r
 import type { ShortageSnapshot,ShortageTrace,ShortageProduct,ShortageStock } from './shortage-report-types.js';
 const dateRange=`occurred_at>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
   AND occurred_at<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`;
-export async function readShortageSnapshot(f:ShortageReportFilter,environment=env.FAREJADOR_ENV,db:Pool=pool):Promise<ShortageSnapshot>{
+export async function readShortageSnapshot(f:ShortageReportFilter,environment=env.FAREJADOR_ENV,db:Pool=pool,chatAccount?:number):Promise<ShortageSnapshot>{
   const c=await db.connect();
   try{
     await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await c.query("SET LOCAL statement_timeout='15s'");
     const params=[environment,f.from,f.to];
     const meta=(await c.query<{as_of:Date;tracking_since:Date|null;legacy_records:number}>(`SELECT now() AS as_of,
-      (SELECT min(occurred_at) FROM ops.bot_stock_searches WHERE environment=$1) AS tracking_since,
+      (SELECT min(occurred_at) FROM ops.bot_stock_searches s WHERE environment=$1 AND ($5::bigint IS NULL OR EXISTS
+        (SELECT 1 FROM core.conversations c WHERE c.environment=s.environment AND c.id=s.conversation_id AND c.deleted_at IS NULL AND c.chatwoot_account_id=$5))) AS tracking_since,
       (SELECT count(*)::int FROM analytics.conversation_facts f WHERE f.environment=$1 AND f.fact_key='faltou_estoque'
-        AND f.superseded_by IS NULL
+        AND f.superseded_by IS NULL AND ($5::bigint IS NULL OR EXISTS
+          (SELECT 1 FROM core.conversations c WHERE c.environment=f.environment AND c.id=f.conversation_id AND c.deleted_at IS NULL AND c.chatwoot_account_id=$5))
         AND ($4='all' OR ($4='unknown' AND f.vehicle_type IS NULL) OR f.vehicle_type=$4)
         AND COALESCE(f.observed_at,f.created_at)>=($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
         AND COALESCE(f.observed_at,f.created_at)<(($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
         AND NOT EXISTS(SELECT 1 FROM ops.bot_stock_searches s WHERE s.environment=f.environment
           AND s.conversation_id=f.conversation_id AND s.trigger_message_id=f.message_id
-          AND s.measure=upper(btrim(f.fact_value->>'medida')))) AS legacy_records`,[...params,f.vehicle_type || 'all'])).rows[0]!;
+          AND s.measure=upper(btrim(f.fact_value->>'medida')))) AS legacy_records`,[...params,f.vehicle_type || 'all',chatAccount??null])).rows[0]!;
     const traces=(await c.query<Omit<ShortageTrace,'occurred_at'>&{occurred_at:Date}>(`SELECT id,conversation_id,search_key,occurred_at,measure,municipality,filters,stores,vehicle_type
-      FROM ops.bot_stock_searches WHERE environment=$1 AND ${dateRange} AND ($4='all' OR ($4='unknown' AND vehicle_type IS NULL) OR vehicle_type=$4)
+      FROM ops.bot_stock_searches s WHERE environment=$1 AND ${dateRange} AND ($4='all' OR ($4='unknown' AND vehicle_type IS NULL) OR vehicle_type=$4)
+      AND ($5::bigint IS NULL OR EXISTS(SELECT 1 FROM core.conversations c WHERE c.environment=s.environment
+        AND c.id=s.conversation_id AND c.deleted_at IS NULL AND c.chatwoot_account_id=$5))
       AND EXISTS(SELECT 1 FROM jsonb_array_elements(stores) st WHERE st->>'available'='false')
-      ORDER BY occurred_at DESC,id LIMIT 20001`,[...params,f.vehicle_type || 'all'])).rows;
+      ORDER BY occurred_at DESC,id LIMIT 20001`,[...params,f.vehicle_type || 'all',chatAccount??null])).rows;
     if(traces.length>20000)throw new ShortageReportLimitError();
     const ids=[...new Set(traces.flatMap(t=>t.stores.filter(s=>s.id!=='matriz').map(s=>s.id)))];
     // Current channel prices only. The immutable search trace never recorded a historical price.
