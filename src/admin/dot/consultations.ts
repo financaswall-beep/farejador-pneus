@@ -10,6 +10,7 @@ import { readDotDeliveries } from './deliveries-read.js';
 import { periodInput, dotPeriod } from './period.js';
 import { expandedTools, type ExpandedToolName } from './expanded-tools.js';
 import { reportInput, reportTarget } from './reports.js';
+import { fullSchemas,runFullTool,type FullToolName } from './full-tools.js';
 export { periodInput, dotPeriod } from './period.js';
 
 export const stockInput = z.object({medida:z.string().trim().max(30).regex(/^[\d\s/.RrXx-]*$/).default(''),
@@ -21,7 +22,7 @@ export const financeInput = z.object({mes:z.string().regex(/^\d{4}-(0[1-9]|1[0-2
 
 const expandedSchemas=Object.fromEntries(Object.entries(expandedTools).map(([key,value])=>[key,value.schema])) as
   {[K in ExpandedToolName]:typeof expandedTools[K]['schema']};
-export const dotSchemas = {...expandedSchemas,consultar_resumo_matriz:periodInput,consultar_vendas_matriz:periodInput,
+export const dotSchemas = {...fullSchemas,...expandedSchemas,consultar_resumo_matriz:periodInput,consultar_vendas_matriz:periodInput,
   consultar_estoque_matriz:stockInput,consultar_entregas_matriz:deliveryInput,consultar_financeiro_matriz:financeInput,
   consultar_reposicao_matriz:stockInput,consultar_relatorios_matriz:reportInput};
 export type DotToolName = keyof typeof dotSchemas;
@@ -29,6 +30,7 @@ export type DotToolName = keyof typeof dotSchemas;
 export async function runDotConsultation(name:DotToolName,raw:unknown):Promise<Record<string,unknown>> {
   const metadata={environment:env.FAREJADOR_ENV,timezone:'America/Sao_Paulo',currency:'BRL',
     read_at:new Date().toISOString(),scope:'matriz',read_only:true};
+  if(Object.hasOwn(fullSchemas,name))return {...metadata,...await runFullTool(name as FullToolName,raw)};
   if(name==='consultar_relatorios_matriz') {
     const target=reportTarget(reportInput.parse(raw));
     return {...await runDotConsultation(target.name,target.input),report:target.area,export_format:'json',

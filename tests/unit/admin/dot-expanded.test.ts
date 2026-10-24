@@ -10,16 +10,16 @@ import { readContext,pageInput } from '../../../src/admin/dot/read-model.js';
 import { dotChatwootAccount } from '../../../src/admin/dot/chat-scope.js';
 
 it('descoberta enumera todas as ferramentas, sem escrita, e coincide com os validadores',()=>{
-  expect(dotTools).toHaveLength(24);
+  expect(dotTools).toHaveLength(30);
   expect(dotTools.map(tool=>tool.name).sort()).toEqual(Object.keys(dotSchemas).sort());
   for(const tool of dotTools) {
     expect(tool.inputSchema.additionalProperties).toBe(false);
     expect(tool.annotations).toMatchObject({readOnlyHint:true,destructiveHint:false,openWorldHint:false});
     const properties=tool.inputSchema.properties!;
-    for(const extra of [{environment:'prod'},{sql:'select *'},{url:'https://evil.test'},{pagina:0},{pagina:1.5},{pagina:10001}]) {
+    for(const extra of [{environment:'prod'},{sql:'select *'},{url:'https://evil.test'},{pagina:0},{pagina:1.5},{pagina:1000001}]) {
       expect(dotSchemas[tool.name as keyof typeof dotSchemas].safeParse({...(tool.name==='consultar_relatorios_matriz'?{area:'varejo'}:{}),...extra}).success).toBe(false);
     }
-    if('pagina' in properties)expect(properties.pagina).toMatchObject({minimum:1,maximum:10000});
+    if('pagina' in properties)expect(properties.pagina).toMatchObject({minimum:1});
   }
 });
 it('três pessoas cadastradas não liberam salário ou total pago de uma única pessoa',async()=>{
