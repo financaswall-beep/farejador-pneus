@@ -13,7 +13,9 @@ export function dotPage(requestToken?:string) {
     <li>Cadastros e operação das lojas parceiras, inclusive seu financeiro</li><li>Clientes, nomes, telefones, endereços, documentos e conversas</li>
     <li>Marketing, textos, comentários e mídia cadastrada</li><li>Equipe, remuneração individual, folha, notificações e saúde do sistema</li></ul>
     <p><strong>Acesso amplo, somente para consulta.</strong> Você autoriza a leitura dos dados pessoais e comerciais acima.
-    O assistente não pode alterar registros, enviar mensagens ou executar pagamentos. Senhas, tokens e chaves de integração ficam protegidos.</p>
+    O assistente não pode alterar registros comerciais, enviar mensagens a clientes ou executar pagamentos. Senhas, tokens e chaves de integração ficam protegidos.</p>
+    <p>Quando você pedir acompanhamento no Dot e o recurso estiver habilitado, o Farejador poderá enviar eventos de conversas e entregas para análise.
+    Conectar sozinho não ativa avisos. Você pode pedir para parar o acompanhamento ou desconectar abaixo.</p>
     <p>A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
     <button id="allow" type="button">Autorizar consultas</button><button id="deny" class="secondary" type="button">Agora não</button>`:
     `<h1>Conexões do Dot</h1><p>Acesso de consulta autorizado para o ChatGPT / Work.</p><div id="connections"></div><a href="/admin/painel">Voltar à Matriz</a>`}
