@@ -35,6 +35,11 @@ it('três pessoas cadastradas não liberam salário ou total pago de uma única 
   const three=await readDotTeam(readContext({} as never,pageInput.parse({})));
   expect(three.financial).toMatchObject({base_salary_total:6000,payroll_total:6000,payroll_paid:null});
   expect(JSON.stringify(three)).not.toContain('4321');
+  collaborators.forEach((row,i)=>{row.payroll_status='paid';row.total_due=i===0?4321:0;row.base_salary=i===0?4321:0;});
+  management.mockResolvedValue({collaborators,summary:{base_salary_total:4321,payroll_paid:4321,payroll_total:4321}});
+  const zeroItems=await readDotTeam(readContext({} as never,pageInput.parse({})));
+  expect(zeroItems.financial).toMatchObject({base_salary_total:null,payroll_total:null,payroll_paid:null});
+  expect(JSON.stringify(zeroItems)).not.toContain('4321');
 });
 it('sem configuração, a conta é inferida só quando não há ambiguidade',async()=>{
   const query=vi.fn();

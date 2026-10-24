@@ -14,8 +14,8 @@ export async function readDotTeam(ctx:DotReadContext) {
     base_salary_total:guarded('base_salary_total',eligible.filter(row=>row.base_salary>0)),
     commission_total:guarded('commission_total',eligible.filter(row=>row.commission_amount>0)),
     payroll_total:guarded('payroll_total',population.filter(row=>row.total_due>0)),
-    payroll_payable:guarded('payroll_payable',eligible.filter(row=>row.payroll_status==='pending')),
-    payroll_paid:guarded('payroll_paid',eligible.filter(row=>row.payroll_status==='paid')),
+    payroll_payable:guarded('payroll_payable',eligible.filter(row=>row.payroll_status==='pending'&&row.total_due>0)),
+    payroll_paid:guarded('payroll_paid',eligible.filter(row=>row.payroll_status==='paid'&&row.total_due>0)),
     payroll_count:population.length,payroll_period_status:data.summary.payroll_period_status,
   }:null;
   const rows=data.collaborators.filter(row=>!ctx.input.referencia||row.id===ctx.input.referencia)
