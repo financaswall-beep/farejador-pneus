@@ -44,7 +44,7 @@ describe('consistência das regras centrais do prompt', () => {
 
   it('monta o resumo pelos itens reais e aceita posição desconhecida', () => {
     expect(SYSTEM_PROMPT).toContain('exactly one summary line per ordered item');
-    expect(SYSTEM_PROMPT).toContain('when position is unregistered/unknown, use "*Item:*"');
+    expect(SYSTEM_PROMPT).toContain('when position is unregistered/unknown, use "*Pneu:*"');
     expect(SYSTEM_PROMPT).not.toContain('✅ *Traseiro:* Pneu [size]\n✅ *Total:*');
   });
 
