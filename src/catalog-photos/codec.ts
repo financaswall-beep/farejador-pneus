@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { sniffImageMime } from '../parceiro/photo-upload.js';
 import { CatalogPhotoError } from './model.js';
 import { MAX_CATALOG_PHOTO_BYTES } from './storage.js';
+import { catalogWatermark } from './watermark.js';
 let activeCodecs=0;
 /** Sanitized original + branded derivative. Never fabricates a tire or another angle. */
 export async function prepareCatalogPhoto(input:Buffer){
@@ -15,7 +16,7 @@ export async function prepareCatalogPhoto(input:Buffer){
    .webp({quality:86}).toBuffer({resolveWithObject:true});
   if(original.info.width<200||original.info.height<200)throw new Error('small');
   const width=Math.min(260,Math.max(80,Math.round(original.info.width*0.19)));
-  const mark=Buffer.from(`<svg width="${width}" height="${Math.round(width*.55)}" xmlns="http://www.w3.org/2000/svg"><text x="50%" y="75%" text-anchor="middle" font-family="sans-serif" font-style="italic" font-weight="900" font-size="${width*.58}" fill="white" stroke="#063f31" stroke-width="1" opacity=".76">2W</text></svg>`);
+  const mark=catalogWatermark(width);
   const photo=await sharp(original.data).composite([{input:mark,gravity:'southeast'}]).webp({quality:84}).toBuffer();
   return {original:original.data,photo,width:original.info.width,height:original.info.height};
  }catch{throw new CatalogPhotoError('invalid_or_small_photo',415);}finally{activeCodecs--;}
