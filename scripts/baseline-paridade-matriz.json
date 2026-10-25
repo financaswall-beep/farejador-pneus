@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-10-19T19:28:24.473Z",
-  "total": 3058,
+  "geradoEm": "2026-10-25T00:38:22.522Z",
+  "total": 3064,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -817,6 +817,12 @@
     "despesasLoaded": "value:boolean",
     "destroyMarketingCreativeChart": "function",
     "displaySlot": "function",
+    "dotAlertConnection": "function",
+    "dotAlertFields": "function",
+    "dotAlerts": "value:object",
+    "dotAlertsLoad": "function",
+    "dotAlertsRuntimeLabel": "function",
+    "dotAlertsSave": "function",
     "ensureCredentials": "function",
     "ensurePartnerPanelCredentials": "function",
     "entregasSemRota": "function",

@@ -7,6 +7,8 @@ import { deliverEvents } from './delivery.js';
 import { seal } from './crypto.js';
 import { sendWebhook,type WebhookSender } from './https.js';
 import { dotEventsAvailable,dotEventsState,setDotEventsAvailability,type DotEventsFailure } from './availability.js';
+import { scanSignals } from './scan.js';
+let lastScan=0;
 
 /** Transaction-scoped lock works through Supabase transaction pooling as well as direct connections. */
 export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook) {
@@ -17,6 +19,7 @@ export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook)
     await lock.query("SET LOCAL idle_in_transaction_session_timeout='5min'");
     held=(await lock.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) locked',[env.FAREJADOR_ENV+':dot-event-worker'])).rows[0].locked;
     if(!held)return;
+    if(Date.now()-lastScan>=60_000){await scanSignals(db);lastScan=Date.now();}
     await collectEvents(db);
     await deliverEvents(db,send,undefined,async()=>{await lock.query('SELECT 1');});
     // Private technical history only. Preserve pending retries and live incident deduplication for seven days.
@@ -36,6 +39,8 @@ export async function assertDotEventsSchema(db:Pool=pool) {
   await db.query('SELECT id,verified_at FROM network.dot_event_subscriptions LIMIT 0');
   await db.query('SELECT id FROM ops.dot_event_deliveries LIMIT 0');
   await db.query('SELECT revision FROM ops.dot_monitor_targets LIMIT 0');
+  await db.query('SELECT version,settings FROM network.dot_event_settings LIMIT 0');
+  await db.query('SELECT status FROM ops.dot_external_health LIMIT 0');
 }
 /** Fail closed for the optional monitor, without taking the commercial application offline. */
 export async function initializeDotEvents(db:Pool=pool) {

@@ -41,6 +41,7 @@ beforeAll(async()=>{
 },240000);
 beforeEach(async()=>{
   await db.pool.query(`DELETE FROM network.dot_event_subscriptions;DELETE FROM ops.dot_monitor_targets;
+    TRUNCATE network.dot_event_settings,network.dot_event_settings_history,ops.dot_external_health;
     UPDATE network.dot_oauth_grants SET revoked_at=NULL,expires_at=now()+interval '30 days';`);
 });
 afterAll(async()=>{if(app)await app.close();await(await import('../../src/persistence/db.js')).pool.end();if(db)await stopPostgres(db);});
@@ -74,9 +75,179 @@ function rpc(method:string,params:Record<string,unknown>={},headers:Record<strin
         'io.modelcontextprotocol/clientInfo':{name:'test',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}}});
 }
 
+it('controles exigem sessão humana de dono, mesma origem e versão; guardam histórico imutável',async()=>{
+ const {mintMatrizAdminSessionForPerson,ADMIN_SESSION_COOKIE}=await import('../../src/admin/session.js');
+ const session=await mintMatrizAdminSessionForPerson('test',identity.person_id,identity.collaborator_id,db.pool);
+ const headers={cookie:`${ADMIN_SESSION_COOKIE}=${session!.sessionToken}`,host:'farejador.example',origin:'http://farejador.example'};
+ const path='/admin/api/dot/alerts';
+ expect((await app.inject({url:path})).statusCode).toBe(401);
+ expect((await app.inject({url:path,headers:{authorization:'Bearer '+token}})).statusCode).toBe(401);
+ const config=(await app.inject({url:path,headers})).json();expect(config.version).toBe(0);
+ expect(Object.values(config.settings.events).filter(Boolean)).toHaveLength(2);
+ expect((await app.inject({method:'PUT',url:path,headers:{...headers,origin:'https://evil.example'},payload:{version:0,settings:config.settings}})).statusCode).toBe(403);
+ const payload={version:0,settings:{...config.settings,paused:true}};
+ expect((await app.inject({method:'PUT',url:path,headers,payload})).json().version).toBe(1);
+ expect((await app.inject({method:'PUT',url:path,headers,payload})).statusCode).toBe(409);
+ expect((await db.pool.query('SELECT environment,version,updated_by FROM network.dot_event_settings_history')).rows)
+  .toEqual([{environment:'test',version:1,updated_by:identity.person_id}]);
+ await expect(db.pool.query('UPDATE network.dot_event_settings_history SET version=2')).rejects.toThrow('immutable');
+ for(const table of ['network.dot_event_settings','network.dot_event_settings_history','ops.dot_external_health'])
+  expect((await db.pool.query("SELECT has_table_privilege('farejador_partner_app',$1,'SELECT') allowed",[table])).rows[0].allowed).toBe(false);
+ const settings=await import('../../src/admin/dot/events/settings.js');
+ await expect(settings.saveSettings(payload.settings,1,randomUUID(),db.pool)).rejects.toThrow('owner_required');
+});
+it('pausar cancela pendências; teto por proprietário abrange assinaturas diferentes',async()=>{
+ const settings=await import('../../src/admin/dot/events/settings.js');
+ const a=await conversation(),b=await conversation();await subscribe({ids:[a.id]});await subscribe({ids:[b.id]});
+ await message(a);await message(b);await collect();
+ const config=settings.defaultSettings();config.max_per_hour=1;
+ await settings.saveSettings(config,0,identity.person_id,db.pool);
+ const send=vi.fn(async()=>({status:200,body:''}));await delivery.deliverEvents(db.pool,send);
+ expect(send).toHaveBeenCalledTimes(1);
+ config.paused=true;await settings.saveSettings(config,1,identity.person_id,db.pool);
+ expect((await db.pool.query("SELECT count(*)::int n FROM ops.dot_event_deliveries WHERE status='pending'")).rows[0].n).toBe(0);
+ await delivery.deliverEvents(db.pool,send);expect(send).toHaveBeenCalledTimes(1);
+});
+it('fontes novas executam SQL real em READ ONLY e fontes desligadas não inventam resultado',async()=>{
+ const config=(await import('../../src/shared/config/env.js')).env,old={MATRIZ_CENTRAL_LEDGER:config.MATRIZ_CENTRAL_LEDGER,
+  MARKETING_META_ENABLED:config.MARKETING_META_ENABLED,MARKETING_SYNC_ENABLED:config.MARKETING_SYNC_ENABLED,
+  GOOGLE_ADS_ENABLED:config.GOOGLE_ADS_ENABLED,AGENT_V2_WORKER_ENABLED:config.AGENT_V2_WORKER_ENABLED,BOT_OUTBOX:config.BOT_OUTBOX};
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();
+ for(const name of Object.keys(value.events))value.events[name as keyof typeof value.events]=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);
+ const {withDotReadOnly}=await import('../../src/admin/dot/read-only.js');
+ const {systemSignals}=await import('../../src/admin/dot/events/signals-system.js');
+ const {financeSignals}=await import('../../src/admin/dot/events/signals-finance.js');
+ const {marketingSignals}=await import('../../src/admin/dot/events/signals-marketing.js');
+ const {restockSignals}=await import('../../src/admin/dot/events/signals-stock.js');
+ try {
+  Object.assign(config,{MATRIZ_CENTRAL_LEDGER:true,MARKETING_META_ENABLED:true,MARKETING_SYNC_ENABLED:true,GOOGLE_ADS_ENABLED:true,AGENT_V2_WORKER_ENABLED:true,BOT_OUTBOX:true});
+  for(const detector of [systemSignals,financeSignals,marketingSignals,restockSignals])
+   expect(Array.isArray(await withDotReadOnly(reader=>detector(reader,value,new Date()),db.pool))).toBe(true);
+  config.MATRIZ_CENTRAL_LEDGER=false;
+  const {readSignals,signalSourceStatus}=await import('../../src/admin/dot/events/signals.js');
+  await expect(readSignals('farejador.financeiro.atencao',db.pool)).rejects.toThrow('central_ledger_disabled');
+  expect(signalSourceStatus()['farejador.financeiro.atencao'].available).toBe(false);
+ }finally{Object.assign(config,old);}
+});
+it('procura agrupa contatos distintos, exclui outra conta, desconhecido e estoque disponível; sinal resolve sem alterar buscas',async()=>{
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.estoque.procura']=true;value.demand_contacts=2;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);
+ const a=await conversation(),b=await conversation(),other=await conversation(2);
+ const search=async(c:typeof a,stores:unknown,measure='110/90-17')=>db.pool.query(`INSERT INTO ops.bot_stock_searches(environment,conversation_id,search_key,tool_name,measure,stores)
+  VALUES('test',$1,$2,'buscar_produto',$3,$4)`,[c.id,randomUUID(),measure,JSON.stringify(stores)]);
+ await search(a,[{available:false}]);await search(a,[{available:false}]);await search(other,[{available:false}]);await search(b,[]);await search(b,[{available:true}]);
+ const {readSignals}=await import('../../src/admin/dot/events/signals.js');
+ expect(await readSignals('farejador.estoque.procura',db.pool)).toEqual([]);
+ await search(b,[{available:false}]);
+ const signal=(await readSignals('farejador.estoque.procura',db.pool))[0]!;expect(signal.data.evidence).toMatchObject({distinct_contacts:2});
+ await subscribe({},'farejador.estoque.procura');const sub=(await subscriptions.activeSubscriptions(db.pool))[0]!;
+ await queue.enqueueSnapshot(db.pool,sub,signal,new Date());
+ await db.pool.query('UPDATE core.contacts SET deleted_at=now() WHERE id=$1',[b.contact]);
+ const send=vi.fn(async()=>({status:200,body:''}));await delivery.deliverEvents(db.pool,send);expect(send).not.toHaveBeenCalled();
+ expect((await db.pool.query('SELECT count(*)::int n FROM ops.bot_stock_searches WHERE conversation_id=$1',[b.id])).rows[0].n).toBe(3);
+});
+it('inconsistência usa último turno entregue; resposta posterior remove bloqueio antigo',async()=>{
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.atendimento.inconsistencia']=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);
+ const c=await conversation(),trigger=await message(c);
+ await db.pool.query(`INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions,created_at)
+  VALUES('test',$1,$2,'v2',$3,'delivered',$4,now()-interval '1 minute')`,[c.id,trigger,randomUUID(),JSON.stringify([{role:'tool',content:'{"erro":"preco_alterado"}'}])]);
+ const {readSignals}=await import('../../src/admin/dot/events/signals.js');
+ expect(await readSignals('farejador.atendimento.inconsistencia',db.pool)).toHaveLength(1);
+ await db.pool.query(`INSERT INTO agent.turns(environment,conversation_id,trigger_message_id,agent_version,context_hash,status,actions)
+  VALUES('test',$1,$2,'v2',$3,'delivered','[]')`,[c.id,await message(c),randomUUID()]);
+ expect(await readSignals('farejador.atendimento.inconsistencia',db.pool)).toEqual([]);
+});
+it('monitor externo exige falhas consecutivas, deduplica o caso e recuperação cancela envio',async()=>{
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.sistema.atencao']=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);await subscribe({},'farejador.sistema.atencao');
+ const {recordExternalHealth,readExternalHealth}=await import('../../src/admin/dot/events/external-health.js');
+ const base=new Date(),now=new Date(base.getTime()+2000);
+ await recordExternalHealth(db.pool,false,503,base);expect(await readExternalHealth(db.pool,value,base)).toBeNull();
+ await recordExternalHealth(db.pool,false,0,new Date(base.getTime()+1000));await recordExternalHealth(db.pool,false,503,now);
+ const snapshot=(await readExternalHealth(db.pool,value,now))!,sub=(await subscriptions.activeSubscriptions(db.pool))[0]!;
+ await queue.enqueueSnapshot(db.pool,sub,snapshot,now,now);await queue.enqueueSnapshot(db.pool,sub,snapshot,now,now);
+ expect((await db.pool.query('SELECT count(*)::int n FROM ops.dot_event_deliveries')).rows[0].n).toBe(1);
+ const recovered=new Date(base.getTime()+3000);await recordExternalHealth(db.pool,true,200,recovered);
+ const send=vi.fn(async()=>({status:200,body:''}));await delivery.deliverEvents(db.pool,send,recovered);expect(send).not.toHaveBeenCalled();
+ await recordExternalHealth(db.pool,false,503,new Date(base.getTime()+240000));
+ expect((await db.pool.query('SELECT consecutive_failures FROM ops.dot_external_health')).rows[0].consecutive_failures).toBe(1);
+});
+it('aumentar intervalo pelo painel também segura aviso que já estava na fila',async()=>{
+ await subscribe();const c=await conversation();await message(c);await collect();
+ const send=vi.fn(async()=>({status:200,body:''}));await delivery.deliverEvents(db.pool,send);
+ await message(c,1);await collect();
+ await db.pool.query("UPDATE ops.dot_event_deliveries SET not_before=now() WHERE status='pending'");
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.cooldown_minutes=60;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);await delivery.deliverEvents(db.pool,send);
+ expect(send).toHaveBeenCalledTimes(1);
+ expect((await db.pool.query("SELECT not_before>now()+interval '55 minutes' delayed FROM ops.dot_event_deliveries WHERE status='pending'")).rows[0].delayed).toBe(true);
+});
+it('aviso vencido é cancelado mesmo quando a fonte está indisponível',async()=>{
+ await subscribe();const c=await conversation();await message(c);await collect();
+ await db.pool.query("UPDATE ops.dot_event_deliveries SET created_at=now()-interval '25 hours'");
+ const spy=vi.spyOn(snapshots,'readSnapshot').mockRejectedValue(new Error('fonte indisponível'));
+ try{await delivery.deliverEvents(db.pool,async()=>{throw Error('não enviar');});
+  expect((await db.pool.query('SELECT status FROM ops.dot_event_deliveries')).rows[0].status).toBe('cancelled');expect(spy).not.toHaveBeenCalled();
+ }finally{spy.mockRestore();}
+});
+it('financeiro inclui contas no prazo configurado, exclui futuro/ambiente e mantém livro intacto',async()=>{
+ const config=(await import('../../src/shared/config/env.js')).env,old=config.MATRIZ_CENTRAL_LEDGER;config.MATRIZ_CENTRAL_LEDGER=true;
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.financeiro.atencao']=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);
+ const post=async(environment:string,days:number)=>(await db.pool.query(`SELECT finance.post_matriz_ledger_transaction(
+  $1::env_t,'manual.test',$2,'sale',150,current_date,'Conta de teste','owner:test',$3::jsonb,current_date+$4::int,NULL,'{}') id`,
+  [environment,randomUUID(),JSON.stringify([{account_code:'accounts_receivable',account_class:'asset',side:'debit',amount:150},
+   {account_code:'sales_revenue',account_class:'revenue',side:'credit',amount:150}]),days])).rows[0].id;
+ const due=await post('test',1),future=await post('test',20),other=await post('prod',1);
+ const before=(await db.pool.query('SELECT count(*)::int n FROM finance.matriz_ledger_transactions')).rows[0].n;
+ try {
+  const {readSignals}=await import('../../src/admin/dot/events/signals.js');const rows=await readSignals('farejador.financeiro.atencao',db.pool);
+  const evidence=rows.map(row=>row.data.evidence as Record<string,unknown>);
+  expect(evidence).toContainEqual(expect.objectContaining({obligation_id:due,balance_brl:'150.00',currency:'BRL'}));
+  expect(evidence.some(row=>row.obligation_id===future||row.obligation_id===other)).toBe(false);
+  expect((await db.pool.query('SELECT count(*)::int n FROM finance.matriz_ledger_transactions')).rows[0].n).toBe(before);
+ }finally{config.MATRIZ_CENTRAL_LEDGER=old;}
+});
+it('marketing considera só campanhas próprias verificadas e métricas desatualizadas pedem conferência',async()=>{
+ const config=(await import('../../src/shared/config/env.js')).env,old=config.MARKETING_META_ENABLED;config.MARKETING_META_ENABLED=true;
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.marketing.atencao']=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);
+ const sync=(await db.pool.query(`INSERT INTO marketing.meta_sync_runs(environment,trigger_type,status,window_since,window_until,finished_at)
+  VALUES('test','manual','succeeded',current_date,current_date,now()) RETURNING id`)).rows[0].id;
+ await db.pool.query("INSERT INTO marketing.meta_identity_accounts(environment,ad_account_id,sync_run_id) VALUES('test','alerts-verified',$1)",[sync]);
+ await db.pool.query(`INSERT INTO marketing.campaign_scopes(environment,ad_account_id,campaign_id,scope,classification_reason,classified_by,classified_at)
+  VALUES('test','alerts-verified','991','matrix','Escopo de teste','qa',now()),('test','alerts-unverified','992','matrix','Escopo de teste','qa',now()),
+  ('test','alerts-verified','993','external','Escopo de teste','qa',now());
+  INSERT INTO marketing.meta_ad_identities(environment,ad_account_id,ad_id,campaign_id,scope)
+   VALUES('test','alerts-verified','991','991','matrix'),('test','alerts-verified','993','993','external');
+  INSERT INTO marketing.meta_insights_daily(environment,ad_account_id,api_version,account_currency,entity_level,entity_id,campaign_id,metric_date,spend,conversations)
+  VALUES('test','alerts-verified','v26.0','BRL','ad','991','991',(now() AT TIME ZONE 'America/Sao_Paulo')::date,150,0),
+   ('test','alerts-unverified','v26.0','BRL','ad','992','992',(now() AT TIME ZONE 'America/Sao_Paulo')::date,900,0),
+   ('test','alerts-verified','v26.0','BRL','ad','993','993',(now() AT TIME ZONE 'America/Sao_Paulo')::date,900,0)`);
+ try {
+  const {readSignals}=await import('../../src/admin/dot/events/signals.js');
+  const rows=await readSignals('farejador.marketing.atencao',db.pool);
+  expect(rows).toHaveLength(1);expect(rows[0]!.data).toMatchObject({reason:'verba_com_poucos_resultados_registrados',evidence:{campaign_id:'991',qualified_conversations:null,realized_sales:null}});
+  await db.pool.query("UPDATE marketing.meta_insights_daily SET collected_at=now()-interval '3 days' WHERE environment='test' AND campaign_id='991'");
+  expect((await readSignals('farejador.marketing.atencao',db.pool))[0]!.data.reason).toBe('conferir_rastreamento_e_atualizacao');
+ }finally{config.MARKETING_META_ENABLED=old;}
+});
+it('monitor externo envia somente o próprio sinal e não consome pendências de atendimento',async()=>{
+ const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.sistema.atencao']=true;
+ await settings.saveSettings(value,0,identity.person_id,db.pool);await subscribe({},'farejador.sistema.atencao');await subscribe();
+ const c=await conversation();await message(c);await collect();
+ const {runExternalCycle}=await import('../../src/admin/dot/events/external-cycle.js');
+ const probe=vi.fn(async()=>({status:503,body:''})),send=vi.fn(async()=>({status:200,body:''})),base=Date.now();
+ for(let n=0;n<3;n++)await runExternalCycle(db.pool,probe,send,new Date(base+n*1000));
+ expect(send).toHaveBeenCalledTimes(1);expect(JSON.parse(send.mock.calls[0]![1]).data.reason).toBe('farejador_indisponivel_confirmado_por_monitor_externo');
+ expect(probe).toHaveBeenCalledWith(origin+'/healthz');
+ expect((await db.pool.query("SELECT status FROM ops.dot_event_deliveries WHERE kind='conversation'")).rows[0].status).toBe('pending');
+});
 it('MCP 2.0 descobre eventos e ferramentas com autenticação, cabeçalhos e cache privado',async()=>{
   expect((await rpc('server/discover')).json()).toMatchObject({result:{resultType:'complete',supportedVersions:['2026-07-28'],capabilities:{events:{}},cacheScope:'private'}});
-  expect((await rpc('events/list')).json().result.events).toHaveLength(2);
+  expect((await rpc('events/list')).json().result.events).toHaveLength(8);
   expect((await rpc('tools/list')).json().result.tools).toHaveLength(31);
   expect((await rpc('events/list',{}, {authorization:''})).statusCode).toBe(401);
   expect((await rpc('tools/list',{}, {'mcp-method':'tools/call'})).json().error.code).toBe(-32020);
@@ -182,11 +353,15 @@ it('entrega vencida precisa de data registrada e conclusão cancela aviso',async
   const id=(await db.pool.query(`INSERT INTO commerce.orders(environment,unit_id,contact_id,total_amount,status,
     fulfillment_mode,payment_method,delivery_status,scheduled_delivery_date,delivery_address)
     VALUES('test',$1,$2,100,'open','delivery','pix','pending',current_date-1,'Rua de teste 1') RETURNING id`,[unit,c.contact])).rows[0].id;
+  await db.pool.query("UPDATE ops.dot_monitor_targets SET changed_at=now()-interval '1 hour' WHERE entity_id=$1",[id]);
   await collect();expect((await db.pool.query('SELECT payload FROM ops.dot_event_deliveries')).rows[0].payload.data.reason).toBe('entrega_atrasada');
   await db.pool.query(`UPDATE commerce.orders SET delivery_status='delivered',delivered_at=now() WHERE id=$1`,[id]);
   const send=vi.fn(async()=>({status:200,body:''}));await delivery.deliverEvents(db.pool,send);expect(send).not.toHaveBeenCalled();
   await db.pool.query(`UPDATE commerce.orders SET delivery_status='pending',scheduled_delivery_date=NULL WHERE id=$1`,[id]);
   const unknown=await snapshots.readSnapshot('order',id,db.pool);expect(unknown!.data.reason).toBe('entrega_agendada');
+  const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.delivery_without_date=true;
+  await settings.saveSettings(value,0,identity.person_id,db.pool);
+  expect((await snapshots.readSnapshot('order',id,db.pool,new Date(Date.now()+25*3600000)))!.data.reason).toBe('entrega_sem_atualizacao_e_sem_prazo');
 });
 it('tabelas privadas ficam fora do catálogo e do acesso do parceiro',async()=>{
   const sources=(await import('../../src/admin/dot/full-catalog.js')).fullSources;

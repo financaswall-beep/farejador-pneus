@@ -18,11 +18,13 @@ window.PAINEL_MENU_ITEMS = Object.freeze([
   { id: 'colaboradores', label: 'Colaboradores', icon: 'users', requires: 'colaboradores' },
   { id: 'catalogo', label: 'Catálogo', icon: 'tag', requires: 'catalogo' },
   { id: 'relatorios', label: 'Relatórios', icon: 'chart-no-axes-combined', requires: ['vendas','compras','estoque','logistica','financeiro','rede','bot'] },
+  { id: 'config', label: 'Avisos do assistente', icon: 'bell-ring', requires: 'resumo' },
 ]);
 
 // Registro único do ciclo de vida das páginas. As telas do parceiro acrescentam
 // seus handlers nos PRs próprios, sem criar outro watcher ou outro encanamento.
 window.PAINEL_PAGES = {
+  config: { scopes: ['matrix'], requires: 'resumo', ownerOnly: true, load: ['dotAlertsLoad'] },
   relatorios: { scopes: ['matrix'], requires: ['vendas','compras','estoque','logistica','financeiro','rede','bot'], load: ['rpOpen'] },
   resumo: { scopes: ['matrix', 'partner'], requires: 'resumo', matrixLoad: ['loadMatrizOverview'], partnerLoad: ['loadPartnerResumo'] },
   rede: { scopes: ['matrix'], requires: 'rede', load: ['loadComissoes'], render: [
@@ -75,7 +77,7 @@ window.PAINEL_MODULES.nav = function () {
 
     panelPageEnabled(pageId) {
       const page = window.PAINEL_PAGES[pageId];
-      return !!page && page.scopes.includes(this.panelScope) && [page.requires].flat().some(module=>this.hasPanelModule(module));
+      return !!page && (!page.ownerOnly || this.adminUser?.role === 'owner') && page.scopes.includes(this.panelScope) && [page.requires].flat().some(module=>this.hasPanelModule(module));
     },
 
     firstPanelPage() {
