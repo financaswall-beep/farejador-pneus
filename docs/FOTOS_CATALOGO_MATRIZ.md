@@ -13,6 +13,8 @@ As imagens do app são lidas autenticadas e exibidas por URLs Blob locais, sem t
 
 Uma foto basta. O sistema não inventa ângulos. Cada arquivo passa por validação, orientação, limite de pixels,
 remoção de EXIF/GPS, redução e conversão para WebP. Guarda uma cópia sem marca e uma derivada com “2W”.
+A marca usa curvas vetoriais e dispensa fontes no container. Fotos já processadas mantêm o arquivo existente;
+o desenho corrigido é aplicado nos novos uploads/importações e nas substituições.
 O bucket `farejador-matrix-catalog` é privado; somente rotas owner autenticadas servem as imagens no painel.
 Os tokens do Supabase e do Google nunca são enviados ao navegador.
 Substituir uma foto preserva a versão anterior no histórico técnico privado, mas tira a versão antiga do uso no bot.
