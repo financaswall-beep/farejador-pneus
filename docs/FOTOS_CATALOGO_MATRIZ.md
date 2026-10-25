@@ -19,10 +19,16 @@ Substituir uma foto preserva a versão anterior no histórico técnico privado, 
 
 ## Atendimento
 
-A ferramenta existente `pedir_foto` continua sendo a entrada. Primeiro resolve produto, localização, estoque e loja
-pelas regras atuais. Somente se a unidade escolhida for `main` consulta a galeria habilitada do produto exato e ambiente.
+A ferramenta existente `pedir_foto` continua sendo a entrada. Se o cliente pediu referência da Matriz ou o produto
+já foi escolhido na Matriz, `loja=matriz` consulta a galeria habilitada do produto exato e ambiente **24 horas**,
+sem exigir estoque, localização do cliente ou loja aberta. A imagem não confirma estoque, reserva ou atendimento físico.
+Nos demais casos, primeiro resolve produto, localização, estoque e loja pelas regras atuais. Somente se a unidade escolhida for `main` consulta a galeria.
 Com imagem, enfileira a principal ou o ângulo pedido no outbox já existente. Sem imagem/ângulo, continua e cria o
-pedido de foto à loja. Não substitui fotos de parceiros por imagens da Matriz.
+pedido de foto à loja, sujeito ao expediente. Não substitui fotos de parceiros por imagens da Matriz.
+
+Lojas fechadas não encerram o atendimento do bot: consultas de catálogo mantêm os dados e retornam a situação do
+atendimento presencial separadamente. O bot não deve transformar ausência de loja aberta em prova de estoque zerado.
+Pedidos, retirada/entrega imediata e fotos novas da equipe continuam protegidos pelas regras existentes de expediente.
 
 Pedidos de foto atual, de exemplar ou de desgaste/sulcos seguem para a loja. A legenda da galeria diz explicitamente
 que é referência do modelo, sem comprovar o estado de um seminovo. `foto_atual=true` também força o fluxo sob demanda.

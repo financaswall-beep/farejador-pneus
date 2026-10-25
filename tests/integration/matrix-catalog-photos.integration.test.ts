@@ -129,4 +129,29 @@ describe('galeria isolada e envio real pelo outbox',()=>{
    expect((await client.query(`SELECT unit_id FROM commerce.photo_requests WHERE environment='test'`)).rows).toEqual([{unit_id:main}]);
   }finally{await client.query('ROLLBACK');client.release();}
  });
+ it('envia referência da Matriz à meia-noite, sem estoque e sem exigir localização; foto atual continua com a equipe',async()=>{
+  const {executeTool}=await import('../../src/atendente-v2/tools.js');
+  const {withStoreOpeningContext}=await import('../../src/atendente-v2/routing-store-hours.js');
+  const {tryRequestedMatrixCatalogPhoto}=await import('../../src/catalog-photos/bot.js');
+  await message('Quero uma foto de referência do pneu da Matriz');
+  const client=await db.pool.connect();try{
+   await client.query('BEGIN');
+   await client.query(`UPDATE commerce.matriz_delivery_settings SET settings=jsonb_set(settings,'{store_hours}',
+    '[{"day":1,"opens_at":"08:00","closes_at":"18:00"}]'::jsonb) WHERE environment='test'`);
+   expect((await client.query(`SELECT count(*) n FROM commerce.stock_levels WHERE environment='test' AND product_id=$1`,[product])).rows[0].n).toBe('0');
+   const call=(args:Record<string,unknown>)=>withStoreOpeningContext('test',()=>executeTool(client,'test',conversation,'pedir_foto',{
+    product_id:product,...args}),new Date('2026-10-25T03:15:00Z'));
+   expect(await tryRequestedMatrixCatalogPhoto(client,'test',conversation,product,{})).toBeNull();
+   const out=JSON.parse(await call({loja:'matriz'}));
+   expect(out).toMatchObject({status:'foto_enfileirada',origem:'galeria_matriz',tipo:'referencia'});
+   expect(out.orientacao).toContain('não confirma estoque');
+   const rows=await client.query(`SELECT body FROM ops.outbound_messages WHERE environment='test' AND conversation_id=$1 AND kind='photo_attachment' AND trigger_message_id=
+    (SELECT id FROM core.messages WHERE environment='test' AND conversation_id=$1 ORDER BY sent_at DESC,id DESC LIMIT 1)`,[conversation]);
+   expect(rows.rows).toHaveLength(1);expect(JSON.parse(rows.rows[0].body)).toMatchObject({product_id:product,unit_id:main});
+   expect((await client.query(`SELECT count(*) n FROM commerce.photo_requests WHERE environment='test'`)).rows[0].n).toBe('0');
+   const actual=JSON.parse(await call({loja:'matriz',foto_atual:true,municipio:'Rio de Janeiro'}));
+   expect(actual).toMatchObject({erro:'lojas_fechadas',atendimento_agora:false});
+   expect((await client.query(`SELECT count(*) n FROM commerce.photo_requests WHERE environment='test'`)).rows[0].n).toBe('0');
+  }finally{await client.query('ROLLBACK');client.release();}
+ });
 });

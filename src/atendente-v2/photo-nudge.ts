@@ -64,6 +64,6 @@ export const PHOTO_NUDGE = `\n\n[CLIENTE PEDIU FOTO 📸] O cliente acabou de pe
 /** Reforça a regra de conjunto no turno, sem inferir UUIDs a partir de texto livre. */
 export function photoRequestNudge(text: string | null | undefined, lastAssistantText?: string | null): string {
   if (!customerWantsPhoto(text, lastAssistantText)) return '';
-  return PHOTO_NUDGE + '\nNa Matriz, pedir_foto pode retornar foto_enfileirada ou foto_ja_enfileirada da galeria. Nesse caso, é imagem de referência: não diga que avisou a loja, nem que a entrega foi confirmada; não crie outro pedido. Para foto atual ou desgaste do exemplar, use foto_atual=true.'
+  return PHOTO_NUDGE + '\nSe o cliente pediu uma referência da Matriz ou esse é o produto já escolhido na Matriz, chame pedir_foto com loja="matriz": a galeria atende 24h, mesmo sem estoque, localização ou loja aberta. Não troque a loja de um parceiro por causa da foto. foto_enfileirada/foto_ja_enfileirada é referência: não confirme estoque ou entrega, nem diga que avisou a equipe; não crie outro pedido. Para foto atual ou desgaste do exemplar use foto_atual=true, que depende da equipe e do expediente.'
     + '\nSe o pedido é foto DOS DOIS pneus escolhidos, use product_ids com os dois UUIDs já consultados aqui na mesma chamada pedir_foto. Não solicite só o último pneu. Se não estiver claro quais são os dois, pergunte quais; não escolha duas alternativas por conta própria. Leia o resultado de cada pneu antes de confirmar.';
 }
