@@ -1,4 +1,5 @@
-import { BOT_COST_TOTALS_SQL } from './bot-cost-select.js';
+import {readBotVisaoCards} from './bot-cost-select.js';
+import {readBotCostBreakdown,type BotCostBreakdown} from './bot-cost-breakdown.js';
 import type { VehicleReportFilter } from '../../shared/tire-vehicle-type.js';
 import { getBotVehicleDemand } from './bot-vehicle-demand.js';
 import { botDemandLocationSql } from './bot-demand-location-sql.js';
@@ -16,6 +17,7 @@ export interface BotVisaoHorarioRow {
 }
 
 export interface BotVisaoPayload {
+  custo_detalhado:BotCostBreakdown|null;
   cards: Record<string, unknown> | null;
   mapa: BotVisaoMapaRow[];
   sem_regiao: number;
@@ -52,6 +54,7 @@ export async function getBotVisao(
     : `date_trunc('month', ${todaySql})::date`;
 
   const out: BotVisaoPayload = {
+    custo_detalhado:null,
     cards: null, mapa: [], sem_regiao: 0, radar: [],
     demanda_disponivel: false, medidas_por_municipio: null,
     funil: [], perdas: [], boca: [], medidas_top: [], horarios: [],
@@ -59,42 +62,13 @@ export async function getBotVisao(
 
   // Defensivo por bloco (padrão getMatrizResumo): um bloco quebrado não derruba a tela.
   try {
-    const r = await dbPool.query(
-      `SELECT
-         COALESCE(sum(conversas_total), 0)::int AS conversas,
-         COALESCE(sum(fecharam), 0)::int AS fecharam,
-         COALESCE(sum(escalaram), 0)::int AS escalaram,
-         COALESCE(sum(abandonaram), 0)::int AS abandonaram,
-         ${BOT_COST_TOTALS_SQL},
-         CASE WHEN sum(conversas_total) > 0
-              THEN round(100.0 * sum(fecharam) / sum(conversas_total), 1) ELSE 0 END AS taxa_conversao,
-         COALESCE(sum(faturamento), 0)::numeric AS faturamento,
-         CASE WHEN sum(fecharam) > 0
-              THEN round(sum(faturamento) / sum(fecharam), 2) ELSE NULL END AS ticket_medio,
-         round(avg(resposta_media_seg) FILTER (WHERE resposta_media_seg IS NOT NULL))::int AS resposta_seg,
-         COALESCE(sum(conv_madrugada), 0)::int AS conv_madrugada,
-         COALESCE(sum(conv_manha), 0)::int AS conv_manha,
-         COALESCE(sum(conv_tarde), 0)::int AS conv_tarde,
-         COALESCE(sum(conv_noite), 0)::int AS conv_noite
-       FROM analytics.v_daily_metrics
-       WHERE environment = $1 AND dia >= ${sinceSql}`,
-      [environment],
-    );
-    out.cards = r.rows[0] ?? null;
-    if (out.cards) {
-      // Card "Resumo das últimas 48h" (aba Conversas): régua FIXA de 48h — NÃO
-      // acompanha o seletor de período. Conversas distintas com resposta do bot
-      // ENTREGUE (mesma régua delivered da campainha/stale-trigger).
-      const r48 = await dbPool.query<{ respondidas_bot_48h: number }>(
-        `SELECT count(DISTINCT t.conversation_id)::int AS respondidas_bot_48h
-         FROM agent.turns t
-         WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status IN ('delivered', 'sent_api_ack')
-           AND t.created_at > now() - interval '48 hours'`,
-        [environment],
-      );
-      out.cards.respondidas_bot_48h = r48.rows[0]?.respondidas_bot_48h ?? 0;
-    }
+    out.cards=await readBotVisaoCards(dbPool,environment,sinceSql);
   } catch { /* view ausente → cards null, tela avisa */ }
+
+  try {
+    const dates=await dbPool.query(`SELECT (${sinceSql})::text AS "from",${todaySql}::text AS "to"`);
+    out.custo_detalhado=await readBotCostBreakdown(dbPool,environment,dates.rows[0].from,dates.rows[0].to);
+  } catch { /* indisponível não vira custo zero */ }
 
   try {
     // Série horária da mesma população-base dos cards: uma conversa conta uma vez,

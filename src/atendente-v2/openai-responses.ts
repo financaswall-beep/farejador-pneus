@@ -3,6 +3,7 @@ import { env } from '../shared/config/env.js';
 import { isReasoningModel } from '../shared/openai-model.js';
 import type { ChatMessage, ToolCall, ToolDefinition } from './types.js';
 import { requestOpenAIResponse, type OpenAIUsageObserver } from './openai-responses-http.js';
+import {staticPromptCache} from './prompt-cache.js';
 
 const outputSchema = z.array(z.discriminatedUnion('type', [
   z.object({ type: z.literal('reasoning') }).passthrough(),
@@ -62,8 +63,9 @@ export interface AgentModelResponse {
  * criptografado) entre ferramentas, sem gravá-los no banco ou nos logs.
  * agent.turns.actions continua no formato ChatMessage usado pelo histórico.
  */
-export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: ToolDefinition[], observer?: OpenAIUsageObserver) {
-  const input = historyToInput(history);
+export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: ToolDefinition[], observer?: OpenAIUsageObserver,
+ options:{cacheStaticPrefix?:boolean}={}) {
+  const {input,...cacheOptions}=staticPromptCache(historyToInput(history),env.OPENAI_MODEL,options.cacheStaticPrefix===true);
   const tools = definitions.map(({ function: fn }) => ({ type: 'function', ...fn, strict: fn.strict ?? false }));
   const allowedNames = new Set(definitions.map((tool) => tool.function.name));
   const seenCallIds = new Set(input.filter((item) => item.type === 'function_call').map((item) => item.call_id));
@@ -81,10 +83,11 @@ export function createOpenAIResponsesTurn(history: ChatMessage[], definitions: T
       const raw = await requestOpenAIResponse(JSON.stringify({
         model: env.OPENAI_MODEL,
         input, tools, tool_choice: 'auto',
+        ...cacheOptions,
         store: false,
         max_output_tokens: env.AGENT_V2_MAX_OUTPUT_TOKENS,
         ...(reasoningModel ? { reasoning: { effort: 'medium' }, include: ['reasoning.encrypted_content'] } : {}),
-        // Cache implícito do provedor; não enviar prompt_cache_retention, legado no GPT-5.6.
+        // GPT-6.1 marca somente as regras fixas; outros modelos mantêm o cache implícito anterior.
       }), observer);
       const envelope = z.object({ status: z.string(), output: z.unknown(),
         incomplete_details: z.object({ reason: z.string() }).nullish(), usage: z.unknown().optional(),

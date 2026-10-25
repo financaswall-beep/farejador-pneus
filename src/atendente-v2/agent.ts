@@ -25,6 +25,7 @@ import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { loadLastAcceptedAgentText } from './turn-guards.js';
 import { botMayProcessTrigger } from './conversation-control.js';
 import { createOpenAIResponsesTurn } from './openai-responses.js';
+import { buildAgentMessages } from './prompt-cache.js';
 import { loadCustomerMemory } from './customer-memory.js';
 import { loadCustomerContext } from './customer-context.js';
 import { withStockSearchTrace } from './stock-search-trace.js';
@@ -159,20 +160,17 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const deliveryNudge = env.DELIVERY_FREIGHT_FROM_PIN
       ? buildDeliveryQuoteFirstNudge(latestCustomerText, customerPin != null)
       : '';
-    const systemPromptWithContext =
-      basePrompt + (customerContext ?? '') + (customerMemory ?? '') + organicContext + (env.BOT_AUDIO_ENABLED?AUDIO_RULES:'')
+    const conversationContext =
+      (customerContext ?? '') + (customerMemory ?? '') + organicContext + (env.BOT_AUDIO_ENABLED?AUDIO_RULES:'')
       + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge
       + buildPurchaseContext(history) + cityClarificationNudge
       + await currentConfirmedStockPrompt(client,environment as Environment,stockRequestBeforeTurn);
 
-    const messages: ChatMessage[] = [
-      { role: 'system', content: systemPromptWithContext },
-      ...history,
-    ];
+    const messages=buildAgentMessages(env.OPENAI_MODEL,basePrompt,conversationContext,history);
 
     // 3. LLM loop with function calling
     const modelTurn = createOpenAIResponsesTurn(messages, activeToolDefinitions(),
-      event => recordBotModelUsage(client, job, event));
+      event => recordBotModelUsage(client, job, event),{cacheStaticPrefix:true});
     let inputTokens = 0;
     let outputTokens = 0;
     let cachedTokens = 0;

@@ -6,6 +6,7 @@ let db:IntegrationDb,conversation:string,job:{jobId:string;conversationId:string
 let record:typeof import('../../src/atendente-v2/model-usage.js').recordBotModelUsage;
 let overview:typeof import('../../src/admin/painel/matriz-overview-sales.js').readOverviewBotCost;
 let botVisao:typeof import('../../src/admin/painel/queries-bot-visao.js').getBotVisao;
+let breakdown:typeof import('../../src/admin/painel/bot-cost-breakdown.js').readBotCostBreakdown;
 const body=(id=randomUUID())=>({id,model:'gpt-5.6-sol',service_tier:'default',status:'completed',
   usage:{input_tokens:10_000,output_tokens:1_000,input_tokens_details:{cached_tokens:6_000,cache_write_tokens:2_000}},
   output:[{text:'Conteúdo privado que NÃO deve ser persistido na medição'}]});
@@ -20,6 +21,7 @@ beforeAll(async()=>{
   ({recordBotModelUsage:record}=await import('../../src/atendente-v2/model-usage.js'));
   ({readOverviewBotCost:overview}=await import('../../src/admin/painel/matriz-overview-sales.js'));
   ({getBotVisao:botVisao}=await import('../../src/admin/painel/queries-bot-visao.js'));
+  ({readBotCostBreakdown:breakdown}=await import('../../src/admin/painel/bot-cost-breakdown.js'));
   const contact=(await db.pool.query(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
     VALUES('test',99178,'Custo teste') RETURNING id`)).rows[0].id;
   conversation=(await db.pool.query(`INSERT INTO core.conversations(environment,chatwoot_account_id,
@@ -49,6 +51,37 @@ it('conta todas as rodadas e respostas incompletas, inclusive sem agent.turns en
   await write(body());await write({...body(),status:'incomplete'});
   expect(await all()).toMatchObject({estimated_cents:44,calls:2,tokens:22_000,missing_usage:0});
   expect(Number((await db.pool.query('SELECT count(*) FROM agent.turns')).rows[0].count)).toBe(0);
+});
+it('registra e detalha 6.1 no painel, preservando contadores e privacidade',async()=>{
+  await write({...body(),model:'gpt-6.1-sol'});
+  expect((await db.pool.query('SELECT estimated_usd,pricing_version FROM ops.bot_model_usage')).rows[0])
+    .toEqual({estimated_usd:'0.0196000000',pricing_version:'sol:standard:2026-10-25'});
+  expect(await all()).toMatchObject({estimated_usd:.0196,missing_usage:0,cached_tokens:6000,cache_write_tokens:2000});
+  const view=await botVisao('today','test',db.pool);
+  expect(Number(view.cards!.custo_bot_usd)).toBe(.0196);
+  expect(view.custo_detalhado).toEqual({inputUsd:.004,cacheReadUsd:.0006,cacheWriteUsd:.005,outputUsd:.01,
+    totalUsd:.0196,calls:1,unavailableCalls:0});
+  expect(JSON.stringify(view.custo_detalhado)).not.toContain('Conteúdo privado');
+});
+it('agrega por faixa de CADA chamada, sem aplicar tarifa longa ao somar chamadas curtas',async()=>{
+  const response={...body(),model:'gpt-6.1-sol',usage:{input_tokens:200000,output_tokens:1000,
+    input_tokens_details:{cached_tokens:100000,cache_write_tokens:0}}};
+  await write(response);await write({...response,id:randomUUID()});
+  await write({...response,id:randomUUID(),usage:{...response.usage,input_tokens:300000}});
+  expect(await breakdown(db.pool,'test','2000-01-01','2100-01-01')).toMatchObject({
+    inputUsd:1.2,cacheReadUsd:.04,cacheWriteUsd:0,outputUsd:.035,totalUsd:1.275,calls:3,unavailableCalls:0});
+});
+it('não reprecifica nem inventa detalhamento para versão antiga, uso desconhecido ou TTL não preservado',async()=>{
+  await write({...body(),model:'gpt-6.1-sol'});
+  await db.pool.query("UPDATE ops.bot_model_usage SET pricing_version='historica',estimated_usd=0.5");
+  await write({...body(),model:'gpt-6.1-sol',usage:{input_tokens:12000,output_tokens:0,
+    input_tokens_details:{cached_tokens:4000,cache_write_tokens:7000,
+      cache_write_tokens_details:{ttl_30m_tokens:3000,ttl_12h_tokens:4000}}}});
+  await write(undefined,'test','timeout_unknown_usage');
+  expect(await all()).toMatchObject({estimated_usd:null,missing_usage:1});
+  expect(await breakdown(db.pool,'test','2000-01-01','2100-01-01')).toMatchObject({calls:0,unavailableCalls:3,totalUsd:0});
+  expect((await db.pool.query("SELECT estimated_usd FROM ops.bot_model_usage WHERE pricing_version='historica'")).rows[0].estimated_usd)
+    .toBe('0.5000000000');
 });
 it('consumo desconhecido não vira zero nem esconde o subtotal conhecido',async()=>{
   await write(body());await write(undefined,'test','timeout_unknown_usage');
