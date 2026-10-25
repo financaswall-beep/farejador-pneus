@@ -7471,6 +7471,16 @@
           <p class="text-xs text-gray-500">Custo do bot</p>
           <p class="text-2xl font-semibold mt-1" x-text="botCards?.custo_bot != null ? formatCurrency(Number(botCards.custo_bot)) : '—'"></p>
           <p class="text-[11px] text-gray-400" x-text="Number(botCards?.custo_bot_pendente)>0 ? 'Apuração incompleta · parcial '+formatCurrency(Number(botCards.custo_bot_parcial || 0)) : (botCards?.cambio_min == null ? 'Estimativa de IA no período' : Number(botCards.cambio_min) === Number(botCards.cambio_max) ? 'Estimado · câmbio de referência '+formatCurrency(Number(botCards.cambio_min))+'/US$' : 'Estimado · câmbio de referência de cada chamada')"></p>
+          <details class="mt-2 text-xs text-gray-600" x-show="botVisao?.custo_detalhado?.calls > 0">
+            <summary class="cursor-pointer">Detalhar em US$</summary>
+            <dl class="mt-2 space-y-1">
+              <template x-for="part in [{key:'inputUsd',label:'Entrada'},{key:'cacheReadUsd',label:'Leitura de cache'},{key:'cacheWriteUsd',label:'Gravação de cache'},{key:'outputUsd',label:'Resposta'}]" :key="part.key">
+                <div class="flex justify-between gap-2"><dt x-text="part.label"></dt><dd class="tabular-nums" x-text="Number(botVisao?.custo_detalhado?.[part.key] || 0).toLocaleString('pt-BR',{style:'currency',currency:'USD',minimumFractionDigits:4,maximumFractionDigits:6})"></dd></div>
+              </template>
+            </dl>
+            <p class="mt-2 text-gray-500" x-text="'Chamadas detalhadas: '+(botVisao?.custo_detalhado?.calls || 0)+'. Estimativa sem impostos e tarifas.'"></p>
+            <p class="mt-1 text-amber-700" x-show="botVisao?.custo_detalhado?.unavailableCalls > 0 || Number(botCards?.custo_bot_pendente)>0">Há chamadas antigas ou sem medição fora deste detalhamento.</p>
+          </details>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500">Faturamento (bot)</p>

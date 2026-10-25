@@ -10,6 +10,7 @@ vi.mock('../../../src/atendente-v2/tools.js',()=>({activeToolDefinitions:()=>[{t
 vi.mock('../../../src/shared/logger.js',()=>({logger:{warn:vi.fn(),error:vi.fn(),info:vi.fn()}}));
 const job={environment:'test',conversationId:'conv',jobId:'job',triggerMessageId:'trigger'};
 beforeEach(()=>{
+  vi.resetModules();
   Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://unused',CHATWOOT_HMAC_SECRET:'fixture',
     ADMIN_AUTH_TOKEN:'fixture',OPENAI_API_KEY:'fixture',OPENAI_MODEL:'gpt-5.6-sol',PARTNER_STOCK_CONFIRMATION:'true',
     ROUTING_GEO:'false',PHOTO_REQUESTS:'false',ORGANIC_ATTRIBUTION_ENABLED:'false',SATISFACTION_SURVEY:'false'});
@@ -18,6 +19,22 @@ beforeEach(()=>{
 });
 afterEach(()=>vi.unstubAllGlobals());
 describe('integração do agente com estado operacional',()=>{
+  it('no 6.1 mantém endereço já informado e correções de quantidade, entrega e pagamento fora do prefixo fixo',async()=>{
+    process.env.OPENAI_MODEL='gpt-6.1-sol';
+    const history=[{role:'user',content:'Quero dois pneus para retirar. Meu endereço é Rua Teste A, 10, Centro.'},
+      {role:'assistant',content:'Esse pneu fica R$ 89,00 cada.'},
+      {role:'user',content:'Mudei: quero só um, por entrega na Rua Teste B, 25, bairro Novo. Vou pagar no cartão.'}];
+    mock.history.mockResolvedValue(history);
+    const {runAgentV2}=await import('../../../src/atendente-v2/agent.js');await runAgentV2(job);
+    const payload=JSON.parse(String((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body));
+    expect(payload.model).toBe('gpt-6.1-sol');expect(payload.prompt_cache_options).toEqual({mode:'explicit',ttl:'30m'});
+    const fixed=payload.input[0];expect(fixed.role).toBe('developer');
+    expect(fixed.content[0].text).toContain('Reuse data already supplied in the conversation');
+    expect(JSON.stringify(fixed)).not.toContain('Rua Teste');
+    expect(payload.input[1].role).toBe('developer');expect(payload.input.slice(-history.length)).toEqual(history);
+    expect(JSON.stringify(payload.input.slice(1))).not.toContain('prompt_cache_breakpoint');
+    expect(mock.history).toHaveBeenCalledTimes(1);expect(mock.send).toHaveBeenCalledTimes(1);
+  });
   it('terceiro cumprimento gera encaminhamento real sem chamada OpenAI nem ferramenta comercial',async()=>{
     mock.history.mockResolvedValue([{role:'user',content:'Oi!'},{role:'assistant',content:'Como posso ajudar?'},
       {role:'user',content:'Bom dia!'},{role:'assistant',content:'Me conta o que precisa.'},{role:'user',content:'Boa noite!'}]);

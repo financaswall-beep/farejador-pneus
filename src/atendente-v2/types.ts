@@ -1,5 +1,5 @@
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
+  role: 'system' | 'developer' | 'user' | 'assistant' | 'tool';
   content: string | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
