@@ -27,4 +27,11 @@ describe('anexo do catálogo no sender existente',()=>{
   expect(mocks.read).not.toHaveBeenCalled();expect(mocks.send).not.toHaveBeenCalled();
   expect(client.query.mock.calls[0][0]).toContain("u.slug='main'");
  });
+ it('envia a foto sem legenda técnica, mantendo anexo e deduplicação',async()=>{
+  mocks.read.mockResolvedValue(await sharp({create:{width:200,height:200,channels:3,background:'black'}}).webp().toBuffer());
+  const client={query:vi.fn(async()=>({rows:[{storage_path:'private-catalog-path'}]}))};
+  await deliverOutboundRow(client as never,{...row,body:JSON.stringify({...JSON.parse(row.body),caption:''})});
+  expect(mocks.send.mock.calls[0]?.[2]).toBe('');expect(mocks.send.mock.calls[0]?.[3]).toBe('stable-catalog-echo');
+  expect(mocks.message).not.toHaveBeenCalled();
+ });
 });

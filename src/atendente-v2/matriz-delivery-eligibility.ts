@@ -6,7 +6,7 @@ import { env } from '../shared/config/env.js';
 import { cachedRoadDistanceKm } from '../shared/geo/geo-cache.js';
 import { getMatrizWholesaleStockQty, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { readDeliverySettings,matrizOrigin,matrizCoverageBlock,type DeliverySettings,type DeliveryBlock } from './matriz-delivery-settings.js';
-import { matrixStoreOpeningAllowed, storeOpeningBlockResponse } from './routing-store-hours.js';
+import { matrixStoreOrdersAllowed, storeOpeningBlockResponse } from './routing-store-hours.js';
 
 export interface MatrixEligibility {
   settings:DeliverySettings|null; origin:GeoPoint; distanceKm:number|null;
@@ -42,7 +42,7 @@ export async function evaluateMatrizDelivery(client:PoolClient,environment:Envir
     }
     if (!canFulfill && settings) block='insufficient_stock';
   }
-  if(!block && canFulfill && !matrixStoreOpeningAllowed(settings)) {
+  if(!block && canFulfill && !matrixStoreOrdersAllowed(settings)) {
     canFulfill=false;
     block=storeOpeningBlockResponse().erro==='horario_nao_confirmado'?'store_hours_unknown':'store_closed';
   }

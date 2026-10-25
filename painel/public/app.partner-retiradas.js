@@ -9,6 +9,11 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     const quantity = Number.isFinite(parsed) ? parsed : 0;
     return `${quantity}× ${item?.tire_size || item?.product_name || item?.item_name || 'item'}`;
   };
+  const windowBlocked = (app, row) => {
+    if (!row?.fulfillment_not_before || new Date(row.fulfillment_not_before).getTime() <= Date.now()) return false;
+    app.partnerRetiradasError = 'Atendimento disponível a partir de ' + app.formatDateTime(row.fulfillment_not_before) + '.';
+    return true;
+  };
   return {
     partnerRetiradasRows: [], partnerRetiradasLoading: false,
     partnerRetiradasError: '', partnerRetiradasNotice: '',
@@ -194,6 +199,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     },
     async partnerRetiradasStageSave(row, stage) {
       if (!row?.order_id || this.partnerRetiradasSavingId) return;
+      if (windowBlocked(this, row)) return;
       this.partnerRetiradasSavingId = row.order_id; this.partnerRetiradasError = '';
       const body = { stage, services: this.partnerRetiradasDraft(row) };
       try {
@@ -205,6 +211,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     },
     async partnerRetiradasConfirm(row) {
       if (!row?.order_id || this.partnerRetiradasSavingId) return;
+      if (windowBlocked(this, row)) return;
       this.partnerRetiradasSavingId = row.order_id; this.partnerRetiradasError = '';
       const body = { payment_method: this.partnerRetiradasPaymentFor(row), services: this.partnerRetiradasDraft(row) };
       try {

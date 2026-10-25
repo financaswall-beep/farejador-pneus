@@ -139,15 +139,15 @@ describe('TENHO ligado ao fechamento real do bot e à reserva existente',()=>{
       expect((await db.pool.query('SELECT quantity_reserved FROM commerce.partner_stock_levels WHERE id=$1',[unit.stockId])).rows).toEqual(before);
     }finally{await configureTestOpeningHours(db.pool,unit.unitId);}
   });
-  it('Matriz fechada informa abertura sem criar pedido; pedido existente continua consultável',async()=>{
+  it('Matriz fechada aceita pedido para próxima abertura; retry preserva pedido existente',async()=>{
     mocked.routing=null;const existing=await customer(), fresh=await customer();
     const trigger=randomUUID(), first=await close(existing,trigger);
     expect(first).toMatchObject({ok:true});
     await db.pool.query(`UPDATE commerce.matriz_delivery_settings SET settings=jsonb_set(settings,'{store_hours}',$1::jsonb)
       WHERE environment='test'`,[JSON.stringify(testOpeningHours.map(row=>({...row,closes_at:'11:00'})))]);
     try{
-      expect(await close(fresh,randomUUID())).toMatchObject({erro:'lojas_fechadas',proxima_abertura:{days_ahead:1,opens_at:'08:00'}});
-      expect((await db.pool.query('SELECT id FROM commerce.orders WHERE source_conversation_id=$1',[fresh])).rows).toHaveLength(0);
+      expect(await close(fresh,randomUUID())).toMatchObject({ok:true,atendimento_a_partir_de:'2026-10-13T11:00:00.000Z'});
+      expect((await db.pool.query('SELECT id FROM commerce.orders WHERE source_conversation_id=$1',[fresh])).rows).toHaveLength(1);
       expect(await close(existing,trigger)).toMatchObject({ok:true,repetido:true,order_number:first.order_number});
     }finally{await configureTestOpeningHours(db.pool);}
   });

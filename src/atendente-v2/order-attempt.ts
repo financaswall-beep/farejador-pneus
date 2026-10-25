@@ -34,8 +34,8 @@ export async function botOrderReplay(client: PoolClient, environment: Environmen
     WHERE environment=$1 AND id=$2 FOR UPDATE`, [environment, link.rows[0].partner_order_id]);
   await client.query(`SELECT id FROM commerce.orders WHERE environment=$1 AND id=$2 FOR UPDATE`,
     [environment, orderId]);
-  const result = await client.query<{ order_number: string; total_amount: string; live: boolean }>(
-    `SELECT o.order_number,o.total_amount,
+  const result = await client.query<{ order_number: string; total_amount: string; live: boolean;fulfillment_not_before:Date|null }>(
+    `SELECT o.order_number,o.total_amount,o.fulfillment_not_before,
       CASE WHEN o.partner_order_id IS NULL THEN o.status='open'
         AND o.retrieved_at IS NULL AND o.delivered_at IS NULL
       ELSE po.status<>'cancelled' AND po.deleted_at IS NULL
@@ -48,7 +48,8 @@ export async function botOrderReplay(client: PoolClient, environment: Environmen
   if (!row?.live) return JSON.stringify({ erro: 'pedido_desta_solicitacao_encerrado',
     order_number: row?.order_number, mensagem: 'Esta solicitação já foi atendida e o pedido foi encerrado. Não confirme uma nova reserva sem uma nova solicitação do cliente.' });
   return JSON.stringify({ ok: true, order_number: row.order_number, total: row.total_amount,
-    repetido: true, mensagem: `Pedido ${row.order_number} já registrado e aguardando atendimento.` });
+    repetido: true, atendimento_a_partir_de:row.fulfillment_not_before?.toISOString()??null,time_zone:'America/Sao_Paulo',
+    mensagem: `Pedido ${row.order_number} já registrado e aguardando atendimento.` });
 }
 
 export async function resolveBotOrderKey(client: PoolClient, environment: Environment,
