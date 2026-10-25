@@ -16,6 +16,7 @@
     const sales = tab === 'sales';
     const pickups = tab === 'pickups';
     const catalog = tab === 'catalog';
+    if(!catalog)Caixa.matrixPhotoGallery?.close();
     const stock = tab === 'stock';
     const stockDetail = tab === 'stock-detail';
     const stockReceipts = tab === 'stock-receipts';

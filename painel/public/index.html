@@ -286,6 +286,8 @@
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260916-vehicle-ui1"></script>
+<link rel="stylesheet" href="/admin/painel/catalog-photos.css?v=20261025-1">
+<script src="/admin/painel/app.catalogo.photos.js?v=20261025-1"></script>
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
@@ -303,7 +305,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261025-dot1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261025-photos1"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -10228,7 +10230,99 @@
 </article></template></div></section>
 <p x-show="partnerCatalogo.compatibilityLoading" class="py-10 text-center text-sm text-gray-500">Carregando compatibilidades…</p><p x-show="partnerCatalogo.compatibilityError" class="rounded-lg bg-rose-50 p-3 text-sm text-rose-700" x-text="partnerCatalogo.compatibilityError"></p><div x-show="!partnerCatalogo.compatibilityLoading" class="grid gap-3 sm:grid-cols-2"><template x-for="row in partnerCatalogo.compatibility" :key="row.vehicle_model_id+'-'+row.position"><article class="min-w-0 rounded-xl border p-4"><b class="block truncate" x-text="partnerCatalogoVehicleLabel(row)"></b><span class="text-xs text-gray-500" x-text="partnerCatalogoYears(row)+' · '+(row.position==='front'?'Dianteiro':row.position==='rear'?'Traseiro':'Ambos')"></span><span x-show="row.is_oem" class="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">Aplicação original</span></article></template></div><p x-show="!partnerCatalogo.compatibilityLoading&&!partnerCatalogo.compatibility.length&&!partnerCatalogo.applications?.length&&!partnerCatalogo.compatibilityError" class="py-10 text-center text-sm text-gray-500">Nenhuma moto compatível cadastrada.</p></div></article></div>
     </div>
-    <div x-show="currentPage === 'catalogo' && isMatrixPanel()" class="space-y-5">
+    <!-- Fotos oficiais: somente o proprietário da Matriz. Parceiros usam o fluxo existente. -->
+    <nav x-show="currentPage === 'catalogo' && isMatrixPanel() && adminUser?.role === 'owner'" class="mcph-tabs" role="tablist" aria-label="Seções do Catálogo">
+      <button type="button" role="tab" :aria-selected="catalogSection === 'products'" @click="catalogSection='products'">Produtos e preços</button>
+      <button type="button" role="tab" :aria-selected="catalogSection === 'photos'" @click="catalogSection='photos'; mcphLoad()">Fotos para o bot</button>
+    </nav>
+    <section x-show="currentPage === 'catalogo' && isMatrixPanel() && adminUser?.role === 'owner' && catalogSection === 'photos'" x-cloak class="mcph-shell" aria-label="Fotos para o bot">
+      <header class="mcph-header">
+        <div><h2>Fotos para o bot</h2><p>Cadastre as imagens dos pneus da Matriz para o atendimento.</p></div>
+        <button type="button" class="mcph-secondary" @click="mcphLoad()" :disabled="matrixPhotos.loading || matrixPhotos.busy">Atualizar</button>
+      </header>
+      <p x-show="matrixPhotos.error" x-text="matrixPhotos.error" class="mcph-alert mcph-error" role="alert"></p>
+      <p x-show="matrixPhotos.notice" x-text="matrixPhotos.notice" class="mcph-alert mcph-success" aria-live="polite"></p>
+      <p x-show="matrixPhotos.loading" class="mcph-muted" role="status">Carregando fotos…</p>
+      <p x-show="!matrixPhotos.loading && !matrixPhotos.enabled && !matrixPhotos.error" class="mcph-alert">A galeria ainda precisa ser ativada no servidor. Seus produtos e preços continuam na outra aba.</p>
+      <p x-show="matrixPhotos.enabled && !matrixPhotos.storageReady" class="mcph-alert">O armazenamento de fotos precisa ser configurado para receber novas imagens.</p>
+      <p x-show="matrixPhotos.enabled && !matrixPhotos.botReady" class="mcph-alert">A galeria está disponível. O envio pelo bot ainda precisa ser ativado no servidor.</p>
+      <div x-show="matrixPhotos.enabled && !matrixPhotos.selected">
+        <label class="mcph-field" for="matrix-photo-search">Buscar pneu</label>
+        <input id="matrix-photo-search" class="mcph-search" placeholder="Medida, marca ou modelo" x-model="matrixPhotos.search" @input="matrixPhotos.page=1" type="search">
+        <nav class="mcph-tabs" role="tablist" aria-label="Situação das fotos">
+          <template x-for="filter in [{id:'all',label:'Todos'},{id:'missing',label:'Sem foto'},{id:'ready',label:'Prontos'},{id:'error',label:'Com erro'}]" :key="filter.id">
+            <button type="button" role="tab" :aria-selected="matrixPhotos.filter===filter.id" @click="matrixPhotos.filter=filter.id; matrixPhotos.page=1" x-text="filter.label"></button>
+          </template>
+        </nav>
+        <p class="mcph-muted" x-text="mcphFiltered().length+' pneus encontrados'"></p>
+        <div class="mcph-list">
+          <template x-for="row in mcphPageRows()" :key="row.product_id">
+            <article class="mcph-row">
+              <template x-if="mcphPrimary(row)"><img class="mcph-thumb" :src="mcphImage(mcphPrimary(row))" :alt="'Foto de '+row.product_name" loading="lazy"></template>
+              <span x-show="!mcphPrimary(row)" class="mcph-thumb mcph-placeholder" aria-hidden="true">Sem foto</span>
+              <div class="mcph-identity"><h3 x-text="row.tire_size"></h3><p x-text="row.brand+' · '+catalogoConditionLabel(row.tire_condition)"></p><p x-text="row.product_name"></p><span class="mcph-status" :class="{'is-ready':row.photos.length && row.enabled}" x-text="mcphStatus(row)"></span></div>
+              <button type="button" :class="row.photos.length?'mcph-secondary':'mcph-primary'" @click="mcphOpen(row)" x-text="row.photos.length?'Ver fotos':'Cadastrar fotos'"></button>
+            </article>
+          </template>
+          <p x-show="!matrixPhotos.loading && !mcphFiltered().length" class="mcph-empty">Nenhum pneu encontrado. Cadastre o produto em “Produtos e preços” antes de adicionar as fotos.</p>
+        </div>
+        <div class="mcph-pager" x-show="mcphFiltered().length>12">
+          <button type="button" class="mcph-secondary" @click="matrixPhotos.page--" :disabled="matrixPhotos.page<=1">Anterior</button><span x-text="'Página '+matrixPhotos.page"></span>
+          <button type="button" class="mcph-secondary" @click="matrixPhotos.page++" :disabled="matrixPhotos.page*12>=mcphFiltered().length">Próxima</button>
+        </div>
+        <p x-show="matrixPhotos.truncated" class="mcph-alert">A consulta atingiu o limite de 2.000 produtos. O catálogo completo continua em Produtos e preços.</p>
+      </div>
+      <div x-show="matrixPhotos.enabled && matrixPhotos.selected">
+        <button type="button" class="mcph-secondary" @click="mcphOpen(null)" :disabled="matrixPhotos.busy">← Voltar aos pneus</button>
+        <header class="mcph-header"><div><h2 x-text="matrixPhotos.selected?.tire_size"></h2><p x-text="(matrixPhotos.selected?.brand||'')+' · '+catalogoConditionLabel(matrixPhotos.selected?.tire_condition)"></p><p x-text="matrixPhotos.selected?.product_name"></p></div></header>
+        <div class="mcph-detail">
+          <article class="mcph-panel">
+            <nav class="mcph-tabs" role="tablist" aria-label="Ângulo da foto">
+              <template x-for="angle in ['front','side','detail']" :key="angle"><button type="button" role="tab" :aria-selected="matrixPhotos.angle===angle" @click="matrixPhotos.angle=angle" :disabled="matrixPhotos.busy" x-text="mcphAngleLabel(angle)+(mcphPhoto(matrixPhotos.selected,angle)?' ✓':'')"></button></template>
+            </nav>
+            <template x-if="mcphPhoto()"><img class="mcph-viewer" :src="mcphImage(mcphPhoto())" :alt="mcphAngleLabel(matrixPhotos.angle)+' do pneu'"></template>
+            <div x-show="!mcphPhoto()" class="mcph-photo-empty"><strong>Adicione uma foto deste ângulo</strong><span class="mcph-muted">Uma foto já permite usar a galeria. As demais são opcionais.</span></div>
+            <input id="matrix-photo-camera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden @change="mcphUpload($event)">
+            <input id="matrix-photo-gallery" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="mcphUpload($event)">
+            <div class="mcph-actions">
+              <button type="button" class="mcph-primary" @click="document.getElementById('matrix-photo-camera').click()" :disabled="matrixPhotos.busy || !matrixPhotos.storageReady">Fotografar</button>
+              <button type="button" class="mcph-secondary" @click="document.getElementById('matrix-photo-gallery').click()" :disabled="matrixPhotos.busy || !matrixPhotos.storageReady">Escolher foto</button>
+            </div>
+            <p class="mcph-muted">A marca 2W é aplicada automaticamente. JPG, PNG ou WebP, até 10 MB.</p>
+            <button x-show="mcphPhoto() && !mcphPhoto()?.is_primary" type="button" class="mcph-secondary" style="margin-top:14px" @click="mcphSave({primary_id:mcphPhoto().id})" :disabled="matrixPhotos.busy">Usar como principal</button>
+            <p x-show="mcphPhoto()?.is_primary" class="mcph-status is-ready">✓ Foto principal do atendimento</p>
+            <a x-show="mcphPhoto()" :href="mcphImage(mcphPhoto())+'?original=true'" target="_blank" rel="noopener" class="mcph-muted" style="display:block;margin-top:12px">Ver cópia sem marca d’água ↗</a>
+          </article>
+          <aside class="mcph-panel">
+            <h3 style="font-size:21px;font-weight:700">Uso no atendimento</h3>
+            <label class="mcph-switch"><span>Permitir que o bot use estas fotos</span><input type="checkbox" :checked="matrixPhotos.selected?.enabled" @change="mcphSave({enabled:$event.target.checked})" :disabled="matrixPhotos.busy" aria-label="Permitir uso das fotos no bot"></label>
+            <p class="mcph-status" :class="{'is-ready':matrixPhotos.selected?.photos.length && matrixPhotos.selected?.enabled}" x-text="matrixPhotos.selected?mcphStatus(matrixPhotos.selected):''"></p>
+            <p class="mcph-notice" style="margin-top:12px">Quando o cliente pedir uma foto, o bot envia a principal. Outros ângulos são enviados se solicitados. Sem foto cadastrada, a loja recebe o pedido de foto.</p>
+            <p class="mcph-notice" style="margin-top:12px">Estas são fotos de referência. Pedidos de foto atual ou do desgaste do exemplar continuam com a loja.</p>
+            <button type="button" class="mcph-primary" style="width:100%;margin-top:18px" @click="mcphPreview()" :disabled="!mcphPrimary() || matrixPhotos.busy">Testar envio</button>
+            <details class="mcph-drive">
+              <summary>Importar automaticamente do Google Drive</summary>
+              <p x-show="!matrixPhotos.drive.configured" class="mcph-alert">A conexão do Drive precisa ser configurada no servidor. Você já pode cadastrar fotos pela câmera ou galeria.</p>
+              <p x-show="matrixPhotos.drive.email" class="mcph-notice">Compartilhe uma pasta exclusiva deste pneu com o e-mail abaixo, como <strong>leitor</strong>.</p>
+              <code x-text="matrixPhotos.drive.email"></code>
+              <label class="mcph-field" for="matrix-drive-folder">Link da pasta deste pneu</label>
+              <input id="matrix-drive-folder" class="mcph-search" type="text" x-model="matrixPhotos.folder" placeholder="Cole o link da pasta do Drive">
+              <label class="mcph-switch"><span>Importação automática</span><input type="checkbox" x-model="matrixPhotos.driveEnabled" aria-label="Importação automática do Drive"></label>
+              <p class="mcph-notice">Nomeie as imagens como <strong>principal.jpg</strong>, <strong>lateral.jpg</strong> e <strong>detalhe.jpg</strong>. PNG e WebP também funcionam. Uma foto por ângulo; o sistema não cria ângulos novos.</p>
+              <button type="button" class="mcph-secondary" style="margin:14px 0" @click="mcphSave({drive_folder_id:matrixPhotos.folder,drive_enabled:matrixPhotos.driveEnabled})" :disabled="matrixPhotos.busy">Salvar pasta e importação</button>
+              <p class="mcph-muted" x-show="matrixPhotos.selected?.drive_checked_at" x-text="'Última verificação: '+new Date(matrixPhotos.selected?.drive_checked_at).toLocaleString('pt-BR')"></p>
+              <p x-show="matrixPhotos.selected?.drive_error" x-text="mcphError(matrixPhotos.selected?.drive_error)" class="mcph-alert" role="status"></p>
+            </details>
+          </aside>
+        </div>
+        <section x-show="matrixPhotos.preview" class="mcph-preview" aria-label="Prévia da imagem no atendimento">
+          <h3 style="font-size:21px;font-weight:700;margin-bottom:12px">Prévia para o cliente</h3>
+          <figure><img :src="mcphImage(mcphPrimary())" alt="Foto principal com marca 2W"><figcaption x-text="mcphCaption()"></figcaption></figure>
+          <p class="mcph-muted">Esta é uma prévia. Nenhuma mensagem foi enviada.</p><button type="button" class="mcph-secondary" style="margin-top:12px" @click="matrixPhotos.preview=false">Fechar prévia</button>
+        </section>
+      </div>
+    </section>
+    <div x-show="currentPage === 'catalogo' && isMatrixPanel() && catalogSection === 'products'" class="space-y-5">
       <div x-show="adminUser?.role !== 'owner'" x-cloak class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         Catálogo em modo de consulta. Somente o proprietário pode cadastrar produtos, corrigir marcas ou alterar o preço oficial.
       </div>

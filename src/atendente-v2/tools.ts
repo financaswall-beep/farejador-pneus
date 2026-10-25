@@ -72,6 +72,7 @@ import { audioNeedsConfirmation } from './audio-transcription.js';
 import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRouteOptions,cancelStockConfirmation,CANCEL_STOCK_CONFIRMATION_TOOL } from './stock-confirmation.js';
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
+import { tryMatrixCatalogPhoto } from '../catalog-photos/bot.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 import { withStoreOpeningScope, matrixStoreIsOpen } from './routing-store-hours.js';
@@ -272,7 +273,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: 'pedir_foto',
       description:
-        'Solicita à loja uma foto real do pneu quando o cliente pede para vê-lo. Exige produto consultado e localização (bairro ou pino). foto_solicitada: confirme o pedido da foto; prazo_min é a estimativa, product_id identifica o pneu. Preserve a escolha seguindo PURCHASE CONTINUITY. precisa_produto: falta identificar o pneu. sem_loja: a loja não foi resolvida; confira localização/disponibilidade antes de prometer foto. limite_fotos: já há solicitação em andamento. Solicitar foto não confirma envio nem reserva.',
+        'Preserve a escolha seguindo PURCHASE CONTINUITY. Quando o cliente pede foto, consulta a galeria da Matriz se ela for a loja que atenderá. Sem foto cadastrada, pede à loja; parceiros seguem foto sob demanda. foto_enfileirada/foto_ja_enfileirada: imagem de referência, não prometa foto atual do exemplar nem crie outro pedido. Use foto_atual=true para verificar estado/desgaste do exemplar. Exige produto consultado e localização. foto_solicitada: confirme o pedido com prazo_min. precisa_produto/sem_loja: pergunte o que falta. Solicitação/enfileiramento não confirma entrega nem reserva.',
       parameters: {
         type: 'object',
         properties: {
@@ -284,6 +285,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             description: 'Para foto dos dois pneus escolhidos, passe os dois UUIDs consultados aqui. Não passe product_id junto. Não use duas alternativas da mesma medida sem o cliente escolher.' },
           bairro: { type: 'string', description: 'Bairro do cliente, se informado — acha a loja que TEM o pneu.' },
           municipio: { type: 'string', description: 'Cidade (opcional).' },
+          tipo_foto: { type: 'string', enum: ['principal','lateral','detalhe','todas'], description: 'Principal por padrão. Outros ângulos somente se solicitados.' },
+          foto_atual: { type: 'boolean', description: 'true quando o cliente pede foto atual, do exemplar ou para conferir desgaste. Solicita foto nova à loja.' },
         },
         required: [],
         additionalProperties: false,
@@ -1060,6 +1063,9 @@ async function executeToolInternal(
         if (!unitId) {
           return JSON.stringify({ status: 'sem_loja' });
         }
+
+        const catalogPhoto=await tryMatrixCatalogPhoto(client,environment,conversationId,productId,unitId,args);
+        if(catalogPhoto)return catalogPhoto;
 
         // Rótulo do card (medida em destaque) — snapshot do produto.
         const prod = await client.query<{ product_name: string; brand: string | null; tire_condition: string | null }>(

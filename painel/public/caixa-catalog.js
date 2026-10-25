@@ -84,6 +84,7 @@
 
   async function loadOperationCatalog(page, append) {
     if (!Caixa.canModule || !Caixa.canModule('estoque')) return;
+    Caixa.matrixPhotoGallery?.sync();
     const requestedPage = Math.max(1, Number(page) || 1);
     const request = ++state.request;
     const session = Caixa.sessionFingerprint();

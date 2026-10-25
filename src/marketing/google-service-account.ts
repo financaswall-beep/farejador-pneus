@@ -1,7 +1,8 @@
 import { constants, createPrivateKey, sign } from 'node:crypto';
 
 export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const scopes = { ads: 'https://www.googleapis.com/auth/adwords', conversions: 'https://www.googleapis.com/auth/datamanager' };
+const scopes = { ads: 'https://www.googleapis.com/auth/adwords', conversions: 'https://www.googleapis.com/auth/datamanager',
+  drive:'https://www.googleapis.com/auth/drive.readonly' };
 const encode = (value: object) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 
 /** OAuth JWT Bearer oficial. Nunca usa URLs ou delegação de usuário vindas do JSON. */

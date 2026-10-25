@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_partner_search_continuity_2026-10-15';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_matrix_catalog_photos_2026-10-25';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)
