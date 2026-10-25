@@ -16,6 +16,7 @@ function clientFor(stores:Store[]) {
   const query=vi.fn(async(sql:string,values:unknown[])=>{
     let rows:unknown[]=[];
     if(sql.includes('opening_hours_weekly'))rows=stores.filter(s=>(values[1] as string[]).includes(s.id)).map(s=>({unit_id:s.id,hours:s.hours}));
+    else if(sql.includes('commerce.matriz_delivery_settings'))rows=[{settings,version:1,updated_at:at}];
     else if(sql.includes('FROM network.partner_units pu'))rows=stores.map(s=>({unit_id:s.id,partner_id:s.id,
       partner_unit_id:s.id,slug:s.id,partner_name:s.id,unit_name:s.id,service_mode:'both',latitude:0,longitude:s.lng,
       delivery_radius_km:40,has_city_coverage:true,neighborhoods:[]}));
@@ -53,6 +54,34 @@ describe('horários na escolha de atendimento agora',()=>{
   it('horário ausente fica a confirmar; nunca é tratado como aberto',async()=>{
     expect((await decide([{id:'sem-cadastro',lng:.02,hours:null}],{...settings,store_hours:null})).out)
       .toMatchObject({erro:'horario_nao_confirmado',disponivel:false});
+  });
+  it.each(['buscar_produto','buscar_compatibilidade','verificar_estoque'])('%s preserva a consulta e informa atendimento físico fechado',async name=>{
+    const {client}=clientFor([{id:'a',lng:.02,hours:hours()}]);
+    const product={product_id:'p',price_amount:'89.00',total_stock_available:10};
+    const out=JSON.parse(await withStoreOpeningScope(client,'test',name,async()=>{
+      await filterOpeningCandidates(client,'test',[{ctx:{unitId:'a',unitName:'Loja'}}]);
+      return JSON.stringify({encontrado:true,produtos:[product],
+        ...(name==='buscar_compatibilidade'?{veiculos:[{produtos:[{...product,product_id:'p2'}]}]}:{})});
+    },at));
+    expect(out).toMatchObject({encontrado:true,produtos:[product],atendimento_agora:false,
+      atendimento_presencial:{erro:'lojas_fechadas',proxima_abertura:{opens_at:'08:00'}}});
+    expect(out).not.toHaveProperty('erro');expect(out.orientacao).toContain('24 horas');
+  });
+  it.each([false,true])('não troca foto de catálogo enfileirada por fechamento (lote=%s)',async batch=>{
+    const {client}=clientFor([{id:'a',lng:.02,hours:hours()}]);
+    const photo={status:'foto_enfileirada',origem:'galeria_matriz',tipo:'referencia'};
+    const result=batch?{status:'fotos_parciais',solicitacoes:[photo,{erro:'store_closed'}]}:photo;
+    const out=JSON.parse(await withStoreOpeningScope(client,'test','pedir_foto',async()=>{
+      await filterOpeningCandidates(client,'test',[{ctx:{unitId:'a',unitName:'Loja'}}]);return JSON.stringify(result);
+    },at));
+    expect(out).toEqual(result);
+  });
+  it('solicitar foto nova da equipe continua limitado ao horário da loja',async()=>{
+    const {client}=clientFor([{id:'a',lng:.02,hours:hours()}]);
+    const out=JSON.parse(await withStoreOpeningScope(client,'test','pedir_foto',async()=>{
+      await filterOpeningCandidates(client,'test',[{ctx:{unitId:'a',unitName:'Loja'}}]);return JSON.stringify({erro:'store_closed'});
+    },at));
+    expect(out).toMatchObject({erro:'lojas_fechadas',atendimento_agora:false});
   });
   it('não troca um bloqueio de cobertura por horário quando a Matriz está fora do raio',async()=>{
     const {client}=clientFor([]);

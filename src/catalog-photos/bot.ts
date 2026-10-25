@@ -7,7 +7,15 @@ import type { OutboundRow } from '../atendente-v2/outbound-worker.js';
 import { CatalogPhotoStorage } from './storage.js';
 import { catalogPhotoPayload } from './model.js';
 export const catalogCaption=(product:string)=>`Foto de referência: ${product}. A imagem mostra o modelo; não comprova o estado de um exemplar seminovo.`;
-/** Called only AFTER normal stock/geographic routing has selected the fulfilling unit. */
+/** Consulta explícita ao catálogo da Matriz não depende de estoque, localização ou expediente. */
+export async function tryRequestedMatrixCatalogPhoto(client:PoolClient,environment:Environment,conversationId:string,
+ productId:string,args:Record<string,unknown>):Promise<string|null>{
+ if(args.loja!=='matriz'||!env.MATRIZ_CATALOG_PHOTOS_ENABLED||!env.BOT_OUTBOX||args.foto_atual===true)return null;
+ const unit=(await client.query<{id:string}>(`SELECT id FROM core.units
+  WHERE environment=$1 AND slug='main' AND is_active`,[environment])).rows[0];
+ return unit?tryMatrixCatalogPhoto(client,environment,conversationId,productId,unit.id,args):null;
+}
+/** Unit comes from normal fulfillment routing or an explicit Matriz catalog consultation. */
 export async function tryMatrixCatalogPhoto(client:PoolClient,environment:Environment,conversationId:string,
  productId:string,unitId:string,args:Record<string,unknown>):Promise<string|null>{
  if(!env.MATRIZ_CATALOG_PHOTOS_ENABLED||!env.BOT_OUTBOX||args.foto_atual===true)return null;
@@ -45,7 +53,7 @@ export async function tryMatrixCatalogPhoto(client:PoolClient,environment:Enviro
  }
  if(!accepted)return JSON.stringify({status:'foto_nao_enfileirada',orientacao:'O controle da conversa impediu o envio. Não prometa foto enviada.'});
  return JSON.stringify({status:queued?'foto_enfileirada':'foto_ja_enfileirada',product_id:productId,quantidade:photos.length,
-  origem:'galeria_matriz',tipo:'referencia',orientacao:'Imagem de referência cadastrada. Enfileirar não comprova entrega. Não diga que é foto atual do exemplar. Não crie outro pedido de foto neste turno.'});
+  origem:'galeria_matriz',tipo:'referencia',orientacao:'Imagem de referência do catálogo da Matriz, disponível 24 horas. A foto não confirma estoque, reserva ou loja aberta. Enfileirar não comprova entrega. Não diga que é foto atual do exemplar. Não crie outro pedido de foto neste turno.'});
 }
 export async function authorizedCatalogPhoto(client:PoolClient,row:OutboundRow){
  const payload=catalogPhotoPayload(row.body);

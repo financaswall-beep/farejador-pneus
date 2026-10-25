@@ -72,7 +72,7 @@ import { audioNeedsConfirmation } from './audio-transcription.js';
 import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRouteOptions,cancelStockConfirmation,CANCEL_STOCK_CONFIRMATION_TOOL } from './stock-confirmation.js';
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
-import { tryMatrixCatalogPhoto } from '../catalog-photos/bot.js';
+import { tryMatrixCatalogPhoto,tryRequestedMatrixCatalogPhoto } from '../catalog-photos/bot.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 import { withStoreOpeningScope, matrixStoreIsOpen } from './routing-store-hours.js';
@@ -273,7 +273,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: 'pedir_foto',
       description:
-        'Preserve a escolha seguindo PURCHASE CONTINUITY. Quando o cliente pede foto, consulta a galeria da Matriz se ela for a loja que atenderá. Sem foto cadastrada, pede à loja; parceiros seguem foto sob demanda. foto_enfileirada/foto_ja_enfileirada: imagem de referência, não prometa foto atual do exemplar nem crie outro pedido. Use foto_atual=true para verificar estado/desgaste do exemplar. Exige produto consultado e localização. foto_solicitada: confirme o pedido com prazo_min. precisa_produto/sem_loja: pergunte o que falta. Solicitação/enfileiramento não confirma entrega nem reserva.',
+        'Preserve a escolha seguindo PURCHASE CONTINUITY. Foto de referência do catálogo da Matriz: use loja=matriz, disponível 24h sem depender de localização, estoque ou loja aberta. Use somente quando o cliente quer a Matriz ou o produto consultado é da Matriz. Outros casos mantêm a loja escolhida pelo roteamento e a foto sob demanda dos parceiros. Sem foto cadastrada, segue a solicitação à loja, sujeita ao expediente. foto_enfileirada/foto_ja_enfileirada não comprova entrega, estoque ou reserva. Use foto_atual=true para estado/desgaste do exemplar; exige equipe e localização. foto_solicitada: confirme o pedido com prazo_min. precisa_produto/sem_loja: pergunte o que falta.',
       parameters: {
         type: 'object',
         properties: {
@@ -285,6 +285,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             description: 'Para foto dos dois pneus escolhidos, passe os dois UUIDs consultados aqui. Não passe product_id junto. Não use duas alternativas da mesma medida sem o cliente escolher.' },
           bairro: { type: 'string', description: 'Bairro do cliente, se informado — acha a loja que TEM o pneu.' },
           municipio: { type: 'string', description: 'Cidade (opcional).' },
+          loja: { type: 'string', enum: ['matriz'], description: 'Somente para foto de referência da Matriz explicitamente solicitada ou já escolhida. Não transfere pedido nem usa a foto como foto atual de parceiro.' },
           tipo_foto: { type: 'string', enum: ['principal','lateral','detalhe','todas'], description: 'Principal por padrão. Outros ângulos somente se solicitados.' },
           foto_atual: { type: 'boolean', description: 'true quando o cliente pede foto atual, do exemplar ou para conferir desgaste. Solicita foto nova à loja.' },
         },
@@ -1018,6 +1019,8 @@ async function executeToolInternal(
         if (!productId) {
           return JSON.stringify({ status: 'precisa_produto' });
         }
+        const reference=await tryRequestedMatrixCatalogPhoto(client,environment,conversationId,productId,args);
+        if(reference)return reference;
         const deferredPhoto=await deferPhotoUntilStockConfirmed(client,environment,conversationId,productId);
         if(deferredPhoto)return deferredPhoto;
 

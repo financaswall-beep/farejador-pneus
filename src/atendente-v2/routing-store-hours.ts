@@ -93,18 +93,25 @@ export function storeOpeningBlockResponse(): Record<string,unknown> {
     mensagem: unknown ? 'Não consegui confirmar uma loja aberta agora. Há horário de loja ainda não cadastrado.'
       : opening ? `Não encontrei atendimento disponível agora. ${opening.nome_loja}: ${opening.texto}`
         : 'Não encontrei atendimento disponível agora nem próxima abertura cadastrada.',
-    orientacao: 'Não prometa atendimento imediato, estoque confirmado, foto ou pedido fechado. Informe a próxima abertura retornada. Pergunte se o cliente quer deixar a solicitação com o atendimento para a abertura; só após aceitar use escalar_humano com esse contexto. Horário desconhecido exige confirmação do atendimento, sem inventar. Não agende uma entrega nem reserve estoque por conta própria.' };
+    orientacao: 'O bot continua atendendo 24 horas. Não prometa atendimento presencial imediato, estoque confirmado, foto nova da equipe ou pedido fechado. Fotos de referência já cadastradas na Matriz podem ser consultadas com pedir_foto e loja=matriz, inclusive fora do expediente. Informe a próxima abertura da loja retornada. Só após aceitar deixar uma solicitação com a equipe use escalar_humano. Horário desconhecido exige confirmação, sem inventar. Não agende entrega nem reserve estoque por conta própria.' };
 }
 function hasProductAvailability(data: Record<string,unknown>): boolean {
-  const products = Array.isArray(data.produtos) ? data.produtos : [];
+  const products = Array.isArray(data.produtos) ? [...data.produtos] : [];
   if (Array.isArray(data.veiculos)) for (const vehicle of data.veiculos) products.push(...(vehicle.produtos ?? []));
   return products.some(product => Number(product.total_stock_available ?? product.total_stock ?? 0) > 0);
+}
+function hasQueuedCatalogPhoto(data:Record<string,unknown>):boolean {
+  const queued=(row:Record<string,unknown>)=>row.origem==='galeria_matriz' && row.tipo==='referencia'
+    && ['foto_enfileirada','foto_ja_enfileirada'].includes(String(row.status));
+  return queued(data)||(Array.isArray(data.solicitacoes)&&data.solicitacoes.some(row=>row&&typeof row==='object'&&queued(row)));
 }
 export async function withStoreOpeningScope(client: PoolClient, environment: Environment, name: string,
   run: () => Promise<string>, now?: Date): Promise<string> {
   if (!commercial.has(name)) return run();
   return withStoreOpeningContext(environment, async () => {
     const raw = await run(), data = JSON.parse(raw) as Record<string,unknown>, state = context()!;
+    // A imagem cadastrada já foi enfileirada; não depende de alguém presente na loja.
+    if(name==='pedir_foto' && hasQueuedCatalogPhoto(data))return raw;
     // Pedidos existentes continuam consultáveis mesmo depois que a loja fechou.
     if (data.ok === true || data.repetido || data.precisa_localizacao || data.precisa_municipio) return raw;
     if(data.erro && !['store_closed','store_hours_unknown','insufficient_stock'].includes(String(data.erro)))return raw;
@@ -114,7 +121,13 @@ export async function withStoreOpeningScope(client: PoolClient, environment: Env
     }
     const explicitBlock = data.erro === 'store_closed' || data.erro === 'store_hours_unknown';
     if (explicitBlock || (state.checked.size && ![...state.checked.values()].some(store => store.status.state === 'open'))) {
-      return JSON.stringify(storeOpeningBlockResponse());
+      const blocked=storeOpeningBlockResponse();
+      // Preserva os dados de catálogo para o atendimento 24h, sem prometer atendimento físico.
+      if(['buscar_produto','buscar_compatibilidade','verificar_estoque'].includes(name) && !data.erro) {
+        return JSON.stringify({...data,atendimento_agora:false,atendimento_presencial:blocked,
+          orientacao:'Continue a consulta de catálogo e preços. Loja fechada não significa falta de estoque: a disponibilidade local pode não estar confirmada. Não prometa retirada, entrega ou reserva imediata. Para foto de referência da Matriz use pedir_foto com loja=matriz; a galeria funciona 24 horas.'});
+      }
+      return JSON.stringify(blocked);
     }
     return raw;
   }, now);
