@@ -3,6 +3,8 @@ import type { DotIdentity } from '../token-store.js';
 import { withDotReadOnly } from '../read-only.js';
 import { activeSubscriptionsSql,subscriptionParams } from './subscriptions.js';
 import { dotEventsState } from './availability.js';
+import { readSettings,ruleLabels } from './settings.js';
+import { signalSourceStatus } from './signals.js';
 
 export const monitorTool={name:'consultar_acompanhamento_matriz',
   description:'Consulta assinaturas ativas e contadores de eventos do acompanhamento, limites e horários. Não ativa, pausa ou envia avisos. Sem segredos ou destinos dos webhooks.',
@@ -19,10 +21,13 @@ export async function monitorStatus(identity:DotIdentity) {
       JOIN network.dot_event_subscriptions s ON s.environment=d.environment AND s.id=d.subscription_id
       WHERE d.environment=$1 AND s.person_id=$2 AND d.created_at>now()-interval '24 hours' GROUP BY d.status`,
     [env.FAREJADOR_ENV,identity.person_id]);
-    return {...state,subscriptions:subs.rows,last_24h:deliveries.rows,
-      policy:{wait_minutes:env.DOT_EVENTS_WAIT_MINUTES,cooldown_minutes:env.DOT_EVENTS_COOLDOWN_MINUTES,
-        normal_events_per_hour:env.DOT_EVENTS_MAX_PER_HOUR,quiet_start:env.DOT_EVENTS_QUIET_START_HOUR,
-        quiet_end:env.DOT_EVENTS_QUIET_END_HOUR,timezone:'America/Sao_Paulo'},
-      warning:'Entrega HTTP confirmada não prova análise pela Milly nem notificação ao dono. Confira o resultado no Dot. Sem monitor externo de indisponibilidade total.'};
+    const config=await readSettings(db);
+    const external=(await db.query('SELECT status,consecutive_failures,last_checked_at FROM ops.dot_external_health WHERE environment=$1',[env.FAREJADOR_ENV])).rows[0]??null;
+    return {...state,subscriptions:subs.rows,last_24h:deliveries.rows,settings:config,source_checks:signalSourceStatus(),external_monitor:external,
+      policy:{wait_minutes:config.settings.wait_minutes,cooldown_minutes:config.settings.cooldown_minutes,
+        normal_events_per_hour:config.settings.max_per_hour,limit_scope:'owner_all_subscriptions',quiet_start:config.settings.quiet_start,
+        quiet_end:config.settings.quiet_end,timezone:'America/Sao_Paulo',rules:ruleLabels},
+      warning:'Entrega HTTP confirmada não prova análise pela Milly nem notificação ao dono. Confira o resultado no Dot. '
+        +(external?'Confira a data da última verificação externa; um registro antigo não confirma monitor ativo.':'Monitor externo ainda sem verificação registrada.')};
   });
 }

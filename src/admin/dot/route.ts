@@ -8,8 +8,10 @@ import { validateDotAccess } from './token-store.js';
 import { createDotMcpServer } from './mcp-server.js';
 import { acquireDotRequest } from './request-limit.js';
 import { handleModernDot } from './protocol-v2.js';
+import { registerDotAlertSettings } from './events/route-settings.js';
 
 export async function registerDotRoutes(fastify:FastifyInstance) {
+  await registerDotAlertSettings(fastify);
   const config=dotConfig();
   if(!config)return;
   await fastify.register(async app=>{

@@ -61,5 +61,5 @@ it('permite ativar após corrigir a chave e passar por nova inicialização',asy
   config.DOT_EVENTS_ENCRYPTION_KEY='';await worker.initializeDotEvents(db);
   config.DOT_EVENTS_ENCRYPTION_KEY=valid;
   expect(await worker.initializeDotEvents(db)).toMatchObject({enabled:true,state:'ready',reason:null});
-  expect(db.query).toHaveBeenCalledTimes(3);
+  expect(db.query).toHaveBeenCalledTimes(5);
 });

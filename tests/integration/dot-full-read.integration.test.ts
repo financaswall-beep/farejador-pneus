@@ -1,6 +1,7 @@
 import {beforeAll,afterAll,expect,it,vi} from 'vitest';
 import {randomUUID,createHash} from 'node:crypto';
 import {startPostgres,stopPostgres,type IntegrationDb} from './helpers/postgres.js';
+import {businessDateSaoPaulo} from '../../src/shared/business-time.js';
 let db:IntegrationDb;
 let run:typeof import('../../src/admin/dot/consultations.js').runDotConsultation;
 let sources:typeof import('../../src/admin/dot/full-catalog.js').fullSources;
@@ -22,7 +23,7 @@ it('todas as fontes explícitas executam no schema real dentro de transação so
     expect(Array.isArray(result.registros)).toBe(true);
   }catch(e){failures.push(source.key+': '+(e as Error).message);}
   expect(failures).toEqual([]);
-  const today=new Date().toISOString().slice(0,10);
+  const today=businessDateSaoPaulo(new Date());
   expect(await run('consultar_relatorio_painel',{relatorio:'financeiro',filtros:{from:today,to:today}})).toHaveProperty('resultado');
   expect(await run('consultar_extrato_matriz',{})).toMatchObject({available:true,rows:[]});
 },120000);
@@ -82,7 +83,7 @@ it('datas civis não mudam de dia e valores decimais aceitam filtro numérico',a
 });
 
 it('relatórios completos reutilizam o painel e exportam somente a seção escolhida',async()=>{
-  const today=new Date().toISOString().slice(0,10);
+  const today=businessDateSaoPaulo(new Date());
   for(const relatorio of ['vendas','compras','estoque','logistica','parceiros','demanda','faltas']) {
     const description=await run('consultar_relatorio_painel',{relatorio,descrever:true});expect(description.filtros).toBeTruthy();
     const filtros=relatorio==='estoque'?{}:{from:today,to:today};

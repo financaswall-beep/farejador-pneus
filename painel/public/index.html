@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260930-results1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261006-atacado1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261025-dot1" />
 <style>
   #sino-dropdown{display:flex;flex-direction:column;max-height:calc(100dvh - 6rem)}
   #sino-dropdown>div{flex-shrink:0}
@@ -109,7 +109,7 @@
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260916-overview1"></script>
+<script src="/admin/painel/app.nav.js?v=20261025-dot1"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.rede.canario.js?v=20260823-partner-canary1"></script>
@@ -175,6 +175,7 @@
 <script src="/admin/painel/stock-waitlist-view.js?v=20261008-metal1"></script>
 <script src="/admin/painel/stock-waitlist.js?v=20261008-metal1"></script>
 <script src="/admin/painel/app.bot.waitlist.js?v=20261008-metal1"></script>
+<script src="/admin/painel/app.dot-alerts.js?v=20261025-1"></script>
 <link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20261008-metal1">
 <script src="/admin/painel/app.bot.js?v=20260927-waitlist1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20261008-legibilidade3"></script>
@@ -302,7 +303,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261006-atacado1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261025-dot1"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -11206,24 +11207,61 @@
       </div>
       <div x-show="rp.selectedSale&&rp.report==='vendas'" x-cloak class="rp-modal" role="dialog" aria-modal="true" aria-label="Itens da venda" @click.self="rp.selectedSale=null" @keydown.escape.window="rp.selectedSale=null"><article><header><div><small>ITENS NO RECORTE SELECIONADO</small><h2 x-text="rp.selectedSale?rpSaleLabel(rp.selectedSale):''"></h2><p x-text="rpDate(rp.selectedSale?.day)"></p></div><button class="rp-btn" @click="rp.selectedSale=null" aria-label="Fechar itens da venda">×</button></header><div class="rp-table-scroll"><table class="rp-table"><thead><tr><th>Medida / item</th><th>Quantidade</th><th>Valor</th><th x-show="rp.data?.can_view_costs">Custo histórico</th><th x-show="rp.data?.can_view_costs">Margem</th></tr></thead><tbody><template x-for="item in rp.selectedSale?.items||[]" :key="item.id"><tr><td class="rp-product-label"><b x-text="item.measure"></b><small x-text="item.brand+' · '+rpCondition(item.condition)"></small></td><td x-text="rpNumber(item.quantity)"></td><td x-text="rpMoney(item.revenue)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(item.cost)"></td><td x-show="rp.data?.can_view_costs" x-text="rpMoney(item.margin)"></td></tr></template></tbody></table></div><p>Somente os itens que atendem aos filtros do relatório aparecem aqui.</p></article></div>
     </section>
-    <!-- ═══ TELA: PLACEHOLDERS ═══ -->
-    <div x-show="currentPage === 'config'"
-         class="flex items-center justify-center min-h-[80vh] p-8">
-      <div class="text-center max-w-md">
-        <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm">
-          <i data-lucide="construction" class="w-8 h-8 text-gray-300"></i>
-        </div>
-        <h3 class="text-lg font-semibold mb-2" x-text="currentPageTitle()"></h3>
-        <p class="text-sm text-gray-500 mb-4 leading-relaxed">
-          Esta tela faz parte da <span class="text-brand-600 font-medium">Fase 2</span> do painel.
-          Vai entrar depois das 2 semanas de operação inicial, conforme prioridade real surgir.
-        </p>
-        <div class="inline-flex items-center gap-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
-          <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-          Aguardando aprovação da Fase 2
-        </div>
+    <section x-show="currentPage === 'config'" class="p-4 md:p-8 max-w-5xl mx-auto">
+      <header class="mb-6"><h2 class="text-2xl font-bold text-gray-900">Avisos do assistente</h2>
+        <p class="text-gray-600 mt-2">Escolha o que merece atenção. O assistente confere os fatos antes de avisar você.</p></header>
+      <p x-show="adminUser?.role !== 'owner'" class="rounded-xl bg-white border border-gray-200 p-5">Somente o proprietário pode configurar os avisos.</p>
+      <div x-show="adminUser?.role === 'owner'">
+        <p x-show="dotAlerts.loading" role="status" class="p-5">Carregando preferências…</p>
+        <p x-show="dotAlerts.error" x-text="dotAlerts.error" role="alert" class="p-4 mb-4 rounded-xl bg-red-50 text-red-800"></p>
+        <p x-show="dotAlerts.message" x-text="dotAlerts.message" role="status" class="p-4 mb-4 rounded-xl bg-emerald-50 text-emerald-800"></p>
+        <button type="button" @click="dotAlertsLoad()" :disabled="dotAlerts.loading || dotAlerts.saving" class="mb-4 min-h-[44px] underline text-emerald-700 disabled:opacity-50">Recarregar preferências</button>
+        <template x-if="dotAlerts.form">
+          <form @submit.prevent="dotAlertsSave()" class="space-y-5">
+            <fieldset :disabled="dotAlerts.saving" class="space-y-5">
+              <div class="bg-white border border-gray-200 rounded-2xl p-5">
+                <p class="font-semibold text-emerald-800" x-text="dotAlertsRuntimeLabel()"></p>
+                <p class="text-sm text-gray-600 mt-2">Ligar um tipo permite o envio. O assistente também precisa assinar esse acompanhamento na conexão Farejador.</p>
+                <label class="flex items-center gap-3 mt-4 min-h-[44px] cursor-pointer font-semibold"><input type="checkbox" x-model="dotAlerts.form.paused" class="w-6 h-6 accent-emerald-600">Pausar todos os avisos</label>
+              </div>
+              <section class="bg-white border border-gray-200 rounded-2xl p-5" aria-labelledby="dot-limits-title">
+                <h3 id="dot-limits-title" class="text-xl font-bold mb-2">Para não incomodar</h3>
+                <p class="text-sm text-gray-600 mb-4">Limites de envio ao assistente. Ele decide quais situações precisam de um aviso para você.</p>
+                <div class="grid sm:grid-cols-2 gap-4">
+                  <label class="text-sm font-medium">Máximo de eventos por hora<input required type="number" min="1" max="300" x-model.number="dotAlerts.form.max_per_hour" class="block mt-2 w-full rounded-lg border border-gray-300 p-3 text-lg"></label>
+                  <label class="text-sm font-medium">Intervalo mínimo por caso (minutos)<input required type="number" min="1" max="1440" x-model.number="dotAlerts.form.cooldown_minutes" class="block mt-2 w-full rounded-lg border border-gray-300 p-3 text-lg"></label>
+                  <label class="text-sm font-medium">Silêncio a partir de (hora)<input required type="number" min="0" max="23" x-model.number="dotAlerts.form.quiet_start" class="block mt-2 w-full rounded-lg border border-gray-300 p-3 text-lg"></label>
+                  <label class="text-sm font-medium">Voltar a enviar às (hora)<input required type="number" min="0" max="23" x-model.number="dotAlerts.form.quiet_end" class="block mt-2 w-full rounded-lg border border-gray-300 p-3 text-lg"></label>
+                </div>
+                <p class="text-sm text-gray-500 mt-3">Horário de São Paulo. Horas iguais deixam o envio disponível o dia todo. O teto vale para todos os acompanhamentos do proprietário juntos.</p>
+                <label class="flex items-center gap-3 mt-4 min-h-[44px] cursor-pointer"><input type="checkbox" x-model="dotAlerts.form.urgent_outside_hours" class="w-6 h-6 accent-emerald-600">Permitir falha registrada de entrega fora do horário de silêncio</label>
+              </section>
+              <div class="grid md:grid-cols-2 gap-4">
+                <template x-for="rule in dotAlerts.data.rules" :key="rule.name">
+                  <section class="bg-white border rounded-2xl p-5" :class="dotAlerts.form.events[rule.name] ? 'border-emerald-500' : 'border-gray-200'">
+                    <label class="flex items-start gap-3 cursor-pointer min-h-[44px]"><input type="checkbox" x-model="dotAlerts.form.events[rule.name]" class="w-6 h-6 mt-1 shrink-0 accent-emerald-600"><span class="text-lg font-bold" x-text="rule.label"></span></label>
+                    <p class="text-sm text-gray-600 leading-relaxed mt-2" x-text="rule.description"></p>
+                    <div x-show="dotAlerts.form.events[rule.name]" class="space-y-3 mt-4">
+                      <p class="text-sm font-medium text-gray-700" x-text="dotAlertConnection(rule.name)"></p>
+                      <template x-for="field in dotAlertFields(rule.name)" :key="field[0]">
+                        <label class="block text-sm font-medium"><span x-text="field[1]"></span><input required type="number" :min="field[2]" :max="field[3]" :step="field[0] === 'marketing_spend_brl' ? '0.01' : '1'" x-model.number="dotAlerts.form[field[0]]" class="block mt-2 w-full rounded-lg border border-gray-300 p-3 text-lg"></label>
+                      </template>
+                      <label x-show="rule.name === 'farejador.entrega.atencao'" class="flex items-center gap-3 min-h-[44px] cursor-pointer text-sm"><input type="checkbox" x-model="dotAlerts.form.delivery_without_date" class="w-5 h-5 accent-emerald-600">Incluir entregas paradas sem data combinada</label>
+                      <p x-show="rule.name === 'farejador.sistema.atencao'" class="text-sm text-gray-600">Detectar queda total depende de um monitor rodando fora do servidor.</p>
+                    </div>
+                  </section>
+                </template>
+              </div>
+              <div class="rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
+                <p x-text="dotAlerts.data.external_monitor ? 'Monitor externo: última verificação em ' + new Date(dotAlerts.data.external_monitor.last_checked_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Monitor externo: ainda sem verificação registrada.'"></p>
+                <p class="mt-2">As preferências são alteradas por você. O assistente continua com acesso de consulta aos dados da operação.</p>
+              </div>
+            </fieldset>
+            <button type="submit" :disabled="dotAlerts.saving" class="w-full sm:w-auto rounded-xl bg-emerald-600 text-white font-semibold text-lg px-8 py-4 disabled:opacity-50" x-text="dotAlerts.saving ? 'Salvando…' : 'Salvar preferências'"></button>
+          </form>
+        </template>
       </div>
-    </div>
+    </section>
   </main>
 </div>
 

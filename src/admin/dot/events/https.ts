@@ -27,7 +27,9 @@ export function callbackUrl(raw:string) {
 export type WebhookSender=(url:string,body:string,headers:Record<string,string>)=>Promise<{status:number;body:string}>;
 
 /** Resolve for each connection, pin the validated address, keep original TLS hostname. No redirects/proxies. */
-export const sendWebhook:WebhookSender=async(raw,body,headers)=>{
+export const sendWebhook:WebhookSender=(raw,body,headers)=>sendPublicRequest(raw,'POST',body,headers);
+export const getPublicHealth=(raw:string)=>sendPublicRequest(raw,'GET','',{});
+async function sendPublicRequest(raw:string,method:'GET'|'POST',body:string,headers:Record<string,string>) {
   const url=callbackUrl(raw);
   if(Buffer.byteLength(body)>256*1024)throw new Error('payload_too_large');
   let timer:NodeJS.Timeout|undefined;
@@ -37,8 +39,8 @@ export const sendWebhook:WebhookSender=async(raw,body,headers)=>{
   ]).finally(()=>clearTimeout(timer));
   if(!addresses.length||addresses.some(item=>!publicAddress(item.address)))throw new Error('invalid_callback');
   const address=addresses.find(item=>item.family===4)??addresses[0]!;
-  return new Promise((resolve,reject)=>{
-    const req=request(url,{method:'POST',agent:false,family:address.family,...{autoSelectFamily:false},
+  return new Promise<{status:number;body:string}>((resolve,reject)=>{
+    const req=request(url,{method,agent:false,family:address.family,...{autoSelectFamily:false},
       headers:{...headers,'content-length':Buffer.byteLength(body)},
       lookup:(_host,_options,done)=>done(null,address.address,address.family),
     },response=>{
