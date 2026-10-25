@@ -27,7 +27,7 @@ export interface IntegrationDb {
   connectionString: string;
 }
 
-export async function startPostgres(options: { throughMigration?: string } = {}): Promise<IntegrationDb> {
+export async function startPostgres(options: { throughMigration?: string; timeZone?: 'UTC' | 'America/Sao_Paulo' } = {}): Promise<IntegrationDb> {
   // Imagem alinhada com prod (Supabase usa Postgres 17.x).
   const container = process.env.FAREJADOR_TEST_POSTGRES_BIN
     ? await startPortablePostgres(process.env.FAREJADOR_TEST_POSTGRES_BIN)
@@ -41,7 +41,9 @@ export async function startPostgres(options: { throughMigration?: string } = {})
   // "postgres://...@localhost:PORT/..." mas o forwarding so funciona em IPv4.
   // Como Node.js resolve "localhost" pra IPv6 (::1), conexao falha com
   // ECONNRESET. Substituindo por 127.0.0.1 forca IPv4.
-  const connectionString = container.getConnectionUri().replace('@localhost:', '@127.0.0.1:');
+  const uri = new URL(container.getConnectionUri().replace('@localhost:', '@127.0.0.1:'));
+  if (options.timeZone) uri.searchParams.set('options', `-c TimeZone=${options.timeZone}`);
+  const connectionString = uri.toString();
   const pool = new Pool({ connectionString, max: 5 });
 
   try { await applyMigrations(pool, options.throughMigration); }

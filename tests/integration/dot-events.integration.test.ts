@@ -19,7 +19,8 @@ beforeAll(async()=>{
     CHATWOOT_HMAC_SECRET:'test-secret',CHATWOOT_ACCOUNT_ID:'1',ADMIN_AUTH_TOKEN:'test',DOT_MCP_ENABLED:'true',
     DOT_MCP_PUBLIC_ORIGIN:origin,DOT_EVENTS_ENABLED:'true',DOT_EVENTS_ENCRYPTION_KEY:Buffer.alloc(32,7).toString('base64'),
     DOT_EVENTS_QUIET_START_HOUR:'0',DOT_EVENTS_QUIET_END_HOUR:'0',DOT_EVENTS_MAX_PER_HOUR:'30'});
-  db=await startPostgres();process.env.DATABASE_URL=db.connectionString;vi.resetModules();
+  db=await startPostgres({timeZone:'UTC'});process.env.DATABASE_URL=db.connectionString;vi.resetModules();
+  expect((await db.pool.query("SELECT current_setting('TimeZone') zone")).rows[0].zone).toBe('UTC');
   const person=(await db.pool.query(`INSERT INTO network.partner_people(environment,username,password_hash)
     VALUES('test','dot-monitor-owner','hash-fixture') RETURNING id`)).rows[0].id;
   const collaborator=(await db.pool.query(`INSERT INTO network.matriz_collaborators
@@ -134,8 +135,8 @@ it('procura agrupa contatos distintos, exclui outra conta, desconhecido e estoqu
  const settings=await import('../../src/admin/dot/events/settings.js'),value=settings.defaultSettings();value.events['farejador.estoque.procura']=true;value.demand_contacts=2;
  await settings.saveSettings(value,0,identity.person_id,db.pool);
  const a=await conversation(),b=await conversation(),other=await conversation(2);
- const search=async(c:typeof a,stores:unknown,measure='110/90-17')=>db.pool.query(`INSERT INTO ops.bot_stock_searches(environment,conversation_id,search_key,tool_name,measure,stores)
-  VALUES('test',$1,$2,'buscar_produto',$3,$4)`,[c.id,randomUUID(),measure,JSON.stringify(stores)]);
+ const search=async(c:typeof a,stores:unknown,measure='110/90-17')=>db.pool.query(`INSERT INTO ops.bot_stock_searches(environment,conversation_id,search_key,tool_name,measure,stores,occurred_at)
+  VALUES('test',$1,$2,'buscar_produto',$3,$4,now()-interval '1 second')`,[c.id,randomUUID(),measure,JSON.stringify(stores)]);
  await search(a,[{available:false}]);await search(a,[{available:false}]);await search(other,[{available:false}]);await search(b,[]);await search(b,[{available:true}]);
  const {readSignals}=await import('../../src/admin/dot/events/signals.js');
  expect(await readSignals('farejador.estoque.procura',db.pool)).toEqual([]);
@@ -352,7 +353,7 @@ it('entrega vencida precisa de data registrada e conclusão cancela aviso',async
     ON CONFLICT(environment,slug) DO UPDATE SET name=EXCLUDED.name RETURNING id`)).rows[0].id;
   const id=(await db.pool.query(`INSERT INTO commerce.orders(environment,unit_id,contact_id,total_amount,status,
     fulfillment_mode,payment_method,delivery_status,scheduled_delivery_date,delivery_address)
-    VALUES('test',$1,$2,100,'open','delivery','pix','pending',current_date-1,'Rua de teste 1') RETURNING id`,[unit,c.contact])).rows[0].id;
+    VALUES('test',$1,$2,100,'open','delivery','pix','pending',(now() AT TIME ZONE 'America/Sao_Paulo')::date-1,'Rua de teste 1') RETURNING id`,[unit,c.contact])).rows[0].id;
   await db.pool.query("UPDATE ops.dot_monitor_targets SET changed_at=now()-interval '1 hour' WHERE entity_id=$1",[id]);
   await collect();expect((await db.pool.query('SELECT payload FROM ops.dot_event_deliveries')).rows[0].payload.data.reason).toBe('entrega_atrasada');
   await db.pool.query(`UPDATE commerce.orders SET delivery_status='delivered',delivered_at=now() WHERE id=$1`,[id]);

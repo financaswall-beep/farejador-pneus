@@ -9,7 +9,8 @@ beforeAll(async()=>{
   Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',DATABASE_SSL:'false',
     CHATWOOT_HMAC_SECRET:'test-secret',CHATWOOT_ACCOUNT_ID:'1',ADMIN_AUTH_TOKEN:'test-emergency',DOT_MCP_ENABLED:'false',
     MATRIZ_CENTRAL_LEDGER:'true',MATRIZ_CENTRAL_LEDGER_READ:'true',MATRIZ_LOGISTICS:'true',WHOLESALE_FINANCE:'true'});
-  db=await startPostgres();process.env.DATABASE_URL=db.connectionString;vi.resetModules();
+  db=await startPostgres({timeZone:'UTC'});process.env.DATABASE_URL=db.connectionString;vi.resetModules();
+  expect((await db.pool.query("SELECT current_setting('TimeZone') zone")).rows[0].zone).toBe('UTC');
   run=(await import('../../src/admin/dot/consultations.js')).runDotConsultation;
   sources=(await import('../../src/admin/dot/full-catalog.js')).fullSources;
 },240000);
@@ -116,7 +117,7 @@ it('folha individual e despesas do parceiro estão liberadas para o proprietári
     .toMatchObject({registros:[expect.objectContaining({base_salary:'2345.67'})]});
   const unit=(await db.pool.query(`INSERT INTO core.units(environment,slug,name) VALUES('test','partner-full-read','Loja teste') RETURNING id`)).rows[0].id;
   await db.pool.query(`INSERT INTO finance.partner_expenses(environment,unit_id,expense_date,category,description,amount,payment_method,created_by,idempotency_key)
-    VALUES('test',$1,current_date,'other','Conta particular da loja',123.45,'pix','qa',$2)`,[unit,randomUUID()]);
+    VALUES('test',$1,(now() AT TIME ZONE 'America/Sao_Paulo')::date,'other','Conta particular da loja',123.45,'pix','qa',$2)`,[unit,randomUUID()]);
   expect(await run('consultar_registros_matriz',{fonte:'finance.partner_expenses',filtros:[{campo:'unit_id',valor:unit}]}))
     .toMatchObject({registros:[expect.objectContaining({description:'Conta particular da loja',amount:'123.45'})]});
 });
