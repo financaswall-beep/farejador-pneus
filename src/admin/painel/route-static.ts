@@ -12,6 +12,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   for(const [file,type] of [['google-contact.css','text/css'],['google-contact.js','text/javascript'],['google-chatwoot.js','text/javascript']]) {
     fastify.get(`/admin/painel/assets/${file}`,async(_request,reply)=>sendStatic(reply.header('Cache-Control','no-store'),file!,`${type}; charset=utf-8`));
   }
+  fastify.get('/admin/painel/catalog-photos.css',async(_request,reply)=>sendStatic(reply,'catalog-photos.css','text/css; charset=utf-8'));
   fastify.get('/admin/login', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/login.js', async (_request, reply) =>
@@ -31,6 +32,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
+    'app.catalogo.photos.js',
     'app.atacado.requests.js',
     'app.catalogo.atacado.js',
     'stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',

@@ -21,7 +21,7 @@ export async function requestPhotoBatch(
   for (const id of ids) {
     results.push({ ...JSON.parse(await requestOne({ ...singleArgs, product_id: id })), product_id: id });
   }
-  const requested = results.filter(row => row.status === 'foto_solicitada' || row.status === 'aguardando_parceiro').length;
+  const requested = results.filter(row => ['foto_solicitada','aguardando_parceiro','foto_enfileirada','foto_ja_enfileirada'].includes(String(row.status))).length;
   return JSON.stringify({ status: requested === ids.length ? 'fotos_solicitadas' : requested ? 'fotos_parciais' : 'fotos_nao_solicitadas',
     total_solicitado: requested, solicitacoes: results,
     orientacao: 'Confira cada solicitação. Confirme somente as fotos solicitadas; aguardando_parceiro depende do TENHO. Solicitação não significa foto enviada.' });

@@ -3,6 +3,7 @@ import { resolveConversationOnce, sendAttachmentOnce, sendMessageOnce, type Send
 import type { OutboundRow } from './outbound-worker.js';
 import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js';
 import { tirePhotoForWhatsApp } from '../photos/codec.js';
+import { catalogPhotoPayload } from '../catalog-photos/model.js';
 
 export async function deliverOutboundRow(
   client: PoolClient,
@@ -24,6 +25,14 @@ export async function deliverOutboundRow(
   }
   if (row.kind !== 'photo_attachment') {
     return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
+  }
+  if(catalogPhotoPayload(row.body)){
+    const {readOutboundCatalogPhoto}=await import('../catalog-photos/bot.js');
+    const photo=await readOutboundCatalogPhoto(client,row);
+    const jpeg=await tirePhotoForWhatsApp(photo.bytes,photo.mime);
+    return sendAttachmentOnce(Number(row.chatwoot_conversation_id),{
+      buffer:jpeg.bytes,filename:'pneu-matriz.jpg',contentType:jpeg.mime,
+    },photo.caption,row.echo_id??undefined);
   }
   const parsed = JSON.parse(row.body) as { photo_request_id?: unknown; photo_blob_id?: unknown; caption?: unknown };
   if (typeof parsed.photo_request_id !== 'string' || typeof parsed.caption !== 'string') {
@@ -58,6 +67,7 @@ export async function markPhotoRequestSent(
     return;
   }
   if (row.kind !== 'photo_attachment') return;
+  if(catalogPhotoPayload(row.body))return;
   const parsed = JSON.parse(row.body) as { photo_request_id?: unknown };
   if (typeof parsed.photo_request_id !== 'string') {
     throw new Error('invalid photo attachment outbox payload after send');

@@ -3,6 +3,7 @@ import { validateProductionEnv } from './env-production-validation.js';
 import { marketingEnvShape } from './env-marketing.js';
 import { aiEnvShape } from './env-ai.js';
 import { dotEnvShape } from './env-dot.js';
+import { catalogPhotoEnvShape } from './env-catalog-photos.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 const optionalNonEmptyStringSchema = z.preprocess(
   (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -25,9 +26,8 @@ const envSchema = z.object({
   // role sem BYPASSRLS. Opcional pra nao quebrar ambientes que ainda nao
   // configuraram (dev/test/staging). Em prod, deve estar setado.
   PARTNER_DATABASE_URL: z.string().min(1).optional(),
-  // SHA do commit publicado. No Coolify, o compose recebe SOURCE_COMMIT e o
-  // repassa como APP_COMMIT_SHA; deploys por Dockerfile recebem SOURCE_COMMIT
-  // diretamente. parseEnv normaliza ambos para APP_COMMIT_SHA no /healthz.
+  // SHA publicado: compose e Dockerfile recebem SOURCE_COMMIT.
+  // parseEnv o normaliza para APP_COMMIT_SHA no /healthz.
   SOURCE_COMMIT: z.string().min(1).optional(),
   APP_COMMIT_SHA: z.string().min(1).default('unknown').transform((value) => value.toLowerCase()),
   DATABASE_POOL_MAX: z.string().transform(Number).pipe(z.number().int().min(1)).default('10'),
@@ -45,6 +45,7 @@ const envSchema = z.object({
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   ...aiEnvShape,
   ...dotEnvShape,
+  ...catalogPhotoEnvShape,
   SKIP_EVENT_TYPES: z
     .string()
     .default('')
@@ -294,7 +295,6 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
     const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
     throw new Error('Invalid environment variables:\n' + issues);
   }
-
   return parsed.data;
 }
 export const env = parseEnv();

@@ -4,6 +4,7 @@ import { humanHandoffActor, syncHumanIntervention } from './conversation-control
 import { recordOutboundEvent } from './outbound-events.js';
 import { validateResolutionOutbound } from './auto-resolve.js';
 import { validateStockConfirmationOutbound } from './stock-confirmation-outbound.js';
+import { catalogPhotoPayload } from '../catalog-photos/model.js';
 
 /** Última trava antes do HTTP, dentro da transação do caller, com lock até o ACK.
  * Mesmo após retomar, respostas antigas e fotos pedidas antes da retomada não saem. */
@@ -34,13 +35,15 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
           (COALESCE(m.sent_at,o.created_at)>$4 AND (o.kind<>'photo_attachment' OR EXISTS (
             SELECT 1 FROM commerce.photo_requests p WHERE p.environment=o.environment
               AND p.id::text=CASE WHEN o.kind='photo_attachment' THEN (o.body::jsonb)->>'photo_request_id' END
-              AND p.created_at>$4))))) AS allowed`,
+              AND p.created_at>$4) OR CASE WHEN o.kind='photo_attachment' THEN o.body::jsonb ? 'catalog_photo_id' ELSE false END)))) AS allowed`,
     [row.environment,row.conversation_id,row.id,state.resumed_at]);
     const handoffNotice = state.mode==='human' && row.kind==='agent_text'
       && state.updated_by===humanHandoffActor(row.id);
     const baseAllowed = (state.mode==='auto' || handoffNotice) && result.rows[0]?.allowed===true;
     const stockAllowed=row.kind!=='stock_text'||await validateStockConfirmationOutbound(client,row);
-    const allowed = baseAllowed && stockAllowed && (row.kind !== 'conversation_resolution'
+    const catalogAllowed=row.kind!=='photo_attachment'||!catalogPhotoPayload(row.body)
+      ||!!await (await import('../catalog-photos/bot.js')).authorizedCatalogPhoto(client,row);
+    const allowed = baseAllowed && stockAllowed && catalogAllowed && (row.kind !== 'conversation_resolution'
       || await validateResolutionOutbound(
         client,row.environment,row.conversation_id,row.id,row.body,
       ));

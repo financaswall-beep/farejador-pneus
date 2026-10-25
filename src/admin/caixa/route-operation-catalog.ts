@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { registerCatalogPhotoRoutes } from '../painel/route-catalogo-photos.js';
 import type { CaixaAuth } from './queries.js';
 import { logger } from '../../shared/logger.js';
 import { tireVehicleTypeSchema } from '../../shared/tire-vehicle-type.js';
@@ -34,6 +35,7 @@ export function registerCaixaOperationCatalogRoutes(
   fastify: FastifyInstance, guards: Guard[], requireOwner: Guard,
 ) {
   const read = { preHandler: guards }, write = { preHandler: [...guards, requireOwner] };
+  registerCatalogPhotoRoutes(fastify,{base,guards:[...guards,requireOwner],actor});
   fastify.get(base, read, async (_request, reply) => respond(reply, () => getMatrizOperationCatalog()));
   fastify.post(base + '/products', write, async (request, reply) => {
     const parsed = createProductBody.strict().safeParse(request.body);

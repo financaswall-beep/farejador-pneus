@@ -11,6 +11,7 @@ window.PAINEL_MONTAR = function (estado) {
     'comprasResumo:compras->comprasRelatorios',
   ]);
   const fabricas = [
+    window.PAINEL_MODULES.catalogPhotos,
     window.PAINEL_MODULES.dotAlerts,
     window.PAINEL_MODULES.botWaitlist,
     window.PAINEL_MODULES.vehicleTypes,

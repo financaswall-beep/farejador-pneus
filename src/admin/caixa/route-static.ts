@@ -23,6 +23,9 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
 
   text('/operacao', 'caixa.html', 'text/html; charset=utf-8');
   text('/operacao/', 'caixa.html', 'text/html; charset=utf-8');
+  text('/operacao/catalog-photos.css','catalog-photos.css','text/css; charset=utf-8');
+  text('/operacao/app.catalogo.photos.js','app.catalogo.photos.js','text/javascript; charset=utf-8');
+  text('/operacao/caixa-catalog-photos.js','caixa-catalog-photos.js','text/javascript; charset=utf-8');
   for (const url of ['/caixa', '/caixa/', '/vendas', '/caixa/vendas']) {
     fastify.get(url, { preHandler: flagGate }, async (_request, reply) =>
       reply.header('Cache-Control', 'no-store').redirect('/operacao#vendas'));
