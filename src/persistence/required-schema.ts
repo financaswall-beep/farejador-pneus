@@ -4,6 +4,8 @@ type Queryable = Pick<Pool, 'query'>;
 
 export const REQUIRED_SCHEMA_SQL = `
   SELECT
+    EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='commerce' AND table_name='orders' AND column_name='fulfillment_not_before')
+    AND
     to_regclass('commerce.matriz_delivery_settings') IS NOT NULL
     AND to_regclass('commerce.matriz_delivery_settings_events') IS NOT NULL
     AND

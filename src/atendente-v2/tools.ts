@@ -75,7 +75,8 @@ import { requestPhotoBatch } from './photo-batch.js';
 import { tryMatrixCatalogPhoto,tryRequestedMatrixCatalogPhoto } from '../catalog-photos/bot.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
-import { withStoreOpeningScope, matrixStoreIsOpen } from './routing-store-hours.js';
+import { withStoreOpeningScope, matrixStoreAcceptsOrders,currentStoreOpeningTime } from './routing-store-hours.js';
+import {saveMatrizOrderWindow} from './matriz-order-window.js';
 import { partnerOrderPresentation } from './partner-order-state.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
@@ -1474,7 +1475,7 @@ async function criarPedido(
   }
 
   // Defesa final: também cobre retirada direta e flags antigas sem reordenar os parceiros.
-  const matrixSettings=!partner?(await readDeliverySettings(client,environment))?.settings??null:null;
+  let matrixSettings=!partner?(await readDeliverySettings(client,environment))?.settings??null:null;
   if(matrixSettings){
     const customerLocation=modalidade==='delivery'?await resolveCustomerLocation(client,environment,conversationId,{
       municipio:null,bairro:args.bairro as string|undefined,fullAddress:deliveryAddress,apiKey:env.GOOGLE_MAPS_API_KEY}):null;
@@ -1492,6 +1493,7 @@ async function criarPedido(
   let respSubtotal: number;
   let respFrete: number;
   let respTotal: number;
+  let fulfillmentNotBefore:string|null=null;
   // Opção 1 (decisão Wallace 2026-06-14): endereço/mapa só são devolvidos AGORA,
   // no fechamento da retirada. Antes disso localizacao_loja pode dar nome, distância,
   // horário e taxa de instalação, mas nunca o endereço exato nem o link.
@@ -1590,7 +1592,8 @@ async function criarPedido(
     );
   } else {
     // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
-    if(!await matrixStoreIsOpen(client,environment,true))return JSON.stringify({erro:'store_closed'});
+    if(!await matrixStoreAcceptsOrders(client,environment,true))return JSON.stringify({erro:'store_hours_unknown'});
+    matrixSettings=(await readDeliverySettings(client,environment))?.settings??null;
     // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
     // Parceiros usam o sale_price da borracharia, sem alterar o preço da Matriz.
     const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);
@@ -1658,6 +1661,7 @@ async function criarPedido(
       })),
     });
 
+    fulfillmentNotBefore=await saveMatrizOrderWindow(client,environment,order.id,matrixSettings,modalidade as 'pickup'|'delivery',currentStoreOpeningTime());
     respSubtotal = subtotal;
     respFrete = valorFrete;
     respTotal = totalAmount;
@@ -1690,6 +1694,7 @@ async function criarPedido(
     valor_frete: respFrete.toFixed(2),
     total: respTotal.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
+    ...(fulfillmentNotBefore?{atendimento_a_partir_de:fulfillmentNotBefore,time_zone:'America/Sao_Paulo',orientacao:'Pedido registrado e estoque reservado. Informe retirada/entrega somente após este horário de abertura. O horário não é uma promessa de entrega; respeite a janela e o prazo cadastrados.'}:{}),
     ...(env.PHOTO_REQUESTS ? { fotos: await loadConversationPhotoStatus(client, environment, conversationId) } : {}),
     // Retirada: cartão da loja pro resumo "como chegar" (só no caminho parceiro+pickup).
     ...(retirada ? { retirada } : {}),
@@ -1699,6 +1704,7 @@ async function criarPedido(
 // ─── consultar_pedido ──────────────────────────────────────────────────────
 
 interface OrderRow {
+  fulfillment_not_before:Date|null;
   id: string;
   order_number: string;
   status: string;
@@ -1763,7 +1769,7 @@ async function consultarPedido(
     }
     const result = await client.query<OrderRow>(
       `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
-              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
+              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,o.fulfillment_not_before,
               o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status,
               po.payment_method AS partner_payment_method, po.retrieved_at AS partner_retrieved_at, po.delivered_at AS partner_delivered_at
        FROM commerce.orders o
@@ -1792,7 +1798,7 @@ async function consultarPedido(
     }
     const result = await client.query<OrderRow>(
       `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
-              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
+              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,o.fulfillment_not_before,
               o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status,
               po.payment_method AS partner_payment_method, po.retrieved_at AS partner_retrieved_at, po.delivered_at AS partner_delivered_at
        FROM commerce.orders o
@@ -1843,6 +1849,7 @@ async function consultarPedido(
         endereco_entrega: o.delivery_address,
         cliente_nome: o.customer_name,
         criado_em: o.created_at.toISOString(),
+        atendimento_a_partir_de:o.fulfillment_not_before?.toISOString()??null,time_zone:'America/Sao_Paulo',
         fechado_em: (partnerState?.closedAt ?? o.closed_at)?.toISOString() ?? null,
         itens: itensResult.rows.map((i) => ({
           product_id: i.product_id,

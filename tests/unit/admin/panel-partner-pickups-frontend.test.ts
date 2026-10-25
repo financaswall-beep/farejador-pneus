@@ -14,6 +14,15 @@ function pickupModule() {
 }
 
 describe('retiradas no painel único', () => {
+  it('bloqueia atendimento antecipado no navegador sem chamar a API nem o caixa',async()=>{
+    const write=vi.fn(),reload=vi.fn();
+    const app:any={...pickupModule(),isPartnerPanel:()=>false,formatDateTime:()=> 'amanhã às 10:15',apiPut:write,apiPost:write};
+    app.loadPartnerRetiradas=reload;
+    const row={order_id:'order',fulfillment_not_before:new Date(Date.now()+86400000).toISOString()};
+    await app.partnerRetiradasStageSave(row,'arrived');await app.partnerRetiradasConfirm(row);
+    expect(write).not.toHaveBeenCalled();expect(reload).not.toHaveBeenCalled();
+    expect(app.partnerRetiradasError).toContain('amanhã às 10:15');
+  });
   it('publica a mesma tela para Matriz e parceiro, mantendo rotas protegidas', () => {
     const nav = source('painel/public/app.nav.js');
     const html = source('painel/public/index.html');

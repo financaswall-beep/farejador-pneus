@@ -118,7 +118,7 @@
 <script src="/admin/painel/app.api.js?v=20261019-sino1"></script>
 <script src="/admin/painel/app.partner-api.js?v=20260823-partner-canary1"></script>
 <script src="/admin/painel/app.partner-resumo.js?v=20260828-partner-resumo1"></script>
-<script src="/admin/painel/app.partner-retiradas.js?v=20260824-pickup-cards1"></script>
+<script src="/admin/painel/app.partner-retiradas.js?v=20261025-24h1"></script>
 <script src="/admin/painel/app.partner-estoque.js?v=20260830-partner-stock-permissions1"></script>
 <script src="/admin/painel/app.partner-estoque.actions.js?v=20260830-partner-stock-permissions1"></script>
 <script src="/admin/painel/app.partner-vendas.js?v=20260828-partner-vendas1"></script>
@@ -287,7 +287,7 @@
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260916-vehicle-ui1"></script>
 <link rel="stylesheet" href="/admin/painel/catalog-photos.css?v=20261025-1">
-<script src="/admin/painel/app.catalogo.photos.js?v=20261025-tone1"></script>
+<script src="/admin/painel/app.catalogo.photos.js?v=20261025-tone2"></script>
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
@@ -736,6 +736,7 @@
                 <div class="mt-2 space-y-2"><template x-for="(item,itemIndex) in row.pickup_card_items" :key="itemIndex"><div class="flex min-w-0 items-center gap-2 text-sm text-gray-700"><i data-lucide="circle-dot-dashed" class="h-4 w-4 shrink-0"></i><span class="min-w-0 truncate" x-text="item.pickup_label"></span><template x-if="item.pickup_brand_logo"><img data-pickup-brand-logo :src="item.pickup_brand_logo" :alt="`Logo ${item.brand}`"></template><template x-if="item.brand && !item.pickup_brand_logo"><span class="shrink-0 rounded bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase text-gray-600" x-text="item.brand"></span></template></div></template><p x-show="row.pickup_card_items.length===0" class="text-xs text-gray-400">Itens não informados</p></div>
                 <div class="mt-4 flex items-center justify-between gap-2"><span class="text-xs text-gray-400" x-text="formatDateTime(row.created_at)"></span><span :class="partnerRetiradasStage(row)==='waiting'?'bg-emerald-100 text-emerald-800':partnerRetiradasStage(row)==='arrived'?'bg-amber-100 text-amber-800':partnerRetiradasStage(row)==='installing'?'bg-gray-200 text-gray-700':'bg-emerald-800 text-white'" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold"><i :data-lucide="partnerRetiradasStageIcon(row)" class="h-3.5 w-3.5"></i><span x-text="partnerRetiradasStageLabel(row)"></span></span></div>
               </button>
+              <p class="mx-5 mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800" x-show="row.fulfillment_not_before" x-text="row.fulfillment_not_before ? 'Atendimento a partir de '+formatDateTime(row.fulfillment_not_before) : ''"></p>
               <footer data-pickup-card-actions class="px-5 pb-5">
                 <template x-if="partnerRetiradasPhone(row)"><a :href="partnerRetiradasWaLink(row)" target="_blank" rel="noopener" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-sky-600 bg-white px-3 text-xs font-bold text-sky-700"><i data-lucide="message-circle" class="h-4 w-4"></i>WhatsApp</a></template>
                 <template x-if="!partnerRetiradasPhone(row)"><button type="button" disabled class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-3 text-xs font-bold text-gray-400"><i data-lucide="message-circle-off" class="h-4 w-4"></i>Sem WhatsApp</button></template>

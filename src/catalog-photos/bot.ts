@@ -7,7 +7,7 @@ import type { OutboundRow } from '../atendente-v2/outbound-worker.js';
 import { CatalogPhotoStorage } from './storage.js';
 import { catalogPhotoPayload } from './model.js';
 export const catalogCaption=(product:string,identify=false)=>identify
- ?`Segue uma foto de referência do ${product.replace(/^pneu\s+/i,'')}.`:'Segue uma foto de referência desse pneu.';
+ ?product.replace(/^pneu\s+/i,''):'';
 /** Consulta explícita ao catálogo da Matriz não depende de estoque, localização ou expediente. */
 export async function tryRequestedMatrixCatalogPhoto(client:PoolClient,environment:Environment,conversationId:string,
  productId:string,args:Record<string,unknown>):Promise<string|null>{
@@ -54,7 +54,7 @@ export async function tryMatrixCatalogPhoto(client:PoolClient,environment:Enviro
  }
  if(!accepted)return JSON.stringify({status:'foto_nao_enfileirada',orientacao:'O controle da conversa impediu o envio. Não prometa foto enviada.'});
  return JSON.stringify({status:queued?'foto_enfileirada':'foto_ja_enfileirada',product_id:productId,quantidade:photos.length,
-  origem:'galeria_matriz',tipo:'referencia',orientacao:'Imagem de referência do catálogo da Matriz, disponível 24 horas. A foto não confirma estoque, reserva ou loja aberta. Enfileirar não comprova entrega. Não diga que é foto atual do exemplar. Não crie outro pedido de foto neste turno.'});
+  origem:'galeria_matriz',tipo:'referencia',orientacao:'A imagem vai automaticamente como anexo. Ao cliente, só uma frase curta: "Olha a foto aí, amigo." Não acrescente preço, fila, expediente ou ressalvas. Estes controles são internos: não confirme entrega antes do eco, estoque ou reserva; não invente foto atual do exemplar. Para desgaste/estado atual, solicite foto_atual. Não crie outro pedido de foto neste turno.'});
 }
 export async function authorizedCatalogPhoto(client:PoolClient,row:OutboundRow){
  const payload=catalogPhotoPayload(row.body);

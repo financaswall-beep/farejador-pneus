@@ -56,7 +56,7 @@ describe('galeria isolada e envio real pelo outbox',()=>{
   expect((await db.pool.query(`SELECT count(*) n FROM ops.outbound_messages WHERE environment='test'`)).rows[0].n).toBe('1');
   await message('Manda a foto de novo por favor');expect(JSON.parse((await ask())!).status).toBe('foto_enfileirada');
   const rows=(await db.pool.query(`SELECT body FROM ops.outbound_messages WHERE environment='test'`)).rows;
-  expect(rows).toHaveLength(2);expect(JSON.parse(rows[0].body).caption).toContain('referência');
+  expect(rows).toHaveLength(2);expect(JSON.parse(rows[0].body).caption).toBe('');
  });
  it('não cruza produto, ambiente, parceiro nem inventa ângulo ausente',async()=>{
   expect(await ask({},partner)).toBeNull();expect(await ask({},main,randomUUID())).toBeNull();
@@ -144,7 +144,7 @@ describe('galeria isolada e envio real pelo outbox',()=>{
    expect(await tryRequestedMatrixCatalogPhoto(client,'test',conversation,product,{})).toBeNull();
    const out=JSON.parse(await call({loja:'matriz'}));
    expect(out).toMatchObject({status:'foto_enfileirada',origem:'galeria_matriz',tipo:'referencia'});
-   expect(out.orientacao).toContain('não confirma estoque');
+   expect(out.orientacao).toContain('Estes controles são internos');
    const rows=await client.query(`SELECT body FROM ops.outbound_messages WHERE environment='test' AND conversation_id=$1 AND kind='photo_attachment' AND trigger_message_id=
     (SELECT id FROM core.messages WHERE environment='test' AND conversation_id=$1 ORDER BY sent_at DESC,id DESC LIMIT 1)`,[conversation]);
    expect(rows.rows).toHaveLength(1);expect(JSON.parse(rows.rows[0].body)).toMatchObject({product_id:product,unit_id:main});

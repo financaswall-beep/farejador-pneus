@@ -46,10 +46,10 @@ describe('horários na escolha de atendimento agora',()=>{
     expect((await decide([{id:'fechada',lng:.02,hours:hours()}],{...settings,store_hours:hours('20:00')})).out)
       .toMatchObject({kind:'matriz',canFulfill:true});
   });
-  it('todas fechadas: informa próxima abertura sem prometer estoque ou pedido',async()=>{
+  it('todas fechadas: Matriz com estoque pode reservar para a próxima abertura',async()=>{
     const {out}=await decide([{id:'fechada',lng:.02,hours:hours()}]);
-    expect(out).toMatchObject({erro:'lojas_fechadas',disponivel:false,proxima_abertura:{days_ahead:1,opens_at:'08:00'}});
-    expect(out.orientacao).toContain('escalar_humano');
+    expect(out).toMatchObject({kind:'matriz',canFulfill:true,pedidos_24h_matriz:true,
+      atendimento_matriz:{atendimento_agora:false,proxima_abertura:{next_opening:{days_ahead:1,opens_at:'08:00'}}}});
   });
   it('horário ausente fica a confirmar; nunca é tratado como aberto',async()=>{
     expect((await decide([{id:'sem-cadastro',lng:.02,hours:null}],{...settings,store_hours:null})).out)
@@ -63,9 +63,9 @@ describe('horários na escolha de atendimento agora',()=>{
       return JSON.stringify({encontrado:true,produtos:[product],
         ...(name==='buscar_compatibilidade'?{veiculos:[{produtos:[{...product,product_id:'p2'}]}]}:{})});
     },at));
-    expect(out).toMatchObject({encontrado:true,produtos:[product],atendimento_agora:false,
-      atendimento_presencial:{erro:'lojas_fechadas',proxima_abertura:{opens_at:'08:00'}}});
-    expect(out).not.toHaveProperty('erro');expect(out.orientacao).toContain('24 horas');
+    expect(out).toMatchObject({encontrado:true,produtos:[product],pedidos_24h_matriz:true,
+      atendimento_matriz:{atendimento_agora:false,proxima_abertura:{next_opening:{opens_at:'08:00'}}}});
+    expect(out).not.toHaveProperty('erro');expect(out.orientacao_matriz).toContain('24h');
   });
   it.each([false,true])('não troca foto de catálogo enfileirada por fechamento (lote=%s)',async batch=>{
     const {client}=clientFor([{id:'a',lng:.02,hours:hours()}]);

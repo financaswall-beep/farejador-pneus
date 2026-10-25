@@ -42,7 +42,7 @@ import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { storeHoursForCustomer } from '../shared/weekly-store-hours.js';
 import { lockAndValidatePartnerSalePrices } from '../parceiro/partner-sale-pricing.js';
-import { filterOpeningCandidates, openingFilteringEnabled, matrixStoreIsOpen, partnerStoreIsOpen } from './routing-store-hours.js';
+import { filterOpeningCandidates, openingFilteringEnabled, matrixStoreAcceptsOrders,matrixStoreIsOpen, partnerStoreIsOpen } from './routing-store-hours.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
 import {
@@ -983,7 +983,7 @@ export async function decideStoreForItemsGeo(
     ? input.matrizPolicy.deliveryRadiusKm : Math.max(...rings);
   const matrizCanFulfill = async (): Promise<boolean> => {
     if(input.matrizPolicy&&!input.matrizPolicy.canFulfill)return false;
-    if (!await matrixStoreIsOpen(client,environment)) return false;
+    if (!await matrixStoreAcceptsOrders(client,environment)) return false;
     if (input.matrizPolicy) return input.matrizPolicy.canFulfill
       && haversineKm(input.customerLocation,matrizLocation)<=matrizLimit;
     if (!env.ROUTING_MATRIZ_AS_STORE || !env.WHOLESALE_UNIFIED_STOCK) return false;
@@ -1075,7 +1075,7 @@ export async function decideStoreForItemsGeo(
     // sido medida por rua). Empate ou parceiro mais perto → parceiro fica (a régua ENTRE
     // parceiros, acima, segue intacta). Requer WHOLESALE_UNIFIED_STOCK on + galpão com todos os
     // itens. Default OFF (a matriz segue só como backstop no bloco de baixo).
-    if (env.ROUTING_MATRIZ_COMPETES && env.WHOLESALE_UNIFIED_STOCK && input.matrizPolicy?.canFulfill!==false) {
+    if (env.ROUTING_MATRIZ_COMPETES && env.WHOLESALE_UNIFIED_STOCK && input.matrizPolicy?.canFulfill!==false && await matrixStoreIsOpen(client,environment)) {
       const matrizDist = haversineKm(input.customerLocation, matrizLocation);
       const nearestPartnerDist = Math.min(
         ...selection.pool.map((f) => haversineKm(input.customerLocation, f.cand.location!)),
