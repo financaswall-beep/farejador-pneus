@@ -82,7 +82,7 @@ window.PAINEL_MODULES.catalogPhotos = function () {
       finally { state.busy = false; }
     },
     mcphPreview() { this.matrixPhotos.preview = true; },
-    mcphCaption() { return 'Foto de referência: ' + (this.matrixPhotos.selected?.product_name || '') + '. A imagem mostra o modelo; não comprova o estado de um exemplar seminovo.'; },
+    mcphCaption() { return 'Segue uma foto de referência desse pneu.'; },
     mcphError(code) {
       return ({ settings_changed: 'O cadastro mudou em outra tela. Atualize antes de salvar.',
         photo_too_large: 'A foto deve ter até 10 MB.', not_an_image: 'Escolha uma imagem válida.',

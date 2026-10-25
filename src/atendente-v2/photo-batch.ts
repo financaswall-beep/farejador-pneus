@@ -19,7 +19,7 @@ export async function requestPhotoBatch(
   const { product_ids: _ids, ...singleArgs } = args;
   const results: Array<Record<string, unknown>> = [];
   for (const id of ids) {
-    results.push({ ...JSON.parse(await requestOne({ ...singleArgs, product_id: id })), product_id: id });
+    results.push({ ...JSON.parse(await requestOne({ ...singleArgs, product_id: id,...(ids.length>1?{_photo_batch:true}:{}) })), product_id: id });
   }
   const requested = results.filter(row => ['foto_solicitada','aguardando_parceiro','foto_enfileirada','foto_ja_enfileirada'].includes(String(row.status))).length;
   return JSON.stringify({ status: requested === ids.length ? 'fotos_solicitadas' : requested ? 'fotos_parciais' : 'fotos_nao_solicitadas',

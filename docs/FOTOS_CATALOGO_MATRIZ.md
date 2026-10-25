@@ -32,8 +32,9 @@ Lojas fechadas não encerram o atendimento do bot: consultas de catálogo mantê
 atendimento presencial separadamente. O bot não deve transformar ausência de loja aberta em prova de estoque zerado.
 Pedidos, retirada/entrega imediata e fotos novas da equipe continuam protegidos pelas regras existentes de expediente.
 
-Pedidos de foto atual, de exemplar ou de desgaste/sulcos seguem para a loja. A legenda da galeria diz explicitamente
-que é referência do modelo, sem comprovar o estado de um seminovo. `foto_atual=true` também força o fluxo sob demanda.
+Pedidos de foto atual, de exemplar ou de desgaste/sulcos seguem para a loja. A legenda curta da galeria é
+“Segue uma foto de referência desse pneu.”; com dois produtos, identifica cada um para evitar confusão.
+A imagem continua sendo referência do modelo, sem comprovar o estado de um seminovo. `foto_atual=true` força o fluxo sob demanda.
 `tipo_foto` aceita principal/lateral/detalhe/todas, sendo principal o padrão. O LLM não escolhe caminhos de Storage.
 
 Repetir a ferramenta no mesmo pedido/mensagem não duplica o arquivo no outbox. Outro pedido explícito do cliente
