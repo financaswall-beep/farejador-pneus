@@ -10,7 +10,7 @@ describe('pedido de fotos dos dois pneus', () => {
     const result = JSON.parse(await requestPhotoBatch(db as unknown as PoolClient, 'test', { product_ids: [a, b], bairro: 'Méier' }, request));
     expect(result.status).toBe('fotos_solicitadas'); expect(result.total_solicitado).toBe(2);
     expect(result.solicitacoes.map((r: any) => r.product_id)).toEqual([a, b]);
-    expect(request.mock.calls.map(([args]) => args)).toEqual([{ product_id: a, bairro: 'Méier' }, { product_id: b, bairro: 'Méier' }]);
+    expect(request.mock.calls.map(([args]) => args)).toEqual([{ product_id: a, bairro: 'Méier',_photo_batch:true }, { product_id: b, bairro: 'Méier',_photo_batch:true }]);
     expect(db.query.mock.calls[0]).toEqual([expect.stringContaining('environment=$1'), ['test', [a, b]]]);
   });
   it.each([[], [a, b, a], ['inválido', b], null])('rejeita conjunto inválido antes de consultar ou criar cards (%j)', async ids => {

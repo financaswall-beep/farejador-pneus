@@ -6,7 +6,8 @@ import { hasAgentV2Wildcard } from '../atendente-v2/conversation-scope.js';
 import type { OutboundRow } from '../atendente-v2/outbound-worker.js';
 import { CatalogPhotoStorage } from './storage.js';
 import { catalogPhotoPayload } from './model.js';
-export const catalogCaption=(product:string)=>`Foto de referência: ${product}. A imagem mostra o modelo; não comprova o estado de um exemplar seminovo.`;
+export const catalogCaption=(product:string,identify=false)=>identify
+ ?`Segue uma foto de referência do ${product.replace(/^pneu\s+/i,'')}.`:'Segue uma foto de referência desse pneu.';
 /** Consulta explícita ao catálogo da Matriz não depende de estoque, localização ou expediente. */
 export async function tryRequestedMatrixCatalogPhoto(client:PoolClient,environment:Environment,conversationId:string,
  productId:string,args:Record<string,unknown>):Promise<string|null>{
@@ -36,7 +37,7 @@ export async function tryMatrixCatalogPhoto(client:PoolClient,environment:Enviro
  if(!photos.length)return null;
  let queued=0,accepted=0;
  for(const photo of photos){
-  const body=JSON.stringify({catalog_photo_id:photo.id,product_id:productId,unit_id:unitId,caption:catalogCaption(photo.product_name)});
+  const body=JSON.stringify({catalog_photo_id:photo.id,product_id:productId,unit_id:unitId,caption:catalogCaption(photo.product_name,args._photo_batch===true)});
   const echo=`catalog-photo:${conversationId}:${incoming?.id??'initial'}:${photo.id}`;
   const result=await client.query(`INSERT INTO ops.outbound_messages
    (environment,conversation_id,chatwoot_conversation_id,trigger_message_id,echo_id,kind,body,body_sha256,status)
