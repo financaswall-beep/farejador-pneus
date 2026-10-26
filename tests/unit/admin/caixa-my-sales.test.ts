@@ -67,15 +67,30 @@ describe('Minhas vendas da Matriz', () => {
   it('abre detalhes do bot sem exigir colaborador e mantém a categoria do pneu', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{
       order_id: 'bot-order', order_number: 'PED-0019', status: 'delivered', total_amount: '193',
-      seller_name: null, source: 'chatwoot_com_bot', items_json: [{
+      seller_name: null, source: 'chatwoot_com_bot', customer_name: 'Marina Costa', items_json: [{
         product_name: 'Pneu Bridgestone 225/45-17', quantity: 1, unit_price: '180',
         reference_unit_price: '180', discount_amount: 0, line_total: '180', vehicle_type: 'car',
       }],
     }] });
     const detail = await getCaixaMySaleDetail('prod', 'owner', 'bot-order', { query } as unknown as Pool, 'matrix');
-    expect(detail).toMatchObject({ sales_scope: 'matrix', source: 'chatwoot_com_bot',
+    expect(detail).toMatchObject({ sales_scope: 'matrix', source: 'chatwoot_com_bot', customer_name: 'Marina Costa',
       seller_name: 'Sem vendedor vinculado', items: [{ vehicle_type: 'car', unit_price: 180 }] });
     expect(query.mock.calls[0]?.[0]).toContain('LEFT JOIN network.matriz_collaborators');
     expect(query.mock.calls[0]?.[1]).toEqual(['prod', 'owner', 'bot-order', true]);
+  });
+
+  it('retorna o cliente no próprio recibo com vínculos do mesmo ambiente', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{
+      order_id: 'own-order', order_number: 'PED-0100', customer_name: 'Marina Costa',
+      status: 'confirmed', total_amount: '109', items_json: [],
+    }] });
+    const detail = await getCaixaMySaleDetail('test', 'seller', 'own-order', { query } as unknown as Pool);
+    expect(detail).toMatchObject({ customer_name: 'Marina Costa', sales_scope: 'own', total_amount: 109 });
+    const [sql, args] = query.mock.calls[0]!;
+    expect(args).toEqual(['test', 'seller', 'own-order', false]);
+    expect(sql).toContain('ct.id=o.contact_id AND ct.environment=o.environment');
+    expect(sql).toContain('cu.id=o.customer_id AND cu.environment=o.environment');
+    expect(sql).toContain('o.seller_collaborator_id=$2');
+    expect(sql).not.toContain('phone');
   });
 });

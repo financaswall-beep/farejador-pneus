@@ -18,7 +18,7 @@
     }
     function editPrice(line) {
       if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
-      priceLine = line; el('checkout-price-name').textContent = line.product.tire_size || catalog.productTitle(line.product);
+      priceLine = line; el('checkout-price-name').textContent = (!C.isPartner() && line.product.tire_size) || catalog.productTitle(line.product);
       el('checkout-price-reference').textContent = 'Preço oficial: ' + C.currency.format(line.referencePrice);
       el('checkout-price-image').replaceChildren(catalog.productImage(line.product));
       el('checkout-price-description').textContent = catalog.productDetails(line.product);
@@ -50,7 +50,7 @@
       const footer = node('div', '', 'co-line-footer'), stepper = node('div', '', 'co-stepper');
       const minus = button('Diminuir quantidade de ' + catalog.productTitle(product), '', () => changeQuantity(product, -1)); minus.textContent = '−';
       const plus = button('Aumentar quantidade de ' + catalog.productTitle(product), '', () => changeQuantity(product, 1)); plus.textContent = '+';
-      plus.disabled = checkout.busy || product.sellable === false || line.quantity >= (product.product_type === 'service' || product.stock_tracked === false ? 50 : Number(product.stock_quantity || 0));
+      plus.disabled = Boolean(checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) || product.sellable === false || line.quantity >= (product.product_type === 'service' || product.stock_tracked === false ? 50 : Number(product.stock_quantity || 0));
       stepper.append(minus, node('span', String(line.quantity)), plus);
       footer.append(stepper, node('strong', line.negotiatedPrice == null ? '—' : C.currency.format(line.quantity * line.negotiatedPrice), 'co-line-total'));
       body.append(price, footer); card.append(body, remove); return card;

@@ -42,6 +42,7 @@ export interface OperationMySalesPayload {
 
 export interface OperationSaleDetail extends OperationSaleListItem {
   sales_scope?: OperationSalesScope;
+  customer_name?: string;
   seller_name: string;
   items: Array<{
     product_name: string;

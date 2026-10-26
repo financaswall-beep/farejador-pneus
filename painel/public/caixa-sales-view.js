@@ -190,12 +190,12 @@
 
   function renderReceipt(receipt) {
     Caixa.resetMatrixCheckoutReceipt?.();
-    elements.receiptModal.classList.toggle('matrix-checkout-receipt', !Caixa.isPartner() && receipt.sales_scope === 'matrix');
+    elements.receiptModal.classList.toggle('matrix-checkout-receipt', !Caixa.isPartner());
     if (Caixa.isPartner() && Caixa.partnerReceipt) {
       return Caixa.partnerReceipt.render(receipt, { orderLabel, paymentLabel, commissionRule, commissionStatus });
     }
     const matrix = receipt.sales_scope === 'matrix';
-    if (matrix && Caixa.renderMatrixCheckoutReceipt) {
+    if (!Caixa.isPartner() && Caixa.renderMatrixCheckoutReceipt) {
       return Caixa.renderMatrixCheckoutReceipt(receipt, { orderLabel, paymentLabel, statusInfo, commissionRule, commissionStatus, saleOrigin });
     }
     elements.receiptContent.replaceChildren();

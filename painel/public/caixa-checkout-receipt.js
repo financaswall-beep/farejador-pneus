@@ -30,7 +30,7 @@
     meta.append(node('strong', order.startsWith('PED-') ? order : labels.orderLabel(order)), node('p', Number.isFinite(date.getTime()) ? C.dateTime.format(date) : 'Data não informada'));
     const list = node('dl');
     field(list, 'Cliente', receipt.customer_name || 'Cliente não informado');
-    const received = !cancelled && (receipt.payment_status === 'received' || ['paid', 'delivered'].includes(receipt.status));
+    const received = !cancelled && (receipt.payment_status === 'received' || receipt.status === 'paid');
     field(list, 'Pagamento', labels.paymentLabel(receipt.payment_method) + (received ? ' · Recebido' : ''));
     meta.appendChild(list);
     const items = node('section', '', 'mc-receipt-items'), prices = [];
