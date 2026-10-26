@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-10-25T02:21:32.427Z",
-  "total": 3081,
+  "total": 3084,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -1624,6 +1624,9 @@
     "mcphSave": "function",
     "mcphStatus": "function",
     "mcphUpload": "function",
+    "mcphUploadVideo": "function",
+    "mcphVideo": "function",
+    "mcphVideoSize": "function",
     "measureAvailable": "function",
     "measureBlur": "function",
     "measureBox": "value:object",

@@ -30,7 +30,7 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
       LEFT JOIN core.messages m ON m.environment=o.environment AND m.id=o.trigger_message_id
         AND m.conversation_id=o.conversation_id
       WHERE o.environment=$1 AND o.conversation_id=$2 AND o.id=$3 AND o.status='sending'
-        AND (o.kind<>'agent_text' OR m.id IS NOT NULL)
+        AND (o.kind NOT IN ('agent_text','video_attachment') OR m.id IS NOT NULL)
         AND ($4::timestamptz IS NULL OR
           (COALESCE(m.sent_at,o.created_at)>$4 AND (o.kind<>'photo_attachment' OR EXISTS (
             SELECT 1 FROM commerce.photo_requests p WHERE p.environment=o.environment
@@ -43,7 +43,8 @@ export async function prepareControlledOutbound(client: PoolClient, row: Outboun
     const stockAllowed=row.kind!=='stock_text'||await validateStockConfirmationOutbound(client,row);
     const catalogAllowed=row.kind!=='photo_attachment'||!catalogPhotoPayload(row.body)
       ||!!await (await import('../catalog-photos/bot.js')).authorizedCatalogPhoto(client,row);
-    const allowed = baseAllowed && stockAllowed && catalogAllowed && (row.kind !== 'conversation_resolution'
+    const videoAllowed=row.kind!=='video_attachment'||!!await (await import('../catalog-photos/video-bot.js')).authorizedCatalogVideo(client,row);
+    const allowed = baseAllowed && stockAllowed && catalogAllowed && videoAllowed && (row.kind !== 'conversation_resolution'
       || await validateResolutionOutbound(
         client,row.environment,row.conversation_id,row.id,row.body,
       ));

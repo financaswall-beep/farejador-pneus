@@ -6,13 +6,13 @@ export const catalogStorageReady=()=>!!(env.SUPABASE_STORAGE_URL&&env.SUPABASE_S
 const valid=/^(prod|test)\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/(original|photo)\.webp$/;
 export class CatalogPhotoStorage {
  constructor(private fetcher:typeof fetch=fetch){}
- private async request(path:string,method='GET',bytes?:Buffer){
+ private async request(path:string,method='GET',bytes?:Buffer|string){
   if(!catalogStorageReady())throw new CatalogPhotoError('storage_not_configured',503);
   const response=await this.fetcher(env.SUPABASE_STORAGE_URL!.replace(/\/$/,'')+'/storage/v1'+path,{
    method,redirect:'error',signal:AbortSignal.timeout(20000),
    headers:{Authorization:'Bearer '+env.SUPABASE_STORAGE_SERVICE_KEY,apikey:env.SUPABASE_STORAGE_SERVICE_KEY!,
-    'Content-Type':bytes?'image/webp':'application/json'},
-   ...(bytes?{body:new Uint8Array(bytes)}:{}),
+    'Content-Type':Buffer.isBuffer(bytes)?'image/webp':'application/json'},
+   ...(bytes?{body:typeof bytes==='string'?bytes:new Uint8Array(bytes)}:{}),
   });
   if(!response.ok){await response.body?.cancel();throw new CatalogPhotoError('photo_storage_unavailable',503);}
   return response;
@@ -45,13 +45,18 @@ export class CatalogPhotoStorage {
   const response=await this.request('/object/'+CATALOG_PHOTO_BUCKET+'/'+path);
   return readLimited(response,MAX_CATALOG_PHOTO_BYTES);
  }
+ async remove(path:string){
+  if(!valid.test(path))throw new Error('invalid_catalog_path');
+  const response=await this.request('/object/'+CATALOG_PHOTO_BUCKET,'DELETE',JSON.stringify({prefixes:[path]}));
+  await response.body?.cancel();
+ }
 }
-export async function readLimited(response:Response,max:number){
- if(Number(response.headers.get('content-length')??0)>max){await response.body?.cancel();throw new CatalogPhotoError('photo_too_large',413);}
+export async function readLimited(response:Response,max:number,tooLarge='photo_too_large'){
+ if(Number(response.headers.get('content-length')??0)>max){await response.body?.cancel();throw new CatalogPhotoError(tooLarge,413);}
  const reader=response.body?.getReader();if(!reader)throw new CatalogPhotoError('empty_photo');
  const chunks:Uint8Array[]=[];let size=0;
  try{for(;;){const part=await reader.read();if(part.done)break;size+=part.value.length;
-  if(size>max)throw new CatalogPhotoError('photo_too_large',413);chunks.push(part.value);}}
+  if(size>max)throw new CatalogPhotoError(tooLarge,413);chunks.push(part.value);}}
  finally{await reader.cancel();}
  return Buffer.concat(chunks);
 }

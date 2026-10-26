@@ -11,7 +11,7 @@ let update:typeof import('../../src/catalog-photos/repository.js').updatePhotoSe
 let request:typeof import('../../src/catalog-photos/bot.js').tryMatrixCatalogPhoto;
 let env:typeof import('../../src/shared/config/env.js').env;
 let image:Buffer;
-const storage={ensureBucket:vi.fn(async()=>{}),put:vi.fn(async()=>{}),read:vi.fn(async()=>image)};
+const storage={ensureBucket:vi.fn(async()=>{}),put:vi.fn(async()=>{}),read:vi.fn(async()=>image),remove:vi.fn(async()=>{})};
 beforeAll(async()=>{
  db=await startPostgres();
  Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:db.connectionString,CHATWOOT_HMAC_SECRET:'test',ADMIN_AUTH_TOKEN:'test',
@@ -43,12 +43,13 @@ describe('galeria isolada e envio real pelo outbox',()=>{
  it('sem foto e em parceiro continua pelo fluxo sob demanda',async()=>{
   expect(await ask()).toBeNull();expect(await ask({},partner)).toBeNull();
  });
- it('guarda um original e um derivado privado e torna a primeira foto principal',async()=>{
+ it('guarda somente o WebP final privado e torna a primeira foto principal',async()=>{
   const result=await save(db.pool,{environment:'test',productId:product,angle:'front',bytes:image,source:'upload',sourceKey:'fixture-1',actor:'teste'},storage as never);
-  expect(result.duplicate).toBe(false);expect(storage.put).toHaveBeenCalledTimes(2);
+  expect(result.duplicate).toBe(false);expect(storage.put).toHaveBeenCalledTimes(1);
+  expect((await db.pool.query('SELECT original_path FROM commerce.matrix_catalog_photos WHERE id=$1',[result.id])).rows[0].original_path).toBeNull();
   expect((await db.pool.query(`SELECT is_primary FROM commerce.matrix_catalog_photos WHERE id=$1`,[result.id])).rows[0].is_primary).toBe(true);
   const duplicate=await save(db.pool,{environment:'test',productId:product,angle:'front',bytes:image,source:'upload',sourceKey:'fixture-1',actor:'teste'},storage as never);
-  expect(duplicate).toMatchObject({id:result.id,duplicate:true});expect(storage.put).toHaveBeenCalledTimes(2);
+  expect(duplicate).toMatchObject({id:result.id,duplicate:true});expect(storage.put).toHaveBeenCalledTimes(1);
  });
  it('enfileira a foto exata uma vez por mensagem e aceita outro pedido explícito depois',async()=>{
   await message('Pode mandar a foto do pneu?');expect(JSON.parse((await ask())!)).toMatchObject({status:'foto_enfileirada',origem:'galeria_matriz'});

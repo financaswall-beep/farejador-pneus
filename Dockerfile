@@ -24,6 +24,8 @@ ENV NODE_ENV=production
 RUN apk add --no-cache ffmpeg libheif-tools util-linux \
     && command -v ffprobe && command -v ffmpeg \
     && command -v heif-info && command -v heif-convert && command -v prlimit
+RUN ffmpeg -hide_banner -encoders | grep -q libx264 \
+    && ffmpeg -hide_banner -h full | grep -q -- '-display_rotation'
 
 COPY package*.json ./
 # O sharp distribui o binário e o libvips como dependências opcionais específicas

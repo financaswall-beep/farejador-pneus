@@ -11,13 +11,17 @@ export async function prepareCatalogPhoto(input:Buffer){
  if(activeCodecs>=2)throw new CatalogPhotoError('photo_processing_busy',429);
  activeCodecs++;
  try{
-  const original=await sharp(input,{limitInputPixels:30_000_000,animated:false}).rotate()
-   .flatten({background:'#f6f7f8'}).resize({width:1600,height:1600,fit:'inside',withoutEnlargement:true})
-   .webp({quality:86}).toBuffer({resolveWithObject:true});
-  if(original.info.width<200||original.info.height<200)throw new Error('small');
-  const width=Math.min(260,Math.max(80,Math.round(original.info.width*0.19)));
+  const image=sharp(input,{limitInputPixels:30_000_000,animated:false});
+  const metadata=await image.metadata();
+  const rotated=(metadata.orientation??1)>=5;
+  const displayWidth=(rotated?metadata.height:metadata.width)??0,displayHeight=(rotated?metadata.width:metadata.height)??0;
+  const factor=Math.min(1,1600/Math.max(displayWidth,displayHeight));
+  if(Math.min(displayWidth,displayHeight)*factor<200)throw new Error('small');
+  const width=Math.min(260,Math.max(80,Math.round(displayWidth*factor*0.19)));
   const mark=catalogWatermark(width);
-  const photo=await sharp(original.data).composite([{input:mark,gravity:'southeast'}]).webp({quality:84}).toBuffer();
-  return {original:original.data,photo,width:original.info.width,height:original.info.height};
+  const photo=await image.rotate().flatten({background:'#f6f7f8'})
+   .resize({width:1600,height:1600,fit:'inside',withoutEnlargement:true})
+   .composite([{input:mark,gravity:'southeast'}]).webp({quality:84}).toBuffer({resolveWithObject:true});
+  return {photo:photo.data,width:photo.info.width,height:photo.info.height};
  }catch{throw new CatalogPhotoError('invalid_or_small_photo',415);}finally{activeCodecs--;}
 }

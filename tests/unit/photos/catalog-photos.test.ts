@@ -15,12 +15,12 @@ describe('fotos do catálogo da Matriz',()=>{
   expect(driveAngle('traseira.png')).toBe('detail');expect(driveAngle('IMG_2934.jpg')).toBeNull();
   expect(driveAngle('principal-do-outro-pneu.jpg')).toBeNull();
  });
- it('preserva a proporção, remove metadados e aplica uma marca ao derivado, mantendo cópia sem marca',async()=>{
+ it('preserva a proporção, remove metadados e gera somente o WebP final com marca',async()=>{
   const input=await sharp({create:{width:800,height:600,channels:3,background:'#667788'}}).jpeg().toBuffer();
   const result=await prepareCatalogPhoto(input);
-  expect(result).toMatchObject({width:800,height:600});expect(result.photo.equals(result.original)).toBe(false);
+  expect(result).toMatchObject({width:800,height:600});expect(result).not.toHaveProperty('original');
   expect(await sharp(result.photo).metadata()).toMatchObject({format:'webp',width:800,height:600});
-  expect((await sharp(result.original).metadata()).exif).toBeUndefined();
+  expect((await sharp(result.photo).metadata()).exif).toBeUndefined();
  });
  it('rejeita arquivo não imagem, imagem pequena e upload grande antes de processar',async()=>{
   await expect(prepareCatalogPhoto(Buffer.from('<script>bad</script>'))).rejects.toMatchObject({code:'not_an_image'});
