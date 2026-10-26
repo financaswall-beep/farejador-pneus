@@ -3,7 +3,7 @@
   const C=window.FarejadorBotChat||window.Caixa,ch=C.chat;
   let recorder=null,stream=null,timer=null,mediaVersion=0,requesting=false;
   ch.media=null;ch.recording=false;
-  const input=document.createElement('input');input.type='file';input.hidden=true;input.accept='image/jpeg,image/png,image/webp,audio/*,video/mp4,application/pdf';document.body.append(input);
+  const input=document.createElement('input');input.id='chat-media-file';input.type='file';input.hidden=true;input.accept='image/jpeg,image/png,image/webp,audio/*,video/mp4,application/pdf';document.body.append(input);
   ch.toBase64=blob=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob);});
   ch.resetMedia=function(){
     mediaVersion++;requesting=false;if(recorder&&recorder.state!=='inactive')recorder.stop();recorder=null;
@@ -11,7 +11,7 @@
     if(ch.media)URL.revokeObjectURL(ch.media.url);ch.media=null;ch.renderMedia();
   };
   ch.stopRecording=function(){if(recorder&&recorder.state!=='inactive')recorder.stop();};
-  async function prepare(file,photoRequestId,version=mediaVersion){
+  async function prepare(file,photoRequestId,version=mediaVersion,durationSeconds){
     if(file.size>16*1024*1024)throw Error('chat_media_invalid');
     let blob=file,mime=file.type.split(';')[0];
     if(mime.startsWith('image/')){
@@ -23,17 +23,21 @@
     if(!['image/jpeg','audio/webm','audio/ogg','audio/mp4','audio/mpeg','video/mp4','application/pdf'].includes(mime))throw Error('chat_media_invalid');
     if(version!==mediaVersion)return;
     if(ch.media)URL.revokeObjectURL(ch.media.url);
-    ch.media={blob,mime,url:URL.createObjectURL(blob),photoRequestId};ch.renderMedia();
+    ch.media={blob,mime,url:URL.createObjectURL(blob),photoRequestId,durationSeconds};ch.renderMedia();
   }
-  let selectedPhoto=null,selectedConversation=null;
-  ch.el('attach').onclick=()=>{selectedPhoto=null;selectedConversation=ch.state.id;input.removeAttribute('capture');input.accept='image/jpeg,image/png,image/webp,audio/*,video/mp4,application/pdf';input.click();};
+  let selectedPhoto=null,selectedConversation=null,selectedSession=null;
+  ch.chooseMedia=function(kind='any',photoRequestId=null){
+    selectedPhoto=photoRequestId;selectedConversation=ch.state.id;selectedSession=ch.state.session;input.removeAttribute('capture');
+    input.accept=({camera:'image/*',image:'image/*',gallery:'image/*,video/mp4',audio:'audio/*',pdf:'application/pdf'})[kind]||'image/jpeg,image/png,image/webp,audio/*,video/mp4,application/pdf';
+    if(kind==='camera')input.setAttribute('capture','environment');input.click();
+  };
+  ch.el('attach').onclick=()=>ch.chooseMedia();
   ch.el('panel').addEventListener('click',event=>{
     const button=event.target.closest('[data-photo]');if(!button)return;
-    selectedPhoto=button.dataset.photoId;selectedConversation=ch.state.id;input.accept='image/*';
-    if(button.dataset.photo==='camera')input.setAttribute('capture','environment');else input.removeAttribute('capture');input.click();
+    ch.chooseMedia(button.dataset.photo==='camera'?'camera':'image',button.dataset.photoId);
   });
   input.onchange=async()=>{
-    const file=input.files[0],id=ch.state.id,photo=selectedPhoto;input.value='';if(!file||id!==selectedConversation)return;
+    const file=input.files[0],id=ch.state.id,photo=selectedPhoto;input.value='';if(!file||!ch.state.active||id!==selectedConversation||selectedSession!==ch.state.session)return;
     ch.resetMedia();const version=mediaVersion;
     try{await prepare(file,photo,version);if(ch.state.id!==id||version!==mediaVersion)return;void ch.setControl(id,'takeover');}
     catch(error){C.showToast(ch.errorText(error));}
@@ -59,6 +63,7 @@
       const capture=await navigator.mediaDevices.getUserMedia({audio:true});
       if(version!==mediaVersion||id!==ch.state.id||!ch.state.active){capture.getTracks().forEach(t=>t.stop());return;}
       stream=capture;requesting=false;
+      ch.observeRecording?.(capture);
       const mime=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(type=>MediaRecorder.isTypeSupported(type));
       if(!mime)throw Error('unsupported_audio');
       const current=new MediaRecorder(capture,{mimeType:mime}),chunks=[],startedAt=Date.now();recorder=current;
@@ -66,7 +71,7 @@
       current.onstop=async()=>{
         capture.getTracks().forEach(t=>t.stop());if(version!==mediaVersion)return;
         stream=null;recorder=null;clearInterval(timer);ch.recording=false;
-        if(id===ch.state.id){try{await prepare(new Blob(chunks,{type:mime.split(';')[0]}),undefined,version);}catch(error){C.showToast(ch.errorText(error));}}
+        if(id===ch.state.id){try{await prepare(new Blob(chunks,{type:mime.split(';')[0]}),undefined,version,(Date.now()-startedAt)/1000);}catch(error){C.showToast(ch.errorText(error));}}
         ch.renderMedia();
       };
       recorder.start(1000);ch.recording=true;ch.renderMedia();void ch.setControl(id,'takeover');

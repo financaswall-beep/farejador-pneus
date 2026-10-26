@@ -49,6 +49,12 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-navigation.js', 'caixa-navigation.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-checkout-view.js', 'caixa-checkout-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-chat.css', 'caixa-chat.css', 'text/css; charset=utf-8');
+  for (const file of ['caixa-chat-metal', 'caixa-chat-metal-sheets', 'caixa-chat-metal-media']) {
+    text(`/operacao/${file}.css`, `${file}.css`, 'text/css; charset=utf-8');
+  }
+  for (const file of ['caixa-chat-metal', 'caixa-chat-metal-filters', 'caixa-chat-metal-audio', 'caixa-chat-metal-media']) {
+    text(`/operacao/${file}.js`, `${file}.js`, 'text/javascript; charset=utf-8');
+  }
   text('/operacao/stock-waitlist.css', 'stock-waitlist.css', 'text/css; charset=utf-8');
   for(const file of ['stock-waitlist-view','stock-waitlist','caixa-waitlist']) {
     text(`/operacao/${file}.js`,`${file}.js`,'text/javascript; charset=utf-8');

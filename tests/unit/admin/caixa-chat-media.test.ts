@@ -5,7 +5,7 @@ import {parseOperatorMedia} from '../../../src/admin/caixa/chat-media.js';
 
 function mediaApp(){
   const elements=new Map<string,any>();
-  const el=(id:string)=>{if(!elements.has(id))elements.set(id,{classList:{toggle:vi.fn()},setAttribute:vi.fn(),addEventListener:vi.fn(),replaceChildren:vi.fn()});return elements.get(id);};
+  const el=(id:string)=>{if(!elements.has(id))elements.set(id,{classList:{toggle:vi.fn()},setAttribute:vi.fn(),removeAttribute:vi.fn(),click:vi.fn(),addEventListener:vi.fn(),replaceChildren:vi.fn()});return elements.get(id);};
   let resolve!:(value:any)=>void;const permission=new Promise<any>(r=>{resolve=r;});
   const capture={getTracks:()=>[{stop}]},stop=vi.fn(),getUserMedia=vi.fn(()=>permission);
   const chat:any={state:{id:'one',active:true},el,icon:()=>'',setControl:vi.fn(),errorText:(e:any)=>e.message};
@@ -33,9 +33,16 @@ describe('áudio e validação dos anexos',()=>{
     expect(a.stop).toHaveBeenCalled();expect(a.instances).toHaveLength(0);expect(a.chat.media).toBeNull();
   });
   it('produz prévia para ouvir, sem enviar automaticamente ao parar',async()=>{
-    const a=mediaApp(),start=a.el('mic').onclick();a.resolve();await start;a.chat.stopRecording();
+    const a=mediaApp(),start=a.el('mic').onclick();a.resolve();await start;vi.advanceTimersByTime(18000);a.chat.stopRecording();
     await Promise.resolve();expect(a.chat.recording).toBe(false);expect(a.chat.media.mime).toBe('audio/webm');
+    expect(a.chat.media.durationSeconds).toBe(18);
     expect(a.el('media-preview').innerHTML).toContain('<audio controls');expect(a.stop).toHaveBeenCalled();
+  });
+  it.each(['conversa','tela','sessão'])('ignora o arquivo selecionado após mudar %s',async(kind)=>{
+    const a=mediaApp();a.chat.chooseMedia('audio');
+    if(kind==='conversa')a.chat.state.id='two';else if(kind==='tela')a.chat.state.active=false;else a.chat.state.session='another-session';
+    a.el('file').files=[new Blob(['audio'],{type:'audio/webm'})];await a.el('file').onchange();
+    expect(a.chat.media).toBeNull();expect(a.chat.setControl).not.toHaveBeenCalled();
   });
   it('recusa arquivo que só se apresenta como foto',async()=>{
     await expect(parseOperatorMedia({mime:'image/jpeg',base64:Buffer.from('<script>fake</script>').toString('base64')})).rejects.toThrow('chat_media_invalid');

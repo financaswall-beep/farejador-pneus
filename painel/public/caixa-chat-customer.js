@@ -40,7 +40,7 @@
   function orderHtml(order){
     const date=new Date(order.occurred_at),when=Number.isNaN(date.getTime())?'Data não informada':date.toLocaleDateString('pt-BR');
     const status=({cancelled:'Cancelado',confirmed:'Confirmado',completed:'Concluído',pending:'Pendente',reserved:'Reservado',delivered:'Entregue',picked_up:'Retirado'})[order.status]||order.status||'Sem status';
-    return `<article class="chat-customer-order">${icon('receipt')}<div><strong>${esc(order.order_number||'Pedido')}</strong><small>${esc(status)} · ${esc(when)}</small></div><b>${ch.currency(order.total_amount)}</b></article>`;
+    return `<article class="chat-customer-order" data-chat-order="${esc(order.id||'')}">${icon('receipt')}<div><strong>${esc(order.order_number||'Pedido')}</strong><small>${esc(status)} · ${esc(when)}</small></div><b>${ch.currency(order.total_amount)}</b></article>`;
   }
   function render(ctx){
     const scroll=sheet.scrollTop;
