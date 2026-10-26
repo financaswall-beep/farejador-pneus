@@ -29,7 +29,8 @@
 .is-matrix-pickups .mp-search { display: flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 48px; border: 1px solid #94a398; border-radius: 8px; background: #f8faf9b8; box-shadow: inset 0 1px 2px #24453226,0 1px #fff; }
 .is-matrix-pickups .mp-search input { min-width: 0; width: 100%; padding: 10px 0; color: var(--mc-ink); border: 0; background: none; font: 400 20px var(--mc-font); }
 .is-matrix-pickups .mp-filters { display: flex; gap: 5px; overflow-x: auto; padding: 1px 1px 3px; scrollbar-width: thin; }
-.is-matrix-pickups .mp-filters button { flex: 1 1 0; min-width: 0; min-height: 45px; padding: 7px 3px; font-size: 15px; }
+.is-matrix-pickups .mp-filters button { flex: 1 0 auto; min-width: 0; min-height: 45px; padding: 7px 4px; font-size: 14px; }
+.is-matrix-pickups .mp-filters button span { white-space: nowrap; overflow-wrap: normal; }
 .is-matrix-pickups .mp-list { display: flex; flex-direction: column; gap: 11px; }
 .is-matrix-pickups .mp-order { display: grid; grid-template-columns: 68px minmax(0,1fr); gap: 10px; padding: 12px 11px; }
 .is-matrix-pickups .mp-tire { width: 100%; height: 110px; align-self: center; object-fit: contain; mix-blend-mode: multiply; }
