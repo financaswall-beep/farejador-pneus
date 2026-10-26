@@ -59,11 +59,12 @@
     const session = Caixa.sessionFingerprint();
     state.saving = true; elements.sheetError.textContent = ''; P.renderSheet();
     try {
-      await api(basePath() + '/' + encodeURIComponent(row.order_id) + '/stage', {
+      const result = await api(basePath() + '/' + encodeURIComponent(row.order_id) + '/stage', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stage: stage, services: P.draftServices(row) }),
       });
       if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && (result?.order_id !== row.order_id || result.stage !== stage)) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Etapa da retirada atualizada.');
       await loadPickups();
       if (session !== Caixa.sessionFingerprint()) return;
@@ -94,6 +95,7 @@
         }),
       });
       if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && (result?.order_id !== row.order_id || result.status !== 'paid' || !result.retrieved_at)) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Retirada concluída. Estoque e caixa confirmados juntos.');
       await loadPickups();
       if (session !== Caixa.sessionFingerprint()) return;
@@ -115,11 +117,12 @@
     const session = Caixa.sessionFingerprint();
     state.saving = true; elements.sheetError.textContent = '';
     try {
-      await api(basePath() + '/' + encodeURIComponent(row.order_id), {
+      const result = await api(basePath() + '/' + encodeURIComponent(row.order_id), {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason }),
       });
       if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && result?.cancelled !== true) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Pedido cancelado. A reserva foi liberada sem lançar caixa.');
       await loadPickups();
       if (session !== Caixa.sessionFingerprint()) return;

@@ -15,7 +15,7 @@ function app() {
   let session = 'session-one';
   const P: any = { elements, state, selected: () => state.rows.find(item => item.order_id === state.selectedId), draftServices: () => [],
     renderSheet: vi.fn(), renderList: vi.fn(), setStateView: vi.fn(), closeSheet: vi.fn(), openSelected: vi.fn(), normalizedPayment: (value: string) => value };
-  const C: any = { Pickups: P, token: () => session, canModule: () => true, sessionFingerprint: () => session,
+  const C: any = { Pickups: P, token: () => session, canModule: () => true, isPartner: () => false, sessionFingerprint: () => session,
     operationPath: (_: string, fallback: string) => fallback, authenticatedFetch: vi.fn(), json: (response: any) => response.payload, showToast: vi.fn() };
   runInNewContext(readFileSync('painel/public/caixa-pickups-actions.js', 'utf8'), {
     window: { Caixa: C }, document: { querySelectorAll: () => [], addEventListener: vi.fn() }, AbortController, DOMException, Error,
@@ -56,6 +56,13 @@ describe('ações de retirada usadas pelas telas da Matriz', () => {
     expect(a.C.authenticatedFetch).not.toHaveBeenCalled();
     expect(a.P.elements.sheetError.textContent).toContain('Informe o valor');
   });
+  it.each(['completePickup', 'cancelPickup', 'saveStage'])('exige confirmação da operação mesmo com HTTP 200 em %s', async action => {
+    const a = app(); a.C.authenticatedFetch.mockResolvedValue(a.response({}));
+    await a.P.actions[action](action === 'saveStage' ? 'arrived' : 'Cliente desistiu');
+    expect(a.P.closeSheet).not.toHaveBeenCalled(); expect(a.C.showToast).not.toHaveBeenCalled();
+    expect(a.C.authenticatedFetch).toHaveBeenCalledTimes(1);
+    expect(a.P.elements.sheetError.textContent).toContain('Não foi possível confirmar');
+  });
   it('descarta a lista recebida depois da troca de sessão', async () => {
     const a = app(), read = deferred<unknown>(); a.C.authenticatedFetch.mockReturnValueOnce(read.promise);
     const pending = a.C.loadPickups(); a.changeSession();
@@ -73,7 +80,7 @@ describe('ações de retirada usadas pelas telas da Matriz', () => {
   });
   it('não fecha a tela da nova sessão se a troca ocorrer durante a releitura após o pagamento', async () => {
     const a = app(), read = deferred<unknown>();
-    a.C.authenticatedFetch.mockResolvedValueOnce(a.response({ order_id: a.row.order_id, status: 'paid' })).mockReturnValueOnce(read.promise);
+    a.C.authenticatedFetch.mockResolvedValueOnce(a.response({ order_id: a.row.order_id, status: 'paid', retrieved_at: '2026-10-26T15:00:00Z' })).mockReturnValueOnce(read.promise);
     const pending = a.P.actions.completePickup();
     await vi.waitFor(() => expect(a.C.authenticatedFetch).toHaveBeenCalledTimes(2));
     a.changeSession(); read.resolve(a.response({ rows: [a.row] })); await pending;
