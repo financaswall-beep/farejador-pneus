@@ -16,10 +16,12 @@
   }
   function prepareEditor() {
     const details = document.createElement('details'); details.id = 'mcg-extra-spec';
-    const summary = V.el('summary', 'Mais dados técnicos'); details.appendChild(summary);
+    const summary = V.el('summary', 'Mais dados técnicos'), fields = V.el('div', null, 'matrix-catalog-grid mcg-extra-fields');
+    details.append(summary, fields);
     const first = el('matrix-catalog-tread').closest('label'); first.before(details);
-    ['tread', 'load', 'speed'].forEach(name => details.appendChild(el('matrix-catalog-' + name).closest('label')));
-    const initial = el('matrix-catalog-initial-price-label'); details.after(initial);
+    ['tread', 'load', 'speed'].forEach(name => fields.appendChild(el('matrix-catalog-' + name).closest('label')));
+    const initial = el('matrix-catalog-initial-price-label'), price = V.el('fieldset'); price.id = 'mcg-initial-price-group';
+    price.append(V.el('legend', 'Preço de venda'), initial); el('matrix-catalog-form').querySelector(':scope > .matrix-catalog-note').before(price);
     el('matrix-catalog-price-form').appendChild(V.el('p', 'O novo preço vale para as próximas vendas.', 'mcg-hint'));
   }
   prepareEditor();
@@ -33,6 +35,10 @@
     el('matrix-catalog-form').querySelector(':scope > .matrix-catalog-note').textContent = editing ? 'As alterações valem no app e no painel.' : 'O cadastro não adiciona quantidade ao estoque.';
     el('matrix-catalog-title').textContent = mode === 'price' ? 'Alterar preço' : editing ? 'Ficha técnica' : row?.creation_mode === 'stock' ? 'Completar cadastro' : 'Cadastrar pneu';
     el('matrix-catalog-identity').classList.toggle('mcg-hide-identity', editing);
+    el('mcg-initial-price-group').classList.toggle('hidden', editing);
+    el('matrix-catalog-measure-help').textContent = row?.creation_mode === 'stock'
+      ? 'Medida, marca e condição seguem o item de estoque.'
+      : 'Escolha uma medida cadastrada ou digite uma nova. Ex.: 90/90-18.';
     el('mcg-extra-spec').open = editing;
     const old = dialog.querySelector('.mcg-current-price'); old?.remove();
     if (mode === 'price') {

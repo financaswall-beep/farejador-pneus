@@ -42,9 +42,9 @@ html:has(.is-matrix-metal.is-authenticated),body:has(.is-matrix-metal.is-authent
   color: var(--mc-ink); border: 0; background: none; box-shadow: none;
 }
 .is-matrix-metal .notifications-button svg { width: 30px; height: 30px; }
-.is-matrix-metal .operator-button { border: 1px solid #a9b5ae; border-radius: 50%; background: linear-gradient(#fff,#cdd9d0); box-shadow: 0 2px 3px #17372433; }
-.is-matrix-metal .operator-button svg { width: 29px; height: 29px; fill: currentColor; stroke-width: 1; }
-.is-matrix-metal .operator-button::after { content: ''; position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: #087c45; }
+.is-matrix-metal .operator-button { display: grid; place-items: center; flex: 0 0 44px; gap: 0; overflow: visible; border: 1px solid #a9b5ae; border-radius: 50%; background: linear-gradient(#fff,#cdd9d0); box-shadow: 0 2px 3px #17372433; }
+.is-matrix-metal .operator-button svg { display: block; flex: none; width: 29px; height: 29px; fill: currentColor; stroke-width: 1; }
+.is-matrix-metal .operator-button::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; background: #087c45; pointer-events: none; }
 .is-matrix-metal .operator-button span,.is-matrix-metal .online-status { display: none; }
 .is-matrix-checkout #cash-panel {
   flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
