@@ -33,7 +33,7 @@
         const url = URL.createObjectURL(blob); images.set(photo.id, url);
         if (images.size > 48) { const oldest = images.keys().next().value; URL.revokeObjectURL(images.get(oldest)); images.delete(oldest); }
         host.querySelectorAll('[data-mcph-image]').forEach(node => { if (node.dataset.mcphImage === photo.id) node.src = url; });
-      }).catch(() => { if (instance === app) failedImages.add(photo.id); }).finally(() => { if (instance === app) pendingImages.delete(photo.id); });
+      }).catch(() => { if (instance === app) { failedImages.add(photo.id); app.matrixPhotos.error = 'Não foi possível abrir a foto. Atualize para tentar novamente.'; render(); } }).finally(() => { if (instance === app) pendingImages.delete(photo.id); });
     }
     return placeholder;
   }
@@ -116,6 +116,7 @@
   });
   window.addEventListener('pagehide', clearImages);
   Caixa.matrixPhotoGallery = { sync, close, open,
+    refresh() { if (!app || !active) return; failedImages.clear(); return action(() => app.mcphLoad()); },
     mediaView: () => app?.matrixPhotos.selected ? 'media-' + (app.matrixPhotos.preview ? 'preview' : app.matrixPhotos.screen || 'photos') : 'gallery',
   };
 }());

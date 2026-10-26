@@ -63,7 +63,7 @@
     const b = event.target.closest('[data-mcg-action]'); if (!b || b.disabled || !valid()) return;
     const action = b.dataset.mcgAction, row = selected();
     if (action === 'products') { m.selected = ''; render(); }
-    else if (action === 'refresh') void C.loadOperationCatalog(1);
+    else if (action === 'refresh') { if (m.media) void C.matrixPhotoGallery.refresh(); else void C.loadOperationCatalog(1); }
     else if (action === 'filters') showFilters();
     else if (action === 'close-filters') filters.close();
     else if (action === 'close-stock-choice') stockChoice.close();
