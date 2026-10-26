@@ -41,7 +41,7 @@
   };
   const catalogView = Caixa.createCheckoutCatalogView(checkout, ui, changeQuantity);
   const productTitle = catalogView.productTitle, renderCatalog = catalogView.renderCatalog, setCatalogState = catalogView.setCatalogState;
-  const pricing = Caixa.createCheckoutPricing(checkout, ui, productTitle, renderCart);
+  const pricing = Caixa.createCheckoutPricing(checkout, ui, productTitle, renderCart, catalogView);
   const cartTotals = pricing.cartTotals, reviewRow = pricing.reviewRow, updateReviewSummary = pricing.updateReviewSummary;
   const saleView = Caixa.createCheckoutView(checkout, catalogView, pricing, changeQuantity);
 
@@ -139,7 +139,11 @@
   function openReview() {
     if (checkout.cart.size === 0 || checkout.recoveryBlocked) return;
     ui.submitError.textContent = '';
+    elements.checkoutReviewModal.querySelector('header p').textContent = Caixa.isPartner() ? 'Conferência obrigatória' : 'Confira antes de confirmar';
+    const actions = elements.checkoutReviewModal.querySelector('.checkout-review-actions'), back = actions.querySelector('[data-close-checkout]');
+    if (Caixa.isPartner()) actions.insertBefore(back, ui.confirmButton); else actions.appendChild(back);
     ui.reviewContent.replaceChildren();
+    document.getElementById('checkout-review-total-slot').replaceChildren();
     const items = document.createElement('div');
     items.className = 'checkout-review-items';
     checkout.cart.forEach(function (line) { items.appendChild(reviewRow(line)); });
@@ -154,6 +158,18 @@
       const detail = document.createElement('dd');
       detail.textContent = pair[1];
       row.append(term, detail);
+      if (!Caixa.isPartner()) {
+        const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = 'Alterar ›';
+        edit.setAttribute('aria-label', 'Alterar ' + pair[0].toLowerCase());
+        edit.disabled = Boolean(checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked);
+        edit.addEventListener('click', function () {
+          if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
+          closeReview();
+          if (pair[0] === 'Cliente') openCustomer();
+          else ui.paymentButtons.find(button => button.classList.contains('active'))?.focus();
+        });
+        row.appendChild(edit);
+      }
       meta.appendChild(row);
     });
     const total = document.createElement('div');
@@ -164,7 +180,9 @@
     amount.dataset.checkoutReviewTotal = 'true';
     amount.textContent = Caixa.currency.format(cartTotals().total);
     total.append(label, amount);
-    ui.reviewContent.append(items, meta, total);
+    ui.reviewContent.append(items, meta);
+    if (!Caixa.isPartner()) document.getElementById('checkout-review-total-slot').appendChild(total);
+    else ui.reviewContent.appendChild(total);
     updateReviewSummary();
     if (checkout.pendingAttempt) { ui.submitError.textContent = Caixa.checkoutPendingMessage; ui.confirmButton.textContent = 'VERIFICAR VENDA'; }
     elements.checkoutReviewModal.classList.remove('hidden');

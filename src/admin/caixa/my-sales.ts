@@ -165,6 +165,7 @@ export async function getCaixaMySaleDetail(
 ): Promise<OperationSaleDetail | null> {
   const result = await db.query<any>(
     `SELECT o.id order_id,o.order_number,o.payment_method,o.total_amount::text,o.status,o.created_at,
+            COALESCE(NULLIF(btrim(ct.name),''),NULLIF(btrim(cu.name),''),'Cliente Balcão') customer_name,
             mc.display_name seller_name,o.source,items.quantity items_quantity,items.item_kind,
             items.first_name,items.lines item_lines,cr.kind commission_kind,cr.basis commission_basis,
             COALESCE(cr.value,0)::text commission_value,(${commissionSql})::text commission_amount,
@@ -183,6 +184,8 @@ export async function getCaixaMySaleDetail(
              WHERE oi.order_id=o.id AND oi.environment=o.environment),'[]'::jsonb) items_json
        FROM commerce.orders o
        JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
+       LEFT JOIN core.contacts ct ON ct.id=o.contact_id AND ct.environment=o.environment
+       LEFT JOIN commerce.customers cu ON cu.id=o.customer_id AND cu.environment=o.environment
        LEFT JOIN network.matriz_collaborators mc
          ON mc.id=o.seller_collaborator_id AND mc.environment=o.environment
        ${itemLateralSql}
@@ -200,6 +203,7 @@ export async function getCaixaMySaleDetail(
     ...listRow(row),
     sales_scope: scope,
     seller_name: row.seller_name ?? 'Sem vendedor vinculado',
+    customer_name: row.customer_name ?? 'Cliente Balcão',
     items: (row.items_json ?? []).map((item: any) => ({
       product_name: item.product_name,
       quantity: Number(item.quantity),

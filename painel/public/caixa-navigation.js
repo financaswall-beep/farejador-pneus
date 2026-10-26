@@ -5,6 +5,7 @@
   const state = Caixa.state;
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
+    elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     if (Caixa.isPartner() && Caixa.partnerHome) {
       Caixa.checkoutRuntime?.close();
       Caixa.partnerHome.sync(tab);

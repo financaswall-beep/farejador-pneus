@@ -77,6 +77,7 @@
   }
 
   function closeReceipt() {
+    Caixa.resetMatrixCheckoutReceipt?.();
     elements.receiptModal.classList.add('hidden');
     elements.receiptContent.replaceChildren();
     Caixa.partnerReceipt?.close();

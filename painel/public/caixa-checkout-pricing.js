@@ -14,7 +14,7 @@
     return cents / 100;
   }
 
-  Caixa.createCheckoutPricing = function (checkout, ui, productTitle, renderCart) {
+  Caixa.createCheckoutPricing = function (checkout, ui, productTitle, renderCart, catalogView) {
     function cartTotals() {
       let quantity = 0;
       let total = 0;
@@ -30,7 +30,8 @@
 
     function updateReviewSummary() {
       const totals = cartTotals();
-      const amount = ui.reviewContent.querySelector('[data-checkout-review-total]');
+      const amount = ui.reviewContent.querySelector('[data-checkout-review-total]')
+        || document.getElementById('checkout-review-total-slot')?.querySelector('[data-checkout-review-total]');
       if (amount) amount.textContent = totals.valid ? Caixa.currency.format(totals.total) : 'Revise os preços';
       ui.confirmButton.disabled = checkout.busy || !totals.valid || totals.quantity === 0;
       ui.submitError.textContent = totals.valid ? '' : 'Informe um preço negociado válido para todos os itens.';
@@ -38,18 +39,29 @@
 
     function reviewRow(line) {
       const row = document.createElement('div'); row.className = 'checkout-review-line';
+      row.dataset.quantity = String(line.quantity);
       const copy = document.createElement('span');
-      const name = document.createElement('strong'); name.textContent = line.quantity + '× ' + productTitle(line.product);
+      const name = document.createElement('strong'); name.textContent = line.quantity + '× ' + (!Caixa.isPartner() && line.product.tire_size || productTitle(line.product));
       const description = document.createElement('small'); description.textContent = line.product.product_name;
+      if (!Caixa.isPartner() && catalogView) {
+        row.appendChild(catalogView.productImage(line.product));
+        description.textContent = catalogView.productDetails(line.product);
+      }
       const official = document.createElement('small'); official.className = 'checkout-reference-price';
       official.textContent = 'Preço oficial: ' + Caixa.currency.format(Number(line.referencePrice));
-      copy.append(name, description, official);
+      const matrix = !Caixa.isPartner() && Boolean(catalogView);
+      if (matrix) official.hidden = Number(line.negotiatedPrice) === Number(line.referencePrice);
+      copy.append(name, description);
+      if (!matrix) copy.appendChild(official);
       const editor = priceEditor(line, function () {
         amount.textContent = line.negotiatedPrice == null ? 'Preço inválido' : Caixa.currency.format(Number(line.negotiatedPrice) * line.quantity);
+        if (matrix) official.hidden = Number(line.negotiatedPrice) === Number(line.referencePrice);
       });
       const amount = document.createElement('strong'); amount.className = 'checkout-negotiated-total';
       amount.textContent = Caixa.currency.format(Number(line.negotiatedPrice) * line.quantity);
-      row.append(copy, editor, amount);
+      row.append(copy, editor);
+      if (matrix) row.appendChild(official);
+      row.appendChild(amount);
       return row;
     }
 
@@ -65,6 +77,7 @@
       input.value = line.negotiatedPrice == null ? '' : Number(line.negotiatedPrice).toFixed(2).replace('.', ',');
       input.setAttribute('aria-label', 'Preço negociado de ' + productTitle(line.product));
       field.append(currency, input); editor.append(label, field);
+      if (!Caixa.isPartner() && Caixa.createSvg) field.appendChild(Caixa.createSvg([{ d: 'm15 4 5 5M4 20l5-1L21 7l-5-5L4 14v6Z' }]));
       input.addEventListener('input', function () {
         if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
         const price = parseNegotiatedPrice(input.value);

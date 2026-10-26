@@ -6,7 +6,10 @@
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260918-catalog2" />
-  <link rel="stylesheet" href="/operacao/caixa-checkout.css?v=20260923-caixa2" />
+  <link rel="stylesheet" href="/operacao/caixa-checkout.css?v=20261026-metal1" />
+  <link rel="stylesheet" href="/operacao/caixa-checkout-metal.css?v=20261026-metal1" />
+  <link rel="stylesheet" href="/operacao/caixa-checkout-metal-sheets.css?v=20261026-metal1" />
+  <link rel="stylesheet" href="/operacao/caixa-checkout-metal-receipt.css?v=20261026-metal1" />
   <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-accounts.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-tools.css?v=20260923-receipt2" />
@@ -21,14 +24,15 @@
   <script defer src="/operacao/caixa-core.js?v=20261002-audit1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20261006-partner-buy2"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
-  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260923-caixa2"></script>
-  <script defer src="/operacao/caixa-checkout-pricing.js?v=20261002-recovery1"></script>
-  <script defer src="/operacao/caixa-checkout-view.js?v=20260923-caixa2"></script>
-  <script defer src="/operacao/caixa-checkout.js?v=20261002-recovery1"></script>
+  <script defer src="/operacao/caixa-checkout-catalog.js?v=20261026-metal1"></script>
+  <script defer src="/operacao/caixa-checkout-pricing.js?v=20261026-metal1"></script>
+  <script defer src="/operacao/caixa-checkout-view.js?v=20261026-metal1"></script>
+  <script defer src="/operacao/caixa-checkout.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-checkout-submit.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20261002-recovery1"></script>
   <script defer src="/operacao/caixa-sales-weekly.js?v=20260923-sales-scope1"></script>
-  <script defer src="/operacao/caixa-sales-view.js?v=20261005-partner-receipt1"></script>
+  <script defer src="/operacao/caixa-checkout-receipt.js?v=20261026-metal1"></script>
+  <script defer src="/operacao/caixa-sales-view.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260822-continuity1"></script>
   <script defer src="/operacao/caixa-stock-price.js?v=20261009-price-metal1"></script>
@@ -47,8 +51,8 @@
   <script defer src="/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261025-photos1"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20261005-partner-receipt1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261026-metal1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20260918-purchasevariants1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20260918-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20260918-purchasevariants1"></script>
@@ -358,10 +362,6 @@
             </div>
 
           </section>
-          <footer class="co-checkout-bar">
-            <div><small>Total da venda</small><strong id="checkout-total">R$ 0,00</strong></div>
-            <div><button id="checkout-review-button" class="checkout-finish" type="button" disabled>Revisar venda <span aria-hidden="true">→</span></button><small>Confira antes de registrar.</small></div>
-          </footer>
           <dialog id="checkout-picker" class="co-picker" aria-labelledby="checkout-picker-title">
             <div class="co-picker-inner"><header class="co-picker-heading"><span class="co-handle" aria-hidden="true"></span><h2 id="checkout-picker-title">Adicionar item</h2><button id="checkout-picker-close" type="button" aria-label="Fechar produtos" autofocus>×</button></header>
           <div class="checkout-search">
@@ -403,11 +403,17 @@
           </dialog>
           <dialog id="checkout-price-dialog" class="co-price-dialog" aria-labelledby="checkout-price-title">
             <header><h2 id="checkout-price-title">Preço nesta venda</h2><button id="checkout-price-close" type="button" aria-label="Fechar edição de preço">×</button></header>
-            <p id="checkout-price-name"></p><small id="checkout-price-reference"></small><div id="checkout-price-field"></div>
+            <section class="mc-price-product"><div id="checkout-price-image" class="mc-only"></div><div><p id="checkout-price-name"></p><small id="checkout-price-description" class="mc-only"></small><small id="checkout-price-reference"></small><div class="mc-official mc-only"><span>Preço oficial</span><strong id="checkout-price-official"></strong></div></div></section><div id="checkout-price-field"></div>
+            <p id="checkout-price-difference" class="mc-price-difference mc-only" aria-live="polite" hidden></p>
             <p id="checkout-price-error" role="alert" hidden>Informe um preço válido maior que zero, com até duas casas decimais.</p><button id="checkout-price-done" type="button">Concluir</button>
+            <button id="checkout-price-back" class="mc-only mc-secondary" type="button">Voltar</button>
           </dialog>
         </div>
 
+        <footer class="co-checkout-bar">
+          <div><small>Total da venda</small><strong id="checkout-total">R$ 0,00</strong></div>
+          <div><button id="checkout-review-button" class="checkout-finish" type="button" disabled>Revisar venda <span aria-hidden="true">→</span></button><small>Confira antes de registrar.</small></div>
+        </footer>
         <div id="sales-panel" class="app-panel my-sales-panel hidden">
           <section id="weekly-summary" class="weekly-summary hidden" aria-labelledby="weekly-summary-title">
             <header class="weekly-week-nav">
@@ -1564,7 +1570,7 @@
             <span>Vendas</span>
           </button>
           <button id="nav-conversations" type="button" data-tab="conversations" class="hidden">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 3h16v14H9l-5 4V3Zm4 5h8m-8 4h5"/></svg><span>Atendimento</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 3h16v14H9l-5 4V3Zm4 5h8m-8 4h5"/></svg><span>Conversas</span>
           </button>
           <button id="nav-pickups" type="button" data-tab="pickups">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6h18l-1 4H4L3 6Z"/><path d="M9 20v-6h6v6"/></svg>
@@ -1866,7 +1872,9 @@
           <form id="checkout-customer-form" novalidate>
             <label>Nome<input id="checkout-customer-name" type="text" maxlength="200" autocomplete="name" placeholder="Cliente Balcão" /></label>
             <label>Telefone (opcional)<input id="checkout-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="(21) 99999-9999" /></label>
+            <p class="mc-only mc-customer-help">Você também pode vender sem identificar.</p>
             <button class="account-modal-primary" type="submit">Salvar cliente</button>
+            <button class="mc-only mc-secondary" type="button" data-close-customer>Voltar</button>
           </form>
         </article>
       </div>
@@ -1879,6 +1887,7 @@
             <button type="button" data-close-checkout aria-label="Fechar">×</button>
           </header>
           <div id="checkout-review-content" class="checkout-review-content"></div>
+          <div id="checkout-review-total-slot"></div>
           <p id="checkout-submit-error" class="checkout-submit-error" role="alert"></p>
           <footer class="checkout-review-actions">
             <button type="button" data-close-checkout>Voltar</button>
