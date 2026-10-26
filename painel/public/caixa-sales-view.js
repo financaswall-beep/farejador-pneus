@@ -55,6 +55,7 @@
   }
 
   function setSalesState(value) {
+    elements.salesPanel.dataset.state = value;
     elements.salesLoading.classList.toggle('hidden', value !== 'loading');
     elements.salesError.classList.toggle('hidden', value !== 'error');
     elements.salesEmpty.classList.toggle('hidden', value !== 'empty');
@@ -103,12 +104,14 @@
     meta.className = 'sale-payment';
     meta.textContent = paymentLabel(sale.payment_method);
     const created = new Date(sale.created_at);
-    if (Caixa.isPartner() && !Number.isNaN(created.getTime())) {
+    if (!Number.isNaN(created.getTime())) {
       meta.textContent += ' · ' + new Intl.DateTimeFormat('pt-BR', {
         day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo',
-      }).format(created);
+        ...(!Caixa.isPartner() ? { hour: '2-digit', minute: '2-digit' } : {}),
+      }).format(created).replace(' às ', ', ');
     }
-    if (matrix) meta.textContent += ' · ' + saleOrigin(sale);
+    const origin = document.createElement('span'); origin.className = 'sale-origin';
+    if (!Caixa.isPartner()) origin.textContent = saleOrigin(sale);
     const amount = document.createElement('strong');
     amount.className = 'sale-amount';
     amount.textContent = Caixa.currency.format(Number(sale.total_amount || 0));
@@ -121,6 +124,11 @@
     commissionText.textContent = status.className === 'cancelled'
       ? 'Comissão cancelada'
       : (matrix ? 'Comissão da venda: ' : 'Sua comissão: ') + Caixa.currency.format(Number(sale.commission_amount || 0)) + rate;
+    if (!Caixa.isPartner() && matrix && status.className !== 'cancelled') {
+      const value = sale.commission_amount;
+      commissionText.textContent = value == null || !Number.isFinite(Number(value)) ? 'Comissão não informada'
+        : Number(value) === 0 ? 'Sem comissão' : 'Comissão: ' + Caixa.currency.format(Number(value));
+    }
     const detailsButton = document.createElement('button');
     detailsButton.type = 'button';
     detailsButton.className = 'receipt-button';
@@ -131,17 +139,16 @@
     detailsButton.addEventListener('click', function () { void Caixa.openReceipt(sale.order_id); });
     commission.append(commissionText, detailsButton);
     copy.append(item, meta);
+    if (!Caixa.isPartner()) copy.appendChild(origin);
     body.append(copy, amount);
     details.append(heading, body, commission);
     article.append(saleIcon(), details);
-    if (Caixa.isPartner()) {
-      ['tl', 'tr', 'bl', 'br'].forEach(function (corner) {
-        const screw = document.createElement('span');
-        screw.className = 'ph-header-screw ps-sale-screw ps-sale-screw--' + corner;
-        screw.setAttribute('aria-hidden', 'true');
-        article.appendChild(screw);
-      });
-    }
+    ['tl', 'tr', 'bl', 'br'].forEach(function (corner) {
+      const screw = document.createElement('span');
+      screw.className = 'ph-header-screw ps-sale-screw ps-sale-screw--' + corner;
+      screw.setAttribute('aria-hidden', 'true');
+      article.appendChild(screw);
+    });
     return article;
   }
 

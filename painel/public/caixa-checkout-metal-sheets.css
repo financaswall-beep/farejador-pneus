@@ -137,7 +137,7 @@
   .is-matrix-checkout .co-picker .catalog-product-footer > b { font-size: 26px; }
 }
 @media (max-height: 500px) {
-  .is-matrix-checkout,.matrix-checkout-receipt { --mc-header: 58px; --mc-nav: 58px; }
+  .is-matrix-metal,.matrix-checkout-receipt { --mc-header: 58px; --mc-nav: 58px; }
   .is-matrix-checkout .sales-logo { width: 40px; height: 40px; flex-basis: 40px; }
   .is-matrix-checkout .co-picker-heading { padding-block: 4px; }
   .is-matrix-checkout .co-picker-footer { padding-block: 5px; }
