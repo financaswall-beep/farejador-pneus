@@ -288,6 +288,7 @@ form { display: grid; gap: 16px; }
 .notifications-button b { position: absolute; top: -7px; right: -6px; display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border: 2px solid #07543b; border-radius: 999px; color: #fff; background: #0b9a61; font-size: 11px; line-height: 1; }
 .operator-button {
   display: flex;
+  justify-content: center;
   max-width: 142px;
   height: 43px;
   align-items: center;
