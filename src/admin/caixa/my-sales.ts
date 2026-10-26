@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
+import { commissionItemRulesOf } from '../../shared/operation-team.js';
 import {
   summarizeOperationDays,
   type OperationMySalesPayload,
@@ -169,6 +170,10 @@ export async function getCaixaMySaleDetail(
             mc.display_name seller_name,o.source,items.quantity items_quantity,items.item_kind,
             items.first_name,items.lines item_lines,cr.kind commission_kind,cr.basis commission_basis,
             COALESCE(cr.value,0)::text commission_value,(${commissionSql})::text commission_amount,
+            cr.active commission_active,cr.itemized commission_itemized,cr.item_rules commission_item_rules,
+            CASE WHEN cr.kind='percent' AND NOT COALESCE(cr.itemized,false)
+              THEN CASE WHEN cr.basis='revenue' THEN o.total_amount
+                WHEN cr.basis='margin' THEN items.margin END END::text commission_base_amount,
             pi.payment_status payroll_status,
             COALESCE((SELECT jsonb_agg(jsonb_build_object(
               'product_name',COALESCE(p.product_name,'Item'),'quantity',oi.quantity,
@@ -204,6 +209,15 @@ export async function getCaixaMySaleDetail(
     sales_scope: scope,
     seller_name: row.seller_name ?? 'Sem vendedor vinculado',
     customer_name: row.customer_name ?? 'Cliente Balcão',
+    commission_calculation: {
+      active: row.commission_active ?? null,
+      itemized: row.commission_itemized === true,
+      item_rules: row.commission_itemized && row.commission_item_rules != null
+        ? commissionItemRulesOf(row.commission_item_rules) : null,
+      base_amount: row.commission_base_amount != null
+        && (row.commission_basis !== 'margin' || scope === 'matrix')
+        ? Number(row.commission_base_amount) : null,
+    },
     items: (row.items_json ?? []).map((item: any) => ({
       product_name: item.product_name,
       quantity: Number(item.quantity),

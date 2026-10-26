@@ -93,4 +93,54 @@ describe('Minhas vendas da Matriz', () => {
     expect(sql).toContain('o.seller_collaborator_id=$2');
     expect(sql).not.toContain('phone');
   });
+
+  it.each([
+    ['revenue', '109', false, '5.45'],
+    ['margin', '40', false, '2'],
+    ['sale', null, false, '8'],
+    ['revenue', null, true, '6.17'],
+  ])('explica a comissão %s sem recalcular o valor retornado pelo banco', async (basis, base, itemized, amount) => {
+    const query = vi.fn().mockResolvedValue({ rows: [{
+      order_id: 'sale', total_amount: '109', status: 'confirmed', items_json: [],
+      commission_kind: basis === 'sale' ? 'fixed' : 'percent', commission_basis: basis,
+      commission_value: '5', commission_amount: amount, commission_active: true,
+      commission_itemized: itemized, commission_base_amount: base,
+    }] });
+    const detail = await getCaixaMySaleDetail('test', 'owner', 'sale', { query } as unknown as Pool, 'matrix');
+    expect(detail).toMatchObject({
+      commission_amount: Number(amount), commission_calculation: {
+        active: true, itemized, base_amount: base == null ? null : Number(base),
+      },
+    });
+    const [sql, args] = query.mock.calls[0]!;
+    expect(sql).toContain('cr.active commission_active,cr.itemized commission_itemized');
+    expect(sql).toContain("WHEN cr.basis='margin' THEN items.margin");
+    expect(args).toEqual(['test', 'owner', 'sale', true]);
+  });
+
+  it('não acrescenta a margem privada da Matriz ao recibo pessoal', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{
+      order_id: 'sale', total_amount: '109', status: 'confirmed', items_json: [],
+      commission_basis: 'margin', commission_base_amount: '40', commission_active: true,
+      commission_amount: '2',
+    }] });
+    const detail = await getCaixaMySaleDetail('prod', 'seller', 'sale', { query } as unknown as Pool);
+    expect(detail?.commission_calculation).toEqual({ active: true, itemized: false, base_amount: null, item_rules: null });
+    expect(detail?.commission_amount).toBe(2);
+    expect(query.mock.calls[0]?.[1]).toEqual(['prod', 'seller', 'sale', false]);
+  });
+
+  it('inclui as regras por grupo sem substituir o total calculado pelo banco', async () => {
+    const rules = { tire: { kind: 'fixed', value: 2 }, service: { kind: 'percent', value: 10 },
+      other: { kind: 'none', value: 0 } };
+    const query = vi.fn().mockResolvedValue({ rows: [{
+      order_id: 'sale', total_amount: '109', status: 'confirmed', items_json: [],
+      commission_active: true, commission_itemized: true, commission_item_rules: rules,
+      commission_amount: '6.17', commission_base_amount: null,
+    }] });
+    const detail = await getCaixaMySaleDetail('test', 'owner', 'sale', { query } as unknown as Pool, 'matrix');
+    expect(detail).toMatchObject({ commission_amount: 6.17, commission_calculation: {
+      active: true, itemized: true, item_rules: rules, base_amount: null,
+    } });
+  });
 });

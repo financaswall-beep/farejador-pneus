@@ -4,7 +4,9 @@
   const printer = doc.getElementById('receipt-print');
   const footer = modal.querySelector('.receipt-sheet > footer'), originalFooter = Array.from(footer.childNodes);
   const originalPrinter = Array.from(printer.childNodes, node => node.cloneNode(true));
-  let customized = false, printDetails = null, printWasOpen = false;
+  const title = doc.getElementById('receipt-title'), close = modal.querySelector('.receipt-close');
+  const originalTitle = title.textContent, originalCloseLabel = close.getAttribute('aria-label');
+  let customized = false, returnToSale = null;
   function node(tag, text, className) {
     const el = doc.createElement(tag); if (text != null) el.textContent = String(text);
     if (className) el.className = className; return el;
@@ -14,26 +16,34 @@
   C.resetMatrixCheckoutReceipt = function () {
     if (customized) printer.replaceChildren(...originalPrinter.map(el => el.cloneNode(true)));
     if (customized) footer.replaceChildren(...originalFooter);
-    customized = false; modal.classList.remove('matrix-checkout-receipt');
+    title.textContent = originalTitle; close.setAttribute('aria-label', originalCloseLabel);
+    returnToSale = null; customized = false;
+    modal.classList.remove('matrix-checkout-receipt', 'mc-commission-detail');
   };
   C.renderMatrixCheckoutReceipt = function (receipt, labels) {
     customized = true; modal.classList.add('matrix-checkout-receipt');
-    const content = C.elements.receiptContent; content.replaceChildren();
+    const content = C.elements.receiptContent; content.replaceChildren(); content.scrollTop = 0;
+    const overview = node('div', '', 'mc-receipt-overview'), commission = C.matrixSaleCommission;
     const cancelled = receipt.status === 'cancelled';
     const status = node('div', '', 'mc-receipt-status'); status.dataset.status = receipt.status || '';
     const pending = ['open', 'pending', 'reserved'].includes(receipt.status);
     status.append(C.createSvg([{ d: cancelled ? 'm6 6 12 12M6 18 18 6' : 'm5 12 4 4L19 6' }]),
-      node('strong', cancelled ? 'Venda cancelada' : pending ? 'Venda em andamento' : 'Venda registrada'));
+      node('strong', cancelled ? 'Venda cancelada' : pending ? 'Venda em andamento'
+        : ['paid', 'delivered'].includes(receipt.status) ? 'Venda concluída' : 'Venda registrada'));
     const meta = node('section', '', 'mc-receipt-meta');
     const date = new Date(receipt.created_at);
     const order = String(receipt.order_number || '');
-    meta.append(node('strong', order.startsWith('PED-') ? order : labels.orderLabel(order)), node('p', Number.isFinite(date.getTime()) ? C.dateTime.format(date) : 'Data não informada'));
+    const identification = node('div', '', 'mc-receipt-identification');
+    identification.append(node('strong', order.startsWith('PED-') ? order : labels.orderLabel(order)), node('p', Number.isFinite(date.getTime()) ? C.dateTime.format(date) : 'Data não informada'));
+    meta.append(identification);
     const list = node('dl');
     field(list, 'Cliente', receipt.customer_name || 'Cliente não informado');
     const received = !cancelled && (receipt.payment_status === 'received' || receipt.status === 'paid');
     field(list, 'Pagamento', labels.paymentLabel(receipt.payment_method) + (received ? ' · Recebido' : ''));
     meta.appendChild(list);
-    const items = node('section', '', 'mc-receipt-items'), prices = [];
+    const items = node('section', '', 'mc-receipt-items');
+    const itemHeading = node('h3'); itemHeading.append(C.createSvg([{ d: 'M3 3h2l3 12h10l3-9H6M9 21h.01M18 21h.01' }]), node('span', 'Produtos da venda'));
+    items.append(itemHeading);
     (receipt.items || []).forEach(item => {
       const row = node('div', '', 'mc-receipt-row'), copy = node('span');
       row.dataset.quantity = String(item.quantity);
@@ -41,28 +51,35 @@
       const unit = money(item.unit_price);
       copy.append(node('small', 'Valor unitário: ' + unit));
       if (item.reference_unit_price != null && Math.abs(Number(item.reference_unit_price) - Number(item.unit_price)) >= .005) {
-        copy.append(node('small', 'Preço oficial: ' + money(item.reference_unit_price)));
+        copy.append(node('small', 'Preço oficial: ' + money(item.reference_unit_price), 'mc-reference-price'));
       }
-      prices.push(item.product_name + ': ' + unit + ' por unidade' + (item.reference_unit_price != null ? ' · oficial ' + money(item.reference_unit_price) : ''));
       row.append(copy, node('strong', money(item.line_total))); items.appendChild(row);
     });
-    const total = node('div', '', 'mc-receipt-total'); total.append(node('span', 'Total'), node('strong', money(receipt.total_amount))); items.appendChild(total);
-    const details = node('details', '', 'mc-receipt-details');
-    details.append(node('summary', 'Comissão e origem'), node('p', 'Comissão: ' + money(receipt.commission_amount)),
-      node('p', labels.commissionRule(receipt)), node('p', labels.commissionStatus(receipt.commission_status)), node('p', 'Origem: ' + labels.saleOrigin(receipt)));
-    details.append(node('p', 'Status: ' + labels.statusInfo(receipt.status).label));
-    prices.forEach(price => details.appendChild(node('p', price)));
-    if (receipt.seller_name) details.append(node('p', 'Vendedor: ' + receipt.seller_name));
-    content.append(status, meta, items, details);
-    const fixedTotal = total.cloneNode(true); fixedTotal.classList.add('mc-receipt-fixed-total'); footer.append(fixedTotal, printer, footer.querySelector('.receipt-done'));
+    const total = node('div', '', 'mc-receipt-total'); total.append(node('span', 'Total da venda'), node('strong', money(receipt.total_amount))); items.appendChild(total);
+    const calculation = commission.detail(receipt, labels);
+    let savedScroll = 0;
+    const summary = commission.summary(receipt, function () {
+      savedScroll = content.scrollTop; overview.classList.add('hidden'); calculation.classList.remove('hidden');
+      modal.classList.add('mc-commission-detail'); title.textContent = 'Comissão da venda';
+      close.setAttribute('aria-label', 'Voltar à venda'); content.scrollTop = 0;
+      title.tabIndex = -1; title.focus({ preventScroll: true });
+    });
+    returnToSale = function () {
+      overview.classList.remove('hidden'); calculation.classList.add('hidden'); modal.classList.remove('mc-commission-detail');
+      title.textContent = originalTitle; close.setAttribute('aria-label', originalCloseLabel);
+      content.scrollTop = savedScroll; summary.querySelector('button').focus({ preventScroll: true });
+    };
+    overview.append(status, meta, items, commission.originCard(receipt, labels), summary);
+    content.append(overview, calculation);
+    const back = node('button', '', 'mc-commission-back'); back.type = 'button';
+    back.append(commission.icon('back'), node('span', 'Voltar à venda')); back.addEventListener('click', returnToSale);
+    footer.append(printer, footer.querySelector('.receipt-done'), back);
     printer.replaceChildren(C.createSvg([{ d: 'M6 9V3h12v6M6 18H4V9h16v9h-2M7 14h10v7H7z' }]), doc.createTextNode('Imprimir recibo'));
   };
-  window.addEventListener('beforeprint', function () {
-    if (!modal.classList.contains('matrix-checkout-receipt') || modal.classList.contains('hidden')) return;
-    printDetails = modal.querySelector('.mc-receipt-details');
-    if (printDetails) { printWasOpen = printDetails.open; printDetails.open = true; }
-  });
-  window.addEventListener('afterprint', function () { if (printDetails) printDetails.open = printWasOpen; printDetails = null; });
+  modal.addEventListener('click', function (event) {
+    if (!modal.classList.contains('mc-commission-detail') || !event.target.closest('[data-close-receipt]')) return;
+    event.preventDefault(); event.stopPropagation(); returnToSale?.();
+  }, true);
 
   // As janelas existentes preservam teclado, foco e retorno ao controle que as abriu.
   const sheets = ['checkout-customer-modal', 'checkout-review-modal', 'receipt-modal'].map(id => doc.getElementById(id));
@@ -89,7 +106,8 @@
   doc.addEventListener('keydown', function (event) {
     const sheet = visibleSheet(); if (!sheet || doc.querySelector('dialog[open]')) return;
     if (event.key === 'Escape' && !C.checkoutRuntime.state.busy) {
-      event.preventDefault(); sheet.querySelector('[data-close-customer],[data-close-checkout],[data-close-receipt]')?.click(); return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      sheet.querySelector('[data-close-customer],[data-close-checkout],[data-close-receipt]')?.click(); return;
     }
     if (event.key !== 'Tab') return;
     const article = sheet.querySelector('article');
