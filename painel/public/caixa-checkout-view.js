@@ -14,21 +14,32 @@
     function button(label, className, action, symbol) {
       const b = node('button', symbol ? '' : label, className); b.type = 'button'; b.setAttribute('aria-label', label);
       if (symbol) b.appendChild(C.createSvg([{ d: icons[symbol] }]));
-      b.disabled = checkout.busy; b.addEventListener('click', action); return b;
+      b.disabled = Boolean(checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked); b.addEventListener('click', action); return b;
     }
     function editPrice(line) {
-      if (checkout.busy) return;
-      priceLine = line; el('checkout-price-name').textContent = catalog.productTitle(line.product);
+      if (checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked) return;
+      priceLine = line; el('checkout-price-name').textContent = line.product.tire_size || catalog.productTitle(line.product);
       el('checkout-price-reference').textContent = 'Preço oficial: ' + C.currency.format(line.referencePrice);
+      el('checkout-price-image').replaceChildren(catalog.productImage(line.product));
+      el('checkout-price-description').textContent = catalog.productDetails(line.product);
+      el('checkout-price-official').textContent = C.currency.format(line.referencePrice);
       el('checkout-price-field').replaceChildren(pricing.priceEditor(line, refreshPrice));
       refreshPrice(); priceDialog.showModal(); priceDialog.querySelector('input').focus();
     }
     function refreshPrice() {
       const valid = priceLine?.negotiatedPrice != null && priceLine.negotiatedPrice > 0;
       el('checkout-price-error').hidden = valid; el('checkout-price-done').disabled = !valid;
+      const summary = el('checkout-price-difference');
+      summary.hidden = !valid;
+      if (valid) {
+        const cents = Math.round(priceLine.referencePrice * 100) - Math.round(priceLine.negotiatedPrice * 100);
+        summary.textContent = cents > 0 ? 'Redução de ' + C.currency.format(cents / 100)
+          : cents < 0 ? 'Acréscimo de ' + C.currency.format(-cents / 100) : 'Preço oficial mantido';
+      }
     }
     function cartLine(line) {
       const product = line.product, card = node('article', '', 'co-line'); card.dataset.productId = product.product_id;
+      card.dataset.quantity = String(line.quantity);
       card.appendChild(catalog.productImage(product));
       const body = node('div', '', 'co-line-body');
       body.append(node('strong', product.tire_size || product.product_name, 'co-line-title'), node('small', catalog.productDetails(product), 'co-line-meta'));
@@ -53,11 +64,17 @@
         (replacement?.querySelectorAll('button')[index] || el('checkout-add-item')).focus({ preventScroll: true });
       }
       el('checkout-empty-cart').hidden = total.quantity > 0;
+      if (!C.isPartner()) {
+        el('checkout-empty-cart').querySelector('strong').textContent = 'Comece uma venda';
+        el('checkout-empty-cart').querySelector('p').textContent = 'Adicione pneus ou serviços.';
+        document.querySelector('.co-heading p').textContent = total.quantity ? 'Venda em andamento' : 'Nova venda';
+      }
       el('checkout-picker-count').textContent = count + ' na venda';
       el('checkout-picker-total').textContent = total.valid ? C.currency.format(total.total) : 'Revise os preços';
       el('checkout-customer-caption').textContent = checkout.customerName === 'Cliente Balcão' ? 'Identifique se desejar' : 'Cliente identificado';
-      ['checkout-add-item', 'checkout-customer-button'].forEach(id => { el(id).disabled = checkout.busy; });
-      document.querySelectorAll('[data-payment], #checkout-review-content input').forEach(input => { input.disabled = checkout.busy; });
+      const locked = Boolean(checkout.busy || checkout.pendingAttempt || checkout.recoveryBlocked);
+      ['checkout-add-item', 'checkout-customer-button'].forEach(id => { el(id).disabled = locked; });
+      document.querySelectorAll('[data-payment], #checkout-review-content input, #checkout-review-content button').forEach(input => { input.disabled = locked; });
     }
     function close() { picker.close(); priceDialog.close(); }
     el('checkout-add-item').addEventListener('click', function () {
@@ -66,7 +83,7 @@
     });
     ['checkout-picker-close', 'checkout-picker-done'].forEach(id => el(id).addEventListener('click', () => picker.close()));
     picker.addEventListener('click', event => { if (event.target === picker) picker.close(); });
-    ['checkout-price-close', 'checkout-price-done'].forEach(id => el(id).addEventListener('click', () => priceDialog.close()));
+    ['checkout-price-close', 'checkout-price-done', 'checkout-price-back'].forEach(id => el(id).addEventListener('click', () => priceDialog.close()));
     priceDialog.addEventListener('close', () => { priceLine = null; el('checkout-price-field').replaceChildren(); });
     return { render, close };
   };

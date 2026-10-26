@@ -122,7 +122,7 @@
     function productDetails(product) {
       if (product.product_type !== 'tire') return product.product_type === 'service' ? 'Serviço' : 'Produto';
       return [product.brand, { novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' }[product.tire_condition],
-        { car: 'Carro', motorcycle: 'Moto' }[product.vehicle_type]].filter(Boolean).join(' · ');
+        Caixa.isPartner() ? { car: 'Carro', motorcycle: 'Moto' }[product.vehicle_type] : null].filter(Boolean).join(' · ');
     }
 
     function productCard(product) {
