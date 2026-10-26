@@ -28,10 +28,11 @@ describe('marca 2W no servidor sem fontes',()=>{
    }
   }finally{unlinkSync(config);rmdirSync(directory);}
  });
- it.each([[200,200],[360,480],[480,360],[1600,900]])('mantém a assinatura inteira e afastada das bordas em %s × %s',async(width,height)=>{
+ it.each([[200,200],[360,480],[480,360],[1600,900],[1600,200],[1280,64]])('mantém a assinatura inteira e afastada das bordas em %s × %s',async(width,height)=>{
   const placement=catalogWatermarkPlacement(width,height);
   const mark=await sharp(catalogWatermark(placement.width)).metadata();
   expect(mark.width).toBeLessThanOrEqual(width-16);expect(mark.height).toBe(placement.height);
+  expect(mark.height).toBeLessThanOrEqual(height*.21);
   expect(placement.left).toBeGreaterThanOrEqual(8);expect(placement.top).toBeGreaterThanOrEqual(8);
   expect(width-placement.left-mark.width!).toBeGreaterThanOrEqual(8);
   expect(height-placement.top-mark.height!).toBeGreaterThanOrEqual(8);

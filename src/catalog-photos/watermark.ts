@@ -25,7 +25,7 @@ export function catalogWatermark(width:number):Buffer {
 /** Margem segura e telefone legível inclusive nos vídeos de 360 px enviados pelo celular. */
 export function catalogWatermarkPlacement(mediaWidth:number,mediaHeight:number){
  const inset=Math.max(8,Math.round(Math.min(mediaWidth,mediaHeight)*.025));
- const width=Math.round(Math.min(480,Math.max(220,mediaWidth*.38),mediaWidth-inset*2));
+ const width=Math.round(Math.min(480,Math.max(220,mediaWidth*.38),mediaWidth-inset*2,mediaHeight*.9));
  const height=Math.round(width*.22);
  return {width,height,inset,left:mediaWidth-width-inset,top:mediaHeight-height-inset};
 }
