@@ -73,6 +73,7 @@ import { gatePartnerSearch,requirePartnerStockConfirmation,stockConfirmationRout
 import { deferPhotoUntilStockConfirmed } from './stock-confirmation-photo.js';
 import { requestPhotoBatch } from './photo-batch.js';
 import { tryMatrixCatalogPhoto,tryRequestedMatrixCatalogPhoto } from '../catalog-photos/bot.js';
+import { requestCatalogVideos,CATALOG_VIDEO_TOOL } from '../catalog-photos/video-bot.js';
 import { STORE_HOURS_TOOL, consultStoreHours } from './store-hours-tool.js';
 import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 import { withStoreOpeningScope, matrixStoreAcceptsOrders,currentStoreOpeningTime } from './routing-store-hours.js';
@@ -89,6 +90,7 @@ import { partnerOrderPresentation } from './partner-order-state.js';
  */
 export function activeToolDefinitions(): ToolDefinition[] {
   let defs = env.PHOTO_REQUESTS ? TOOL_DEFINITIONS : TOOL_DEFINITIONS.filter((t) => t.function.name !== 'pedir_foto');
+  if(!env.PHOTO_REQUESTS||!env.MATRIZ_CATALOG_PHOTOS_ENABLED||!env.BOT_OUTBOX)defs=defs.filter(t=>t.function.name!=='pedir_video');
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
@@ -269,9 +271,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  CATALOG_VIDEO_TOOL,
   {
-    type: 'function',
-    function: {
+    type:'function',
+    function:{
       name: 'pedir_foto',
       description:
         'Preserve a escolha seguindo PURCHASE CONTINUITY. Foto de referência do catálogo da Matriz: use loja=matriz, disponível 24h sem depender de localização, estoque ou loja aberta. Use somente quando o cliente quer a Matriz ou o produto consultado é da Matriz. Outros casos mantêm a loja escolhida pelo roteamento e a foto sob demanda dos parceiros. Sem foto cadastrada, segue a solicitação à loja, sujeita ao expediente. foto_enfileirada/foto_ja_enfileirada não comprova entrega, estoque ou reserva. Use foto_atual=true para estado/desgaste do exemplar; exige equipe e localização. foto_solicitada: confirme o pedido com prazo_min. precisa_produto/sem_loja: pergunte o que falta.',
@@ -444,6 +447,7 @@ async function executeToolInternal(
         erro:'audio_precisa_confirmacao',orientacao:'Os dados do áudio ainda precisam de confirmação para mudar o pedido. Apresente o resumo e peça confirmação por texto. Se não for possível, ofereça atendente.' });
     args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
+      case 'pedir_video':return requestCatalogVideos(client,environment,conversationId,args);
       case 'consultar_horario_loja': return JSON.stringify(await consultStoreHours(client,environment,conversationId,args));
       case 'cancelar_consulta_estoque': return cancelStockConfirmation(client,environment,conversationId);
       case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));

@@ -114,7 +114,7 @@ async function sendAttachmentWithAttempts(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), file.contentType==='video/mp4'?30_000:REQUEST_TIMEOUT_MS);
 
     try {
       // FormData/Blob nativos (Node >= 18). Recriado a cada tentativa: body de

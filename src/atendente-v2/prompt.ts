@@ -1,6 +1,6 @@
 import { CUSTOMER_LOCATION_REQUEST } from './product-search-nudge.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_counter_green_receipt_2026-10-25';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_catalog_video_2026-10-25';
 
 /**
  * SYSTEM_PROMPT — versao hibrida ingles + exemplos pt-br (experimento 2026-05-26)

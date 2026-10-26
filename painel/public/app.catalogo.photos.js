@@ -27,16 +27,16 @@ window.PAINEL_MODULES.catalogPhotos = function () {
       state.folder = row?.drive_folder_id || ''; state.driveEnabled = row?.drive_enabled || false;
     },
     mcphStatus(row) {
-      if (row.photos?.length && row.enabled) return 'Pronto para o bot';
-      if (row.photos?.length) return 'Uso no bot pausado';
+      if ((row.photos?.length || row.video) && row.enabled) return 'Pronto para o bot';
+      if (row.photos?.length || row.video) return 'Uso no bot pausado';
       if (row.drive_error) return 'Importação precisa de atenção';
       if (row.drive_enabled && !row.drive_checked_at) return 'Aguardando importação';
-      return 'Sem foto';
+      return 'Sem fotos ou vídeo';
     },
     mcphFiltered() {
       const state = this.matrixPhotos, search = state.search.trim().toLocaleLowerCase('pt-BR');
       return state.rows.filter(row => {
-        const has = !!row.photos?.length;
+        const has = !!row.photos?.length || !!row.video;
         if (state.filter === 'missing' && has) return false;
         if (state.filter === 'ready' && !(has && row.enabled)) return false;
         if (state.filter === 'error' && !row.drive_error) return false;
@@ -47,6 +47,8 @@ window.PAINEL_MODULES.catalogPhotos = function () {
     mcphPhoto(row = this.matrixPhotos.selected, angle = this.matrixPhotos.angle) { return row?.photos?.find(photo => photo.angle === angle); },
     mcphPrimary(row = this.matrixPhotos.selected) { return row?.photos?.find(photo => photo.is_primary) || row?.photos?.[0]; },
     mcphImage(photo) { return photo?.id ? '/admin/api/catalog/photos/' + encodeURIComponent(photo.id) + '/image' : ''; },
+    mcphVideo(video = this.matrixPhotos.selected?.video) { return video?.id ? '/admin/api/catalog/videos/' + encodeURIComponent(video.id) + '/file' : ''; },
+    mcphVideoSize(video = this.matrixPhotos.selected?.video) { return video ? (Number(video.file_bytes) / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB · ' + Math.ceil(Number(video.duration_seconds)) + ' segundos' : ''; },
     mcphAngleLabel(angle) { return { front: 'Principal / frente', side: 'Lateral', detail: 'Detalhe / traseira' }[angle]; },
     async mcphRequest(url, options) {
       const response = await fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(60000), ...options });
@@ -65,7 +67,7 @@ window.PAINEL_MODULES.catalogPhotos = function () {
         await this.mcphRequest('/admin/api/catalog/' + productId + '/photos?angle=' + angle, {
           method: 'POST', headers: { 'Content-Type': file.type, 'X-Upload-Id': crypto.randomUUID() }, body: file,
         });
-        await this.mcphLoad(); state.notice = 'Foto cadastrada com a marca 2W.';
+        await this.mcphLoad(); state.notice = 'Foto pronta com a marca 2W. Apenas o WebP final foi guardado.';
       } catch (error) { state.notice = ''; state.error = this.mcphError(error.message); }
       finally { state.busy = false; }
     },
@@ -81,10 +83,37 @@ window.PAINEL_MODULES.catalogPhotos = function () {
       } catch (error) { state.selected = { ...row }; state.error = this.mcphError(error.message); }
       finally { state.busy = false; }
     },
+    async mcphUploadVideo(event) {
+      const file = event.target.files?.[0], state = this.matrixPhotos, productId = state.selected?.product_id;
+      event.target.value = '';
+      if (!file || !productId || state.busy) return;
+      if (!['video/mp4', 'video/quicktime', 'video/webm'].includes(file.type)) { state.error = 'Escolha um vídeo MP4, MOV ou WebM.'; return; }
+      if (file.size > 80 * 1024 * 1024) { state.error = 'O vídeo original deve ter até 80 MB e 15 segundos.'; return; }
+      state.busy = true; state.error = ''; state.notice = 'Processando vídeo: reduzindo o tamanho e aplicando a marca 2W…';
+      try {
+        await this.mcphRequest('/admin/api/catalog/' + productId + '/videos', {
+          method: 'POST', headers: { 'Content-Type': file.type, 'X-Upload-Id': crypto.randomUUID() }, body: file,
+          signal: AbortSignal.timeout(180000),
+        });
+        await this.mcphLoad(); state.notice = 'Vídeo pronto com a marca 2W. Apenas a versão final foi guardada.';
+      } catch (error) { state.notice = ''; state.error = error.name === 'TimeoutError' ? 'O processamento demorou. Atualize para conferir antes de reenviar.' : this.mcphError(error.message); }
+      finally { state.busy = false; }
+    },
     mcphPreview() { this.matrixPhotos.preview = true; },
     mcphCaption() { return ''; },
     mcphError(code) {
       return ({ settings_changed: 'O cadastro mudou em outra tela. Atualize antes de salvar.',
+        video_invalid: 'Não foi possível ler o vídeo. Use MP4, MOV ou WebM.',
+        video_too_large: 'O vídeo original deve ter até 80 MB.',
+        video_too_long: 'Grave um vídeo com até 15 segundos.',
+        video_too_small: 'Use um vídeo com pelo menos 200 pixels em cada lado.',
+        video_dimensions_too_large: 'Use um vídeo com resolução de até 4K.',
+        video_output_too_large: 'Este vídeo não ficou dentro de 8 MB. Grave novamente com menos movimento.',
+        video_storage_unavailable: 'Não foi possível guardar o vídeo. Atualize para conferir antes de reenviar.',
+        video_processor_missing: 'O processador de vídeo precisa ser habilitado no servidor.',
+        video_processing_timeout: 'O vídeo demorou para processar. Tente um arquivo menor.',
+        video_processing_busy: 'Outro vídeo está sendo preparado. Aguarde um pouco e tente novamente.',
+        catalog_video_bucket_policy_invalid: 'O armazenamento dos vídeos precisa ser revisado no servidor.',
         photo_too_large: 'A foto deve ter até 10 MB.', not_an_image: 'Escolha uma imagem válida.',
         photo_processing_busy: 'Outra foto está sendo preparada. Aguarde alguns segundos e tente novamente.',
         invalid_or_small_photo: 'Não foi possível ler a foto. Use uma imagem com pelo menos 200 × 200 pixels.',
@@ -98,8 +127,9 @@ window.PAINEL_MODULES.catalogPhotos = function () {
         drive_not_configured: 'A conexão com o Google Drive precisa ser configurada no servidor.',
         drive_authorization_failed: 'Não foi possível autenticar no Drive. Revise a conexão no servidor.',
         drive_duplicate_angle: 'Há duas fotos para o mesmo ângulo na pasta. Mantenha uma de cada.',
-        drive_no_named_photos: 'Use principal.jpg, lateral.jpg ou detalhe.jpg na pasta vinculada.',
-        drive_folder_too_large: 'Use uma pasta exclusiva do pneu, com até 100 imagens.',
+        drive_no_named_photos: 'Use principal.jpg, lateral.jpg, detalhe.jpg ou video.mp4 na pasta vinculada.',
+        drive_duplicate_video: 'Mantenha somente um video.mp4, video.mov ou video.webm na pasta deste pneu.',
+        drive_folder_too_large: 'Use uma pasta exclusiva do pneu, com até 100 arquivos.',
         drive_photo_changed: 'A foto mudou durante a importação. O sistema tentará novamente.',
         rate_limited: 'Muitas fotos em pouco tempo. Aguarde um minuto.',
       })[code] || 'Não foi possível concluir. Atualize a tela e tente novamente.';

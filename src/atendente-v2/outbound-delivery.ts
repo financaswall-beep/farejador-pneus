@@ -23,6 +23,13 @@ export async function deliverOutboundRow(
     await resolveConversationOnce(Number(row.chatwoot_conversation_id));
     return { chatwootMessageId: null };
   }
+  if(row.kind==='video_attachment'){
+    const {readOutboundCatalogVideo}=await import('../catalog-photos/video-bot.js');
+    const video=await readOutboundCatalogVideo(client,row);
+    return sendAttachmentOnce(Number(row.chatwoot_conversation_id),{
+      buffer:video.bytes,filename:'pneu-matriz.mp4',contentType:'video/mp4',
+    },video.caption,row.echo_id??undefined);
+  }
   if (row.kind !== 'photo_attachment') {
     return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
   }

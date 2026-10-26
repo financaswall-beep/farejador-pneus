@@ -8,6 +8,7 @@ import { CatalogPhotoError,angleSchema,folderSchema } from '../../catalog-photos
 import { catalogDriveStatus } from '../../catalog-photos/drive.js';
 import { CatalogPhotoStorage,catalogStorageReady,MAX_CATALOG_PHOTO_BYTES } from '../../catalog-photos/storage.js';
 import { listCatalogPhotos,readCatalogPhoto,saveCatalogPhoto,updatePhotoSettings } from '../../catalog-photos/repository.js';
+import { registerCatalogVideoRoutes } from './route-catalogo-videos.js';
 const database=async()=> (await import('../../persistence/db.js')).pool;
 const productParams=z.object({productId:z.string().uuid()});
 const photoParams=z.object({photoId:z.string().uuid()});
@@ -16,6 +17,7 @@ const settingsBody=z.object({version:z.number().int().positive(),enabled:z.boole
 type Guard=(request:FastifyRequest,reply:FastifyReply)=>Promise<void>;
 export function registerCatalogPhotoRoutes(app:FastifyInstance,options:{base?:string;guards?:Guard[];actor?:(request:FastifyRequest)=>string}={}){
  const base=options.base??'/admin/api/catalog',guard=options.guards??[requireAdminOwner];
+ registerCatalogVideoRoutes(app,options);
  for(const mime of ['image/jpeg','image/png','image/webp'])if(!app.hasContentTypeParser(mime))
   app.addContentTypeParser(mime,{parseAs:'buffer'},(_request,body,done)=>done(null,body));
  app.get(base+'/photos',{preHandler:guard},async(_request,reply)=>{
@@ -49,6 +51,6 @@ export function registerCatalogPhotoRoutes(app:FastifyInstance,options:{base?:st
   if(!photo)return reply.code(404).send({error:'photo_not_found'});
   const original=(request.query as {original?:string}).original==='true';
   reply.header('Cache-Control','private, no-store').header('X-Content-Type-Options','nosniff');
-  return reply.type('image/webp').send(await new CatalogPhotoStorage().read(original?photo.original_path:photo.storage_path));
+  return reply.type('image/webp').send(await new CatalogPhotoStorage().read(original&&photo.original_path?photo.original_path:photo.storage_path));
  });
 }

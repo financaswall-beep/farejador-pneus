@@ -15,7 +15,7 @@ export class CatalogPhotoError extends Error {
 }
 export interface CatalogPhoto {
  id:string;environment:'prod'|'test';product_id:string;angle:PhotoAngle;is_primary:boolean;
- storage_path:string;original_path:string;width:number;height:number;source:string;created_at:Date;
+ storage_path:string;original_path:string|null;width:number;height:number;source:string;created_at:Date;
 }
 export function driveAngle(name:string):PhotoAngle|null {
  const stem=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\.[^.]+$/,'');

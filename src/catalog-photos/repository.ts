@@ -4,13 +4,17 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import { prepareCatalogPhoto } from './codec.js';
 import { CatalogPhotoError,type CatalogPhoto,type PhotoAngle } from './model.js';
 import { CatalogPhotoStorage } from './storage.js';
+import { logger } from '../shared/logger.js';
 export const photoProjection=`id,angle,is_primary,width,height,source,created_at`;
 export async function listCatalogPhotos(db:Pool,environment:Environment){
  const result=await db.query(`SELECT p.id product_id,p.product_name,p.brand,p.tire_condition,t.tire_size,
   COALESCE(s.enabled,true) enabled,s.version,s.drive_folder_id,s.drive_enabled,s.drive_checked_at,s.drive_error,
-  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',f.id,'angle',f.angle,'is_primary',f.is_primary,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',f.id,'angle',f.angle,'is_primary',f.is_primary,'has_original',f.original_path IS NOT NULL,
    'width',f.width,'height',f.height,'source',f.source) ORDER BY f.is_primary DESC,f.angle)
-   FROM commerce.matrix_catalog_photos f WHERE f.environment=p.environment AND f.product_id=p.id AND f.retired_at IS NULL),'[]') photos
+   FROM commerce.matrix_catalog_photos f WHERE f.environment=p.environment AND f.product_id=p.id AND f.retired_at IS NULL),'[]') photos,
+  (SELECT jsonb_build_object('id',v.id,'width',v.width,'height',v.height,'duration_seconds',v.duration_seconds,
+    'file_bytes',v.file_bytes,'source',v.source) FROM commerce.matrix_catalog_videos v
+   WHERE v.environment=p.environment AND v.product_id=p.id AND v.retired_at IS NULL) video
   FROM commerce.products p JOIN commerce.tire_specs t ON t.environment=p.environment AND t.product_id=p.id
   LEFT JOIN commerce.matrix_photo_settings s ON s.environment=p.environment AND s.product_id=p.id
   WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.product_type='tire' ORDER BY t.tire_size,p.brand,p.id LIMIT 2001`,[environment]);
@@ -31,8 +35,9 @@ export async function saveCatalogPhoto(db:Pool,input:{environment:Environment;pr
  const prepared=await prepareCatalogPhoto(input.bytes),id=randomUUID();
  const base=`${input.environment}/${input.productId}/${id}/`;
  await storage.ensureBucket();
- await storage.put(base+'original.webp',prepared.original);await storage.put(base+'photo.webp',prepared.photo);
- const client=connection??await db.connect();
+ const discard=()=>storage.remove(base+'photo.webp').catch(()=>logger.warn({code:'catalog_photo_orphan_cleanup_failed'},'Catalog photo upload cleanup failed'));
+ try{await storage.put(base+'photo.webp',prepared.photo);}catch(error){await discard();throw error;}
+ const client=connection??await db.connect().catch(async error=>{await discard();throw error;});let saved=false,committing=false;
  try{
   await client.query(connection?'SAVEPOINT matrix_catalog_save':'BEGIN');
   await client.query(`INSERT INTO commerce.matrix_photo_settings(environment,product_id) VALUES($1,$2) ON CONFLICT DO NOTHING`,[input.environment,input.productId]);
@@ -53,13 +58,13 @@ export async function saveCatalogPhoto(db:Pool,input:{environment:Environment;pr
   await client.query(`INSERT INTO commerce.matrix_catalog_photos
    (id,environment,product_id,angle,is_primary,storage_path,original_path,sha256,width,height,source,source_key,actor_label)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[id,input.environment,input.productId,input.angle,primary,
-   base+'photo.webp',base+'original.webp',createHash('sha256').update(input.bytes).digest('hex'),prepared.width,prepared.height,
+   base+'photo.webp',null,createHash('sha256').update(input.bytes).digest('hex'),prepared.width,prepared.height,
    input.source,input.sourceKey,input.actor.slice(0,120)]);
-  await client.query(connection?'RELEASE SAVEPOINT matrix_catalog_save':'COMMIT');return {id,duplicate:false};
+  committing=true;await client.query(connection?'RELEASE SAVEPOINT matrix_catalog_save':'COMMIT');saved=true;return {id,duplicate:false};
  }catch(error){
   await client.query(connection?'ROLLBACK TO SAVEPOINT matrix_catalog_save':'ROLLBACK');
   if(connection)await client.query('RELEASE SAVEPOINT matrix_catalog_save');throw error;
- }finally{if(!connection)client.release();}
+ }finally{if(!connection)client.release();if(!saved&&!committing)await discard();}
 }
 export async function updatePhotoSettings(db:Pool,environment:Environment,productId:string,input:{
  version:number;enabled?:boolean;drive_folder_id?:string|null;drive_enabled?:boolean;primary_id?:string}){
