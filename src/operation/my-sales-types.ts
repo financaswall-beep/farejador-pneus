@@ -1,3 +1,5 @@
+import type { OperationCommissionItemRules } from '../shared/operation-team.js';
+
 export type OperationCommissionStatus = 'receivable' | 'paid' | 'reversed';
 export type OperationSalesScope = 'own' | 'matrix';
 
@@ -44,6 +46,12 @@ export interface OperationSaleDetail extends OperationSaleListItem {
   sales_scope?: OperationSalesScope;
   customer_name?: string;
   seller_name: string;
+  commission_calculation?: {
+    active: boolean | null;
+    itemized: boolean;
+    base_amount: number | null;
+    item_rules: OperationCommissionItemRules | null;
+  };
   items: Array<{
     product_name: string;
     quantity: number;
