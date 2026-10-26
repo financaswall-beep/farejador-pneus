@@ -51,6 +51,7 @@
       item_name: entry.item_name || row.product_name || row.tire_size || 'Produto',
       tire_size: row.tire_size || entry.tire_size || null,
       brand: row.brand || entry.brand || null,
+      tire_condition: row.tire_condition || entry.tire_condition || null,
       sale_price: money(entry.sale_price),
       product_id: row.product_id || entry.product_id || null,
     };
@@ -121,6 +122,7 @@
       view()?.render();
       return true;
     } catch (failure) {
+      if (session !== Caixa.sessionFingerprint()) return;
       if (request === state.request) { state.loading = false; state.error = true; }
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       if (request === state.request) view()?.showError();

@@ -23,8 +23,8 @@ describe('Catálogo na Operação da Loja', () => {
   it('vive no mesmo casco do /operacao e segue a permissão de Estoque', () => {
     expect(html).toContain('id="operation-catalog-panel"');
     expect(html).toContain('id="nav-catalog"');
-    expect(html).toContain('/operacao/caixa-catalog.js?v=20261025-photos1');
-    expect(html).toContain('/operacao/caixa-catalog-view.js?v=20260918-catalog2');
+    expect(html).toContain('/operacao/caixa-catalog.js?v=20261026-catalog1');
+    expect(html).toContain('/operacao/caixa-catalog-view.js?v=20261026-catalog1');
     expect(html.indexOf('/operacao/caixa-catalog.js')).toBeLessThan(
       html.indexOf('/operacao/caixa-catalog-view.js'),
     );

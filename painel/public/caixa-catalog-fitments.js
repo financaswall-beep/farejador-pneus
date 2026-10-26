@@ -2,23 +2,25 @@
   'use strict';
   const C = window.Caixa, el = id => document.getElementById('matrix-fitments' + (id ? '-' + id : ''));
   const dialog = el(''), form = el('form');
-  const state = { row: null, vehicle: null, action: 'add', busy: false, version: 0, search: 0 };
+  const state = { row: null, vehicle: null, action: 'add', busy: false, version: 0, search: 0, generation: 0 };
   const node = (tag, text) => { const n = document.createElement(tag); n.textContent = text; return n; };
   const position = value => C.operationCatalogUtils.positionLabel(value);
   const years = row => row.year_start || row.year_end
     ? (row.year_start || 'início não informado') + ' – ' + (row.year_end || 'fim não informado') : 'Anos não informados';
   const canEdit = () => C.matrixCatalog.allowed() && state.row?.product_id && state.row?.vehicle_type;
-  function reset() {
+  function reset(toList = true) {
     state.vehicle = null; state.action = 'add'; state.search++;
     form.reset(); el('position').disabled = false; el('results').replaceChildren();
     el('selected').textContent = ''; el('action').textContent = 'Vincular veículo';
     el('save').textContent = 'Salvar vínculo';
+    dialog.dataset.fitmentView = toList ? 'list' : 'edit'; C.catalogMetalForms?.fitment(state);
   }
   function busy(on) {
     state.busy = on; dialog.querySelectorAll('button').forEach(b => { b.disabled = on; });
+    form.querySelector('fieldset').disabled = on;
   }
   function select(vehicle, action, fitment) {
-    reset(); state.vehicle = { ...vehicle, id: vehicle.id || vehicle.vehicle_model_id }; state.action = action;
+    reset(false); state.vehicle = { ...vehicle, id: vehicle.id || vehicle.vehicle_model_id }; state.action = action;
     el('selected').textContent = [vehicle.make, vehicle.model, vehicle.variant].filter(Boolean).join(' ');
     el('search').value = el('selected').textContent;
     el('start').value = vehicle.year_start || ''; el('end').value = vehicle.year_end || '';
@@ -28,6 +30,7 @@
     }
     el('action').textContent = action === 'remove' ? 'Remover vínculo selecionado' : action === 'edit' ? 'Ajustar vínculo' : 'Vincular veículo';
     el('save').textContent = action === 'remove' ? 'Confirmar remoção' : 'Salvar vínculo';
+    dialog.dataset.fitmentView = action === 'remove' ? 'remove' : 'edit'; C.catalogMetalForms?.fitment(state);
     el('selected').scrollIntoView({ block: 'nearest' });
   }
   function render(data) {
@@ -71,6 +74,7 @@
     if (C.matrixCatalog.allowed() && !canEdit()) {
       list.append(node('p', state.row.product_id ? 'Classifique o pneu como Moto ou Carro na ficha técnica para ajustar vínculos.' : 'Complete o cadastro do pneu para ajustar vínculos.'));
     }
+    C.catalogMetalForms?.fitment(state);
   }
   async function load() {
     const version = ++state.version, row = state.row;
@@ -91,6 +95,7 @@
   async function open(row) {
     if (C.isPartner() || !C.canModule('estoque') || state.busy || !row?.tire_size) return;
     state.row = row; reset(); el('title').textContent = row.tire_size + (row.brand ? ' · ' + row.brand : '');
+    C.catalogMetalForms?.fitment(state);
     if (!dialog.open) dialog.showModal(); await load();
   }
   async function search() {
@@ -114,6 +119,7 @@
     event.preventDefault(); if (!canEdit() || state.busy || !form.reportValidity()) return;
     if (!state.vehicle) { el('message').textContent = 'Busque e selecione um veículo.'; return; }
     busy(true); state.search++;
+    const generation = state.generation;
     try {
       const path = '/' + state.row.product_id + '/compatibility';
       const reason = el('reason').value.trim(), pos = el('position').value;
@@ -125,9 +131,11 @@
           year_end: el('end').value ? Number(el('end').value) : null,
           source: el('source').value, is_oem: el('oem').checked, confidence_level: 1 });
       }
+      if (generation !== state.generation) return;
       reset(); await load(); await C.loadOperationCatalog(1);
+      if (generation !== state.generation || !dialog.open) return;
       if (el('retry').classList.contains('hidden')) el('message').textContent = 'Compatibilidade atualizada no app e no web.';
-    } catch (error) { el('message').textContent = C.matrixCatalog.message(error); } finally { busy(false); }
+    } catch (error) { if (generation === state.generation) el('message').textContent = C.matrixCatalog.message(error); } finally { if (generation === state.generation) busy(false); }
   });
   el('search-button').addEventListener('click', search);
   el('search').addEventListener('input', () => { state.vehicle = null; state.search++; state.action = 'add'; el('position').disabled = false; el('selected').textContent = ''; el('results').replaceChildren(); el('action').textContent = 'Vincular veículo'; el('save').textContent = 'Salvar vínculo'; });
@@ -135,6 +143,9 @@
   el('reset').addEventListener('click', reset); el('retry').addEventListener('click', load);
   dialog.querySelector('[data-close-matrix-fitments]').addEventListener('click', () => { if (!state.busy) dialog.close(); });
   dialog.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); });
-  dialog.addEventListener('close', () => { state.version++; state.search++; });
+  dialog.addEventListener('close', () => { state.version++; state.search++; state.generation++; });
   C.openMatrixCatalogFitments = open;
+  C.matrixCatalogFitments = { add() { reset(false); el('form').classList.remove('hidden'); el('search').focus(); },
+    reset() { state.version++; state.search++; state.generation++; state.row = null; state.vehicle = null; state.busy = false; busy(false); dialog.close(); form.reset(); el('list').replaceChildren(); el('message').textContent = ''; dialog.querySelector('.mcg-editor-product')?.remove(); },
+  };
 }());
