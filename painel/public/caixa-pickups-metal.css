@@ -1,0 +1,55 @@
+/* Retiradas da Matriz: materiais e hierarquia das telas aprovadas. */
+.is-matrix-pickups #session-view.is-pickups { max-width: none; padding: 0; }
+.is-matrix-pickups #pickups-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 12px 14px 22px; background: none; scrollbar-width: thin; }
+.is-matrix-pickups #pickups-panel > :not(#matrix-pickups-metal) { display: none !important; }
+#matrix-pickups-metal[hidden] { display: none; }
+.is-matrix-pickups #matrix-pickups-metal { color: var(--mc-ink); font-family: var(--mc-font); }
+.is-matrix-pickups .mp-page { display: flex; flex-direction: column; gap: 11px; }
+.is-matrix-pickups .mp-page :is(h2,h3,p) { margin: 0; }
+.is-matrix-pickups .mp-page svg { width: 25px; height: 25px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.is-matrix-pickups .mp-heading { display: flex; align-items: center; gap: 12px; min-height: 46px; }
+.is-matrix-pickups .mp-heading h2 { flex: 1; color: var(--mc-ink); font: 900 36px/1.05 var(--mc-font); letter-spacing: -.025em; overflow-wrap: anywhere; }
+.is-matrix-pickups .mp-queue .mp-heading h2 { font-size: 43px; }
+.is-matrix-pickups .mp-plate { position: relative; min-width: 0; padding: 13px 11px; border: 1px solid #8d9c93; border-radius: 9px; background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); }
+.is-matrix-pickups .mp-plate::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: var(--mc-screw),var(--mc-screw),var(--mc-screw),var(--mc-screw); background-size: 8px 8px; background-repeat: no-repeat; background-position: 5px 5px,calc(100% - 5px) 5px,5px calc(100% - 5px),calc(100% - 5px) calc(100% - 5px); }
+.is-matrix-pickups .mp-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; min-height: 48px; padding: 8px 12px; border: 1px solid #8d9c93; border-radius: 8px; color: var(--mc-ink); background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); cursor: pointer; font: 700 23px/1.1 var(--mc-font); text-align: center; text-decoration: none; }
+.is-matrix-pickups .mp-button span { min-width: 0; overflow-wrap: anywhere; }
+.is-matrix-pickups .mp-primary,.is-matrix-pickups .mp-button.active { color: #fff; border-color: #75a48b; background: var(--mc-action); box-shadow: inset 0 1px #b3d6c2,0 2px 3px #173c2c55; }
+.is-matrix-pickups .mp-danger { color: #fff; border-color: #a33345; background: linear-gradient(#b61932,#880d23); }
+.is-matrix-pickups .mp-icon { flex: 0 0 44px; width: 44px; padding: 5px; }
+.is-matrix-pickups .mp-link-danger { color: #a21d29; border: 0; background: none; box-shadow: none; font-size: 18px; text-decoration: underline; }
+.is-matrix-pickups .mp-button:disabled { opacity: .55; cursor: default; }
+.is-matrix-pickups :is(button,input,select,textarea,a):focus-visible { outline: 3px solid #075b38; outline-offset: 2px; }
+.is-matrix-pickups .mp-heading h2:focus { outline: none; }
+.is-matrix-pickups .mp-kpis { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.is-matrix-pickups .mp-kpis .mp-plate { display: flex; align-items: center; gap: 7px; padding: 9px 8px; }
+.is-matrix-pickups .mp-kpis .mp-plate::after { display: none; }
+.is-matrix-pickups .mp-kpis small { display: block; font: 500 16px/1.1 var(--mc-font); }
+.is-matrix-pickups .mp-kpis strong { display: block; font: 800 29px/1 var(--mc-font); }
+.is-matrix-pickups .mp-search { display: flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 48px; border: 1px solid #94a398; border-radius: 8px; background: #f8faf9b8; box-shadow: inset 0 1px 2px #24453226,0 1px #fff; }
+.is-matrix-pickups .mp-search input { min-width: 0; width: 100%; padding: 10px 0; color: var(--mc-ink); border: 0; background: none; font: 400 20px var(--mc-font); }
+.is-matrix-pickups .mp-filters { display: flex; gap: 5px; overflow-x: auto; padding: 1px 1px 3px; scrollbar-width: thin; }
+.is-matrix-pickups .mp-filters button { flex: 1 0 auto; min-width: 0; min-height: 45px; padding: 7px 4px; font-size: 14px; }
+.is-matrix-pickups .mp-filters button span { white-space: nowrap; overflow-wrap: normal; }
+.is-matrix-pickups .mp-list { display: flex; flex-direction: column; gap: 11px; }
+.is-matrix-pickups .mp-order { display: grid; grid-template-columns: 68px minmax(0,1fr); gap: 10px; padding: 12px 11px; }
+.is-matrix-pickups .mp-tire { width: 100%; height: 110px; align-self: center; object-fit: contain; mix-blend-mode: multiply; }
+.is-matrix-pickups .mp-order-copy { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.is-matrix-pickups .mp-order-copy header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
+.is-matrix-pickups .mp-order h3 { flex: 1 0 auto; max-width: 100%; font: 800 25px/1.08 var(--mc-font); overflow-wrap: anywhere; }
+.is-matrix-pickups .mp-order small { font-size: 15px; color: #314b3c; overflow-wrap: anywhere; }
+.is-matrix-pickups .mp-order p { color: #23392d; font: 400 18px/1.18 var(--mc-font); }
+.is-matrix-pickups .mp-order footer { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.is-matrix-pickups .mp-order footer > strong { font: 900 29px/1 var(--mc-font); white-space: nowrap; }
+.is-matrix-pickups .mp-order footer .mp-button { min-height: 44px; padding: 7px 8px; font-size: 19px; gap: 4px; }
+.is-matrix-pickups .mp-order footer svg { width: 19px; }
+.is-matrix-pickups .mp-status { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; max-width: 100%; padding: 5px 8px; border: 1px solid #b79229; border-radius: 8px; color: #352100; background: linear-gradient(#ffe6a0,#ffd064); font: 700 16px/1.05 var(--mc-font); }
+.is-matrix-pickups .mp-status svg { width: 19px; height: 19px; }
+.is-matrix-pickups .mp-status-arrived,.is-matrix-pickups .mp-status-completed { color: #fff; border-color: #7f9c8b; background: var(--mc-action); }
+.is-matrix-pickups .mp-notice { display: grid; gap: 8px; padding: 15px 10px; text-align: center; color: #2a4034; font: 400 20px/1.25 var(--mc-font); }
+.is-matrix-pickups .mp-notice strong { font-size: 25px; }
+.is-matrix-pickups .mp-error { padding: 10px; border: 1px solid #bd7a82; border-radius: 7px; color: #891d2b; background: #fff0f1; font: 600 19px/1.2 var(--mc-font); }
+.is-matrix-pickups .bottom-nav { display: flex !important; overflow-x: auto; }
+.is-matrix-pickups #session-view .bottom-nav > button { display: none; }
+.is-matrix-pickups #session-view .bottom-nav > :is(#nav-cash,#nav-sales,#nav-conversations,#nav-pickups,#nav-catalog):not(.hidden) { display: flex; }
+@media(max-width:350px){.is-matrix-pickups #pickups-panel{padding-inline:10px}.is-matrix-pickups .mp-kpis .mp-plate{gap:4px;padding-inline:6px}.is-matrix-pickups .mp-kpis svg{width:20px}.is-matrix-pickups .mp-kpis small{font-size:14px}.is-matrix-pickups .mp-order{grid-template-columns:50px minmax(0,1fr);gap:7px}.is-matrix-pickups .mp-heading h2{font-size:31px}.is-matrix-pickups .mp-order footer>strong{font-size:26px}}

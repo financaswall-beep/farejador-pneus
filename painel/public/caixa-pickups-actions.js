@@ -12,7 +12,7 @@
     if (code === 'reserva_insuficiente') return 'A reserva de estoque não está íntegra. Nada foi baixado.';
     if (code === 'pickup_not_found') return 'Esta retirada não está mais disponível. Atualize a fila.';
     if (error && error.status === 403) return 'Seu usuário não tem permissão para operar Retiradas.';
-    return 'Não foi possível concluir a operação. Nada foi alterado.';
+    return 'Não foi possível confirmar a operação. Atualize as retiradas antes de tentar novamente.';
   }
   async function api(path, options) {
     const response = await Caixa.authenticatedFetch(path, options);
@@ -29,9 +29,11 @@
     if (!Caixa.token() || !Caixa.canModule('retiradas')) return;
     if (state.request) state.request.abort();
     const controller = new AbortController();
+    const session = Caixa.sessionFingerprint();
     state.request = controller; P.setStateView('loading');
     try {
       const payload = await api(basePath(), { signal: controller.signal });
+      if (state.request !== controller || session !== Caixa.sessionFingerprint()) return;
       state.rows = Array.isArray(payload.rows) ? payload.rows : [];
       state.serviceCatalog = Array.isArray(payload.service_catalog) ? payload.service_catalog : [];
       state.rows.forEach(function (row) {
@@ -43,6 +45,7 @@
       P.renderList();
       if (!elements.sheet.classList.contains('hidden')) P.renderSheet();
     } catch (error) {
+      if (state.request !== controller || session !== Caixa.sessionFingerprint()) return;
       if (error instanceof DOMException && error.name === 'AbortError') return;
       if (error instanceof Error && error.message === 'invalid_session') return;
       P.setStateView('error');
@@ -53,23 +56,30 @@
   async function saveStage(stage) {
     const row = P.selected();
     if (!row || state.saving) return;
+    const session = Caixa.sessionFingerprint();
     state.saving = true; elements.sheetError.textContent = ''; P.renderSheet();
     try {
-      await api(basePath() + '/' + encodeURIComponent(row.order_id) + '/stage', {
+      const result = await api(basePath() + '/' + encodeURIComponent(row.order_id) + '/stage', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stage: stage, services: P.draftServices(row) }),
       });
+      if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && (result?.order_id !== row.order_id || result.stage !== stage)) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Etapa da retirada atualizada.');
       await loadPickups();
+      if (session !== Caixa.sessionFingerprint()) return;
+      return true;
     } catch (error) {
+      if (session !== Caixa.sessionFingerprint()) return;
       elements.sheetError.textContent = errorMessage(error);
     } finally {
-      state.saving = false; P.renderSheet();
+      if (session === Caixa.sessionFingerprint()) { state.saving = false; P.renderSheet(); }
     }
   }
   async function completePickup() {
     const row = P.selected();
     if (!row || state.saving) return;
+    const session = Caixa.sessionFingerprint();
     if (P.draftServices(row).some(function (service) {
       return service.charge_mode === 'charged' && Number(service.amount_cents || 0) <= 0;
     })) {
@@ -78,37 +88,54 @@
     }
     state.saving = true; elements.sheetError.textContent = ''; P.renderSheet();
     try {
-      await api(basePath() + '/' + encodeURIComponent(row.order_id), {
+      const result = await api(basePath() + '/' + encodeURIComponent(row.order_id), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           payment_method: state.payments[row.order_id] || 'Pix', services: P.draftServices(row),
         }),
       });
+      if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && (result?.order_id !== row.order_id || result.status !== 'paid' || !result.retrieved_at)) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Retirada concluída. Estoque e caixa confirmados juntos.');
-      await loadPickups(); P.closeSheet();
+      await loadPickups();
+      if (session !== Caixa.sessionFingerprint()) return;
+      P.closeSheet();
+      return result;
     } catch (error) {
+      if (session !== Caixa.sessionFingerprint()) return;
       elements.sheetError.textContent = errorMessage(error);
     } finally {
-      state.saving = false;
-      if (!elements.sheet.classList.contains('hidden')) P.renderSheet();
+      if (session === Caixa.sessionFingerprint()) {
+        state.saving = false;
+        if (P.selected()) P.renderSheet();
+      }
     }
   }
   async function cancelPickup(reason) {
     const row = P.selected();
     if (!row || state.saving) return;
+    const session = Caixa.sessionFingerprint();
     state.saving = true; elements.sheetError.textContent = '';
     try {
-      await api(basePath() + '/' + encodeURIComponent(row.order_id), {
+      const result = await api(basePath() + '/' + encodeURIComponent(row.order_id), {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: reason }),
       });
+      if (session !== Caixa.sessionFingerprint()) return;
+      if (!Caixa.isPartner() && result?.cancelled !== true) throw new Error('pickup_confirmation_missing');
       Caixa.showToast('Pedido cancelado. A reserva foi liberada sem lançar caixa.');
-      await loadPickups(); P.closeSheet();
+      await loadPickups();
+      if (session !== Caixa.sessionFingerprint()) return;
+      P.closeSheet();
+      return true;
     } catch (error) {
+      if (session !== Caixa.sessionFingerprint()) return;
       elements.sheetError.textContent = errorMessage(error);
     } finally {
-      state.saving = false;
-      if (!elements.sheet.classList.contains('hidden')) P.renderSheet();
+      if (session === Caixa.sessionFingerprint()) {
+        state.saving = false;
+        if (P.selected()) P.renderSheet();
+      }
     }
   }
 
@@ -175,4 +202,5 @@
     if (event.key === 'Escape' && !elements.sheet.classList.contains('hidden')) P.closeSheet();
   });
   Object.assign(Caixa, { loadPickups: loadPickups, openPickup: P.openSelected, closePickup: P.closeSheet });
+  P.actions = { saveStage, completePickup, cancelPickup };
 }());

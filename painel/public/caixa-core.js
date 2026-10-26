@@ -115,6 +115,7 @@
   }
 
   function clearSession() {
+    if (Caixa.matrixPickups) Caixa.matrixPickups.reset();
     if (Caixa.partnerHome) Caixa.partnerHome.reset();
     if (Caixa.chat) Caixa.chat.reset();
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
