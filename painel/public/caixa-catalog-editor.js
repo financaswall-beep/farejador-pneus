@@ -2,7 +2,7 @@
   'use strict';
   const C = window.Caixa, el = id => document.getElementById(id);
   const dialog = el('matrix-catalog-editor'), form = el('matrix-catalog-form');
-  const state = { row: null, busy: false, existing: null };
+  const state = { row: null, busy: false, existing: null, version: 0, mode: 'spec' };
   const create = window.CatalogCreateUtils, measureInput = el('matrix-catalog-measure');
   const measureList = el('matrix-catalog-measure-options');
   let choices = [], choiceIndex = -1;
@@ -32,17 +32,18 @@
   async function api(path, body, method) {
     if (C.isPartner()) throw new Error('owner_required');
     const session = C.sessionFingerprint();
+    const version = state.version;
     try {
       if (!session) throw new Error('invalid_session');
       const response = await C.authenticatedFetch('/api/caixa/operacao/catalogo' + path, body === undefined ? undefined : {
         method: method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const payload = await C.json(response);
-      if (session !== C.sessionFingerprint()) throw new Error('invalid_session');
+      if (session !== C.sessionFingerprint() || version !== state.version) throw new Error('invalid_session');
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       return payload;
     } catch (error) {
-      if (error.message === 'invalid_session') {
+      if (error.message === 'invalid_session' && version === state.version) {
         dialog.close(); document.getElementById('matrix-fitments').close();
       }
       throw error;
@@ -52,6 +53,7 @@
     state.busy = value;
     if (value) closeMeasures();
     dialog.querySelectorAll('button').forEach(button => { button.disabled = value; });
+    dialog.querySelectorAll('fieldset').forEach(field => { field.disabled = value || (field.id === 'matrix-catalog-identity' && Boolean(state.row?.product_id)); });
   }
   function closeMeasures() {
     measureList.classList.add('hidden');
@@ -132,12 +134,14 @@
     el('matrix-catalog-existing').classList.add('hidden');
     el('matrix-catalog-save').textContent = editing ? 'Salvar ficha técnica' : 'Cadastrar pneu';
     if (!editing && row?.tire_size) suggestCode();
+    C.catalogMetalForms?.editor(row, state.mode);
   }
-  function open(row) {
+  function open(row, mode = 'spec') {
     if (!allowed() || state.busy) return;
+    state.mode = mode;
     populate(row || null); el('matrix-catalog-message').textContent = '';
     if (!dialog.open) dialog.showModal();
-    el(row?.product_id ? 'matrix-catalog-vehicle' : row?.creation_mode === 'stock'
+    el(row?.product_id ? mode === 'price' ? 'matrix-catalog-price' : 'matrix-catalog-vehicle' : row?.creation_mode === 'stock'
       ? 'matrix-catalog-code' : 'matrix-catalog-measure').focus();
   }
   function spec() {
@@ -145,7 +149,9 @@
       tread_pattern: nullable('tread'), load_index: nullable('load'), speed_rating: nullable('speed') };
   }
   async function refresh(row) {
+    const version = state.version;
     await C.loadOperationCatalog(1);
+    if (version !== state.version) return;
     const latest = C.operationCatalogState.rows.find(item => item.product_id === row.product_id) || row;
     populate(latest);
     if (C.loadStock) void C.loadStock();
@@ -158,6 +164,7 @@
     }
     if (!form.reportValidity()) return;
     busy(true); el('matrix-catalog-message').textContent = ''; let created = false;
+    const version = state.version;
     const details = spec(), editing = Boolean(state.row?.product_id);
     const measure = value('measure'), brand = value('brand'), condition = value('condition');
     try {
@@ -170,6 +177,7 @@
         const product = await api('/products', { ...details, measure, brand, tire_condition: condition,
           product_code: value('code'), product_name: 'Pneu ' + brand + ' ' + measure,
           creation_mode: mode, ...(mode === 'manual' ? { price_amount: price } : {}) });
+        if (version !== state.version) return;
         created = true;
         populate({ ...product, ...details, tire_position: details.position, product_type: 'tire',
           catalogued: true, local_sale_price_min: product.price_amount ?? null });
@@ -180,29 +188,34 @@
         }
         await refresh(state.row);
       }
+      if (version !== state.version) return;
       el('matrix-catalog-message').textContent = editing ? 'Ficha técnica atualizada no app e no web.'
         : 'Pneu cadastrado. Confira abaixo o preço e as compatibilidades.';
     } catch (error) {
+      if (version !== state.version) return;
       el('matrix-catalog-message').textContent = created
         ? 'Pneu cadastrado, mas não foi possível concluir a atualização. Confira o preço abaixo antes de vender.' : message(error);
       if (error.message === 'catalog_variant_already_exists') {
         await C.loadOperationCatalog(1);
+        if (version !== state.version) return;
         state.existing = C.operationCatalogState.rows.find(row => row.product_id
           && String(row.tire_size).replace(/\D/g, '') === measure.replace(/\D/g, '')
           && C.canonicalCatalogBrand(row.brand) === C.canonicalCatalogBrand(brand) && row.tire_condition === condition);
         el('matrix-catalog-existing').classList.toggle('hidden', !state.existing);
       }
-    } finally { busy(false); }
+    } finally { if (version === state.version) busy(false); }
   });
   el('matrix-catalog-price-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!allowed() || state.busy || !state.row?.product_id || !event.target.reportValidity()) return;
     busy(true); el('matrix-catalog-message').textContent = '';
+    const version = state.version;
     try {
       const price = Number(value('price'));
       await api('/' + state.row.product_id + '/price', { price_amount: price, reason: value('price-reason') });
       await refresh({ ...state.row, local_sale_price_min: price });
+      if (version !== state.version) return;
       el('matrix-catalog-message').textContent = 'Preço oficial atualizado no app e no web.';
-    } catch (error) { el('matrix-catalog-message').textContent = message(error); } finally { busy(false); }
+    } catch (error) { if (version === state.version) el('matrix-catalog-message').textContent = message(error); } finally { if (version === state.version) busy(false); }
   });
   C.populateCatalogBrandSelect(el('matrix-catalog-brand'));
   el('matrix-catalog-create').addEventListener('click', () => open(null));
@@ -216,6 +229,8 @@
     button.className = 'operation-catalog-price-open'; button.textContent = row.product_id ? 'Configurar pneu' : 'Completar cadastro';
     button.addEventListener('click', () => open(row)); actions.append(button);
   }
-  C.matrixCatalog = { api, message, allowed, appendAction };
+  C.matrixCatalog = { api, message, allowed, appendAction,
+    reset() { state.version++; state.row = null; state.existing = null; busy(false); dialog.close(); form.reset(); el('matrix-catalog-price-form').reset(); el('matrix-catalog-message').textContent = ''; dialog.querySelector('.mcg-editor-product')?.remove(); dialog.querySelector('.mcg-current-price')?.remove(); closeMeasures(); },
+  };
   C.openMatrixCatalogEditor = open;
 }());

@@ -288,6 +288,8 @@
   }
 
   Caixa.operationCatalogView = Object.freeze({
+    openPrice: openPrice,
+    closeStockSelection: closeStockSelection,
     renderSummary: renderSummary, render: render, setLoading: setLoading, showError: showError,
     openCompatibility: openCompatibility, renderCompatibility: renderCompatibility,
     showCompatibilityError: showCompatibilityError, finishCompatibility: finishCompatibility,
