@@ -9,6 +9,8 @@ O catálogo aceita fotos e um vídeo ativo por pneu, vinculados ao produto exato
 3. Aguardar o processamento e conferir a prévia. A marca 2W é aplicada por código.
 4. O controle de uso no atendimento permite ou pausa fotos e vídeo daquele produto.
 
+A assinatura dos novos envios combina o logo 2W, o ícone do WhatsApp e **(21) 97250-9411** em uma faixa verde no canto inferior direito. Logo e letras usam curvas vetoriais, sem fontes instaladas no container; o tamanho acompanha a mídia e preserva uma margem nas bordas. A alteração vale para novos processamentos. Fotos e vídeos já guardados mantêm a marca existente, e não há migration ou variável adicional.
+
 Novas fotos guardam somente o WebP final, com até 1.600 pixels em cada lado. Os originais antigos continuam disponíveis; nenhuma limpeza de arquivos históricos é executada pela migration.
 
 Vídeos aceitam MP4/MOV/WebM de até 80 MiB. A conversão preserva a orientação e a proporção dos vídeos comuns de celular, limita a resolução a 1.280 × 720 ou 720 × 1.280, e produz MP4/H.264 com áudio AAC quando presente. O original existe somente em diretório temporário do processo, removido no encerramento, inclusive em falha. Somente o MP4 final, limitado a 8 MiB, vai ao bucket privado `farejador-matrix-catalog-videos`.

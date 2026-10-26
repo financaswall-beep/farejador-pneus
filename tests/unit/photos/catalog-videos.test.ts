@@ -1,6 +1,7 @@
 import { describe,expect,it,vi } from 'vitest';
 import { access,readFile,writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import sharp from 'sharp';
 Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',CHATWOOT_HMAC_SECRET:'test',ADMIN_AUTH_TOKEN:'test'});
 const {prepareCatalogVideo,MAX_CATALOG_VIDEO_UPLOAD}=await import('../../../src/catalog-photos/video-codec.js');
 const input=Buffer.concat([Buffer.alloc(4),Buffer.from('ftyp'),Buffer.alloc(24)]);
@@ -22,7 +23,7 @@ describe('vídeo do catálogo: limites, marca e arquivo final único',()=>{
   expect(result).not.toHaveProperty('original');
   const encode=runner.mock.calls.find(call=>call[0]==='ffmpeg')![1];
   expect(encode).toEqual(expect.arrayContaining(['libx264','aac','2200k','+faststart','-map_metadata','-1']));
-  expect(encode.join(' ')).toContain('overlay=main_w-overlay_w:main_h-overlay_h');
+  expect(encode.join(' ')).toMatch(/overlay=main_w-overlay_w-[1-9]\d*:main_h-overlay_h-[1-9]\d*/);
   const first=runner.mock.calls[0][1];expect(first[first.indexOf('-protocol_whitelist')+1]).toBe('file');
   expect(first).toEqual(expect.arrayContaining(['-enable_drefs','0','-use_absolute_path']));
   await expect(access(dirname(output))).rejects.toBeDefined();
@@ -43,6 +44,8 @@ describe('vídeo do catálogo: limites, marca e arquivo final único',()=>{
    }
    expect(args).toContain('-noautorotate');expect(args).toContain('-display_rotation:v:0');
    expect(args[args.indexOf('-filter_complex')+1]).toContain('transpose='+transpose);
+   const mark=await sharp(await readFile(args[args.indexOf('-filter_complex_threads')-1]!)).metadata();
+   expect(mark.width).toBeGreaterThan(200);expect(mark.width).toBeLessThan(300);
    await writeFile(args.at(-1)!,'rotated');return Buffer.alloc(0);
   });
   expect(await prepareCatalogVideo(input,runner as never)).toMatchObject({width:720,height:1280,duration:3});
