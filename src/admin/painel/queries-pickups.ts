@@ -9,7 +9,7 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
   const result = await dbPool.query(
     `SELECT pr.order_id,pr.created_at,pr.contact_name AS customer_name,
             pr.contact_phone AS customer_phone,pr.source AS source_tag,live.status,
-            live.payment_method,live.total_amount,live.retrieved_at,live.fulfillment_not_before,
+            live.order_number,live.payment_method,live.total_amount,live.retrieved_at,live.fulfillment_not_before,
             live.pickup_arrived_at,live.pickup_installation_started_at,
             live.pickup_services,COALESCE(items.rows,'[]'::jsonb) items,
             EXISTS (SELECT 1 FROM audit.events reservation
@@ -24,7 +24,8 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
        LEFT JOIN LATERAL (
          SELECT jsonb_agg(jsonb_build_object(
            'product_name',product.product_name,'tire_size',spec.tire_size,
-           'brand',product.brand,'quantity',item.quantity,'unit_price',item.unit_price,
+           'brand',product.brand,'tire_condition',product.tire_condition,
+           'quantity',item.quantity,'unit_price',item.unit_price,
            'pickup_service_code',item.pickup_service_code
          ) ORDER BY item.created_at) rows
            FROM commerce.order_items item

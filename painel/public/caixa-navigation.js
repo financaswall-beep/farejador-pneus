@@ -7,7 +7,9 @@
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
-    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations'].includes(tab));
+    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups'].includes(tab));
+    elements.app.classList.toggle('is-matrix-pickups', !Caixa.isPartner() && tab === 'pickups');
+    Caixa.matrixPickups?.sync(tab);
     elements.app.classList.toggle('is-matrix-chat', !Caixa.isPartner() && tab === 'conversations');
     Caixa.chatMetal?.sync(tab);
     if (Caixa.isPartner() && Caixa.partnerHome) {

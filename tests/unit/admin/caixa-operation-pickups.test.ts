@@ -23,7 +23,7 @@ describe('Retiradas dentro da Operação da Loja', () => {
     expect(html).toContain('id="nav-pickups"');
     expect(html).toContain('/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2');
     expect(html).toContain('/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2');
-    expect(html).toContain('/operacao/caixa-pickups-actions.js?v=20260823-pickups-layout2');
+    expect(html).toContain('/operacao/caixa-pickups-actions.js?v=20261026-pickups1');
     expect(modules).toContain("pickups: 'retiradas'");
     expect(modules).toContain("setNavigationVisibility('nav-pickups', canModule('retiradas'))");
     expect(navigation).toContain("showTab('pickups')");
