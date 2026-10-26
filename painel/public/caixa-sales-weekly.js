@@ -64,11 +64,11 @@
     elements.weeklyTotalLabel.textContent = day ? `Faturamento de ${label}` : 'Faturamento da semana';
     elements.weeklySummaryTitle.textContent = day ? `Resumo de ${label}` : 'Resumo semanal';
     elements.salesListTitle.textContent = day ? `Vendas de ${label}`
-      : (payload.sales_scope === 'matrix' ? 'Vendas recentes da Matriz' : 'Minhas vendas recentes');
+      : (Caixa.isPartner() ? 'Minhas vendas recentes' : 'Vendas recentes');
     document.getElementById('weekly-scope-label').textContent = payload.sales_scope === 'matrix'
       ? 'Vendas da Matriz · bot e equipe' : 'Somente suas vendas';
     document.getElementById('weekly-commission-label').textContent = payload.sales_scope === 'matrix'
-      ? 'Comissões das vendas' : 'Minha comissão';
+      ? 'Comissões da equipe' : 'Minha comissão';
     elements.weeklyClearDay.classList.toggle('hidden', !day);
   }
 

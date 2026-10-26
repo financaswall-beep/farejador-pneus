@@ -6,7 +6,10 @@
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
+    elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
+    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales'].includes(tab));
     if (Caixa.isPartner() && Caixa.partnerHome) {
+      Caixa.matrixSalesScreen?.sync(tab);
       Caixa.checkoutRuntime?.close();
       Caixa.partnerHome.sync(tab);
       return;
@@ -140,6 +143,7 @@
     if (Caixa.chat) Caixa.chat.syncTab(tab);
     if (Caixa.waitlist) Caixa.waitlist.syncTab(tab);
     if (Caixa.partnerHome) Caixa.partnerHome.sync(tab);
+    Caixa.matrixSalesScreen?.sync(tab);
     const partnerNavigation = document.getElementById('nav-partner-home');
     partnerNavigation.classList.toggle('active', tab === 'partner-home');
     if (tab === 'partner-home') partnerNavigation.setAttribute('aria-current', 'page');

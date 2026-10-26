@@ -40,6 +40,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
     text(`/operacao/${file}.css`, `${file}.css`, 'text/css; charset=utf-8');
   }
   text('/operacao/caixa-checkout-receipt.js', 'caixa-checkout-receipt.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-sales-metal.css', 'caixa-sales-metal.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-sales-metal.js', 'caixa-sales-metal.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-deliveries-flow.css', 'caixa-deliveries-flow.css', 'text/css; charset=utf-8');
   for (const file of ['caixa-deliveries-flow-view', 'caixa-deliveries-flow-actions', 'caixa-deliveries-flow-receipts']) {
     text(`/operacao/${file}.js`, `${file}.js`, 'text/javascript; charset=utf-8');

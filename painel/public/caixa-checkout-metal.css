@@ -1,6 +1,6 @@
 /* Caixa da Matriz: composição aprovada, usando os mesmos materiais do parceiro. */
 .mc-only { display: none; }
-.is-matrix-checkout,.matrix-checkout-receipt {
+.is-matrix-metal,.matrix-checkout-receipt {
   --mc-metal: url('/operacao/assets/partner-steel-v3.webp');
   --mc-screw: url('/operacao/assets/partner-screw.svg');
   --mc-ink: #0b1010; --mc-green: #07563d; --mc-muted: #384b47; --mc-line: #8e9b96;
@@ -15,37 +15,37 @@
   --mc-width: min(calc(100vw - 48px),540px);
   color: var(--mc-ink); font-family: var(--mc-font);
 }
-.caixa-shell:has(.is-matrix-checkout.is-authenticated) { background: #edf0ef; }
-html:has(.is-matrix-checkout.is-authenticated),body:has(.is-matrix-checkout.is-authenticated) { height: 100%; overflow: hidden; }
+.caixa-shell:has(.is-matrix-metal.is-authenticated) { background: #edf0ef; }
+html:has(.is-matrix-metal.is-authenticated),body:has(.is-matrix-metal.is-authenticated) { height: 100%; overflow: hidden; }
 .sales-app:not(.is-cash) > .co-checkout-bar { display: none; }
-.caixa-app.is-matrix-checkout.is-authenticated {
+.caixa-app.is-matrix-metal.is-authenticated {
   width: min(100%,540px); height: calc(100dvh - 48px); min-height: 0;
   border: 1px solid #a7b1ab; border-radius: 26px; background: var(--mc-metal) center/cover;
 }
-.is-matrix-checkout.is-authenticated #session-view { display: flex; flex-direction: column; height: 100%; min-height: 0; background: none; }
-.is-matrix-checkout.is-authenticated #session-view.hidden { display: none; }
-.is-matrix-checkout .sales-header {
+.is-matrix-metal.is-authenticated #session-view { display: flex; flex-direction: column; height: 100%; min-height: 0; background: none; }
+.is-matrix-metal.is-authenticated #session-view.hidden { display: none; }
+.is-matrix-metal .sales-header {
   position: relative; flex: 0 0 var(--mc-header); height: var(--mc-header); min-height: 0;
   margin: 0; padding: calc(8px + env(safe-area-inset-top)) 14px 10px; gap: 10px;
   border-bottom: 2px solid var(--mc-green); border-radius: 0 0 18px 18px;
   color: var(--mc-ink); background: var(--mc-panel); background-size: 100% 100%,540px 540px;
   box-shadow: 0 2px 3px #1b3a2940,inset 0 -1px 0 white;
 }
-.is-matrix-checkout .sales-heading { min-width: 0; gap: 10px; }
-.is-matrix-checkout .sales-heading h2 { display: none; }
-.is-matrix-checkout .sales-heading p { color: var(--mc-ink); font: 800 24px/1.1 var(--mc-font); }
-.is-matrix-checkout .sales-logo { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 11px; }
-.is-matrix-checkout .operator-area { min-width: 0; }
-.is-matrix-checkout .operator-actions { gap: 10px; padding-left: 10px; border-left: 1px solid #80938b80; }
-.is-matrix-checkout .notifications-button,.is-matrix-checkout .operator-button {
+.is-matrix-metal .sales-heading { min-width: 0; gap: 10px; }
+.is-matrix-metal .sales-heading h2 { display: none; }
+.is-matrix-metal .sales-heading p { color: var(--mc-ink); font: 800 24px/1.1 var(--mc-font); }
+.is-matrix-metal .sales-logo { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 11px; }
+.is-matrix-metal .operator-area { min-width: 0; }
+.is-matrix-metal .operator-actions { gap: 10px; padding-left: 10px; border-left: 1px solid #80938b80; }
+.is-matrix-metal .notifications-button,.is-matrix-metal .operator-button {
   position: relative; width: 44px; height: 44px; min-width: 44px; padding: 0;
   color: var(--mc-ink); border: 0; background: none; box-shadow: none;
 }
-.is-matrix-checkout .notifications-button svg { width: 30px; height: 30px; }
-.is-matrix-checkout .operator-button { border: 1px solid #a9b5ae; border-radius: 50%; background: linear-gradient(#fff,#cdd9d0); box-shadow: 0 2px 3px #17372433; }
-.is-matrix-checkout .operator-button svg { width: 29px; height: 29px; fill: currentColor; stroke-width: 1; }
-.is-matrix-checkout .operator-button::after { content: ''; position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: #087c45; }
-.is-matrix-checkout .operator-button span,.is-matrix-checkout .online-status { display: none; }
+.is-matrix-metal .notifications-button svg { width: 30px; height: 30px; }
+.is-matrix-metal .operator-button { border: 1px solid #a9b5ae; border-radius: 50%; background: linear-gradient(#fff,#cdd9d0); box-shadow: 0 2px 3px #17372433; }
+.is-matrix-metal .operator-button svg { width: 29px; height: 29px; fill: currentColor; stroke-width: 1; }
+.is-matrix-metal .operator-button::after { content: ''; position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: #087c45; }
+.is-matrix-metal .operator-button span,.is-matrix-metal .online-status { display: none; }
 .is-matrix-checkout #cash-panel {
   flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 12px 14px;
@@ -112,16 +112,16 @@ html:has(.is-matrix-checkout.is-authenticated),body:has(.is-matrix-checkout.is-a
 .is-matrix-checkout #cash-panel .catalog-product-visual,.is-matrix-checkout #cash-panel .catalog-product-visual img { width: 74px; height: 116px; }
 .is-matrix-checkout #cash-panel .catalog-product-visual--service,.is-matrix-checkout #cash-panel .catalog-product-visual--other { width: 64px; height: 64px; background: #cfe9de; }
 .is-matrix-checkout #cash-panel .catalog-product-visual--service svg { width: 38px; height: 38px; }
-.is-matrix-checkout .bottom-nav { position: relative; bottom: auto; flex: 0 0 var(--mc-nav); min-height: var(--mc-nav); height: var(--mc-nav); gap: 0; padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); border: 1px solid #8e9c94; border-top: 2px solid var(--mc-green); border-radius: 20px 20px 0 0; color: var(--mc-ink); background: var(--mc-metal) center/540px 540px; box-shadow: 0 -2px 3px #173c2a40,inset 0 1px 0 white; }
-.is-matrix-checkout .bottom-nav button { min-width: calc((100% - 4px)/5); flex-basis: calc((100% - 4px)/5); gap: 4px; min-height: 54px; padding: 3px 2px; color: var(--mc-ink); font: 600 15px/1.1 var(--mc-font); border-right: 1px solid #84978c55; border-radius: 12px 0 0 0; box-shadow: inset 1px 0 #ffffffb0; }
-.is-matrix-checkout .bottom-nav button.active { color: var(--mc-green); font-weight: 800; }
-.is-matrix-checkout .bottom-nav button.active::before { display: none; }
-.is-matrix-checkout .bottom-nav svg { width: 25px; height: 25px; stroke-width: 2.2; }
+.is-matrix-metal .bottom-nav { position: relative; bottom: auto; flex: 0 0 var(--mc-nav); min-height: var(--mc-nav); height: var(--mc-nav); gap: 0; padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); border: 1px solid #8e9c94; border-top: 2px solid var(--mc-green); border-radius: 20px 20px 0 0; color: var(--mc-ink); background: var(--mc-metal) center/540px 540px; box-shadow: 0 -2px 3px #173c2a40,inset 0 1px 0 white; }
+.is-matrix-metal .bottom-nav button { min-width: calc((100% - 4px)/5); flex-basis: calc((100% - 4px)/5); gap: 4px; min-height: 54px; padding: 3px 2px; color: var(--mc-ink); font: 600 15px/1.1 var(--mc-font); border-right: 1px solid #84978c55; border-radius: 12px 0 0 0; box-shadow: inset 1px 0 #ffffffb0; }
+.is-matrix-metal .bottom-nav button.active { color: var(--mc-green); font-weight: 800; }
+.is-matrix-metal .bottom-nav button.active::before { display: none; }
+.is-matrix-metal .bottom-nav svg { width: 25px; height: 25px; stroke-width: 2.2; }
 .is-matrix-checkout :is(button,input,summary):focus-visible,.matrix-checkout-receipt :is(button,summary):focus-visible { outline: 3px solid #004d36; outline-offset: 2px; }
 @media (max-width: 580px) {
-  .is-matrix-checkout,.matrix-checkout-receipt { --mc-gap: 0px; --mc-width: 100vw; }
-  .caixa-shell:has(.is-matrix-checkout.is-authenticated) { padding: 0; }
-  .caixa-app.is-matrix-checkout.is-authenticated { width: 100%; height: 100dvh; min-height: 0; border: 0; border-radius: 0; }
+  .is-matrix-metal,.matrix-checkout-receipt { --mc-gap: 0px; --mc-width: 100vw; }
+  .caixa-shell:has(.is-matrix-metal.is-authenticated) { padding: 0; }
+  .caixa-app.is-matrix-metal.is-authenticated { width: 100%; height: 100dvh; min-height: 0; border: 0; border-radius: 0; }
 }
 @media (max-width: 350px) {
   .is-matrix-checkout #cash-panel { padding-inline: 10px; }

@@ -1,0 +1,43 @@
+/* A Matriz usa o acabamento de caixa-partner-sales.css sobre o mesmo motor. */
+.is-matrix-sales { --ph-metal: url('/operacao/assets/partner-steel-v3.webp'); }
+.is-matrix-sales .ms-sales {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 6px 14px 22px; scrollbar-width: thin;
+}
+.is-matrix-sales .ms-sales > .ps-screen-heading h3 { margin: 0; line-height: 1.1; letter-spacing: -.035em; }
+.is-matrix-sales .ps-sales .weekly-week-nav { flex-basis: 200px; width: 200px; grid-template-columns: 44px minmax(0,1fr) 44px; }
+.is-matrix-sales .ps-sales .weekly-week-nav button { width: 44px; }
+.is-matrix-sales .ps-sales .weekly-week-nav small { white-space: normal; overflow: visible; text-overflow: clip; }
+.is-matrix-sales .ps-sales #sales-panel { display: block; }
+.is-matrix-sales .ps-sales #sales-panel.hidden { display: none; }
+.is-matrix-sales #sales-panel:is([data-state='loading'],[data-state='error']) :is(.weekly-summary,.sales-list-heading) { display: none; }
+.is-matrix-sales .ps-sales .sale-card-body { grid-template-columns: minmax(0,1fr) auto; gap: 5px 12px; }
+.is-matrix-sales .sale-card-copy { display: contents; }
+.is-matrix-sales .sale-card-copy > p { grid-column: 1 / -1; margin: 0; line-height: 1.25; }
+.is-matrix-sales .sale-payment { grid-column: 1; grid-row: 2; align-self: end; line-height: 1.35; }
+.is-matrix-sales .sale-amount { grid-column: 2; grid-row: 2; white-space: nowrap; }
+.is-matrix-sales .sale-origin { grid-column: 1 / -1; color: #273b2e; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.is-matrix-sales .ps-sale-screw { position: absolute; pointer-events: none; }
+.is-matrix-sales .ps-sales .sale-commission { margin-top: 5px; }
+.is-matrix-sales .ps-sales .sale-card-heading > strong { font-size: 20px; }
+.is-matrix-sales .ps-sales .sale-status { border-color: transparent; background: transparent; }
+.is-matrix-sales .ps-sales .sale-card-copy > p { font-size: clamp(22px,6.8vw,28px); font-weight: 800; }
+.is-matrix-sales .ps-sales .sale-amount { font-size: 29px; }
+.is-matrix-sales .ps-sales .sale-payment,.is-matrix-sales .ps-sales .sale-origin { font-size: 16px; }
+.is-matrix-sales .ps-sales .sale-commission > span { font-size: 16px; }
+.is-matrix-sales .ps-sales .receipt-button { font-size: 21px; }
+.is-matrix-sales .ps-sales .sales-list-heading { flex-wrap: wrap; }
+.is-matrix-sales .ps-sales .sales-list-heading h3 { margin: 0; font-size: clamp(24px,7vw,30px); line-height: 1.15; }
+.is-matrix-sales .ps-sales .weekly-stats-grid small { font-size: 14px; }
+.is-matrix-sales .ps-sales .weekly-commission small { font-size: 13px; letter-spacing: -.025em; }
+.is-matrix-sales .weekly-stats-grid > div { min-width: 0; }
+.is-matrix-sales .sales-loading svg,.is-matrix-sales .sales-error svg,.is-matrix-sales .sales-empty svg { color: #234d36; }
+@media (max-width: 350px) {
+  .is-matrix-sales .ms-sales { padding-inline: 10px; }
+  .is-matrix-sales .ps-sales > .ps-screen-heading { gap: 7px; }
+  .is-matrix-sales .ps-sales .weekly-week-nav { flex-basis: 176px; }
+  .is-matrix-sales .ps-sales .sale-card { padding-inline: 12px; }
+  .is-matrix-sales .ps-sales .sale-card-copy > p { font-size: 20px; }
+  .is-matrix-sales .sale-card-body { gap: 5px 7px; }
+  .is-matrix-sales .sale-payment { font-size: 13px; }
+}

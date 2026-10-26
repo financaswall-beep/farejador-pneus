@@ -50,7 +50,7 @@ describe('Vendas do app conforme a abrangência enviada pelo servidor', () => {
     expect(elements.salesList.textContent).toContain('Bot');
     expect(elements.salesList.textContent).toContain('Balcão · Ana');
     expect(elements.salesList.textContent).not.toContain('Sua comissão');
-    expect(nodes['weekly-commission-label'].textContent).toBe('Comissões das vendas');
+    expect(nodes['weekly-commission-label'].textContent).toBe('Comissões da equipe');
     expect(nodes['weekly-scope-label'].textContent).toBe('Vendas da Matriz · bot e equipe');
   });
   it('preserva a visão pessoal e os rótulos dos funcionários e parceiros', () => {
