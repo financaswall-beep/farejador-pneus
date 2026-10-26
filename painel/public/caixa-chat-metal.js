@@ -7,6 +7,7 @@
   skin.dialog=function(label){const d=document.createElement('dialog');d.className='cm-sheet';d.setAttribute('aria-label',label);app.appendChild(d);return d;};
   skin.header=function(title,close,subtitle){const h=document.createElement('header');h.className='cm-sheet-heading';const b=skin.button('‹',close,true);b.className='cm-back';b.setAttribute('aria-label','Voltar');const copy=document.createElement('div'),t=document.createElement('h2');t.textContent=title;copy.appendChild(t);if(subtitle){const p=document.createElement('p');p.textContent=subtitle;copy.appendChild(p);}h.append(b,copy);return h;};
   const originParent=sheet.parentNode,originNext=sheet.nextSibling;
+  const reset=ch.reset;ch.reset=function(){skin.filters?.close();skin.media?.leave();reset();};
   skin.sync=function(tab){
     skin.enabled=!C.isPartner()&&tab==='conversations';
     if(skin.enabled){if(sheet.parentNode!==app)app.appendChild(sheet);skin.prepare();}

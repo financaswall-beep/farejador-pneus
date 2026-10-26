@@ -6,6 +6,7 @@
   let starting=false,disposePlayer=null;
   const recipient=()=>{const row=s.detail||s.rows.find(r=>r.id===s.id);return 'Para '+(row?.name||'o cliente');};
   function close(dialog){if(dialog.open)dialog.close();}
+  const reset=ch.resetMedia;ch.resetMedia=function(){close(chooser);reset();};
   function discard(){starting=false;ch.resetMedia();close(preview);}
   const oldAttach=ch.el('attach').onclick,oldMic=ch.el('mic').onclick;
   function choose(kind){close(chooser);ch.chooseMedia(kind);}
