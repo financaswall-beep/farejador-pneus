@@ -33,6 +33,7 @@
 #matrix-catalog-editor.mcg-dialog :is(input,select) { height: 48px; min-height: 48px; padding: 9px 10px; font-size: 21px; }
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-code { font-size: 20px; }
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-measure-help { display: block; margin: 12px 0 0; font-size: 16px; line-height: 1.35; }
+#matrix-catalog-editor.mcg-dialog .matrix-catalog-measure-options { top: calc(100% + 6px); }
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-spec-reason-label { margin-top: 14px; }
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-spec-reason-label.hidden { display: none; }
 #matrix-catalog-editor.mcg-dialog #mcg-extra-spec { grid-column: 1/-1; padding-top: 6px; border-top: 1px solid #8e9b9666; }
