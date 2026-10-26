@@ -5,7 +5,7 @@ import { join,resolve,sep } from 'node:path';
 import { runMediaProgram,withMediaSlot,type ProgramRunner } from '../marketing/publisher/media-process.js';
 import { parseVideoInspection } from '../marketing/publisher/media-inspection.js';
 import { CatalogPhotoError } from './model.js';
-import { catalogWatermark } from './watermark.js';
+import { catalogWatermark,catalogWatermarkPlacement } from './watermark.js';
 export const MAX_CATALOG_VIDEO_UPLOAD=80*1024*1024;
 export const MAX_CATALOG_VIDEO_BYTES=8*1024*1024;
 export const MAX_CATALOG_VIDEO_SECONDS=15;
@@ -26,7 +26,9 @@ function metadata(bytes:Buffer){
   const video=value.streams?.find((stream:{codec_type?:string})=>stream.codec_type==='video');
   const rotation=Number(video?.side_data_list?.find((side:{rotation?:number})=>side.rotation!==undefined)?.rotation??video?.tags?.rotate??0);
   if(!Number.isFinite(rotation)||rotation%90!==0)throw new Error('rotation');
-  return {...parseVideoInspection(value),rotation:((rotation%360)+360)%360};
+  const displayRotation=((rotation%360)+360)%360;
+  return {...parseVideoInspection(value),rotation:displayRotation,
+   width:Number(displayRotation%180?video.height:video.width),height:Number(displayRotation%180?video.width:video.height)};
  }
  catch{throw new CatalogPhotoError('video_invalid',415);}
 }
@@ -46,13 +48,15 @@ export async function prepareCatalogVideo(input:Buffer,runner:ProgramRunner=runM
    if(original.duration>MAX_CATALOG_VIDEO_SECONDS+.25)throw new CatalogPhotoError('video_too_long');
    if(original.width*original.height>9_437_184)throw new CatalogPhotoError('video_dimensions_too_large');
    if(Math.min(original.width,original.height)<200)throw new CatalogPhotoError('video_too_small');
-   const maxWidth=original.width>=original.height?1280:720;
-   const markWidth=Math.min(260,Math.max(80,Math.round(Math.min(maxWidth,original.width)*.19)));
-   await writeFile(logo,await sharp(catalogWatermark(markWidth)).png().toBuffer(),{mode:0o600});
+   const displayWidth=original.width,displayHeight=original.height;
+   const landscape=displayWidth>=displayHeight;
+   const factor=Math.min(1,(landscape?1280:720)/displayWidth,(landscape?720:1280)/displayHeight);
+   const placement=catalogWatermarkPlacement(Math.floor(displayWidth*factor/2)*2,Math.floor(displayHeight*factor/2)*2);
+   await writeFile(logo,await sharp(catalogWatermark(placement.width)).png().toBuffer(),{mode:0o600});
    const scale="scale=w='if(gte(iw,ih),min(iw,1280),min(iw,720))':h='if(gte(iw,ih),min(ih,720),min(ih,1280))':force_original_aspect_ratio=decrease:force_divisible_by=2";
    const rotate=original.rotation===90?'transpose=cclock,':original.rotation===270?'transpose=clock,':original.rotation===180?'hflip,vflip,':'';
    await runner('ffmpeg',[...common,'-nostdin','-y',...safeInput(kind),'-noautorotate','-display_rotation:v:0','0','-i',source,'-i',logo,
-    '-filter_complex_threads','1','-filter_complex',`[0:v:0]${rotate}${scale},setsar=1,fps=30[base];[base][1:v]overlay=main_w-overlay_w:main_h-overlay_h:format=auto,format=yuv420p[video]`,
+    '-filter_complex_threads','1','-filter_complex',`[0:v:0]${rotate}${scale},setsar=1,fps=30[base];[base][1:v]overlay=main_w-overlay_w-${placement.inset}:main_h-overlay_h-${placement.inset}:format=auto,format=yuv420p[video]`,
     '-map','[video]','-map','0:a:0?','-t',String(MAX_CATALOG_VIDEO_SECONDS),
     '-c:v','libx264','-preset','fast','-crf','22','-maxrate','2200k','-bufsize','4400k','-threads','2',
     '-c:a','aac','-b:a','64k','-ac','1','-ar','48000',
