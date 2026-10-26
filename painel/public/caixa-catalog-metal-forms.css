@@ -27,6 +27,8 @@
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-form { display: grid; gap: 16px; }
 #matrix-catalog-editor.mcg-dialog #matrix-catalog-form.hidden { display: none; }
 #matrix-catalog-editor.mcg-dialog fieldset { margin: 0; padding: 14px 12px; }
+#matrix-catalog-editor.mcg-dialog fieldset > legend { float: left; width: 100%; margin: 0 0 14px; padding: 0; text-align: left; line-height: 1.2; }
+#matrix-catalog-editor.mcg-dialog fieldset > legend + * { clear: both; }
 #matrix-catalog-editor.mcg-dialog .matrix-catalog-grid { display: grid; grid-template-columns: minmax(0,1fr); align-items: start; gap: 16px 12px; }
 #matrix-catalog-editor.mcg-dialog label { display: grid; grid-template-columns: minmax(0,1fr); align-content: start; min-width: 0; gap: 7px; margin: 0; line-height: 1.25; }
 #matrix-catalog-editor.mcg-dialog label > small { color: var(--mc-muted); font: 400 16px/1.3 var(--mc-font); }
