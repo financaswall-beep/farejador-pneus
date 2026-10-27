@@ -96,7 +96,8 @@
     if (C.isPartner() || !C.canModule('estoque') || state.busy || !row?.tire_size) return;
     state.row = row; reset(); el('title').textContent = row.tire_size + (row.brand ? ' · ' + row.brand : '');
     C.catalogMetalForms?.fitment(state);
-    if (!dialog.open) dialog.showModal(); await load();
+    if (!dialog.open) C.catalogMetalForms?.show ? C.catalogMetalForms.show(dialog) : dialog.showModal();
+    await load();
   }
   async function search() {
     if (!canEdit() || state.busy) return;

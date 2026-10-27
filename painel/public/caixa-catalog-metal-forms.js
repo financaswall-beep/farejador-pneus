@@ -1,6 +1,38 @@
 (function () {
   'use strict';
   const C = window.Caixa, V = C.catalogMetalView, el = id => document.getElementById(id);
+  const origins = new WeakMap();
+  const pages = () => [...document.querySelectorAll('dialog[data-catalog-page][open]')];
+  const stockPage = () => el('stock-price-modal').classList.contains('mcg-stock-price') && !el('stock-price-modal').classList.contains('hidden');
+  function syncPanel() { C.elements.catalogPanel.inert = Boolean(C.matrixCatalogMetal?.isActive() && (pages().length || stockPage())); }
+  const watchedPages = new WeakSet(), pageObserver = new MutationObserver(syncPanel);
+  pageObserver.observe(el('stock-price-modal'), { attributes: true, attributeFilter: ['class'] });
+  function show(dialog) {
+    if (dialog.open) return;
+    if (!dialog.classList.contains('mcg-dialog') || !C.matrixCatalogMetal?.isActive()) {
+      delete dialog.dataset.catalogPage; dialog.removeAttribute('aria-modal'); dialog.showModal(); return;
+    }
+    // A tela ocupa só o conteúdo; cabeçalho e navegação continuam acessíveis.
+    origins.set(dialog, document.activeElement); dialog.dataset.catalogPage = 'true';
+    if (!watchedPages.has(dialog)) { pageObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] }); watchedPages.add(dialog); }
+    dialog.setAttribute('aria-modal', 'false'); dialog.show(); syncPanel();
+  }
+  function canClose(dialog) { return dialog.dispatchEvent(new Event('cancel', { cancelable: true })); }
+  document.addEventListener('close', event => {
+    if (!event.target.dataset?.catalogPage) return;
+    syncPanel(); const origin = origins.get(event.target); origins.delete(event.target);
+    if (origin?.isConnected && origin.getClientRects().length && !C.elements.catalogPanel.inert) origin.focus({ preventScroll: true });
+  }, true);
+  document.addEventListener('keydown', event => {
+    const page = pages().at(-1);
+    if (event.key !== 'Escape' || event.defaultPrevented || !page || document.querySelector('dialog:modal')) return;
+    event.preventDefault(); event.stopImmediatePropagation(); if (canClose(page)) page.close();
+  });
+  document.addEventListener('click', event => {
+    if (!C.matrixCatalogMetal?.isActive() || !event.target.closest('.bottom-nav > button,.sales-header button')) return;
+    if (pages().every(canClose) && !(stockPage() && C.stockPriceBusy?.())) return;
+    event.preventDefault(); event.stopImmediatePropagation(); C.showToast('Salvando. Aguarde a conclusão para trocar de aba.');
+  }, true);
   function frame(dialog) {
     const active = Boolean(C.matrixCatalogMetal?.isActive());
     dialog.classList.toggle('mcg-dialog', active); dialog.classList.toggle('is-matrix-metal', active);
@@ -59,5 +91,5 @@
     el('matrix-fitments-scope').textContent = state.row?.vehicle_type === 'motorcycle' ? 'Em motos, o vínculo vale para a mesma medida e categoria.' : 'Em carros, o vínculo vale somente para este produto.';
     el('matrix-fitments-selected').classList.toggle('mcg-selected-vehicle', Boolean(state.vehicle));
   }
-  C.catalogMetalForms = { editor, fitment };
+  C.catalogMetalForms = { editor, fitment, show, syncPanel };
 }());

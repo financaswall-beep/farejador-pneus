@@ -140,7 +140,7 @@
     if (!allowed() || state.busy) return;
     state.mode = mode;
     populate(row || null); el('matrix-catalog-message').textContent = '';
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) C.catalogMetalForms?.show ? C.catalogMetalForms.show(dialog) : dialog.showModal();
     el(row?.product_id ? mode === 'price' ? 'matrix-catalog-price' : 'matrix-catalog-vehicle' : row?.creation_mode === 'stock'
       ? 'matrix-catalog-code' : 'matrix-catalog-measure').focus();
   }

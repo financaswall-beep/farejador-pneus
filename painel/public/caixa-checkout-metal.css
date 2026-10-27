@@ -112,10 +112,11 @@ html:has(.is-matrix-metal.is-authenticated),body:has(.is-matrix-metal.is-authent
 .is-matrix-checkout #cash-panel .catalog-product-visual,.is-matrix-checkout #cash-panel .catalog-product-visual img { width: 74px; height: 116px; }
 .is-matrix-checkout #cash-panel .catalog-product-visual--service,.is-matrix-checkout #cash-panel .catalog-product-visual--other { width: 64px; height: 64px; background: #cfe9de; }
 .is-matrix-checkout #cash-panel .catalog-product-visual--service svg { width: 38px; height: 38px; }
-.is-matrix-metal .bottom-nav { position: relative; bottom: auto; flex: 0 0 var(--mc-nav); min-height: var(--mc-nav); height: var(--mc-nav); gap: 0; padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); border: 1px solid #8e9c94; border-top: 2px solid var(--mc-green); border-radius: 20px 20px 0 0; color: var(--mc-ink); background: var(--mc-metal) center/540px 540px; box-shadow: 0 -2px 3px #173c2a40,inset 0 1px 0 white; }
-.is-matrix-metal .bottom-nav button { min-width: calc((100% - 4px)/5); flex-basis: calc((100% - 4px)/5); gap: 4px; min-height: 54px; padding: 3px 2px; color: var(--mc-ink); font: 600 15px/1.1 var(--mc-font); border-right: 1px solid #84978c55; border-radius: 12px 0 0 0; box-shadow: inset 1px 0 #ffffffb0; }
-.is-matrix-metal .bottom-nav button.active { color: var(--mc-green); font-weight: 800; }
-.is-matrix-metal .bottom-nav button.active::before { display: none; }
+.is-matrix-metal #session-view > .bottom-nav { position: relative; bottom: auto; display: flex !important; flex: 0 0 var(--mc-nav); flex-wrap: nowrap; justify-content: flex-start; min-width: 0; max-width: 100%; min-height: var(--mc-nav); height: var(--mc-nav); overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-inline: contain; gap: 0; padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); border: 1px solid #8e9c94; border-top: 2px solid var(--mc-green); border-radius: 20px 20px 0 0; color: var(--mc-ink); background: var(--mc-metal) center/540px 540px; box-shadow: 0 -2px 3px #173c2a40,inset 0 1px 0 white; }
+.is-matrix-metal #session-view .bottom-nav > button:not(.hidden) { display: flex; min-width: calc((100% - 4px)/5); flex: 0 0 calc((100% - 4px)/5); gap: 4px; min-height: 54px; padding: 3px 2px; color: var(--mc-ink); font: 600 15px/1.1 var(--mc-font); border-right: 1px solid #84978c55; border-radius: 12px 0 0 0; box-shadow: inset 1px 0 #ffffffb0; }
+.is-matrix-metal #session-view .bottom-nav > #nav-chat-more { display: none !important; }
+.is-matrix-metal #session-view .bottom-nav > button.active { color: var(--mc-green); font-weight: 800; }
+.is-matrix-metal #session-view .bottom-nav > button.active::before { display: none; }
 .is-matrix-metal .bottom-nav svg { width: 25px; height: 25px; stroke-width: 2.2; }
 .is-matrix-checkout :is(button,input,summary):focus-visible,.matrix-checkout-receipt :is(button,summary):focus-visible { outline: 3px solid #004d36; outline-offset: 2px; }
 @media (max-width: 580px) {

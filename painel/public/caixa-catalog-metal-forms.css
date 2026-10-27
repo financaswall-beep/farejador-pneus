@@ -1,5 +1,6 @@
 .mcg-dialog { box-sizing: border-box; position: fixed; inset: var(--mc-top) auto var(--mc-bottom) 50%; transform: translateX(-50%); width: var(--mc-width); height: calc(100dvh - var(--mc-top) - var(--mc-bottom)); max-width: 100vw; max-height: none; margin: 0; padding: 12px 14px 24px; border: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain; color: var(--mc-ink); background: var(--mc-metal) center/540px 540px; box-shadow: none; font-family: var(--mc-font); scrollbar-width: thin; }
 .mcg-dialog::backdrop { background: transparent; }
+.mcg-dialog[data-catalog-page][open] { z-index: 9; }
 .mcg-dialog > header { display: flex; justify-content: flex-end; align-items: center; gap: 12px; min-height: 46px; margin-bottom: 11px; }
 .mcg-dialog > header:not(.mcg-heading) { flex-direction: row-reverse; }
 .mcg-dialog > header > div { flex: 1; }
@@ -77,7 +78,7 @@
 .mcg-stock-choice .operation-catalog-stock-heading { font: 800 28px/1.1 var(--mc-font); }
 .mcg-stock-choice .operation-catalog-stock-option { min-height: 105px; margin-top: 12px; padding: 14px; color: var(--mc-ink); background: var(--mc-panel); border: 1px solid #8e9e93; box-shadow: var(--mc-shadow); font: 500 22px var(--mc-font); }
 .mcg-stock-choice .operation-catalog-stock-option strong { font-size: 27px; }
-#stock-price-modal.mcg-stock-price { background: transparent; backdrop-filter: none; }
+#stock-price-modal.mcg-stock-price { inset: var(--mc-top) 0 var(--mc-bottom); background: transparent; backdrop-filter: none; }
 #stock-price-modal.mcg-stock-price .stock-price-sheet { position: fixed; inset: var(--mc-top) auto var(--mc-bottom) 50%; width: var(--mc-width); height: calc(100dvh - var(--mc-top) - var(--mc-bottom)); max-height: none; margin: 0; padding: 14px; transform: translateX(-50%); border: 0; border-radius: 0; color: var(--mc-ink); background: var(--mc-metal); font: 500 21px var(--mc-font); }
 #stock-price-modal.mcg-stock-price :is(input,textarea) { font-size: 23px; }
 #stock-price-modal.mcg-stock-price :is(.stock-price-product-card,.stock-price-current) { color: var(--mc-ink); background: var(--mc-panel); }

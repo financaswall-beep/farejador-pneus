@@ -84,9 +84,5 @@
 .is-matrix-chat .sales-header { display: flex !important; border-radius: 0 0 18px 18px; color: #0b1010; }
 .is-matrix-chat .sales-logo,.is-matrix-chat #operation-unit-label { display: block; }
 .is-matrix-chat .wl-attendance-tabs { display: none; }
-.is-matrix-chat .bottom-nav { display: flex !important; overflow-x: auto; }
-.is-matrix-chat #session-view.is-chat .bottom-nav > button { display: none; }
-.is-matrix-chat #session-view.is-chat .bottom-nav > :is(#nav-cash,#nav-sales,#nav-conversations,#nav-pickups,#nav-catalog):not(.hidden) { display: flex; }
-.is-matrix-chat #session-view .bottom-nav > #nav-chat-more { display: none !important; }
 .is-matrix-chat :is(button,input,textarea,summary):focus-visible { outline: 3px solid #075b38; outline-offset: 2px; }
 @media(max-width:350px){.is-matrix-chat .chat-queue{padding-inline:10px}.is-matrix-chat .chat-tabs{gap:4px}.is-matrix-chat .chat-tabs button{font-size:15px;padding-inline:5px}.is-matrix-chat .chat-contact{gap:6px;padding-inline:8px}.is-matrix-chat .chat-contact h3{font-size:21px}.is-matrix-chat .cm-ficha{min-width:39px;font-size:16px;padding-inline:5px}.is-matrix-chat .cm-ficha svg{display:none}.is-matrix-chat .chat-compose{gap:4px;padding-inline:6px}}
