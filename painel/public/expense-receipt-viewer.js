@@ -14,8 +14,12 @@
     const button = document.createElement('button'); button.textContent = 'Fechar comprovante'; button.type = 'button';
     Object.assign(button.style, { padding: '10px', borderRadius: '8px', marginBottom: '12px', cursor: 'pointer' });
     const status = document.createElement('p'); status.textContent = 'Carregando comprovante…'; status.setAttribute('role', 'status');
-    modal.append(button, status); document.body.appendChild(modal); modal.showModal();
+    modal.append(button, status); document.body.appendChild(modal);
+    const finance = window.Caixa?.financeClean;
+    if (finance?.active()) { modal.classList.add('mf-dialog', 'mfc-receipt-viewer'); finance.showDialog(modal); }
+    else modal.showModal();
     button.addEventListener('click', close); modal.addEventListener('cancel', e => { e.preventDefault(); close(); });
+    modal.addEventListener('close', () => { if (dialog === modal) close(); });
     try {
       const response = await authenticatedFetch(path, { signal: current.signal });
       if (!response.ok) throw Error('receipt_unavailable');

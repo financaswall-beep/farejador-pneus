@@ -54,7 +54,9 @@
   }
   function openSummary() {
     if (!receipt) return;
-    summaryContents(); if (!el('mer-summary').open) el('mer-summary').showModal();
+    summaryContents();
+    if (C.financeClean?.active()) C.financeClean.showDialog(el('mer-summary'));
+    else if (!el('mer-summary').open) el('mer-summary').showModal();
   }
   function apply(row) {
     if (row.status !== 'parsed' || applied === row.reading_id || locked) return;
@@ -163,7 +165,8 @@
       const session = C.sessionFingerprint(); button.disabled = true;
       try {
         const response = await C.authenticatedFetch(base + '/' + expenseId + '/comprovante'); const data = await C.json(response);
-        if (session !== C.sessionFingerprint() || !body.isConnected) return;
+        if (session !== C.sessionFingerprint() || !body.isConnected || !body.contains(button)
+          || el('matrix-finance-panel').classList.contains('hidden')) return;
         if (!response.ok) throw Error('unavailable');
         if (data.receipt) void window.ExpenseReceiptViewer.show(base + '/comprovantes/' + data.receipt.id + '/imagem', C.authenticatedFetch);
         else button.textContent = 'Sem comprovante anexado';
@@ -186,6 +189,6 @@
     if (receipt && !busy && !locked) { if (event.target !== el('mer-confirm')) el('mer-confirm').checked = false; persist(); }
   });
   document.querySelectorAll('[data-me-status]').forEach(button => button.addEventListener('click', () => { if (receipt) persist(); }));
-  C.financeReceipts = { load, reset, cancel, payload, setLocked, attachment, blocked: () => busy || Boolean(receipt?.processing || receipt?.expense_id),
+  C.financeReceipts = { load, reset, cancel, payload, setLocked, attachment, working: () => busy, blocked: () => busy || Boolean(receipt?.processing || receipt?.expense_id),
     saved: () => sessionStorage.removeItem(storage) };
 }());

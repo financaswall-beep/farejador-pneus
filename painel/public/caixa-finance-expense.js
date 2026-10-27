@@ -147,6 +147,6 @@
     if (saved.payment_status === 'paid') el('mf-month').value = T.dateKey(saved.paid_at).slice(0, 7);
     C.financeMatrix.open(saved.payment_status === 'paid' ? 'statement' : 'accounts');
   });
-  C.financeExpense = { load, cancel, reset, refresh: controls, status: () => status,
+  C.financeExpense = { load, cancel, reset, refresh: controls, busy: () => sending, status: () => status,
     setStatus: value => { status = value; controls(); }, setReturnTab: tab => { back = tab; }, returnTab: () => back };
 }());

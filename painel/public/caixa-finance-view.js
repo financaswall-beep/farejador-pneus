@@ -13,7 +13,7 @@
     'chevron-down': ['m7 10 5 5 5-5'], chevron: ['m9 5 7 7-7 7'], back: ['m15 5-7 7 7 7'],
     arrow: ['M4 12h16m-6-6 6 6-6 6'], refresh: ['M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6'],
     eye: ['M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12', 'M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0'],
-    in: ['M12 4v16m-6-6 6 6 6-6'], out: ['M6 18 18 6M6 6h12v12'],
+    in: ['M12 20V4m-6 6 6-6 6 6'], out: ['M12 4v16m-6-6 6 6 6-6'],
     chart: ['M5 20V10h3v10M11 20V4h3v16M17 20V8h3v12'],
     tire: ['M12 2C2 2 2 22 12 22s10-20 0-20M12 5c-6 0-6 14 0 14s6-14 0-14M12 5c-2 0-2 14 0 14M7 4C2 12 7 20 7 20M17 4c5 8 0 16 0 16'],
     team: ['M5 7a3 3 0 1 0 6 0 3 3 0 0 0-6 0M15 6a2 2 0 1 0 4 0 2 2 0 0 0-4 0M2 21v-4a6 6 0 0 1 12 0v4M17 12a5 5 0 0 1 5 5v4'],
@@ -52,7 +52,8 @@
   function dialog(title) {
     el('mf-detail-title').textContent = title;
     const body = el('mf-detail-body'); body.replaceChildren();
-    if (!el('mf-detail').open) el('mf-detail').showModal();
+    if (C.financeClean?.active()) C.financeClean.showDialog(el('mf-detail'));
+    else if (!el('mf-detail').open) el('mf-detail').showModal();
     return body;
   }
   function lines(body, rows, financial) {
@@ -79,7 +80,7 @@
     amount('mf-result', divergent ? '—' : money(value));
     amount('mf-balance', money(cash.saldo_atual));
     amount('mf-incoming', money(cash.entradas_registradas)); amount('mf-outgoing', money(cash.saidas_registradas));
-    el('mf-balance-label').textContent = payload.period === currentMonth ? 'SALDO EM CAIXA' : 'SALDO AO FIM DO MÊS';
+    el('mf-balance-label').textContent = payload.period === currentMonth ? 'Saldo em caixa' : 'Saldo ao fim do mês';
     const warning = el('mf-warning'); warning.classList.toggle('hidden', !divergent && !partial);
     warning.textContent = divergent ? 'Há divergências na apuração. Confira a conciliação no Financeiro web.'
       : pending > 0 ? 'Há vendas com custo pendente. O resultado ainda está incompleto.'
@@ -113,10 +114,10 @@
     const incoming = number(row.cash_in), outgoing = number(row.cash_out);
     const article = node('button', undefined, 'mf-entry ' + (incoming > 0 ? 'is-in' : 'is-out')); article.type = 'button';
     const visual = node('span', undefined, 'mf-icon-circle ' + (incoming > 0 ? 'mf-in' : 'mf-out'));
-    visual.appendChild(icon(['varejo', 'atacado'].includes(row.origin) ? 'sale' : row.origin === 'compras' ? 'purchase' : 'expense'));
+    visual.appendChild(icon(incoming > 0 ? 'in' : 'out'));
     const copy = node('span', undefined, 'mf-entry-copy');
     copy.append(node('strong', row.description || origins[row.origin] || 'Movimentação'), node('small',
-      [preview ? day(row.cash_on) : row.reference || origins[row.origin], row.reversal_of ? 'Estorno' : row.reversed ? 'Estornado posteriormente' : ''].filter(Boolean).join(' · ')));
+      [preview ? day(row.cash_on) : incoming > 0 ? 'Recebimento' : 'Pagamento', row.payment_method || origins[row.origin], row.reversal_of ? 'Estorno' : row.reversed ? 'Estornado posteriormente' : ''].filter(Boolean).join(' · ')));
     const value = node('span', undefined, 'mf-entry-amount');
     amount(value, [incoming > 0 ? '+ ' + money(incoming) : '', outgoing > 0 ? '− ' + money(outgoing) : ''].filter(Boolean).join(' / '));
     article.append(visual, copy, value, icon('chevron'));

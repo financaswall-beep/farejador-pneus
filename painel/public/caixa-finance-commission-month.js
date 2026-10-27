@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const C = window.Caixa, V = C.financeView, el = id => document.getElementById(id);
-  let request, detailRequest, payload = null, tab = 'payable';
+  let request, detailRequest, payload = null, tab = 'payable', sendingSession = null;
   const date = value => value ? window.FarejadorTime.formatDate(String(value).slice(0, 10)) : 'Não informada';
   function cancel() { if (request) request.abort(); if (detailRequest) detailRequest.abort(); request = null; detailRequest = null; }
   function reset() { cancel(); payload = null; tab = 'payable'; el('mc-list').replaceChildren(); el('mc-content').classList.add('hidden'); }
@@ -123,7 +123,7 @@
     const error = V.node('p', '', 'mf-inline-error hidden'); error.setAttribute('role', 'alert'); body.append(error, button);
     const session = C.sessionFingerprint();
     button.addEventListener('click', async () => {
-      button.disabled = true; error.classList.add('hidden');
+      button.disabled = true; sendingSession = session; error.classList.add('hidden');
       try {
         const res = await C.authenticatedFetch('/api/caixa/financeiro-comissoes/' + encodeURIComponent(s.collaborator_id) + '/pagar', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_target_id: s.id, idempotency_key: 'operation-commission-' + s.id }) });
@@ -136,7 +136,7 @@
         error.classList.remove('hidden'); button.textContent = 'Atualizar comissões';
         // Não reenvia o pagamento quando a resposta é incerta.
         const refresh = button.cloneNode(true); refresh.disabled = false; refresh.addEventListener('click', () => { el('mf-detail').close(); void C.financeMatrix.load(); }); button.replaceWith(refresh);
-      }
+      } finally { if (sendingSession === session) sendingSession = null; }
     });
   }
   function choosePayment() {
@@ -149,5 +149,5 @@
   }
   document.querySelectorAll('[data-mc-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.mcTab; render(); }));
   el('mc-rules').addEventListener('click', showRules); el('mc-retry').addEventListener('click', load); el('mc-pay').addEventListener('click', choosePayment);
-  C.financeCommissionMonth = { load, cancel, reset };
+  C.financeCommissionMonth = { load, cancel, reset, busy: () => sendingSession !== null && sendingSession === C.sessionFingerprint() };
 }());

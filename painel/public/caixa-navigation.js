@@ -7,10 +7,14 @@
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     if (Caixa.purchasesMetal?.blockNavigation(tab)) return;
     if (Caixa.matrixDeliveries?.blockNavigation()) return;
+    if (Caixa.financeClean?.blockNavigation()) return;
+    const cleanFinance = !Caixa.isPartner() && ['finance', 'finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-commissions', 'finance-expense', 'finance-reports'].includes(tab);
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries'].includes(tab));
+    elements.app.classList.toggle('is-matrix-metal', cleanFinance || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-finance-clean', cleanFinance);
+    Caixa.financeClean?.sync(cleanFinance);
     elements.app.classList.toggle('is-matrix-deliveries', !Caixa.isPartner() && tab === 'deliveries');
     elements.app.classList.toggle('is-matrix-purchases', !Caixa.isPartner() && tab === 'purchases');
     if (tab !== 'purchases') Caixa.purchasesMetal?.sync(tab);

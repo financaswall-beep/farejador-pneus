@@ -1,15 +1,4 @@
-/* Superfícies do Financeiro da Matriz, preservando os demais módulos. */
-.sales-app.is-finance.is-matrix-finance { color: #102e37; background: #fbfcfc url('/operacao/finance-waves.svg') center top / 100% 1000px repeat-y; }
-.is-matrix-finance .sales-header { min-height: 94px; padding: 22px 20px 14px; align-items: center; background: transparent; color: #123c35; box-shadow: none; }
-.is-matrix-finance .sales-heading h2 { display: none; }
-.is-matrix-finance .sales-heading p { margin: 0; font-size: 14px; color: #087747; }
-.is-matrix-finance .sales-logo { width: 52px; height: 52px; flex-basis: 52px; border-radius: 14px; box-shadow: none; }
-.is-matrix-finance .notifications-button,.is-matrix-finance .operator-button { color: #123c35; background: #ffffffb8; border-color: #d6e0e5; }
-.is-matrix-finance .operator-button { width: 44px; padding: 0; justify-content: center; }
-.is-matrix-finance .operator-button span { display: none; }
-.is-matrix-finance .online-status { font-size: 11px; color: #506570; }
-.is-matrix-finance .bottom-nav { background: #ffffffed; border-top-color: #dde5e8; }
-.is-matrix-finance .bottom-nav button.active { color: #006347; }
+/* Componentes financeiros; cabeçalho e menu usam o shell compartilhado. */
 .mf-page { --mf-green: #004d3e; --mf-muted: #516575; min-height: 640px; margin: 0; padding: 6px 18px 110px; border-radius: 0; color: #102e37; background: transparent; box-shadow: none; font-size: 14px; }
 .mf-page button { cursor: pointer; }
 .mf-page button:disabled { cursor: not-allowed; }

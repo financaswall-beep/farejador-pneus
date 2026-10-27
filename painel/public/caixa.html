@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/operacao/caixa-checkout-metal.css?v=20261026-navigation1" />
   <link rel="stylesheet" href="/operacao/caixa-checkout-metal-sheets.css?v=20261026-sales1" />
   <link rel="stylesheet" href="/operacao/caixa-checkout-metal-receipt.css?v=20261026-commission1" />
-  <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20260918-finance3" />
+  <link rel="stylesheet" href="/operacao/caixa-finance-matrix.css?v=20261027-finance1" />
   <link rel="stylesheet" href="/operacao/caixa-finance-accounts.css?v=20260918-finance3" />
   <link rel="stylesheet" href="/operacao/caixa-finance-tools.css?v=20260923-receipt2" />
   <link rel="stylesheet" href="/operacao/caixa-catalog-editor.css?v=20260918-catalog3" />
@@ -54,7 +54,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261027-finance1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
@@ -78,16 +78,16 @@
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
-  <script defer src="/operacao/caixa-finance-view.js?v=20260923-receipt2"></script>
-  <script defer src="/operacao/caixa-finance-matrix.js?v=20260922-finance1"></script>
-  <script defer src="/operacao/caixa-finance-payment.js?v=20260918-finance3"></script>
-  <script defer src="/operacao/caixa-finance-accounts.js?v=20260918-finance3"></script>
-  <script defer src="/operacao/caixa-finance-commission-month.js?v=20260918-finance3"></script>
+  <script defer src="/operacao/caixa-finance-view.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-matrix.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-payment.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-accounts.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-commission-month.js?v=20261027-finance1"></script>
   <script defer src="/operacao/app.relatorios.pdf.core.js?v=20260922-finance1"></script>
   <script defer src="/operacao/app.relatorios.financeiro.pdf.js?v=20260922-finance1"></script>
-  <script defer src="/operacao/expense-receipt-viewer.js?v=20260923-receipt2"></script>
-  <script defer src="/operacao/caixa-finance-expense.js?v=20260923-receipt2"></script>
-  <script defer src="/operacao/caixa-finance-receipts.js?v=20260923-receipt2"></script>
+  <script defer src="/operacao/expense-receipt-viewer.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-expense.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-receipts.js?v=20261027-finance1"></script>
   <script defer src="/operacao/caixa-finance-report-view.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-reports.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260918-finance3"></script>
@@ -177,6 +177,9 @@
   <link rel="stylesheet" href="/operacao/caixa-purchases-metal-prices.css?v=20261027-purchases1" />
   <script defer src="/operacao/caixa-purchases-metal-view.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-metal.js?v=20261027-purchases1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-finance-clean.css?v=20261027-finance1" />
+  <link rel="stylesheet" href="/operacao/caixa-finance-clean-tools.css?v=20261027-finance1" />
+  <script defer src="/operacao/caixa-finance-clean.js?v=20261027-finance1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -1147,51 +1150,59 @@
         </div>
 
         <section id="matrix-finance-panel" class="app-panel mf-page hidden" aria-labelledby="mf-title">
+          <div id="mfc-content">
           <header class="mf-heading">
             <button id="mf-back" class="mf-back hidden" type="button" aria-label="Voltar ao resumo"><span data-mf-icon="back"></span></button>
-            <h2 id="mf-title">Financeiro</h2>
+            <h2 id="mf-title">Financeiro</h2><span id="mfc-position" class="hidden">Posição atual</span>
             <label class="mf-period"><span data-mf-icon="calendar"></span><span id="mf-month-label"></span><span data-mf-icon="chevron-down"></span><input id="mf-month" type="month" min="2000-01" aria-label="Mês do financeiro" /></label>
           </header>
           <p id="mf-commission-subtitle" class="mc-subtitle hidden">Apuração e pagamentos</p>
           <p id="mf-tool-subtitle" class="mt-subtitle hidden"></p>
           <nav id="mf-main-tabs" class="mf-tabs" aria-label="Seções do financeiro">
             <button id="mf-tab-summary" type="button" aria-current="page">Resumo</button>
-            <button id="mf-tab-statement" type="button">Extrato</button>
             <button id="mf-accounts" type="button">Contas</button>
+            <button id="mf-tab-statement" type="button">Extrato</button>
           </nav>
           <div class="mf-toolbar"><span id="mf-updated"></span><button id="mf-refresh" type="button" aria-label="Atualizar financeiro"><span data-mf-icon="refresh"></span>Atualizar</button></div>
           <div id="mf-loading" class="mf-message" role="status"><span class="mf-spinner"></span>Conferindo os lançamentos…</div>
           <div id="mf-error" class="mf-message hidden" role="alert"><strong>Financeiro indisponível</strong><p id="mf-error-copy"></p><button id="mf-retry" class="mf-primary" type="button">Tentar novamente</button></div>
           <div id="mf-summary" class="hidden">
             <section class="mf-balance" aria-label="Saldo em caixa">
-              <span id="mf-balance-label">SALDO EM CAIXA</span>
-              <div><strong id="mf-balance" data-mf-money>—</strong><button id="mf-privacy" type="button" aria-label="Ocultar valores" aria-pressed="false"><span data-mf-icon="eye"></span></button></div>
+              <div class="mfc-balance-label"><span id="mf-balance-label">Saldo em caixa</span><button id="mf-privacy" type="button" aria-label="Ocultar valores" aria-pressed="false"><span data-mf-icon="eye"></span></button></div>
+              <strong id="mf-balance" data-mf-money>—</strong>
               <p>Conforme os lançamentos</p>
             </section>
             <div class="mf-cash-pair">
-              <button type="button" data-mf-direction="in"><span class="mf-icon-circle mf-in" data-mf-icon="in"></span><span>Entradas<strong id="mf-incoming" data-mf-money>—</strong></span></button>
-              <button type="button" data-mf-direction="out"><span class="mf-icon-circle mf-out" data-mf-icon="out"></span><span>Saídas<strong id="mf-outgoing" data-mf-money>—</strong></span></button>
+              <button type="button" data-mf-direction="in"><span class="mf-icon-circle mf-in" data-mf-icon="in"></span><span>Entradas do mês<strong id="mf-incoming" data-mf-money>—</strong></span></button>
+              <button type="button" data-mf-direction="out"><span class="mf-icon-circle mf-out" data-mf-icon="out"></span><span>Saídas do mês<strong id="mf-outgoing" data-mf-money>—</strong></span></button>
             </div>
+            <section id="mfc-today" class="mfc-today" aria-labelledby="mfc-today-title">
+              <header><span data-mf-icon="calendar"></span><h3 id="mfc-today-title">Vencem hoje</h3><span id="mfc-today-count" class="mfc-count"></span></header>
+              <strong id="mfc-today-amount" data-mf-money>—</strong><p id="mfc-today-names"></p>
+              <button id="mfc-today-open" class="mf-primary" type="button">Ver contas de hoje</button>
+            </section>
             <p id="mf-warning" class="mf-warning hidden" role="status"></p>
             <button id="mf-result-card" class="mf-result" type="button" aria-label="Ver cálculo do resultado">
               <span class="mf-result-main"><span class="mf-icon-circle" data-mf-icon="chart"></span><span><span id="mf-result-label">Lucro do mês</span><strong id="mf-result" data-mf-money>—</strong></span><span class="mf-result-link">Ver cálculo <span data-mf-icon="arrow"></span></span></span>
               <span class="mf-result-note">Vendas menos custos e despesas.</span>
             </button>
-            <button id="mf-stock" class="mf-stock" type="button"><span data-mf-icon="tire"></span><span><strong>Em estoque</strong><small id="mf-stock-note">Posição atual · valor de custo</small></span><b id="mf-stock-value" data-mf-money>—</b><span data-mf-icon="chevron"></span></button>
-            <div class="mf-shortcuts">
-              <button id="mf-expense" type="button" data-mf-expense><span data-mf-icon="expense"></span><span>Lançar despesa</span></button>
-              <button id="mf-commissions" type="button"><span data-mf-icon="team"></span><span>Comissões</span></button>
-              <button id="mf-reports" type="button"><span data-mf-icon="chart"></span><span>Relatórios</span></button>
-            </div>
-            <div class="mf-section-heading"><h3>Movimentações</h3><button id="mf-see-all" type="button">Ver todas <span data-mf-icon="arrow"></span></button></div>
-            <div id="mf-recent" aria-live="polite"></div>
-            <p id="mf-recent-error" class="mf-inline-error hidden">Não foi possível carregar as movimentações. <button id="mf-recent-retry" type="button">Tentar novamente</button></p>
+            <button id="mf-expense" class="mfc-action" type="button" data-mf-expense><span class="mfc-plus" data-mf-icon="plus"></span><span>Lançar despesa</span><span data-mf-icon="chevron"></span></button>
+            <details id="mfc-more" class="mfc-more"><summary><span data-mf-icon="expense"></span><span>Relatórios e comissões</span><span data-mf-icon="chevron"></span></summary>
+              <div class="mfc-more-body">
+                <button id="mf-reports" class="mfc-action" type="button"><span data-mf-icon="chart"></span><span>Relatórios</span><span data-mf-icon="chevron"></span></button>
+                <button id="mf-commissions" class="mfc-action" type="button"><span data-mf-icon="team"></span><span>Comissões</span><span data-mf-icon="chevron"></span></button>
+                <button id="mf-stock" class="mf-stock" type="button"><span data-mf-icon="tire"></span><span><strong>Em estoque</strong><small id="mf-stock-note">Posição atual · valor de custo</small></span><b id="mf-stock-value" data-mf-money>—</b><span data-mf-icon="chevron"></span></button>
+                <div class="mf-section-heading"><h3>Movimentações</h3><button id="mf-see-all" type="button">Ver todas <span data-mf-icon="arrow"></span></button></div>
+                <div id="mf-recent" aria-live="polite"></div>
+                <p id="mf-recent-error" class="mf-inline-error hidden">Não foi possível carregar as movimentações. <button id="mf-recent-retry" type="button">Tentar novamente</button></p>
+              </div>
+            </details>
           </div>
           <section id="mf-statement" class="hidden" aria-labelledby="mf-statement-title">
             <h3 id="mf-statement-title">Movimentações do caixa</h3>
-            <label class="mf-search"><span data-mf-icon="search"></span><input id="mf-search" type="search" maxlength="120" placeholder="Buscar lançamento" aria-label="Buscar lançamento" /><button id="mf-search-clear" class="hidden" type="button" aria-label="Limpar busca"><span data-mf-icon="close"></span></button></label>
-            <div class="mf-filters" role="group" aria-label="Filtrar movimentações"><button type="button" data-mf-filter="all" aria-pressed="true">Todas</button><button type="button" data-mf-filter="in" aria-pressed="false">Entradas</button><button type="button" data-mf-filter="out" aria-pressed="false">Saídas</button></div>
-            <div id="mf-statement-balances" class="mf-statement-balances"><div><span>Saldo anterior</span><strong id="mf-opening" data-mf-money>—</strong></div><div><span id="mf-closing-label">Saldo atual</span><strong id="mf-closing" data-mf-money>—</strong></div></div>
+            <div id="mf-statement-balances" class="mf-statement-balances"><div><span>Inicial</span><strong id="mf-opening" data-mf-money>—</strong></div><div><span id="mf-closing-label">Saldo atual</span><strong id="mf-closing" data-mf-money>—</strong></div></div>
+            <label class="mf-search"><span data-mf-icon="search"></span><input id="mf-search" type="search" maxlength="120" placeholder="Buscar movimentação" aria-label="Buscar lançamento" /><button id="mf-search-clear" class="hidden" type="button" aria-label="Limpar busca"><span data-mf-icon="close"></span></button></label>
+            <div class="mf-filters" role="group" aria-label="Filtrar movimentações"><button type="button" data-mf-filter="all" aria-pressed="true">Tudo</button><button type="button" data-mf-filter="in" aria-pressed="false">Entradas</button><button type="button" data-mf-filter="out" aria-pressed="false">Saídas</button></div>
             <p id="mf-statement-warning" class="mf-warning hidden" role="status">Há pendências de integração. Confira a conciliação no Financeiro web.</p>
             <div id="mf-list-loading" class="mf-message hidden" role="status"><span class="mf-spinner"></span>Buscando movimentações…</div>
             <div id="mf-list-error" class="mf-message hidden" role="alert"><p id="mf-list-error-copy">Não foi possível carregar o extrato.</p><button id="mf-list-retry" class="mf-primary" type="button">Tentar novamente</button></div>
@@ -1260,12 +1271,15 @@
               <div class="mf-cash-pair ma-totals"><button type="button" data-ma-direction="out"><span class="mf-icon-circle mf-out" data-mf-icon="out"></span><span>A pagar<strong id="ma-payable" data-mf-money>—</strong></span></button><button type="button" data-ma-direction="in"><span class="mf-icon-circle mf-in" data-mf-icon="in"></span><span>A receber<strong id="ma-receivable" data-mf-money>—</strong></span></button></div>
               <p id="ma-warning" class="mf-warning hidden">Há pendências de integração. Confira a conciliação no Financeiro web.</p>
               <div class="ma-segment" role="group" aria-label="Tipo de conta"><button type="button" data-ma-direction="out" aria-pressed="true">A pagar</button><button type="button" data-ma-direction="in" aria-pressed="false">A receber</button></div>
-              <div class="ma-search-row"><label class="mf-search"><span data-mf-icon="search"></span><input id="ma-search" type="search" maxlength="120" placeholder="Buscar conta ou fornecedor" aria-label="Buscar conta" /></label><button id="ma-filters" class="mf-outline" type="button" aria-label="Filtros de contas" aria-expanded="false" aria-controls="ma-filter-panel"><span data-mf-icon="filters"></span></button></div>
+              <section class="mfc-accounts-balance" aria-label="Total das contas"><span id="mfc-accounts-label">Total a pagar</span><strong id="mfc-accounts-total" data-mf-money>—</strong></section>
+              <p id="mfc-today-filter" class="mfc-filter-chip hidden">Vencem hoje <button id="mfc-today-clear" type="button" aria-label="Mostrar todas as contas">Limpar filtro ×</button></p>
+              <div class="ma-search-row"><label class="mf-search"><span data-mf-icon="search"></span><input id="ma-search" type="search" maxlength="120" placeholder="Buscar conta ou fornecedor" aria-label="Buscar conta" /></label><button id="ma-filters" class="mf-outline" type="button" aria-label="Filtros de contas" aria-expanded="false" aria-controls="ma-filter-panel"><span data-mf-icon="filters"></span>Filtrar</button></div>
               <div id="ma-filter-panel" class="hidden"><label class="mf-field">Tipo de lançamento<select id="ma-category"><option value="all">Todos os tipos</option value="fornecedor">Compras de pneus</option><option value="despesa">Despesas</option><option value="folha">Remuneração da equipe</option><option value="marketing">Marketing</option><option value="fiado">Vendas a prazo</option><option value="varejo">Vendas na Matriz</option><option value="comissao">Comissões da rede</option><option value="mensalidade">Mensalidades</option></select></label></div>
               <div class="mf-filters" role="group" aria-label="Situação da conta"><button type="button" data-ma-status="open" aria-pressed="true">Em aberto</button><button type="button" data-ma-status="overdue" aria-pressed="false">Vencidas</button><button id="ma-settled-tab" type="button" data-ma-status="settled" aria-pressed="false">Pagas</button></div>
               <p id="ma-scope" class="ma-scope"></p><div id="ma-list" aria-live="polite"></div><p id="ma-count" class="ma-scope"></p>
               <div id="ma-pagination" class="mf-pagination hidden"><span id="ma-page-count"></span><button id="ma-prev" type="button" aria-label="Página anterior"><span data-mf-icon="back"></span></button><button id="ma-next" type="button" aria-label="Próxima página"><span data-mf-icon="chevron"></span></button></div>
               <p class="mf-explanation"><span data-mf-icon="info"></span><span id="ma-note">Pagar uma conta registra a saída no caixa.</span></p>
+              <button class="mfc-action" type="button" data-mf-expense><span class="mfc-plus" data-mf-icon="plus"></span><span>Lançar despesa</span><span data-mf-icon="chevron"></span></button>
             </div>
           </section>
           <section id="mf-commissions-view" class="hidden" aria-label="Comissões">
@@ -1281,6 +1295,7 @@
               <p class="mc-payment-note">Total dos fechamentos a pagar: <strong id="mc-payment-total" data-mf-money>—</strong></p><p id="mc-note" class="ma-scope"></p>
             </div>
           </section>
+          </div>
           <dialog id="mf-detail" class="mf-dialog" aria-labelledby="mf-detail-title"><header><h3 id="mf-detail-title"></h3><button id="mf-detail-close" type="button" aria-label="Fechar detalhes"><span data-mf-icon="close"></span></button></header><div id="mf-detail-body"></div><button id="mf-detail-done" class="mf-primary" type="button">Concluir</button></dialog>
         </section>
 

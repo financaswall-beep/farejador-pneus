@@ -78,7 +78,7 @@
       const body = await fetchData('/api/caixa/financeiro-simples?period=' + encodeURIComponent(ctx.month), ctx);
       if (!valid(ctx)) return;
       if (!body.truth || !Array.isArray(body.expenses)) throw Error('finance_payload_invalid');
-      V.summary(body, currentMonth()); state.payload = body;
+      V.summary(body, currentMonth()); C.financeClean?.summary(body); state.payload = body;
       hidden('mf-summary', false); hidden('mf-loading', true); updated();
       await loadRecent();
     } catch (error) {
@@ -159,9 +159,11 @@
     hidden('mf-statement', state.tab !== 'statement'); hidden('mf-summary', true);
     if (!el('mf-month').value) el('mf-month').value = currentMonth();
     try { period(); } catch { /* A tela de erro é preenchida pelo carregamento. */ }
+    C.financeClean?.view(state.tab);
   }
   function open(tab, direction) {
     if (!C.canModule('financeiro') || C.isPartner()) return;
+    if (C.financeClean?.blockNavigation()) return;
     state.offset = 0;
     if (tab === 'statement') { state.direction = direction || 'all'; state.search = ''; el('mf-search').value = ''; }
     if (['commissions', 'expense'].includes(tab) && C.stored(C.keys.role) !== 'owner') return;
@@ -172,6 +174,7 @@
     if (tab === 'summary') void load();
   }
   function reset() {
+    C.financeClean?.reset();
     if (C.financeExpense) C.financeExpense.reset(); if (C.financeReports) C.financeReports.reset();
     cancel(); if (C.financeAccounts) C.financeAccounts.reset(); if (C.financeCommissionMonth) C.financeCommissionMonth.reset(); state.payload = null; state.masked = false; state.search = ''; state.direction = 'all'; state.offset = 0;
     el('mf-month').value = ''; el('mf-search').value = ''; el('mf-detail').close();
