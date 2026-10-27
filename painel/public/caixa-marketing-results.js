@@ -10,8 +10,9 @@
   }
   function total(rows, network) {
     const values = rows.flatMap(post => deliveries(post, network)), known = values.filter(d => V.number(d.views) != null);
-    return { value: known.length ? known.reduce((sum, d) => sum + d.views, 0) : values.length === 0 && M.state.results?.sources?.some(s => s.status === 'ready') ? 0 : null,
-      partial: known.length < values.length || Boolean(M.state.results?.central_truncated || M.state.results?.central_available === false || M.state.results?.sources?.some(s => (network === 'all' || s.platform === network) && (s.status !== 'ready' || s.truncated))) };
+    const sources = (M.state.results?.sources || []).filter(s => network === 'all' || s.platform === network);
+    const partial = known.length < values.length || Boolean(M.state.results?.central_truncated || M.state.results?.central_available === false || sources.some(s => s.status !== 'ready' || s.truncated));
+    return { value: known.length ? known.reduce((sum, d) => sum + d.views, 0) : values.length === 0 && sources.length && !partial ? 0 : null, partial };
   }
   function display(value) { return V.count(value.value) + (value.value != null && value.partial ? ' · parcial' : ''); }
   function networkButtons(host, selected, action, available = platforms()) {
@@ -33,6 +34,7 @@
   };
   M.pages.results = () => {
     const state = M.state, host = M.el('results-posts'), summary = M.el('results-summary'); host.replaceChildren(); summary.replaceChildren();
+    M.el('results-range').textContent = ''; M.el('results-updated').textContent = '';
     M.el('results-period').value = state.period; M.el('results-sort').value = state.sort;
     networkButtons(M.el('results-networks'), state.network, value => { state.network = value; M.render(); });
     if (state.resultsLoading) { V.empty(host, 'Consultando os resultados…'); return; }

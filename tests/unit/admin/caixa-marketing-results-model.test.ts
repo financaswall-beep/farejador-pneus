@@ -33,7 +33,11 @@ describe('contadores de resultados no app', () => {
     m.state.results.sources = [{ platform: 'instagram', status: 'ready' }, { platform: 'facebook', status: 'unavailable' }];
     expect(m.resultTotal(posts, 'instagram')).toEqual({ value: 10, partial: false });
     expect(m.resultTotal(posts, 'all')).toEqual({ value: 30, partial: true });
+    expect(m.resultTotal([], 'facebook')).toEqual({ value: null, partial: true });
+    expect(m.resultTotal([], 'instagram')).toEqual({ value: 0, partial: false });
+    expect(m.resultTotal([], 'all')).toEqual({ value: null, partial: true });
     m.state.results.central_available = false;
     expect(m.resultTotal(posts, 'instagram')).toEqual({ value: 10, partial: true });
+    expect(m.resultTotal([], 'instagram')).toEqual({ value: null, partial: true });
   });
 });
