@@ -9,7 +9,7 @@ import sharp from 'sharp';
 async function fixture(finalDuration = 90) {
   const bytes = 4 * 1024 * 1024 + 12;
   const thumbnail = await sharp({ create: { width: 20, height: 40, channels: 3, background: '#abc' } }).jpeg().toBuffer();
-  const storage = { readRange: vi.fn(async (_path: string, start: number, end: number) => Buffer.alloc(end - start + 1)), put: vi.fn() };
+  const storage = { readRange: vi.fn(async (_path: string, start: number, end: number) => Buffer.alloc(end - start + 1)), putFile: vi.fn() };
   let directory = '';
   const runner = vi.fn<ProgramRunner>().mockImplementation(async (program, args) => {
     const target = args.at(-1)!;
@@ -38,13 +38,13 @@ it('baixa em blocos limitados, usa somente arquivos locais e preserva 90 segundo
     expect(args).toEqual(expect.arrayContaining(['-protocol_whitelist', 'file', '-enable_drefs', '0', '-use_absolute_path', '0']));
     expect(args.join(' ')).not.toMatch(/https?:|signed|service_key/);
   }
-  expect(f.storage.put).toHaveBeenCalledTimes(1);
+  expect(f.storage.putFile).toHaveBeenCalledTimes(1);
   await expect(stat(f.directory())).rejects.toMatchObject({ code: 'ENOENT' });
 });
 it('não envia arquivo truncado ao Storage e limpa temporários quando a duração muda', async () => {
   const f = await fixture(60);
   await expect(preparePublisherVideo(f.storage as unknown as PublisherStorage, 'test/object/original.mov', f.bytes,
     { maxBytes: null, allowedMimes: null }, 'test', '00000000-0000-4000-8000-000000000001', f.runner)).rejects.toThrow('publisher_media_invalid');
-  expect(f.storage.put).not.toHaveBeenCalled();
+  expect(f.storage.putFile).not.toHaveBeenCalled();
   await expect(stat(f.directory())).rejects.toMatchObject({ code: 'ENOENT' });
 });

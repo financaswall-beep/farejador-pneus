@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { mkdtemp, readFile, stat, rm, open } from 'node:fs/promises';
+import { mkdtemp, stat, rm, open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { parseVideoInspection } from './media-inspection.js';
@@ -71,7 +71,7 @@ export async function preparePublisherVideo(storage: PublisherStorage, path: str
       '-filter_threads', '1', '-frames:v', '1', '-vf', 'scale=400:400:force_original_aspect_ratio=decrease', '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'], 2 * 1024 * 1024);
     const thumbnail = await sharp(image, { limitInputPixels: 2_000_000 }).jpeg({ quality: 72 }).toBuffer();
     const publishPath = preparedPath(environment, id, 'video', 'story');
-    await storage.put(publishPath, await readFile(output), 'video/mp4');
+    await storage.putFile(publishPath, output, 'video/mp4');
     return { publishPath, width: final.width, height: final.height, duration: final.duration, thumbnail,
       inspection: { ...final.inspection, prepared: { version: 1 as const, profiles: { vertical: { width: final.width, height: final.height, bytes: size } } } } };
   } finally {

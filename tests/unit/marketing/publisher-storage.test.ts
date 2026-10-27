@@ -1,10 +1,27 @@
 import { beforeEach,describe,it,expect,vi } from 'vitest';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { Readable } from 'node:stream';
 vi.mock('../../../src/shared/config/env.js',()=>({env:{SUPABASE_STORAGE_URL:'https://project.supabase.co',SUPABASE_STORAGE_SERVICE_KEY:'secret-storage',MARKETING_PUBLICATIONS_BUCKET:'farejador-publications'}}));
 import { PublisherStorage } from '../../../src/marketing/publisher/storage.js';
 const path='test/ad5e2be8-2725-4a4f-96a6-c77aceecdc80/original.mp4';
 const fetcher=vi.fn<typeof fetch>();
-beforeEach(()=>fetcher.mockReset());
+beforeEach(()=>{fetcher.mockReset();});
 describe('Storage privado: limites e credenciais',()=>{
+  it('transmite o arquivo convertido por stream com tamanho exato e blocos limitados',async()=>{
+    const directory=await mkdtemp(join(tmpdir(),'publisher-stream-test-')),file=join(directory,'vertical.mp4');
+    const content=Buffer.alloc(1024*1024,7);await writeFile(file,content);let received=0,largest=0;
+    fetcher.mockImplementation(async(_url,options)=>{
+      expect(options?.headers).toMatchObject({'Content-Length':String(content.length),'Content-Type':'video/mp4'});
+      expect(options).toMatchObject({duplex:'half',redirect:'error'});
+      expect(Buffer.isBuffer(options?.body)).toBe(false);
+      for await(const part of options?.body as unknown as Readable){received+=part.length;largest=Math.max(largest,part.length);}
+      return new Response('{}');
+    });
+    try{await new PublisherStorage(fetcher).putFile(path.replace('original.mp4','vertical-v1.mp4'),file);expect(received).toBe(content.length);expect(largest).toBeLessThanOrEqual(256*1024);}
+    finally{await rm(directory,{recursive:true,force:true});}
+  });
   it('não expõe chave e aceita URL de upload somente para o objeto autorizado',async()=>{
     fetcher.mockResolvedValue(new Response(JSON.stringify({url:`/object/upload/sign/farejador-publications/${path}?token=limited-token`})));
     const url=await new PublisherStorage(fetcher).uploadUrl(path);

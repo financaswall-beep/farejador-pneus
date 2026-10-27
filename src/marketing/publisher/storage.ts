@@ -1,5 +1,8 @@
 import { env } from '../../shared/config/env.js';
 import { PublisherError } from './model.js';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 
 type FetchBody = NonNullable<Parameters<typeof fetch>[1]>['body'];
 export interface BucketPolicy { maxBytes: number | null; allowedMimes: string[] | null }
@@ -31,7 +34,7 @@ export class PublisherStorage {
     return `${env.MARKETING_PUBLICATIONS_BUCKET}/${path}`;
   }
 
-  private async request(path: string, method = 'GET', body?: string | Uint8Array,
+  private async request(path: string, method = 'GET', body?: string | Uint8Array | Readable,
     headers: Record<string, string> = {}, objectLookup = false): Promise<Response> {
     let response: Response;
     try {
@@ -42,6 +45,7 @@ export class PublisherStorage {
           apikey: env.SUPABASE_STORAGE_SERVICE_KEY!, 'Content-Type': 'application/json', ...headers,
         },
         ...(body ? { body: body as FetchBody } : {}), signal: AbortSignal.timeout(30_000),
+        ...(body instanceof Readable ? { duplex: 'half' as const } : {}),
       });
     } catch {
       throw new PublisherError('publisher_storage_unavailable', 502);
@@ -194,6 +198,17 @@ export class PublisherStorage {
     const response = await this.request(`/object/${this.object(path)}`, 'POST', body,
       { 'Content-Type': mime, 'x-upsert': 'true' });
     await response.body?.cancel();
+  }
+
+  /** O arquivo convertido vai ao Storage com contrapressão, sem um Buffer do vídeo inteiro. */
+  async putFile(path: string, file: string, mime = 'video/mp4'): Promise<void> {
+    const target = this.object(path), bytes = (await stat(file)).size;
+    const stream = createReadStream(file, { highWaterMark: 256 * 1024 });
+    try {
+      const response = await this.request(`/object/${target}`, 'POST', stream,
+        { 'Content-Type': mime, 'Content-Length': String(bytes), 'x-upsert': 'true' });
+      await response.body?.cancel();
+    } finally { stream.destroy(); }
   }
 
   async remove(paths: string[]): Promise<void> {
