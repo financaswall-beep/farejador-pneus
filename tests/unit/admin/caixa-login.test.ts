@@ -35,6 +35,8 @@ const scriptFiles = [
   'caixa-team-commission.js',
   'caixa-team-permissions.js',
   'caixa-profile.js',
+  'caixa-profile-photo.js',
+  'caixa-profile-camera.js',
   'caixa-alert-sound.js',
   'caixa-photo.js',
   'caixa.js',
@@ -217,7 +219,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Modo compacto');
     expect(html).toContain('Trocar senha');
     expect(html).toContain('Operador de Caixa');
-    expect(html).toContain('<dd>Frente de Caixa</dd>');
+    expect(html).toContain('<dd id="profile-access-name">Operador de Caixa</dd>');
     expect(html).not.toContain('<dd>Administrador</dd>');
     expect(script).toContain("authenticatedFetch('/api/caixa/password'");
     expect(script).toContain('loadProfileSummary');

@@ -22,6 +22,7 @@ import { caixaSalesScope } from './sales-access.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 import { registerCaixaSaleRecovery } from './sale-recovery.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
+import { registerCaixaProfilePhotoRoutes } from './route-profile-photo.js';
 import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 import { registerCaixaCommissionRoutes } from './route-commissions.js';
@@ -132,6 +133,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   const requireRetiradas = requireCaixaModule('retiradas');
   const requireFinanceiro = requireCaixaModule('financeiro');
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
+  registerCaixaProfilePhotoRoutes(fastify, flagGate, requireCaixaAuth);
   registerCaixaChatRoutes(fastify, flagGate, requireCaixaAuth);
   await registerCaixaMarketingRoutes(fastify, flagGate, requireCaixaAuth);
   registerCaixaDeliveryRoutes(fastify, flagGate, requireCaixaAuth, requireEntregas);

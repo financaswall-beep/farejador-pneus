@@ -10,13 +10,16 @@
     if (Caixa.financeClean?.blockNavigation()) return;
     if (Caixa.marketing?.blockNavigation(tab)) return;
     if (Caixa.teamClean?.blockNavigation()) return;
+    if (Caixa.profilePhoto?.blockNavigation()) return;
+    const cleanProfile = !Caixa.isPartner() && ['profile', 'profile-camera'].includes(tab);
     const cleanFinance = !Caixa.isPartner() && ['finance', 'finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-commissions', 'finance-expense', 'finance-reports'].includes(tab);
     const cleanTeam = !Caixa.isPartner() && ['team', 'team-remuneration', 'team-commission', 'team-permissions'].includes(tab);
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', cleanFinance || cleanTeam || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries', 'marketing'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-metal', cleanProfile || cleanFinance || cleanTeam || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries', 'marketing'].includes(tab)));
     elements.app.classList.toggle('is-matrix-team', cleanTeam);
+    elements.app.classList.toggle('is-matrix-profile', cleanProfile);
     elements.app.classList.toggle('is-matrix-marketing', !Caixa.isPartner() && tab === 'marketing');
     elements.app.classList.toggle('is-matrix-finance-clean', cleanFinance);
     Caixa.financeClean?.sync(cleanFinance);
@@ -85,6 +88,7 @@
     document.getElementById('team-permissions-panel').classList.toggle('hidden', !teamPermissions);
     elements.notificationsPanel.classList.toggle('hidden', !notifications);
     elements.profilePanel.classList.toggle('hidden', !profile);
+    document.getElementById('profile-camera-panel')?.classList.toggle('hidden', tab !== 'profile-camera');
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
     document.getElementById('stock-receipts-panel').classList.toggle('hidden', !stockReceipts);
@@ -151,7 +155,8 @@
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
-    if (profile) void Caixa.loadProfileSummary();
+    Caixa.profilePhoto?.sync(tab);
+    if (profile && !cleanProfile) void Caixa.loadProfileSummary();
     if (matrixFinance && Caixa.financeMatrix) Caixa.financeMatrix.setTab(tab);
     if (financeEntries && matrixFinance && Caixa.financeMatrix) void Caixa.financeMatrix.load();
     else if (financeEntries && Caixa.loadFinanceEntries) void Caixa.loadFinanceEntries();

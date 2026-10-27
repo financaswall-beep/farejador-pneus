@@ -30,7 +30,7 @@ function storageOrigin(storageUrl?: string): string | undefined {
 }
 
 export function applySecurityHeaders(
-  reply: FastifyReply, production: boolean, mapsPanel = false, publisherStorageUrl?: string, photoUploadApp = false,
+  reply: FastifyReply, production: boolean, mapsPanel = false, publisherStorageUrl?: string, photoUploadApp = false, cameraApp = false,
 ): void {
   let policy = mapsPanel ? CONTENT_SECURITY_POLICY
     .replace("https://cdn.jsdelivr.net", "https://cdn.jsdelivr.net https://maps.googleapis.com https://maps.gstatic.com")
@@ -45,7 +45,7 @@ export function applySecurityHeaders(
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('X-Frame-Options', 'DENY');
   reply.header('Referrer-Policy', mapsPanel ? 'strict-origin-when-cross-origin' : 'no-referrer');
-  reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+  reply.header('Permissions-Policy', `camera=${cameraApp ? '(self)' : '()'}, microphone=(), geolocation=(self)`);
   reply.header('Cross-Origin-Opener-Policy', 'same-origin');
   reply.header('Cross-Origin-Resource-Policy', 'same-origin');
   if (production) {
@@ -58,7 +58,7 @@ export function registerSecurityHeaders(
 ): void {
   fastify.addHook('onSend', async (request, reply, payload) => {
     applySecurityHeaders(reply, production, /^\/admin\/painel\/?(?:\?|$)/.test(request.url), publisherStorageUrl,
-      /^\/(?:operacao\/?|parceiro\/[^/]+\/?)(?:\?|$)/.test(request.url));
+      /^\/(?:operacao\/?|parceiro\/[^/]+\/?)(?:\?|$)/.test(request.url), /^\/operacao\/?(?:\?|$)/.test(request.url));
     return payload;
   });
 }

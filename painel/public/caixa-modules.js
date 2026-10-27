@@ -72,7 +72,7 @@
       return ['partner-home', 'partner-profile'].includes(mapped) || (permission && canModule(permission)) ? mapped : 'partner-home';
     }
     if (tab === 'partner-home') return Caixa.isPartner() ? tab : firstAllowedTab();
-    if (tab === 'profile' || tab === 'notifications') return tab;
+    if (tab === 'profile' || tab === 'profile-camera' || tab === 'notifications') return tab;
     if (['finance-expense', 'finance-reports'].includes(tab) && Caixa.isPartner()) return firstAllowedTab();
     if (tab === 'finance-expense' && Caixa.stored(Caixa.keys.role) !== 'owner') return firstAllowedTab();
     if (tab === 'finance-accounts' && Caixa.isPartner()) return firstAllowedTab();
