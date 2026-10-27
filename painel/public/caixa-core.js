@@ -104,7 +104,6 @@
   function token() {
     return sessionStorage.getItem(keys.token) || localStorage.getItem(keys.token) || '';
   }
-
   function stored(key) {
     return sessionStorage.getItem(key) || localStorage.getItem(key) || '';
   }
@@ -121,6 +120,7 @@
     if (Caixa.partnerHome) Caixa.partnerHome.reset();
     if (Caixa.chat) Caixa.chat.reset();
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
+    Caixa.marketing?.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();
     if (Caixa.resetSales) Caixa.resetSales();

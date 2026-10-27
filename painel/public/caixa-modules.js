@@ -12,6 +12,7 @@
   }
 
   function canModule(name) {
+    if (name === 'marketing') return Caixa.scope() === 'matrix' && Caixa.stored(Caixa.keys.role) === 'owner';
     if (name === 'conversas') return !Caixa.isPartner() && (modules().conversas === true || (modules().conversas == null && Caixa.stored(Caixa.keys.role) === 'owner'));
     if (name === 'purchases') return Caixa.scope() === 'matrix' && Caixa.stored(Caixa.keys.role) === 'owner' && modules().estoque === true;
     if (name === 'team') return Caixa.stored(Caixa.keys.role) === 'owner';
@@ -32,6 +33,7 @@
     'stock-receipts': 'estoque',
     deliveries: 'entregas',
     finance: 'financeiro',
+    marketing: 'marketing',
     'finance-in': 'financeiro',
     'finance-out': 'financeiro',
     'finance-statement': 'financeiro',
@@ -112,6 +114,7 @@
     setNavigationVisibility('nav-purchases', canModule('purchases'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
+    setNavigationVisibility('nav-marketing', canModule('marketing'));
     setNavigationVisibility('nav-team', canModule('team'));
     setNavigationVisibility('nav-profile', !canModule('financeiro'));
     const nav = document.querySelector('.bottom-nav');
@@ -126,6 +129,7 @@
       return authorizedOperationTab(tab);
     }
     if (window.location.hash === '#lista-de-espera') return authorizedOperationTab('waitlist');
+    if (window.location.hash.startsWith('#marketing')) return authorizedOperationTab('marketing');
     if (window.location.hash === '#conversas') return authorizedOperationTab('conversations');
     if (location.hash === '#financeiro/despesa') return authorizedOperationTab('finance-expense');
     if (location.hash === '#financeiro/relatorios') return authorizedOperationTab('finance-reports');

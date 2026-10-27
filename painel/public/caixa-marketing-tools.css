@@ -1,0 +1,63 @@
+.is-matrix-marketing .mk-field { display: grid; gap: 6px; min-width: 0; margin: 14px 0; color: var(--mk-ink); }
+.is-matrix-marketing .mk-field :is(input,textarea,select),.is-matrix-marketing .mk-destination select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 46px; padding: 9px 11px; border: 1px solid var(--mk-line); border-radius: 8px; background: #fff; color: var(--mk-ink); }
+.is-matrix-marketing .mk-field textarea { min-height: 110px; resize: vertical; }
+.is-matrix-marketing .mk-field :is(input,textarea):disabled { background: #edf1ee; }
+.is-matrix-marketing .mk-field-pair { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); gap: 12px; }
+.is-matrix-marketing .mk-check { display: flex; align-items: center; gap: 9px; min-height: 44px; margin: 10px 0; }
+.is-matrix-marketing .mk-check input { flex: 0 0 22px; width: 22px; height: 22px; margin: 0; accent-color: #07563d; }
+.is-matrix-marketing .mk-sources { display: flex; gap: 8px; margin: 12px 0; }
+.is-matrix-marketing .mk-sources button { display: grid; justify-items: center; gap: 6px; flex: 1; min-height: 70px; border: 0; border-right: 1px solid var(--mk-line); background: none; color: var(--mk-ink); }
+.is-matrix-marketing .mk-sources button:last-child { border-right: 0; }
+.is-matrix-marketing .mk-sources svg { width: 30px !important; height: 30px !important; }
+.is-matrix-marketing .mk-preview-button { display: block; width: 100%; border: 0; padding: 0; border-radius: 10px; background: #e8eee9; color: var(--mk-green); }
+.is-matrix-marketing .mk-compose-image { display: grid; place-items: center; position: relative; overflow: hidden; width: 100%; aspect-ratio: 1.7; border-radius: 9px; }
+.is-matrix-marketing .mk-compose-image.is-video::after { content: '▶'; display: grid; place-items: center; position: absolute; inset: calc(50% - 28px) auto auto calc(50% - 28px); width: 56px; height: 56px; border: 1px solid #fff; border-radius: 50%; background: #07110a88; color: #fff; font-size: 25px; pointer-events: none; }
+.is-matrix-marketing .mk-composer-preview > .mk-link { display: flex; }
+.is-matrix-marketing .mk-ai { display: flex; margin-left: auto; padding: 7px 10px; border-radius: 7px; background: #e6f1e9; }
+.is-matrix-marketing #mk-upload-progress progress { display: block; width: 100%; height: 12px; margin: 10px 0; accent-color: #07563d; }
+.is-matrix-marketing #mk-upload-progress strong { display: block; overflow-wrap: anywhere; }
+.is-matrix-marketing #mk-review-preview,.is-matrix-marketing .mk-post-context { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px; margin: 10px 0 18px; border: 1px solid var(--mk-line); border-radius: 10px; background: #fff9; }
+.is-matrix-marketing #mk-review-preview > div,.is-matrix-marketing .mk-post-context > div { flex: 1; min-width: 0; }
+.is-matrix-marketing .mk-post-context strong,.is-matrix-marketing #mk-review-preview strong { display: block; font-size: 24px; font-weight: 750; overflow-wrap: anywhere; }
+.is-matrix-marketing .mk-post-context small,.is-matrix-marketing #mk-review-preview small { display: block; margin-top: 4px; color: var(--mk-muted); font-size: 17px; }
+.is-matrix-marketing .mk-preview-small { border: 0; padding: 0; background: none; }
+.is-matrix-marketing .mk-destination { display: flex; align-items: center; gap: 10px; min-height: 70px; padding: 10px 0; border-bottom: 1px solid var(--mk-line); }
+.is-matrix-marketing .mk-destination .mk-check { flex: 1; min-width: 0; margin: 0; }
+.is-matrix-marketing .mk-destination select { width: 100px; flex: 0 0 100px; }
+.is-matrix-marketing #mk-review h3 { margin: 20px 0 8px; }
+.is-matrix-marketing #mk-custom summary { min-height: 44px; padding: 10px 0; color: var(--mk-green); cursor: pointer; }
+.is-matrix-marketing .mk-cleanup { align-items: flex-start; font-size: 17px; margin-top: 16px; color: var(--mk-muted); }
+.is-matrix-marketing .mk-library-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.is-matrix-marketing .mk-library-item { padding: 10px; margin: 0; }
+.is-matrix-marketing .mk-library-preview { padding: 0; border: 0; width: 100%; background: none; }
+.is-matrix-marketing .mk-library-image { width: 100%; height: 130px; }
+.is-matrix-marketing .mk-library-item > strong { display: block; overflow-wrap: anywhere; font-size: 20px; margin-top: 7px; }
+.is-matrix-marketing .mk-library-item > small { display: block; }
+.is-matrix-marketing .mk-library-item .mk-primary { font-size: 20px !important; }
+.is-matrix-marketing .mk-results-controls { display: flex; align-items: center; gap: 10px; }.is-matrix-marketing .mk-results-controls > label { flex: 1; }
+.is-matrix-marketing .mk-results-controls .mk-field { margin-bottom: 3px; }
+.is-matrix-marketing .mk-metric { display: grid; gap: 2px; margin: 8px 0 12px; }
+.is-matrix-marketing .mk-metric > span { font-size: 19px; }.is-matrix-marketing .mk-metric > strong { font-size: 32px; font-weight: 850; line-height: 1.1; color: var(--mk-green); overflow-wrap: anywhere; }
+.is-matrix-marketing .mk-metric.is-hero > strong { font-size: clamp(42px,13vw,61px); letter-spacing: -.035em; }
+.is-matrix-marketing .mk-metric-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 16px 0; }
+.is-matrix-marketing .mk-metric-pair > div + div { border-left: 1px solid var(--mk-line); padding-left: 18px; }
+.is-matrix-marketing .mk-result-card { display: flex; align-items: center; gap: 11px; width: 100%; min-width: 0; padding: 10px; margin: 10px 0; border: 1px solid var(--mk-line); border-radius: 11px; color: var(--mk-ink); background: #fff9; text-align: left; }
+.is-matrix-marketing .mk-result-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }.is-matrix-marketing .mk-result-copy > strong { font-size: 24px; overflow-wrap: anywhere; }.is-matrix-marketing .mk-result-copy > b { font-size: 21px; }.is-matrix-marketing .mk-result-copy > small { font-size: 18px; color: var(--mk-green); }
+.is-matrix-marketing .mk-result-card > svg { width: 16px !important; flex-basis: 16px !important; }
+.is-matrix-marketing #mk-results-sort { max-width: 42%; min-height: 44px; padding: 7px 3px; border: 0; color: var(--mk-muted); background: none; }
+.is-matrix-marketing .mk-network-card > header { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 15px; }.is-matrix-marketing .mk-network-card > header > strong { color: var(--mk-green); font-size: 27px; }
+.is-matrix-marketing .mk-network-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; gap: 13px; }.is-matrix-marketing .mk-network-metrics > div { min-width: 0; }.is-matrix-marketing .mk-network-metrics dt { font-size: 17px; color: var(--mk-muted); overflow-wrap: anywhere; }.is-matrix-marketing .mk-network-metrics dd { margin: 3px 0 0; font-size: 24px; font-weight: 750; }
+.is-matrix-marketing .mk-sale-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; padding: 13px 0; border: 0; border-bottom: 1px solid var(--mk-line); background: none; color: var(--mk-ink); text-align: left; }.is-matrix-marketing .mk-sale-row > span { flex: 1; min-width: 0; }.is-matrix-marketing .mk-sale-row small { display: block; margin-top: 4px; }.is-matrix-marketing .mk-sale-row b { font-size: 24px; color: var(--mk-green); }
+.is-matrix-marketing .mk-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0; }
+.is-matrix-marketing .mk-journey-step { position: relative; padding: 15px 0 15px 15px; border-left: 2px solid #6ba385; }.is-matrix-marketing .mk-journey-step p { overflow-wrap: anywhere; }
+.is-matrix-marketing #mk-history-chart > svg { display: block; width: 100%; height: auto; stroke: none; }.is-matrix-marketing #mk-history-chart text { fill: var(--mk-muted); font-family: Arial,sans-serif; }.is-matrix-marketing #mk-history-chart circle { stroke: white; stroke-width: 1; }
+.is-matrix-marketing .mk-chart-legend { display: inline-block; margin: 10px 16px 4px 0; font-weight: 700; }
+.is-matrix-marketing #mk-history-data details { padding: 10px 0; overflow-x: auto; }.is-matrix-marketing #mk-history-data summary { min-height: 44px; cursor: pointer; }.is-matrix-marketing #mk-history-data table { width: 100%; border-collapse: collapse; font-size: 17px; }.is-matrix-marketing #mk-history-data :is(th,td) { padding: 10px 6px; text-align: left; border-bottom: 1px solid var(--mk-line); }
+@media (max-width: 350px) {
+  .is-matrix-marketing .mk-field-pair { grid-template-columns: 1fr; gap: 0; }
+  .is-matrix-marketing .mk-destination select { width: 82px; flex-basis: 82px; }
+  .is-matrix-marketing .mk-library-grid { gap: 8px; }.is-matrix-marketing .mk-library-image { height: 100px; }
+  .is-matrix-marketing .mk-thumb { width: 72px; height: 70px; flex-basis: 72px; }
+  .is-matrix-marketing .mk-result-card { gap: 8px; padding: 9px; }
+  .is-matrix-marketing .mk-sale-row b { font-size: 21px; }
+}

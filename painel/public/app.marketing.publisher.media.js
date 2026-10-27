@@ -56,7 +56,7 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
             if (!window.publisherTusLoading) {
                 window.publisherTusLoading = new Promise((resolve, reject) => {
                     const script = document.createElement('script');
-                    script.src = '/admin/painel/vendor/publisher-tus-4.3.1.min.js';
+                    script.src = this.mpTusLibraryUrl || '/admin/painel/vendor/publisher-tus-4.3.1.min.js';
                     script.onload = () => window.PublisherTus ? resolve(window.PublisherTus) : reject(new Error('publisher_upload_unavailable'));
                     script.onerror = () => reject(new Error('publisher_upload_unavailable'));
                     document.head.appendChild(script);

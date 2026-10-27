@@ -21,8 +21,8 @@
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20261027-deliveries1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20261006-partner-buy2"></script>
+  <script defer src="/operacao/caixa-core.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20261027-marketing1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20261026-metal1"></script>
@@ -54,7 +54,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261027-marketing1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
@@ -180,6 +180,24 @@
   <link rel="stylesheet" href="/operacao/caixa-finance-clean.css?v=20261027-finance1" />
   <link rel="stylesheet" href="/operacao/caixa-finance-clean-tools.css?v=20261027-finance1" />
   <script defer src="/operacao/caixa-finance-clean.js?v=20261027-finance1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-marketing.css?v=20261027-marketing1" />
+  <link rel="stylesheet" href="/operacao/caixa-marketing-tools.css?v=20261027-marketing1" />
+  <script defer src="/operacao/app.marketing.publisher.helpers.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/app.marketing.publisher.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/app.marketing.publisher.media.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/app.marketing.organic.summary.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/app.marketing.organic.results.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-template.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-view.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-content.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-compose.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-library.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-calendar.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-results.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-sales.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-history.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-marketing-reconciliation.js?v=20261027-marketing1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
 </head>
 <body>
@@ -1149,6 +1167,8 @@
           </div>
         </div>
 
+        <section id="marketing-panel" class="app-panel hidden" aria-labelledby="mk-title"></section>
+
         <section id="matrix-finance-panel" class="app-panel mf-page hidden" aria-labelledby="mf-title">
           <div id="mfc-content">
           <header class="mf-heading">
@@ -1646,6 +1666,9 @@
           <button id="nav-finance" type="button" data-tab="finance">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.7-1.7-1-3-1-1.7 0-3 1-3 2.4 0 3.6 6 1.8 6 5.2 0 1.4-1.3 2.4-3 2.4-1.2 0-2.3-.4-3-1.2M12 5v14"/></svg>
             <span>Financeiro</span>
+          </button>
+          <button id="nav-marketing" class="hidden" type="button" data-tab="marketing">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10h4l12-6v16L7 14H3v-4ZM7 14l2 7h4l-2-6M22 9v6"/></svg><span>Marketing</span>
           </button>
           <button id="nav-team" type="button" data-tab="team">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4 4 0 0 1 7 0"/></svg>

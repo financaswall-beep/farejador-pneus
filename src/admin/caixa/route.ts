@@ -36,6 +36,7 @@ import { registerCaixaFinanceAccountsRoutes } from './route-finance-accounts.js'
 import { registerCaixaFinanceCommissionMonthRoutes } from './route-finance-commission-month.js';
 import { registerCaixaFinanceToolRoutes } from './route-finance-tools.js';
 import { registerCaixaChatRoutes,canAccessOperationChat } from './route-chat.js';
+import { registerCaixaMarketingRoutes } from './route-marketing.js';
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const salesQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d']).default('today'),
@@ -132,6 +133,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   const requireFinanceiro = requireCaixaModule('financeiro');
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
   registerCaixaChatRoutes(fastify, flagGate, requireCaixaAuth);
+  await registerCaixaMarketingRoutes(fastify, flagGate, requireCaixaAuth);
   registerCaixaDeliveryRoutes(fastify, flagGate, requireCaixaAuth, requireEntregas);
   registerCaixaOperationLoginRoutes(fastify, flagGate);
   registerCaixaCommissionRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);

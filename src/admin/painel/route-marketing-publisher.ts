@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest, RouteShorthandOptions } from 'fastify';
 import { z } from 'zod';
 import { requireAdminOwner, getAdminContext } from '../auth.js';
 import { pool } from '../../persistence/db.js';
@@ -13,7 +13,12 @@ import { deleteMedia } from '../../marketing/publisher/cleanup.js';
 import { PublisherGraph } from '../../marketing/publisher/graph.js';
 import { reconcileDestination, reconciliationSchema } from '../../marketing/publisher/reconciliation.js';
 import { generateCaption } from '../../marketing/publisher/caption.js';
-const base = '/admin/api/marketing/publisher';
+import { reschedulePost } from '../../marketing/publisher/reschedule.js';
+export interface MarketingPublisherAccess {
+    base?: string;
+    preHandler?: RouteShorthandOptions['preHandler'];
+    actor?: (request: FastifyRequest) => { displayName: string; personId?: string | null };
+}
 const params = z.object({ id: idSchema }).strict();
 const submitSchema = z.object({ version: z.number().int().min(1), scheduled_at: z.string().datetime({ offset: true }).nullable() }).strict();
 type Handler = (request: FastifyRequest) => Promise<unknown>;
@@ -35,8 +40,10 @@ function guarded(handler: Handler, enabled = true) {
         }
     };
 }
-export async function registerMarketingPublisher(app: FastifyInstance): Promise<void> {
-    const options = { preHandler: requireAdminOwner };
+export async function registerMarketingPublisher(app: FastifyInstance, access: MarketingPublisherAccess = {}): Promise<void> {
+    const base = access.base ?? '/admin/api/marketing/publisher';
+    const actor = access.actor ?? getAdminContext;
+    const options = { preHandler: access.preHandler ?? requireAdminOwner };
     const environment = env.FAREJADOR_ENV;
     app.get(base, options, guarded(async () => {
         const config = publisherConfig();
@@ -70,7 +77,7 @@ export async function registerMarketingPublisher(app: FastifyInstance): Promise<
     }, false));
     app.post(base + '/connections', options, guarded(async () => ({ connections: await new PublisherGraph().connections() })));
     app.post(base + '/media', options, guarded(async (request) => {
-        return reserveMedia(pool, environment, uploadSchema.parse(request.body), getAdminContext(request).displayName);
+        return reserveMedia(pool, environment, uploadSchema.parse(request.body), actor(request).displayName);
     }));
     app.post(base + '/media/:id/complete', { ...options, bodyLimit: 400000 }, guarded(async (request) => {
         return finalizeMedia(pool, environment, params.parse(request.params).id, finalizeSchema.parse(request.body));
@@ -91,26 +98,31 @@ export async function registerMarketingPublisher(app: FastifyInstance): Promise<
         return { removed: true };
     }));
     app.put(base + '/posts/:id', options, guarded(async (request) => {
-        return saveDraft(pool, environment, params.parse(request.params).id, draftSchema.parse(request.body), getAdminContext(request).displayName);
+        return saveDraft(pool, environment, params.parse(request.params).id, draftSchema.parse(request.body), actor(request).displayName);
     }));
     app.post(base + '/posts/:id/submit', options, guarded(async (request) => {
         requireSending();
         const body = submitSchema.parse(request.body);
-        return submitPost(pool, environment, params.parse(request.params).id, body.version, body.scheduled_at, getAdminContext(request).displayName);
+        return submitPost(pool, environment, params.parse(request.params).id, body.version, body.scheduled_at, actor(request).displayName);
+    }));
+    app.post(base + '/posts/:id/reschedule', options, guarded(async request => {
+        requireSending();
+        const body = z.object({ version: z.number().int().min(1), scheduled_at: z.string().datetime({ offset: true }) }).strict().parse(request.body);
+        return reschedulePost(pool, environment, params.parse(request.params).id, body.version, body.scheduled_at, actor(request).displayName);
     }));
     app.post(base + '/posts/:id/action', options, guarded(async (request) => {
         const body = z.object({ action: z.enum(['cancel', 'retry']) }).strict().parse(request.body);
         if (body.action === 'retry')
             requireSending();
-        return postAction(pool, environment, params.parse(request.params).id, body.action, getAdminContext(request).displayName);
+        return postAction(pool, environment, params.parse(request.params).id, body.action, actor(request).displayName);
     }));
     app.post(base + '/posts/:id/reconcile', options, guarded(async (request) => {
-        return reconcileDestination(pool, environment, params.parse(request.params).id, reconciliationSchema.parse(request.body), getAdminContext(request).displayName, new PublisherGraph());
+        return reconcileDestination(pool, environment, params.parse(request.params).id, reconciliationSchema.parse(request.body), actor(request).displayName, new PublisherGraph());
     }));
     app.post(base + '/caption', options, guarded(async (request) => {
         const body = z.object({ brief: z.string().trim().min(5).max(1200) }).strict().parse(request.body);
-        const actor = getAdminContext(request);
-        if (rateLimitHit(`publisher-caption:${actor.personId ?? request.ip}`, 10, 3600000))
+        const operator = actor(request);
+        if (rateLimitHit(`publisher-caption:${operator.personId ?? request.ip}`, 10, 3600000))
             throw new PublisherError('publisher_ai_rate_limit', 429);
         return generateCaption(pool, environment, body.brief);
     }));
