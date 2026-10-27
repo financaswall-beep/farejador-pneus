@@ -64,8 +64,5 @@
 .mcg-notice { padding: 12px 4px; color: #294131; font: 500 20px/1.25 var(--mc-font); text-align: center; }
 .mcg-error { padding: 11px; border: 1px solid #ba7d86; border-radius: 7px; color: #8a2231; background: #fff0f1; font: 500 19px/1.2 var(--mc-font); }
 .mcg-hint { color: #354f3d; font: 400 17px/1.2 var(--mc-font); text-align: center; }
-.is-matrix-catalog .bottom-nav { display: flex !important; overflow-x: auto; }
-.is-matrix-catalog #session-view .bottom-nav > button { display: none; }
-.is-matrix-catalog #session-view .bottom-nav > :is(#nav-cash,#nav-sales,#nav-conversations,#nav-pickups,#nav-catalog):not(.hidden) { display: flex; }
 :is(.is-matrix-catalog,.mcg-dialog,.mcg-stock-choice,.mcg-stock-price) :is(button,input,select,textarea,a,summary):focus-visible { outline: 3px solid #075b38; outline-offset: 2px; }
 @media(max-width:350px){.is-matrix-catalog #operation-catalog-panel{padding-inline:10px}.mcg-card{grid-template-columns:50px minmax(0,1fr);gap:8px}.mcg-card footer b{font-size:26px}.mcg-card footer .mcg-button{font-size:17px}.mcg-product{grid-template-columns:76px minmax(0,1fr)}.mcg-product strong{font-size:36px}.mcg-stats{gap:5px}.mcg-stats small{font-size:15px}}

@@ -19,12 +19,18 @@
     filters.close(); filters.replaceChildren(); stockChoice.close(); stockChoice.replaceChildren(); choiceRow = null; host.replaceChildren(); panel.dataset.catalogView = 'products';
     title.querySelector('h2').textContent = 'Catálogo';
     C.matrixPhotoGallery.close(); C.matrixCatalog.reset?.(); C.matrixCatalogFitments?.reset(); source.closeStockSelection();
+    C.catalogMetalForms?.syncPanel();
     if (document.getElementById('stock-price-modal').classList.contains('mcg-stock-price')) C.resetStockPrice();
   }
   function sync(tab) {
     if (m.session && m.session !== C.sessionFingerprint()) reset();
     m.session = C.sessionFingerprint(); m.active = tab === 'catalog' && !C.isPartner() && C.canModule('estoque');
-    if (!m.active) { filters.close(); stockChoice.close(); source.closeStockSelection(); C.matrixCatalog.reset?.(); C.matrixCatalogFitments?.reset(); m.selected = ''; }
+    if (!m.active) {
+      filters.close(); stockChoice.close(); source.closeStockSelection(); C.matrixCatalog.reset?.(); C.matrixCatalogFitments?.reset();
+      const price = document.getElementById('stock-price-modal');
+      if (price.classList.contains('mcg-stock-price') && !price.classList.contains('hidden')) C.resetStockPrice();
+      C.catalogMetalForms?.syncPanel(); m.selected = '';
+    }
     else render();
   }
   function render() {
@@ -51,14 +57,15 @@
       const option = V.button('', 'select-stock', 'secondary'); option.dataset.index = index; option.classList.add('mcg-stock-option');
       option.replaceChildren(V.el('strong', entry.local_sku || entry.item_name || 'Item ' + (index + 1)), V.el('span', entry.shelf_location || 'Local não informado'), V.el('span', U.number(entry.quantity_available) + ' disponíveis'), V.el('b', entry.sale_price == null ? 'Preço não definido' : C.currency.format(Number(entry.sale_price)))); stockChoice.appendChild(option);
     });
-    stockChoice.append(V.button('Voltar', 'close-stock-choice'), V.el('p', 'O preço será alterado somente no item escolhido.', 'mcg-hint')); stockChoice.showModal();
+    stockChoice.append(V.button('Voltar', 'close-stock-choice'), V.el('p', 'O preço será alterado somente no item escolhido.', 'mcg-hint')); C.catalogMetalForms.show(stockChoice);
   }
   const previousPrice = C.openStockPrice;
   C.openStockPrice = function (row) {
     previousPrice(row);
     const modal = document.getElementById('stock-price-modal'); modal.classList.toggle('mcg-stock-price', valid()); modal.classList.toggle('is-matrix-metal', valid());
+    modal.setAttribute('aria-modal', String(!valid())); C.catalogMetalForms.syncPanel();
   };
-  function showFilters() { filters.replaceChildren(V.filterForm(state)); filters.showModal(); }
+  function showFilters() { filters.replaceChildren(V.filterForm(state)); C.catalogMetalForms.show(filters); }
   function act(event) {
     const b = event.target.closest('[data-mcg-action]'); if (!b || b.disabled || !valid()) return;
     const action = b.dataset.mcgAction, row = selected();
@@ -90,9 +97,11 @@
     if (event.key === 'Escape') source.closeStockSelection();
     const modal = document.getElementById('stock-price-modal');
     if (event.key !== 'Tab' || !modal.classList.contains('mcg-stock-price') || modal.classList.contains('hidden')) return;
-    const focusable = [...modal.querySelectorAll('.stock-price-sheet button,.stock-price-sheet input,.stock-price-sheet textarea')].filter(n => !n.disabled && n.offsetParent !== null);
-    const target = event.shiftKey ? focusable.at(-1) : focusable[0];
-    if (target && (!modal.contains(document.activeElement) || document.activeElement === (event.shiftKey ? focusable[0] : focusable.at(-1)))) { event.preventDefault(); target.focus(); }
+    const focusable = [...modal.querySelectorAll('.stock-price-sheet button,.stock-price-sheet input,.stock-price-sheet textarea'),
+      ...document.querySelectorAll('#session-view > .bottom-nav > button,.sales-header button')].filter(n => !n.disabled && n.getClientRects().length);
+    if (!focusable.length) return;
+    const current = focusable.indexOf(document.activeElement), step = event.shiftKey ? -1 : 1;
+    event.preventDefault(); focusable[(current + step + focusable.length) % focusable.length].focus();
   });
   C.operationCatalogView = Object.freeze({ ...source,
     render() { if (C.isPartner()) return source.render(); render(); },
