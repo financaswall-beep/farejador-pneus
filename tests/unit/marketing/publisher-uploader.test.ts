@@ -89,6 +89,26 @@ it('HEIC sem MIME do navegador pode ser enviado e a conferência usa metadados d
   expect(b.state.apiPost.mock.calls[0]?.[1]).toMatchObject({name:'foto.HEIC',mime:'image/heic',bytes:10});
   expect(b.state.apiPost.mock.calls[1]?.[1]).toEqual({});expect(b.state.mpError).toBe('');
 });
+it('adapta foto legada antes da submissão, preserva rascunho e só consulta a prévia do formato pedido',async()=>{
+  const b=browser(),media={id:'legacy',name:'foto.jpg',kind:'photo',status:'ready',inspection:{verified:true}};
+  b.state.mpMedia=[media];b.state.mpForm.media_id=media.id;b.state.mpForm.title='Minha foto';b.state.mpForm.caption='Texto já escrito';
+  b.state.mpLoad=vi.fn(async()=>{b.state.mpMedia=[{...media,inspection:{verified:true,prepared:{version:1,profiles:{feed:{width:1080,height:1350},vertical:{width:1080,height:1920}}}}}];});
+  b.state.apiPost.mockResolvedValueOnce({id:'legacy'}).mockResolvedValueOnce({url:'https://storage.invalid/story',format:'story',width:1080,height:1920});
+  await b.state.mpOpenPreview(media,'story');
+  expect(b.state.apiPost.mock.calls).toEqual([['/admin/api/marketing/publisher/media/legacy/complete',{}],['/admin/api/marketing/publisher/media/legacy/preview',{format:'story'}]]);
+  expect(b.state.mpForm).toMatchObject({media_id:'legacy',title:'Minha foto',caption:'Texto já escrito'});
+  expect(b.state.mpPreview).toMatchObject({format:'story',width:1080,height:1920});
+  expect(b.requests).toHaveLength(0);expect(b.state.mpUploadBusy).toBe(false);
+});
+it('falha na adaptação mantém o rascunho e não submete a publicação nem usa a prévia antiga',async()=>{
+  const b=browser(),media={id:'legacy',name:'foto.jpg',kind:'photo',status:'ready',inspection:{verified:true}};
+  b.state.mpMedia=[media];b.state.mpForm.media_id=media.id;b.state.mpForm.title='Pneu';b.state.mpConfig.sending=true;
+  b.state.apiPost.mockRejectedValue(Error('publisher_media_processing_timeout'));
+  const id=b.state.mpForm.id;await b.state.mpSubmit();
+  expect(b.state.mpForm.id).toBe(id);expect(b.state.mpForm.media_id).toBe('legacy');
+  expect(b.state.apiPost.mock.calls).toEqual([['/admin/api/marketing/publisher/media/legacy/complete',{}]]);
+  expect(b.state.mpError).toContain('preservado');expect(b.state.mpUploadBusy).toBe(false);
+});
 it('não envia token para URL de retomada adulterada ou arquivo diferente',async()=>{
   const b=browser();const file=new File(['video'],'iphone.mov',{type:'video/quicktime'});
   b.state.mpStoreUploadSession('media-id',{url:'https://outside.invalid/session',fingerprint:'same'});
@@ -109,6 +129,16 @@ it('limite de bucket menor que 8 MB é respeitado antes de reservar uma foto',as
   const file=new File([new Uint8Array(1025)],'foto.jpg',{type:'image/jpeg'});
   await b.state.mpUploadFiles({target:{files:[file]}});
   expect(b.state.apiPost).not.toHaveBeenCalled();expect(b.state.mpError).toContain('limite');
+});
+it('aceita foto de celular acima de 8 MiB quando o servidor autoriza a adaptação para arquivos menores',async()=>{
+  const b=browser();b.state.mpConfig.max_photo_bytes=32*1024*1024;
+  b.state.mpResumableUpload=vi.fn().mockResolvedValue(undefined);
+  const file=new File([new Uint8Array(12*1024*1024)],'foto-grande.jpg',{type:'image/jpeg'});
+  await b.state.mpUploadFiles({target:{files:[file]}});
+  expect(b.state.apiPost.mock.calls[0]?.[1]).toMatchObject({bytes:file.size,mime:'image/jpeg'});
+  expect(b.state.apiPost.mock.calls[1]?.[0]).toContain('/complete');expect(b.state.mpError).toBe('');
+  b.state.apiPost.mockClear();b.state.mpConfig.max_photo_bytes=1024;
+  await b.state.mpUploadFiles({target:{files:[file]}});expect(b.state.apiPost).not.toHaveBeenCalled();
 });
 it('selecionar novamente arquivo completo com falha reutiliza reserva e não acessa URL TUS expirada',async()=>{
   const b=browser();const file=new File(['video'],'iphone.mov',{type:'video/quicktime',lastModified:1});

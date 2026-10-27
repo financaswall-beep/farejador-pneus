@@ -9,6 +9,7 @@ import type { PublisherStorage } from './storage.js';
 
 export interface MediaInspection {
   verified: boolean;
+  prepared?: { version: 1; profiles: Partial<Record<'feed' | 'vertical', { width: number; height: number; bytes: number }>> };
   video_codec?: string;
   fps?: number;
   bit_rate?: number;

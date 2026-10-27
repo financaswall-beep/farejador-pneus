@@ -11,6 +11,7 @@ import { reserveMedia, finalizeMedia, listMedia } from '../../src/marketing/publ
 import { PublisherStorage } from '../../src/marketing/publisher/storage.js';
 import { PublisherError } from '../../src/marketing/publisher/model.js';
 import { cleanupMedia, deleteMedia } from '../../src/marketing/publisher/cleanup.js';
+import { saveDraft, submitPost } from '../../src/marketing/publisher/posts.js';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 
 class TestStorage extends PublisherStorage {
@@ -99,11 +100,30 @@ it('foto é decodificada/converte no servidor e finalização repetida não regr
   storage.objects.set(reservation.resumable.object, { data: image, mime: 'image/jpeg' });
   await finalizeMedia(pool, 'test', reservation.id, { width: 1, height: 1, duration: 999 }, storage);
   const row = (await pool.query('SELECT * FROM ops.publisher_media')).rows[0];
-  expect(row).toMatchObject({ status: 'ready', width: 800, height: 1000, duration: null, inspection: { verified: true }, error_code: null });
+  expect(row).toMatchObject({ status: 'ready', width: 1080, height: 1350, duration: null,
+    inspection: { verified: true, prepared: { version: 1, profiles: { feed: { width: 1080, height: 1350 }, vertical: { width: 1080, height: 1920 } } } }, error_code: null });
   expect(row.upload_completed_at).toBeTruthy();
   expect((await sharp(storage.objects.get(row.publish_path)!.data).metadata()).format).toBe('jpeg');
   await finalizeMedia(pool, 'test', reservation.id, {}, storage);
-  expect(storage.put).toHaveBeenCalledTimes(2);
+  expect(storage.put).toHaveBeenCalledTimes(3);
+});
+it('adapta a foto vertical já recebida de um rascunho e permite Feed sem novo upload nem publicação automática', async () => {
+  const image = await sharp({ create: { width: 1440, height: 2560, channels: 3, background: '#abc' } }).jpeg().toBuffer();
+  const { reservation } = await reserve(image);
+  storage.objects.set(reservation.resumable.object, { data: image, mime: 'image/jpeg' });
+  await pool.query(`UPDATE ops.publisher_media SET status='ready',width=1440,height=2560,
+    inspection='{"verified":true}',upload_completed_at=now() WHERE id=$1`, [reservation.id]);
+  const id = randomUUID(), draft = await saveDraft(pool, 'test', id, { version: 0, title: 'Foto vertical', media_id: reservation.id,
+    caption: 'Pneus disponíveis', destinations: [{ platform: 'instagram', format: 'feed' }, { platform: 'facebook', format: 'story' }], delete_after_publish: false }, 'owner');
+  await expect(submitPost(pool, 'test', id, draft.version, null, 'owner')).rejects.toThrow('publisher_instagram_feed_ratio');
+  await finalizeMedia(pool, 'test', reservation.id, {}, storage);
+  expect((await pool.query('SELECT status FROM ops.publisher_posts WHERE id=$1', [id])).rows[0].status).toBe('draft');
+  expect(storage.objects.get(reservation.resumable.object)!.data).toEqual(image);
+  expect(storage.uploadSession).toHaveBeenCalledOnce();
+  await submitPost(pool, 'test', id, draft.version, null, 'owner');
+  expect((await pool.query('SELECT status FROM ops.publisher_destinations WHERE post_id=$1', [id])).rows.map(row => row.status)).toEqual(['queued', 'queued']);
+  await expect(deleteMedia(pool, 'test', reservation.id, false, storage)).rejects.toThrow('publisher_media_in_use');
+  expect(storage.objects.has(`test/${reservation.id}/feed-v1.jpg`)).toBe(true);
 });
 it('falha após upload preserva o original e permite finalizar sem enviar novamente', async () => {
   const image = await jpeg();
@@ -135,7 +155,7 @@ it('objeto ausente limpa timestamp antigo e permite retomar sem alegar que já f
   expect(renewed.resumable.object).toBe(reservation.resumable.object);
 });
 it('quota inclui arquivos com processamento falho e libera espaço somente após exclusão', async () => {
-  config.MARKETING_LIBRARY_MAX_MB = 10;
+  config.MARKETING_LIBRARY_MAX_MB = 20;
   const { reservation } = await reserve(await jpeg());
   await pool.query(`UPDATE ops.publisher_media SET status='failed' WHERE id=$1`, [reservation.id]);
   await expect(reserve(await jpeg())).rejects.toThrow('publisher_library_full');
@@ -148,7 +168,7 @@ it('miniaturas preservadas no histórico continuam contando na quota da bibliote
   storage.objects.set(reservation.resumable.object, { data: image, mime: 'image/jpeg' });
   await finalizeMedia(pool, 'test', reservation.id, {}, storage);
   await deleteMedia(pool, 'test', reservation.id, false, storage);
-  config.MARKETING_LIBRARY_MAX_MB = 8.1;
+  config.MARKETING_LIBRARY_MAX_MB = 16.4;
   await expect(reserve(image)).rejects.toThrow('publisher_library_full');
 });
 it('o tipo/tamanho declarado e a separação de ambientes são verificados na finalização', async () => {
@@ -165,11 +185,12 @@ it('vídeo usa medição e miniatura do servidor; uma recuperação não confia 
   storage.objects.set(reservation.resumable.object, { data: body, mime: 'video/mp4' });
   const thumbnail = await jpeg();
   const inspector = vi.fn().mockResolvedValue({ width: 1080, height: 1920, duration: 50, thumbnail,
-    inspection: { verified: true, video_codec: 'hevc', fps: 30, bit_rate: 8_000_000 } });
+    publishPath: `test/${reservation.id}/vertical-v1.mp4`, inspection: { verified: true, video_codec: 'h264', fps: 30,
+      bit_rate: 5_000_000, prepared: { version: 1, profiles: { vertical: { width: 1080, height: 1920, bytes: 5000 } } } } });
   await finalizeMedia(pool, 'test', reservation.id, { width: 1, height: 1, duration: 1, thumbnail: 'malicious' }, storage, inspector);
-  expect(inspector).toHaveBeenCalledWith(storage, reservation.resumable.object, 32);
+  expect(inspector).toHaveBeenCalledWith(storage, reservation.resumable.object, 32, storage.policy, 'test', reservation.id);
   expect((await pool.query('SELECT width,height,duration,inspection FROM ops.publisher_media')).rows[0])
-    .toMatchObject({ width: 1080, height: 1920, inspection: { verified: true, video_codec: 'hevc', fps: 30 } });
+    .toMatchObject({ width: 1080, height: 1920, inspection: { verified: true, video_codec: 'h264', fps: 30 } });
 });
 it('limpeza preserva arquivo completo com conversão falha e remove somente órfão incompleto após 24h', async () => {
   const { reservation: received } = await reserve(await jpeg());

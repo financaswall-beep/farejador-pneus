@@ -135,6 +135,7 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             this.mpError = '';
             this.mpMessage = '';
             try {
+                await this.mpPrepareFormats?.();
                 await this.mpPersist();
                 if (this.marketingIsMock?.())
                     throw new Error('publisher_demo_disabled');

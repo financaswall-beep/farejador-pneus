@@ -3,6 +3,12 @@ import { PublisherError } from './model.js';
 
 type FetchBody = NonNullable<Parameters<typeof fetch>[1]>['body'];
 export interface BucketPolicy { maxBytes: number | null; allowedMimes: string[] | null }
+export function assertUploadPolicy(policy: BucketPolicy, bytes: number, mime: string): void {
+  if (policy.maxBytes !== null && bytes > policy.maxBytes) throw new PublisherError('publisher_bucket_file_limit', 413);
+  if (policy.allowedMimes && !policy.allowedMimes.some(allowed => allowed === mime || allowed === '*' || allowed === mime.split('/')[0] + '/*')) {
+    throw new PublisherError('publisher_bucket_mime_rejected', 400);
+  }
+}
 export interface UploadSession {
   upload_url: string;
   resumable: { endpoint: string; token: string; bucket: string; object: string; chunk_size: number };
@@ -20,7 +26,7 @@ export class PublisherStorage {
   }
 
   private object(path: string): string {
-    const allowed = /^(prod|test)\/[a-f0-9-]{36}\/(original\.(jpg|png|webp|heic|heif|mp4|mov)|publish\.jpg|thumbnail\.jpg)$/;
+    const allowed = /^(prod|test)\/[a-f0-9-]{36}\/(original\.(jpg|png|webp|heic|heif|mp4|mov)|publish\.jpg|thumbnail\.jpg|feed-v1\.jpg|vertical-v1\.(jpg|mp4))$/;
     if (!allowed.test(path)) throw new PublisherError('publisher_storage_path', 400);
     return `${env.MARKETING_PUBLICATIONS_BUCKET}/${path}`;
   }

@@ -72,6 +72,7 @@ export async function deleteMedia(pool: Pool, environment: Environment, id: stri
   // Remoção explícita não exige original completo. Miniatura leve é preservada no histórico.
   await storage.remove([media.original_path,
     ...(media.kind === 'photo' ? [`${environment}/${id}/publish.jpg`] : []),
+    `${environment}/${id}/feed-v1.jpg`, `${environment}/${id}/vertical-v1.jpg`, `${environment}/${id}/vertical-v1.mp4`,
     ...(media.publish_path ? [media.publish_path] : []),
     ...(!media.thumbnail_path ? [`${environment}/${id}/thumbnail.jpg`] : [])]);
   await pool.query(`UPDATE ops.publisher_media SET status='deleted',deleted_at=now(),updated_at=now()

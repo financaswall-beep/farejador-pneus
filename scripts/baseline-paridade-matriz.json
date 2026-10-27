@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-10-25T02:21:32.427Z",
-  "total": 3084,
+  "total": 3086,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -1935,6 +1935,7 @@
     "mpMediaCanFinalize": "function",
     "mpMediaNeedsRecovery": "function",
     "mpMediaReceived": "function",
+    "mpMediaSize": "function",
     "mpMessage": "value:string",
     "mpMissingPermissions": "function",
     "mpNew": "function",
@@ -1942,6 +1943,7 @@
     "mpOpenReconciliation": "function",
     "mpPayload": "function",
     "mpPersist": "function",
+    "mpPrepareFormats": "function",
     "mpPosts": "value:array",
     "mpPreview": "value:null",
     "mpReadUploadSession": "function",

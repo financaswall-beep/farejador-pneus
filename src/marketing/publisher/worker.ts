@@ -10,6 +10,7 @@ import { publisherConfig } from './config.js';
 import { cleanupMedia } from './cleanup.js';
 import { PublisherError, type Environment } from './model.js';
 import { validateDestinationMedia } from './media-validation.js';
+import { preparedPublishPath } from './media-formats.js';
 
 const MAX_SAFE_RETRIES = 5;
 function expired(task: Task, verification = false): boolean {
@@ -42,7 +43,7 @@ export async function publishTick(db: Pool, environment: Environment, graph: Pub
       }
       validateDestinationMedia(task, [task]);
       await storage.assertPrivateBucket();
-      const url = await storage.signedUrl(task.publish_path ?? task.original_path, 3600);
+      const url = await storage.signedUrl(preparedPublishPath(task, task.format), 3600);
       const container = await graph.prepare(task, url);
       await setDelivery(db, environment, task, 'processing', { container });
       return true;

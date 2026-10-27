@@ -38,6 +38,13 @@ beforeEach(() => {
 });
 
 describe('Repetições seguras na fila', () => {
+  it('envia a versão de cada formato em vez de reutilizar a foto do Feed no Story', async () => {
+    const original = 'test/00000000-0000-4000-8000-000000000001/original.jpg';
+    for (const format of ['feed', 'story'] as const) await tick(task({ kind: 'photo', media_kind: 'photo', format, original_path: original,
+      publish_path: original.replace('original.jpg', 'feed-v1.jpg'), width: 1080, height: 1350,
+      inspection: { verified: true, prepared: { version: 1, profiles: { feed: { width: 1080, height: 1350, bytes: 100 }, vertical: { width: 1080, height: 1920, bytes: 100 } } } } }));
+    expect(storage.signedUrl.mock.calls.map(args => args[0])).toEqual([original.replace('original.jpg', 'feed-v1.jpg'), original.replace('original.jpg', 'vertical-v1.jpg')]);
+  });
   it('confere privacidade antes de fornecer a URL ao provedor', async () => {
     await tick();
     expect(storage.assertPrivateBucket.mock.invocationCallOrder[0])
