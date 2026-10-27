@@ -27,6 +27,7 @@
     return C.createSvg([{ d: paths[name] || paths.box }]);
   };
   P.tire = function (row) {
+    if (C.tireIllustration) { const node = C.tireIllustration(row); node.classList.add('pc-tire'); return node; }
     const image = P.el('img', 'pc-tire'); image.alt = '';
     image.src = row.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp';
     image.width = 62; image.height = 76; image.loading = 'lazy'; return image;

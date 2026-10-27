@@ -69,7 +69,7 @@
       if (!row.cheapest) right.append(P.el('small', 'pc-muted', row.diff_pct == null ? 'Referência mínima: R$ 0,00' : '+' + percent.format(row.diff_pct) + '% sobre a menor média'));
       button.append(left, right, P.el('span', 'pp-chevron', '›')); X.id('suppliers').append(button);
     });
-    renderChart(group);
+    renderChart(P.metal?.active() ? { ...group, suppliers: group.suppliers.filter(row => row.supplier_id === X.supplier) } : group);
     const selected = group.suppliers.find(function (row) { return row.supplier_id === X.supplier; });
     const history = X.id('history'); history.replaceChildren();
     const rows = [...(selected.history || [])].filter(function (row) { return Number(row.quantity) > 0; }).sort(function (a, b) { return new Date(b.purchased_at) - new Date(a.purchased_at); });

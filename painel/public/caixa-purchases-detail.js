@@ -10,6 +10,7 @@
     P.id('detail-close').disabled = s.busy;
     P.id('confirm-receipt').disabled = s.busy || (!!s.pending && s.pending.suffix !== '/confirmar');
     P.id('confirm-receipt').textContent = s.busy ? 'Confirmando…' : s.pending ? 'Tentar confirmar novamente' : 'Confirmar recebimento';
+    P.metal?.lockDetail();
   }
   P.openDetail = function (row, receive) {
     if (!row) return;
@@ -59,8 +60,9 @@
       : 'Há uma compra aguardando confirmação. Feche os detalhes e toque em Nova compra para retomá-la.');
     if (row.notes) host.append(P.el('p', 'pc-muted', row.notes));
     if (row.cancel_reason) host.append(P.el('p', 'pc-notice', 'Cancelamento: ' + row.cancel_reason));
+    if (P.metal?.active()) P.metalView.detail(row, receiving, inputs);
     P.id('confirm-receipt').hidden = !receiving; locks();
-    if (!P.id('dialog').open) P.id('dialog').showModal();
+    if (!P.id('dialog').open) { if (P.metal?.active()) P.metal.showDetail(); else P.id('dialog').showModal(); }
   };
   P.id('confirm-receipt').addEventListener('click', async function () {
     if (!selected || !receiving || s.busy || (s.pending && s.pending.suffix !== '/confirmar')) return;

@@ -1,0 +1,98 @@
+/* Compras: identidade compartilhada da Matriz, com recebimento e pagamento separados. */
+.is-matrix-purchases #session-view { max-width: none; padding: 0; }
+.is-matrix-purchases #purchases-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 12px 14px 22px; background: none; scrollbar-width: thin; }
+.is-matrix-purchases .pc { --pc-green: var(--mc-green); --pc-ink: var(--mc-ink); --pc-muted: var(--mc-muted); color: var(--mc-ink); font: 500 20px/1.2 var(--mc-font); }
+.is-matrix-purchases .pc :is(h2,h3,p) { margin: 0; }
+.is-matrix-purchases .pc h2 { color: var(--mc-ink); font: 900 35px/1.05 var(--mc-font); letter-spacing: -.025em; }
+.is-matrix-purchases .pc h3 { color: var(--mc-ink); font: 800 24px/1.15 var(--mc-font); }
+.is-matrix-purchases .pc p { font-size: 20px; line-height: 1.25; }
+.is-matrix-purchases .pc :is(.pc-muted,.pc-due,.pp-footnote) { color: var(--mc-muted); font: 500 18px/1.25 var(--mc-font); }
+.is-matrix-purchases .pc :is(button,input,select,textarea) { font-family: var(--mc-font); }
+.is-matrix-purchases .pc :is(button,input,select,textarea,summary):focus-visible { outline: 3px solid #07563d; outline-offset: 2px; }
+.is-matrix-purchases .pc svg { width: 25px; height: 25px; flex: 0 0 25px; }
+.is-matrix-purchases .pc :is(.pc-card,.pc-kpis > div) { position: relative; border: 1px solid var(--mc-line); border-radius: 9px; padding: 13px 12px; background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); }
+.is-matrix-purchases .pc :is(.pc-card,.pc-kpis > div)::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: var(--mc-screw) 5px 5px/8px 8px no-repeat,var(--mc-screw) calc(100% - 5px) 5px/8px 8px no-repeat,var(--mc-screw) 5px calc(100% - 5px)/8px 8px no-repeat,var(--mc-screw) calc(100% - 5px) calc(100% - 5px)/8px 8px no-repeat; }
+.is-matrix-purchases .pc .pc-card > h3 { margin-bottom: 10px; }
+.is-matrix-purchases .pc .pc-button { min-height: 46px; padding: 8px 11px; border: 1px solid var(--mc-line); border-radius: 8px; color: var(--mc-ink); background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); font: 700 23px/1.1 var(--mc-font); }
+.is-matrix-purchases .pc .pc-primary { min-height: 51px; border-color: #7ea98d; color: white; background: var(--mc-action); font-size: 25px; }
+.is-matrix-purchases .pc .pc-button:disabled { opacity: .5; }
+.is-matrix-purchases .pc .pc-icon-button { flex: 0 0 44px; width: 44px; padding: 5px; }
+.is-matrix-purchases .pc .pc-link { min-height: 44px; padding: 8px 0; color: var(--mc-green); font: 600 20px/1.15 var(--mc-font); text-decoration: underline; }
+.is-matrix-purchases .pc .pc-intro { display: flex; flex-wrap: nowrap; gap: 10px; margin-bottom: 12px; }
+.is-matrix-purchases .pc .pc-intro > div { flex: 1; min-width: 0; }
+.is-matrix-purchases .pc .pc-intro h2 { font-size: 43px; }
+.is-matrix-purchases .pc .pc-intro p { display: none; }
+.is-matrix-purchases #purchase-new { flex: 0 0 auto; width: auto; max-width: 55%; }
+.is-matrix-purchases #mp-prices-home-back { flex: 0 0 44px; width: 44px; padding: 5px; }
+.is-matrix-purchases #purchase-home { background: none; }
+.is-matrix-purchases .pc-kpis { grid-template-columns: 1fr 1.25fr; gap: 8px; margin: 0 0 12px; }
+.is-matrix-purchases .pc-kpis > div { gap: 8px; min-width: 0; padding: 14px 10px; }
+.is-matrix-purchases .pc-kpis svg { width: 31px; height: 31px; flex: 0 0 31px; color: var(--mc-ink); }
+.is-matrix-purchases .pc-kpis small { color: var(--mc-ink); font: 500 17px/1.1 var(--mc-font); white-space: nowrap; }
+.is-matrix-purchases .pc-kpis strong { color: var(--mc-ink); font: 900 34px/1 var(--mc-font); letter-spacing: -.03em; }
+.is-matrix-purchases #purchase-payable { font-size: clamp(25px,7.3vw,35px); }
+.is-matrix-purchases .pc-tabs { display: grid; grid-template-columns: 1.1fr .8fr 1.1fr; gap: 5px; margin: 10px 0 12px; border: 0; padding: 0; }
+.is-matrix-purchases .pc-tabs > button { min-width: 0; min-height: 46px; padding: 7px 4px; white-space: normal; border: 1px solid var(--mc-line); border-radius: 8px; color: var(--mc-ink); background: var(--mc-panel); box-shadow: var(--mc-shadow); font: 600 20px/1.1 var(--mc-font); }
+.is-matrix-purchases .pc-tabs > button[aria-selected=true] { background: var(--mc-action); color: #fff; }
+.is-matrix-purchases #purchase-tab-pending { display: flex; align-items: center; justify-content: center; white-space: nowrap; gap: 5px; font-size: 18px; }
+.is-matrix-purchases #purchase-tab-count { display: inline; min-width: 0; min-height: 0; padding: 0; border-radius: 0; background: none; color: inherit; font: inherit; }
+.is-matrix-purchases #purchases-panel.pc-pricing[data-pending-attempt=false] #purchase-notice.pc-success { display: none; }
+.is-matrix-purchases .pc .pc-searchbar { gap: 7px; margin-bottom: 12px; }
+.is-matrix-purchases .pc .pc-searchbar input { min-width: 0; width: 0; }
+.is-matrix-purchases .pc input,.is-matrix-purchases .pc select,.is-matrix-purchases .pc textarea { box-sizing: border-box; width: 100%; min-height: 48px; padding: 9px 10px; border: 1px solid #99a69e; border-radius: 8px; color: var(--mc-ink); background: #fafcfad9; box-shadow: inset 0 1px 2px #243b2a22; font: 500 22px/1.15 var(--mc-font); }
+.is-matrix-purchases .pc label { min-width: 0; gap: 7px; color: var(--mc-ink); font: 600 20px/1.15 var(--mc-font); }
+.is-matrix-purchases .pc .pc-badge { padding: 6px 10px; border: 1px solid #9bac9f; border-radius: 7px; color: #164d34; background: #e0eee4; font: 600 18px/1.1 var(--mc-font); }
+.is-matrix-purchases .pc .pc-blue,.is-matrix-purchases .pc .pc-amber { color: #634000; border-color: #b08c27; background: #ffdc70; }
+.is-matrix-purchases .pc .pc-gray { color: #394a40; background: #e3e9e3; }
+.is-matrix-purchases .pc .pc-badges { gap: 6px; margin: 0; }
+.is-matrix-purchases .pc .pc-notice { margin: 0; padding: 10px; border: 1px solid #9aaca0; border-radius: 8px; background: #edf3ebd9; color: #254231; font: 500 18px/1.25 var(--mc-font); }
+.is-matrix-purchases .pc .pc-error { font-size: 19px; line-height: 1.25; }
+.is-matrix-purchases .pc .pc-empty { padding: 22px 10px; font-size: 21px; background: #eef2ecc9; border-radius: 8px; }
+.is-matrix-purchases .pc .pc-pagination { gap: 10px; font-size: 17px; }
+.is-matrix-purchases .pc .pc-tire { flex: 0 0 66px; width: 66px; height: 105px; object-fit: contain; mix-blend-mode: multiply; }
+.is-matrix-purchases .mp-purchase-card { display: flex; flex-direction: column; gap: 10px; }
+.is-matrix-purchases .mp-card-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.is-matrix-purchases .mp-card-title > div:first-child { min-width: 0; }
+.is-matrix-purchases .mp-card-title h3 { font-size: 27px; margin-bottom: 5px; }
+.is-matrix-purchases .mp-card-title p { font-size: 18px; margin: 4px 0; }
+.is-matrix-purchases .mp-amount { display: block; color: var(--mc-green); font: 900 37px/1.05 var(--mc-font); letter-spacing: -.025em; }
+.is-matrix-purchases .mp-thumbnails { display: flex; align-items: center; justify-content: flex-end; flex: 0 1 115px; min-width: 48px; }
+.is-matrix-purchases .mp-thumbnails .pc-tire { flex: 0 1 58px; width: 58px; min-width: 0; height: 115px; }
+.is-matrix-purchases .mp-thumbnails > svg { width: 60px; height: 60px; }
+.is-matrix-purchases #purchases-panel[data-purchase-view=price-detail] #purchase-home > :is(.pc-intro,.pc-kpis,.pc-tabs,#purchase-summary-note) { display: none; }
+.is-matrix-purchases #purchase-dialog { position: fixed; z-index: 9; inset: var(--mc-top) auto var(--mc-bottom) 50%; transform: translateX(-50%); width: var(--mc-width); height: calc(100dvh - var(--mc-top) - var(--mc-bottom)); max-width: 100vw; max-height: none; margin: 0; padding: 12px 14px 22px; border: 0; border-radius: 0; overflow-y: auto; background: var(--mc-metal) center/540px 540px; box-shadow: none; scrollbar-width: thin; }
+.is-matrix-purchases #purchase-dialog > header { display: flex; flex-direction: row-reverse; justify-content: flex-end; gap: 10px; margin-bottom: 13px; }
+.is-matrix-purchases #purchase-dialog h2 { flex: 1; font-size: 33px; }
+.is-matrix-purchases #purchase-dialog #purchase-detail-close { flex: 0 0 44px; height: 44px; padding: 5px; }
+.is-matrix-purchases #purchase-dialog #purchase-detail { gap: 12px; }
+.is-matrix-purchases .mp-supplier > strong { display: block; font: 800 28px/1.1 var(--mc-font); margin-bottom: 6px; }
+.is-matrix-purchases .mp-supplier p { margin-bottom: 9px; }
+.is-matrix-purchases .mp-product { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.is-matrix-purchases .mp-product > div { min-width: 0; }
+.is-matrix-purchases .mp-product strong { font: 900 32px/1 var(--mc-font); overflow-wrap: anywhere; }
+.is-matrix-purchases .mp-product p { font-size: 20px; margin-top: 5px; }
+.is-matrix-purchases .mp-receipt-item { margin-top: 10px; padding: 10px 0 0; border-top: 1px solid #a4afa6; }
+.is-matrix-purchases .mp-receipt-item:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+.is-matrix-purchases .pc .pc-review-line { padding: 8px 0; font-size: 20px; border-color: #a4afa6; align-items: center; }
+.is-matrix-purchases .pc .pc-review-line strong { font: 800 24px/1.1 var(--mc-font); white-space: normal; overflow-wrap: anywhere; }
+.is-matrix-purchases .pc .mp-total-line { color: var(--mc-green); font-size: 25px; }
+.is-matrix-purchases .pc .mp-total-line strong { font-size: 31px; }
+.is-matrix-purchases .mp-values > .mp-amount { margin-bottom: 10px; font-size: 31px; }
+.is-matrix-purchases .mp-instruction { display: flex; align-items: center; gap: 10px; padding: 12px; background: #d9eee0; color: #07563d; border-radius: 8px; font-weight: 700; }
+.is-matrix-purchases .mp-received { margin-top: 8px; }
+.is-matrix-purchases .mp-payment .pc-badge { margin-bottom: 7px; }
+.is-matrix-purchases #purchase-confirm-receipt { position: sticky; bottom: -22px; margin: 12px 0 0; box-shadow: 0 -7px 0 #d7ded7; }
+@media (max-width: 350px) {
+  .is-matrix-purchases #purchases-panel { padding-inline: 10px; }
+  .is-matrix-purchases .pc .pc-intro h2 { font-size: 36px; }
+  .is-matrix-purchases #purchase-new { font-size: 21px; padding-inline: 9px; }
+  .is-matrix-purchases .pc-tabs > button { font-size: 18px; }
+  .is-matrix-purchases .pc-kpis > div { padding-inline: 8px; gap: 5px; }
+  .is-matrix-purchases .pc-kpis svg { flex-basis: 24px; width: 24px; }
+  .is-matrix-purchases .pc-kpis small { font-size: 17px; }
+  .is-matrix-purchases #purchase-payable { font-size: 25px; }
+  .is-matrix-purchases .mp-thumbnails { flex-basis: 80px; }
+  .is-matrix-purchases .mp-thumbnails .pc-tire { width: 40px; height: 92px; flex-basis: 40px; }
+  .is-matrix-purchases .mp-amount { font-size: 32px; }
+  .is-matrix-purchases #purchase-dialog { padding-inline: 10px; }
+}

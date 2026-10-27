@@ -12,6 +12,7 @@
     X.id('use').disabled = true;
     X.id('search').value = ''; X.id('brand').replaceChildren(new Option('Todas as marcas', '')); X.id('condition').value = '';
     X.id('quantity').value = 10; X.id('detail').hidden = true; X.id('period').hidden = true;
+    X.vehicleFilter = '';
     X.id('period-toggle').setAttribute('aria-expanded', 'false'); X.id('list').hidden = false;
   };
   X.group = function () { return X.groups.find(function (group) { return group.variant_key === X.selected; }) || null; };
@@ -22,7 +23,8 @@
     if (detail) X.renderDetail(); else X.renderList();
   };
   X.renderList = function () {
-    const visible = U.filter(X.groups, { query: X.id('search').value, brand: X.id('brand').value, condition: X.id('condition').value });
+    const visible = U.filter(X.groups, { query: X.id('search').value, brand: X.id('brand').value, condition: X.id('condition').value })
+      .filter(group => !X.vehicleFilter || group.vehicle_type === X.vehicleFilter);
     X.id('count').textContent = visible.length + (visible.length === 1 ? ' variante encontrada' : ' variantes encontradas');
     const host = X.id('cards'); host.replaceChildren();
     visible.forEach(function (group) {

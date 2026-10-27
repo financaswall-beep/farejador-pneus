@@ -12,6 +12,7 @@
     return line;
   };
   function card(row) {
+    if (P.metal?.active()) return P.metalView.card(row);
     const node = P.el('article', 'pc-card pc-purchase-card');
     const heading = P.el('div', 'pc-between pc-card-heading');
     const name = P.el('div'); name.append(P.el('h3', '', row.supplier_name), P.el('p', 'pc-muted', 'Compra ' + P.reference(row) + ' · ' + P.date(row.purchased_at)));

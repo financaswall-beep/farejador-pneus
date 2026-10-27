@@ -73,7 +73,7 @@
       text.append(badges);
       const remove = P.button('', function () { s.draft.items.splice(index, 1); P.changed(); P.renderItems(); P.totals(); }, 'pc-button');
       remove.append(P.icon('trash')); remove.setAttribute('aria-label', 'Remover ' + item.measure);
-      const image = P.tire(item); top.append(image, text, remove);
+      const image = P.el('div', 'mp-item-picture'); image.append(P.tire(item)); top.append(image, text, remove);
       const fields = P.el('div', 'pc-grid');
       const quantityLabel = P.el('label', '', 'Quantidade'); const stepper = P.el('span', 'pc-stepper');
       const quantity = P.el('input'); quantity.type = 'number'; quantity.inputMode = 'numeric'; quantity.min = '1'; quantity.max = '100000'; quantity.step = '1'; quantity.required = true; quantity.value = item.quantity;
@@ -94,11 +94,14 @@
         title.textContent = name; brand.textContent = item.brand || 'Informe a marca';
         badges.replaceChildren(P.badge(item.vehicle_type === 'car' ? 'Carro' : item.vehicle_type === 'motorcycle' ? 'Moto' : 'Não identificado', 'green'));
         if (item.tire_condition) badges.append(P.badge(P.condition(item.tire_condition), 'gray'));
-        image.src = item.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp';
+        image.replaceChildren(P.tire(item));
         quantity.setAttribute('aria-label', 'Quantidade de ' + name); cost.setAttribute('aria-label', 'Custo unitário de ' + name);
         remove.setAttribute('aria-label', 'Remover ' + name);
       }
-      bottom.append(P.el('span', '', 'Subtotal'), subtotal); card.append(top, identityFields(item, index, refresh), fields, bottom); host.append(card); refresh();
+      const identity = identityFields(item, index, refresh);
+      if (P.metal?.active()) { const edit = P.el('details', 'mp-item-edit'); edit.open = !item.measure || !item.brand || !item.tire_condition; edit.append(P.el('summary', '', 'Editar identificação'), identity); card.append(top, edit, fields, bottom); }
+      else card.append(top, identity, fields, bottom);
+      bottom.append(P.el('span', '', 'Subtotal'), subtotal); host.append(card); refresh();
     });
     if (!s.draft.items.length) host.append(P.el('p', 'pc-empty', 'Busque um pneu acima ou toque em Adicionar pneu por medida.'));
   };
