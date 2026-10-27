@@ -113,8 +113,8 @@
     if (!currentToken) return '';
     return [currentToken, scope(), slug(), stored(keys.user)].join('|');
   }
-
   function clearSession() {
+    Caixa.matrixDeliveries?.reset();
     Caixa.matrixCatalogMetal?.reset();
     Caixa.matrixStock?.reset();
     if (Caixa.matrixPickups) Caixa.matrixPickups.reset();

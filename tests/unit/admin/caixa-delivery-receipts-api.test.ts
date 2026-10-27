@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const image = vi.hoisted(() => vi.fn());
+const avatar = vi.hoisted(() => vi.fn());
+vi.mock('../../../src/admin/caixa/delivery-presentation.js', () => ({ getDeliveryCustomerAvatar: avatar }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { MATRIZ_LOGISTICS: true, FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test', DATABASE_SSL: false } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: vi.fn() } }));
 vi.mock('../../../src/admin/entregador/queries.js', () => ({
@@ -33,6 +35,35 @@ describe('foto da nota fiscal no app da Matriz', () => {
       expect(image).toHaveBeenCalledWith(expect.objectContaining({ collaboratorId: 'courier-a' }), id);
     } finally { await server.close(); }
   });
+  it('consulta avatar só com sessão e permissão Entregas, por pedido e sem cache público', async () => {
+    avatar.mockResolvedValue('https://chatwoot.example/avatar.webp');
+    for (const allowed of [true, false]) {
+      const server = await app(allowed);
+      try {
+        const url = '/api/caixa/entregas/' + id + '/avatar';
+        expect((await server.inject(url)).statusCode).toBe(401);
+        const result = await server.inject({ url, headers: { authorization: 'fixture' } });
+        expect(result.statusCode).toBe(allowed ? 200 : 403);
+        if (allowed) {
+          expect(result.json()).toEqual({ url: 'https://chatwoot.example/avatar.webp' });
+          expect(result.headers['cache-control']).toBe('private, no-store');
+        }
+      } finally { await server.close(); }
+    }
+    expect(avatar).toHaveBeenCalledTimes(1);
+    expect(avatar).toHaveBeenCalledWith(expect.objectContaining({ collaboratorId: 'courier-a' }), id);
+  });
+  it('avatar indisponível usa null; pedido fora do escopo ou UUID inválido retorna 404', async () => {
+    const server = await app(); const headers = { authorization: 'fixture' };
+    try {
+      avatar.mockResolvedValueOnce(null);
+      expect((await server.inject({ url: '/api/caixa/entregas/' + id + '/avatar', headers })).json()).toEqual({ url: null });
+      avatar.mockRejectedValueOnce(new Error('delivery_not_found'));
+      expect((await server.inject({ url: '/api/caixa/entregas/' + id + '/avatar', headers })).statusCode).toBe(404);
+      expect((await server.inject({ url: '/api/caixa/entregas/invalido/avatar', headers })).statusCode).toBe(404);
+      expect(avatar).toHaveBeenCalledTimes(2);
+    } finally { await server.close(); }
+  });
   it('recusa leitura sem sessão e sem permissão de entrega', async () => {
     for (const allowed of [true, false]) {
       const server = await app(allowed);
@@ -58,11 +89,14 @@ describe('foto da nota fiscal no app da Matriz', () => {
       const html = await server.inject('/operacao');
       const scripts = [...html.body.matchAll(/src="(\/operacao\/caixa-deliveries-flow-[^"?]+\.js\?v=[^"]+)"/g)].map(row => row[1]!);
       expect(scripts).toHaveLength(3);
-      for (const url of scripts) {
+      for (const url of [...scripts, '/operacao/caixa-deliveries-people.js?v=20261027-deliveries1',
+        '/operacao/caixa-deliveries-metal-view.js?v=20261027-deliveries1']) {
         const result = await server.inject(url); expect(result.statusCode).toBe(200);
         expect(result.headers['content-type']).toContain('text/javascript');
         expect(result.body).toContain('window.Caixa');
       }
+      const css = await server.inject('/operacao/caixa-deliveries-metal.css?v=20261027-deliveries1');
+      expect(css.statusCode).toBe(200); expect(css.headers['content-type']).toContain('text/css');
       enabled = false; expect((await server.inject(scripts[0]!)).statusCode).toBe(404);
     } finally { await server.close(); }
   });

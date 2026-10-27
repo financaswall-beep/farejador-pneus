@@ -6,10 +6,12 @@
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     if (Caixa.purchasesMetal?.blockNavigation(tab)) return;
+    if (Caixa.matrixDeliveries?.blockNavigation()) return;
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases'].includes(tab));
+    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries'].includes(tab));
+    elements.app.classList.toggle('is-matrix-deliveries', !Caixa.isPartner() && tab === 'deliveries');
     elements.app.classList.toggle('is-matrix-purchases', !Caixa.isPartner() && tab === 'purchases');
     if (tab !== 'purchases') Caixa.purchasesMetal?.sync(tab);
     elements.app.classList.toggle('is-matrix-stock', !Caixa.isPartner() && tab === 'stock');

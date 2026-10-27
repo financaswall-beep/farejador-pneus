@@ -78,12 +78,14 @@
       state.failingOrderId = id; returnFocus = document.activeElement;
       byId('delivery-failure-reason').value = ''; byId('delivery-failure-error').textContent = '';
       byId('mdf-failure-order').textContent = 'Pedido ' + ui.orderLabel(current);
-      const modal = byId('delivery-failure-modal'); modal.classList.remove('hidden'); modal.showModal(); byId('delivery-failure-reason').focus();
+      const modal = byId('delivery-failure-modal'); modal.classList.remove('hidden');
+      if (ui.showOverlay) ui.showOverlay(modal); else modal.showModal(); byId('delivery-failure-reason').focus();
     }
     function closeFailure(force) {
       if (state.busy && !force) return;
       const modal = byId('delivery-failure-modal'); if (modal.open) modal.close();
       modal.classList.add('hidden'); state.failingOrderId = null;
+      ui.closeOverlay?.();
       if (returnFocus?.isConnected) returnFocus.focus(); returnFocus = null;
     }
     async function submitFailure() {

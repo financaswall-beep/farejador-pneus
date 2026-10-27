@@ -28,10 +28,11 @@
       photos.forEach(promise => promise.then(url => { if (url) URL.revokeObjectURL(url); }));
       photos.clear(); photoSession = C.sessionFingerprint();
     }
-    function photo(row) {
-      const box = node('figure', null, 'mdf-photo'); const image = node('img');
-      image.src = '/operacao/catalog-tire.webp'; image.alt = 'Referência do produto';
-      const caption = node('figcaption', 'Referência'); box.append(image, caption);
+    const people = C.createDeliveryPeople(root);
+    function photo(row, item) {
+      const box = node('figure', null, 'mdf-photo');
+      const fallback = C.tireIllustration(item || {}), image = node('img'); image.hidden = true;
+      const caption = node('figcaption', 'Ilustração'); box.append(fallback, image, caption);
       if (row.photo_request_id && row.in_route) {
         const id = row.photo_request_id; const session = C.sessionFingerprint();
         if (!photos.has(id)) {
@@ -46,61 +47,16 @@
         }
         photos.get(id).then(url => {
           if (url && image.isConnected && session === C.sessionFingerprint()) {
-            image.src = url; image.alt = 'Foto do produto deste pedido'; caption.textContent = 'Foto do produto';
+            fallback.hidden = true; image.hidden = false; image.src = url; image.alt = 'Foto do produto deste pedido'; caption.textContent = 'Foto';
+            image.onerror = () => { image.hidden = true; fallback.hidden = false; caption.textContent = 'Ilustração'; };
           }
         });
       }
       return box;
     }
-    function card(row, model, prepare) {
-      const el = node('article', null, 'mdf-card'); el.dataset.orderId = row.order_id;
-      const selected = model.selected.has(row.order_id);
-      if (prepare && selected) el.classList.add('is-selected');
-      if (!prepare) el.appendChild(node('span', status(row), 'mdf-status mdf-status--' + row.delivery_status));
-      el.append(node('h3', row.customer_name || 'Cliente não identificado'), node('p', items(row), 'mdf-items'));
-      if (prepare) {
-        const button = action('', 'select', row.order_id, false, model.busy || Boolean(model.route));
-        button.classList.add('mdf-selection'); button.setAttribute('aria-pressed', String(selected));
-        const mark = node('span', selected ? '✓' : '', 'mdf-selection-mark'); mark.setAttribute('aria-hidden', 'true');
-        button.append(mark, node('span', 'Levar nesta saída')); el.appendChild(button);
-      } else el.appendChild(action('Ver entrega', 'detail', row.order_id, false, model.busy));
-      return el;
-    }
-    function detail(row, model) {
-      const el = node('article', null, 'mdf-detail');
-      if (!row) { el.appendChild(node('p', 'Entrega indisponível. Volte à rota e atualize.', 'mdf-empty')); return el; }
-      el.dataset.orderId = row.order_id;
-      const identity = node('div', null, 'mdf-detail-identity');
-      identity.append(node('h3', row.customer_name || 'Cliente não identificado'), node('span', status(row), 'mdf-status mdf-status--' + row.delivery_status)); el.appendChild(identity);
-      const products = node('section', null, 'mdf-product'); const copy = node('div', null, 'mdf-product-copy');
-      for (const item of row.items || []) {
-        const label = String(item.label || 'Pneu'); const size = label.match(/\b\d{2,3}\/\d{2,3}[-R ]\d{2}\b/i)?.[0];
-        const line = node('div'); line.append(node('strong', size || label), node('p', item.quantity + (Number(item.quantity) === 1 ? ' pneu' : ' pneus')));
-        const extra = size ? label.replace(size, '').replace(/\bpneu\b/gi, '').trim() : '';
-        if (extra) line.appendChild(node('small', extra)); copy.appendChild(line);
-      }
-      if (!copy.children.length) copy.appendChild(node('strong', 'Itens a conferir'));
-      products.append(photo(row), copy); el.appendChild(products);
-      el.appendChild(node('p', row.delivery_address || 'Endereço não informado', 'mdf-detail-address'));
-      if (row.delivery_status === 'dispatched' && row.delivery_address) {
-        el.appendChild(link('➤ Abrir mapa', 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(row.delivery_address)));
-      }
-      const charge = node('div', null, 'mdf-payment-value');
-      charge.append(node('span', row.delivery_status === 'delivered' ? 'Recebido na entrega' : 'Cobrar na entrega'),
-        node('strong', validAmount(row) ? money(row.total_amount) : 'Valor a confirmar')); el.appendChild(charge);
-      if (row.delivery_status === 'pending') el.appendChild(action('Iniciar entrega', 'dispatch', row.order_id, true, model.busy));
-      if (row.delivery_status === 'dispatched') el.appendChild(action('✓ Entreguei e recebi', 'payment', row.order_id, true, model.busy || !validAmount(row)));
-      if (['pending', 'dispatched'].includes(row.delivery_status)) {
-        const problem = action('⚠ Problema na entrega', 'fail', row.order_id, false, model.busy); problem.classList.add('mdf-danger'); el.appendChild(problem);
-      }
-      if (row.delivery_status === 'failed') el.appendChild(node('p', 'O escritório avalia a próxima ação.', 'mdf-hint'));
-      const contacts = node('details', null, 'mdf-extra'); contacts.appendChild(node('summary', 'Contato e detalhes'));
-      const links = node('div', null, 'mdf-links');
-      let phone = String(row.customer_phone || '').replace(/\D/g, ''); if (phone.length === 10 || phone.length === 11) phone = '55' + phone;
-      if (phone) links.append(link('WhatsApp', 'https://wa.me/' + phone), link('Ligar', 'tel:+' + phone));
-      if (row.delivery_address) links.appendChild(link('Waze', 'https://waze.com/ul?q=' + encodeURIComponent(row.delivery_address) + '&navigate=yes'));
-      contacts.append(node('p', 'Pedido ' + orderLabel(row)), links); el.appendChild(contacts); return el;
-    }
+    const metal = C.createDeliveryMetalView({ node, action, link, orderLabel, status, validAmount, photo, people });
+    byId('mdf-back').replaceChildren(metal.icon('back'));
+    root.querySelector('.mdf-refresh').replaceChildren(metal.icon('refresh'));
     function render(model) {
       model = { ...model, busy: model.busy || model.loading };
       if (photoSession !== C.sessionFingerprint()) resetPhotos();
@@ -113,6 +69,9 @@
       root.querySelectorAll('.mdf-tabs button').forEach(el => {
         if (el.dataset.mdfAction === model.view) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
       });
+      byId('mdf-selection-count').textContent = model.selected.size + (model.selected.size === 1 ? ' entrega selecionada' : ' entregas selecionadas');
+      byId('mdf-route-reported').hidden = !model.route?.reported;
+      byId('mdf-route-reported').textContent = model.route?.reported + (model.route?.reported === 1 ? ' problema informado' : ' problemas informados');
       byId('mdf-route-tab').disabled = model.busy || !model.route;
       byId('mdf-back').hidden = ['prepare', 'route'].includes(model.view);
       byId('mdf-error').textContent = model.error || ''; byId('mdf-notice').textContent = model.notice || '';
@@ -121,7 +80,7 @@
       const queue = model.rows.filter(row => !row.in_route && row.delivery_status === 'pending');
       const query = model.query.trim().toLocaleLowerCase('pt-BR');
       const found = queue.filter(row => [orderLabel(row), row.customer_name, row.delivery_address, items(row)].join(' ').toLocaleLowerCase('pt-BR').includes(query));
-      byId('mdf-queue').replaceChildren(...found.map(row => card(row, model, true)));
+      byId('mdf-queue').replaceChildren(...found.map(row => metal.card(row, model, true)));
       byId('mdf-queue-empty').hidden = found.length > 0 || model.loading;
       byId('mdf-queue-empty').textContent = queue.length ? 'Nenhuma entrega encontrada para esta busca.' : 'Nenhuma entrega para sair.';
       byId('mdf-queue-count').textContent = queue.length;
@@ -129,11 +88,13 @@
       byId('matrix-route-open').disabled = model.busy || !model.selected.size || Boolean(model.route);
       byId('mdf-open-hint').hidden = !model.route;
       const routeRows = model.rows.filter(row => row.in_route); const route = model.route;
-      byId('matrix-route-number').textContent = route?.trip_number || 'Nenhuma rota aberta';
+      byId('matrix-route-number').textContent = route ? route.total + (route.total === 1 ? ' parada' : ' paradas') : 'Nenhuma rota aberta';
+      byId('mdf-route-code').textContent = route?.trip_number || '';
+      byId('mdf-route-open-badge').hidden = !route;
       byId('matrix-route-progress-label').textContent = route ? `${route.completed} de ${route.total} entregas concluídas` : 'Selecione as entregas em Para sair.';
-      byId('mdf-route-list').replaceChildren(...routeRows.map(row => card(row, model, false)));
+      byId('mdf-route-list').replaceChildren(...routeRows.map(row => metal.card(row, model, false)));
       byId('mdf-route-empty').hidden = routeRows.length > 0;
-      if (model.view === 'detail') byId('mdf-detail').replaceChildren(detail(model.rows.find(row => row.order_id === model.detailOrderId && row.in_route), model));
+      if (model.view === 'detail') byId('mdf-detail').replaceChildren(metal.detail(model.rows.find(row => row.order_id === model.detailOrderId && row.in_route), model));
       const unresolved = route?.unresolved ?? 0;
       byId('mdf-go-close').disabled = model.busy || !route || unresolved > 0;
       byId('mdf-close-hint').textContent = unresolved ? `Resolva ${unresolved === 1 ? 'a entrega pendente' : 'as ' + unresolved + ' entregas pendentes'} para encerrar.` : '';
@@ -143,13 +104,21 @@
       byId('mdf-close-reported').parentElement.classList.toggle('mdf-has-occurrences', Boolean(route?.reported));
       byId('matrix-route-close-button').disabled = model.busy || !route || unresolved > 0;
       const current = model.rows.find(row => row.order_id === model.paymentOrderId && row.in_route && row.delivery_status === 'dispatched');
-      byId('mdf-payment-order').textContent = current?.customer_name || 'Entrega indisponível';
+      byId('mdf-payment-order').replaceChildren(current ? metal.identity(current, false) : node('p', 'Entrega indisponível'));
       byId('mdf-payment-total').textContent = validAmount(current) ? money(current.total_amount) : 'Valor a confirmar';
       root.querySelectorAll('[name="mdf-payment"]').forEach(el => { el.checked = el.value === model.paymentMethod; });
       byId('mdf-received').checked = model.received;
       byId('mdf-payment-confirm').disabled = model.busy || !validAmount(current) || !model.paymentMethod || !model.received;
-      root.setAttribute('aria-busy', String(model.busy));
+      root.setAttribute('aria-busy', String(model.busy)); people.refresh();
     }
-    return { root, render, reset: resetPhotos, focus: () => byId('mdf-title').focus(), byId, orderLabel };
+    function showOverlay(modal) { root.inert = true; modal.show(); }
+    function closeOverlay() { root.inert = false; }
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || C.isPartner()) return;
+      const modal = [byId('mdf-receipt-preview'), byId('delivery-failure-modal')].find(el => el.open);
+      if (modal) { event.preventDefault(); modal.dispatchEvent(new Event('cancel', { cancelable: true })); }
+    });
+    return { root, render, showOverlay, closeOverlay, reset: () => { resetPhotos(); people.reset(); closeOverlay(); },
+      focus: () => { byId('deliveries-panel').scrollTop = 0; byId('mdf-title').focus(); }, byId, orderLabel };
   };
 }());

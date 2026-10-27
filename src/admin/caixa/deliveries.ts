@@ -6,6 +6,7 @@ import {
 } from '../entregador/queries.js';
 import type { CaixaAuth } from './queries.js';
 import { getCaixaDeliveryReceipts } from './delivery-receipts.js';
+import { getDeliveryPresentation, type DeliveryPresentation } from './delivery-presentation.js';
 
 export interface CaixaDeliveryRow {
   order_id: string;
@@ -19,7 +20,9 @@ export interface CaixaDeliveryRow {
   total_amount: number;
   photo_request_id: string | null;
   in_route: boolean;
-  items: Array<{ quantity: number; label: string; tire_condition: null }>;
+  has_customer_avatar?: boolean;
+  delivery_failure_reason?: string | null;
+  items: DeliveryPresentation['items'] | Array<{ quantity: number; label: string; tire_condition: null }>;
 }
 
 function courierAuth(auth: CaixaAuth): EntregadorAuth {
@@ -63,12 +66,19 @@ export async function getCaixaDeliveries(auth: CaixaAuth) {
     (row) => mapDelivery(row, auth, true),
   ) ?? [];
   const queueRows = rota.fila.map((row) => mapDelivery(row, auth, false));
+  const rows = [...routeRows, ...queueRows];
+  const presentation = await getDeliveryPresentation(auth, rows.map(row => row.order_id));
+  for (const row of rows) {
+    const extra = presentation.get(row.order_id);
+    if (extra) Object.assign(row, { items: extra.items, delivery_failure_reason: extra.delivery_failure_reason,
+      has_customer_avatar: Boolean(extra.conversation_id) });
+  }
   const unresolved = routeRows.filter(
     (row) => row.delivery_status === 'pending' || row.delivery_status === 'dispatched',
   ).length;
 
   return {
-    rows: [...routeRows, ...queueRows],
+    rows,
     summary: {
       preparing: queueRows.length,
       dispatched: unresolved,
