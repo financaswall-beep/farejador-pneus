@@ -9,11 +9,14 @@
     if (Caixa.matrixDeliveries?.blockNavigation()) return;
     if (Caixa.financeClean?.blockNavigation()) return;
     if (Caixa.marketing?.blockNavigation(tab)) return;
+    if (Caixa.teamClean?.blockNavigation()) return;
     const cleanFinance = !Caixa.isPartner() && ['finance', 'finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-commissions', 'finance-expense', 'finance-reports'].includes(tab);
+    const cleanTeam = !Caixa.isPartner() && ['team', 'team-remuneration', 'team-commission', 'team-permissions'].includes(tab);
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', cleanFinance || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries', 'marketing'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-metal', cleanFinance || cleanTeam || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries', 'marketing'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-team', cleanTeam);
     elements.app.classList.toggle('is-matrix-marketing', !Caixa.isPartner() && tab === 'marketing');
     elements.app.classList.toggle('is-matrix-finance-clean', cleanFinance);
     Caixa.financeClean?.sync(cleanFinance);
@@ -155,6 +158,7 @@
     if (financeCommissions && matrixFinance && Caixa.financeMatrix) void Caixa.financeMatrix.load();
     else if (financeCommissions && Caixa.loadFinanceCommissions) void Caixa.loadFinanceCommissions();
     if (financeCommissionDetail && Caixa.loadFinanceCommissionDetail) void Caixa.loadFinanceCommissionDetail();
+    Caixa.teamClean?.sync(tab);
     if (team && Caixa.loadTeam) void Caixa.loadTeam();
     if (teamRemuneration && Caixa.loadTeamRemuneration) void Caixa.loadTeamRemuneration();
     if (teamCommission && Caixa.loadTeamCommission) void Caixa.loadTeamCommission();

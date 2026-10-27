@@ -25,6 +25,10 @@
   function action(label, className, click) {
     const button = document.createElement('button');
     button.type = 'button'; button.className = className; button.textContent = label;
+    if (!Caixa.isPartner()) {
+      const icon = label.startsWith('▤') ? 'remuneration' : label.startsWith('%') ? 'commission' : 'lock';
+      button.replaceChildren(Caixa.teamClean.icon(icon), document.createTextNode(label.slice(1).trim()));
+    }
     button.addEventListener('click', click); return button;
   }
 
@@ -43,9 +47,11 @@
     avatar.textContent = initials(member.name).toUpperCase();
     const identity = document.createElement('p');
     const name = document.createElement('strong'); name.textContent = member.name;
-    const role = document.createElement('span'); role.textContent = member.role + ' · ';
+    const role = document.createElement('span'); role.textContent = member.role + (Caixa.isPartner() ? ' · ' : '');
     const status = document.createElement('em'); status.textContent = member.active ? 'Ativo' : 'Inativo';
-    role.appendChild(status); identity.append(name, role); head.append(avatar, identity);
+    if (Caixa.isPartner()) role.appendChild(status);
+    identity.append(name, role); head.append(avatar, identity);
+    if (!Caixa.isPartner()) head.appendChild(status);
 
     const metrics = document.createElement('div'); metrics.className = 'team-member-metrics';
     const salary = document.createElement('p'); salary.innerHTML = '<small>Salário</small>';
@@ -83,7 +89,8 @@
   function render() {
     const payload = state.payload; if (!payload) return;
     document.getElementById('team-unit').textContent = payload.unit_name;
-    document.getElementById('team-active-count').textContent = payload.active_count + (payload.active_count === 1 ? ' colaborador' : ' colaboradores');
+    document.getElementById('team-active-count').textContent = Caixa.isPartner() ? payload.active_count + (payload.active_count === 1 ? ' colaborador' : ' colaboradores') : String(payload.active_count);
+    document.querySelector('#team-active-count + small').textContent = Caixa.isPartner() ? 'ativos na operação' : 'Colaboradores ativos';
     document.getElementById('team-commission-total').textContent = Caixa.currency.format(payload.commission_total || 0);
     const list = document.getElementById('team-list'); list.replaceChildren();
     const inactiveCount = payload.members.filter(function (member) { return !member.active; }).length;
@@ -109,16 +116,17 @@
   async function loadTeam(force) {
     if (!Caixa.canModule('team')) return;
     if (state.payload && !force) { render(); setState('content'); return; }
-    if (state.request) state.request.abort(); state.request = new AbortController(); setState('loading');
+    if (state.request) state.request.abort(); const request = state.request = new AbortController(); setState('loading');
     try {
-      const response = await Caixa.authenticatedFetch(path(), { signal: state.request.signal });
-      const payload = await Caixa.json(response); if (!response.ok) throw new Error(payload.error || 'request_failed');
+      const { response, data: payload } = await Caixa.teamClean.request(path(), { signal: request.signal });
+      if (state.request !== request) return; if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.payload = payload; render(); setState('content');
     } catch (error) {
+      if (state.request !== request) return;
       if (error instanceof DOMException && error.name === 'AbortError') return;
       if (error instanceof Error && error.message === 'invalid_session') return;
       setState('error');
-    } finally { state.request = null; }
+    } finally { if (state.request === request) state.request = null; }
   }
 
   function configureNewMemberRoles() {
@@ -155,7 +163,7 @@
   }
 
   async function submitNewMember(event) {
-    event.preventDefault();
+    event.preventDefault(); const session = Caixa.teamClean.sessionKey();
     const error = document.getElementById('team-create-error');
     const submit = document.getElementById('team-create-submit');
     const name = document.getElementById('team-create-name').value.trim();
@@ -175,11 +183,10 @@
     }
     submit.disabled = true; submit.textContent = 'CRIANDO…';
     try {
-      const response = await Caixa.authenticatedFetch(path(), {
+      const { response, data: payload } = await Caixa.teamClean.request(path(), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name, username: username, password: password, role: role }),
       });
-      const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       closeNewMember(); state.payload = null; state.showInactive = false; await loadTeam(true);
       Caixa.showToast('Colaborador criado. Agora confira as permissões de acesso.');
@@ -188,9 +195,9 @@
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       error.textContent = newMemberError(failure instanceof Error ? failure.message : 'request_failed');
-    } finally {
+    } finally { if (session === Caixa.teamClean.sessionKey()) {
       submit.disabled = false; submit.textContent = 'Criar colaborador';
-    }
+    } }
   }
 
   Object.assign(Caixa, { teamPath: path, loadTeam: loadTeam, closeNewMember: closeNewMember });
@@ -201,7 +208,7 @@
   document.getElementById('team-filters').addEventListener('click', function (event) {
     const button = event.target.closest('[data-team-filter]'); if (!button) return;
     state.filter = button.dataset.teamFilter;
-    document.querySelectorAll('[data-team-filter]').forEach(function (item) { item.classList.toggle('active', item === button); });
+    document.querySelectorAll('[data-team-filter]').forEach(function (item) { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', String(item === button)); });
     render();
   });
   document.getElementById('team-new-member').addEventListener('click', openNewMember);

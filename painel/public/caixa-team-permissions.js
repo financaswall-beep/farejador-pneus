@@ -3,7 +3,7 @@
 
   const Caixa = window.Caixa;
   const state = Caixa.teamState;
-  let payload = null;
+  let payload = null, payloadSession = '', sequence = 0;
 
   const definitions = {
     vendas: ['Caixa', 'Frente de caixa, catálogo e as próprias vendas', 'C'],
@@ -40,7 +40,7 @@
   function row(key) {
     const info = definitions[key];
     const label = document.createElement('label'); label.className = 'team-permission-row';
-    const icon = document.createElement('b'); icon.textContent = info[2];
+    const icon = document.createElement('b'); icon.textContent = info[2]; if (!Caixa.isPartner()) icon.replaceChildren(Caixa.teamClean.icon(key));
     const copy = document.createElement('span');
     const title = document.createElement('strong'); title.textContent = info[0];
     const detail = document.createElement('small'); detail.textContent = info[1];
@@ -60,7 +60,7 @@
   }
 
   function render(data) {
-    payload = data; const person = data.member;
+    payload = data; payloadSession = Caixa.teamClean.sessionKey(); const person = data.member;
     document.getElementById('team-permissions-unit').textContent = data.unit_name;
     document.getElementById('team-permissions-avatar').textContent = initials(person.name);
     document.getElementById('team-permissions-name').textContent = person.name;
@@ -75,25 +75,28 @@
     document.getElementById('team-permissions-note').lastChild.textContent = data.locked
       ? 'O acesso do proprietário ou de um colaborador inativo não pode ser alterado nesta tela.'
       : 'Ao alterar permissões, as sessões atuais deste colaborador serão encerradas por segurança.';
-    document.getElementById('team-permissions-save-error').textContent = '';
+    document.getElementById('team-permissions-save-error').textContent = ''; Caixa.teamClean.refresh();
   }
 
   async function load(force) {
+    if (!Caixa.canModule('team')) return;
+    const ticket = ++sequence, id = memberId(), key = Caixa.teamClean.sessionKey();
     if (!memberId()) return back();
-    if (payload && !force && payload.member.id === memberId()) { render(payload); setMode('content'); return; }
+    if (payloadSession === key && payload && !force && payload.member.id === memberId()) { render(payload); setMode('content'); return; }
     setMode('loading');
     try {
-      const response = await Caixa.authenticatedFetch(url());
-      const data = await Caixa.json(response); if (!response.ok) throw new Error(data.error || 'request_failed');
+      const { response, data } = await Caixa.teamClean.request(url());
+      if (ticket !== sequence || id !== memberId()) return; if (!response.ok) throw new Error(data.error || 'request_failed');
       render(data); setMode('content');
     } catch (error) {
+      if (ticket !== sequence || key !== Caixa.teamClean.sessionKey() || id !== memberId()) return;
       if (error instanceof Error && error.message === 'invalid_session') return;
       setMode('error');
     }
   }
 
   async function save(event) {
-    event.preventDefault(); if (!payload || payload.locked) return;
+    event.preventDefault(); const session = Caixa.teamClean.sessionKey(); if (!payload || payload.locked || payloadSession !== Caixa.teamClean.sessionKey()) return;
     const body = {};
     document.querySelectorAll('[data-permission]').forEach(function (input) {
       body[input.dataset.permission] = input.checked;
@@ -102,19 +105,20 @@
     const error = document.getElementById('team-permissions-save-error');
     error.textContent = ''; button.disabled = true; button.textContent = 'Salvando…';
     try {
-      const response = await Caixa.authenticatedFetch(url(), {
+      const { response, data } = await Caixa.teamClean.request(url(), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      const data = await Caixa.json(response); if (!response.ok) throw new Error(data.error || 'request_failed');
+      if (!response.ok) throw new Error(data.error || 'request_failed');
       render(data); Caixa.teamState.payload = null;
       Caixa.showToast('Permissões salvas. O colaborador entrará novamente com o novo acesso.');
     } catch (failure) {
+      if (failure instanceof Error && failure.message === 'invalid_session') return;
       error.textContent = failure instanceof Error && failure.message === 'owner_permissions_locked'
         ? 'O acesso do proprietário é protegido.' : 'Não foi possível salvar. Tente novamente.';
-    } finally {
+    } finally { if (session === Caixa.teamClean.sessionKey()) {
       button.disabled = Boolean(payload && payload.locked);
       button.textContent = payload && payload.locked ? 'Permissões protegidas' : 'Salvar permissões';
-    }
+    } }
   }
 
   function back() { window.location.hash = '#equipe'; Caixa.showTab('team'); }

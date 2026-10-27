@@ -3,12 +3,11 @@
 
   const Caixa = window.Caixa;
   const state = Caixa.teamState;
-  let payload = null;
+  let payload = null, payloadSession = '', sequence = 0;
 
   function memberId() {
-    if (state.memberId) return state.memberId;
     const match = window.location.hash.match(/^#equipe\/remuneracao\/([^/]+)$/);
-    state.memberId = match ? decodeURIComponent(match[1]) : ''; return state.memberId;
+    if (match) state.memberId = decodeURIComponent(match[1]); return state.memberId || '';
   }
 
   function url() { return Caixa.teamPath(memberId()) + '/remuneracao'; }
@@ -43,15 +42,16 @@
     if (changed && payload && frequency !== (payload.salary_frequency || 'monthly')) {
       document.getElementById('team-compensation-start').value = boundary(frequency);
     }
-    updateSummary();
+    if (changed && !Caixa.isPartner()) document.getElementById('team-payment-details').open = true;
+    updateSummary(); Caixa.teamClean.refresh();
   }
 
   function benefitRow(benefit) {
     const row = document.createElement('div'); row.className = 'team-benefit-row';
     const name = document.createElement('input'); name.maxLength = 60; name.placeholder = 'Nome do benefício';
-    name.value = benefit.name || '';
+    name.value = benefit.name || ''; name.setAttribute('aria-label', 'Nome do benefício');
     const amount = document.createElement('input'); amount.type = 'number'; amount.min = '0'; amount.step = '0.01';
-    amount.placeholder = 'R$ 0,00'; amount.value = moneyValue(benefit.amount) || '';
+    amount.setAttribute('aria-label', 'Valor mensal do benefício'); amount.placeholder = 'R$ 0,00'; amount.value = moneyValue(benefit.amount) || '';
     const active = document.createElement('input'); active.type = 'checkbox'; active.className = 'team-benefit-toggle';
     active.checked = benefit.active !== false; active.setAttribute('aria-label', 'Benefício ativo');
     const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×';
@@ -82,7 +82,7 @@
   }
 
   function render(data) {
-    payload = data; const member = data.member;
+    payload = data; payloadSession = Caixa.teamClean.sessionKey(); const member = data.member;
     document.getElementById('team-remuneration-unit').textContent = data.unit_name;
     document.getElementById('team-remuneration-avatar').textContent = initials(member.name).toUpperCase();
     document.getElementById('team-remuneration-name').textContent = member.name;
@@ -101,19 +101,23 @@
   }
 
   async function load(force) {
+    if (!Caixa.canModule('team')) return;
+    const ticket = ++sequence, id = memberId(), key = Caixa.teamClean.sessionKey();
     if (!memberId()) { Caixa.showTab('team'); return; }
-    if (payload && payload.member.id === memberId() && !force) { render(payload); setMode('content'); return; }
+    if (payloadSession === key && payload && payload.member.id === memberId() && !force) { render(payload); setMode('content'); return; }
     setMode('loading');
     try {
-      const response = await Caixa.authenticatedFetch(url()); const data = await Caixa.json(response);
+      const { response, data } = await Caixa.teamClean.request(url());
+      if (ticket !== sequence || id !== memberId()) return;
       if (!response.ok) throw new Error(data.error || 'request_failed'); render(data); setMode('content');
     } catch (error) {
+      if (ticket !== sequence || key !== Caixa.teamClean.sessionKey() || id !== memberId()) return;
       if (error instanceof Error && error.message === 'invalid_session') return; setMode('error');
     }
   }
 
   async function save(event) {
-    event.preventDefault(); const error = document.getElementById('team-remuneration-save-error'); error.textContent = '';
+    event.preventDefault(); const session = Caixa.teamClean.sessionKey(); if (!payload || payloadSession !== Caixa.teamClean.sessionKey()) return; const error = document.getElementById('team-remuneration-save-error'); error.textContent = '';
     const button = document.getElementById('team-remuneration-save'); button.disabled = true; button.textContent = 'Salvando…';
     const body = {
       employment_type: document.getElementById('team-employment-type').value,
@@ -124,15 +128,15 @@
       starts_on: document.getElementById('team-compensation-start').value, benefits: readBenefits(),
     };
     try {
-      const response = await Caixa.authenticatedFetch(url(), {
+      const { response, data } = await Caixa.teamClean.request(url(), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      const data = await Caixa.json(response); if (!response.ok) throw new Error(data.error || 'request_failed');
+      if (!response.ok) throw new Error(data.error || 'request_failed');
       payload = data; state.payload = null; render(data); Caixa.showToast('Remuneração salva com segurança.');
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       error.textContent = 'Não foi possível salvar. Confira os campos.';
-    } finally { button.disabled = false; button.textContent = 'Salvar remuneração'; }
+    } finally { if (session === Caixa.teamClean.sessionKey()) { button.disabled = false; button.textContent = 'Salvar remuneração'; } }
   }
 
   function back() { payload = null; state.memberId = ''; window.location.hash = '#equipe'; Caixa.showTab('team'); }

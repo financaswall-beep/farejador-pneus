@@ -120,7 +120,7 @@
     if (Caixa.partnerHome) Caixa.partnerHome.reset();
     if (Caixa.chat) Caixa.chat.reset();
     if (Caixa.financeMatrix) Caixa.financeMatrix.reset();
-    Caixa.marketing?.reset();
+    Caixa.marketing?.reset(); Caixa.teamClean?.reset();
     if (Caixa.purchases) Caixa.purchases.reset();
     if (Caixa.resetCheckout) Caixa.resetCheckout();
     if (Caixa.resetSales) Caixa.resetSales();

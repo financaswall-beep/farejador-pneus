@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20261027-team1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20261027-marketing1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20261026-metal1"></script>
@@ -54,7 +54,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261027-team1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
@@ -92,10 +92,11 @@
   <script defer src="/operacao/caixa-finance-reports.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260918-finance3"></script>
   <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
-  <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
-  <script defer src="/operacao/caixa-team-remuneration.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-team-commission.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-team-permissions.js?v=20260822-caixa-brand1"></script>
+  <script defer src="/operacao/caixa-team-clean.js?v=20261027-team1"></script>
+  <script defer src="/operacao/caixa-team.js?v=20261027-team1"></script>
+  <script defer src="/operacao/caixa-team-remuneration.js?v=20261027-team1"></script>
+  <script defer src="/operacao/caixa-team-commission.js?v=20261027-team1"></script>
+  <script defer src="/operacao/caixa-team-permissions.js?v=20261027-team1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-alert-sound.js?v=20261007-sound1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20261007-sound1"></script>
@@ -182,6 +183,8 @@
   <script defer src="/operacao/caixa-finance-clean.js?v=20261027-finance1"></script>
   <link rel="stylesheet" href="/operacao/caixa-marketing.css?v=20261027-marketing1" />
   <link rel="stylesheet" href="/operacao/caixa-marketing-tools.css?v=20261027-marketing1" />
+  <link rel="stylesheet" href="/operacao/caixa-team-clean.css?v=20261027-team1" />
+  <link rel="stylesheet" href="/operacao/caixa-team-clean-forms.css?v=20261027-team1" />
   <script defer src="/operacao/app.marketing.publisher.helpers.js?v=20261027-autoformats1"></script>
   <script defer src="/operacao/app.marketing.publisher.js?v=20261027-autoformats1"></script>
   <script defer src="/operacao/app.marketing.publisher.media.js?v=20261027-autoformats1"></script>
@@ -1416,7 +1419,7 @@
               <p><b class="team-summary-icon">$</b><span><strong id="team-commission-total">R$ 0,00</strong><small>comissões do mês</small></span></p>
             </section>
             <button id="team-new-member" class="team-new-member" type="button"><b>＋</b>Novo colaborador</button>
-            <label class="team-search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="team-search" placeholder="Buscar colaborador" maxlength="80" /></label>
+            <label class="team-search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="team-search" placeholder="Buscar colaborador" aria-label="Buscar colaborador" maxlength="80" /></label>
             <div id="team-filters" class="team-filters"><button class="active" type="button" data-team-filter="all">Todos</button><button type="button" data-team-filter="sales">Vendedores</button><button type="button" data-team-filter="delivery">Entregadores</button></div>
             <h3 id="team-list-title">Minha equipe</h3>
             <div id="team-list" class="team-list"></div>
@@ -1439,11 +1442,13 @@
               <label><input type="radio" name="team-salary-frequency" value="weekly" /><span><b>Semanal</b><small>Valor exato da semana; fecha sábado</small></span></label>
               <label><input type="radio" name="team-salary-frequency" value="monthly" /><span><b>Mensal</b><small>Pagamento no dia escolhido</small></span></label>
             </section>
-            <section class="team-form-card">
-              <label><span id="team-salary-value-label">Salário mensal</span><span class="team-input-money">R$ <input id="team-base-salary" type="number" min="0" max="10000000" step="0.01" required /></span></label>
+            <section class="team-form-card team-salary-card">
+              <label class="team-salary-amount"><span id="team-salary-value-label">Salário mensal</span><span class="team-input-money">R$ <input id="team-base-salary" type="number" min="0" max="10000000" step="0.01" required /></span></label>
+              <details id="team-payment-details" class="team-payment-details" open><summary><strong>Pagamento e vigência</strong><small id="team-payment-preview">Dia do pagamento e início da vigência</small></summary>
               <label id="team-payment-day-row">Dia do pagamento<span>Todo dia <input id="team-payment-day" type="number" min="1" max="28" step="1" required /></span></label>
               <label>Início da vigência<input id="team-compensation-start" type="date" required /></label>
-              <label>Vínculo<select id="team-employment-type"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
+              </details>
+              <label class="team-salary-employment">Vínculo<select id="team-employment-type"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
             </section>
             <p class="team-private-note"><b>🔒</b>Visível somente para o proprietário.</p>
             <h3>Benefícios e adicionais</h3>
