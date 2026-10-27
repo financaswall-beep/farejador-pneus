@@ -14,6 +14,17 @@ function mockReply(): FastifyReply & { values: Record<string, string> } {
 }
 
 describe('security response headers', () => {
+  it('permite câmera somente na página do app e mantém o microfone bloqueado', async () => {
+    const server = Fastify(); registerSecurityHeaders(server, true);
+    const paths = ['/operacao', '/operacao/', '/admin/painel', '/parceiro/loja', '/api/caixa/profile/photo', '/operacao/falso'];
+    paths.forEach(path => server.get(path, async () => 'ok'));
+    try {
+      for (const url of [...paths, '/operacao?aba=perfil']) {
+        const response = await server.inject(url), enabled = url === '/operacao' || url === '/operacao/' || url.includes('?');
+        expect(response.headers['permissions-policy']).toBe(`camera=${enabled ? '(self)' : '()'}, microphone=(), geolocation=(self)`);
+      }
+    } finally { await server.close(); }
+  });
   it('preserves a public route CSP while retaining the global security headers', async () => {
     const server = Fastify();
     registerSecurityHeaders(server, true);

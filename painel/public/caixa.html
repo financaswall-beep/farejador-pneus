@@ -21,8 +21,8 @@
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20261027-team1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20261027-marketing1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20261027-profile1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20261027-profile1"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-checkout-pricing.js?v=20261026-metal1"></script>
@@ -54,7 +54,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-team1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261027-profile1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
@@ -98,6 +98,8 @@
   <script defer src="/operacao/caixa-team-commission.js?v=20261027-team1"></script>
   <script defer src="/operacao/caixa-team-permissions.js?v=20261027-team1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-profile-photo.js?v=20261027-profile1"></script>
+  <script defer src="/operacao/caixa-profile-camera.js?v=20261027-profile1"></script>
   <script defer src="/operacao/caixa-alert-sound.js?v=20261007-sound1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20261007-sound1"></script>
   <script defer src="/operacao/caixa-notifications.js?v=20260816-notifications1"></script>
@@ -185,6 +187,7 @@
   <link rel="stylesheet" href="/operacao/caixa-marketing-tools.css?v=20261027-marketing1" />
   <link rel="stylesheet" href="/operacao/caixa-team-clean.css?v=20261027-team1" />
   <link rel="stylesheet" href="/operacao/caixa-team-clean-forms.css?v=20261027-team1" />
+  <link rel="stylesheet" href="/operacao/caixa-profile-steel.css?v=20261027-profile1" />
   <script defer src="/operacao/app.marketing.publisher.helpers.js?v=20261027-autoformats1"></script>
   <script defer src="/operacao/app.marketing.publisher.js?v=20261027-autoformats1"></script>
   <script defer src="/operacao/app.marketing.publisher.media.js?v=20261027-autoformats1"></script>
@@ -1562,7 +1565,10 @@
         </div>
 
         <div id="profile-panel" class="app-panel profile-panel hidden">
-          <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
+          <header class="profile-settings-heading"><button id="profile-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><h2>Configurações</h2></header>
+          <button id="profile-photo-button" class="profile-photo-button" type="button" aria-label="Tirar ou trocar minha foto de perfil"><span id="profile-initials" class="profile-avatar" aria-hidden="true">OP</span><img id="profile-photo" alt="Sua foto de perfil" hidden/><span class="profile-camera-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h4l2-3h6l2 3h4v14H3V7Z"/><circle cx="12" cy="13" r="4"/></svg></span></button>
+          <p class="profile-photo-hint">Toque na foto para tirar outra</p>
+          <p id="profile-photo-error" role="status"></p><button id="profile-photo-retry" type="button" hidden>Tentar novamente</button>
           <div class="profile-identity">
             <h3 id="session-name">Operador</h3>
             <span id="profile-role-label">Operador de Caixa</span>
@@ -1594,12 +1600,12 @@
                 <dd id="profile-username">—</dd>
               </div>
               <div>
-                <dt><span class="profile-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 21V4h14v17M9 8h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1M3 21h18"/></svg></span>Área</dt>
-                <dd>Vendas</dd>
+                <dt><span class="profile-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 21V4h14v17M9 8h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1M3 21h18"/></svg></span>Unidade</dt>
+                <dd id="profile-unit-name">Matriz</dd>
               </div>
               <div>
                 <dt><span class="profile-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.4 7 10 4.1-1.6 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg></span>Acesso</dt>
-                <dd>Frente de Caixa</dd>
+                <dd id="profile-access-name">Operador de Caixa</dd>
               </div>
             </dl>
           </section>
