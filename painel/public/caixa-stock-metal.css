@@ -88,6 +88,8 @@
 #stock-price-modal.ms-stock-price .stock-price-cancel { background: var(--mc-panel); color: var(--mc-ink); }
 #stock-price-modal.ms-stock-price :is(button,input,textarea):focus-visible,.ms-page :is(button,input,select):focus-visible { outline: 3px solid #07563d; outline-offset: 2px; }
 #stock-price-modal.ms-stock-price .stock-price-sheet > header { padding: 0; border: 0; }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header > button { position: relative; display: grid; place-items: center; border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-panel); color: var(--mc-ink); font-size: 0; box-shadow: var(--mc-shadow); }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header > button::before { content: '←'; font: 500 30px/1 Arial,sans-serif; }
 #stock-price-modal.ms-stock-price .stock-price-sheet form { padding: 0; }
 #stock-price-modal.ms-stock-price .stock-price-input b { padding: 0; border: 0; }
 #stock-price-modal.ms-stock-price #stock-price-value { font-size: 43px !important; }

@@ -36,6 +36,7 @@ function matrixPool(withCatalog = true): Pool {
     }] };
     if (sql.includes('FROM commerce.products p')) return { rows: withCatalog ? [{
       product_id: '22222222-2222-4222-8222-222222222222', tire_size: '90/90R18',
+      product_code: 'TECNIC-018', vehicle_type: 'motorcycle',
       brand: 'Tecnic', tire_condition: 'meia_vida', sale_price: '150.00',
     }] : [] };
     throw new Error(`consulta inesperada: ${sql}`);
@@ -49,6 +50,7 @@ describe('preço oficial da Matriz no estoque da Operação', () => {
     expect(result).toMatchObject({ readonly: true, stock_readonly: true });
     expect(result.rows[0]).toMatchObject({
       product_id: '22222222-2222-4222-8222-222222222222', sale_price: 150,
+      product_code: 'TECNIC-018', vehicle_type: 'motorcycle',
       quantity_on_hand: 8, quantity_reserved: 2, quantity_available: 6,
     });
     expect(result.rows[0]).not.toHaveProperty('average_cost');

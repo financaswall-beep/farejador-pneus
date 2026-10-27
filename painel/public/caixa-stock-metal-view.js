@@ -51,7 +51,7 @@
       && (m.filter !== 'available' || Number(row.quantity_available) > 0)
       && (m.filter !== 'low' || row.stock_status === 'low_stock')
       && (m.filter !== 'empty' || Number(row.quantity_available) === 0)
-      && (!query || [row.tire_size, row.brand, row.item_name, row.local_sku].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(query)));
+      && (!query || [row.tire_size, row.brand, row.item_name, row.product_code, row.local_sku].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR').includes(query)));
   }
   function list(m) {
     const page = el('div', null, 'mcg-page ms-page'), head = heading('Estoque'), refresh = button('', 'refresh', 'icon-button', 'refresh');
