@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { env } from '../shared/config/env.js';
 import { PROFILE_PHOTO_MAX, ProfilePhotoError } from './profile-codec.js';
 
@@ -60,7 +61,7 @@ export class ProfilePhotoStorage {
   async read(path: string): Promise<Buffer | null> {
     if (!validPath.test(path)) throw new ProfilePhotoError('invalid_photo_path', 400);
     if (!await this.privateBucket(false)) return null;
-    const response = await this.request('/object/' + PROFILE_PHOTO_BUCKET + '/' + path);
+    const response = await this.request('/object/' + PROFILE_PHOTO_BUCKET + '/' + path + '?cacheNonce=' + randomUUID());
     if (response.status === 404) { await response.body?.cancel(); return null; }
     if (!response.ok) {
       const error = await response.json().catch(() => ({})) as { statusCode?: unknown; code?: unknown };

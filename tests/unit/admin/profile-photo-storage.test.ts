@@ -67,4 +67,14 @@ describe('foto pessoal compacta e privada', () => {
       .mockResolvedValueOnce(Response.json({ httpStatusCode: 400, code }, { status: 400 }));
     expect(await new ProfilePhotoStorage(mock as unknown as typeof fetch).read(profilePhotoPath('test', person))).toBeNull();
   });
+  it('busca a versão atual no Storage após trocar a foto, sem reutilizar a resposta da CDN', async () => {
+    const mock = vi.fn(async (url: string) => url.includes('/bucket/') ? policy() : new Response('photo'));
+    const storage = new ProfilePhotoStorage(mock as unknown as typeof fetch), path = profilePhotoPath('test', person);
+    await storage.read(path); await storage.read(path);
+    const urls = mock.mock.calls.map(([url]) => url).filter(url => url.includes('/object/')).map(url => new URL(url));
+    expect(urls).toHaveLength(2);
+    expect(urls[0].pathname).toBe('/storage/v1/object/farejador-profile-photos/' + path);
+    expect(urls[0].searchParams.get('cacheNonce')).toBeTruthy();
+    expect(urls[0].search).not.toBe(urls[1].search);
+  });
 });
