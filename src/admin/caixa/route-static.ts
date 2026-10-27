@@ -175,6 +175,18 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-deliveries-matrix.js', 'caixa-deliveries-matrix.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-deliveries.js', 'caixa-deliveries.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance.js', 'caixa-finance.js', 'text/javascript; charset=utf-8');
+  for (const file of [
+    'app.marketing.publisher.helpers', 'app.marketing.publisher', 'app.marketing.publisher.media',
+    'app.marketing.organic.summary', 'app.marketing.organic.results',
+    'caixa-marketing-template', 'caixa-marketing', 'caixa-marketing-view', 'caixa-marketing-content',
+    'caixa-marketing-compose', 'caixa-marketing-library', 'caixa-marketing-calendar',
+    'caixa-marketing-results', 'caixa-marketing-sales', 'caixa-marketing-history', 'caixa-marketing-reconciliation',
+  ]) text('/operacao/' + file + '.js', file + '.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-marketing.css', 'caixa-marketing.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-marketing-tools.css', 'caixa-marketing-tools.css', 'text/css; charset=utf-8');
+  text('/operacao/vendor/publisher-tus-4.3.1.min.js', 'vendor/publisher-tus-4.3.1.min.js', 'text/javascript; charset=utf-8');
+  text('/operacao/assets/brands/instagram.svg', 'assets/brands/instagram.svg', 'image/svg+xml');
+  text('/operacao/assets/brands/facebook.svg', 'assets/brands/facebook.svg', 'image/svg+xml');
   text('/operacao/caixa-finance-clean.css', 'caixa-finance-clean.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-clean-tools.css', 'caixa-finance-clean-tools.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-clean.js', 'caixa-finance-clean.js', 'text/javascript; charset=utf-8');

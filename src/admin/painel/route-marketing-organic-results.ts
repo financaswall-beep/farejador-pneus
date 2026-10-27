@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, RouteShorthandOptions } from 'fastify';
 import { z } from 'zod';
 import { requireAdminOwner } from '../auth.js';
 import { pool } from '../../persistence/db.js';
@@ -11,7 +11,6 @@ import { organicPublicationWindow } from './marketing-organic-period.js';
 import { marketingDateWindow } from './marketing-meta.js';
 import { MetaCommentError } from '../../social-comments/graph.js';
 
-const base = '/admin/api/marketing/organic/results';
 const keySchema = z.object({ key: z.string().regex(/^(publisher:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?:instagram|facebook):\d{1,40}(?:_\d{1,40})?)$/) }).strict();
 const periodSchema = z.object({ period: z.enum(['7d', '30d']).default('30d') }).strict();
 const detailSchema = z.object({ window: z.enum(['7d', '30d']).default('7d'),
@@ -21,8 +20,9 @@ const metricsSchema = z.object({ days: z.enum(['7', '30']).default('7'),
 function safeError(error: unknown) {
   return error instanceof MetaCommentError && ['meta_post_owner_mismatch', 'meta_account_not_allowed'].includes(error.code);
 }
-export async function registerMarketingOrganicResults(app: FastifyInstance) {
-  const options = { preHandler: requireAdminOwner };
+export async function registerMarketingOrganicResults(app: FastifyInstance, access: { base?: string; preHandler?: RouteShorthandOptions['preHandler'] } = {}) {
+  const base = access.base ?? '/admin/api/marketing/organic/results';
+  const options = { preHandler: access.preHandler ?? requireAdminOwner };
   app.get(base, options, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const query = periodSchema.safeParse(request.query);

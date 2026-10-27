@@ -8,11 +8,13 @@
     if (Caixa.purchasesMetal?.blockNavigation(tab)) return;
     if (Caixa.matrixDeliveries?.blockNavigation()) return;
     if (Caixa.financeClean?.blockNavigation()) return;
+    if (Caixa.marketing?.blockNavigation(tab)) return;
     const cleanFinance = !Caixa.isPartner() && ['finance', 'finance-in', 'finance-out', 'finance-statement', 'finance-accounts', 'finance-commissions', 'finance-expense', 'finance-reports'].includes(tab);
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', cleanFinance || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-metal', cleanFinance || (!Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases', 'deliveries', 'marketing'].includes(tab)));
+    elements.app.classList.toggle('is-matrix-marketing', !Caixa.isPartner() && tab === 'marketing');
     elements.app.classList.toggle('is-matrix-finance-clean', cleanFinance);
     Caixa.financeClean?.sync(cleanFinance);
     elements.app.classList.toggle('is-matrix-deliveries', !Caixa.isPartner() && tab === 'deliveries');
@@ -63,6 +65,7 @@
       state.selectedSalesDay = null;
     }
     elements.cashPanel.classList.toggle('hidden', !cash);
+    document.getElementById('marketing-panel').classList.toggle('hidden', tab !== 'marketing');
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.pickupsPanel.classList.toggle('hidden', !pickups);
     elements.catalogPanel.classList.toggle('hidden', !catalog);
@@ -110,6 +113,8 @@
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
     document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries || financeCommissions || financeCommissionDetail);
     document.getElementById('nav-team').classList.toggle('active', team || teamRemuneration || teamCommission || teamPermissions);
+    document.getElementById('nav-marketing').classList.toggle('active', tab === 'marketing');
+    document.getElementById('nav-marketing').setAttribute('aria-current', tab === 'marketing' ? 'page' : 'false');
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
@@ -164,6 +169,7 @@
     if (Caixa.partnerHome) Caixa.partnerHome.sync(tab);
     Caixa.matrixSalesScreen?.sync(tab);
     const partnerNavigation = document.getElementById('nav-partner-home');
+    Caixa.marketing?.sync(tab);
     partnerNavigation.classList.toggle('active', tab === 'partner-home');
     if (tab === 'partner-home') partnerNavigation.setAttribute('aria-current', 'page');
     else partnerNavigation.removeAttribute('aria-current');

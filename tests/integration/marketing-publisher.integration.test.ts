@@ -8,6 +8,7 @@ vi.mock('../../src/shared/config/env.js',()=>({env:{FAREJADOR_ENV:'test',MARKETI
   MARKETING_MEDIA_MAX_MB:500,MARKETING_LIBRARY_MAX_MB:20000,META_GRAPH_API_VERSION:'v26.0'}}));
 vi.mock('../../src/persistence/db.js',()=>({pool:{}}));
 import {saveDraft,submitPost,postAction} from '../../src/marketing/publisher/posts.js';
+import {reschedulePost} from '../../src/marketing/publisher/reschedule.js';
 import {claimDelivery} from '../../src/marketing/publisher/queue.js';
 import {publishTick} from '../../src/marketing/publisher/worker.js';
 import {deleteMedia,cleanupMedia} from '../../src/marketing/publisher/cleanup.js';
@@ -74,6 +75,40 @@ it('agendamento em Brasília não sai antes do horário e cancelamento impede o 
   const p=await post(await asset());const future=new Date(Date.now()+3600000).toISOString();
   await submitPost(pool,env,p.id,p.version,future,'owner');expect(await claimDelivery(pool,env)).toBeNull();
   await postAction(pool,env,p.id,'cancel','owner');await due();expect(await publishTick(pool,env,graph,storage)).toBe(false);expect(graph.publish).not.toHaveBeenCalled();
+});
+it('altera somente o horário da publicação e dos destinos, com versão e auditoria idempotentes',async()=>{
+  const p=await post(await asset()),first=new Date(Date.now()+3600000).toISOString(),next=new Date(Date.now()+7200000).toISOString();
+  const scheduled=await submitPost(pool,env,p.id,p.version,first,'Owner');
+  const changed=await reschedulePost(pool,env,p.id,scheduled.version,next,'Owner');
+  const repeated=await reschedulePost(pool,env,p.id,scheduled.version,next,'Owner');
+  expect(changed.version).toBe(scheduled.version+1);expect(repeated.version).toBe(changed.version);
+  expect(new Date(changed.scheduled_at!).toISOString()).toBe(next);
+  const destinations=(await pool.query('SELECT status,next_attempt_at FROM ops.publisher_destinations WHERE environment=$1 AND post_id=$2',[env,p.id])).rows;
+  expect(destinations).toHaveLength(2);for(const d of destinations){expect(d.status).toBe('queued');expect(new Date(d.next_attempt_at).toISOString()).toBe(next);}
+  expect((await pool.query("SELECT * FROM ops.publisher_events WHERE event='rescheduled'")).rows).toHaveLength(1);
+  expect(await claimDelivery(pool,env)).toBeNull();expect(graph.publish).not.toHaveBeenCalled();
+});
+it('duas alterações concorrentes não sobrescrevem a versão nem criam novos destinos',async()=>{
+  const p=await post(await asset()),at=new Date(Date.now()+3600000).toISOString();
+  const scheduled=await submitPost(pool,env,p.id,p.version,at,'Owner');
+  const dates=[new Date(Date.now()+7200000).toISOString(),new Date(Date.now()+10800000).toISOString()];
+  const attempts=await Promise.allSettled(dates.map(date=>reschedulePost(pool,env,p.id,scheduled.version,date,'Owner')));
+  expect(attempts.filter(a=>a.status==='fulfilled')).toHaveLength(1);expect(attempts.filter(a=>a.status==='rejected')).toHaveLength(1);
+  const current=(await pool.query('SELECT * FROM ops.publisher_posts WHERE id=$1',[p.id])).rows[0];
+  expect(current.version).toBe(scheduled.version+1);
+  const rows=(await pool.query('SELECT next_attempt_at FROM ops.publisher_destinations WHERE post_id=$1',[p.id])).rows;
+  expect(rows).toHaveLength(2);for(const row of rows)expect(new Date(row.next_attempt_at).toISOString()).toBe(new Date(current.scheduled_at).toISOString());
+});
+it('recusa alteração após início, versão antiga, destino incerto e outro ambiente',async()=>{
+  const p=await post(await asset()),at=new Date(Date.now()+3600000).toISOString();
+  const scheduled=await submitPost(pool,env,p.id,p.version,at,'Owner');
+  await expect(reschedulePost(pool,env,p.id,p.version,at,'Owner')).rejects.toThrow('publisher_version_conflict');
+  await expect(reschedulePost(pool,'prod',p.id,scheduled.version,at,'Owner')).rejects.toThrow('publisher_post_not_found');
+  await pool.query("UPDATE ops.publisher_destinations SET status='uncertain' WHERE post_id=$1",[p.id]);
+  await expect(reschedulePost(pool,env,p.id,scheduled.version,at,'Owner')).rejects.toThrow('publisher_already_started');
+  await pool.query("UPDATE ops.publisher_destinations SET status='queued' WHERE post_id=$1",[p.id]);await due();expect(await claimDelivery(pool,env)).not.toBeNull();
+  await expect(reschedulePost(pool,env,p.id,scheduled.version,at,'Owner')).rejects.toThrow('publisher_already_started');
+  expect((await pool.query("SELECT * FROM ops.publisher_events WHERE event='rescheduled'")).rows).toHaveLength(0);
 });
 it('confirma todas as redes antes de apagar original, mantendo a miniatura e a auditoria',async()=>{
   const id=await asset();const p=await post(id);await submitPost(pool,env,p.id,p.version,null,'owner');

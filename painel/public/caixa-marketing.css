@@ -1,0 +1,109 @@
+/* Aço no shell compartilhado; o conteúdo permanece claro para destacar a mídia. */
+.is-matrix-marketing #session-view { max-width: none; padding: 0; }
+.is-matrix-marketing #marketing-panel {
+  --mk-green: #07563d; --mk-ink: #101715; --mk-muted: #52625a; --mk-line: #cbd4ce;
+  flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden;
+  margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+  background: linear-gradient(#ffffffe6,#ffffffe6),var(--mc-metal) center/540px 540px;
+  color: var(--mk-ink); font: 500 20px/1.3 var(--mc-font); scrollbar-width: thin;
+}
+.is-matrix-marketing #marketing-panel:not(.hidden) { display: flex; flex-direction: column; }
+.is-matrix-marketing #mk-content { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 24px; scrollbar-width: thin; }
+.is-matrix-marketing .mk-form-actions { flex: 0 0 auto; padding: 10px 16px; border-top: 1px solid #d2dad5; background: #f8faf8; }
+.is-matrix-marketing .mk-form-actions > .mk-primary { margin: 0; }
+.is-matrix-marketing #marketing-panel :is(button,input,select,textarea) { font: inherit; }
+.is-matrix-marketing #marketing-panel button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.is-matrix-marketing #marketing-panel button:disabled { opacity: .5; cursor: default; }
+.is-matrix-marketing #marketing-panel :is(button,input,select,textarea,summary,a):focus-visible { outline: 3px solid #087b56; outline-offset: 3px; }
+.is-matrix-marketing #marketing-panel :is(h2,h3,h4,p) { margin: 0; }
+.is-matrix-marketing #marketing-panel svg { display: inline-block; width: 24px; height: 24px; flex: 0 0 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.is-matrix-marketing #marketing-panel [data-mk-icon] { display: inline-flex; align-items: center; justify-content: center; }
+.is-matrix-marketing .mk-heading { display: flex; align-items: center; gap: 8px; min-height: 45px; margin-bottom: 8px; }
+.is-matrix-marketing .mk-heading h2 { flex: 1; min-width: 0; font-size: 35px; line-height: 1.1; font-weight: 850; letter-spacing: -.025em; }
+.is-matrix-marketing .mk-heading:has(#mk-back:not(.hidden)) h2 { font-size: 29px; }
+.is-matrix-marketing .mk-icon-button { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-radius: 8px; color: var(--mk-ink); background: none; }
+.is-matrix-marketing .mk-tabs { display: flex; gap: 0; margin: 4px 0 14px; border-bottom: 1px solid var(--mk-line); }
+.is-matrix-marketing .mk-tabs button { flex: 1; min-height: 46px; padding: 8px 3px; border: 0; border-radius: 0; color: #43534d; background: none; font-size: 20px; }
+.is-matrix-marketing .mk-tabs button[aria-current=page] { color: var(--mk-green); font-weight: 800; box-shadow: inset 0 -3px var(--mk-green); }
+.is-matrix-marketing .mk-primary { display: flex; justify-content: center; align-items: center; gap: 9px; width: 100%; min-height: 51px; padding: 10px 14px; margin: 12px 0; border: 1px solid #568a70; border-radius: 9px; background: var(--mc-action); color: #fff; font-size: 24px !important; font-weight: 750 !important; box-shadow: inset 0 1px #ffffff66,0 2px 3px #193b2920; }
+.is-matrix-marketing .mk-outline { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 10px 13px; margin: 8px 0; border: 1px solid var(--mk-line); border-radius: 8px; color: var(--mk-green); background: #ffffffa8; }
+.is-matrix-marketing .mk-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 7px 1px; gap: 7px; border: 0; background: none; color: var(--mk-green); font-weight: 650 !important; text-decoration: none; }
+.is-matrix-marketing .is-danger { color: #a0322b; }
+.is-matrix-marketing .mk-segment { display: flex; gap: 5px; margin: 14px 0; min-width: 0; }
+.is-matrix-marketing .mk-segment button { flex: 1; min-height: 44px; padding: 7px 6px; border: 1px solid #d2d9d4; border-radius: 8px; background: #f4f6f4; color: #354a40; font-size: 18px !important; }
+.is-matrix-marketing .mk-segment button[aria-pressed=true] { color: white; border-color: #07563d; background: #07563d; font-weight: 750 !important; }
+.is-matrix-marketing .mk-search { display: flex; align-items: center; min-width: 0; gap: 8px; min-height: 46px; padding: 0 10px; margin: 12px 0; border: 1px solid #d2d9d4; border-radius: 8px; background: #f1f4f2; }
+.is-matrix-marketing .mk-search input { min-width: 0; width: 100%; min-height: 44px; padding: 7px 0; border: 0; background: none; color: var(--mk-ink); }
+.is-matrix-marketing .mk-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 8px; }
+.is-matrix-marketing .mk-heading-actions { display: flex; align-items: center; }
+.is-matrix-marketing [data-mk-filter] { white-space: nowrap; font-size: clamp(14px,4vw,17px) !important; padding-inline: 3px !important; }
+.is-matrix-marketing #marketing-panel h3 { font-size: 25px; font-weight: 800; line-height: 1.15; }
+.is-matrix-marketing #marketing-panel h4 { font-size: 24px; font-weight: 750; overflow-wrap: anywhere; }
+.is-matrix-marketing .mk-card { min-width: 0; padding: 13px; margin: 10px 0; border: 1px solid #cbd4ce; border-radius: 12px; background: #ffffffe6; box-shadow: 0 2px 5px #223a2b0b; }
+.is-matrix-marketing .mk-post-card { display: grid; grid-template-columns: 98px minmax(0,1fr); gap: 8px 12px; }
+.is-matrix-marketing .mk-post-card > .mk-link { grid-column: 1/-1; justify-content: flex-end; }
+.is-matrix-marketing .mk-post-card.is-hero { display: block; padding: 0 0 7px; overflow: hidden; }
+.is-matrix-marketing .mk-post-card.is-hero .mk-post-copy { padding: 10px 12px 0; }
+.is-matrix-marketing .mk-post-card.is-hero > .mk-link { display: flex; padding-inline: 12px; justify-content: flex-start; }
+.is-matrix-marketing .mk-post-image,.is-matrix-marketing .mk-thumb,.is-matrix-marketing .mk-library-image { position: relative; display: grid; place-items: center; min-width: 0; overflow: hidden; border-radius: 8px; background: #e7ece8; color: #66766b; }
+.is-matrix-marketing .mk-post-image { width: 98px; min-height: 95px; }
+.is-matrix-marketing .is-hero > .mk-post-image { display: block; width: 100%; aspect-ratio: 1.9; min-height: 0; border-radius: 0; }
+.is-matrix-marketing :is(.mk-post-image,.mk-thumb,.mk-compose-image,.mk-library-image) img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.is-matrix-marketing .mk-thumb { width: 94px; height: 74px; flex: 0 0 94px; }
+.is-matrix-marketing .mk-post-copy { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 6px 9px; min-width: 0; }
+.is-matrix-marketing .mk-post-copy > h4 { width: 100%; }
+.is-matrix-marketing .mk-post-copy > small { width: 100%; }
+.is-matrix-marketing .mk-networks { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.is-matrix-marketing .mk-network { display: inline-flex; align-items: center; gap: 7px; font-size: 18px; }
+.is-matrix-marketing .mk-network img { width: 23px; height: 23px; flex: 0 0 23px; }
+.is-matrix-marketing .mk-badge { display: inline-flex; align-items: center; border-radius: 6px; padding: 3px 8px; font-size: 17px; background: #e8ebed; color: #394c43; }
+.is-matrix-marketing .mk-badge[data-status=scheduled],.is-matrix-marketing .mk-badge[data-status=queued] { background: #ffe49b; color: #6e4b0e; }
+.is-matrix-marketing .mk-badge[data-status=published] { background: #d9eee1; color: #005537; }
+.is-matrix-marketing .mk-badge:is([data-status=failed],[data-status=uncertain],[data-status=partial]) { color: #8e3025; background: #fce3d8; }
+.is-matrix-marketing .mk-video-label { position: absolute; right: 7px; bottom: 7px; display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 4px; font-size: 17px; color: white; background: #000b; }
+.is-matrix-marketing .mk-video-label svg { width: 15px !important; height: 15px !important; flex-basis: 15px !important; }
+.is-matrix-marketing .mk-action { display: flex; align-items: center; gap: 12px; min-height: 58px; width: 100%; padding: 12px 1px; border: 0; border-bottom: 1px solid var(--mk-line); background: none; color: var(--mk-ink); text-align: left; }
+.is-matrix-marketing .mk-action > span:nth-last-child(2),.is-matrix-marketing .mk-action > span:first-child:last-of-type { flex: 1; }
+.is-matrix-marketing .mk-muted { color: var(--mk-muted); font-size: 17px !important; line-height: 1.35; }
+.is-matrix-marketing p.mk-muted { margin: 7px 0 !important; }
+.is-matrix-marketing .mk-empty,.is-matrix-marketing .mk-loading { padding: 24px 8px; text-align: center; color: var(--mk-muted); line-height: 1.4; }
+.is-matrix-marketing .mk-notice,.is-matrix-marketing .mk-message { padding: 11px 13px; margin: 10px 0 !important; border: 1px solid #c2ddc9; border-radius: 8px; background: #e3f1e7; color: #15573e; font-size: 18px; overflow-wrap: anywhere; }
+.is-matrix-marketing .mk-message.is-error { color: #8c3128; background: #fff0e8; border-color: #ebcabb; }
+.is-matrix-marketing .mk-notice small { display: block; margin-top: 4px; }
+.is-matrix-marketing .mk-value-line { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--mk-line); }
+.is-matrix-marketing .mk-value-line strong { color: var(--mk-green); }
+.is-matrix-marketing .mk-calendar-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0; }
+.is-matrix-marketing .mk-calendar-nav strong { font-size: 25px; }
+.is-matrix-marketing .mk-calendar-days { display: flex; gap: 5px; overflow-x: auto; touch-action: pan-x; margin-bottom: 18px; scrollbar-width: thin; }
+.is-matrix-marketing .mk-day { position: relative; flex: 0 0 calc((100% - 30px)/7); min-width: 39px; min-height: 66px; padding: 6px 2px 11px; border: 1px solid var(--mk-line); border-radius: 8px; background: #f6f8f6; color: #34493c; }
+.is-matrix-marketing .mk-day small,.is-matrix-marketing .mk-day strong { display: block; }
+.is-matrix-marketing .mk-day small { font-size: 14px; text-transform: uppercase; }.is-matrix-marketing .mk-day strong { font-size: 25px; }
+.is-matrix-marketing .mk-day[aria-pressed=true] { color: #fff; border-color: var(--mk-green); background: var(--mk-green); }
+.is-matrix-marketing .mk-day.has-post::after { content: ''; position: absolute; bottom: 5px; left: calc(50% - 2px); width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.is-matrix-marketing .mk-calendar-row { position: relative; padding-left: 48px; margin-top: 12px; }
+.is-matrix-marketing .mk-at { position: absolute; left: 0; top: 11px; font-size: 21px; }
+.is-matrix-marketing .mk-calendar-row .mk-post-card { grid-template-columns: 72px minmax(0,1fr); gap: 8px; padding: 10px; }
+.is-matrix-marketing .mk-calendar-row .mk-post-image { width: 72px; min-height: 82px; }
+.is-matrix-marketing .mk-calendar-row .mk-networks { gap: 4px; }
+.is-matrix-marketing .mk-calendar-row .mk-network { font-size: 16px; }
+.is-matrix-marketing .mk-calendar-row .mk-network img { width: 18px; height: 18px; flex-basis: 18px; }
+.is-matrix-marketing .mk-calendar-row .mk-post-copy h4 { font-size: 22px !important; }
+.is-matrix-marketing .mk-calendar-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; grid-column: 1/-1; }
+.is-matrix-marketing .mk-calendar-actions .mk-link { font-size: 18px !important; }
+.is-matrix-marketing .mk-delivery { padding: 12px 0; border-bottom: 1px solid var(--mk-line); }
+.is-matrix-marketing .mk-delivery .mk-badge { float: right; }
+.is-matrix-marketing .mk-post-caption { white-space: pre-wrap; margin: 14px 0 !important; overflow-wrap: anywhere; }
+.is-matrix-marketing #mk-dialog { position: fixed; z-index: 75; inset: var(--mc-top) auto var(--mc-bottom) 50%; transform: translateX(-50%); box-sizing: border-box; width: var(--mc-width); height: calc(100dvh - var(--mc-top) - var(--mc-bottom)); max-width: 100vw; max-height: none; margin: 0; padding: 18px 16px 26px; border: 0; border-radius: 0; background: linear-gradient(#fffffff0,#fffffff0),var(--mc-metal) center/540px 540px; color: var(--mk-ink); overflow-y: auto; overscroll-behavior: contain; font: 500 20px/1.35 var(--mc-font); }
+.is-matrix-marketing #mk-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 18px; }
+.is-matrix-marketing #mk-dialog h3 { font-size: 29px; overflow-wrap: anywhere; }
+.is-matrix-marketing #mk-dialog video { width: 100%; max-height: 65dvh; border-radius: 9px; background: #15231b; }
+.is-matrix-marketing .mk-full-image { display: block; }.is-matrix-marketing .mk-full-image img { display: block; width: 100%; max-height: 65dvh; object-fit: contain; }
+@media (max-width: 350px) {
+  .is-matrix-marketing #mk-content { padding-inline: 12px; }
+  .is-matrix-marketing .mk-heading:has(#mk-back:not(.hidden)) h2 { font-size: 26px; }
+  .is-matrix-marketing .mk-post-card { grid-template-columns: 78px minmax(0,1fr); gap: 8px; }
+  .is-matrix-marketing .mk-post-image { width: 78px; }
+  .is-matrix-marketing .mk-calendar-row { padding-left: 38px; }.is-matrix-marketing .mk-at { font-size: 18px; }
+  .is-matrix-marketing .mk-segment button { font-size: 16px !important; padding-inline: 3px; }
+  .is-matrix-marketing .mk-calendar-row .mk-post-card { grid-template-columns: 1fr; }.is-matrix-marketing .mk-calendar-row .mk-post-image { width: 100%; height: 100px; min-height: 0; }
+}
