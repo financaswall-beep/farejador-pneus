@@ -27,6 +27,7 @@ function editor(view: ReturnType<typeof partnerScreen>) {
   Object.assign(view.context.document, { querySelectorAll: () => [close], addEventListener: vi.fn() });
   Object.assign(view.node('stock-price-form'), { reset: () => { view.node('stock-price-reason').value = ''; } });
   view.node('stock-price-modal').classList.add('hidden');
+  view.node('stock-price-illustration').append(new TestNode('img'));
   runInNewContext(readFileSync('painel/public/caixa-stock-price.js', 'utf8'), view.context);
   return close;
 }

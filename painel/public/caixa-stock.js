@@ -40,6 +40,7 @@
 
   async function loadStock() {
     if (!Caixa.canModule || !Caixa.canModule('estoque')) return;
+    if (!Caixa.isPartner() && Caixa.matrixStock) return Caixa.matrixStock.load();
     syncScope();
     const request = ++state.request;
     setLoading();

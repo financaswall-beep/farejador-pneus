@@ -52,6 +52,7 @@
       tire_size: row.tire_size || entry.tire_size || null,
       brand: row.brand || entry.brand || null,
       tire_condition: row.tire_condition || entry.tire_condition || null,
+      vehicle_type: row.vehicle_type || entry.vehicle_type || null,
       sale_price: money(entry.sale_price),
       product_id: row.product_id || entry.product_id || null,
     };

@@ -44,6 +44,10 @@
     byId('stock-price-size').textContent = row.tire_size || row.item_name || 'Produto selecionado';
     byId('stock-price-meta').textContent = [row.brand, Caixa.partnerUI?.condition(row.tire_condition)].filter(Boolean).join(' · ');
     byId('stock-price-illustration').hidden = !row.tire_size;
+    const image = byId('stock-price-illustration').querySelector('img');
+    image.src = partner ? '/operacao/assets/partner-replenishment-tire-v1.webp'
+      : row.vehicle_type === 'car' ? '/operacao/catalog-tire-car.png' : '/operacao/catalog-tire.webp';
+    image.hidden = !partner && !['car', 'motorcycle'].includes(row.vehicle_type);
     const identity = [row.brand, row.tire_size || row.item_name,
       Caixa.isPartner() ? Caixa.partnerUI?.condition(row.tire_condition) : null].filter(Boolean).join(' · ') || 'Produto selecionado';
     byId('stock-price-submit').textContent = partner ? 'Salvar preço' : 'Salvar novo preço oficial';
