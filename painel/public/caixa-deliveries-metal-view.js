@@ -49,7 +49,7 @@
       const content = node('div', null, 'mdf-card-content'), product = node('div');
       product.append(products(row, true), charge(row, true)); content.appendChild(product);
       if (prepare) {
-        const button = action('', 'select', row.order_id, false, model.busy || Boolean(model.route));
+        const button = action('', 'select', row.order_id, false, model.busy);
         button.classList.add('mdf-selection'); button.setAttribute('aria-pressed', String(selected));
         button.setAttribute('aria-label', (selected ? 'Retirar ' : 'Levar ') + (row.customer_name || orderLabel(row)) + ' nesta saída');
         const mark = node('span', null, 'mdf-selection-mark'); mark.setAttribute('aria-hidden', 'true');

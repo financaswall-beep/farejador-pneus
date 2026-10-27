@@ -84,9 +84,13 @@
       byId('mdf-queue-empty').hidden = found.length > 0 || model.loading;
       byId('mdf-queue-empty').textContent = queue.length ? 'Nenhuma entrega encontrada para esta busca.' : 'Nenhuma entrega para sair.';
       byId('mdf-queue-count').textContent = queue.length;
-      byId('matrix-route-open').textContent = model.busy ? 'Aguarde…' : 'Montar rota · ' + model.selected.size;
-      byId('matrix-route-open').disabled = model.busy || !model.selected.size || Boolean(model.route);
+      byId('matrix-route-open').textContent = model.busy ? 'Aguarde…' : model.route
+        ? model.route.unresolved > 0 ? 'Continuar rota atual' : 'Fechar rota anterior' : 'Montar rota · ' + model.selected.size;
+      byId('matrix-route-open').disabled = model.busy || (!model.route && !model.selected.size);
       byId('mdf-open-hint').hidden = !model.route;
+      byId('mdf-open-hint').textContent = model.route
+        ? `${model.route.trip_number || 'Sua rota'} ainda está aberta. A seleção abaixo fica para a próxima saída. `
+          + (model.route.unresolved > 0 ? 'Conclua a rota atual antes de iniciar outra.' : 'Feche a rota anterior para iniciar esta saída.') : '';
       const routeRows = model.rows.filter(row => row.in_route); const route = model.route;
       byId('matrix-route-number').textContent = route ? route.total + (route.total === 1 ? ' parada' : ' paradas') : 'Nenhuma rota aberta';
       byId('mdf-route-code').textContent = route?.trip_number || '';

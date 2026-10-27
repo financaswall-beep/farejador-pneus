@@ -107,7 +107,13 @@
         await state.reload(); if (alive()) { state.notice = '✓ Rota encerrada e registrada.'; C.showToast('Rota encerrada.'); ui.focus(); }
       });
     }
-    byId('matrix-route-open').addEventListener('click', openRoute);
+    function continuePreparation() {
+      if (state.busy || state.loading || C.isPartner() || state.session !== C.sessionFingerprint()) return;
+      if (!state.route) return openRoute();
+      receipts.leave(); state.error = ''; state.notice = '';
+      state.view = state.route.unresolved > 0 ? 'route' : 'close'; paint(); ui.focus();
+    }
+    byId('matrix-route-open').addEventListener('click', continuePreparation);
     byId('mdf-payment-confirm').addEventListener('click', confirmPayment);
     byId('matrix-route-close-button').addEventListener('click', closeRoute);
     byId('delivery-failure-submit').addEventListener('click', submitFailure);
