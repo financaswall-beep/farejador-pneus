@@ -54,7 +54,7 @@
     if (state.busy || state.loading || C.isPartner()) return false;
     const id = target?.dataset.orderId || card?.dataset.orderId; const row = state.rows.find(item => item.order_id === id);
     if (action === 'select') {
-      if (state.route || !row || row.in_route || row.delivery_status !== 'pending') return false;
+      if (!row || row.in_route || row.delivery_status !== 'pending') return false;
       if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id); paint();
     } else if (action === 'detail') {
       if (!state.route || !row?.in_route) return false;

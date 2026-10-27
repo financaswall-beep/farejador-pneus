@@ -20,7 +20,7 @@ function setup() {
   C.authenticatedFetch = vi.fn(async (url: string, options: any = {}) => {
     const body = options.headers?.['Content-Type'] === 'application/json' ? JSON.parse(options.body) : {};
     if (url.endsWith('rota/abrir')) {
-      payload = { rows: rows.map(row => ({ ...row, in_route: body.order_ids.includes(row.order_id) })),
+      payload = { rows: payload.rows.map((row: any) => ({ ...row, in_route: body.order_ids.includes(row.order_id) })),
         matrix_route: { trip_id: 'route-a', total: body.order_ids.length, completed: 0, unresolved: body.order_ids.length } };
     } else if (url.endsWith('/status')) {
       payload.rows = payload.rows.map((row: any) => row.order_id === body.order_id ? { ...row, delivery_status: body.status } : row);
@@ -29,7 +29,7 @@ function setup() {
     } else if (url.endsWith('/nao-entregue')) {
       payload.rows = payload.rows.map((row: any) => row.order_id === body.order_id ? { ...row, delivery_status: 'failed' } : row);
       payload.matrix_route.unresolved = 0; payload.matrix_route.reported = 1;
-    } else if (url.endsWith('rota/fechar')) payload = { rows: [], matrix_route: null };
+    } else if (url.endsWith('rota/fechar')) payload = { rows: payload.rows.filter((row: any) => !row.in_route), matrix_route: null };
     else if (url.endsWith('rota/comprovante')) return response({ receipt_id: 'receipt-a', workflow_status: 'review_required' });
     return response();
   });
@@ -60,6 +60,30 @@ describe('quatro etapas das entregas da Matriz', () => {
     expect(JSON.parse(s.C.authenticatedFetch.mock.calls[0][1].body)).toEqual({ order_ids: ['a', 'b'], km_start: 45210 });
     expect(s.state.view).toBe('route'); expect(s.state.rows.every((row: any) => row.delivery_status === 'pending')).toBe(true);
     expect(s.state.paymentMethod).toBeNull();
+  });
+  it('permite preparar a próxima saída com rota anterior resolvida e mantém a seleção ao fechá-la', async () => {
+    const s = setup(); s.inRoute('failed', 0);
+    s.setPayload({ rows: [...s.state.rows, { order_id: 'b', in_route: false, delivery_status: 'pending' }], matrix_route: s.state.route });
+    await s.reload(); await s.action('prepare');
+    expect(await s.action('select', 'b')).toBe(true); expect(s.state.selected.has('b')).toBe(true);
+    await s.el('matrix-route-open').fire('click');
+    expect(s.state.view).toBe('close'); expect(s.C.authenticatedFetch).not.toHaveBeenCalled();
+    await s.el('matrix-route-close-button').fire('click');
+    expect(s.state.route).toBeNull(); expect(s.state.selected.has('b')).toBe(true); expect(s.state.view).toBe('prepare');
+    await s.el('matrix-route-open').fire('click');
+    expect(s.C.authenticatedFetch).toHaveBeenCalledTimes(2);
+    expect(s.C.authenticatedFetch.mock.calls[0][0]).toContain('/rota/fechar');
+    expect(JSON.parse(s.C.authenticatedFetch.mock.calls[1][1].body).order_ids).toEqual(['b']);
+  });
+  it('leva à rota em andamento sem criar outra nem perder a seleção da próxima saída', async () => {
+    const s = setup(); s.inRoute('dispatched', 1);
+    s.setPayload({ rows: [...s.state.rows, { order_id: 'b', in_route: false, delivery_status: 'pending' }], matrix_route: s.state.route });
+    await s.reload(); await s.action('prepare'); await s.action('select', 'b');
+    await s.el('matrix-route-open').fire('click');
+    expect(s.state.view).toBe('route'); expect(s.state.selected.has('b')).toBe(true);
+    expect(s.C.authenticatedFetch).not.toHaveBeenCalled();
+    expect(await s.action('select', 'a')).toBe(false);
+    expect(s.state.selected.has('a')).toBe(false);
   });
   it('registra a saída por pedido separadamente da montagem da rota', async () => {
     const s = setup(); s.inRoute('pending'); await s.action('dispatch', 'a');
