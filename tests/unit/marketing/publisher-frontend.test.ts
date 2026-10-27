@@ -10,6 +10,10 @@ function state() {
   const s=window.PAINEL_MODULES.marketingPublisher();s.$nextTick=(fn:()=>void)=>fn();s.apiPut=vi.fn().mockResolvedValue({version:1});
   s.apiPost=vi.fn().mockResolvedValue({});s.apiGet=vi.fn().mockResolvedValue({config:{enabled:true},posts:[],media:[]});s.mpFresh();return s;
 }
+it('distingue tamanho das versões adaptadas do original que ainda está preservado',()=>{
+  const s=state();expect(s.mpMediaSize({bytes:65*1024*1024,inspection:{prepared:{profiles:{vertical:{bytes:2.5*1024*1024}}}}})).toBe('2.5 MB preparados · 65.0 MB original');
+  expect(s.mpMediaSize({bytes:1024*1024})).toBe('1.0 MB');
+});
 it('usa -03:00 independente do fuso do dispositivo e transmite apenas destinos selecionados',async()=>{
   const s=state();s.mpConfig={sending:true};s.mpMedia=[{id:'media',kind:'video'}];s.mpForm.media_id='media';s.mpForm.title='Pneus';s.mpWhen='schedule';
   const futureYear=new Date().getFullYear()+1;s.mpDate=futureYear+'-10-01';s.mpTime='09:00';s.mpForm.destinations[1].selected=false;

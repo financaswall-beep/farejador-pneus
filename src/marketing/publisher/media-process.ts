@@ -2,11 +2,13 @@ import { spawn } from 'node:child_process';
 import { PublisherError } from './model.js';
 
 export type MediaProgram = 'ffprobe' | 'ffmpeg' | 'heif-info' | 'heif-convert';
-export type ProgramRunner = (program: MediaProgram, args: string[], maxOutput?: number) => Promise<Buffer>;
+export interface ProgramLimits { timeoutMs?: number; cpuSeconds?: number; maxFileBytes?: number }
+export type ProgramRunner = (program: MediaProgram, args: string[], maxOutput?: number, limits?: ProgramLimits) => Promise<Buffer>;
 
 /** Sem shell, com tempo/saída limitados; Linux limita também memória e CPU do decodificador. */
-export const runMediaProgram: ProgramRunner = (program, args, maxOutput = 256 * 1024) => new Promise((resolve, reject) => {
-  const limits = ['--as=1073741824', '--cpu=40', '--nofile=64', '--fsize=33554432', '--', program];
+export const runMediaProgram: ProgramRunner = (program, args, maxOutput = 256 * 1024, options = {}) => new Promise((resolve, reject) => {
+  const limits = ['--as=1073741824', '--cpu=' + (options.cpuSeconds ?? 40), '--nofile=64',
+    '--fsize=' + (options.maxFileBytes ?? 33554432), '--', program];
   const child = spawn(process.platform === 'linux' ? 'prlimit' : program,
     process.platform === 'linux' ? [...limits, ...args] : args,
     { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
@@ -17,7 +19,7 @@ export const runMediaProgram: ProgramRunner = (program, args, maxOutput = 256 * 
     failure = error;
     child.kill('SIGKILL');
   };
-  const timer = setTimeout(() => stop(new PublisherError('publisher_media_processing_timeout', 503)), 60_000);
+  const timer = setTimeout(() => stop(new PublisherError('publisher_media_processing_timeout', 503)), options.timeoutMs ?? 60_000);
   child.stdout.on('data', (part: Buffer) => {
     bytes += part.length;
     if (bytes > maxOutput) stop(new PublisherError('publisher_media_invalid', 400));

@@ -121,7 +121,7 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
             });
         },
         async mpFinalizeMedia(id) {
-            this.mpUploadPhase = 'Conferindo o arquivo no servidor…';
+            this.mpUploadPhase = 'Adaptando foto ou vídeo para as redes…';
             try {
                 await this.apiPost('/admin/api/marketing/publisher/media/' + id + '/complete', {});
             }
@@ -153,7 +153,7 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
             try {
                 for (const file of files) {
                     const mime = this.mpFileMime(file);
-                    const limit = Math.min(this.mpConfig.max_file_bytes, mime.startsWith('image/') ? 8 * 1024 * 1024 : Infinity);
+                    const limit = Math.min(this.mpConfig.max_file_bytes, mime.startsWith('image/') ? this.mpConfig.max_photo_bytes || 8 * 1024 * 1024 : Infinity);
                     if (file.size > limit)
                         throw new Error('publisher_media_too_large');
                     if (resume && (resume.name !== file.name || Number(resume.bytes) !== file.size || resume.mime !== mime))
@@ -239,7 +239,20 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
                 this.mpBusy = false;
             }
         },
-        async mpOpenPreview(media) {
+        async mpPrepareFormats(media = this.mpSelectedMedia()) {
+            const profiles = media?.inspection?.prepared;
+            if (!media || profiles?.version === 1 && profiles.profiles?.vertical && (media.kind === 'video' || profiles.profiles.feed)) return;
+            const uploading = this.mpUploadBusy, phase = this.mpUploadPhase, name = this.mpUploadName;
+            this.mpUploadBusy = true; this.mpUploadName = media.name; this.mpUploadPhase = 'Adaptando para Feed, Story e Reel…';
+            try {
+                await this.apiPost('/admin/api/marketing/publisher/media/' + media.id + '/complete', {});
+                await this.mpLoad(true);
+                const prepared = this.mpMedia.find(item => item.id === media.id)?.inspection?.prepared;
+                if (prepared?.version !== 1 || !prepared.profiles?.vertical || media.kind === 'photo' && !prepared.profiles.feed)
+                    throw new Error('publisher_media_preparation_required');
+            } finally { this.mpUploadBusy = uploading; this.mpUploadPhase = phase; this.mpUploadName = name; }
+        },
+        async mpOpenPreview(media, format) {
             if (!media || media.status && media.status !== 'ready')
                 return;
             this.mpError = '';
@@ -249,8 +262,9 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
                 return;
             }
             try {
-                const result = await this.apiPost('/admin/api/marketing/publisher/media/' + media.id + '/preview', {});
-                this.mpPreview = { ...media, url: result.url };
+                await this.mpPrepareFormats(media);
+                const result = await this.apiPost('/admin/api/marketing/publisher/media/' + media.id + '/preview', format ? { format } : {});
+                this.mpPreview = { ...media, ...result };
                 this.$nextTick(() => window.lucide?.createIcons());
             }
             catch (error) {

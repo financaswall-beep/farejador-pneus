@@ -6,7 +6,8 @@ import { env } from '../../shared/config/env.js';
 import { rateLimitHit } from '../../shared/rate-limit.js';
 import { publisherConfig, requirePublisher, requireSending } from '../../marketing/publisher/config.js';
 import { PublisherError, idSchema, draftSchema, uploadSchema, finalizeSchema } from '../../marketing/publisher/model.js';
-import { listMedia, reserveMedia, finalizeMedia } from '../../marketing/publisher/media.js';
+import { listMedia, reserveMedia, finalizeMedia, type Media } from '../../marketing/publisher/media.js';
+import { preparedPublishPath, preparedDimensions, MAX_PHOTO_SOURCE_BYTES } from '../../marketing/publisher/media-formats.js';
 import { listPosts, saveDraft, submitPost, postAction } from '../../marketing/publisher/posts.js';
 import { PublisherStorage } from '../../marketing/publisher/storage.js';
 import { deleteMedia } from '../../marketing/publisher/cleanup.js';
@@ -68,6 +69,7 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
                 storage_credentials_ready: config.storage_ready, storage_ready: storageReady,
                 sending: config.sending && storageReady,
                 max_file_bytes: Math.min(config.max_file_bytes, bucketMax ?? config.max_file_bytes),
+                max_photo_bytes: Math.min(MAX_PHOTO_SOURCE_BYTES, config.max_file_bytes, bucketMax ?? config.max_file_bytes),
                 bucket_max_file_bytes: bucketMax ?? null },
             posts: posts.status === 'fulfilled' ? posts.value : [],
             media: media.status === 'fulfilled' ? media.value : [],
@@ -84,14 +86,14 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
     }));
     app.post(base + '/media/:id/preview', options, guarded(async (request) => {
         const id = params.parse(request.params).id;
-        const media = (await pool.query<{
-            preview_path: string;
-        }>(`SELECT CASE WHEN kind='photo'
-      THEN coalesce(publish_path,original_path) ELSE original_path END preview_path FROM ops.publisher_media
+        const body = z.object({ format: z.enum(['feed', 'story', 'reel']).optional() }).strict().parse(request.body ?? {});
+        const media = (await pool.query<Media>(`SELECT kind,publish_path,original_path,width,height,inspection FROM ops.publisher_media
       WHERE environment=$1 AND id=$2 AND status='ready'`, [environment, id])).rows[0];
         if (!media)
             throw new PublisherError('publisher_media_not_found', 404);
-        return { url: await new PublisherStorage().signedUrl(media.preview_path, 900) };
+        const format = body.format ?? (media.kind === 'photo' ? 'feed' : 'reel');
+        if (media.kind === 'video' && format === 'feed' || media.kind === 'photo' && format === 'reel') throw new PublisherError('publisher_format_incompatible', 400);
+        return { url: await new PublisherStorage().signedUrl(preparedPublishPath(media, format), 900), format, ...preparedDimensions(media, format) };
     }));
     app.post(base + '/media/:id/remove', options, guarded(async (request) => {
         await deleteMedia(pool, environment, params.parse(request.params).id, false);

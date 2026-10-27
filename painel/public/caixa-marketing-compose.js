@@ -43,7 +43,7 @@
       const format = V.node('select'); format.setAttribute('aria-label', 'Formato no ' + V.platform(destination.platform));
       (media?.kind === 'video' ? ['reel', 'story'] : ['feed', 'story']).forEach(value => { const option = V.node('option', p.mpFormat(value)); option.value = value; format.appendChild(option); });
       format.value = destination.format; format.addEventListener('change', () => { destination.format = format.value; mark(); });
-      row.append(label, format); host.appendChild(row);
+      row.append(label, format); host.append(row, V.button('Ver prévia no ' + V.platform(destination.platform), () => void M.preview(media, destination.format), 'mk-link'));
       const caption = V.field('Legenda no ' + V.platform(destination.platform), 'textarea', destination.caption || '', value => { destination.caption = value; mark(); });
       caption.input.maxLength = 2200; M.el('custom-fields').appendChild(caption.wrap);
     });
@@ -51,7 +51,7 @@
     M.el('date').min = T.dateKey(new Date()); M.el('date').value = p.mpDate; M.el('time').value = p.mpTime;
     M.el('cleanup').checked = p.mpForm.delete_after_publish;
     reviewControls();
-    host.appendChild(V.node('p', 'Feed e Story para fotos; Reel e Story para vídeos. No Story, o texto deve estar na própria mídia.', 'mk-muted'));
+    host.appendChild(V.node('p', 'Ajuste automático, sem cortes. Confira a prévia de cada rede. Nos Stories, a legenda não é exibida.', 'mk-muted'));
   };
   function validate() {
     const p = M.publisher;
@@ -63,7 +63,11 @@
   M.el('post-title').addEventListener('input', () => { M.publisher.mpForm.title = M.el('post-title').value; mark(); });
   M.el('caption').addEventListener('input', () => { M.publisher.mpForm.caption = M.el('caption').value; M.el('caption-count').textContent = M.el('caption').value.length + '/2200'; mark(); });
   M.el('continue').addEventListener('click', () => {
-    const error = validate(); if (error) { M.publisher.mpError = error; M.status(); return; } M.go('review');
+    const error = validate(); if (error) { M.publisher.mpError = error; M.status(); return; }
+    void M.run(async () => {
+      await M.publisher.mpPrepareFormats(); M.state.page = 'review';
+      history.pushState(null, '', '#marketing/revisar'); M.el('content').scrollTop = 0;
+    });
   });
   M.el('save').addEventListener('click', () => void M.run(async () => {
     if (!M.publisher.mpForm.title.trim()) throw Error('invalid_publisher_request');

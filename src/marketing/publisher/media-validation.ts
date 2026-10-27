@@ -1,16 +1,17 @@
 import { PublisherError, validateFormats, type Destination } from './model.js';
 import type { Media } from './media.js';
+import { preparedDimensions } from './media-formats.js';
 
 /** Regras obrigatórias. 9:16 no Instagram Reel é recomendação, não bloqueio. */
 export function validateDestinationMedia(media: Pick<Media, 'kind' | 'width' | 'height' | 'duration' | 'inspection'>,
   destinations: Destination[]): void {
   validateFormats(media.kind, destinations);
-  const width = Number(media.width);
-  const height = Number(media.height);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
-    throw new PublisherError('publisher_media_dimensions_required', 400);
-  }
   for (const destination of destinations) {
+    const dimensions = preparedDimensions(media, destination.format);
+    const width = Number(dimensions.width), height = Number(dimensions.height);
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+      throw new PublisherError('publisher_media_dimensions_required', 400);
+    }
     if (media.kind === 'photo') {
       if (destination.platform === 'instagram' && destination.format === 'feed') {
         const ratio = width / height;

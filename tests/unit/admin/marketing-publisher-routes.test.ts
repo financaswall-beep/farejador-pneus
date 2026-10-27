@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import {beforeEach,it,expect,vi} from 'vitest';
 const m=vi.hoisted(()=>({query:vi.fn(),reserve:vi.fn(),complete:vi.fn(),listMedia:vi.fn(),listPosts:vi.fn(),
-  bucket:vi.fn(),reconcile:vi.fn(),submit:vi.fn(),draft:vi.fn(),caption:vi.fn(),enabled:true,sending:true,storageReady:false}));
+  bucket:vi.fn(),signed:vi.fn(),reconcile:vi.fn(),submit:vi.fn(),draft:vi.fn(),caption:vi.fn(),enabled:true,sending:true,storageReady:false}));
 vi.mock('../../../src/admin/auth.js',()=>({requireAdminOwner:async(req:any,reply:any)=>{
   if(req.headers['x-role']!=='owner')return reply.code(403).send({error:'owner_required'});
 },getAdminContext:()=>({displayName:'Owner',personId:'operator-test'})}));
@@ -12,7 +12,7 @@ vi.mock('../../../src/marketing/publisher/config.js',()=>({publisherConfig:()=>(
   requirePublisher:()=>{if(!m.enabled)throw Error('disabled');},requireSending:()=>{if(!m.sending)throw Error('disabled');}}));
 vi.mock('../../../src/marketing/publisher/media.js',()=>({reserveMedia:m.reserve,finalizeMedia:m.complete,listMedia:m.listMedia}));
 vi.mock('../../../src/marketing/publisher/posts.js',()=>({submitPost:m.submit,saveDraft:m.draft,postAction:vi.fn(),listPosts:m.listPosts}));
-vi.mock('../../../src/marketing/publisher/storage.js',()=>({PublisherStorage:class {assertPrivateBucket=m.bucket;}}));
+vi.mock('../../../src/marketing/publisher/storage.js',()=>({PublisherStorage:class {assertPrivateBucket=m.bucket;signedUrl=m.signed;}}));
 vi.mock('../../../src/marketing/publisher/reconciliation.js',async()=>{
   const actual=await vi.importActual<typeof import('../../../src/marketing/publisher/reconciliation.js')>('../../../src/marketing/publisher/reconciliation.js');
   return {...actual,reconcileDestination:m.reconcile};
@@ -25,6 +25,22 @@ beforeEach(()=>{
   m.query.mockResolvedValue({rows:[{ready:true}]});m.submit.mockResolvedValue({id});m.complete.mockResolvedValue({id});
   m.listMedia.mockResolvedValue([]);m.listPosts.mockResolvedValue([]);m.bucket.mockResolvedValue({maxBytes:null,allowedMimes:null});
   m.reconcile.mockResolvedValue({id,status:'cancelled'});
+  m.signed.mockResolvedValue('https://storage.invalid/preview');
+});
+it('prévia escolhe a versão real de Feed/Story sem aceitar caminhos ou formatos incompatíveis',async()=>{
+  const app=Fastify();await registerMarketingPublisher(app);
+  m.query.mockResolvedValue({rows:[{kind:'photo',original_path:`test/${id}/original.jpg`,publish_path:`test/${id}/feed-v1.jpg`,width:1080,height:1350,
+    inspection:{verified:true,prepared:{version:1,profiles:{feed:{width:1080,height:1350,bytes:1000},vertical:{width:1080,height:1920,bytes:1200}}}}}]});
+  const url=base+'/media/'+id+'/preview',headers={'x-role':'owner'};
+  try{
+    const feed=await app.inject({method:'POST',url,headers,payload:{format:'feed'}});
+    const story=await app.inject({method:'POST',url,headers,payload:{format:'story'}});
+    expect(feed.json()).toMatchObject({format:'feed',width:1080,height:1350});
+    expect(story.json()).toMatchObject({format:'story',width:1080,height:1920});
+    expect(m.signed.mock.calls).toEqual([[`test/${id}/feed-v1.jpg`,900],[`test/${id}/vertical-v1.jpg`,900]]);
+    for(const payload of [{format:'reel'},{format:'story',path:'prod/other/file.jpg'},{format:'invalid'}]) expect((await app.inject({method:'POST',url,headers,payload})).statusCode).toBe(400);
+    expect(m.signed).toHaveBeenCalledTimes(2);
+  }finally{await app.close();}
 });
 it('owner-only antes de banco, upload, IA e publicação',async()=>{
   const app=Fastify();await registerMarketingPublisher(app);
@@ -60,6 +76,7 @@ it('falha no bucket bloqueia upload/publicação na tela e preserva histórico',
     m.bucket.mockResolvedValue({maxBytes:104857600,allowedMimes:null});
     const recovered=await app.inject({url:base,headers:{'x-role':'owner'}});
     expect(recovered.json().config.max_file_bytes).toBe(104857600);
+    expect(recovered.json().config.max_photo_bytes).toBe(33554432);
   }finally{await app.close();}
 });
 it('recupera a finalização sem exigir metadados e recusa escolha de ambiente',async()=>{

@@ -38,7 +38,9 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 publisher_media_aspect_ratio: 'A proporção da mídia não é compatível com um dos destinos. Confira o formato escolhido.',
                 publisher_media_dimensions: 'As dimensões da mídia não são compatíveis com um dos destinos.',
                 publisher_video_codec: 'Este vídeo usa um codec incompatível com a publicação. Exporte em H.264 ou HEVC, com áudio AAC.',
-                publisher_instagram_feed_ratio: 'O Feed do Instagram aceita fotos entre 4:5 e 1,91:1. Escolha outra foto ou use Story.',
+                publisher_instagram_feed_ratio: 'Esta foto ainda precisa ser adaptada para o Feed. Abra a prévia ou confira o arquivo e tente novamente.',
+                publisher_media_preparation_required: 'Não foi possível confirmar a adaptação. O arquivo foi preservado; atualize a biblioteca e tente novamente.',
+                publisher_video_output_too_large: 'O vídeo não coube no limite de arquivo da biblioteca. Use um vídeo mais curto; o original foi preservado.',
                 publisher_instagram_photo_width: 'A foto para Instagram precisa ter largura entre 320 e 1440 pixels.',
                 publisher_instagram_video_width: 'O vídeo para Instagram excede a largura de 1920 pixels. Exporte uma cópia compatível.',
                 publisher_instagram_video_fps: 'O vídeo para Instagram precisa ter entre 23 e 60 quadros por segundo.',
@@ -108,6 +110,11 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
         mpFormat(format) { return ({ feed: 'Feed', reel: 'Reel', story: 'Story' })[format] || format; },
         mpDateLabel(date) { return date ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date(date)) : 'Sem agendamento'; },
         mpBytes(bytes) { return Number(bytes) >= 1024 * 1024 * 1024 ? (Number(bytes) / 1024 / 1024 / 1024).toFixed(1) + ' GB' : (Number(bytes) / 1024 / 1024).toFixed(1) + ' MB'; },
+        mpMediaSize(media) {
+            const profiles = media?.inspection?.prepared?.profiles;
+            const bytes = profiles && Object.values(profiles).reduce((sum, profile) => sum + (Number(profile?.bytes) || 0), 0);
+            return bytes > 0 ? this.mpBytes(bytes) + ' preparados · ' + this.mpBytes(media.bytes) + ' original' : this.mpBytes(media?.bytes || 0);
+        },
         mpFilteredPosts() {
             const states = this.mpTab === 'drafts' ? ['draft'] : ['published', 'partial', 'failed', 'publishing', 'cancelled'];
             const q = this.mpHistorySearch.toLocaleLowerCase('pt-BR');

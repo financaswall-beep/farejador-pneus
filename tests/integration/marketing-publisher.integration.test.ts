@@ -115,7 +115,8 @@ it('confirma todas as redes antes de apagar original, mantendo a miniatura e a a
   await publishTick(pool,env,graph,storage);await cleanupMedia(pool,env,storage);expect(storage.remove).not.toHaveBeenCalled();
   await finish();expect(graph.publish).toHaveBeenCalledTimes(2);
   expect((await pool.query('SELECT status FROM ops.publisher_posts')).rows[0].status).toBe('published');
-  await cleanupMedia(pool,env,storage);expect(storage.remove).toHaveBeenCalledWith([`test/${id}/original.mp4`,`test/${id}/original.mp4`]);
+  await cleanupMedia(pool,env,storage);expect(storage.remove).toHaveBeenCalledWith([`test/${id}/original.mp4`,
+    `test/${id}/feed-v1.jpg`,`test/${id}/vertical-v1.jpg`,`test/${id}/vertical-v1.mp4`,`test/${id}/original.mp4`]);
   expect((await pool.query('SELECT status,thumbnail_path FROM ops.publisher_media')).rows[0]).toMatchObject({status:'deleted',thumbnail_path:`test/${id}/thumbnail.jpg`});
   expect((await pool.query(`SELECT * FROM ops.publisher_events WHERE event='delivery_published'`)).rows).toHaveLength(2);
 });

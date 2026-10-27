@@ -16,8 +16,8 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
       </label>
       <input type="file" x-ref="mpResumeInput" hidden @change="mpUploadFiles($event)" aria-label="Selecionar o mesmo arquivo para continuar envio">
       <div class="mp-upload-progress" x-show="mpUploadBusy"><span x-text="mpUploadName"></span><progress max="100" :value="mpUploadProgress||0"></progress><small x-text="mpUploadPhase+' '+(mpUploadProgress==null?'':(mpUploadProgress||0)+'%')"></small></div>
-      <small class="mp-muted" x-text="'Fotos até '+mpBytes(Math.min(8388608,mpConfig?.max_file_bytes||524288000))+' · Vídeos até '+mpBytes(mpConfig?.max_file_bytes||524288000)"></small>
-      <small class="mp-muted mp-upload-help">Envio retomável. Se interromper, selecione o mesmo arquivo para continuar. Fotos HEIC são convertidas no servidor.</small>
+      <small class="mp-muted" x-text="'Fotos até '+mpBytes(mpConfig?.max_photo_bytes||Math.min(8388608,mpConfig?.max_file_bytes||524288000))+' · Vídeos até '+mpBytes(mpConfig?.max_file_bytes||524288000)"></small>
+      <small class="mp-muted mp-upload-help">Envio retomável com adaptação automática de fotos e vídeos. Se interromper, selecione o mesmo arquivo para continuar.</small>
       <div class="mp-media-grid">
         <template x-for="media in mpVisibleMedia()" :key="media.id">
           <div class="mp-media-tile"><button type="button" @click="mpSelectMedia(media)" :disabled="mpBusy||mpMediaNeedsRecovery(media)" :class="{'is-selected':mpForm?.media_id===media.id}">
@@ -34,7 +34,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
         </template>
       </div>
       <div class="mp-empty" x-show="!mpVisibleMedia().length && !mpUploadBusy"><i data-lucide="images"></i><p>Sua biblioteca começa aqui.</p><small>Envie uma foto ou um vídeo para criar a publicação.</small></div>
-      <div class="mp-selected-file" x-show="mpSelectedMedia()"><h4>Arquivo selecionado</h4><div><img :src="mpThumbnail(mpSelectedMedia())" alt=""><span><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpBytes(mpSelectedMedia()?.bytes||0)"></small></span></div></div>
+      <div class="mp-selected-file" x-show="mpSelectedMedia()"><h4>Arquivo selecionado</h4><div><img :src="mpThumbnail(mpSelectedMedia())" alt=""><span><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpMediaSize(mpSelectedMedia())"></small></span></div></div>
     </aside>
     <section class="mp-card mp-editor">
       <div class="mp-card-heading"><h3>Editar publicação</h3><small :class="mpDirty?'mp-muted':''" x-text="mpDirty?'Alterações não salvas':mpForm?.version?'Rascunho salvo':'Novo rascunho'"></small></div>
@@ -50,7 +50,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
         <h4 class="mp-preview-title">Prévia por rede <small>Confira a mídia completa antes de publicar.</small></h4>
         <div class="mp-preview-grid"><template x-for="destination in mpForm.destinations.filter(d=>d.selected)" :key="destination.platform"><article class="mp-network-preview" :class="destination.format==='feed'?'mp-preview-feed':'mp-preview-vertical'">
           <header><img :src="'/assets/brands/'+destination.platform+'.svg'" :alt="destination.platform"><span><strong x-text="destination.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="mpFormat(destination.format)"></small></span></header>
-          <button type="button" @click="mpOpenPreview(mpSelectedMedia())" :disabled="!mpSelectedMedia()"><img x-show="mpSelectedMedia()" :src="mpThumbnail(mpSelectedMedia())" alt="Prévia da mídia"><span x-show="!mpSelectedMedia()">Sem mídia</span></button>
+          <button type="button" @click="mpOpenPreview(mpSelectedMedia(),destination.format)" :disabled="!mpSelectedMedia()||mpUploadBusy"><img x-show="mpSelectedMedia()" :src="mpThumbnail(mpSelectedMedia())" alt="Abrir prévia adaptada"><span x-show="!mpSelectedMedia()">Sem mídia</span></button>
           <p x-show="destination.format!=='story'" x-text="(mpCustom?destination.caption:mpForm.caption)||'Sua legenda aparecerá aqui.'"></p><small x-show="destination.format==='story'">Story utiliza a mídia. A legenda não é sobreposta ao arquivo.</small>
         </article></template></div>
       </fieldset></template>
@@ -62,7 +62,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
           <label><input type="checkbox" x-model="destination.selected" @change="mpDirty=true"><img :src="'/assets/brands/'+destination.platform+'.svg'" :alt="destination.platform"><span><strong x-text="destination.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="destination.platform==='instagram'?'@2wp.pneus':'2W Pneus'"></small></span></label>
           <select x-model="destination.format" @change="mpDirty=true" :aria-label="'Formato no '+destination.platform"><option value="feed" :disabled="mpSelectedMedia()?.kind==='video'">Feed</option><option value="reel" :disabled="mpSelectedMedia()?.kind==='photo'">Reel</option><option value="story">Story</option></select>
         </div></template>
-        <p class="mp-muted mp-tiktok-note">TikTok entra em uma próxima etapa.</p>
+        <p class="mp-muted">Ajuste automático sem cortes: foto em Feed 4:5 ou Story 9:16; vídeo em Reel ou Story 9:16. Reels também são compartilhados no Feed do Instagram. Clique na prévia para conferir o enquadramento.</p>
         <p class="mp-notice mp-warning" x-show="mpKnownPermissionBlock()">Há destinos sem permissão de publicação. Confira Gerenciar contas.</p>
         <button class="mp-link" type="button" @click="mpCustom=!mpCustom;if(mpCustom)mpForm.destinations.forEach(d=>{if(!d.caption)d.caption=mpForm.caption});mpDirty=true"><i data-lucide="sliders-horizontal"></i>Personalizar texto por rede</button>
         <div x-show="mpCustom"><template x-for="destination in mpForm.destinations.filter(d=>d.selected)" :key="destination.platform"><label class="mp-label"><span x-text="destination.platform==='instagram'?'Legenda do Instagram':'Legenda do Facebook'"></span><textarea maxlength="2200" rows="3" x-model="destination.caption" @input="mpDirty=true" :disabled="destination.format==='story'"></textarea></label></template></div>
@@ -95,7 +95,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
     <div class="mp-empty" x-show="!mpFilteredPosts().length"><i data-lucide="file-text"></i><p x-text="mpTab==='drafts'?'Nenhum rascunho salvo.':'Nenhuma publicação neste filtro.'"></p></div>
     <p class="mp-muted">São exibidas as 200 publicações mais recentes criadas nesta Central. As métricas das suas redes ficam na aba Resultados.</p>
   </section>
-  <template x-if="mpPreview"><div class="mp-modal-overlay" @click.self="mpPreview=null" @keydown.escape.window="mpPreview=null"><section class="mp-modal mp-media-modal" role="dialog" aria-modal="true" aria-label="Prévia da mídia"><div class="mp-card-heading"><h3 x-text="mpPreview.name"></h3><button class="mp-icon" @click="mpPreview=null" aria-label="Fechar prévia"><i data-lucide="x"></i></button></div><template x-if="mpPreview.kind==='video'"><video :src="mpPreview.url" controls playsinline preload="metadata"></video></template><template x-if="mpPreview.kind==='photo'"><img :src="mpPreview.url" :alt="mpPreview.name"></template><small class="mp-muted">Prévia do arquivo original. A rede pode adaptar a apresentação.</small></section></div></template>
+  <template x-if="mpPreview"><div class="mp-modal-overlay" @click.self="mpPreview=null" @keydown.escape.window="mpPreview=null"><section class="mp-modal mp-media-modal" role="dialog" aria-modal="true" aria-label="Prévia da mídia"><div class="mp-card-heading"><h3 x-text="mpPreview.name"></h3><button class="mp-icon" @click="mpPreview=null" aria-label="Fechar prévia"><i data-lucide="x"></i></button></div><template x-if="mpPreview.kind==='video'"><video :src="mpPreview.url" controls playsinline preload="metadata"></video></template><template x-if="mpPreview.kind==='photo'"><img :src="mpPreview.url" :alt="mpPreview.name"></template><small class="mp-muted">Prévia adaptada para o formato escolhido, sem cortar nem esticar.</small></section></div></template>
 </div>`;
 
 window.MARKETING_PUBLISHER_CONNECTIONS_TEMPLATE = `
