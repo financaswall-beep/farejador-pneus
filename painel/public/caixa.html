@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/operacao/caixa-chat-customer.css?v=20260923-customer1" />
   <link rel="stylesheet" href="/operacao/chat-channel-alerts.css?v=20260923-2" />
   <script defer src="/operacao/business-time.js?v=20260822-continuity1"></script>
-  <script defer src="/operacao/caixa-core.js?v=20261027-stock1"></script>
+  <script defer src="/operacao/caixa-core.js?v=20261027-deliveries1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20261006-partner-buy2"></script>
   <script defer src="/operacao/caixa-brand-catalog.js?v=20260824-operation-catalog1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20261026-metal1"></script>
@@ -54,7 +54,7 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-purchases1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261027-deliveries1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
@@ -67,10 +67,13 @@
   <script defer src="/operacao/caixa-purchase-prices-detail.js?v=20261027-purchases1"></script>
   <link rel="stylesheet" href="/operacao/caixa-purchase-prices.css?v=20260918-prices1" />
   <link rel="stylesheet" href="/operacao/caixa-deliveries-flow.css?v=20261023-delivery-simple1" />
-  <script defer src="/operacao/caixa-deliveries-flow-view.js?v=20261023-delivery-simple1"></script>
-  <script defer src="/operacao/caixa-deliveries-flow-receipts.js?v=20261023-delivery-simple1"></script>
-  <script defer src="/operacao/caixa-deliveries-flow-actions.js?v=20261023-delivery-simple1"></script>
-  <script defer src="/operacao/caixa-deliveries-matrix.js?v=20261023-delivery-simple1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-deliveries-metal.css?v=20261027-deliveries1" />
+  <script defer src="/operacao/caixa-deliveries-people.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-deliveries-metal-view.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-deliveries-flow-view.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-deliveries-flow-receipts.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-deliveries-flow-actions.js?v=20261027-deliveries1"></script>
+  <script defer src="/operacao/caixa-deliveries-matrix.js?v=20261027-deliveries1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20261023-delivery-simple1"></script>
   <script defer src="/operacao/caixa-finance-month.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260918-finance1"></script>
@@ -610,22 +613,24 @@
             <p id="mdf-loading" class="mdf-hint" role="status" hidden>Atualizando entregas…</p>
             <nav class="mdf-tabs" aria-label="Ver entregas"><button type="button" data-mdf-action="prepare">Para sair · <span id="mdf-queue-count">0</span></button><button id="mdf-route-tab" type="button" data-mdf-action="route">Minha rota</button></nav>
             <section data-mdf-view="prepare">
-              <details class="mdf-extra mdf-search-extra"><summary>Buscar entrega</summary><label class="mdf-search"><span class="sr-only">Buscar cliente ou pedido</span><input id="mdf-search" type="search" maxlength="80" placeholder="Cliente ou pedido" autocomplete="off" /></label></details>
+              <details class="mdf-extra mdf-search-extra" open><summary>Buscar entrega</summary><label class="mdf-search"><span class="sr-only">Buscar cliente ou pedido</span><input id="mdf-search" type="search" maxlength="80" placeholder="Cliente ou pedido" autocomplete="off" /></label></details>
               <div id="mdf-queue" class="mdf-cards"></div><p id="mdf-queue-empty" class="mdf-empty">Nenhuma entrega para sair. Atualize para conferir novos pedidos.</p>
               <section id="matrix-route-start" class="mdf-footer">
+                <p id="mdf-selection-count" class="mcg-plate mdf-selection-count" role="status">0 entregas selecionadas</p>
                 <button id="matrix-route-open" type="button" class="mdf-button mdf-primary" disabled>Montar rota · 0</button>
                 <details id="mdf-km-start-extra" class="mdf-extra"><summary>Informar KM inicial <small>(opcional)</small></summary><label class="mdf-field">KM inicial<input id="matrix-route-km-start" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45210" /></label></details>
                 <p id="mdf-open-hint" class="mdf-hint" hidden>Finalize a rota atual antes de montar outra.</p>
               </section>
             </section>
             <section data-mdf-view="route" hidden>
-              <section id="matrix-route-summary" class="mdf-route-summary"><strong id="matrix-route-number">Minha rota</strong><span id="matrix-route-progress-label">Nenhuma rota aberta</span></section>
+              <section id="matrix-route-summary" class="mdf-route-summary mcg-plate"><div><strong id="matrix-route-number">Minha rota</strong><span id="mdf-route-open-badge" class="mdf-status" hidden>Rota aberta</span></div><small id="mdf-route-code"></small><span id="matrix-route-progress-label">Nenhuma rota aberta</span></section>
+              <p id="mdf-route-reported" class="mdf-route-reported" role="status" hidden></p>
               <p id="mdf-route-empty" class="mdf-empty">Sua rota está vazia. Selecione as entregas em Preparar saída.</p><div id="mdf-route-list" class="mdf-cards"></div>
               <div class="mdf-footer"><button id="mdf-go-close" type="button" class="mdf-button mdf-primary" data-mdf-action="close">Fechar rota</button><p id="mdf-close-hint" class="mdf-hint"></p></div>
             </section>
             <section data-mdf-view="detail" hidden><div id="mdf-detail"></div></section>
             <section data-mdf-view="payment" hidden>
-              <h3 id="mdf-payment-order" class="mdf-customer"></h3><div class="mdf-payment-value"><span>Valor a receber</span><strong id="mdf-payment-total">—</strong></div>
+              <div id="mdf-payment-order" class="mdf-customer mcg-plate"></div><div class="mdf-payment-value mcg-plate"><span>Valor a receber</span><strong id="mdf-payment-total">—</strong></div>
               <fieldset class="mdf-methods"><legend>Como recebeu?</legend><label><input type="radio" name="mdf-payment" value="pix" /><span>Pix</span></label><label><input type="radio" name="mdf-payment" value="dinheiro" /><span>Dinheiro</span></label><label><input type="radio" name="mdf-payment" value="cartao" /><span>Cartão</span></label></fieldset>
               <label class="mdf-confirm-check"><input id="mdf-received" type="checkbox" />Conferi o recebimento</label>
               <button id="mdf-payment-confirm" type="button" class="mdf-button mdf-primary" disabled>Confirmar entrega</button><button type="button" class="mdf-text-button" data-mdf-action="back">Voltar sem concluir</button>

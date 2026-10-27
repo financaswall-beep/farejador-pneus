@@ -22,6 +22,7 @@ import {
 } from '../entregador/queries.js';
 import { caixaCourierAuth, getCaixaDeliveries } from './deliveries.js';
 import type { CaixaAuth } from './queries.js';
+import { getDeliveryCustomerAvatar } from './delivery-presentation.js';
 
 type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 type CaixaRequest = FastifyRequest & { caixa?: CaixaAuth };
@@ -75,6 +76,19 @@ export function registerCaixaDeliveryRoutes(
   fastify.get('/api/caixa/entregas', { preHandler: guarded }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     return reply.status(200).send(await getCaixaDeliveries(authOf(request)));
+  });
+
+  fastify.get('/api/caixa/entregas/:orderId/avatar', { preHandler: guarded }, async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const parsed = z.object({ orderId: z.string().uuid() }).safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'delivery_not_found' });
+    try { return { url: await getDeliveryCustomerAvatar(authOf(request), parsed.data.orderId) }; }
+    catch (error) {
+      if (error instanceof Error && error.message === 'delivery_not_found') {
+        return reply.status(404).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   fastify.post('/api/caixa/entregas/rota/abrir', { preHandler: guarded }, async (request, reply) => {

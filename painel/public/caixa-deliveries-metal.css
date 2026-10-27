@@ -1,0 +1,106 @@
+/* Entregas da Matriz: materiais compartilhados com Estoque e Compras. */
+.is-matrix-deliveries #session-view { max-width: none; padding: 0; }
+.is-matrix-deliveries #deliveries-panel { flex: 1 1 auto; min-height: 0; margin: 0; padding: 12px 14px 22px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; background: none; }
+.is-matrix-deliveries .mdf { --mdf-green: var(--mc-green); --mdf-ink: var(--mc-ink); --mdf-muted: var(--mc-muted); padding: 0; font: 500 22px/1.2 var(--mc-font); }
+.is-matrix-deliveries .mdf-heading { margin-bottom: 12px; gap: 10px; }
+.is-matrix-deliveries .mdf-heading h2 { font: 900 40px/1.05 var(--mc-font); }
+.is-matrix-deliveries :is(.mdf-refresh,.mdf-back) { display: grid; place-items: center; height: 44px; color: var(--mc-ink); border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-panel); box-shadow: var(--mc-shadow); font-size: 30px; }
+.is-matrix-deliveries .mdf-tabs { gap: 7px; margin-bottom: 12px; }
+.is-matrix-deliveries :is(.mdf-tabs button,.mdf-button) { border: 1px solid var(--mc-line); border-radius: 8px; color: var(--mc-ink); background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); font: 800 25px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-tabs button { min-height: 50px; padding: 10px 6px; }
+.is-matrix-deliveries :is(.mdf-tabs button[aria-current=page],.mdf-primary) { color: white; border-color: #6da489; background: var(--mc-action); box-shadow: inset 0 1px #c4e1d1,0 2px 3px #173c2c55; }
+.is-matrix-deliveries .mdf-button { min-height: 52px; padding: 10px; }
+.is-matrix-deliveries .mdf-button.mdf-danger { color: white; border-color: #ad5b65; background: linear-gradient(140deg,#db3b42,#b01429 75%,#8c1024); box-shadow: inset 0 1px #ffc1c1,0 2px 3px #4f172c44; }
+.is-matrix-deliveries .mdf button:disabled { opacity: .5; }
+.is-matrix-deliveries .mdf-icon { flex: 0 0 27px; width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.is-matrix-deliveries .mdf-search-extra { margin: 0 0 12px; }
+.is-matrix-deliveries .mdf-search-extra > summary { display: none; }
+.is-matrix-deliveries .mdf-search { display: block; }
+.is-matrix-deliveries .mdf-search input { margin: 0; min-height: 48px; padding: 11px 12px; border: 1px solid var(--mc-line); border-radius: 8px; color: var(--mc-ink); background: #f8faf9cf; box-shadow: inset 0 1px 2px #20382a25; font: 500 22px var(--mc-font); }
+.is-matrix-deliveries .mdf-cards { gap: 11px; }
+.is-matrix-deliveries .mdf-card { padding: 13px 11px; }
+.is-matrix-deliveries .mdf-card.is-selected { border-color: #36775b; box-shadow: var(--mc-shadow),inset 0 0 0 1px #478361; }
+.is-matrix-deliveries .mdf-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.is-matrix-deliveries .mdf-identity > div { flex: 1; min-width: 100px; }
+.is-matrix-deliveries .mdf-identity h3 { margin: 0 0 3px; font: 900 30px/1 var(--mc-font); letter-spacing: -.025em; }
+.is-matrix-deliveries .mdf-identity small { display: block; font: 500 18px/1.15 var(--mc-font); color: var(--mc-muted); }
+.is-matrix-deliveries .mdf-avatar { position: relative; display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; overflow: hidden; border-radius: 50%; border: 1px solid #98a79f; background: linear-gradient(#fff,#cbd6cf); box-shadow: inset 0 1px #fff,0 2px 3px #26443333; font: 800 22px var(--mc-font); }
+.is-matrix-deliveries .mdf-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.is-matrix-deliveries .mdf-status { flex: 0 1 auto; margin: 0; padding: 7px 9px; border: 1px solid #e3b03b; border-radius: 8px; background: linear-gradient(#ffe798,#ffc629); color: #201800; font: 800 18px/1.05 var(--mc-font); }
+.is-matrix-deliveries .mdf-status--failed { color: #6d1018; background: linear-gradient(#ffdddd,#ef8d95); border-color: #c9747f; }
+.is-matrix-deliveries .mdf-status--delivered { color: #06452f; background: linear-gradient(#e8f6ec,#a4d9b9); border-color: #7caa8d; }
+.is-matrix-deliveries .mdf-card-content { display: grid; grid-template-columns: minmax(0,1fr) 74px; gap: 8px; margin-top: 10px; }
+.is-matrix-deliveries .mdf-card-content > div { min-width: 0; }
+.is-matrix-deliveries .mdf-card-content:not(:has(.mdf-selection)) { grid-template-columns: minmax(0,1fr); }
+.is-matrix-deliveries .mdf-button.mdf-selection { display: flex; flex-direction: column; align-self: center; gap: 7px; width: 74px; min-height: 90px; margin: 0; padding: 5px 2px; border: 0; background: none; box-shadow: none; font: 800 18px/1.05 var(--mc-font); text-align: center; }
+.is-matrix-deliveries .mdf-selection-mark { display: grid; place-items: center; flex: 0 0 43px; width: 43px; height: 43px; border: 1px solid #44826b; border-radius: 10px; background: linear-gradient(#fff,#cad6cf); box-shadow: inset 0 1px #fff,0 2px 3px #163e2e44; }
+.is-matrix-deliveries .mdf-selection[aria-pressed=true] .mdf-selection-mark { color: white; background: var(--mc-action); }
+.is-matrix-deliveries .mdf-selection-mark svg { width: 32px; height: 32px; }
+.is-matrix-deliveries .mdf-products { display: grid; gap: 8px; }
+.is-matrix-deliveries .mdf-product { grid-template-columns: 75px minmax(0,1fr); gap: 10px; padding: 9px; border: 1px solid #a8b2ac; border-radius: 8px; background: #fbfcfb8c; }
+.is-matrix-deliveries .mdf-products--compact .mdf-product { grid-template-columns: 60px minmax(0,1fr); padding: 5px; gap: 8px; border: 0; background: none; }
+.is-matrix-deliveries .mdf-product-copy strong { font: 900 31px/1.05 var(--mc-font); }
+.is-matrix-deliveries .mdf-products--compact .mdf-product-copy strong { font-size: 27px; }
+.is-matrix-deliveries .mdf-product-copy p { margin: 3px 0 0; font: 600 21px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-product-copy small { margin-top: 4px; color: var(--mc-muted); font: 500 19px/1.15 var(--mc-font); }
+.is-matrix-deliveries .mdf-photo { align-self: center; font: 400 14px var(--mc-font); }
+.is-matrix-deliveries .mdf-photo img { display: block; width: 100%; height: 106px; object-fit: contain; mix-blend-mode: multiply; }
+.is-matrix-deliveries .mdf-products--compact .mdf-photo img { height: 100px; }
+.is-matrix-deliveries .mdf-photo .ms-tire-unknown { display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 14px; color: var(--mc-muted); }
+.is-matrix-deliveries .mdf-photo .ms-tire-unknown svg { width: 36px; height: 36px; }
+.is-matrix-deliveries .mdf-products--compact figcaption { display: none; }
+.is-matrix-deliveries .mdf-charge-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; padding-left: 73px; margin-top: 3px; font-size: 20px; }
+.is-matrix-deliveries .mdf-charge-line strong { color: var(--mc-green); font: 900 29px/1 var(--mc-font); }
+.is-matrix-deliveries .mdf-footer { gap: 8px; margin-top: 12px; }
+.is-matrix-deliveries #matrix-route-start { position: sticky; bottom: -12px; z-index: 2; padding: 8px 0 12px; background: var(--mc-metal) center/540px 540px; }
+.is-matrix-deliveries .mdf-detail-actions { display: grid; gap: 9px; }
+.is-matrix-deliveries .mdf-selection-count { margin: 0; padding: 11px 14px; font: 800 23px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-extra { margin-top: 12px; font: 500 20px var(--mc-font); }
+.is-matrix-deliveries .mdf-extra summary { margin: 0 auto; min-height: 44px; color: var(--mc-green); }
+.is-matrix-deliveries .mdf-route-summary { color: var(--mc-ink); margin: 0 0 11px; padding: 15px; gap: 5px; }
+.is-matrix-deliveries .mdf-route-summary > div { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 9px; }
+.is-matrix-deliveries .mdf-route-summary strong { font: 900 29px var(--mc-font); }
+.is-matrix-deliveries .mdf-route-summary > :is(span,small) { font: 500 20px var(--mc-font); color: var(--mc-muted); }
+.is-matrix-deliveries :is(.mdf-route-reported,.mdf-failure-reason) { padding: 10px 12px; margin: 0 0 11px; border: 1px solid #c59d56; border-radius: 8px; background: #fff1d6c9; color: #66380b; font: 700 21px/1.2 var(--mc-font); overflow-wrap: anywhere; }
+.is-matrix-deliveries .mdf-failure-reason { margin-top: 10px; border-color: #cb8d97; background: #fff1f0be; color: #861e2b; }
+.is-matrix-deliveries .mdf-detail { display: grid; gap: 11px; }
+.is-matrix-deliveries .mdf-detail .mdf-detail-identity { margin: 0; }
+.is-matrix-deliveries .mdf-detail .mdf-button + .mdf-button { margin: 0; }
+.is-matrix-deliveries .mdf-detail h4 { margin: 0 0 10px; font: 800 24px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-address-line { display: flex; align-items: center; gap: 11px; margin: 0 0 11px; padding: 10px; border: 1px solid #a8b2ac; border-radius: 8px; background: #fbfcfb8c; }
+.is-matrix-deliveries .mdf-address-line .mdf-icon { flex-basis: 30px; width: 30px; height: 30px; }
+.is-matrix-deliveries .mdf-detail-address { padding: 0; margin: 0; border: 0; border-radius: 0; background: none; font: 700 24px/1.2 var(--mc-font); }
+.is-matrix-deliveries .mdf-payment-value { margin: 0; padding: 15px 12px; color: var(--mc-ink); background: linear-gradient(110deg,#dff8e9e6,#d1eadba8),var(--mc-metal); }
+.is-matrix-deliveries .mdf-payment-value span { font: 800 24px var(--mc-font); }
+.is-matrix-deliveries .mdf-payment-value strong { color: var(--mc-green); font: 900 clamp(40px,12vw,56px)/1 var(--mc-font); }
+.is-matrix-deliveries #mdf-payment-order { padding: 14px 12px; margin: 0 0 11px; }
+.is-matrix-deliveries .mdf-methods { margin: 18px 0 12px; gap: 9px; }
+.is-matrix-deliveries .mdf-methods legend { float: left; width: 100%; margin: 0 0 12px; font: 800 29px/1 var(--mc-font); }
+.is-matrix-deliveries .mdf-methods legend + label { clear: both; }
+.is-matrix-deliveries .mdf-methods label { min-height: 56px; padding: 11px 15px; border: 1px solid #929f97; border-radius: 8px; background: var(--mc-panel); box-shadow: var(--mc-shadow); font: 700 25px var(--mc-font); }
+.is-matrix-deliveries .mdf-methods label:has(input:checked) { background: linear-gradient(110deg,#dff8e9e6,#d1eadba8),var(--mc-metal); border-color: #28714f; }
+.is-matrix-deliveries .mdf-confirm-check { font: 600 24px var(--mc-font); }
+.is-matrix-deliveries .mdf-text-button { font: 500 21px var(--mc-font); }
+.is-matrix-deliveries :is(.mdf-hint,.mdf-error,.mdf-empty) { font: 500 21px/1.25 var(--mc-font); }
+.is-matrix-deliveries .mdf-success { border: 1px solid #8eab99; background: #dff1e6c9; font: 700 25px/1.2 var(--mc-font); }
+.is-matrix-deliveries .mdf-success.mdf-has-occurrences { border-color: #c59d56; background: #fff1d6c9; }
+.is-matrix-deliveries .mdf-success span { font: 500 20px/1.2 var(--mc-font); }
+.is-matrix-deliveries .mdf-close-fields { gap: 14px; }
+.is-matrix-deliveries .mdf-field { grid-template-columns: minmax(95px,.85fr) minmax(0,1fr); font: 800 26px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-field :is(input,.mdf-money-field) { color: var(--mc-ink); border-color: var(--mc-line); border-radius: 8px; background: #f9fbfad9; font: 600 25px var(--mc-font); }
+.is-matrix-deliveries .mdf-receipt-section { padding: 15px 13px; border-color: var(--mc-line); border-radius: 9px; background: var(--mc-panel); box-shadow: var(--mc-shadow); }
+.is-matrix-deliveries .mdf-receipt-section h3 { font: 900 31px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-receipt-section p { font: 500 21px/1.2 var(--mc-font); }
+.is-matrix-deliveries .mdf-receipt-card strong { font: 800 25px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-receipt-state { font: 700 19px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-receipt-gallery { font: 500 21px var(--mc-font); }
+.is-matrix-deliveries :is(dialog.mdf-dialog,dialog.mdf-receipt-preview) { position: fixed; z-index: 9; inset: var(--mc-top) auto var(--mc-bottom) 50%; transform: translateX(-50%); width: var(--mc-width); height: calc(100dvh - var(--mc-top) - var(--mc-bottom)); max-width: 100vw; max-height: none; margin: 0; padding: 14px; border: 0; border-radius: 0; overflow-y: auto; background: var(--mc-metal) center/540px 540px; box-shadow: none; color: var(--mc-ink); font: 500 22px var(--mc-font); }
+.is-matrix-deliveries dialog.mdf-dialog > article { padding: 0; max-height: none; overflow: visible; background: none; }
+.is-matrix-deliveries .mdf-dialog header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.is-matrix-deliveries .mdf-dialog header > div { flex: 1; }
+.is-matrix-deliveries .mdf-dialog header h3 { margin: 6px 0; font: 900 32px/1.1 var(--mc-font); }
+.is-matrix-deliveries .mdf-dialog header button { min-width: 44px; min-height: 44px; border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-panel); font-size: 28px; color: var(--mc-ink); }
+.is-matrix-deliveries .mdf-dialog label { display: grid; gap: 9px; font: 800 25px var(--mc-font); }
+.is-matrix-deliveries .mdf-dialog textarea { width: 100%; min-height: 130px; padding: 12px; border: 1px solid var(--mc-line); border-radius: 8px; background: #f9fbfad9; color: var(--mc-ink); font: 500 23px/1.2 var(--mc-font); }
+.is-matrix-deliveries :is(.mdf-dialog,.mdf-receipt-preview) :is(button,textarea):focus-visible { outline: 3px solid #0b7953; outline-offset: 3px; }
+@media (max-width: 350px) { .is-matrix-deliveries #deliveries-panel { padding-inline: 10px; }.is-matrix-deliveries .mdf-avatar { width: 38px; height: 38px; flex-basis: 38px; }.is-matrix-deliveries .mdf-identity h3 { font-size: 28px; }.is-matrix-deliveries .mdf-status { font-size: 16px; }.is-matrix-deliveries .mdf-card-content { grid-template-columns: minmax(0,1fr) 60px; gap: 5px; }.is-matrix-deliveries .mdf-button.mdf-selection { width: 60px; font-size: 17px; }.is-matrix-deliveries .mdf-products--compact .mdf-product { grid-template-columns: 45px minmax(0,1fr); gap: 6px; padding: 2px; }.is-matrix-deliveries .mdf-products--compact .mdf-product-copy strong { font-size: 25px; }.is-matrix-deliveries .mdf-charge-line { padding-left: 53px; }.is-matrix-deliveries .mdf-charge-line strong { font-size: 27px; } }

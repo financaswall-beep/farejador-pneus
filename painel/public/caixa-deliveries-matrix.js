@@ -94,6 +94,12 @@
   function loadFailed() { state.loading = false; state.error = 'Não consegui atualizar as entregas. Toque em atualizar para tentar novamente.'; paint(); }
   C.matrixDeliveries = {
     sync, render: paint, handleAction, leave, reset, loading, loadFailed,
+    blockNavigation: () => {
+      if (!C.isPartner() && state.busy && C.elements.app.classList.contains('is-matrix-deliveries')) {
+        C.showToast('Aguarde o registro da entrega.'); return true;
+      }
+      return false;
+    },
     matchesFilter: (row, filter) => filter === 'pending' ? !row.in_route && row.delivery_status === 'pending'
       : filter === 'dispatched' ? row.in_route && ['pending', 'dispatched'].includes(row.delivery_status)
         : row.in_route && row.delivery_status === 'delivered',

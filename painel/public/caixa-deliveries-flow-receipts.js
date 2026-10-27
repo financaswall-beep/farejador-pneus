@@ -2,14 +2,16 @@
   'use strict';
   const C = window.Caixa;
   C.createMatrixDeliveryReceipts = function (state, ui, paint, run) {
-    const byId = ui.byId; const images = new Map(); let epoch = 0; let returnFocus = null;
+    const byId = ui.byId; const images = new Map(); let epoch = 0; let previewEpoch = 0; let returnFocus = null;
     const context = () => JSON.stringify([C.sessionFingerprint(), state.generation, state.route?.trip_id, epoch]);
     function node(tag, text, cls) {
       const el = document.createElement(tag); if (text != null) el.textContent = text;
       if (cls) el.className = cls; return el;
     }
     function closePreview() {
+      previewEpoch++;
       const modal = byId('mdf-receipt-preview'); if (modal.open) modal.close();
+      ui.closeOverlay?.();
       byId('mdf-receipt-photo').removeAttribute('src');
       if (returnFocus?.isConnected) returnFocus.focus(); returnFocus = null;
     }
@@ -83,11 +85,12 @@
     async function openPreview(id) {
       if (state.busy || state.loading || state.view !== 'close' || C.isPartner()
         || !state.route?.receipts?.some(row => row.receipt_id === id && row.has_image)) return;
-      const key = context(); const url = await imageUrl(id);
-      if (key !== context() || state.view !== 'close') return;
+      const key = context(), preview = ++previewEpoch; const url = await imageUrl(id);
+      if (key !== context() || preview !== previewEpoch || state.view !== 'close') return;
       if (!url) { state.error = 'Não consegui abrir a foto. Atualize para tentar novamente.'; paint(); return; }
       returnFocus = document.activeElement;
-      byId('mdf-receipt-photo').src = url; const modal = byId('mdf-receipt-preview'); if (!modal.open) modal.showModal();
+      byId('mdf-receipt-photo').src = url; const modal = byId('mdf-receipt-preview');
+      if (!modal.open) { if (ui.showOverlay) ui.showOverlay(modal); else modal.showModal(); }
     }
     for (const id of ['matrix-route-receipt', 'mdf-receipt-gallery']) {
       const input = byId(id); input.addEventListener('change', () => uploadReceipt(input));
