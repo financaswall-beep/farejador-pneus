@@ -30,7 +30,7 @@ export class ProfilePhotoStorage {
     let response = await this.request('/bucket/' + PROFILE_PHOTO_BUCKET);
     const missing = response.status === 404 || (response.status === 400 && await response.clone().json()
       .then(value => { const error = value as { statusCode?: unknown; code?: unknown };
-        return String(error?.statusCode) === '404' || error?.code === 'NoSuchBucket'; })
+        return String(error?.statusCode) === '404' || ['NoSuchBucket', 'not_found'].includes(String(error?.code)); })
       .catch(() => false));
     if (missing) {
       await response.body?.cancel();
@@ -63,8 +63,8 @@ export class ProfilePhotoStorage {
     const response = await this.request('/object/' + PROFILE_PHOTO_BUCKET + '/' + path);
     if (response.status === 404) { await response.body?.cancel(); return null; }
     if (!response.ok) {
-      const error = await response.json().catch(() => ({})) as { statusCode?: unknown };
-      if (String(error.statusCode) === '404') return null;
+      const error = await response.json().catch(() => ({})) as { statusCode?: unknown; code?: unknown };
+      if (String(error.statusCode) === '404' || ['NoSuchKey', 'not_found'].includes(String(error.code))) return null;
       throw new ProfilePhotoError('photo_storage_unavailable');
     }
     const reader = response.body?.getReader();

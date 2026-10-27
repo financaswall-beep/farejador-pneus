@@ -31,7 +31,7 @@ describe('foto pessoal compacta e privada', () => {
     expect(() => profilePhotoPath('test', '../outra-pessoa')).toThrow('invalid_photo_path');
   });
   it('mantém só um objeto por pessoa com upsert e bucket privado', async () => {
-    const mock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 404 }))
+    const mock = vi.fn().mockResolvedValueOnce(Response.json({ httpStatusCode: 400, code: 'not_found' }, { status: 400 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 })).mockResolvedValueOnce(policy())
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
     const storage = new ProfilePhotoStorage(mock as unknown as typeof fetch);
@@ -61,5 +61,10 @@ describe('foto pessoal compacta e privada', () => {
   it('limita também o download se a resposta upstream ultrapassar 256 KB', async () => {
     const mock = vi.fn().mockResolvedValueOnce(policy()).mockResolvedValueOnce(new Response(new Uint8Array(PROFILE_PHOTO_MAX + 1)));
     await expect(new ProfilePhotoStorage(mock as unknown as typeof fetch).read(profilePhotoPath('test', person))).rejects.toThrow('invalid_stored_photo');
+  });
+  it.each(['NoSuchKey', 'not_found'])('aceita ausência explícita do objeto no formato %s do Storage', async code => {
+    const mock = vi.fn().mockResolvedValueOnce(policy())
+      .mockResolvedValueOnce(Response.json({ httpStatusCode: 400, code }, { status: 400 }));
+    expect(await new ProfilePhotoStorage(mock as unknown as typeof fetch).read(profilePhotoPath('test', person))).toBeNull();
   });
 });
