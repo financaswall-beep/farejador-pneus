@@ -3,7 +3,7 @@
 
   const Caixa = window.Caixa;
   const state = Caixa.teamState;
-  let payload = null;
+  let payload = null, payloadSession = '', sequence = 0;
 
   const basisLabels = {
     revenue: 'Valor final da venda', margin: 'Margem da venda', sale: 'Por venda',
@@ -163,7 +163,7 @@
   }
 
   function render(data) {
-    payload = data; const member = data.member;
+    payload = data; payloadSession = Caixa.teamClean.sessionKey(); const member = data.member;
     document.getElementById('team-commission-unit').textContent = data.unit_name;
     document.getElementById('team-commission-avatar').textContent = initials(member.name);
     document.getElementById('team-commission-name').textContent = member.name;
@@ -190,26 +190,30 @@
     document.getElementById('team-commission-history').classList.add('hidden');
     const historyToggle = document.getElementById('team-commission-history-toggle');
     historyToggle.textContent = 'Ver histórico de regras'; historyToggle.setAttribute('aria-expanded', 'false');
-    document.getElementById('team-commission-save-error').textContent = '';
+    document.getElementById('team-commission-save-error').textContent = ''; Caixa.teamClean.refresh();
     document.getElementById('team-open-finance-commission').classList.toggle(
       'hidden', !Caixa.canModule('financeiro'),
     );
   }
 
   async function load(force) {
+    if (!Caixa.canModule('team')) return;
+    const ticket = ++sequence, id = memberId(), key = Caixa.teamClean.sessionKey();
     if (!memberId()) { Caixa.showTab('team'); return; }
-    if (payload && payload.member.id === memberId() && !force) { render(payload); setMode('content'); return; }
+    if (payloadSession === key && payload && payload.member.id === memberId() && !force) { render(payload); setMode('content'); return; }
     setMode('loading');
     try {
-      const response = await Caixa.authenticatedFetch(url()); const data = await Caixa.json(response);
+      const { response, data } = await Caixa.teamClean.request(url());
+      if (ticket !== sequence || id !== memberId()) return;
       if (!response.ok) throw new Error(data.error || 'request_failed'); render(data); setMode('content');
     } catch (error) {
+      if (ticket !== sequence || key !== Caixa.teamClean.sessionKey() || id !== memberId()) return;
       if (error instanceof Error && error.message === 'invalid_session') return; setMode('error');
     }
   }
 
   async function save(event) {
-    event.preventDefault(); const kindChoice = selectedKind();
+    event.preventDefault(); const session = Caixa.teamClean.sessionKey(); if (!payload || payloadSession !== Caixa.teamClean.sessionKey()) return; const kindChoice = selectedKind();
     const frequency = document.querySelector('input[name="team-commission-frequency"]:checked');
     let body;
     if (salesRule()) {
@@ -237,16 +241,16 @@
     const error = document.getElementById('team-commission-save-error'); error.textContent = '';
     const button = document.getElementById('team-commission-save'); button.disabled = true; button.textContent = 'Salvando…';
     try {
-      const response = await Caixa.authenticatedFetch(url(), {
+      const { response, data } = await Caixa.teamClean.request(url(), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      const data = await Caixa.json(response); if (!response.ok) throw new Error(data.error || 'request_failed');
+      if (!response.ok) throw new Error(data.error || 'request_failed');
       payload = data; state.payload = null; render(data); Caixa.showToast('Regra de comissão salva.');
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       error.textContent = failure instanceof Error && failure.message === 'future_start_not_allowed'
         ? 'No parceiro, a vigência começa hoje ou em uma data anterior.' : 'Não foi possível salvar esta regra.';
-    } finally { button.disabled = false; button.textContent = 'Salvar regra de comissão'; }
+    } finally { if (session === Caixa.teamClean.sessionKey()) { button.disabled = false; button.textContent = 'Salvar regra de comissão'; } }
   }
 
   function back() { payload = null; state.memberId = ''; window.location.hash = '#equipe'; Caixa.showTab('team'); }

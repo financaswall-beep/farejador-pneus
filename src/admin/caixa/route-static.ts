@@ -211,6 +211,9 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-finance-commissions.js', 'caixa-finance-commissions.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-commission-detail.js', 'caixa-finance-commission-detail.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-team.js', 'caixa-team.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-team-clean.js', 'caixa-team-clean.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-team-clean.css', 'caixa-team-clean.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-team-clean-forms.css', 'caixa-team-clean-forms.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-team-remuneration.js', 'caixa-team-remuneration.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-team-commission.js', 'caixa-team-commission.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-team-permissions.js', 'caixa-team-permissions.js', 'text/javascript; charset=utf-8');

@@ -1,0 +1,82 @@
+.is-matrix-team .team-page {
+  flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 12px 16px 24px; color: var(--mc-ink);
+  background: linear-gradient(#fffffff5, #f6f9f8f5), var(--mc-metal) center/cover;
+  font: 19px/1.25 var(--mc-font);
+}
+.is-matrix-team .team-page.hidden { display: none; }
+.is-matrix-team .team-page :is(button,input,select,summary) { font-family: inherit; }
+.is-matrix-team .team-page :is(button,input,select,summary):focus-visible,
+.is-matrix-team .team-permission-row:has(input:focus-visible) { outline: 3px solid #0a875d; outline-offset: 3px; }
+.is-matrix-team .team-page button:disabled { opacity: .55; cursor: default; }
+.team-clean-icon { display: block; width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.is-matrix-team #team-title {
+  position: static; clip: auto; clip-path: none; width: auto; height: auto;
+  margin: 0 0 12px; padding: 0; overflow: visible; white-space: normal; font-size: 38px; line-height: 1.05;
+}
+.is-matrix-team .team-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0 0 16px; padding: 2px 0 4px; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.is-matrix-team .team-summary p { display: block; margin: 0; padding: 0 6px; text-align: center; border: 0; }
+.is-matrix-team .team-summary p + p { border-left: 1px solid #d4deda; }
+.is-matrix-team .team-summary-icon { display: none; }
+.is-matrix-team .team-summary strong { display: block; color: #07563d; font-size: 30px; line-height: 1.1; }
+.is-matrix-team .team-summary small { display: block; margin-top: 3px; color: #43524e; font-size: 17px; }
+.is-matrix-team :is(.team-new-member,.team-primary) {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px;
+  margin: 0; padding: 10px 14px; border: 1px solid #035238; border-radius: 9px;
+  background: var(--mc-action); box-shadow: inset 0 1px #ffffff25; color: white; font-size: 24px; font-weight: 700; line-height: 1.15;
+}
+.is-matrix-team .team-new-member b { font-size: 29px; line-height: 1; }
+.is-matrix-team .team-search { display: flex; align-items: center; min-height: 46px; margin: 12px 0; padding: 0 12px; gap: 9px; border: 1px solid #cbd6d0; border-radius: 9px; background: white; }
+.is-matrix-team .team-search svg { position: static; flex: 0 0 22px; width: 22px; height: 22px; transform: none; color: #6d7b74; }
+.is-matrix-team .team-search input { min-width: 0; height: 44px; font-size: 20px; color: #17221c; }
+.is-matrix-team .team-filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin: 0 0 12px; padding: 0; border: 0; background: none; }
+.is-matrix-team .team-filters button { min-width: 0; min-height: 44px; padding: 7px 3px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #4c5852; font-size: 19px; }
+.is-matrix-team .team-filters button.active { border-color: #b4d3c3; background: #e7f2ec; color: #07563d; font-weight: 700; }
+.is-matrix-team #team-list-title { margin: 8px 0 9px; font-size: 23px; }
+.is-matrix-team .team-list { display: grid; gap: 10px; }
+.is-matrix-team .team-member-card { margin: 0; padding: 11px; border: 1px solid #ccd8d0; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px #173c2310; }
+.is-matrix-team .team-member-card.is-inactive { opacity: 1; background: #f4f6f4; }
+.is-matrix-team .team-member-head { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; align-items: center; gap: 10px; }
+.is-matrix-team :is(.team-avatar,.team-person > b) { display: grid; place-items: center; width: 48px; height: 48px; border: 0; border-radius: 9px; background: #e6f0e9; color: #07563d; font: 700 23px var(--mc-font); box-shadow: none; }
+.is-matrix-team .team-member-head p { min-width: 0; margin: 0; }
+.is-matrix-team .team-member-head strong { display: block; font-size: 24px; line-height: 1.05; overflow-wrap: anywhere; }
+.is-matrix-team .team-member-head p > span { display: block; margin-top: 3px; color: #59665e; font-size: 18px; }
+.is-matrix-team .team-member-head > em { display: flex; align-items: center; gap: 4px; color: #08754c; font-size: 16px; font-style: normal; white-space: nowrap; }
+.is-matrix-team .team-member-head > em::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ''; }
+.is-matrix-team .is-inactive :is(.team-member-head > em,.team-person small) { color: #67736c; }
+.is-matrix-team .team-member-metrics { display: none; }
+.is-matrix-team .team-member-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-top: 12px; }
+.is-matrix-team .team-member-actions .team-outline { display: flex; flex-direction: column; align-items: center; justify-content: center; grid-column: auto; gap: 5px; min-width: 0; min-height: 65px; padding: 7px 2px; border: 1px solid #c4d4c9; border-radius: 7px; color: #07563d; background: #fff; font-size: 18px; line-height: 1.05; }
+.is-matrix-team .team-inactive-toggle { display: block; min-height: 44px; margin: 8px auto 0; padding: 6px 12px; border: 0; background: none; color: #07563d; font-size: 19px; text-decoration: underline; text-underline-offset: 3px; }
+.is-matrix-team .team-inactive-toggle.hidden { display: none; }
+.is-matrix-team .team-private-note { display: flex; align-items: flex-start; gap: 7px; margin: 12px 0; padding: 0; border: 0; border-radius: 0; background: none; color: #59675e; font-size: 16px; line-height: 1.3; }
+.is-matrix-team .team-private-note > b { flex: 0 0 17px; width: 17px; height: auto; margin: 0; background: none; color: #59675e; }
+.is-matrix-team .team-private-note .team-clean-icon { width: 17px; height: 19px; }
+.is-matrix-team .team-detail-heading { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; background: none; }
+.is-matrix-team .team-detail-heading > button { display: grid; place-items: center; width: 40px; height: 44px; padding: 7px; border: 0; border-radius: 7px; background: none; color: #111b15; }
+.is-matrix-team .team-detail-heading svg { width: 26px; height: 26px; stroke-width: 2; }
+.is-matrix-team .team-detail-heading small { display: none; }
+.is-matrix-team .team-detail-heading h2 { margin: 0; font-size: 34px; line-height: 1.1; }
+.is-matrix-team .team-person { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 10px; align-items: center; margin: 0 0 16px; padding: 10px; border: 1px solid #d0dad3; border-radius: 9px; background: white; }
+.is-matrix-team .team-person > div { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 8px; align-items: center; min-width: 0; }
+.is-matrix-team .team-person strong { min-width: 0; font-size: 24px; line-height: 1.05; overflow-wrap: anywhere; }
+.is-matrix-team .team-person div > span { grid-column: 1; color: #59665e; font-size: 18px; }
+.is-matrix-team .team-person small { grid-column: 2; grid-row: 1/3; display: flex; align-items: center; gap: 4px; margin: 0; color: #08754c; font-size: 16px; }
+.is-matrix-team .team-person small i { width: 6px; height: 6px; background: currentColor; }
+.is-matrix-team .team-person small em { color: inherit; font-size: inherit; }
+.is-matrix-team .team-message { min-height: 180px; padding: 28px 12px; color: #526158; font-size: 21px; text-align: center; }
+.is-matrix-team .team-message--error { color: #962f30; }
+.is-matrix-team .team-message button { min-height: 44px; padding: 9px 20px; border-radius: 8px; background: #07563d; color: white; font-size: 20px; }
+.is-matrix-team .team-empty { margin: 12px 0; padding: 28px 12px; border: 1px dashed #c4d4c9; border-radius: 9px; background: #fff; color: #59665e; font-size: 21px; }
+.is-matrix-team #team-create-modal .account-modal-sheet { border: 1px solid #b9c7be; border-radius: 16px 16px 0 0; background: #f8faf8; color: #111b15; font-family: var(--mc-font); }
+.is-matrix-team #team-create-modal h2 { font-size: 30px; }
+.is-matrix-team #team-create-modal :is(input,select) { min-width: 0; min-height: 46px; border: 1px solid #c2d1c7; border-radius: 8px; background: white; font: 20px var(--mc-font); }
+.is-matrix-team #team-create-modal label { color: #34473b; font-size: 19px; }
+.is-matrix-team #team-create-submit { min-height: 52px; border-radius: 9px; background: var(--mc-action); color: white; font: 700 24px var(--mc-font); }
+@media (max-width:350px) {
+  .is-matrix-team .team-page { padding-inline: 10px; }
+  .is-matrix-team .team-filters button { font-size: 18px; }
+  .is-matrix-team .team-member-actions .team-outline { font-size: 17px; }
+  .is-matrix-team .team-member-head { gap: 7px; }
+  .is-matrix-team .team-member-head strong,.is-matrix-team .team-person strong { font-size: 22px; }
+}
