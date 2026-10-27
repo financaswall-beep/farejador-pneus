@@ -1,0 +1,11 @@
+/* Mesmo eixo, áreas de toque e distância entre sino e perfil em toda a Matriz. */
+.caixa-app.is-matrix-header .operator-area { align-self: center; }
+.caixa-app.is-matrix-header .operator-actions { display: flex; align-items: center; gap: 18px; }
+.caixa-app.is-matrix-header :is(#notifications-button,#operator-button) { display: grid; place-items: center; align-self: center; box-sizing: border-box; width: 44px; height: 44px; min-width: 44px; flex: 0 0 44px; padding: 0; gap: 0; }
+.caixa-app.is-matrix-header :is(#notifications-button,#operator-button) svg { display: block; width: 28px; height: 28px; flex: none; margin: 0; }
+.caixa-app.is-matrix-header #notifications-badge { top: -3px; right: -2px; min-width: 20px; height: 20px; padding: 0 4px; }
+.caixa-app.is-matrix-header #notifications-badge.hidden { display: none; }
+.caixa-app.is-matrix-header #operator-label { display: none; }
+.caixa-app.is-matrix-header .online-status { display: none; }
+.caixa-app.is-matrix-header #operator-button { position: relative; overflow: visible; }
+.caixa-app.is-matrix-header #operator-button::after { content: ''; position: absolute; width: 14px; height: 14px; right: -1px; bottom: -1px; box-sizing: border-box; border: 2px solid white; border-radius: 50%; background: #087c45; pointer-events: none; }

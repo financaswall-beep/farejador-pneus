@@ -17,11 +17,11 @@
   const plate = name => el('section', null, 'mcg-plate ' + (name || ''));
   const key = row => String(row.row_key || row.product_id || [row.tire_size, row.brand, row.tire_condition].join('|'));
   const meta = row => [row.brand, U.conditionLabel(row.tire_condition)].filter(Boolean).join(' · ');
-  function picture() { const img = el('img'); img.src = '/operacao/assets/partner-replenishment-tire-v1.webp'; img.alt = ''; img.className = 'mcg-tire'; return img; }
+  function picture(row) { return C.tireIllustration(row); }
   function identity(row, compact) {
     const box = plate('mcg-product' + (compact ? ' mcg-product-compact' : '')), copy = el('div');
     copy.append(el('strong', row.tire_size || row.product_name || 'Pneu'), el('p', meta(row)));
-    if (row.product_code) copy.appendChild(el('small', 'Código ' + row.product_code)); box.append(picture(), copy); return box;
+    if (row.product_code) copy.appendChild(el('small', 'Código ' + row.product_code)); box.append(picture(row), copy); return box;
   }
   function heading(title, back) { const n = el('header', null, 'mcg-heading'); if (back) { const b = button('', back, 'icon-button', 'back'); b.setAttribute('aria-label', 'Voltar'); n.appendChild(b); } const h = el('h2', title); h.tabIndex = -1; n.appendChild(h); return n; }
   function list(m, state) {
@@ -49,7 +49,7 @@
       copy.append(el('strong', row.tire_size || row.product_name || 'Produto'), el('p', meta(row)));
       const badge = el('span', row.catalogued ? U.available(row) + ' disponíveis' : 'Cadastro pendente', 'mcg-badge' + (row.catalogued ? '' : ' mcg-amber')); copy.appendChild(badge);
       const footer = el('footer'); footer.append(el('b', U.priceLabel(row)));
-      if (row.product_id || C.matrixCatalog.allowed()) footer.appendChild(open); copy.appendChild(footer); card.append(picture(), copy); host.appendChild(card);
+      if (row.product_id || C.matrixCatalog.allowed()) footer.appendChild(open); copy.appendChild(footer); card.append(picture(row), copy); host.appendChild(card);
     });
     if (!rows.length) host.appendChild(el('p', 'Nenhum pneu encontrado. Revise a busca ou os filtros.', 'mcg-notice'));
     if (rows.length > m.page * 20) host.appendChild(button('Carregar mais pneus', 'more'));

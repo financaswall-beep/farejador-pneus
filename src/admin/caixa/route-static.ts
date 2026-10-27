@@ -128,6 +128,11 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-sales-weekly.js', 'caixa-sales-weekly.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-stock-view.js', 'caixa-stock-view.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-tire-illustration.js', 'caixa-tire-illustration.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-metal-view.js', 'caixa-stock-metal-view.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-metal.js', 'caixa-stock-metal.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-metal.css', 'caixa-stock-metal.css', 'text/css; charset=utf-8');
+  text('/operacao/caixa-header.css', 'caixa-header.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-stock-detail.js', 'caixa-stock-detail.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-stock-price.js', 'caixa-stock-price.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-stock-price.css', 'caixa-stock-price.css', 'text/css; charset=utf-8');

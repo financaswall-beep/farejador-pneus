@@ -116,6 +116,7 @@
 
   function clearSession() {
     Caixa.matrixCatalogMetal?.reset();
+    Caixa.matrixStock?.reset();
     if (Caixa.matrixPickups) Caixa.matrixPickups.reset();
     if (Caixa.partnerHome) Caixa.partnerHome.reset();
     if (Caixa.chat) Caixa.chat.reset();

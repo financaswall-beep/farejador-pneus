@@ -7,7 +7,9 @@ import { tireSizeKey } from '../../shared/tire-size.js';
 
 type MatrizStockRow = SafeStockRow & {
   product_id: string | null;
+  product_code: string | null;
   sale_price: number | null;
+  vehicle_type: 'car' | 'motorcycle' | null;
 };
 
 function brandKey(value: string | null | undefined): string {
@@ -47,22 +49,25 @@ export async function getMatrizOperationStock(
     tire_width_mm: number | null;
     tire_aspect_ratio: number | null;
     tire_rim_diameter: number | null;
+    vehicle_type: 'car' | 'motorcycle' | null;
   }>(
     `SELECT id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,
             GREATEST(quantity_on_hand-quantity_reserved,0)::int quantity_available,
-            min_quantity,updated_at,tire_width_mm,tire_aspect_ratio,tire_rim_diameter
+            min_quantity,updated_at,tire_width_mm,tire_aspect_ratio,tire_rim_diameter,vehicle_type
        FROM commerce.wholesale_stock
       WHERE environment=$1
       ORDER BY measure,brand,tire_condition`,
     [env.FAREJADOR_ENV],
   ), db.query<{
     product_id: string;
+    product_code: string;
     tire_size: string;
     brand: string;
     tire_condition: string;
     sale_price: string | null;
+    vehicle_type: 'car' | 'motorcycle' | null;
   }>(
-    `SELECT p.id product_id,ts.tire_size,p.brand,p.tire_condition,
+    `SELECT p.id product_id,p.product_code,ts.tire_size,p.brand,p.tire_condition,ts.vehicle_type,
             cp.price_amount::text sale_price
        FROM commerce.products p
        JOIN commerce.tire_specs ts
@@ -81,9 +86,13 @@ export async function getMatrizOperationStock(
     ...(function () {
       const matches = productsByVariant.get(variantKey(row.measure, row.brand, row.tire_condition)) ?? [];
       const product = matches.length === 1 ? matches[0]! : null;
+      const types = matches.map(item => item.vehicle_type);
+      const category = types.length && types.every(type => type && type === types[0]) ? types[0]! : null;
       return {
         product_id: product?.product_id ?? null,
+        product_code: product?.product_code ?? null,
         sale_price: product?.sale_price == null ? null : Number(product.sale_price),
+        vehicle_type: row.vehicle_type ?? category,
       };
     }()),
     stock_id: row.id,

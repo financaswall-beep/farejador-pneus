@@ -1,0 +1,103 @@
+/* Estoque da Matriz: consulta do saldo oficial, com o mesmo material do Catálogo. */
+.is-matrix-stock #session-view { padding: 0; max-width: none; }
+.is-matrix-stock #stock-panel { flex: 1 1 auto; min-height: 0; margin: 0; padding: 12px 14px 22px; overflow-y: auto; overscroll-behavior: contain; background: none; scrollbar-width: thin; }
+.is-matrix-stock #stock-panel > :not(#matrix-stock-metal) { display: none !important; }
+#matrix-stock-metal { min-width: 0; }
+.ms-page :is(h2,h3,p) { margin: 0; }
+.ms-page h3 { font: 800 24px/1.1 var(--mc-font); margin-bottom: 11px; }
+.ms-page .mcg-heading h2 { font-size: clamp(31px,8vw,39px); }
+.ms-page > .mcg-heading:not(:has([data-ms-action=list])) h2 { font-size: clamp(35px,10vw,45px); }
+.ms-plate { padding: 14px 12px; }
+.ms-plate > small,.ms-plate p { font: 500 20px/1.2 var(--mc-font); }
+.ms-plate > small { display: block; margin-top: 8px; color: var(--mc-muted); }
+.ms-plate > strong { font: 800 25px/1.15 var(--mc-font); }
+.ms-plate > .ms-big { font-size: 42px; }
+.ms-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.ms-stats .ms-plate { display: flex; flex-direction: column; align-items: flex-start; padding: 12px 9px; }
+.ms-stats small { margin: 0; font-size: clamp(15px,4.5vw,19px); }
+.ms-stats strong { font: 900 38px/1 var(--mc-font); margin-top: 4px; }
+.ms-chips { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
+.ms-chips .mcg-button { padding: 8px 3px; font-size: 18px; }
+.ms-cards { display: flex; flex-direction: column; gap: 11px; }
+.ms-card,.ms-identity { display: grid; grid-template-columns: 77px minmax(0,1fr); align-items: center; gap: 9px; }
+.ms-tire { display: block; width: 77px; height: 130px; object-fit: contain; mix-blend-mode: multiply; }
+.ms-tire-unknown { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 77px; min-height: 100px; text-align: center; color: var(--mc-muted); }
+.ms-tire-unknown small { font: 500 16px/1.1 var(--mc-font); }
+.ms-card > div,.ms-identity > div { min-width: 0; }
+.ms-card strong,.ms-identity strong { display: block; overflow-wrap: anywhere; font: 900 clamp(29px,8.3vw,39px)/1 var(--mc-font); letter-spacing: -.02em; }
+.ms-card p,.ms-identity p { font: 500 20px/1.15 var(--mc-font); margin: 6px 0; }
+.ms-card small,.ms-identity small { display: block; margin: 6px 0; color: var(--mc-muted); font: 500 18px/1.1 var(--mc-font); }
+.ms-card footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px; margin-top: 8px; }
+.ms-card footer b { font: 800 27px/1 var(--mc-font); }
+.ms-card footer button { min-height: 42px; padding: 6px; font-size: 21px; }
+.ms-card .mcg-badge { margin-top: 3px; font-size: 19px; }
+.ms-card .ms-red { color: #fff; border-color: #9b1731; background: linear-gradient(#ce334c,#a31530); }
+.ms-positive { color: #07563d; }
+.ms-warning { color: #865400 !important; }
+.ms-negative { color: #ab1831; }
+.ms-balance { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.ms-balance > div { text-align: center; border-right: 1px solid #98a69e; }
+.ms-balance > div:last-child { border: 0; }
+.ms-balance small { display: block; font: 500 20px/1.1 var(--mc-font); }
+.ms-balance strong { display: block; font: 900 49px/1 var(--mc-font); }
+.ms-balance > div:nth-child(2) strong { color: #946000; }
+.ms-balance > div:last-child strong { color: var(--mc-green); }
+.ms-price { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ms-price h3 { flex: 0 0 100%; margin: 0; }
+.ms-price > strong { font: 900 42px/1 var(--mc-font); color: var(--mc-green); }
+.ms-page select { box-sizing: border-box; width: 100%; min-height: 48px; padding: 9px 10px; border: 1px solid #9aa79e; border-radius: 8px; color: var(--mc-ink); background: #fbfcfbd9; font: 500 22px/1.1 var(--mc-font); }
+.ms-radio { display: flex; align-items: center; gap: 11px; min-height: 45px; color: var(--mc-ink); font: 500 22px var(--mc-font); }
+.ms-radio input { width: 26px; height: 26px; margin: 0; accent-color: #07563d; }
+.ms-hint { font: 500 18px/1.2 var(--mc-font); color: var(--mc-muted); }
+.ms-order { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.ms-order > strong { font-size: 32px; }
+.ms-order > button { width: 100%; }
+.ms-history > article { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid #9daaa3; }
+.ms-history > article > div { min-width: 0; }
+.ms-history > article strong { font: 700 20px/1.15 var(--mc-font); }
+.ms-history > article p { font: 500 18px/1.15 var(--mc-font); }
+.ms-history > article b { flex: 0 0 90px; font: 800 23px/1.1 var(--mc-font); text-align: right; }
+.is-matrix-stock #stock-price-modal.ms-stock-price { position: fixed; z-index: 9; inset: var(--mc-top) 0 var(--mc-bottom); display: block; padding: 0; background: transparent; }
+.is-matrix-stock #stock-price-modal.ms-stock-price.hidden { display: none; }
+#stock-price-modal.ms-stock-price .account-modal-backdrop { display: none; }
+.is-matrix-stock #stock-price-modal.ms-stock-price .stock-price-sheet { position: absolute; inset: 0 auto 0 50%; transform: translateX(-50%); box-sizing: border-box; width: var(--mc-width); max-width: 100%; height: 100%; max-height: none; margin: 0; padding: 12px 14px 22px; overflow-y: auto; border: 0; border-radius: 0; background: var(--mc-metal) center/540px 540px; color: var(--mc-ink); font-family: var(--mc-font); }
+#stock-price-modal.ms-stock-price .stock-price-screw,#stock-price-modal.ms-stock-price .stock-price-legacy-note,#stock-price-modal.ms-stock-price #stock-price-unit,#stock-price-modal.ms-stock-price #stock-price-product { display: none; }
+#stock-price-modal.ms-stock-price .stock-price-model-only { display: block; }
+#stock-price-modal.ms-stock-price [hidden] { display: none !important; }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header { display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; margin-bottom: 14px; }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header > div { flex: 1; }
+#stock-price-modal.ms-stock-price h2 { font: 900 35px/1.05 var(--mc-font); color: var(--mc-ink); }
+#stock-price-modal.ms-stock-price [data-close-stock-price] { min-height: 44px; min-width: 44px; }
+#stock-price-modal.ms-stock-price #stock-price-form { display: flex; flex-direction: column; gap: 12px; }
+#stock-price-modal.ms-stock-price .stock-price-product-card { display: flex; gap: 12px; align-items: center; padding: 12px; background: var(--mc-panel); border: 1px solid var(--mc-line); border-radius: 9px; box-shadow: var(--mc-shadow); }
+#stock-price-modal.ms-stock-price #stock-price-size { display: block; font: 900 36px/1 var(--mc-font); }
+#stock-price-modal.ms-stock-price #stock-price-meta { font: 500 20px var(--mc-font); }
+#stock-price-modal.ms-stock-price #stock-price-illustration { flex: 0 0 74px; }
+#stock-price-modal.ms-stock-price #stock-price-illustration img { width: 74px; height: 100px; object-fit: contain; }
+#stock-price-modal.ms-stock-price #stock-price-illustration img { mix-blend-mode: multiply; }
+#stock-price-modal.ms-stock-price #stock-price-form > label { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 14px 12px; border: 1px solid var(--mc-line); border-radius: 9px; background: var(--mc-panel); box-shadow: var(--mc-shadow); color: var(--mc-ink); font: 800 23px var(--mc-font); }
+#stock-price-modal.ms-stock-price #stock-price-current { color: var(--mc-green); font: 900 43px/1 var(--mc-font); }
+#stock-price-modal.ms-stock-price .stock-price-input { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid #98a69d; border-radius: 8px; background: #fafcfad9; }
+#stock-price-modal.ms-stock-price .stock-price-input b { font-size: 33px; }
+#stock-price-modal.ms-stock-price #stock-price-value { min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; font: 900 43px/1 var(--mc-font); }
+#stock-price-modal.ms-stock-price #stock-price-reason { min-height: 82px; padding: 10px; border: 1px solid #98a69d; border-radius: 8px; background: #fafcfad9; font: 500 22px/1.2 var(--mc-font); }
+#stock-price-modal.ms-stock-price .stock-price-info { display: flex; align-items: center; gap: 7px; font-size: 18px; }
+#stock-price-modal.ms-stock-price .stock-price-info svg { width: 23px; height: 23px; }
+#stock-price-modal.ms-stock-price .stock-price-info p { display: flex; flex-direction: column; gap: 3px; }
+#stock-price-modal.ms-stock-price #stock-price-submit,#stock-price-modal.ms-stock-price .stock-price-cancel { display: block; width: 100%; min-height: 50px; padding: 10px; border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-action); color: #fff; font: 800 25px/1.1 var(--mc-font); box-shadow: var(--mc-shadow); }
+#stock-price-modal.ms-stock-price .stock-price-cancel { background: var(--mc-panel); color: var(--mc-ink); }
+#stock-price-modal.ms-stock-price :is(button,input,textarea):focus-visible,.ms-page :is(button,input,select):focus-visible { outline: 3px solid #07563d; outline-offset: 2px; }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header { padding: 0; border: 0; }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header > button { position: relative; display: grid; place-items: center; border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-panel); color: var(--mc-ink); font-size: 0; box-shadow: var(--mc-shadow); }
+#stock-price-modal.ms-stock-price .stock-price-sheet > header > button::before { content: '←'; font: 500 30px/1 Arial,sans-serif; }
+#stock-price-modal.ms-stock-price .stock-price-sheet form { padding: 0; }
+#stock-price-modal.ms-stock-price .stock-price-input b { padding: 0; border: 0; }
+#stock-price-modal.ms-stock-price #stock-price-value { font-size: 43px !important; }
+@media (max-width: 350px) {
+  .is-matrix-stock #stock-panel { padding-inline: 10px; }
+  .ms-card,.ms-identity { grid-template-columns: 60px minmax(0,1fr); gap: 7px; }
+  .ms-tire,.ms-tire-unknown { width: 60px; }
+  .ms-chips .mcg-button { font-size: 16px; }
+  .ms-plate { padding-inline: 10px; }
+  .ms-balance small { font-size: 18px; }
+}
