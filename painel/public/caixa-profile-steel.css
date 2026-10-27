@@ -8,6 +8,7 @@
 .is-matrix-header #operator-button.has-user-photo > svg { display: none; }
 :is(#profile-panel,#profile-camera-panel,#operator-button) [hidden] { display: none !important; }
 .is-matrix-profile {
+  --profile-safe-bottom: env(safe-area-inset-bottom,0px);
   --profile-engraved: 0 1px 0 #ffffffed, 0 -.7px 0 #0b161f80;
   --profile-steel: linear-gradient(115deg,#ffffff24,#d5d8da14 55%,#435b4814),var(--mc-metal);
 }
@@ -88,6 +89,7 @@
 .is-matrix-profile #profile-camera-error { flex: 0 0 auto; margin: 0; padding: 12px 16px; background: #ffffff60; color: #752d28; font-size: 18px; text-align: center; }
 .is-matrix-profile #profile-camera-error:empty { display: none; }
 .is-matrix-profile.is-profile-live #session-view > .bottom-nav { display: none !important; }
+.is-matrix-profile.is-profile-live #profile-camera-panel { padding-bottom: var(--profile-safe-bottom); }
 @media (max-width:350px) {
   .is-matrix-profile #profile-panel { padding-inline: 12px; }
   .is-matrix-profile .profile-section,.is-matrix-profile .profile-actions { margin-inline: -12px; padding-inline: 12px; }
