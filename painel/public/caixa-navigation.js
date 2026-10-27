@@ -5,10 +5,13 @@
   const state = Caixa.state;
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
+    if (Caixa.purchasesMetal?.blockNavigation(tab)) return;
     elements.app.classList.toggle('is-matrix-checkout', !Caixa.isPartner() && tab === 'cash');
     elements.app.classList.toggle('is-matrix-sales', !Caixa.isPartner() && tab === 'sales');
     elements.app.classList.toggle('is-matrix-header', !Caixa.isPartner());
-    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock'].includes(tab));
+    elements.app.classList.toggle('is-matrix-metal', !Caixa.isPartner() && ['cash', 'sales', 'conversations', 'pickups', 'catalog', 'stock', 'purchases'].includes(tab));
+    elements.app.classList.toggle('is-matrix-purchases', !Caixa.isPartner() && tab === 'purchases');
+    if (tab !== 'purchases') Caixa.purchasesMetal?.sync(tab);
     elements.app.classList.toggle('is-matrix-stock', !Caixa.isPartner() && tab === 'stock');
     Caixa.matrixStock?.sync(tab);
     elements.app.classList.toggle('is-matrix-catalog', !Caixa.isPartner() && tab === 'catalog');
@@ -149,6 +152,7 @@
     if (pickups && Caixa.loadPickups) void Caixa.loadPickups();
 
     if (Caixa.purchases) Caixa.purchases.syncTab(tab);
+    Caixa.purchasesMetal?.sync(tab);
     if (Caixa.chat) Caixa.chat.syncTab(tab);
     if (Caixa.waitlist) Caixa.waitlist.syncTab(tab);
     if (Caixa.partnerHome) Caixa.partnerHome.sync(tab);

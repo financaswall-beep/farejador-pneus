@@ -4,12 +4,13 @@
   const origins = new WeakMap();
   const pages = () => [...document.querySelectorAll('dialog[data-catalog-page][open]')];
   const stockPage = () => el('stock-price-modal').classList.contains('mcg-stock-price') && !el('stock-price-modal').classList.contains('hidden');
-  function syncPanel() { C.elements.catalogPanel.inert = Boolean(C.matrixCatalogMetal?.isActive() && (pages().length || stockPage())); }
+  const active = () => C.matrixCatalogMetal?.isActive() || C.purchasesMetal?.active();
+  function syncPanel() { C.elements.catalogPanel.inert = Boolean(C.matrixCatalogMetal?.isActive() && (pages().length || stockPage())); C.purchasesMetal?.syncPanel(); }
   const watchedPages = new WeakSet(), pageObserver = new MutationObserver(syncPanel);
   pageObserver.observe(el('stock-price-modal'), { attributes: true, attributeFilter: ['class'] });
   function show(dialog) {
     if (dialog.open) return;
-    if (!dialog.classList.contains('mcg-dialog') || !C.matrixCatalogMetal?.isActive()) {
+    if (!dialog.classList.contains('mcg-dialog') || !active()) {
       delete dialog.dataset.catalogPage; dialog.removeAttribute('aria-modal'); dialog.showModal(); return;
     }
     // A tela ocupa só o conteúdo; cabeçalho e navegação continuam acessíveis.
@@ -34,12 +35,12 @@
     event.preventDefault(); event.stopImmediatePropagation(); C.showToast('Salvando. Aguarde a conclusão para trocar de aba.');
   }, true);
   function frame(dialog) {
-    const active = Boolean(C.matrixCatalogMetal?.isActive());
-    dialog.classList.toggle('mcg-dialog', active); dialog.classList.toggle('is-matrix-metal', active);
-    if (active) {
+    const enabled = Boolean(active());
+    dialog.classList.toggle('mcg-dialog', enabled); dialog.classList.toggle('is-matrix-metal', enabled);
+    if (enabled) {
       const back = dialog.querySelector('header > button'); if (back) { back.innerHTML = V.iconHTML('back'); back.setAttribute('aria-label', 'Voltar'); }
     }
-    return active;
+    return enabled;
   }
   function product(dialog, row) {
     dialog.querySelector('.mcg-editor-product')?.remove();

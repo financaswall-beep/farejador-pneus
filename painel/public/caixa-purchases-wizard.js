@@ -14,6 +14,7 @@
     P.id('total-items').textContent = d.step === 1 ? 'Escolha um fornecedor' : quantity + ' pneus · ' + (lot ? '1 lote' : d.items.length + ' itens');
     P.id('total-label').textContent = s.preview ? 'Total da compra' : 'Total dos produtos';
     P.id('total').textContent = P.money(s.preview ? s.preview.values.totalCents / 100 : products);
+    P.metal?.totals({ quantity, products });
   };
   P.footer = function () {
     if (!s.draft) return;

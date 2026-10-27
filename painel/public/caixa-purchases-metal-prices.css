@@ -1,0 +1,72 @@
+.is-matrix-purchases .pp { color: var(--mc-ink); }
+.is-matrix-purchases #purchase-prices-list-heading { display: none; }
+.is-matrix-purchases #purchase-prices-period-toggle { margin: 12px 0; font-size: 21px; }
+.is-matrix-purchases #purchase-prices-period-toggle > span:first-child { font-size: 24px; }
+.is-matrix-purchases #purchase-prices-period { margin-bottom: 12px; }
+.is-matrix-purchases #purchase-prices-list > .pc-notice { margin: 10px 0; }
+.is-matrix-purchases #purchase-prices-count { margin: 10px 0; }
+.is-matrix-purchases .mp-vehicle-filters { display: flex; gap: 7px; margin: 10px 0 0; }
+.is-matrix-purchases .mp-vehicle-filters .pc-button { flex: 1; border-radius: 20px; font-size: 21px; }
+.is-matrix-purchases .mp-vehicle-filters .is-selected { color: #fff; background: var(--mc-action); }
+.is-matrix-purchases .mp-extra-filters { margin-top: 6px; }
+.is-matrix-purchases .mp-extra-filters summary { padding: 10px 0; min-height: 44px; color: var(--mc-green); font-size: 19px; cursor: pointer; }
+.is-matrix-purchases .mp-extra-filters .pp-filters { margin: 0 0 10px; }
+.is-matrix-purchases .pp-variant-card { display: grid; grid-template-columns: 80px minmax(0,1fr); gap: 8px 12px; width: 100%; padding: 14px 12px; border: 1px solid var(--mc-line); border-radius: 9px; color: var(--mc-ink); background: var(--mc-panel); background-size: 100% 100%,540px 540px; box-shadow: var(--mc-shadow); text-align: left; }
+.is-matrix-purchases .pp-variant-card > .pc-tire { grid-column: 1; grid-row: 1/3; width: 80px; height: 140px; }
+.is-matrix-purchases .pp-variant-description { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; gap: 5px; }
+.is-matrix-purchases .pp-variant-description > strong { font: 900 34px/1 var(--mc-font); overflow-wrap: anywhere; }
+.is-matrix-purchases .pp-variant-description > span { font: 500 20px/1.15 var(--mc-font); }
+.is-matrix-purchases .pp-variant-description > small { font-size: 18px; }
+.is-matrix-purchases .pp-variant-cost { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 4px; text-align: left; }
+.is-matrix-purchases .pp-variant-cost > strong { font: 900 35px/1 var(--mc-font); color: var(--mc-green); }
+.is-matrix-purchases .pp-variant-cost > small { font: 500 18px/1.15 var(--mc-font); }
+.is-matrix-purchases .pp-variant-card > .pp-chevron { display: flex; justify-content: center; align-items: center; grid-column: 1/-1; min-height: 44px; border: 1px solid var(--mc-line); border-radius: 7px; background: #eff3eda6; color: var(--mc-ink); font: 700 25px var(--mc-font); }
+.is-matrix-purchases .pp-variant-card > .pp-chevron::before { content: 'Comparar fornecedores'; margin-right: 8px; font-size: 21px; }
+.is-matrix-purchases #purchase-prices-detail-heading { display: grid; gap: 12px; }
+.is-matrix-purchases .mp-page-heading { display: flex; align-items: center; gap: 10px; }
+.is-matrix-purchases #purchase-prices-variant { display: flex; gap: 12px; padding: 12px; border: 1px solid var(--mc-line); border-radius: 9px; background: var(--mc-panel); box-shadow: var(--mc-shadow); }
+.is-matrix-purchases #purchase-prices-variant h3 { font-size: 36px; }
+.is-matrix-purchases #purchase-prices-variant p { font-size: 21px; }
+.is-matrix-purchases #purchase-prices-variant .pc-tire { width: 77px; height: 108px; }
+.is-matrix-purchases #purchase-prices-detail > .pp-kpis { display: none; }
+.is-matrix-purchases #purchase-prices-detail { gap: 12px; margin-top: 12px; }
+.is-matrix-purchases .mp-supplier-comparison #purchase-prices-suppliers { gap: 8px; }
+.is-matrix-purchases .pp-supplier-card { grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 11px 8px; border: 1px solid #a3afa5; border-radius: 7px; background: #eff2edd9; color: var(--mc-ink); }
+.is-matrix-purchases .pp-supplier-card.is-selected { border-color: #07563d; background: #d8eddf; }
+.is-matrix-purchases .pp-supplier-card > .pp-chevron { display: none; }
+.is-matrix-purchases .pp-supplier-name strong { font: 800 22px/1.1 var(--mc-font); }
+.is-matrix-purchases .pp-supplier-cost strong { font: 800 25px/1 var(--mc-font); color: var(--mc-green); }
+.is-matrix-purchases .pp-supplier-name small,.is-matrix-purchases .pp-supplier-cost small { font: 500 16px/1.1 var(--mc-font); white-space: normal; }
+.is-matrix-purchases .pp-supplier-name > small,.is-matrix-purchases .pp-supplier-cost > small { display: none; }
+.is-matrix-purchases .pp-supplier-name { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.is-matrix-purchases .pp-supplier-name > .pc-badge { font-size: 15px; padding: 4px 6px; }
+.is-matrix-purchases .pc .pp-chart-card h3 { font-size: 22px; }
+.is-matrix-purchases .pp-chart-card > .pc-between { flex-direction: column; align-items: flex-start; gap: 3px; }
+.is-matrix-purchases .pc .pp-chart-card .pc-muted { font-size: 17px; }
+.is-matrix-purchases #purchase-prices-chart { margin-top: 10px; }
+.is-matrix-purchases #purchase-prices-chart svg { height: auto; width: 100%; stroke: none; }
+.is-matrix-purchases .pc .pp-point { font-size: 17px; }
+.is-matrix-purchases .pc .pp-legend { font-size: 17px; }
+.is-matrix-purchases .pc .pp-history { font-size: 19px; }
+.is-matrix-purchases .pc .pp-history > summary { min-height: 44px; padding-block: 8px; color: var(--mc-green); }
+.is-matrix-purchases .pp-simulation { padding: 14px 12px; border: 1px solid var(--mc-line); border-radius: 9px; background: var(--mc-panel); box-shadow: var(--mc-shadow); }
+.is-matrix-purchases .pp-simulation h3 { font-size: 24px; margin-bottom: 5px; }
+.is-matrix-purchases .pp-simulation-values { display: grid; grid-template-columns: 132px minmax(0,1fr); gap: 10px 12px; margin: 12px 0; }
+.is-matrix-purchases .pp-simulation-values > .pc-stepper { grid-column: 1; grid-row: 1/3; }
+.is-matrix-purchases .pp-simulation-values > div:nth-child(2) { grid-column: 2; grid-row: 1; }
+.is-matrix-purchases .pp-simulation-values > div:nth-child(3) { grid-column: 2; grid-row: 2; }
+.is-matrix-purchases .pp-simulation-values > div:not(:first-child) { border-color: #9daa9e; gap: 4px; padding-left: 10px; }
+.is-matrix-purchases .pp-simulation-values small { color: var(--mc-ink); font: 500 17px/1.1 var(--mc-font); }
+.is-matrix-purchases .pp-simulation-values strong { color: var(--mc-green); font: 900 29px/1 var(--mc-font); }
+.is-matrix-purchases .pp-simulation .pp-footnote { font-size: 17px; }
+.is-matrix-purchases #purchase-prices-use { margin-top: 5px; }
+@media (max-width: 350px) {
+  .is-matrix-purchases .pp-variant-card { grid-template-columns: 60px minmax(0,1fr); gap: 8px; }
+  .is-matrix-purchases .pp-variant-card > .pc-tire { width: 60px; height: 126px; }
+  .is-matrix-purchases .pp-variant-description > strong { font-size: 31px; }
+  .is-matrix-purchases .pp-variant-cost > strong { font-size: 31px; }
+  .is-matrix-purchases .pp-supplier-card { grid-template-columns: 1fr; }
+  .is-matrix-purchases .pp-supplier-cost { justify-items: start; text-align: left; }
+  .is-matrix-purchases .pp-simulation-values { grid-template-columns: 1fr; }
+  .is-matrix-purchases .pp-simulation-values > :is(.pc-stepper,div:nth-child(2),div:nth-child(3)) { grid-column: 1; grid-row: auto; }
+}
