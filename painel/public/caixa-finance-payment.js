@@ -2,6 +2,7 @@
   'use strict';
   const C = window.Caixa, V = C.financeView, el = id => document.getElementById(id);
   const partial = ['wholesale_sale', 'retail_sale', 'wholesale_purchase', 'central_obligation', 'central_account'];
+  let pendingSession = null;
   function field(form, label, type, value, options) {
     const wrap = V.node('label', label, 'mf-field'), input = V.node(type === 'select' ? 'select' : 'input');
     if (type === 'select') options.forEach(([value, title]) => { const option = V.node('option', title); option.value = value; input.appendChild(option); });
@@ -32,7 +33,7 @@
       if (acceptsPartial) data.amount = Number(amount.value);
       // Uma tentativa incerta reutiliza exatamente o mesmo corpo e a mesma chave.
       if (!attempt) attempt = { ...data, idempotency_key: 'app-account-' + crypto.randomUUID() };
-      sending = true; submit.disabled = true; error.classList.add('hidden');
+      sending = true; pendingSession = C.sessionFingerprint(); submit.disabled = true; error.classList.add('hidden');
       Array.from(form.elements).forEach(input => { if (input !== submit) input.disabled = true; });
       const session = C.sessionFingerprint();
       try {
@@ -48,8 +49,8 @@
           : 'Não foi possível confirmar. Tente novamente com os mesmos dados ou atualize a lista para conferir se a baixa foi registrada.';
         error.classList.remove('hidden'); submit.disabled = /not_open|not_found|nothing_open|conflict|exceeds_balance/.test(failure.message);
         submit.textContent = 'Tentar confirmar novamente';
-      } finally { sending = false; }
+      } finally { sending = false; if (pendingSession === session) pendingSession = null; }
     });
   }
-  C.financePayment = { account };
+  C.financePayment = { account, busy: () => pendingSession !== null && pendingSession === C.sessionFingerprint() };
 }());
