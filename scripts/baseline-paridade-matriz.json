@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-10-25T02:21:32.427Z",
-  "total": 3086,
+  "total": 3087,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -1379,6 +1379,7 @@
     "lsRemember": "function",
     "lsSelectedQuantity": "getter",
     "lsSubmit": "function",
+    "lsUnitPrice": "getter",
     "lsUsed": "getter",
     "madCalculation": "value:boolean",
     "madCapiCount": "function",

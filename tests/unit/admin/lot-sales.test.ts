@@ -46,6 +46,21 @@ describe('venda de lotes',()=>{
    const s=app();for(const amount of ['1.000','1.000,00','1000.00'])expect(s.lsAmount(amount)).toBe(1000);
    for(const discount of ['abc','1,2,3','1e2','-10','10,999']){s.lotSales.form.discount=discount;expect(s.lsProblem).toContain('valor negociado');}
  });
+ it('informa o valor por pneu com desconto e acompanha a quantidade sem alterar o total negociado',()=>{
+   const s=app();Object.assign(s.lotSales.form,{quantity:'5',amount:'25',discount:''});
+   expect(s.lsUnitPrice).toBe(5);expect(s.lsNet).toBe(25);
+   s.lotSales.form.discount='2,50';expect(s.lsUnitPrice).toBe(4.5);expect(s.lsNet).toBe(22.5);
+   s.lotSales.form.quantity='10';expect(s.lsUnitPrice).toBe(2.25);expect(s.lotSales.form.amount).toBe('25');
+   Object.assign(s.lotSales.form,{quantity:'3',amount:'10',discount:''});
+   expect(s.lsUnitPrice).toBeCloseTo(10/3);expect(s.lsNet).toBe(10);
+ });
+ it('aguarda quantidade e valores válidos antes de informar o preço médio',()=>{
+   const s=app();
+   for(const patch of [{quantity:''},{quantity:'0'},{quantity:'1.5'},{quantity:'100001'},
+     {amount:''},{amount:'abc'},{discount:'abc'},{discount:'-1'},{discount:'25'},{discount:'30'}]){
+     Object.assign(s.lotSales.form,{quantity:'5',amount:'25',discount:'',...patch});expect(s.lsUnitPrice).toBeNull();
+   }
+ });
  it('mantém a mesma confirmação após timeout e permite corrigir rejeição definitiva',async()=>{
    const s=app();s.apiPost.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce({order_id:'order'});s.loadLotSalesPage=vi.fn();
    await s.lsSubmit();const original={...s.lotSales.pending};s.lotSales.form.quantity=110;await s.lsSubmit();
