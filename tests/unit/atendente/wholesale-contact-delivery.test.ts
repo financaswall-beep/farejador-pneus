@@ -45,6 +45,68 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('contato nativo do atacado na outbox', () => {
+  const productionShape = { id: 555, account_id: 2, inbox_id: 39, can_reply: true,
+    meta: { sender: { id: 17, account_id: 2, phone_number: '+5521888880002' } } };
+  const associations = { payload: [
+    { inbox: { id: 41, account_id: 2, channel_type: 'Channel::Api' }, source_id: 'simulator-source' },
+    { inbox: { id: 39, account_id: 2, channel_type: 'Channel::Whatsapp' }, source_id: '5521999990001' },
+  ] };
+  function actualConversationPayload(payload: unknown = associations, remote: unknown = productionShape) {
+    fetcher.mockReset().mockResolvedValueOnce(response(remote)).mockResolvedValueOnce(response(inbox))
+      .mockResolvedValueOnce(response(payload)).mockResolvedValueOnce(response({ messages: [{ id: nativeId }] }))
+      .mockResolvedValueOnce(response({ id: 777, source_id: nativeId }));
+  }
+
+  it('consulta a identidade da mesma caixa no formato real do GET da conversa, sem contact_inbox', async () => {
+    actualConversationPayload();
+    await expect(deliverOutboundRow(database() as never, row)).resolves.toEqual({ chatwootMessageId: 777 });
+    expect(fetcher.mock.calls[2]?.[0]).toBe('https://chatwoot.example.test/api/v1/accounts/2/contacts/17/contactable_inboxes');
+    expect(bodyAt(3).type).toBe('contacts'); expect(bodyAt(3).to).toBe('5521999990001');
+    expect(bodyAt(3).to).not.toBe(productionShape.meta.sender.phone_number.replace('+', ''));
+    expect(bodyAt(4).source_id).toBe(nativeId);
+    expect(fetcher).toHaveBeenCalledTimes(5); expect(sends.text).not.toHaveBeenCalled();
+  });
+
+  it.each([{ payload: [] }, { payload: [associations.payload[0]] }, {},
+    { payload: [associations.payload[1], associations.payload[1]] }])
+  ('não adivinha o destinatário sem associação única com a caixa correta: %j', async payload => {
+    actualConversationPayload(payload);
+    await deliverOutboundRow(database() as never, row);
+    expect(fetcher).toHaveBeenCalledTimes(3); expect(sends.text).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([{ id: null }, { id: '17' }, { id: -17 }])('não consulta associação sem contato confirmado: %j', async sender => {
+    actualConversationPayload(associations, { ...productionShape, meta: { sender } });
+    await deliverOutboundRow(database() as never, row);
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(sends.text).toHaveBeenCalledTimes(1);
+  });
+
+  it('barra contato de outra conta antes de consultar suas caixas', async () => {
+    actualConversationPayload(associations, { ...productionShape, meta: { sender: { id: 17, account_id: 3 } } });
+    await expect(deliverOutboundRow(database() as never, row)).rejects.toThrow('sender_account_mismatch');
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(sends.text).not.toHaveBeenCalled();
+  });
+
+  it.each([{ account_id: 3 }, { channel_type: 'Channel::Api' }])('barra associação divergente: %j', async change => {
+    actualConversationPayload({ payload: [{ ...associations.payload[1],
+      inbox: { ...associations.payload[1]!.inbox, ...change } }] });
+    await expect(deliverOutboundRow(database() as never, row)).rejects.toThrow('association_mismatch');
+    expect(fetcher).toHaveBeenCalledTimes(3); expect(sends.text).not.toHaveBeenCalled();
+  });
+
+  it('não substitui BSUID pelo telefone cadastrado no perfil', async () => {
+    actualConversationPayload({ payload: [{ ...associations.payload[1], source_id: 'BSUID-only' }] });
+    await deliverOutboundRow(database() as never, row);
+    expect(fetcher).toHaveBeenCalledTimes(3); expect(sends.text).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantém o link se a consulta da associação estiver indisponível, antes de qualquer envio Meta', async () => {
+    fetcher.mockReset().mockResolvedValueOnce(response(productionShape)).mockResolvedValueOnce(response(inbox))
+      .mockResolvedValueOnce(response({}, 503));
+    await deliverOutboundRow(database() as never, row);
+    expect(fetcher).toHaveBeenCalledTimes(3); expect(sends.text).toHaveBeenCalledTimes(1);
+  });
+
   it('envia um único cartão ao cliente da conversa e registra o ID real no Chatwoot sem novo envio', async () => {
     const db = database();
     await expect(deliverOutboundRow(db as never, row)).resolves.toEqual({ chatwootMessageId: 777 });

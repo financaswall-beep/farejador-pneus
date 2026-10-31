@@ -84,7 +84,28 @@ export async function tryDeliverWholesaleContact(
   if (typeof token !== 'string' || !token.trim() || typeof phoneId !== 'string' || !/^\d{5,30}$/.test(phoneId)) {
     return fallback('provider_config_unavailable');
   }
-  const recipient = object(conversation.contact_inbox).source_id;
+  let recipient = object(conversation.contact_inbox).source_id;
+  // O GET da conversa em produção não inclui contact_inbox. A identidade do
+  // canal está em contactable_inboxes, vinculada ao contato E à mesma caixa.
+  // Não usar meta.sender.phone_number: pode estar desatualizado ou ser de outro canal.
+  if (recipient == null) {
+    const sender = object(object(conversation.meta).sender);
+    if (!Number.isSafeInteger(sender.id) || Number(sender.id) <= 0) return fallback('contact_identity_unavailable');
+    if (sender.account_id != null && Number(sender.account_id) !== Number(env.CHATWOOT_ACCOUNT_ID)) {
+      throw Error('wholesale_contact_sender_account_mismatch');
+    }
+    const associations = await chatwootGet(`${accountUrl}/contacts/${sender.id}/contactable_inboxes`);
+    if (!associations) return fallback('contact_inbox_lookup_unavailable');
+    const matches = Array.isArray(associations.payload) ? associations.payload.map(object)
+      .filter(entry => Number(object(entry.inbox).id) === Number(local.chatwoot_inbox_id)) : [];
+    if (matches.length !== 1) return fallback('contact_inbox_not_unique');
+    const associatedInbox = object(matches[0]!.inbox);
+    if ((associatedInbox.account_id != null && Number(associatedInbox.account_id) !== Number(env.CHATWOOT_ACCOUNT_ID))
+        || (associatedInbox.channel_type != null && associatedInbox.channel_type !== 'Channel::Whatsapp')) {
+      throw Error('wholesale_contact_association_mismatch');
+    }
+    recipient = matches[0]!.source_id;
+  }
   // Identidades BSUID ou sem telefone conservam o caminho habitual do Chatwoot.
   if (typeof recipient !== 'string' || !/^\d{7,15}$/.test(recipient)) return fallback('recipient_not_phone');
 
