@@ -8,3 +8,5 @@
 @media(max-width:600px){.lot-sales{padding:16px 12px}.lot-sales h1{font-size:28px}.lot-sales h2{font-size:20px}.ls-header p{font-size:14px}.ls-card{padding:14px}.ls-fields{gap:10px}.ls-new-customer,.ls-payment-fields{grid-template-columns:1fr}.ls-new-customer label,.ls-payment-fields .ls-wide{grid-column:auto}.ls-buyer-select{gap:9px}.ls-tabs{gap:0}.ls-tabs button{padding:0 10px 11px;font-size:13px}.ls-alert{flex-wrap:wrap}.ls-history-tools{flex-wrap:wrap}.ls-summary{position:static}}
 
 .ls-form fieldset{border:0;margin:0;padding:0;min-width:0}.ls-card label.ls-money-row{flex-direction:row;align-items:center;font-size:14px}.ls-card fieldset:disabled input,.ls-card fieldset:disabled select,.ls-card fieldset:disabled textarea{background:#f5f7f9}
+.ls-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.ls-fields .ls-description{grid-column:1/-1}.ls-fields .ls-unit-price input{background:#eaf8f2;color:var(--ls-green);font-weight:700;font-variant-numeric:tabular-nums}.ls-unit-price-hint{display:block;margin-top:8px;line-height:1.5}
+@media(max-width:1150px){.ls-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.ls-fields .ls-unit-price{grid-column:1/-1}}

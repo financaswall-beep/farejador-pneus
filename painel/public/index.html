@@ -142,7 +142,7 @@
 <script src="/admin/painel/app.atacado.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.atacado.transfer.js?v=20260915-lotsale1"></script>
 <script src="/admin/painel/app.atacado.requests.js?v=20261007-wholesale-requests1"></script>
-<script src="/admin/painel/app.vendas.lotes.js?v=20260915-lotsale1"></script>
+<script src="/admin/painel/app.vendas.lotes.js?v=20261028-unitprice1"></script>
 <script src="/admin/painel/app.compras.lotes.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.estoque.custos.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.estoque.lotes.js?v=20260916-vehicle-ui1"></script>
@@ -335,7 +335,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/admin/painel/compras-lotes.css?v=20260915-lot1">
-<link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20260915-lotsale1">
+<link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20261028-unitprice1">
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
 <link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20260915-finance1">
@@ -2637,8 +2637,8 @@
               </div><button type="button" class="ls-link ls-buyer-toggle" @click="lotSales.form.new_buyer = !lotSales.form.new_buyer" x-text="lotSales.form.new_buyer ? 'Escolher cliente existente' : '+ Cadastrar novo cliente'"></button>
               <div x-show="lotSales.form.new_buyer" class="ls-new-customer"><label>Nome do cliente<input x-model="lotSales.form.name" maxlength="160" autocomplete="name"></label><label>Telefone (opcional)<input x-model="lotSales.form.phone" maxlength="32" inputmode="tel" autocomplete="tel"></label></div></section>
               <section class="ls-card" aria-label="Itens da venda de lotes"><div class="ls-card-head"><h2>Itens da venda</h2></div>
-                <div class="ls-fields"><label>Descrição<input x-model="lotSales.form.description" maxlength="200"></label><label>Quantidade vendida<input type="number" min="1" max="100000" step="1" x-model="lotSales.form.quantity" placeholder="0"></label><label>Valor negociado<input inputmode="decimal" x-model="lotSales.form.amount" placeholder="R$ 0,00" maxlength="16"></label></div>
-                <div class="ls-info"><i data-lucide="calculator"></i><span>Valor por pneu nesta venda: <strong x-text="Number(lotSales.form.quantity)>0 ? formatCurrency(lsNet/Number(lotSales.form.quantity)) : '—'"></strong><span x-show="lsAmount(lotSales.form.discount)>0"> · já considera o desconto</span></span></div>
+                <div class="ls-fields"><label class="ls-description">Descrição<input x-model="lotSales.form.description" maxlength="200"></label><label>Quantidade vendida<input type="number" min="1" max="100000" step="1" x-model="lotSales.form.quantity" placeholder="0"></label><label>Valor total negociado<input inputmode="decimal" x-model="lotSales.form.amount" placeholder="R$ 0,00" maxlength="16"></label><label class="ls-unit-price">Valor por pneu<input :value="lsUnitPrice === null ? '—' : formatCurrency(lsUnitPrice)" readonly aria-describedby="ls-unit-price-hint"></label></div>
+                <small id="ls-unit-price-hint" class="ls-unit-price-hint">Valor médio por pneu: total da venda, com desconto, dividido pela quantidade.</small>
                 <div class="ls-distribution"><h3>De quais lotes os pneus vão sair?</h3><button type="button" class="ls-link" @click="lotSales.form.mode === 'oldest' ? lsManual() : lotSales.form.mode = 'oldest'"><i data-lucide="sliders-horizontal"></i><span x-text="lotSales.form.mode === 'oldest' ? 'Alterar distribuição' : 'Usar mais antigos primeiro'"></span></button></div>
                 <p class="ls-mode" x-text="lotSales.form.mode === 'oldest' ? 'Mais antigos primeiro · distribuição automática' : 'Distribuição manual · informe quanto retirar de cada lote'"></p>
                 <div class="ls-scroll"><table class="ls-table"><thead><tr><th>Lote</th><th>Disponível</th><th>Retirar</th><th>Saldo após venda</th><th>Custo da saída</th></tr></thead><tbody><template x-for="row in lsPlan" :key="row.id"><tr :class="{'ls-invalid':!row.valid}"><td><strong x-text="row.lot_code+' · '+vehicleTypeLabel(row.vehicle_type)"></strong><small x-text="formatCurrency(Number(row.remaining_cost)/Number(row.quantity_on_hand))+' por pneu'"></small><small x-show="row.quantity_reserved>0" x-text="row.quantity_reserved+' reservados'"></small></td><td x-text="row.available_quantity"></td><td><template x-if="lotSales.form.mode === 'manual'"><input type="number" min="0" step="1" :max="row.available_quantity" x-model.number="lotSales.form.allocations[row.id]" :aria-label="'Retirar de '+row.lot_code"></template><span x-show="lotSales.form.mode === 'oldest'" x-text="row.quantity"></span></td><td x-text="row.after"></td><td x-text="row.valid ? formatCurrency(row.cost_cents/100) : 'Revise'"></td></tr></template></tbody></table></div>

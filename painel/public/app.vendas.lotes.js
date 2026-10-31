@@ -48,6 +48,12 @@ window.PAINEL_MODULES.vendasLotes = function () {
     get lsUsed(){return this.lsPlan.filter(row=>row.quantity>0);},
     get lsCost(){return this.lsUsed.reduce((sum,row)=>sum+row.cost_cents,0)/100;},
     get lsNet(){return (cents(this.lsAmount(this.lotSales.form.amount))-cents(this.lsAmount(this.lotSales.form.discount)))/100;},
+    get lsUnitPrice(){
+      const f=this.lotSales.form,quantity=Number(f.quantity),amount=this.lsAmount(f.amount);
+      if(!Number.isSafeInteger(quantity)||quantity<1||quantity>100000||!this.lsMoneyValid(f.amount)||!this.lsMoneyValid(f.discount)
+        ||amount<=0||amount>99999999.99||this.lsAmount(f.discount)<0||this.lsNet<=0)return null;
+      return this.lsNet/quantity;
+    },
     get lsSelectedQuantity(){return this.lsUsed.reduce((sum,row)=>sum+row.quantity,0);},
     get lsRemaining(){return this.lsUsed.reduce((sum,row)=>sum+row.after,0);},
     get lsProblem(){
