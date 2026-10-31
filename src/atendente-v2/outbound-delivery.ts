@@ -4,6 +4,7 @@ import type { OutboundRow } from './outbound-worker.js';
 import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js';
 import { tirePhotoForWhatsApp } from '../photos/codec.js';
 import { catalogPhotoPayload } from '../catalog-photos/model.js';
+import { tryDeliverWholesaleContact } from './wholesale-contact-delivery.js';
 
 export async function deliverOutboundRow(
   client: PoolClient,
@@ -31,6 +32,8 @@ export async function deliverOutboundRow(
     },video.caption,row.echo_id??undefined);
   }
   if (row.kind !== 'photo_attachment') {
+    const contact = await tryDeliverWholesaleContact(client, row);
+    if (contact) return contact;
     return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
   }
   if(catalogPhotoPayload(row.body)){
