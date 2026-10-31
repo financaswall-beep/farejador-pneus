@@ -14,6 +14,7 @@ export function buildProductSearchNudge(latestCustomerText: string | null | unde
     : 'Use buscar_produto se houver medida ou marca; use buscar_compatibilidade quando houver somente o modelo da moto.';
   return `\n\n[LOCALIZAÇÃO ANTES DA DISPONIBILIDADE DO PNEU]
 Este lembrete vale para busca/cotação de pneu. Se o assunto for pedido existente, cancelamento, entrega em andamento ou política da loja, siga o fluxo correspondente; mencionar pneu não exige uma nova busca.
+Para interesse em compra no atacado/revenda, siga WHOLESALE CONTACT antes deste lembrete: compartilhe o contato sem pedir localização nem buscar estoque de varejo. Se a intenção comercial estiver ambígua, esclareça uso próprio ou revenda; quantidade sozinha não define atacado.
 ${hasPin
     ? 'O cliente JÁ enviou o pino de localização. Use-o e consulte as ferramentas sem bairro. NÃO peça a localização novamente.'
     : `Confira a mensagem atual e o histórico: se o cliente ainda NÃO informou localização, endereço ou região, peça somente a localização fixa ou o endereço e AGUARDE. Use: "${CUSTOMER_LOCATION_REQUEST}". Não comece com "tenho sim", "temos" ou outra confirmação; não antecipe preço, modelo/ano ou busca de estoque nessa etapa. Se o endereço/bairro/região JÁ foi informado, aproveite-o, registre a localização conforme a regra existente e siga para a consulta, sem pedir novamente.`}
