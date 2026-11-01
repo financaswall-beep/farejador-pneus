@@ -1,0 +1,16 @@
+[OK 01/15] VC único por ambiente e criação idempotente
+[OK 02/15] cadastro com viagem é atômico; compra avulsa permanece igual
+[OK 03/15] vincular/desvincular não muda UMA linha do financeiro, estoque ou origens
+[OK 04/15] compra e despesa não entram em duas viagens
+[OK 05/15] duas compras da mesma OC não se dividem
+[OK 06/15] bloqueia gastos de combustível legado, nota da rota, nota perdida, folha e comissão
+[OK 07/15] despesa paga e a pagar somam pelo valor da origem
+[OK 08/15] conferência acompanha os números da lista de Compras
+[OK 09/15] lote usa valor e quantidade do lote, sem criar estoque por medida
+[OK 10/15] cancelada/removida sai da soma e mantém o vínculo visível
+[OK 11/15] frete do fornecedor não é somado duas vezes e frete extra gera alerta
+[OK 12/15] FK composta e consultas isolam test de prod
+[OK 13/15] fechada recusa vínculos; reabre; exclusão exige vazia
+[OK 14/15] mesma chave com outra viagem conflita no cadastro
+[OK 15/15] RLS e nenhum grant de tabela ou coluna ao parceiro
+15/15 provas verdes. BEGIN/ROLLBACK: banco preservado.

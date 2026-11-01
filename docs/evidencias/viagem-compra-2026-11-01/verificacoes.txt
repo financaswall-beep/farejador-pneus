@@ -1,0 +1,14 @@
+npm test: exit 0
+ Test Files  563 passed (563)
+      Tests  3727 passed (3727)
+   Start at  02:22:42
+   Duration  54.11s (transform 12.31s, setup 0ms, import 46.91s, tests 46.45s, environment 62ms)
+
+npm run typecheck: exit 0 (tsc --noEmit)
+[OK] fiscal de tamanho: todos os arquivos dentro do teto.
+[OK] PARIDADE: manifesto identico ao baseline (3122 propriedades).
+[OK] PARIDADE DE ROTAS: idêntico ao baseline (583 rotas).
+OK: 281 migrations verificadas; ultima=0280_wholesale_purchase_groups.sql; gaps=0071
+git diff --check (base..implementação): sem erros
+Preview final: 6 etapas por clique passaram; conferência adicional somente leitura abriu Financeiro com filtro e 2 chips.
+Preview baseline: mesmos erros do gráfico de preços no front origin/main; nenhum tipo novo de erro.

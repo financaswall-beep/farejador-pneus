@@ -165,6 +165,7 @@ window.PAINEL_MODULES.compras = function () {
       body.receipt_status = f.receipt_status;
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;
       body.idempotency_key = f.idempotency_key;
+      if (f.group_id) body.group_id = f.group_id;
       return {
         body,
         warnings: {
@@ -248,6 +249,7 @@ window.PAINEL_MODULES.compras = function () {
         const qs = new URLSearchParams();
         if (this.despesaFiltro.mes) qs.set('mes', this.despesaFiltro.mes);
         if (this.despesaFiltro.categoria) qs.set('categoria', this.despesaFiltro.categoria);
+        if (this.despesaFiltro.group_id) qs.set('group_id', this.despesaFiltro.group_id);
         const despesas = await this.apiGet('/admin/api/matriz/despesas' + (qs.toString() ? '?' + qs.toString() : ''));
         // flag off → enabled:false → null (o bloco some; a tela mostra o aviso de dormente)
         this.matrizDespesas = despesas && despesas.enabled ? despesas : null;

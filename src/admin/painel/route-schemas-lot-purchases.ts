@@ -3,6 +3,7 @@ import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/busi
 import { calculateLotPurchaseMoney } from './lot-purchase-money.js';
 
 export const registerLotPurchaseSchema = z.object({
+  group_id: z.string().uuid().nullable().optional(),
   supplier_id: z.string().uuid().optional(),
   new_supplier: z.object({ name: z.string().trim().min(1).max(200),
     phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(),

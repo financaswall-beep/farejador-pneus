@@ -11,6 +11,7 @@ import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 import { registerPurchaseReportRoutes } from './route-purchase-report.js';
 import { registerLotPurchaseSchema } from './route-schemas-lot-purchases.js';
+import { registerPurchaseGroupRoutes } from './route-purchase-groups.js';
 
 import { purchaseReportQuerySchema } from './purchase-report-query.js';
 
@@ -18,6 +19,7 @@ import { priceReportQuerySchema } from './price-report-query.js';
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   await registerPurchaseReportRoutes(fastify);
+  await registerPurchaseGroupRoutes(fastify);
   fastify.post('/admin/api/wholesale/lot-purchases', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerLotPurchaseSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });

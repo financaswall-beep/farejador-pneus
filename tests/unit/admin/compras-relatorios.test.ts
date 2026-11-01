@@ -25,7 +25,7 @@ describe('relatórios conciliados de compras', () => {
     expect(html).toContain('@click="comprasOpenCostDialog()"');
     expect(html).toContain('Evolução do custo médio');
     expect(html).toContain('Compras canceladas ficam fora');
-    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20260918-prices1');
+    expect(html).toContain('/admin/painel/app.compras.relatorios.js?v=20261101-viagens1');
     expect(html).toContain('/admin/painel/app.compras.precos.js?v=20260918-prices1');
   });
 

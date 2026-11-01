@@ -31,6 +31,13 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   }
 
   const dbError = err as Error & { code?: string; constraint?: string };
+  if (['purchase_group_closed','purchase_group_not_empty','purchase_already_grouped',
+    'expense_already_grouped','purchase_order_split_across_groups','expense_owned_by_other_module',
+    'purchase_cancelled'].includes(err.message)) return { status: 409, error: err.message };
+  if (['purchase_group_not_found','purchase_group_link_not_found'].includes(err.message)) return { status: 404, error: err.message };
+  if (dbError.code === '23505' && dbError.constraint?.startsWith('wholesale_purchase_group_')) {
+    return { status: 409, error: dbError.constraint.includes('expenses') ? 'expense_already_grouped' : 'purchase_already_grouped' };
+  }
   if (err.message === 'expense_receipt_not_found') return { status: 404, error: err.message };
   if (err.message === 'expense_receipt_confirmation_required') return { status: 400, error: err.message };
   if (['expense_receipt_already_linked', 'expense_receipt_processing', 'receipt_belongs_to_trip', 'receipt_belongs_to_expense'].includes(err.message)) {

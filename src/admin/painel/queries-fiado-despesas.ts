@@ -111,6 +111,7 @@ export interface MatrizExpenseRow {
 }
 
 export interface MatrizExpensesFiltro {
+  group_id?: string;
   month?: string;
   category?: string;
   limit?: number;
@@ -141,7 +142,11 @@ export async function getMatrizExpenses(
     params.push(filtro.category);
     where.push(`category=$${params.length}`);
   }
-  const filtered = Boolean(filtro?.month || filtro?.category);
+  if (filtro?.group_id) {
+    params.push(filtro.group_id);
+    where.push(`EXISTS(SELECT 1 FROM commerce.wholesale_purchase_group_expenses l WHERE l.environment=matriz_expenses.environment AND l.expense_id=matriz_expenses.id AND l.group_id=$${params.length})`);
+  }
+  const filtered = Boolean(filtro?.month || filtro?.category || filtro?.group_id);
   const limit = filtro?.limit ?? (filtered ? 200 : 50);
   const order = filtered ? 'occurred_at DESC'
     : `(payment_status='pending') DESC,(due_date IS NULL),due_date,occurred_at DESC`;

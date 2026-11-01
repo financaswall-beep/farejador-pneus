@@ -109,6 +109,7 @@ window.PAINEL_MODULES.comprasLotes = function () {
         freight_amount: totals.freight, discount_amount: totals.discount,
         supplier_reference: f.supplier_reference.trim() || null, notes: f.notes.trim() || null,
         idempotency_key: f.idempotency_key,
+        ...(f.group_id ? { group_id: f.group_id } : {}),
       };
     },
     async lotPurchaseSubmit() {

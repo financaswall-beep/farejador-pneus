@@ -20,6 +20,15 @@ describe('conversas no app, banco real e nenhum envio externo',()=>{
   const headers={authorization:'local-owner'};
   beforeAll(async()=>{
     db=await startPostgres();
+    // "Ontem" pode pertencer ao mês anterior; o banco novo só prepara o atual e futuros.
+    await db.pool.query(`DO $partition$
+      DECLARE
+        v_month date := date_trunc('month', now() - interval '1 day')::date;
+        v_next date := (v_month + interval '1 month')::date;
+      BEGIN
+        EXECUTE format('CREATE TABLE IF NOT EXISTS core.%I PARTITION OF core.messages FOR VALUES FROM (%L) TO (%L)',
+          'messages_' || to_char(v_month, 'YYYY_MM'), v_month, v_next);
+      END $partition$`);
     Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:db.connectionString,DATABASE_SSL:'false',
       CHATWOOT_HMAC_SECRET:'test-secret',ADMIN_AUTH_TOKEN:'fixture-token',CHATWOOT_ACCOUNT_ID:'2',CHATWOOT_API_BASE_URL:'https://invalid.example/api/v1',
       CHATWOOT_API_TOKEN:'local-fixture',BOT_OUTBOX:'true',MATRIZ_CUSTOMER_IDENTITY:'true',AGENT_V2_CONVERSATION_IDS:'*'});

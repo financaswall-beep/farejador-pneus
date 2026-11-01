@@ -155,6 +155,8 @@ describe('Etapa 4 — logística e marketing no livro central', () => {
       merchant: 'Posto Etapa 4', document_date: '2026-07-20',
       competence_month: '2026-07-01', payment_status: 'paid' as const,
       payment_date: '2026-07-20', idempotency_key: randomUUID(),
+      // A nota fixa de julho pode ultrapassar a janela de três meses com o tempo.
+      retroactive_confirmed: true,
       actor_label: 'owner:receipt', environment: 'test' as const,
     };
     const approved = await approveReceipt(input, db.pool);
