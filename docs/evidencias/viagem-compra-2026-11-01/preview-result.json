@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "checks": [
+    "Viagem criada no formulário real",
+    "Compra de 5 pneus a R$25, frete R$10 e viagem selecionada: R$135",
+    "+ Gasto abriu o mesmo formulário do Financeiro com a viagem preenchida",
+    "Despesa existente vinculada; Compras R$135 + Despesas R$35 = R$170; custo R$34 por pneu; alerta de frete visível",
+    "Fechar bloqueia vínculos e reabrir restaura as ações",
+    "Detalhe original da compra mostra o chip da viagem"
+  ],
+  "errors": [
+    "Failed to execute 'importNode' on 'Document': parameter 1 is not of type 'Node'.",
+    "tick is not defined",
+    "series is not defined",
+    "point is not defined",
+    "label is not defined"
+  ],
+  "group": {
+    "id": "e6199a74-2d04-4391-96a8-440dce20805e",
+    "code": "VC-0018"
+  },
+  "summary": {
+    "purchases": "135.00",
+    "freight_included": "10.00",
+    "expenses": "35.00",
+    "total": "170.00",
+    "tires": 5,
+    "received": 5,
+    "transit": 0,
+    "pending_purchases": 0,
+    "provisional": false,
+    "cost_per_tire": "34.00",
+    "freight_warning": true
+  },
+  "preview": "http://127.0.0.1:4290/admin/painel",
+  "screenshots": [
+    "preview-viagem.png",
+    "preview-detalhe-compra.png",
+    "preview-gastos.png",
+    "preview-financeiro.png"
+  ],
+  "baseline": {
+    "source": "9761386801e8242f537c2dcccc12ac9c6eb51b36 (origin/main)",
+    "unique_errors": [
+      "Failed to execute 'importNode' on 'Document': parameter 1 is not of type 'Node'.",
+      "tick is not defined",
+      "series is not defined",
+      "point is not defined",
+      "label is not defined"
+    ],
+    "new_errors": []
+  }
+}
