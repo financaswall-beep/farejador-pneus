@@ -23,4 +23,8 @@ As saídas detalhadas da aplicação estão nos artefatos privados locais `.code
 
 ## Deploy
 
+O primeiro CI do PR 146 revelou um cenário antigo de aprovação de nota de julho sem confirmação retroativa. Com novembro, a competência passou do limite de três meses. A correção fica só nos dados de teste: confirmação explícita nos três cenários fixos de julho das provas do livro central e da consistência logística (Etapa 10). A política de produção não foi alterada.
+
+Revalidação local dos dois arquivos em PostgreSQL descartável: **19/19 testes passaram**. O restante da publicação aguarda o novo CI completo.
+
 O deploy é manual no Coolify e fica com o Wallace. O código novo deve chegar ao `main` após o CI da publicação; não executar o deploy enquanto a publicação e suas verificações não forem confirmadas. A migration 0280 já está pronta no banco para receber esse código. Não há variável nova.

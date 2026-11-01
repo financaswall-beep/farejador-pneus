@@ -408,6 +408,7 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
       merchant: 'Posto Teste', document_date: '2026-07-18',
       competence_month: '2026-07-01', payment_status: 'paid',
       payment_date: '2026-07-18', idempotency_key: 'stage10-divergent-receipt',
+      retroactive_confirmed: true,
       actor_label: 'owner-stage10', environment: 'test',
     }, db.pool);
     await closeTrip({
@@ -481,6 +482,7 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
       merchant: 'Oficina Teste', document_date: '2026-07-20',
       competence_month: '2026-07-01', payment_status: 'paid',
       payment_date: '2026-07-20', idempotency_key: 'stage10-repair-approve',
+      retroactive_confirmed: true,
       actor_label: 'owner-stage10', environment: 'test',
     }, db.pool);
 
