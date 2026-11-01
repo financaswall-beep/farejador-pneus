@@ -27,4 +27,8 @@ O primeiro CI do PR 146 revelou um cenário antigo de aprovação de nota de jul
 
 Revalidação local dos dois arquivos em PostgreSQL descartável: **19/19 testes passaram**. O restante da publicação aguarda o novo CI completo.
 
+A rodada local dos arquivos ainda não alcançados pelo primeiro CI passou em 70/71 arquivos e revelou outro cenário sensível à virada do mês: `operation-chat` cria mensagens de ontem, mas no banco descartável novo não havia a partição do mês anterior. O setup desse teste agora prepara explicitamente essa partição, como já faz a prova de localização. Nenhuma migration ou regra de produção foi alterada por essa correção de teste.
+
+Após preparar a partição do cenário, **9/9 testes de operation-chat passaram** no PostgreSQL descartável. O novo CI deve validar o conjunto completo antes do merge.
+
 O deploy é manual no Coolify e fica com o Wallace. O código novo deve chegar ao `main` após o CI da publicação; não executar o deploy enquanto a publicação e suas verificações não forem confirmadas. A migration 0280 já está pronta no banco para receber esse código. Não há variável nova.
