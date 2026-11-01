@@ -22,8 +22,10 @@ import { resolveWholesalePurchaseOrder } from './queries-purchase-orders.js';
 import { calculateLotPurchaseMoney, type PurchaseLotInput } from './lot-purchase-money.js';
 import { confirmLotPurchaseStock, insertPurchaseLot, receivePurchaseLot } from './lot-purchase-stock.js';
 import { resolveSupplier, applyPurchaseStock, type AllocatedPurchaseItem } from './purchase-registration-helpers.js';
+import { linkPurchaseGroupInTransaction } from './purchase-group-links.js';
 
 export interface RegisterWholesalePurchaseInput {
+  group_id?: string | null;
   environment?: 'prod' | 'test';
   supplier_id?: string | null;
   new_supplier?: { name: string; phone?: string | null; document?: string | null } | null;
@@ -92,6 +94,7 @@ export async function registerWholesalePurchase(
     const receiptStatus = input.receipt_status ?? 'received';
     const operation = { environment, domain: 'wholesale_purchase.create',
       idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
+        ...(input.group_id ? { group_id: input.group_id } : {}),
         supplier_id: input.supplier_id ?? null,
         new_supplier: input.new_supplier ? { name: input.new_supplier.name.trim(),
           phone: input.new_supplier.phone ? normalizeBrazilianPhone(input.new_supplier.phone) : null,
@@ -166,6 +169,8 @@ export async function registerWholesalePurchase(
        totals.productsCents / 100, totals.freightCents / 100, totals.discountCents / 100,
        input.payment_method?.trim() || null, input.lot ? 'lot' : 'catalog']);
     const purchaseId = purchase.rows[0]!.id;
+    await linkPurchaseGroupInTransaction(client, { environment, group_id: input.group_id,
+      kind: 'purchase', record_id: purchaseId, actor: input.created_by, idempotency_key: input.idempotency_key });
     const lotRecord = input.lot
       ? await insertPurchaseLot(client, environment, purchaseId, input.lot, totals.totalCents / 100)
       : null;

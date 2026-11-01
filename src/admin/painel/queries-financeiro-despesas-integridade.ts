@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { lockExpenseReceipt, linkExpenseReceipt } from './expense-receipts.js';
+import { linkPurchaseGroupInTransaction } from './purchase-group-links.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState, postMatrizExpensePayment } from './matriz-ledger-expenses.js';
@@ -11,6 +12,7 @@ import {
 } from '../../shared/business-time.js';
 
 export interface CreateMatrizExpenseInput {
+  group_id?: string | null;
   receipt_id?: string;
   receipt_confirmed?: boolean;
   category: string;
@@ -98,6 +100,7 @@ export async function createMatrizExpense(
   const paymentStatus = input.payment_status ?? 'paid';
   const operation = { environment, domain: 'matriz_expense.create',
     idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
+      ...(input.group_id ? { group_id: input.group_id } : {}),
       category: input.category, description: input.description?.trim() || null,
       amount_cents: moneyCents(input.amount), payment_status: paymentStatus,
       due_date: paymentStatus === 'pending' ? (input.due_date ?? null) : null,
@@ -124,6 +127,8 @@ export async function createMatrizExpense(
       competence_month: input.competence_month, created_by: input.created_by,
     });
     if (input.receipt_id) await linkExpenseReceipt(client, environment, input.receipt_id, created.id);
+    await linkPurchaseGroupInTransaction(client, { environment, group_id: input.group_id,
+      kind: 'expense', record_id: created.id, actor: input.created_by ?? 'admin', idempotency_key: input.idempotency_key });
     const result = integrityResult(created);
     await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
       entityTable: 'commerce.matriz_expenses', entityId: result.id,

@@ -12,6 +12,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
       const tasks = [
         this.loadComprasOverview(), this.loadComprasHistory(),
         this.loadComprasSuppliers(), this.loadComprasPrices(),];
+      if (this.viagensLoaded) tasks.push(this.viagensLoad());
       const base = await Promise.allSettled(baseJobs.map(([, request]) => request));
       base.forEach((result, index) => {
         if (result.status === 'rejected') {

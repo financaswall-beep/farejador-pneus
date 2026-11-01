@@ -31,6 +31,7 @@ export const purchaseItemSchema = z.object({
 });
 
 export const registerPurchaseSchema = z.object({
+  group_id: z.string().uuid().nullable().optional(),
   supplier_id: z.string().uuid().nullable().optional(),
   new_supplier: z.object({
     name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(),

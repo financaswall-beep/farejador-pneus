@@ -14,6 +14,8 @@ import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
 import { registerFinanceiroOverview } from './route-financeiro-overview.js';
 import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
 import { registerExpenseReceiptRoutes } from './route-expense-receipts.js';
+import { expensePurchaseGroupTags } from './queries-purchase-groups.js';
+import { pool } from '../../persistence/db.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   registerExpenseReceiptRoutes(fastify, { prefix: '/admin/api/matriz/despesas', read: [requireAdminAuth], write: [requireAdminOwner], actor: operatorLabel });
@@ -64,10 +66,12 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
       return reply.status(400).send({ error: q.error.issues[0]?.message ?? 'invalid_query' });
     }
     const [resumo, categorias] = await Promise.all([
-      getMatrizExpenses(undefined, undefined, { month: q.data.mes, category: q.data.categoria }),
+      getMatrizExpenses(undefined, undefined, { month: q.data.mes, category: q.data.categoria, group_id: q.data.group_id }),
       listMatrizExpenseCategories(),
     ]);
-    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...resumo, categorias });
+    const tags = await expensePurchaseGroupTags(resumo.entries.map(e => e.id), env.FAREJADOR_ENV, pool);
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...resumo, categorias,
+      entries: resumo.entries.map(e => ({ ...e, ...(tags.find(t => t.expense_id === e.id) ?? {}) })) });
   });
 
   // 0130: cadastrar MODALIDADE nova ("Pedágio", "Alimentação"…). Nome já ativo → 409;

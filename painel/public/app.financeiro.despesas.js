@@ -97,6 +97,7 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
       this.despesaMsg = null;
       try {
         const body = {
+          ...(this.despesaForm.group_id ? { group_id: this.despesaForm.group_id } : {}),
           category: this.despesaForm.category,
           description: this.despesaForm.description.trim() || null,
           amount: valor,
@@ -126,6 +127,7 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
           payment_date: '', due_date: '', idempotency_key: '',
         };
         await this.loadFinanceiro();
+        if (this.viagensLoaded) await this.viagensLoad();
       } catch (err) {
         this.despesaMsg = { ok: false, text: `Não consegui lançar (${err.message}).` };
       } finally {
@@ -194,6 +196,7 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
           text: 'Despesa removida. A trilha de auditoria foi preservada.',
         };
         await this.loadFinanceiro();
+        if (this.viagensLoaded) await this.viagensLoad();
       } catch (err) {
         dialog.error = `Não consegui remover (${err.message}).`;
       } finally {

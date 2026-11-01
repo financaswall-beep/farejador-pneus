@@ -64,6 +64,7 @@ export function requiredMatrixModules(pathname?: string): MatrixPanelModule[] | 
   if (/^\/admin\/api\/(clientes|clientes-v2|privacy)(\/|$)/.test(path)) return ['clientes'];
   if (/^\/admin\/api\/wholesale\/lots\/[^/]+\/purchase$/.test(path)) return ['compras'];
   if (/^\/admin\/api\/wholesale\/lot-purchases(\/|$)/.test(path)) return ['compras'];
+  if (/^\/admin\/api\/wholesale\/purchase-groups(\/|$)/.test(path)) return ['compras', 'financeiro'];
   if (/^\/admin\/api\/wholesale\/lot-sales(\/|$)/.test(path)) return ['vendas'];
   if (/^\/admin\/api\/wholesale\/(lots|lot-movements|lot-separation-sources|lot-separations)(\/|$)/.test(path)) return ['estoque'];
   if (/^\/admin\/api\/wholesale\/(purchase|purchases|purchase-orders|supplier|suppliers|replenishment)/.test(path)) return ['compras'];

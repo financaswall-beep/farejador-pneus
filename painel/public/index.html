@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260930-results1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20260930-publisher2" />
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261025-dot1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261101-viagens1" />
 <style>
   #sino-dropdown{display:flex;flex-direction:column;max-height:calc(100dvh - 6rem)}
   #sino-dropdown>div{flex-shrink:0}
@@ -143,12 +143,14 @@
 <script src="/admin/painel/app.atacado.transfer.js?v=20260915-lotsale1"></script>
 <script src="/admin/painel/app.atacado.requests.js?v=20261007-wholesale-requests1"></script>
 <script src="/admin/painel/app.vendas.lotes.js?v=20260915-lotsale1"></script>
-<script src="/admin/painel/app.compras.lotes.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.compras.viagens.js?v=20261101-viagens1"></script>
+<script src="/admin/painel/app.compras.viagens.dialog.js?v=20261101-viagens1"></script>
+<script src="/admin/painel/app.compras.lotes.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.estoque.custos.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.estoque.lotes.js?v=20260916-vehicle-ui1"></script>
-<script src="/admin/painel/app.compras.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.compras.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/purchase-price-utils.js?v=20260918-prices1"></script>
-<script src="/admin/painel/app.compras.relatorios.js?v=20260918-prices1"></script>
+<script src="/admin/painel/app.compras.relatorios.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260918-prices1"></script>
 <script src="/admin/painel/app.compras.reposicao.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
@@ -280,7 +282,7 @@
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260903-finance-carry1"></script>
 <script src="/admin/painel/expense-receipt-viewer.js?v=20260923-receipt2"></script>
-<script src="/admin/painel/app.financeiro.despesas.js?v=20260923"></script>
+<script src="/admin/painel/app.financeiro.despesas.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
@@ -305,7 +307,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261025-photos1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -3286,7 +3288,7 @@
       </div>
     </div>
 
-    <div x-show="currentPage === 'compras' && isMatrixPanel()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+    <div x-show="currentPage === 'compras' && isMatrixPanel()" x-effect="if(currentPage === 'compras') viagensEnsure()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
       <section x-show="comprasTab !== 'lote'" aria-labelledby="compras-heading"
                class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
         <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
@@ -3361,6 +3363,7 @@
                   </div></template>
                   <label>Data da compra<input x-model="lotPurchaseForm.purchased_at" type="date" :max="finHoje()" required></label>
                   <label>Referência do fornecedor (opcional)<input x-model="lotPurchaseForm.supplier_reference" maxlength="160" placeholder="Nota, recibo ou referência"></label>
+                  <label class="lot-wide">Viagem de compra (opcional)<select x-model="lotPurchaseForm.group_id" @change="viagemSelect('lote')" @focus="viagensEnsure()"><option value="">Sem viagem</option><template x-for="g in viagensAbertas" :key="'lote-viagem-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template><option value="__nova__">➕ Nova viagem…</option></select></label>
                 </div>
               </section>
               <section class="lot-purchase-card">
@@ -3419,6 +3422,14 @@
 
       <!-- VISÃO GERAL: tudo derivado das coleções que loadAtacado já carrega. -->
       <div x-show="comprasTab === 'visao'" x-cloak class="space-y-5">
+        <section class="rounded-xl border border-gray-200 bg-white overflow-hidden" aria-label="Viagens de compra">
+          <header class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-5"><div><h2 class="text-base font-semibold">Viagens de compra</h2><p class="mt-1 text-xs text-gray-500">Compras e gastos da mesma viagem, sem alterar os registros de origem.</p></div><button x-show="adminUser?.role === 'owner'" @click="viagemNova()" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white">＋ Nova viagem</button></header>
+          <p x-show="viagensLoading" class="p-5 text-sm text-gray-500">Carregando viagens…</p>
+          <p x-show="viagensError" x-text="viagensError" role="alert" class="p-5 text-sm text-rose-700"></p>
+          <div class="overflow-x-auto"><table class="w-full min-w-[640px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-5 py-3 text-left font-medium">Viagem</th><th class="px-4 py-3 text-left font-medium">Situação</th><th class="px-4 py-3 text-right font-medium">Total da viagem</th><th class="px-4 py-3 text-right font-medium">Custo por pneu</th><th class="px-5 py-3"></th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="g in viagens" :key="'viagem-'+g.id"><tr><td class="px-5 py-4"><p class="font-semibold text-emerald-800" x-text="g.code"></p><p class="mt-1" x-text="g.name"></p></td><td class="px-4 py-4 text-xs" x-text="g.status==='open'?'Aberta':'Fechada'"></td><td class="px-4 py-4 text-right font-semibold num" x-text="formatCurrency(Number(g.summary.total))"></td><td class="px-4 py-4 text-right"><b class="num" x-text="g.summary.cost_per_tire===null?'—':formatCurrency(Number(g.summary.cost_per_tire))"></b><p class="mt-1 text-[11px] text-amber-700" x-show="g.summary.provisional">Provisório</p></td><td class="px-5 py-4 text-right"><button @click="viagemAbrir(g.id)" class="rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800">Abrir viagem</button></td></tr></template></tbody></table></div>
+          <p x-show="!viagensLoading && !viagens.length && !viagensError" class="p-5 text-sm text-gray-500">Nenhuma viagem cadastrada.</p>
+          <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 p-4"><p class="max-w-2xl text-[11px] text-gray-500">Inclui gastos da viagem. O custo do pneu no estoque continua sendo só a compra (pneu + frete do fornecedor).</p><div class="flex gap-2"><button @click="viagensPage--;viagensLoad()" :disabled="viagensPage===1 || viagensLoading" class="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Anterior</button><button @click="viagensPage++;viagensLoad()" :disabled="!viagensHasMore || viagensLoading" class="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">Próxima</button></div></footer>
+        </section>
         <div x-show="comprasErrors.overview" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700">
           <span>Não foi possível atualizar a visão de Compras. Os dados anteriores foram mantidos.</span>
           <button @click="loadComprasOverview()" class="font-semibold hover:underline">Tentar novamente</button>
@@ -3493,6 +3504,29 @@
       </div>
 
       <!-- NOVA COMPRA: pagamento e recebimento são eixos independentes. -->
+      <div x-show="comprasTab === 'viagem'" x-cloak class="space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-3"><button @click="viagemVoltar()" class="text-sm font-semibold text-emerald-800">← Voltar a Compras</button><button @click="viagemAtualizar()" :disabled="viagensLoading" class="rounded-lg border bg-white px-3 py-2 text-xs">Atualizar viagem</button></div>
+        <p x-show="viagensLoading" class="text-sm text-gray-500">Carregando viagem…</p><p x-show="viagensError" x-text="viagensError" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"></p>
+        <template x-if="viagemDetalhe"><div class="space-y-5">
+          <header class="flex flex-wrap items-start justify-between gap-4"><div><p class="text-sm font-semibold text-emerald-800" x-text="viagemDetalhe.group.code"></p><h2 class="mt-1 text-2xl font-semibold" x-text="viagemDetalhe.group.name"></h2><p class="mt-2 text-xs text-gray-500" x-text="viagemDetalhe.group.status==='open'?'Viagem aberta':'Viagem fechada'"></p></div><div x-show="adminUser?.role === 'owner'" class="flex flex-wrap gap-2"><button @click="viagemRenomear()" :disabled="viagemSaving" class="rounded-lg border bg-white px-3 py-2 text-xs">Renomear</button><button @click="viagemAcao(viagemDetalhe.group.status==='open'?'close':'reopen')" :disabled="viagemSaving" class="rounded-lg border bg-white px-3 py-2 text-xs" x-text="viagemDetalhe.group.status==='open'?'Fechar viagem':'Reabrir viagem'"></button><button @click="viagemAcao('delete')" :disabled="viagemSaving || viagemDetalhe.purchases.length>0 || viagemDetalhe.expenses.length>0" class="rounded-lg border bg-white px-3 py-2 text-xs text-rose-700 disabled:opacity-50">Excluir vazia</button></div></header>
+          <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo da viagem">
+            <article class="rounded-xl border border-gray-200 bg-white p-5"><p class="text-xs text-gray-500">Compras</p><p class="mt-2 text-2xl font-semibold num" x-text="formatCurrency(Number(viagemDetalhe.summary.purchases))"></p><p class="mt-2 text-[11px] text-gray-500" x-text="formatCurrency(Number(viagemDetalhe.summary.freight_included))+' de frete já incluído nas compras'"></p></article>
+            <article class="rounded-xl border border-gray-200 bg-white p-5"><p class="text-xs text-gray-500">Gastos da viagem</p><p class="mt-2 text-2xl font-semibold num" x-text="formatCurrency(Number(viagemDetalhe.summary.expenses))"></p></article>
+            <article class="rounded-xl border border-gray-200 bg-white p-5"><p class="text-xs text-gray-500">Total da viagem</p><p class="mt-2 text-2xl font-semibold num" x-text="formatCurrency(Number(viagemDetalhe.summary.total))"></p><p class="mt-2 text-[11px] text-gray-500" x-text="viagemDetalhe.summary.received+' pneus recebidos · '+viagemDetalhe.summary.transit+' a caminho'"></p></article>
+            <article class="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><p class="text-xs text-emerald-800">Custo por pneu com os gastos da viagem</p><p class="mt-2 text-2xl font-semibold num text-emerald-950" x-text="viagemDetalhe.summary.cost_per_tire===null?'—':formatCurrency(Number(viagemDetalhe.summary.cost_per_tire))"></p><p x-show="viagemDetalhe.summary.provisional" class="mt-2 text-[11px] font-semibold text-amber-800" x-text="'Provisório — falta conferir '+viagemDetalhe.summary.pending_purchases+' compra(s)'"></p></article>
+          </section>
+          <p class="rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-600">Inclui gastos da viagem. O custo do pneu no estoque continua sendo só a compra (pneu + frete do fornecedor).</p>
+          <section class="rounded-xl border border-gray-200 bg-white overflow-hidden"><header class="border-b p-5"><h3 class="font-semibold">Compras da viagem</h3></header><div class="overflow-x-auto"><table class="w-full min-w-[700px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="p-4 text-left">Fornecedor / OC</th><th class="p-4 text-right">Valor</th><th class="p-4 text-right">Pneus</th><th class="p-4 text-left">Recebimento</th><th class="p-4 text-left">Pagamento</th><th class="p-4"></th></tr></thead><tbody class="divide-y"><template x-for="p in viagemDetalhe.purchases" :key="p.id"><tr :class="p.status==='cancelled'?'opacity-50 line-through':''"><td class="p-4"><button @click="compraOpenDetails(p)" class="text-left font-semibold text-emerald-800" x-text="p.supplier_name"></button><p class="mt-1 text-xs text-gray-500" x-text="p.order_code || p.id.slice(0,8)"></p></td><td class="p-4 text-right num" x-text="formatCurrency(Number(p.total_amount))"></td><td class="p-4 text-right num" x-text="p.items_count"></td><td class="p-4 text-xs" x-text="p.status==='cancelled'?'Cancelada':p.stock_applied?'Recebida':'Em trânsito'"></td><td class="p-4 text-xs" x-text="viagemDetalhe.can_view_payments ? (p.payment_status==='paid'?'Pago':'A pagar') : '—'"></td><td class="p-4"><button x-show="adminUser?.role === 'owner' && viagemDetalhe.group.status==='open'" @click="viagemVinculo(viagemDetalhe.group.id,'purchase',p.id,true)" :disabled="viagemSaving" class="text-xs text-rose-700">Desvincular</button></td></tr></template></tbody></table></div><p x-show="!viagemDetalhe.purchases.length" class="p-5 text-sm text-gray-500">Vincule uma compra pelo detalhe dela ou escolha esta viagem ao cadastrar.</p></section>
+          <section class="rounded-xl border border-gray-200 bg-white overflow-hidden"><header class="flex flex-wrap items-center justify-between gap-3 border-b p-5"><h3 class="font-semibold">Gastos da viagem</h3><div x-show="adminUser?.role === 'owner' && viagemDetalhe.group.status==='open'" class="flex flex-wrap gap-2"><button @click="viagemPuxarDespesas(1)" class="rounded-lg border px-3 py-2 text-xs">Puxar despesa já lançada</button><button @click="viagemLancarGasto()" class="rounded-lg bg-emerald-800 px-3 py-2 text-xs text-white">＋ Gasto</button></div></header>
+            <p class="px-5 pt-4 text-xs text-gray-600">Frete cobrado pelo fornecedor vai na compra dele. Caminhão ou transportadora que trouxe a carga vai aqui como gasto (modalidade Frete pago).</p>
+            <p x-show="viagemDetalhe.summary.freight_warning" role="status" class="m-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Tem frete nas compras e frete nos gastos — confere se não é o mesmo.</p>
+            <div class="overflow-x-auto"><table class="w-full min-w-[680px] text-sm"><thead class="text-xs text-gray-500"><tr><th class="p-4 text-left">Modalidade / descrição</th><th class="p-4 text-left">Data</th><th class="p-4 text-right">Valor</th><th class="p-4 text-left">Pagamento</th><th class="p-4"></th></tr></thead><tbody class="divide-y"><template x-for="e in viagemDetalhe.expenses" :key="e.id"><tr :class="e.deleted_at?'opacity-50 line-through':''"><td class="p-4"><button @click="viagemVerDespesa(e)" class="text-left font-semibold text-emerald-800" x-text="e.category_label"></button><p class="mt-1 text-xs text-gray-500" x-text="e.description || 'Sem descrição'"></p><span x-show="e.deleted_at" class="text-xs text-rose-700">Removida</span></td><td class="p-4 text-xs" x-text="financeDate(e.occurred_at)"></td><td class="p-4 text-right num" x-text="formatCurrency(Number(e.amount))"></td><td class="p-4 text-xs" x-text="viagemDetalhe.can_view_payments ? (e.payment_status==='paid'?'Pago':'A pagar') : '—'"></td><td class="p-4"><button x-show="adminUser?.role === 'owner' && viagemDetalhe.group.status==='open'" @click="viagemVinculo(viagemDetalhe.group.id,'expense',e.id,true)" :disabled="viagemSaving" class="text-xs text-rose-700">Desvincular</button></td></tr></template></tbody></table></div>
+            <div class="grid gap-2 border-t bg-gray-50 p-4 sm:grid-cols-2"><template x-for="c in viagemDetalhe.categories" :key="c.category"><p class="flex justify-between gap-3 text-xs"><span x-text="c.label"></span><b class="num" x-text="formatCurrency(Number(c.amount))"></b></p></template></div>
+            <div x-show="viagemBuscaOpen" class="m-5 rounded-xl border p-4"><div class="flex items-center justify-between gap-3"><h4 class="text-sm font-semibold">Despesas disponíveis</h4><button @click="viagemBuscaOpen=false" class="text-xs">Fechar</button></div><p class="mt-2 text-xs text-gray-500">Sem viagem e sem vínculo com rota, folha ou comissão.</p><p x-show="viagemBuscaLoading" class="py-4 text-xs">Carregando…</p><template x-for="e in viagemDespesaBusca" :key="'buscar-'+e.id"><div class="flex flex-wrap items-center justify-between gap-3 border-b py-3 text-xs"><div><b x-text="e.category_label"></b><p x-text="e.description"></p><span x-text="formatCurrency(Number(e.amount))"></span></div><button @click="viagemVinculo(viagemDetalhe.group.id,'expense',e.id,false)" :disabled="viagemSaving" class="rounded-lg border border-emerald-700 px-3 py-2 text-emerald-800">Vincular gasto</button></div></template><p x-show="!viagemBuscaLoading && !viagemDespesaBusca.length" class="py-4 text-xs text-gray-500">Nenhuma despesa disponível nesta página.</p><div class="mt-3 flex gap-3"><button @click="viagemPuxarDespesas(viagemBuscaPagina-1)" :disabled="viagemBuscaPagina===1 || viagemBuscaLoading" class="text-xs disabled:opacity-50">Anterior</button><button @click="viagemPuxarDespesas(viagemBuscaPagina+1)" :disabled="viagemDespesaBusca.length<50 || viagemBuscaLoading" class="text-xs disabled:opacity-50">Próxima</button></div></div>
+          </section>
+        </div></template>
+      </div>
+
       <div x-show="comprasTab === 'nova' && adminUser?.role === 'owner'" x-cloak class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
         <div class="2xl:col-span-9 bg-white border border-gray-200 rounded-xl overflow-visible">
           <div class="p-6 border-b border-gray-100">
@@ -3512,6 +3546,7 @@
                 <input x-model="compraForm.supplier_reference" maxlength="160" placeholder="Nota, recibo ou pedido (opcional)" aria-label="Referência do fornecedor" class="min-w-0 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100">
                 <button x-show="adminUser?.role === 'owner'" type="button" @click="fornecedorOpenCreate()" class="px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50 inline-flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Novo fornecedor</button>
               </div>
+              <label class="mt-4 block text-xs font-medium text-gray-600">Viagem de compra (opcional)<select x-model="compraForm.group_id" @change="viagemSelect('compra')" @focus="viagensEnsure()" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"><option value="">Sem viagem</option><template x-for="g in viagensAbertas" :key="'compra-viagem-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template><option value="__nova__">➕ Nova viagem…</option></select></label>
               <div x-show="compraForm.supplierKey === 'new'" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl">
                 <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Nome</span><input x-model="compraForm.newName" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label>
                 <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Documento</span><input x-model="compraForm.newDocument" type="text" placeholder="CPF/CNPJ opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label>
@@ -6274,8 +6309,9 @@
       </div>
 
       <!-- Lançar despesa (0120/0130 — mesmos campos e ações de antes, só o traje mudou) -->
-      <div x-show="matrizDespesas" class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div id="viagem-despesa-form" x-show="matrizDespesas" x-effect="if(currentPage==='financeiro' && finTab==='despesas') viagensEnsure()" class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
         <h3 class="text-base font-semibold mb-1">Lançar despesa</h3>
+        <label class="my-3 block text-xs text-gray-600">Viagem de compra (opcional)<select x-model="despesaForm.group_id" @change="viagemSelect('despesa')" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="">Sem viagem</option><template x-for="g in viagensAbertas" :key="'despesa-viagem-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template><option value="__nova__">➕ Nova viagem…</option></select></label>
         <p class="text-xs text-gray-500 mb-4">Aluguel, funcionário, combustível, frete… tudo que sai do caixa além da compra de pneu.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           <label class="lg:col-span-3 block">
@@ -6347,7 +6383,8 @@
               </p>
               <p x-show="matrizDespesas?.periodo?.truncado" class="text-xs text-amber-600 font-medium mt-0.5">lista grande — mostrando as 200 primeiras (o total acima é do período inteiro)</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <select x-model="despesaFiltro.group_id" @change="despesaFiltroMudou()" aria-label="Filtrar despesas por viagem" class="max-w-xs rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm"><option value="">Todas as viagens</option><template x-for="g in viagensTodas" :key="'filtro-viagem-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template></select>
               <input type="month" x-model="despesaFiltro.mes" @change="despesaFiltroMudou()"
                      class="border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white" title="Mês (pela data do lançamento)" />
               <select x-model="despesaFiltro.categoria" @change="despesaFiltroMudou()"
@@ -6375,7 +6412,7 @@
                 <template x-for="d in (matrizDespesas?.entries || [])" :key="d.id">
                   <tr class="border-b border-gray-100">
                     <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="despesaLabel(d.category)"></span></td>
-                    <td class="py-2.5 pr-3 text-gray-600" x-text="d.description || '—'"></td>
+                    <td class="py-2.5 pr-3 text-gray-600" :class="viagemDespesaAlvo===d.id?'bg-emerald-50':''"><span x-text="d.description || '—'"></span><button x-show="d.group_id" @click="viagemAbrir(d.group_id)" class="mt-1 block rounded-full bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800" x-text="(d.group_code || '')+' · '+(d.group_name || '')"></button></td>
                     <td class="py-2.5 pr-3 text-gray-500 whitespace-nowrap" x-text="financeDate(d.occurred_at)"></td>
                     <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(d.amount))"></td>
                     <td class="py-2.5 pr-3 whitespace-nowrap">
@@ -11843,7 +11880,8 @@
     </div>
 
     <div class="p-6">
-      <div x-show="compraDialog.kind === 'details' && compraDetalhe" class="space-y-5">
+      <div x-show="compraDialog.kind === 'details' && compraDetalhe" x-effect="if(compraDialog.open && compraDialog.kind==='details' && compraDetalhe) viagemCompraEtiqueta(compraDetalhe); else viagemCompraEtiquetaId='' " class="space-y-5">
+        <section class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><h3 class="text-sm font-semibold text-emerald-950">Viagem de compra</h3><p x-show="viagemCompraEtiquetaLoading" class="mt-2 text-xs">Carregando vínculo…</p><template x-if="viagemCompraEtiquetaData"><div class="mt-2 flex flex-wrap items-center justify-between gap-3"><button @click="compraCloseDialog();viagemAbrir(viagemCompraEtiquetaData.id)" class="text-sm font-semibold text-emerald-800" x-text="viagemCompraEtiquetaData.code+' · '+viagemCompraEtiquetaData.name"></button><button x-show="adminUser?.role === 'owner' && viagemCompraEtiquetaData.status==='open'" @click="viagemVinculo(viagemCompraEtiquetaData.id,'purchase',compraDetalhe.id,true)" :disabled="viagemSaving" class="text-xs text-rose-700">Desvincular</button></div></template><div x-show="!viagemCompraEtiquetaData && !viagemCompraEtiquetaLoading && adminUser?.role === 'owner' && compraDetalhe?.status!=='cancelled'" class="mt-3 flex flex-wrap gap-2"><select x-model="viagemCompraSelecionada" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"><option value="">Vincular a uma viagem</option><template x-for="g in viagensAbertas" :key="'vinculo-compra-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template></select><button @click="viagemVinculo(viagemCompraSelecionada,'purchase',compraDetalhe.id,false)" :disabled="!viagemCompraSelecionada || viagemSaving" class="rounded-lg bg-emerald-800 px-3 py-2 text-xs text-white disabled:opacity-50">Vincular</button></div><p x-show="viagensError" x-text="viagensError" role="alert" class="mt-2 text-xs text-rose-700"></p></section>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><p class="text-xs text-gray-500">Data</p><p class="font-semibold mt-1" x-text="compraData(compraDetalhe)"></p></div>
           <div><p class="text-xs text-gray-500">Fornecedor</p><p class="font-semibold mt-1" x-text="compraDetalhe?.supplier_name"></p></div>
@@ -11926,5 +11964,14 @@
   <option value="CEAT"></option><option value="IRA"></option><option value="IRC"></option>
 </datalist>
 
+<div x-show="viagemDialog.open" x-cloak class="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="viagem-dialog-title" @keydown.escape.window="if(!viagemDialog.saving) viagemDialog.open=false">
+  <form @submit.prevent="viagemDialogSalvar()" class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
+    <h2 id="viagem-dialog-title" class="text-xl font-semibold" x-text="viagemDialog.target==='rename'?'Renomear viagem':'Nova viagem de compra'"></h2>
+    <label class="mt-5 block text-sm">Nome da viagem<input x-model="viagemDialog.name" required minlength="2" maxlength="120" placeholder="Ex.: Viagem SP — nov/26" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5"></label>
+    <label class="mt-4 block text-sm">Observações (opcional)<textarea x-model="viagemDialog.notes" maxlength="2000" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5"></textarea></label>
+    <p x-show="viagemDialog.error" x-text="viagemDialog.error" role="alert" class="mt-3 text-sm text-rose-700"></p>
+    <div class="mt-5 flex justify-end gap-3"><button type="button" @click="viagemDialog.open=false" :disabled="viagemDialog.saving" class="rounded-lg border px-4 py-2.5 text-sm">Cancelar</button><button type="submit" :disabled="viagemDialog.saving" class="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50" x-text="viagemDialog.saving?'Salvando…':'Salvar viagem'"></button></div>
+  </form>
+</div>
 </body>
 </html>
