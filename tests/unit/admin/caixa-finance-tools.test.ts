@@ -1,10 +1,10 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ create: vi.fn(), categories: vi.fn(), report: vi.fn(), expenses: true }));
+const m = vi.hoisted(() => ({ create: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), report: vi.fn(), expenses: true }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test', get MATRIZ_EXPENSES() { return m.expenses; } } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/admin/painel/queries-financeiro-despesas-integridade.js', () => ({ createMatrizExpense: m.create }));
-vi.mock('../../../src/admin/painel/queries-despesas-categorias.js', () => ({ listMatrizExpenseCategories: m.categories }));
+vi.mock('../../../src/admin/painel/queries-despesas-categorias.js', () => ({ listMatrizExpenseCategories: m.categories, createMatrizExpenseCategory: m.createCategory }));
 vi.mock('../../../src/admin/painel/queries-financial-report.js', () => ({ getFinancialReport: m.report }));
 import { registerCaixaFinanceExpenseRoutes } from '../../../src/admin/caixa/route-finance-expenses.js';
 import { registerCaixaFinanceReportRoutes } from '../../../src/admin/caixa/route-finance-reports.js';
@@ -26,6 +26,14 @@ function appFor(role = 'owner', authenticated = true, allowed = true) {
   return app;
 }
 describe('despesas e relatórios do app compartilham o financeiro web', () => {
+  it('cria modalidade pelo serviço do web, com perfil e autor confiáveis', async () => {
+    const app = appFor(); m.createCategory.mockResolvedValue({ id: 'alimentacao', label: 'Alimentação' });
+    try {
+      const result = await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/categorias', payload: { label: 'Alimentação', environment: 'prod', created_by: 'falso' } });
+      expect(result.statusCode).toBe(201);
+      expect(m.createCategory).toHaveBeenCalledWith({ label: 'Alimentação', environment: 'test', created_by: 'Responsável (dono)' });
+    } finally { await app.close(); }
+  });
   beforeEach(() => {
     vi.clearAllMocks(); m.expenses = true;
     m.create.mockResolvedValue({ id: 'expense-1', amount: '750.50' });
@@ -40,6 +48,14 @@ describe('despesas e relatórios do app compartilham o financeiro web', () => {
       expect(m.create).toHaveBeenCalledWith({ ...expense, created_by: 'Responsável (dono)' });
       await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas', payload: expense });
       expect(m.create.mock.calls[1]).toEqual(m.create.mock.calls[0]);
+    } finally { await app.close(); }
+  });
+  it('vincula viagem e comprovante no cadastro central, sem um segundo lançamento', async () => {
+    const app = appFor(), group_id = '11111111-1111-4111-8111-111111111111', receipt_id = '22222222-2222-4222-8222-222222222222';
+    try {
+      const body = { ...expense, group_id, receipt_id, receipt_confirmed: true };
+      expect((await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas', payload: body })).statusCode).toBe(201);
+      expect(m.create).toHaveBeenCalledOnce(); expect(m.create).toHaveBeenCalledWith({ ...body, created_by: 'Responsável (dono)' });
     } finally { await app.close(); }
   });
   it('encaminha despesa a pagar sem data de pagamento e só oferece categorias ativas', async () => {

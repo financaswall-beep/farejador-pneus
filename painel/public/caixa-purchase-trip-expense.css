@@ -1,0 +1,140 @@
+/* O formulário do Financeiro é o mesmo. A composição abaixo só se aplica ao gasto de viagem. */
+.vg-receipt-button-label,.vg-camera-hint,.vg-manual,.vg-reading,.vg-extra-dates,#vg-expense-return,.vg-saved-content { display: none; }
+.caixa-app.is-trip-expense #matrix-finance-panel { padding: 12px 14px 23px; background: var(--mc-metal) center/540px 540px; font-family: var(--mc-font); color: var(--mc-ink); --mfc-font: var(--mc-font); }
+.caixa-app.is-trip-expense #matrix-finance-panel :is(button,input,select,textarea) { font-family: var(--mc-font); }
+.caixa-app.is-trip-expense .mf-heading { gap: 8px; margin-bottom: 6px; }
+.caixa-app.is-trip-expense .mf-heading h2 { color: var(--mc-ink); font: 900 32px/1.1 var(--mc-font); letter-spacing: -.02em; }
+.caixa-app.is-trip-expense #mf-back { flex-basis: 30px; min-width: 30px; background: none; border: 0; padding: 0; }
+.caixa-app.is-trip-expense #mf-tool-subtitle { margin: 0 0 9px 38px; font: 500 19px var(--mc-font); }
+.vg-expense-choice { margin: 10px 0; }
+.caixa-app.is-trip-expense .vg-expense-choice { font-size: 0; margin: 0 0 10px 38px; gap: 0; }
+.caixa-app.is-trip-expense .vg-expense-choice select { width: fit-content; max-width: 100%; min-height: 28px; padding: 3px 6px; border: 1px solid #8e9c94; border-radius: 5px; background: var(--mc-panel); color: #253b32; font: 500 19px/1 var(--mc-font); }
+.caixa-app.is-trip-expense #me-form { display: grid; gap: 12px; }
+.caixa-app.is-trip-expense #me-form.hidden { display: none; }
+.caixa-app.is-trip-expense #me-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 0; padding: 0; border: 0; }
+.caixa-app.is-trip-expense #me-fields > label:nth-child(2) { grid-column: 1; grid-row: 1; }
+.caixa-app.is-trip-expense #me-fields > .me-amount { grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.caixa-app.is-trip-expense #me-fields > label:nth-child(3) { grid-column: 1 / -1; }
+.caixa-app.is-trip-expense .mf-field,.caixa-app.is-trip-expense .me-amount { display: grid; gap: 4px; margin: 0; color: var(--mc-ink); font: 500 19px/1.1 var(--mc-font); }
+.caixa-app.is-trip-expense .mf-field :is(input,select),.caixa-app.is-trip-expense #me-amount { box-sizing: border-box; min-width: 0; width: 100%; min-height: 43px; border: 1px solid #95a299; border-radius: 6px; padding: 7px 9px; background: #fbfdfaeb; color: var(--mc-ink); font: 500 23px/1.15 var(--mc-font); }
+.caixa-app.is-trip-expense .me-money { position: relative; display: block; padding: 0; border: 0; }
+.caixa-app.is-trip-expense .me-money > span { position: absolute; inset: 9px auto auto 9px; font: 700 25px/1 var(--mc-font); }
+.caixa-app.is-trip-expense #me-amount { padding-left: 36px; font-size: 27px; font-weight: 750; }
+.caixa-app.is-trip-expense #mer-card { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--mc-line); border-radius: 8px; background: var(--mc-panel); box-shadow: var(--mc-shadow); }
+.caixa-app.is-trip-expense #mer-card[hidden],.caixa-app.is-trip-expense #mer-card.hidden { display: none; }
+.caixa-app.is-trip-expense .mer-heading { display: block; }
+.caixa-app.is-trip-expense .mer-heading h3 { color: var(--mc-ink); font: 800 25px/1.1 var(--mc-font); margin: 0; }
+.caixa-app.is-trip-expense .mer-heading p { display: none; }
+.caixa-app.is-trip-expense .vg-camera-hint { display: grid; justify-items: center; gap: 12px; padding: 17px 5px 0; }
+.caixa-app.is-trip-expense .vg-camera-hint[hidden] { display: none; }
+.vg-camera-hint svg { width: 66px; height: 66px; fill: var(--mc-ink); fill-rule: evenodd; stroke-width: 1.5; }
+.vg-camera-hint p { margin: 0; font: 500 22px/1.1 var(--mc-font); }
+.caixa-app.is-trip-expense .mer-actions { display: grid; gap: 8px; margin-top: 12px; }
+.caixa-app.is-trip-expense .mer-actions.vg-upload-actions { margin-top: 13px; }
+.caixa-app.is-trip-expense .mer-actions .mer-icon-button { width: 100%; height: auto; min-height: 48px; border: 1px solid var(--mc-line); border-radius: 7px; background: var(--mc-panel); box-shadow: var(--mc-shadow); font: 700 23px/1 var(--mc-font); color: var(--mc-ink); }
+.caixa-app.is-trip-expense .mer-actions .mer-camera { color: #fff; border-color: #568b76; background: var(--mc-action); }
+.caixa-app.is-trip-expense .vg-receipt-button-label { display: inline; }
+.caixa-app.is-trip-expense .mer-actions svg { width: 26px; height: 26px; }
+.caixa-app.is-trip-expense .vg-manual { display: block; margin: 0; padding: 4px; min-height: 30px; border: 0; background: none; box-shadow: none; color: var(--mc-green); text-decoration: underline; font-size: 20px; }
+.caixa-app.is-trip-expense .vg-manual[hidden] { display: none; }
+.caixa-app.is-trip-expense #mer-status { margin: 0; font: 500 16px/1.2 var(--mc-font); }
+.caixa-app.is-trip-expense #mer-status:empty { display: none; }
+.caixa-app.is-trip-expense .mer-card.vg-has-receipt { gap: 0; }
+.caixa-app.is-trip-expense .vg-has-receipt .mer-heading { display: none; }
+.caixa-app.is-trip-expense .vg-has-receipt .mer-actions { grid-template-columns: 1fr 1fr; margin: 9px 0 0; }
+.caixa-app.is-trip-expense .vg-has-receipt .mer-actions .mer-icon-button { min-height: 32px; font-size: 15px; }
+.caixa-app.is-trip-expense .vg-has-receipt .mer-photo { display: flex; margin: 0; border: 0; padding: 0; }
+.caixa-app.is-trip-expense .vg-has-receipt .mer-photo.hidden { display: none; }
+.caixa-app.is-trip-expense .mer-open { display: grid; grid-template-columns: 140px 1fr; align-items: stretch; gap: 12px; padding: 0; min-width: 0; background: none; }
+.caixa-app.is-trip-expense .mer-open > svg,.caixa-app.is-trip-expense #mer-remove,.caixa-app.is-trip-expense .mer-file-copy > small { display: none; }
+.caixa-app.is-trip-expense .mer-thumb { display: block; width: 140px; height: 150px; border-radius: 7px; background: #f5f6f4; }
+.caixa-app.is-trip-expense .mer-thumb > svg { display: none; }
+.caixa-app.is-trip-expense .mer-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.caixa-app.is-trip-expense .mer-file-copy { display: flex; flex-direction: column; justify-content: center; gap: 7px; min-width: 0; }
+.caixa-app.is-trip-expense .mer-file-copy strong { color: var(--mc-ink); font: 800 22px/1.1 var(--mc-font); }
+.caixa-app.is-trip-expense .vg-reading { display: grid; gap: 4px; color: #253c32; font: 500 19px/1.2 var(--mc-font); }
+.vg-see-photo { display: none; }
+.caixa-app.is-trip-expense .vg-see-photo { display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin-top: 4px; padding: 6px 12px; border: 1px solid var(--mc-line); border-radius: 6px; background: var(--mc-panel); box-shadow: var(--mc-shadow); font: 700 20px var(--mc-font); color: var(--mc-ink); }
+.vg-see-photo svg { width: 21px; height: 21px; }
+.caixa-app.is-trip-expense #me-payment-fields { display: flex; flex-direction: column; gap: 9px; padding: 0; margin: 0; border: 0; }
+.caixa-app.is-trip-expense #me-payment-fields > .mt-fields { order: -1; display: block; }
+.caixa-app.is-trip-expense #me-status-label { font: 500 19px var(--mc-font); }
+.caixa-app.is-trip-expense .ma-segment { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 0; border: 0; background: none; }
+.caixa-app.is-trip-expense .ma-segment button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-height: 43px; padding: 8px 10px; border: 1px solid #8d9d93; border-radius: 7px; background: var(--mc-panel); color: var(--mc-ink); box-shadow: var(--mc-shadow); font: 600 20px/1 var(--mc-font); }
+.caixa-app.is-trip-expense .ma-segment button::before { content: ''; width: 19px; height: 19px; border: 1px solid #708279; border-radius: 50%; background: #fff; }
+.caixa-app.is-trip-expense .ma-segment button[aria-pressed=true] { color: var(--mc-green); border-color: #06563c; }
+.caixa-app.is-trip-expense .ma-segment button[aria-pressed=true]::before { background: #066442; box-shadow: inset 0 0 0 3px #fff; border-color: #066442; }
+.caixa-app.is-trip-expense .vg-extra-dates { margin: 0; padding: 0; order: 2; color: #365146; font: 500 16px var(--mc-font); }
+.caixa-app.is-trip-expense .vg-extra-dates summary { min-height: 27px; cursor: pointer; }
+.caixa-app.is-trip-expense .vg-extra-dates[open] { display: grid; gap: 8px; }
+.caixa-app.is-trip-expense .vg-extra-dates .mf-field { margin-top: 7px; }
+.caixa-app.is-trip-expense .mer-confirm { order: 3; display: flex; align-items: center; gap: 8px; padding: 3px 0; font: 500 19px/1.15 var(--mc-font); }
+.caixa-app.is-trip-expense .mer-confirm input { width: 23px; height: 23px; accent-color: var(--mc-green); }
+.caixa-app.is-trip-expense .mer-confirm.hidden { display: none; }
+.caixa-app.is-trip-expense #me-note { margin: 0; color: #3a4e44; font: 500 15px/1.2 var(--mc-font); }
+.caixa-app.is-trip-expense #me-save { margin-top: 0; min-height: 47px; border: 1px solid #568b76; border-radius: 7px; background: var(--mc-action); color: #fff; font: 700 25px/1.1 var(--mc-font); box-shadow: var(--mc-shadow); }
+.caixa-app.is-trip-expense #me-save > svg { display: none; }
+.caixa-app.is-trip-expense #me-success { padding: 0; border: 0; background: none; box-shadow: none; }
+.caixa-app.is-trip-expense #me-success > :not(.vg-saved-content):not(#vg-expense-return) { display: none; }
+.caixa-app.is-trip-expense .vg-saved-content { display: grid; gap: 12px; }
+.caixa-app.is-trip-expense #vg-expense-return { display: flex; width: 100%; margin-top: 12px; }
+.caixa-app.is-trip-expense .vg-saved-expense { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 5px 10px; }
+.vg-saved-expense > svg { width: 27px; height: 27px; }
+.vg-saved-expense > :not(svg):not(h3) { grid-column: 2; }
+.vg-saved-expense .vg-total { font-size: 46px; }
+.vg-saved-photo { display: grid; gap: 10px; }
+.vg-saved-photo > img { width: 100%; height: 230px; object-fit: contain; background: #a58e70; border-radius: 7px; }
+.vg-saved-photo h3 { font-size: 24px; }
+.vg-saved-photo .vg-info { font-size: 15px; }
+.vg-success-icon { width: 39px; height: 39px; flex: 0 0 39px; padding: 6px; box-sizing: border-box; background: var(--mc-action); color: white; border-radius: 50%; }
+.caixa-app.is-trip-expense .mfc-sheet { background: var(--mc-metal) center/540px 540px !important; font-family: var(--mc-font) !important; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-fields > label:nth-child(2) { grid-column: 1 / -1; grid-row: 1; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-fields > .me-amount { grid-column: 1; grid-row: 2; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-fields > .vg-attach-date { grid-column: 2; grid-row: 2; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-fields > label:nth-child(3) { display: none; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-payment-fields > :not(.mt-fields) { display: none; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-save { display: none; }
+.vg-photo-tools { display: none; }
+.caixa-app.is-trip-expense .vg-photo-tools:not([hidden]) { display: block; font: 500 16px var(--mc-font); }
+.vg-photo-tools .vg-button { width: 100%; margin: 5px 0; font-size: 18px; min-height: 36px; }
+.vg-category-tools { display: none; }
+.caixa-app.is-trip-expense .vg-category-tools:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.vg-category-tools .vg-button { display: flex; flex-direction: column; min-height: 74px; gap: 6px; font-size: 21px; }
+.vg-category-tools .vg-button[aria-pressed=true] { color: #fff; background: var(--mc-action); }
+.caixa-app.is-trip-expense .mer-actions[hidden] { display: none; }
+.caixa-app.is-trip-expense .mf-heading:has(.mf-back:not(.hidden)) h2 { font: 900 32px/1.1 var(--mc-font); letter-spacing: -.02em; }
+.caixa-app.is-trip-expense .mf-toolbar { display: none; }
+.caixa-app.is-trip-expense .mf-field.vg-expense-choice { font-size: 0; margin: 0 0 10px 38px; }
+.caixa-app.is-trip-expense #me-fields .mf-field,.caixa-app.is-trip-expense #me-payment-fields .mf-field { margin-bottom: 0; }
+.caixa-app.is-trip-expense .mer-actions .mer-icon-button { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 8px; }
+.caixa-app.is-trip-expense #mer-card { margin: 0; }
+.caixa-app.is-trip-expense #me-note { background: none; border: 0; padding: 0; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] #me-note,.caixa-app.is-trip-expense [data-trip-expense-step=saved] #me-note { display: none; }
+.caixa-app.is-trip-expense #me-save > :first-child { display: none; }
+.caixa-app.is-trip-expense #me-success p { color: var(--mc-ink); font: 500 21px/1.15 var(--mc-font); }
+.caixa-app.is-trip-expense .vg-photo-tools { margin-top: 5px; font-size: 15px; }
+.caixa-app.is-trip-expense .mf-field.vg-expense-choice select { width: fit-content; max-width: 100%; min-height: 28px; height: 28px; padding: 3px 6px; font: 500 19px/1 var(--mc-font); }
+.vg-expense-choice[hidden] { display: none !important; }
+.caixa-app.is-trip-expense #vg-saved-check { width: 39px; height: 39px; flex: 0 0 39px; }
+.caixa-app.is-trip-expense .mer-open > [data-mf-icon=chevron],.caixa-app.is-trip-expense .vg-has-receipt #mer-status.mer-quiet { display: none; }
+.caixa-app.is-trip-expense [data-trip-expense-step=attach] #me-note { display: flex; align-items: center; gap: 7px; font-size: 16px; }
+.caixa-app.is-trip-expense #me-note svg { width: 19px; height: 19px; flex: 0 0 19px; }
+.caixa-app.is-trip-expense .vg-saved-expense h3 { font: 800 24px/1.1 var(--mc-font); }
+.caixa-app.is-trip-expense .vg-saved-photo h3 { font: 800 24px/1.1 var(--mc-font); }
+.caixa-app.is-trip-expense .vg-saved-photo > img { height: 200px; }
+.caixa-app.is-trip-expense .vg-saved-photo .vg-info { font-size: 16px !important; }
+.caixa-app.is-trip-expense .mf-heading { min-height: 36px; }
+.caixa-app.is-trip-expense .vg-saved-expense { gap: 3px 8px; padding: 10px; }
+.caixa-app.is-trip-expense .vg-saved-expense .vg-total { font-size: 44px; }
+.caixa-app.is-trip-expense .vg-saved-photo { padding: 10px; gap: 8px; }
+.caixa-app.is-trip-expense .vg-saved-photo > img { height: 180px; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] #me-form { gap: 8px; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] #me-fields { gap: 6px; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] .mf-field:not(.vg-expense-choice) { font-size: 18px; gap: 3px; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] .mf-field:not(.vg-expense-choice) :is(input,select) { min-height: 40px; height: 40px; padding-block: 5px; font-size: 22px; }
+.caixa-app.is-trip-expense [data-trip-expense-step=review] #me-amount { min-height: 40px; height: 40px; font-size: 25px; }
+.caixa-app.is-trip-expense .mer-open { grid-template-columns: 130px 1fr; gap: 10px; }
+.caixa-app.is-trip-expense .mer-thumb { width: 130px; height: 135px; }
+.caixa-app.is-trip-expense .vg-extra-dates { display: block; order: 4; font-size: 15px; }
+.vg-extra-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+@media(max-width:350px) { .caixa-app.is-trip-expense .mer-open { grid-template-columns: 115px 1fr; gap: 9px; }.caixa-app.is-trip-expense .mer-thumb { width: 115px; height: 135px; }.caixa-app.is-trip-expense .mf-heading h2 { font-size: 29px; }.caixa-app.is-trip-expense .mer-actions .mer-icon-button { font-size: 20px; } }

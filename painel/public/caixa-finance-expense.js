@@ -21,6 +21,7 @@
       : 'A despesa entra no resultado da competência e em Contas a pagar. O caixa muda quando o pagamento for registrado.';
     if (!status) el('me-note').textContent = 'Selecione Já paga ou A pagar. A foto não confirma o pagamento.';
     el('me-document-label').textContent = el('me-document').value ? T.formatDate(el('me-document').value) : 'Confira a data';
+    C.purchaseTripExpense?.render();
   }
   function restoreFields(data) {
     status = data.payment_status;
@@ -64,6 +65,7 @@
         restoreFields(attempt); el('me-error').textContent = 'Há uma tentativa sem confirmação. Confira o envio usando o mesmo lançamento para evitar duplicidade.'; hide('me-error', false);
       }
       controls(); hide('me-form', false); C.financeMatrix.updated();
+      await C.purchaseTripExpense?.load(attempt);
       await C.financeReceipts?.load(body, attempt);
     } catch (error) {
       if (controller.signal.aborted || session !== C.sessionFingerprint() || error.message === 'invalid_session') return;
@@ -94,7 +96,7 @@
     if (status === 'paid') {
       const paid = civil(el('me-paid').value); if (paid > today) throw Error('O pagamento não pode estar no futuro.'); data.paid_at = instant(paid);
     } else data.due_date = civil(el('me-due').value);
-    return { ...data, ...C.financeReceipts?.payload() };
+    return { ...data, ...C.financeReceipts?.payload(), ...C.purchaseTripExpense?.payload() };
   }
   el('me-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!allowed() || sending || saved || (!attempt && !el('me-form').reportValidity())) return;
@@ -117,8 +119,9 @@
           sessionStorage.removeItem(storageKey); attempt = null;
           throw Error(result.error === 'expense_receipt_already_linked' ? 'Este comprovante já pertence a uma despesa. Atualize para consultar.' : 'A leitura ainda está em andamento. Atualize e aguarde antes de salvar.');
         }
-        if (response.status === 400 || response.status === 403 || response.status === 404) {
+        if (response.status === 400 || response.status === 403 || response.status === 404 || ['purchase_group_closed', 'expense_owned_by_other_module'].includes(result.error)) {
           sessionStorage.removeItem(storageKey); attempt = null;
+          if (result.error?.startsWith('purchase_group_') || result.error === 'expense_owned_by_other_module') throw Error(C.purchaseTrips.error(new Error(result.error)));
           throw Error(result.error === 'category_invalid' ? 'A categoria foi arquivada. Atualize e selecione outra categoria.'
             : response.status === 403 ? 'Seu acesso não permite lançar despesas.' : 'Confira valor, categoria e datas. O lançamento foi recusado.');
         }
@@ -131,6 +134,7 @@
       el('me-success-copy').textContent = C.currency.format(submitted.amount) + (submitted.payment_status === 'paid' ? ' registrados. A despesa e o pagamento estão no financeiro.' : ' registrados em Contas a pagar. Nenhuma saída de caixa foi registrada.');
       el('me-view').textContent = submitted.payment_status === 'paid' ? 'Ver no extrato' : 'Ver contas a pagar';
       hide('me-form', true); hide('me-success', false);
+      C.purchaseTripExpense?.saved(result.expense, submitted);
       if (C.financeMatrix.currentTab() !== 'expense' && !el('matrix-finance-panel').classList.contains('hidden')) void C.financeMatrix.load();
     } catch (error) {
       if (session !== C.sessionFingerprint() || error.message === 'invalid_session') return;
@@ -148,5 +152,6 @@
     C.financeMatrix.open(saved.payment_status === 'paid' ? 'statement' : 'accounts');
   });
   C.financeExpense = { load, cancel, reset, refresh: controls, busy: () => sending, status: () => status,
+    pending: () => attempt, hasDraft: () => initialized && !saved && Boolean(el('me-amount').value || C.financeReceipts?.snapshot?.().id),
     setStatus: value => { status = value; controls(); }, setReturnTab: tab => { back = tab; }, returnTab: () => back };
 }());

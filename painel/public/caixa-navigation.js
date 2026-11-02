@@ -6,6 +6,7 @@
   function showTab(tab) {
     tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     if (Caixa.purchasesMetal?.blockNavigation(tab)) return;
+    if (Caixa.purchaseTrips?.blockNavigation()) return;
     if (Caixa.matrixDeliveries?.blockNavigation()) return;
     if (Caixa.financeClean?.blockNavigation()) return;
     if (Caixa.marketing?.blockNavigation(tab)) return;
@@ -173,6 +174,7 @@
 
     if (Caixa.purchases) Caixa.purchases.syncTab(tab);
     Caixa.purchasesMetal?.sync(tab);
+    Caixa.purchaseTrips?.sync(tab);
     if (Caixa.chat) Caixa.chat.syncTab(tab);
     if (Caixa.waitlist) Caixa.waitlist.syncTab(tab);
     if (Caixa.partnerHome) Caixa.partnerHome.sync(tab);
