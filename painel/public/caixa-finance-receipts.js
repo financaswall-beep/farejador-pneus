@@ -2,7 +2,7 @@
   'use strict';
   const C = window.Caixa, T = window.FarejadorTime, el = id => document.getElementById(id);
   const base = '/api/caixa/financeiro-despesas', storage = 'farejador.expense-receipt-draft.v1';
-  const fields = ['me-amount', 'me-category', 'me-description', 'me-occurred', 'me-competence', 'me-document', 'me-paid', 'me-due'];
+  const fields = ['me-amount', 'me-category', 'me-description', 'me-occurred', 'me-competence', 'me-document', 'me-paid', 'me-due', 'me-trip'];
   let receipt = null, busy = false, locked = false, enabled = false, ai = false, request, preview, timer, applied;
   let filename = 'comprovante.jpg';
   const identity = () => [C.scope(), C.stored(C.keys.user), C.stored(C.keys.name)].join('|');
@@ -190,5 +190,6 @@
   });
   document.querySelectorAll('[data-me-status]').forEach(button => button.addEventListener('click', () => { if (receipt) persist(); }));
   C.financeReceipts = { load, reset, cancel, payload, setLocked, attachment, working: () => busy, blocked: () => busy || Boolean(receipt?.processing || receipt?.expense_id),
+    snapshot: () => ({ ...(receipt || {}), preview, filename, busy, enabled }),
     saved: () => sessionStorage.removeItem(storage) };
 }());

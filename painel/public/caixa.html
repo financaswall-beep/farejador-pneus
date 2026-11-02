@@ -54,12 +54,12 @@
   <script defer src="/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2"></script>
   <script defer src="/operacao/caixa-pickups-actions.js?v=20261026-pickups1"></script>
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
-  <script defer src="/operacao/caixa-navigation.js?v=20261027-profile1"></script>
+  <script defer src="/operacao/caixa-navigation.js?v=20261101-trips1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
   <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20261027-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases-review.js?v=20260918-purchasevariants1"></script>
+  <script defer src="/operacao/caixa-purchases-review.js?v=20261101-trips1"></script>
   <script defer src="/operacao/caixa-purchases-wizard.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-detail.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/purchase-price-utils.js?v=20260918-prices1"></script>
@@ -86,8 +86,8 @@
   <script defer src="/operacao/app.relatorios.pdf.core.js?v=20260922-finance1"></script>
   <script defer src="/operacao/app.relatorios.financeiro.pdf.js?v=20260922-finance1"></script>
   <script defer src="/operacao/expense-receipt-viewer.js?v=20261027-finance1"></script>
-  <script defer src="/operacao/caixa-finance-expense.js?v=20261027-finance1"></script>
-  <script defer src="/operacao/caixa-finance-receipts.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-expense.js?v=20261101-trips1"></script>
+  <script defer src="/operacao/caixa-finance-receipts.js?v=20261101-trips1"></script>
   <script defer src="/operacao/caixa-finance-report-view.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-reports.js?v=20260922-finance1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260918-finance3"></script>
@@ -183,6 +183,12 @@
   <link rel="stylesheet" href="/operacao/caixa-finance-clean.css?v=20261027-finance1" />
   <link rel="stylesheet" href="/operacao/caixa-finance-clean-tools.css?v=20261027-finance1" />
   <script defer src="/operacao/caixa-finance-clean.js?v=20261027-finance1"></script>
+  <link rel="stylesheet" href="/operacao/caixa-purchase-trips.css?v=20261101-trips1" />
+  <link rel="stylesheet" href="/operacao/caixa-purchase-trip-expense.css?v=20261101-trips1" />
+  <script defer src="/operacao/caixa-purchase-trips.js?v=20261101-trips1"></script>
+  <script defer src="/operacao/caixa-purchase-trips-view.js?v=20261101-trips1"></script>
+  <script defer src="/operacao/caixa-purchase-trips-dialogs.js?v=20261101-trips1"></script>
+  <script defer src="/operacao/caixa-purchase-trip-expense.js?v=20261101-trips1"></script>
   <link rel="stylesheet" href="/operacao/caixa-marketing.css?v=20261027-marketing1" />
   <link rel="stylesheet" href="/operacao/caixa-marketing-tools.css?v=20261027-marketing1" />
   <link rel="stylesheet" href="/operacao/caixa-team-clean.css?v=20261027-team1" />
@@ -779,6 +785,8 @@
           <p id="purchase-notice" class="pc-notice" role="status" hidden></p>
           <div id="purchase-home">
             <div class="pc-intro"><div><h2>Compras</h2><p>Organize suas compras e confira o que chegou.</p></div><button id="purchase-refresh" class="pc-button pc-icon-button" type="button" aria-label="Atualizar compras">↻</button></div>
+            <div id="vg-tabs" class="vg-tabs vg-top-tabs" role="tablist" aria-label="Compras e viagens"><button id="vg-section-orders" type="button" role="tab" aria-selected="true">Compras</button><button id="vg-section-trips" type="button" role="tab" aria-selected="false">Viagens</button></div>
+            <section id="vg-home" class="vg-home" aria-label="Viagens de compra" hidden><p id="vg-loading" role="status" hidden>Carregando viagens…</p><p id="vg-error" class="vg-warning" role="alert" hidden></p><div id="vg-content" class="vg-content"></div></section>
             <button id="purchase-new" class="pc-button pc-primary pc-full" type="button">＋ Nova compra</button>
             <div class="pc-kpis" aria-label="Totais de todas as compras">
               <div><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M1 3h14v14H1zM15 8h4l4 5v4h-8"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg><span><strong id="purchase-pending-count">—</strong><small>A receber</small></span></div>

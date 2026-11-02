@@ -139,4 +139,28 @@ describe('Comprovante avulso: isolamento e transação financeira', () => {
     expect(created.duplicate).toBe(false);
     expect(await addMatrizTripReceipt(normal, db.pool)).toMatchObject({ receipt_id: created.receipt_id, duplicate: true });
   });
+  it('viagem + foto + despesa são atômicos: fechada faz rollback; replay conserva um único gasto e comprovante', async () => {
+    const groups = await import('../../src/admin/painel/queries-purchase-groups-write.js');
+    const { purchaseGroupReceipts } = await import('../../src/admin/painel/purchase-group-receipts.js');
+    const actor = { environment: 'test' as const, actor: 'Prova app', idempotency_key: randomUUID() };
+    const group = await groups.createPurchaseGroup({ ...actor, name: 'Viagem do app' }, db.pool);
+    const { receipt } = await receipts.addExpenseReceipt(photo(), 'Prova app', 'test', db.pool);
+    await groups.changePurchaseGroup({ ...actor, idempotency_key: randomUUID(), group_id: group.id, action: 'close' }, db.pool);
+    const body = { ...input(receipt.id), group_id: group.id };
+    const count = async () => (await db.pool.query("SELECT count(*)::int n FROM commerce.matriz_expenses WHERE environment='test'")).rows[0].n;
+    const before = await count();
+    const ledgerCount = async () => (await db.pool.query("SELECT count(*)::int n FROM finance.matriz_ledger_transactions WHERE environment='test'")).rows[0].n;
+    const ledgerBefore = await ledgerCount();
+    await expect(expenses.createMatrizExpense(body, db.pool)).rejects.toThrow('purchase_group_closed');
+    expect(await count()).toBe(before);
+    expect((await receipts.getExpenseReceipt(receipt.id, 'test', db.pool)).expense_id).toBeNull();
+    expect(await ledgerCount()).toBe(ledgerBefore);
+    await groups.changePurchaseGroup({ ...actor, idempotency_key: randomUUID(), group_id: group.id, action: 'reopen' }, db.pool);
+    const expense = await expenses.createMatrizExpense(body, db.pool);
+    expect(await expenses.createMatrizExpense(body, db.pool)).toEqual(expense);
+    expect(await count()).toBe(before + 1);
+    expect(await purchaseGroupReceipts([expense.id], 'test', db.pool)).toEqual([{ expense_id: expense.id, receipt_id: receipt.id }]);
+    expect(await purchaseGroupReceipts([expense.id], 'prod', db.pool)).toEqual([]);
+    expect((await db.pool.query("SELECT expense_id FROM commerce.wholesale_purchase_group_expenses WHERE environment='test' AND group_id=$1", [group.id])).rows).toEqual([{ expense_id: expense.id }]);
+  });
 });

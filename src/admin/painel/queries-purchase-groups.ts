@@ -50,7 +50,7 @@ export async function listPurchaseGroups(environment: MatrizEnvironment = env.FA
     [environment, options.status ?? null, limit + 1, (page - 1) * limit]);
     const visible = groups.rows.slice(0, limit), ids = visible.map(g => g.id);
     const data = await records(client, environment, ids);
-    const rows = visible.map(g => ({ ...g, summary: purchaseGroupSummary(
+    const rows = visible.map(g => ({ ...g, suppliers_count: new Set(data.purchases.filter(p => p.group_id === g.id && p.status !== 'cancelled').map(p => p.supplier_id)).size, summary: purchaseGroupSummary(
       data.purchases.filter(p => p.group_id === g.id), data.expenses.filter(e => e.group_id === g.id)) }));
     await client.query('COMMIT');
     return { rows, page, has_more: groups.rows.length > limit };

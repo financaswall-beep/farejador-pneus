@@ -55,6 +55,7 @@
     const payload = { idempotency_key: d.key, purchased_at: instant(r['purchased-date']),
       freight_amount: Number(r.freight), discount_amount: Number(r.discount),
       payment_status: r.payment, receipt_status: r['receipt-status'] };
+    if (d.group_id) payload.group_id = d.group_id;
     if (d.newSupplier) payload.new_supplier = { name: d.supplierName.trim(), phone: d.supplierPhone.trim() || null, document: d.supplierDocument.trim() || null };
     else payload.supplier_id = d.supplier;
     if (r.reference.trim()) payload.supplier_reference = r.reference.trim();

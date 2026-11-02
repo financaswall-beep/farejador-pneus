@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import type { CaixaAuth } from './queries.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { createMatrizExpenseSchema } from '../painel/route-schemas.js';
 import { reportDate } from '../painel/report-period.js';
 import { createMatrizExpense } from '../painel/queries-financeiro-despesas-integridade.js';
-import { listMatrizExpenseCategories } from '../painel/queries-despesas-categorias.js';
+import { listMatrizExpenseCategories, createMatrizExpenseCategory } from '../painel/queries-despesas-categorias.js';
 import { mapWriteError } from '../painel/route-helpers.js';
 import { registerExpenseReceiptRoutes } from '../painel/route-expense-receipts.js';
 import { expenseReceiptsReady } from '../painel/expense-receipts.js';
@@ -38,6 +39,17 @@ export function registerCaixaFinanceExpenseRoutes(app: FastifyInstance, flag: Ga
       logger.error({ err: error }, 'app expense categories unavailable');
       return reply.code(503).send({ error: 'expense_categories_unavailable' });
     }
+  });
+  app.post('/api/caixa/financeiro-despesas/categorias', { preHandler: guards }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const body = z.object({ label: z.string().trim().min(2).max(40) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'category_label_invalid' });
+    try {
+      const actor = (request as FastifyRequest & { caixa: CaixaAuth }).caixa;
+      return reply.code(201).send(await createMatrizExpenseCategory({ label: body.data.label, environment: env.FAREJADOR_ENV,
+        created_by: `${actor.displayName} (${actor.username})`.slice(0, 120) }));
+    } catch (error) { if (error instanceof Error && error.message === 'category_exists') return reply.code(409).send({ error: error.message });
+      const mapped = mapWriteError(error); return reply.code(mapped.status).send({ error: mapped.error }); }
   });
   app.post('/api/caixa/financeiro-despesas', { preHandler: guards }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

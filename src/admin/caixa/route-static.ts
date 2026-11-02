@@ -190,6 +190,11 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-finance-clean.css', 'caixa-finance-clean.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-clean-tools.css', 'caixa-finance-clean-tools.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-clean.js', 'caixa-finance-clean.js', 'text/javascript; charset=utf-8');
+  for (const name of ['caixa-purchase-trips', 'caixa-purchase-trip-expense']) {
+    text('/operacao/' + name + '.css', name + '.css', 'text/css; charset=utf-8');
+    text('/operacao/' + name + '.js', name + '.js', 'text/javascript; charset=utf-8');
+  }
+  for (const name of ['caixa-purchase-trips-view', 'caixa-purchase-trips-dialogs']) text('/operacao/' + name + '.js', name + '.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-matrix.css', 'caixa-finance-matrix.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-finance-view.js', 'caixa-finance-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-finance-matrix.js', 'caixa-finance-matrix.js', 'text/javascript; charset=utf-8');
