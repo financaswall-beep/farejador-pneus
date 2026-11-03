@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 function app() {
   const window = { PAINEL_MODULES: {} as Record<string, () => any> };
-  for (const file of ['reviews', 'integrations']) runInNewContext(readFileSync(`painel/public/app.marketing.${file}.js`, 'utf8'), { window });
+  const document = { getElementById: () => null };
+  for (const file of ['reviews', 'integrations']) runInNewContext(readFileSync(`painel/public/app.marketing.${file}.js`, 'utf8'), { window, document });
   return { ...window.PAINEL_MODULES.marketingIntegrations(), marketingIsMock: () => false,
-    apiGet: vi.fn(), apiPost: vi.fn(), marketingSetTab: vi.fn(), googleConversionStatus: (status: string) => status };
+    apiGet: vi.fn(), apiPost: vi.fn(), marketingSetTab: vi.fn(), googleConversionStatus: (status: string) => status,
+    $nextTick: (callback: () => void) => callback() };
 }
 
 describe('formulário de revisão de Marketing', () => {
