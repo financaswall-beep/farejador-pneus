@@ -124,4 +124,24 @@ describe('identidade Meta, campanha mista e financeiro', () => {
       .rejects.toThrow('meta_identity_sync_required');
     expect((await db.pool.query(`SELECT count(*)::int n FROM audit.events WHERE event_type='marketing_meta_ad_identity_decided'`)).rows[0].n).toBe(3);
   });
+  it('identifica a revisão pelo histórico do mesmo ambiente sem alterar escopo ou financeiro', async () => {
+    const account = { ...config, adAccountId: 'act_777' };
+    await sync({ dbPool: db.pool, config: account, now: new Date('2026-09-30T12:00:00Z'), lookbackDays: 2,
+      fetcher: async input => Response.json({ data: String(input).includes('/ads?')
+        ? [{ id: '7771', campaign_id: '7772', effective_status: 'ARCHIVED' }] : [] }) });
+    await db.pool.query(`INSERT INTO marketing.campaign_scopes(environment,ad_account_id,campaign_id,campaign_name)
+      VALUES('test','act_777','7772','Pneus novembro')`);
+    await db.pool.query(`INSERT INTO marketing.meta_insights_daily
+      (environment,ad_account_id,api_version,account_currency,entity_level,entity_id,entity_name,campaign_id,metric_date,spend,impressions,clicks,conversations,actions_raw)
+      VALUES('test','act_777','v26.0','BRL','ad','7771','Pneu Kenda 90/90-18','7772','2026-09-29',0,0,0,0,'[]'),
+      ('prod','act_777','v26.0','BRL','ad','7771','Nome de outro ambiente','7772','2026-09-29',0,0,0,0,'[]'),
+      ('test','act_777','v26.0','BRL','ad','7771','Nome de outra campanha','7773','2026-09-30',0,0,0,0,'[]')`);
+    const before = (await db.pool.query('SELECT count(*)::int n FROM finance.matriz_ledger_transactions')).rows[0].n;
+    const { listMetaIdentityReviews } = await import('../../src/marketing/meta-identity-decisions.js');
+    const result = await listMetaIdentityReviews(db.pool);
+    expect(result.rows.find(row => row.ad_id === '7771')).toMatchObject({ ad_name: 'Pneu Kenda 90/90-18',
+      campaign_name: 'Pneus novembro', metadata_status: 'history', preview: null, scope: 'pending', can_decide: true });
+    expect((await db.pool.query('SELECT count(*)::int n FROM finance.matriz_ledger_transactions')).rows[0].n).toBe(before);
+    expect((await db.pool.query("SELECT scope FROM marketing.meta_ad_identities WHERE environment='test' AND ad_id='7771'")).rows[0].scope).toBe('pending');
+  });
 });

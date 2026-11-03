@@ -4,6 +4,7 @@ import { env } from '../shared/config/env.js';
 import { clearMetaMarketingCache } from '../admin/painel/marketing-meta.js';
 import { reconcileMatrizMarketingCampaign } from './matriz-ledger-spend.js';
 import type { MetaAdIdentity } from './meta-ad-identity.js';
+import { enrichMetaReviewRows } from './meta-review-metadata.js';
 
 type DecisionScope = 'matrix' | 'external' | 'automatic';
 interface Decision {
@@ -26,10 +27,11 @@ export async function resolveMetaIdentities(db: Pick<Pool,'query'>, environment:
 }
 
 export async function listMetaIdentityReviews(dbPool: Pool = pool) {
-  const rows = await dbPool.query(`WITH pending AS MATERIALIZED (
+  const rows = await dbPool.query<{ ad_account_id: string; ad_id: string; campaign_id: string; [key: string]: unknown }>(`WITH pending AS MATERIALIZED (
       SELECT * FROM marketing.meta_pending_campaigns($1,NULL,NULL)
     ) SELECT d.ad_account_id,d.ad_id,d.campaign_id,d.facebook_page_id,
       d.instagram_user_id,d.scope,d.automatic_scope,d.verified_at,d.effective_status,
+      h.entity_name ad_name,COALESCE(h.campaign_name,c.campaign_name) campaign_name,
       a.finance_since::text,
       COALESCE((SELECT sum(p.spend) FROM marketing.meta_pending_spend_daily p
         WHERE p.environment=d.environment AND p.ad_account_id=d.ad_account_id AND p.ad_id=d.ad_id
@@ -42,6 +44,12 @@ export async function listMetaIdentityReviews(dbPool: Pool = pool) {
       (d.identity_fingerprint IS NOT NULL AND d.verified_at >= a.verified_at) can_decide
     FROM marketing.meta_ad_identities d
     JOIN marketing.meta_identity_accounts a USING(environment,ad_account_id)
+    LEFT JOIN LATERAL (SELECT i.entity_name,i.campaign_name FROM marketing.meta_insights_daily i
+      WHERE i.environment=d.environment AND i.ad_account_id=d.ad_account_id
+        AND i.entity_level='ad' AND i.entity_id=d.ad_id AND i.campaign_id=d.campaign_id
+      ORDER BY i.collected_at DESC,i.metric_date DESC LIMIT 1) h ON true
+    LEFT JOIN marketing.campaign_scopes c ON c.environment=d.environment
+      AND c.ad_account_id=d.ad_account_id AND c.campaign_id=d.campaign_id
     LEFT JOIN LATERAL (SELECT scope,reason,actor_label,created_at
       FROM marketing.meta_ad_identity_decisions o
       WHERE o.environment=d.environment AND o.ad_account_id=d.ad_account_id AND o.ad_id=d.ad_id
@@ -52,7 +60,7 @@ export async function listMetaIdentityReviews(dbPool: Pool = pool) {
     FROM marketing.meta_ad_identities WHERE environment=$1 AND scope='pending'`,[env.FAREJADOR_ENV]);
   const accounts = await dbPool.query(`SELECT ad_account_id,finance_since::text
     FROM marketing.meta_identity_accounts WHERE environment=$1 ORDER BY ad_account_id`, [env.FAREJADOR_ENV]);
-  return {rows:rows.rows,pending:count.rows[0]?.pending??0,accounts:accounts.rows};
+  return {rows:await enrichMetaReviewRows(rows.rows),pending:count.rows[0]?.pending??0,accounts:accounts.rows};
 }
 
 export async function setMetaIdentityDecision(input: {
