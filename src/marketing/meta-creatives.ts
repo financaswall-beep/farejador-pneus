@@ -6,6 +6,8 @@ export interface MetaCreative {
   id: string;
   creative_id: string | null;
   name: string | null;
+  campaign_id?: string | null;
+  campaign_name?: string | null;
   status: string | null;
   format: 'image' | 'video' | 'carousel' | 'mixed' | 'unknown';
   image_url: string | null;
@@ -35,6 +37,7 @@ export function parseMetaCreative(value: unknown, config: MetaMarketingConfig): 
   const ad = object(value);
   if (!/^\d+$/.test(String(ad.id)) || String(ad.account_id) !== config.adAccountId.replace(/^act_/, '')) return null;
   const creative = object(ad.creative);
+  const campaign = object(ad.campaign);
   const story = object(creative.object_story_spec);
   const link = object(story.link_data);
   const video = object(story.video_data);
@@ -49,6 +52,7 @@ export function parseMetaCreative(value: unknown, config: MetaMarketingConfig): 
     object(carousel[0]).picture, object(images[0]).url, creative.thumbnail_url];
   return {
     id: String(ad.id), creative_id: text(creative.id), name: text(ad.name),
+    campaign_id: text(ad.campaign_id) ?? text(campaign.id), campaign_name: text(campaign.name),
     status: text(ad.effective_status),
     format: carousel.length ? 'carousel' : hasVideo && images.length ? 'mixed'
       : hasVideo ? 'video' : hasImage ? 'image' : 'unknown',
@@ -58,7 +62,7 @@ export function parseMetaCreative(value: unknown, config: MetaMarketingConfig): 
   };
 }
 
-const FIELDS = 'id,account_id,name,effective_status,creative{id,name,title,body,image_hash,image_url,thumbnail_url,video_id,object_story_spec,asset_feed_spec}';
+const FIELDS = 'id,account_id,name,campaign_id,campaign{id,name},effective_status,creative{id,name,title,body,image_hash,image_url,thumbnail_url,video_id,object_story_spec,asset_feed_spec}';
 const cache = new Map<string, { expires: number; value: MetaCreative | null }>();
 function cacheKey(config: MetaMarketingConfig, id: string): string {
   const credential = createHash('sha256').update(config.accessToken).digest('hex').slice(0, 16);

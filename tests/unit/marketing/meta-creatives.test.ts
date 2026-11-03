@@ -10,6 +10,8 @@ describe('leitura dos criativos da Meta', () => {
     expect(parseMetaCreative({ ...base, creative: { object_story_spec: { video_data: { video_id: '77' } } } }, config)?.format).toBe('video');
     expect(parseMetaCreative({ ...base, creative: { object_story_spec: { link_data: { child_attachments: [{ picture: 'https://scontent.xx.fbcdn.net/p.jpg' }] } } } }, config)?.format).toBe('carousel');
     expect(parseMetaCreative({ ...base, account_id: '999' }, config)).toBeNull();
+    expect(parseMetaCreative({ ...base, campaign_id: '222', campaign: { id: '222', name: 'Pneus novembro' } }, config))
+      .toMatchObject({ name: 'Anúncio', campaign_id: '222', campaign_name: 'Pneus novembro' });
   });
   it.each(['javascript:alert(1)', 'https://fbcdn.net.evil.test/photo', 'https://127.0.0.1/photo',
     'https://facebook.com/photo?access_token=private', 'https://user:pass@fbcdn.net/photo', 'https://fbcdn.net:444/photo'])('recusa mídia insegura: %s', (url) => {
