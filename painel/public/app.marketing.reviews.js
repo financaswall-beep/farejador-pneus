@@ -24,6 +24,12 @@ window.PAINEL_MODULES.marketingReviews = function () {
       this.marketingReviewSelection={kind,row};this.marketingReviewReason='';
       this.marketingReviewScope='matrix';this.marketingReviewAction=row.can_check?'check':'close';
       this.marketingFinanceStart=row.finance_since||'';
+      this.$nextTick(()=>{
+        const form=document.getElementById('marketing-review-form');
+        if(!form||!this.marketingReviewSelection)return;
+        form.scrollIntoView({block:'center',behavior:'auto'});
+        form.focus({preventScroll:true});
+      });
     },
     marketingIdentityFinancialLabel(row) {
       if(row.financial_pending_reason==='verification_missing')return 'Coleta do mês incompleta';
