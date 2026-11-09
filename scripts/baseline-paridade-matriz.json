@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-01T05:20:14.481Z",
-  "total": 3122,
+  "geradoEm": "2026-11-09T02:20:18.728Z",
+  "total": 3123,
   "propriedades": {
     "abrirClienteLead": "function",
     "abrirColabDialog": "function",
@@ -793,6 +793,7 @@
     "definirClienteLeadAtendente": "function",
     "deliveryAddr": "function",
     "despesaArquivarCategoria": "function",
+    "despesaCancelarErro": "function",
     "despesaCatAtivas": "function",
     "despesaCatCustom": "function",
     "despesaCatSelect": "function",
