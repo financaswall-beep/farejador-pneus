@@ -165,6 +165,13 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         this.$refs?.despesaRemoveReason?.focus();
       });
     },
+    despesaCancelarErro(row, fromStatement = false) {
+      this.despesaRemove(fromStatement ? {
+        id: row.source_id, amount: row.amount, description: row.description,
+        payment_status: row.cash_on ? 'paid' : 'pending',
+      } : row);
+      this.despesaRemoveDialog.mode = 'cancel_error';
+    },
     despesaFecharRemocao(force = false) {
       if (this.despesaRemoveDialog?.saving && !force) return;
       this.despesaRemoveDialog = {
@@ -180,25 +187,38 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         dialog.error = 'Informe um motivo com pelo menos 2 caracteres.';
         return;
       }
-      const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-remove', row.id);
-      operation.reason = reason;
+      const cancelError = dialog.mode === 'cancel_error';
+      const domain = cancelError ? 'matriz-expense-cancel-error' : 'matriz-expense-remove';
+      const operation = window.PAINEL_INTEGRITY.operation(domain, row.id);
+      if (cancelError && operation.reason) dialog.reason = operation.reason;
+      else operation.reason = reason;
       window.PAINEL_INTEGRITY.save();
       dialog.saving = true;
       dialog.error = null;
       try {
-        await this.apiPost('/admin/api/matriz/despesas/remove', {
-          id: row.id, reason, idempotency_key: operation.key,
+        await this.apiPost('/admin/api/matriz/despesas/' + (cancelError ? 'cancel-error' : 'remove'), {
+          id: row.id, reason: operation.reason, idempotency_key: operation.key,
         });
-        window.PAINEL_INTEGRITY.complete('matriz-expense-remove', row.id);
+        window.PAINEL_INTEGRITY.complete(domain, row.id);
         this.despesaFecharRemocao(true);
         this.despesaMsg = {
           ok: true,
-          text: 'Despesa removida. A trilha de auditoria foi preservada.',
+          text: cancelError ? 'Lançamento cancelado por erro. O estorno foi registrado e o histórico preservado.'
+            : 'Despesa removida. Se já estava paga, o caixa foi mantido e o valor ficou a recuperar.',
         };
         await this.loadFinanceiro();
         if (this.viagensLoaded) await this.viagensLoad();
+        if (cancelError) await this.loadFinExtrato();
       } catch (err) {
-        dialog.error = `Não consegui remover (${err.message}).`;
+        const messages = {
+          expense_cancellation_linked: 'Esta despesa pertence à folha ou a uma rota. Corrija no módulo de origem.',
+          expense_refund_has_payments: 'A devolução já teve uma baixa. É necessária uma revisão antes de cancelar.',
+          expense_already_cancelled: 'Este lançamento já foi cancelado. Atualize o financeiro.',
+          expense_cancellation_inconsistent: 'Os vínculos financeiros precisam de revisão. Nenhuma alteração foi aplicada.',
+          expense_cancellation_payment_missing: 'A baixa original está incompleta. Reconcilie o financeiro antes de cancelar.',
+        };
+        const code = Object.keys(messages).find(key => String(err.message).includes(key));
+        dialog.error = code ? messages[code] : `Não consegui confirmar (${err.message}). Tente novamente com o mesmo motivo.`;
       } finally {
         if (this.despesaRemoveDialog === dialog) dialog.saving = false;
       }

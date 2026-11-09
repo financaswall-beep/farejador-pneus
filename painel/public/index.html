@@ -6114,7 +6114,7 @@
                           <td class="px-5 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="financeDate(row.competence_on)"></p><p class="text-[11px] text-gray-400" x-text="row.cash_on ? 'Caixa ' + financeDate(row.cash_on) : 'Sem movimento de caixa'"></p></td>
                           <td class="px-4 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="row.origin"></p><p class="text-[10px] text-gray-400 font-mono" x-text="row.source_type"></p></td>
                           <td class="px-4 py-3 max-w-[360px]"><p class="font-medium text-gray-800 truncate" x-text="row.description"></p><p class="text-[11px] text-gray-400 truncate" x-text="row.created_by"></p></td>
-                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><button x-show="adminUser?.role==='owner' && row.source_type==='finance.owner_withdrawal' && !row.reversed" @click="finRetiradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar retirada</button><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
+                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><button x-show="adminUser?.role==='owner' &amp;&amp; row.source_type==='commerce.matriz_expense.accrual' &amp;&amp; !row.reversed" @click="despesaCancelarErro(row, true)" class="block mt-2 text-xs text-rose-700 hover:underline">Cancelar por erro / duplicidade</button><button x-show="adminUser?.role==='owner' && row.source_type==='finance.owner_withdrawal' && !row.reversed" @click="finRetiradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar retirada</button><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
                           <td class="px-5 py-3 text-right font-semibold num" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td>
                         </tr>
                       </template>
@@ -6424,9 +6424,10 @@
                       <button @click="despesaComprovante(d)" class="text-xs px-2.5 py-1 rounded-lg bg-gray-50 text-brand-700">Comprovante</button>
                       <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)" :disabled="finQuitando"
                               class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
-                      <button x-show="!d.payroll_item_id" @click="despesaRemove(d)" title="Remover (lançado errado)"
+                      <button x-show="!d.payroll_item_id" @click="despesaCancelarErro(d)" class="text-xs text-rose-700 hover:underline">Cancelar por erro</button>
+                      <button x-show="!d.payroll_item_id && d.payment_status === 'paid'" @click="despesaRemove(d)" title="Remover e aguardar devolução do pagamento real"
                               class="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-rose-50 hover:text-rose-600 ml-1 align-middle">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        Aguardar devolução
                       </button>
                     </td>
                   </tr>
@@ -6518,7 +6519,7 @@
               </div>
               <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-wide text-rose-600">Remoção auditável</p>
-                <h2 id="despesa-remove-title" class="mt-1 text-lg font-semibold text-gray-900">Remover despesa</h2>
+                <h2 id="despesa-remove-title" class="mt-1 text-lg font-semibold text-gray-900" x-text="despesaRemoveDialog.mode === 'cancel_error' ? 'Cancelar por erro ou duplicidade' : 'Remover despesa / devolução'">Remover despesa</h2>
               </div>
             </div>
             <button type="button" @click="despesaFecharRemocao()" :disabled="despesaRemoveDialog.saving"
@@ -6543,8 +6544,8 @@
             <div class="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
               <i data-lucide="triangle-alert" class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-700"></i>
               <div>
-                <p class="text-sm font-semibold">A despesa sairá das contas e dos resultados.</p>
-                <p class="mt-1 text-xs leading-5 text-amber-800">O registro não será apagado do histórico: o sistema preserva quem removeu, quando e o motivo informado abaixo.</p>
+                <p class="text-sm font-semibold" x-text="despesaRemoveDialog.mode === 'cancel_error' ? 'O lançamento incorreto será estornado. Compras e estoque serão preservados.' : 'Se paga, a saída do caixa permanece e o valor fica a recuperar.'"></p>
+                <p class="mt-1 text-xs leading-5 text-amber-800">O histórico, o operador e o motivo serão preservados. No cancelamento por erro, o ajuste do caixa será registrado hoje; o gráfico manterá a saída original e mostrará o estorno. Não há transferência bancária nem receita de venda.</p>
               </div>
             </div>
 
@@ -6568,7 +6569,7 @@
                     class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
             <button type="submit" :disabled="despesaRemoveDialog.saving"
                     class="rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    x-text="despesaRemoveDialog.saving ? 'Removendo…' : 'Remover despesa'"></button>
+                    x-text="despesaRemoveDialog.saving ? 'Confirmando…' : (despesaRemoveDialog.mode === 'cancel_error' ? 'Confirmar cancelamento' : 'Remover e aguardar devolução')"></button>
           </div>
         </form>
       </div>

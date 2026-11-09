@@ -186,6 +186,7 @@ export async function getMatrizLedgerOpenItems(
        LEFT JOIN commerce.wholesale_suppliers ws ON ws.environment=wp.environment
         AND ws.id=wp.supplier_id
       WHERE t.environment=$1
+        AND t.reversal_of_transaction_id IS NULL
         AND ((e.account_class='asset' AND e.side='debit'
               AND e.account_code=ANY($2::text[]))
           OR (e.account_class='liability' AND e.side='credit'

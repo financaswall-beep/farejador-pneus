@@ -153,6 +153,7 @@ describe('Etapa 4 — logística e marketing no livro central', () => {
     const input = {
       receipt_id: receipt.rows[0]!.id, amount: 64.5, category: 'combustivel',
       merchant: 'Posto Etapa 4', document_date: '2026-07-20',
+      retroactive_confirmed: true,
       competence_month: '2026-07-01', payment_status: 'paid' as const,
       payment_date: '2026-07-20', idempotency_key: randomUUID(),
       // A nota fixa de julho pode ultrapassar a janela de três meses com o tempo.

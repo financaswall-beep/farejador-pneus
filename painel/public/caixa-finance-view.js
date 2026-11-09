@@ -133,8 +133,62 @@
         ['Origem', origins[row.origin] || 'Financeiro'], ['Referência', row.reference || 'Não informada'],
         ['Forma de pagamento', row.payment_method || 'Não informada'], ['Conta', row.cash_account || 'Não informada']], false);
       if (row.reversal_of || row.reversed) body.appendChild(node('p', row.reversal_of ? 'Este lançamento registra um estorno.' : 'Este lançamento tem um estorno posterior, apresentado separadamente no extrato.'));
+      if (C.stored(C.keys.role) === 'owner' && row.source_type === 'commerce.matriz_expense.accrual'
+        && !row.reversed && !row.reversal_of) cancellation(body, row);
     });
     return article;
+  }
+  function cancellation(body, row) {
+    const form = node('form', undefined, 'mf-cancel-form');
+    const label = node('label', 'Motivo do cancelamento por erro ou duplicidade');
+    const reason = node('textarea'); reason.required = true; reason.minLength = 2; reason.maxLength = 300;
+    reason.id = 'mf-cancel-reason'; label.htmlFor = reason.id;
+    const note = node('p', 'Cancela este lançamento e corrige o caixa hoje. Compras e estoque são preservados. Não transfere dinheiro nem registra receita de venda.');
+    const button = node('button', 'Estornar e cancelar lançamento', 'mf-primary'); button.type = 'submit';
+    const error = node('p'); error.setAttribute('role', 'status');
+    form.append(label, reason, note, button, error); body.appendChild(form);
+    const session = C.sessionFingerprint();
+    const key = 'farejador.expense-cancellation.v1:' + [C.scope(), C.stored(C.keys.user), row.source_id].join(':');
+    let sending = false;
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (sending || session !== C.sessionFingerprint() || !form.reportValidity()) return;
+      const messages = {
+        expense_cancellation_linked: 'Corrija esta despesa no módulo de folha ou de rotas.',
+        expense_refund_has_payments: 'A devolução já teve baixa. Solicite revisão antes de cancelar.',
+        expense_already_cancelled: 'Este lançamento já foi cancelado. Atualize o extrato.',
+        expense_cancellation_inconsistent: 'Os vínculos financeiros precisam de revisão. Nada foi alterado.',
+        expense_cancellation_payment_missing: 'A baixa original está incompleta. Solicite reconciliação.',
+      };
+      try {
+        let attempt = JSON.parse(sessionStorage.getItem(key) || 'null');
+        if (!attempt) {
+          attempt = { id: row.source_id, reason: reason.value.trim(), idempotency_key: crypto.randomUUID() };
+          if (attempt.reason.length < 2) { error.textContent = 'Informe pelo menos 2 caracteres.'; return; }
+          sessionStorage.setItem(key, JSON.stringify(attempt));
+        }
+        reason.value = attempt.reason; reason.disabled = true;
+        sending = true; button.disabled = true; error.textContent = 'Confirmando cancelamento…';
+        const response = await C.authenticatedFetch('/api/caixa/financeiro-despesas/cancel-error', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(attempt),
+        });
+        const result = await C.json(response);
+        if (session !== C.sessionFingerprint()) return;
+        if (!response.ok) {
+          if ([400, 403, 404, 409].includes(response.status)) {
+            sessionStorage.removeItem(key); reason.disabled = false;
+          }
+          throw Error(messages[result.error] || 'Não foi possível confirmar. Tente novamente com a mesma tentativa.');
+        }
+        if (!result.cancelled) throw Error('O servidor não confirmou. Tente novamente com a mesma tentativa.');
+        sessionStorage.removeItem(key);
+        error.textContent = 'Lançamento cancelado. O histórico foi preservado.';
+        button.hidden = true;
+        await C.financeMatrix.load();
+      } catch (failure) {
+        if (session === C.sessionFingerprint()) error.textContent = failure.message;
+      } finally { sending = false; button.disabled = false; }
+    });
   }
   function movements(target, rows, preview, search) {
     const list = el(target); list.replaceChildren();
@@ -148,5 +202,5 @@
       section.appendChild(header); items.forEach(row => section.appendChild(entry(row, false))); list.appendChild(section);
     });
   }
-  C.financeView = { icon, node, number, money, amount, privacy, dialog, lines, summary, resultDetail, movements };
+  C.financeView = { icon, node, number, money, amount, privacy, dialog, lines, summary, resultDetail, movements, cancellation };
 }());
