@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-01T05:20:45.155Z",
-  "total": 583,
+  "geradoEm": "2026-11-09T02:20:18.375Z",
+  "total": 584,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -520,6 +520,7 @@
     "POST /admin/api/marketing/reconcile GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/marketing/sync GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/matriz/despesas/cancel-error GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas/categorias GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas/categorias/arquivar GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas/comprovantes GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
