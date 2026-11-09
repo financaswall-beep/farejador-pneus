@@ -128,3 +128,10 @@
   .mf-entry-amount { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .mf-spinner { animation: none; } }
+.mf-cancel-form { display: grid; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #d6e0e5; }
+.mf-cancel-form label { font-weight: 600; }
+.mf-cancel-form textarea { box-sizing: border-box; width: 100%; min-height: 96px; padding: 12px; border: 1px solid #d6e0e5; border-radius: 10px; font: inherit; resize: vertical; }
+.mf-cancel-form textarea:focus-visible { outline: 3px solid #63b99d; outline-offset: 2px; }
+.mf-cancel-form .mf-primary { background: #a32432; }
+.mf-cancel-form .mf-primary:disabled { opacity: .6; cursor: wait; }
+.mf-cancel-form [role="status"]:empty { display: none; }

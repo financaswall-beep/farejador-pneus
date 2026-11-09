@@ -10,6 +10,7 @@ import { listMatrizExpenseCategories, createMatrizExpenseCategory } from '../pai
 import { mapWriteError } from '../painel/route-helpers.js';
 import { registerExpenseReceiptRoutes } from '../painel/route-expense-receipts.js';
 import { expenseReceiptsReady } from '../painel/expense-receipts.js';
+import { cancelExpenseByError, cancelExpenseSchema, expenseCancellationStatus } from '../painel/expense-cancellation.js';
 
 type Gate = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 // O contrato e a transação são os mesmos do web; validação civil evita datas normalizadas pelo Postgres.
@@ -31,6 +32,23 @@ export function registerCaixaFinanceExpenseRoutes(app: FastifyInstance, flag: Ga
   }];
   registerExpenseReceiptRoutes(app, { prefix: '/api/caixa/financeiro-despesas', read: [flag, auth, finance], write: guards,
     actor: request => { const actor = (request as FastifyRequest & { caixa: CaixaAuth }).caixa; return `${actor.displayName} (${actor.username})`.slice(0, 120); } });
+  app.post('/api/caixa/financeiro-despesas/cancel-error', { preHandler: guards }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = cancelExpenseSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_body' });
+    try {
+      const actor = (request as FastifyRequest & { caixa: CaixaAuth }).caixa;
+      return { cancelled: true, ...await cancelExpenseByError(parsed.data,
+        `${actor.displayName} (${actor.username})`.slice(0, 120)) };
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      const status = expenseCancellationStatus(code);
+      if (status !== 500) return reply.code(status).send({ error: code });
+      const mapped = mapWriteError(error);
+      logger.error({ error }, 'app expense cancellation failed');
+      return reply.code(mapped.status).send({ error: mapped.error });
+    }
+  });
   app.get('/api/caixa/financeiro-despesas/categorias', { preHandler: guards }, async (_, reply) => {
     reply.header('Cache-Control', 'no-store');
     try { return { categories: (await listMatrizExpenseCategories()).filter(row => !row.archived),

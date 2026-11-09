@@ -16,12 +16,28 @@ import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-s
 import { registerExpenseReceiptRoutes } from './route-expense-receipts.js';
 import { expensePurchaseGroupTags } from './queries-purchase-groups.js';
 import { pool } from '../../persistence/db.js';
+import { cancelExpenseByError, cancelExpenseSchema, expenseCancellationStatus } from './expense-cancellation.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   registerExpenseReceiptRoutes(fastify, { prefix: '/admin/api/matriz/despesas', read: [requireAdminAuth], write: [requireAdminOwner], actor: operatorLabel });
   await registerFinancialReportRoutes(fastify);
   await registerPainelFinanceiroLedger(fastify);
   await registerFinanceiroOverview(fastify);
+  fastify.post('/admin/api/matriz/despesas/cancel-error', { preHandler: requireAdminOwner }, async (request, reply) => {
+    if (!env.MATRIZ_EXPENSES) return reply.code(404).send({ error: 'expenses_disabled' });
+    const parsed = cancelExpenseSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_body' });
+    try {
+      return { cancelled: true, ...await cancelExpenseByError(parsed.data, operatorLabel(request)) };
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      const status = expenseCancellationStatus(code);
+      if (status !== 500) return reply.code(status).send({ error: code });
+      const mapped = mapWriteError(error);
+      logger.error({ error }, 'expense error cancellation failed');
+      return reply.code(mapped.status).send({ error: mapped.error });
+    }
+  });
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = z.object({
       mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),

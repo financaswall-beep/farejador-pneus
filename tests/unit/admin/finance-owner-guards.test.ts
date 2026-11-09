@@ -16,6 +16,7 @@ describe('guardas de dono nos fatos financeiros da Matriz', () => {
       '/admin/api/matriz/despesas',
       '/admin/api/matriz/despesas/settle',
       '/admin/api/matriz/despesas/remove',
+      '/admin/api/matriz/despesas/cancel-error',
     ]) {
       expect(finance).toContain(`post('${path}', { preHandler: requireAdminOwner }`);
     }

@@ -1,11 +1,15 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ create: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), report: vi.fn(), expenses: true }));
+const m = vi.hoisted(() => ({ create: vi.fn(), cancel: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), report: vi.fn(), expenses: true }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test', get MATRIZ_EXPENSES() { return m.expenses; } } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/admin/painel/queries-financeiro-despesas-integridade.js', () => ({ createMatrizExpense: m.create }));
 vi.mock('../../../src/admin/painel/queries-despesas-categorias.js', () => ({ listMatrizExpenseCategories: m.categories, createMatrizExpenseCategory: m.createCategory }));
 vi.mock('../../../src/admin/painel/queries-financial-report.js', () => ({ getFinancialReport: m.report }));
+vi.mock('../../../src/admin/painel/expense-cancellation.js', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/admin/painel/expense-cancellation.js')>(),
+  cancelExpenseByError: m.cancel,
+}));
 import { registerCaixaFinanceExpenseRoutes } from '../../../src/admin/caixa/route-finance-expenses.js';
 import { registerCaixaFinanceReportRoutes } from '../../../src/admin/caixa/route-finance-reports.js';
 import { FinancialReportLimitError } from '../../../src/admin/painel/financial-report-filter.js';
@@ -32,6 +36,27 @@ describe('despesas e relatórios do app compartilham o financeiro web', () => {
       const result = await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/categorias', payload: { label: 'Alimentação', environment: 'prod', created_by: 'falso' } });
       expect(result.statusCode).toBe(201);
       expect(m.createCategory).toHaveBeenCalledWith({ label: 'Alimentação', environment: 'test', created_by: 'Responsável (dono)' });
+    } finally { await app.close(); }
+  });
+  it('cancelamento exige dono, usa a sessão do servidor e rejeita ambiente no corpo', async () => {
+    const body = { id: 'a44ecf48-c33b-438a-8149-fffbf367dc8c', reason: 'Duplicidade', idempotency_key: 'cancel-test-request' };
+    for (const [role, auth, finance, status] of [
+      ['admin', true, true, 403], ['owner', false, true, 401], ['owner', true, false, 403],
+    ] as const) {
+      const app = appFor(role, auth, finance);
+      try { expect((await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/cancel-error', payload: body })).statusCode).toBe(status); }
+      finally { await app.close(); }
+    }
+    expect(m.cancel).not.toHaveBeenCalled();
+    const app = appFor();
+    try {
+      expect((await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/cancel-error', payload: { ...body, environment: 'prod' } })).statusCode).toBe(400);
+      m.cancel.mockResolvedValue({ id: body.id, cash_correction: '3900.00', reversal_ids: ['reversal'] });
+      const response = await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/cancel-error', payload: body });
+      expect(response.statusCode).toBe(200); expect(response.json().cancelled).toBe(true);
+      expect(m.cancel).toHaveBeenCalledWith(body, 'Responsável (dono)');
+      m.cancel.mockRejectedValueOnce(Error('expense_refund_has_payments'));
+      expect((await app.inject({ method: 'POST', url: '/api/caixa/financeiro-despesas/cancel-error', payload: body })).statusCode).toBe(409);
     } finally { await app.close(); }
   });
   beforeEach(() => {

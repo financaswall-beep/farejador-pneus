@@ -19,6 +19,9 @@
       const button = V.node('button', state.direction === 'out' ? 'Conferir e pagar' : 'Conferir recebimento', 'mf-primary'); button.type = 'button';
       button.addEventListener('click', () => C.financePayment.account(row, state.direction, () => { if (C.financeMatrix.currentTab() === 'accounts') void C.financeMatrix.load(); })); body.appendChild(button);
     } else body.appendChild(V.node('p', 'O proprietário pode registrar a baixa desta conta.'));
+    if (C.stored(C.keys.role) === 'owner' && row.tipo === 'despesa' && row.settlement_mode === 'expense') {
+      V.cancellation(body, { source_id: row.id });
+    }
   }
   function card(row, today) {
     const item = V.node('button', undefined, 'ma-card'); item.type = 'button';

@@ -60,7 +60,7 @@ export async function getMatrizStage4LedgerReconciliation(
          WHERE e.environment=$1 AND e.deleted_at IS NOT NULL
            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=e.environment
-               AND t.source_type='commerce.matriz_expense.remove'
+               AND t.source_type IN ('commerce.matriz_expense.remove','commerce.matriz_expense.cancel')
                AND t.source_id=e.id::text)) expense_remove_missing,
        (SELECT count(*)::int FROM commerce.matriz_trip_receipts r
          WHERE r.environment=$1 AND r.ai_expense_id IS NOT NULL
@@ -167,7 +167,7 @@ export async function runMatrizStage4LedgerBackfill(
           OR (e.deleted_at IS NOT NULL AND NOT EXISTS (
             SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=e.environment
-               AND t.source_type='commerce.matriz_expense.remove'
+               AND t.source_type IN ('commerce.matriz_expense.remove','commerce.matriz_expense.cancel')
                AND t.source_id=e.id::text))
         ) ORDER BY e.occurred_at,e.id LIMIT $2 FOR UPDATE OF e SKIP LOCKED`,
       [environment, limit],

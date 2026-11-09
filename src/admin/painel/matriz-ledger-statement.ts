@@ -151,6 +151,7 @@ export async function getMatrizLedgerStatement(
               s.created_by,s.created_at::text,s.metadata,s.reversal_of_transaction_id,
               s.reversed,s.paid_amount,
               CASE WHEN s.obligation_amount IS NULL THEN NULL
+                WHEN s.reversed OR s.reversal_of_transaction_id IS NOT NULL THEN '0.00'
                 ELSE GREATEST(s.obligation_amount::numeric-s.paid_amount::numeric,0)
                   ::numeric(14,2)::text END open_amount,
               bool_or(e.account_code='cash' AND e.side='debit') has_cash_debit,
