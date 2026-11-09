@@ -1,3 +1,4 @@
+import { saleAddressSchema } from './sale-address.js';
 import { z } from 'zod';
 import { assertRetailSaleMoney } from './sales-money.js';
 
@@ -18,8 +19,8 @@ const orderItemsSchema = z.array(orderItemSchema)
   });
 
 // S6 da auditoria 2026-05-21: pedido de entrega exige endereco.
-export const requireDeliveryAddress = (data: { fulfillment_mode: string; delivery_address?: string | null }): boolean =>
-  data.fulfillment_mode !== 'delivery' || !!(data.delivery_address && data.delivery_address.trim().length > 0);
+export const requireDeliveryAddress = (data: { fulfillment_mode: string; delivery_address?: string | null; delivery_address_fields?: unknown }): boolean =>
+  data.fulfillment_mode !== 'delivery' || !!data.delivery_address_fields || !!(data.delivery_address && data.delivery_address.trim().length > 0);
 export const deliveryAddressRefineOpts = {
   message: 'delivery_address obrigatorio quando fulfillment_mode=delivery',
   path: ['delivery_address'] as (string | number)[],
@@ -44,7 +45,10 @@ export const registerManualOrderSchema = z.object({
   });
 
 export const registerWalkinOrderSchema = z.object({
-  customer_name: z.string().min(1).max(200).nullable().optional(),
+  delivery_address_fields: saleAddressSchema.nullable().optional(),
+  customer_mode: z.enum(['existing','new','anonymous']).optional(),
+  customer_ref: z.object({ source: z.enum(['balcao','chatwoot']), id: z.string().uuid() }).strict().nullable().optional(),
+  customer_name: z.string().trim().min(1).max(200).nullable().optional(),
   customer_phone: z.string().min(1).max(40).nullable().optional(),
   unit_id: z.string().uuid().nullable().optional(),
   items: orderItemsSchema,

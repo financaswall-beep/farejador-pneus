@@ -160,6 +160,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   }
 
   if ([
+    'sale_customer_not_found', 'sale_customer_required', 'sale_customer_phone_invalid',
+    'sale_customer_name_required', 'sale_customer_mode_invalid', 'sale_customer_phone_exists',
     'walkin_items_required',
     'walkin_idempotency_required',
     'walkin_item_invalid',

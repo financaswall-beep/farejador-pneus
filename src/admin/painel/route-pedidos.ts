@@ -1,6 +1,7 @@
 // Obra 300 (2026-07-05): fatia da PORTARIA da matriz — pedido manual/walk-in + cancelar.
 // VERBATIM das linhas 1226-1283 do route.ts pré-obra (corpo de registerPainelRoute).
 // Registrada por ./route.js (porta de entrada) na ordem original.
+import { searchSaleCustomers } from './sale-customers.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getAdminContext, requireAdminOwner } from '../auth.js';
@@ -25,6 +26,12 @@ const pickupStageSchema = z.object({
 });
 
 export async function registerPainelPedidos(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/admin/api/orders/customer-search', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = z.object({ q: z.string().trim().min(2).max(100) }).safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_request' });
+    reply.header('Cache-Control', 'private, no-store');
+    return searchSaleCustomers(env.FAREJADOR_ENV, parsed.data.q);
+  });
   fastify.get('/admin/api/retiradas', { preHandler: requireAdminOwner }, async (_request, reply) => {
     return reply.status(200).send({
       rows: await getMatrizRetiradas(),

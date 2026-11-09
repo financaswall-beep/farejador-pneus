@@ -40,6 +40,7 @@ describe('atualização do catálogo antes da venda de balcão', () => {
       saleModalOpen: false,
     };
 
+    Object.assign(context,module);
     await module.openWalkinModal.call(context);
 
     expect(context.apiGet).toHaveBeenCalledWith('/admin/api/dashboard/produtos?limit=100');

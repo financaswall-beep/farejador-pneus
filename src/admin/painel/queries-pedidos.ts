@@ -1,3 +1,5 @@
+import type { SaleAddress } from './sale-address.js';
+import type { SaleCustomerInput } from './sale-customers.js';
 // Obra 300 (2026-07-05): fatia do banco da MATRIZ — tipos de pedido + getPainelPedidos/Produtos + período/fuso do painel.
 // VERBATIM das linhas 11-129 do queries.ts pré-obra (commit 2628748).
 // Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
@@ -39,7 +41,8 @@ export interface RegisterManualOrderInput {
   source_tag?: SourceTagChatwoot | null;
 }
 
-export interface RegisterWalkinOrderInput {
+export interface RegisterWalkinOrderInput extends SaleCustomerInput {
+  delivery_address_fields?: SaleAddress | null;
   environment?: 'prod' | 'test';
   customer_name?: string | null;
   customer_phone?: string | null;

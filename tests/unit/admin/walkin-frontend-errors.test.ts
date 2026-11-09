@@ -18,6 +18,8 @@ async function submitWalkinWithError(code: string) {
     orderSubmitting: false,
     orderError: null as string | null,
     modalConv: null,
+    saleCustomer: { mode:'new',selected:null },
+    saleAddress: { structured:false },
     saleModalOpen: true,
     saleForm: {
       product_id: 'produto-1',
@@ -65,7 +67,9 @@ describe('mensagens da venda de balcão da matriz', () => {
       orderSubmitting: false,
       orderError: null as string | null,
       modalConv: null,
-      saleModalOpen: true,
+      saleCustomer: { mode:'new',selected:null },
+    saleAddress: { structured:false },
+    saleModalOpen: true,
       saleForm: {
         product_id: 'produto-1',
         quantity: 1,

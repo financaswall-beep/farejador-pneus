@@ -1,3 +1,5 @@
+import { formatSaleAddress } from './sale-address.js';
+import { resolveSaleCustomer, cleanCustomerText } from './sale-customers.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -37,6 +39,9 @@ export async function registerWalkinOrder(
   input: RegisterWalkinOrderInput,
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string }> {
+  if (input.delivery_address_fields && input.fulfillment_mode === 'delivery') {
+    input = { ...input, delivery_address: formatSaleAddress(input.delivery_address_fields) };
+  }
   if (input.payment_method?.trim().toLowerCase() === 'a receber'
     && !input.payment_due_on) {
     throw new Error('payment_due_on_required');
@@ -45,7 +50,8 @@ export async function registerWalkinOrder(
   const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
   const total = calculateTotal(input);
   const requestFingerprint = operationFingerprint({
-    customer_name: input.customer_name?.trim() || null,
+    customer_name: input.customer_mode ? cleanCustomerText(input.customer_name) : input.customer_name?.trim() || null,
+    ...(input.customer_mode || input.customer_ref ? { customer_ref: input.customer_ref ?? null, customer_mode: input.customer_mode ?? null } : {}),
     customer_phone: normalizedPhone,
     unit_id: input.unit_id ?? null,
     items: input.items.map((item) => ({
@@ -134,19 +140,8 @@ export async function registerWalkinOrder(
     }));
     const stockPlan = await prepareMatrizWalkinStock(client, environment, requestedItems);
 
-    // A funcao legada de cliente faz select+insert; este lock evita corrida pelo mesmo telefone.
-    if (normalizedPhone) {
-      await client.query(
-        `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-        [`walkin-customer:${environment}:${normalizedPhone}`],
-      );
-    }
-    const customer = await client.query<{ customer_id: string }>(
-      `SELECT commerce.find_or_create_customer($1, $2, $3) AS customer_id`,
-      [environment, input.customer_name ?? null, normalizedPhone],
-    );
-    const customerId = customer.rows[0]?.customer_id;
-    if (!customerId) throw new Error('walkin_customer_not_found');
+    const customer = await resolveSaleCustomer(client, environment, input);
+    const customerId = customer.customerId;
 
     const order = await client.query<{ id: string }>(
       `INSERT INTO commerce.orders (
@@ -155,7 +150,7 @@ export async function registerWalkinOrder(
          delivery_address, payment_due_on, closed_by, closed_at,
          idempotency_key, source, unit_id
        ) VALUES (
-         $1, NULL, $2, NULL,
+         $1, $11, $2, NULL,
          $3, 'open', $4, $5,
          $6, $10::date, NULL, NULL,
          $7, $8, $9
@@ -164,7 +159,7 @@ export async function registerWalkinOrder(
       [
         environment, customerId, total, input.fulfillment_mode, input.payment_method,
         input.delivery_address ?? null, input.idempotency_key, input.source_tag, unitId,
-        input.payment_due_on ?? null,
+        input.payment_due_on ?? null, customer.contactId,
       ],
     );
     const orderId = order.rows[0]?.id;
@@ -212,8 +207,10 @@ export async function registerWalkinOrder(
         items: input.items,
         unit_id: unitId,
         customer_id: customerId,
-        customer_name: input.customer_name ?? null,
-        customer_phone: normalizedPhone,
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        contact_id: customer.contactId,
+        customer_ref: input.customer_ref ?? null,
         source_tag: input.source_tag,
         request_fingerprint: requestFingerprint,
         payment_method: input.payment_method,

@@ -6,6 +6,11 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
   const walkinOrderErrText = (err) => {
     const code = err instanceof Error ? err.message : String(err);
     const messages = {
+      sale_customer_phone_exists: 'Este telefone já está cadastrado. Escolha Cliente existente e busque pelo telefone.',
+      sale_customer_phone_invalid: 'Informe um telefone completo com DDD.',
+      sale_customer_not_found: 'O cliente selecionado não está disponível. Busque novamente.',
+      sale_customer_required: 'Selecione um cliente.',
+      sale_customer_name_required: 'Informe o nome do novo cliente.',
       walkin_measure_not_found: 'Esse pneu não está cadastrado no estoque do galpão.',
       walkin_cost_missing: 'Essa medida está sem custo no galpão. Cadastre o custo antes de vender.',
       walkin_stock_insufficient: 'Não há pneus suficientes dessa medida no galpão. Confira o estoque e tente novamente.',
@@ -28,6 +33,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         this.orderError = 'Somente o proprietário pode registrar vendas pelo painel administrativo.';
         return;
       }
+      if (typeof this.salePrepareCustomer === 'function' && !this.salePrepareCustomer()) return;
       if (!this.saleForm.product_id) {
         this.orderError = 'Escolha um produto do catalogo.';
         return;
@@ -74,8 +80,11 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
           });
         } else {
           await this.apiPost('/admin/api/orders/register-walkin', {
-            customer_name: this.saleForm.customer_name?.trim() || null,
-            customer_phone: this.saleForm.customer_phone?.trim() || null,
+            delivery_address_fields: this.saleAddress.structured && this.saleForm.fulfillment_mode==='delivery' ? {...this.saleAddress.fields} : null,
+            customer_mode: this.saleCustomer.mode,
+            customer_ref: this.saleCustomer.selected ? { source:this.saleCustomer.selected.source,id:this.saleCustomer.selected.id } : null,
+            customer_name: this.saleCustomer.mode==='new' ? this.saleForm.customer_name?.trim() || null : null,
+            customer_phone: this.saleCustomer.mode==='new' ? this.saleForm.customer_phone?.trim() || null : null,
             items,
             payment_method: this.saleForm.payment_method || null,
             payment_due_on: this.saleForm.payment_due_on || null,
@@ -95,6 +104,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       } catch (err) {
         this.orderError = walkinOrderErrText(err);
         const code = err instanceof Error ? err.message : String(err);
+        if (code.includes('sale_customer_')) this.saleCustomer.error=this.orderError;
         if (code.includes('catalog_price_')) void this.loadRealData();
       } finally {
         this.orderSubmitting = false;
