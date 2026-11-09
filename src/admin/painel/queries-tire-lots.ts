@@ -17,7 +17,7 @@ export async function listTireLots(filters: TireLotFilters = {}, db: Pool = defa
       p.payment_status,p.stock_applied_at received_at,s.name supplier_name,
       l.quantity_on_hand-l.quantity_reserved available_quantity,
       COALESCE(l.accepted_quantity,0)-l.quantity_on_hand exited_quantity,
-      l.allocated_cost/l.ordered_quantity unit_cost,
+      CASE WHEN l.quantity_on_hand>0 THEN l.remaining_cost/l.quantity_on_hand ELSE l.allocated_cost/l.ordered_quantity END unit_cost,
       CASE WHEN p.status='cancelled' THEN 'cancelled'
         WHEN l.accepted_quantity IS NULL THEN 'pending'
         WHEN l.quantity_on_hand=0 THEN 'closed' ELSE 'open' END status
@@ -42,6 +42,7 @@ export async function listTireLots(filters: TireLotFilters = {}, db: Pool = defa
 export async function listTireLotMovements(filters: { lot_id?: string; page?: number; vehicle_type?: string } = {}, db: Pool = defaultPool) {
   const result = await db.query(`WITH filtered AS (
     SELECT m.id,m.lot_id,m.source,m.quantity_delta,m.cost_delta,m.occurred_at,to_jsonb(m)->>'order_id' order_id,
+      to_jsonb(m)->>'transfer_id' transfer_id,
       'LT-'||lpad(l.lot_number::text,6,'0') lot_code,
       CASE WHEN o.id IS NOT NULL THEN 'OC-'||to_char(o.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY')
         ||'-'||lpad(o.order_number::text,6,'0') ELSE left(p.id::text,8) END purchase_code

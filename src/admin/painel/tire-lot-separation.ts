@@ -5,6 +5,9 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import { beginIntegrityOperation, completeIntegrityOperation, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
+import { stockSnapshot, lotSnapshot, lockTireTransfers } from './tire-transfer-plan.js';
+import { recordTransfer, recordItem } from './tire-stock-transfers.js';
+import { tireTransfersReady } from './tire-transfer-read.js';
 
 export const lotSeparationSchema = z.object({
   stock_id: z.string().uuid(), description: z.string().trim().min(1).max(200),
@@ -22,6 +25,7 @@ export async function separateTireLot(input: z.infer<typeof lotSeparationSchema>
     await client.query('BEGIN');
     const replay = await beginIntegrityOperation<{ id: string; lot_code: string }>(client, operation);
     if (replay.replayed) { await client.query('COMMIT'); return replay.result; }
+    await lockTireTransfers(client, environment);
     const source = await client.query(`SELECT id,measure,brand,tire_condition,quantity_on_hand,
       quantity_reserved,unit_cost,
       round(unit_cost*quantity_on_hand,2)-round(unit_cost*(quantity_on_hand-$3),2) transfer_cost
@@ -31,19 +35,26 @@ export async function separateTireLot(input: z.infer<typeof lotSeparationSchema>
     if (!stock) throw new Error('lot_source_not_found');
     if (stock.quantity_on_hand - stock.quantity_reserved < data.quantity) throw new Error('lot_source_insufficient');
     if (stock.unit_cost === null) throw new Error('lot_source_cost_missing');
+    const before = (await stockSnapshot(client, environment, stock.id))!;
     const id = randomUUID();
     await setGalpaoMovContext(client, { source: 'separacao_lote', ref: id, reason: data.reason });
     await client.query(`UPDATE commerce.wholesale_stock SET quantity_on_hand=quantity_on_hand-$3
       WHERE environment=$1 AND id=$2`, [environment, data.stock_id, data.quantity]);
     const result = await client.query<{ id: string; lot_code: string }>(`INSERT INTO commerce.tire_lots
       (id,environment,description,origin_type,origin_stock_id,origin_snapshot,ordered_quantity,accepted_quantity,
-       products_amount,allocated_cost,quantity_on_hand,remaining_cost)
-      VALUES ($1,$2,$3,'separation',$4,$5::jsonb,$6,$6,$7,$7,$6,$7)
+       products_amount,allocated_cost,quantity_on_hand,remaining_cost,vehicle_type)
+      VALUES ($1,$2,$3,'separation',$4,$5::jsonb,$6,$6,$7,$7,$6,$7,$8)
       RETURNING id,'LT-'||lpad(lot_number::text,6,'0') lot_code`,
-    [id, environment, data.description, stock.id, JSON.stringify({ ...stock, reason: data.reason }), data.quantity, stock.transfer_cost]);
+    [id, environment, data.description, stock.id, JSON.stringify({ ...stock, reason: data.reason }), data.quantity, stock.transfer_cost, before.vehicle_type]);
     await client.query(`INSERT INTO commerce.tire_lot_movements
       (environment,lot_id,source,quantity_delta,cost_delta,occurred_at,created_by)
       VALUES ($1,$2,'separation_in',$3,$4,now(),$5)`, [environment, id, data.quantity, stock.transfer_cost, actor]);
+    if (await tireTransfersReady(client)) {
+      await recordTransfer(client, environment, id, 'to_lot', await lotSnapshot(client, environment, id),
+        null, data.quantity, stock.transfer_cost, data.reason, actor);
+      await recordItem(client, environment, id, { product_id: null, quantity: data.quantity,
+        cost: stock.transfer_cost, before }, (await stockSnapshot(client, environment, stock.id))!);
+    }
     await recordIntegrityEvent(client, { environment, domain: operation.domain, entityTable: 'commerce.tire_lots',
       entityId: id, eventType: 'separated', actorLabel: actor, idempotencyKey: operation.idempotencyKey,
       before: stock, after: { quantity: data.quantity, cost: stock.transfer_cost } });

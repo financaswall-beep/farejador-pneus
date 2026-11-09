@@ -23,7 +23,7 @@ export async function getStockCosts(db: Pool = defaultPool, vehicleType: Vehicle
   ), lots AS (
     SELECT l.id,'LT-'||lpad(l.lot_number::text,6,'0') lot_code,l.description,
       l.vehicle_type,l.quantity_on_hand,l.quantity_reserved,l.quantity_on_hand-l.quantity_reserved quantity_available,
-      l.remaining_cost capital,l.allocated_cost/l.ordered_quantity unit_cost,
+      l.remaining_cost capital,l.remaining_cost/l.quantity_on_hand unit_cost,
       l.created_at,CASE WHEN l.remaining_cost=0 THEN l.quantity_on_hand ELSE 0 END zero_cost_quantity
     FROM commerce.tire_lots l
     LEFT JOIN commerce.wholesale_purchases p ON p.environment=l.environment AND p.id=l.purchase_id

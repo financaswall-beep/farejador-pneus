@@ -6,8 +6,10 @@ import { getTireLotPurchase, listLotSeparationSources, listTireLotMovements, lis
 import { lotSeparationSchema, separateTireLot } from './tire-lot-separation.js';
 import { getStockCosts } from './queries-stock-costs.js';
 import { vehicleReportFilterSchema } from '../../shared/tire-vehicle-type.js';
+import { registerTireTransferRoutes } from './route-tire-transfers.js';
 
 export async function registerTireLotRoutes(app: FastifyInstance) {
+  await registerTireTransferRoutes(app);
   const vehicle_type = vehicleReportFilterSchema.default('all');
   app.get('/admin/api/wholesale/stock/costs', { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = z.object({ vehicle_type }).safeParse(request.query);

@@ -147,7 +147,8 @@
 <script src="/admin/painel/app.compras.viagens.dialog.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.compras.lotes.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.estoque.custos.js?v=20260916-vehicle-ui1"></script>
-<script src="/admin/painel/app.estoque.lotes.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.estoque.lotes.js?v=20261109-transfer1"></script>
+<script src="/admin/painel/app.estoque.transferencias.js?v=20261109-transfer1"></script>
 <script src="/admin/painel/app.compras.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/purchase-price-utils.js?v=20260918-prices1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20261101-viagens1"></script>
@@ -287,7 +288,7 @@
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.galpao.js?v=20260916-vehicle-ui1"></script>
+<script src="/admin/painel/app.galpao.js?v=20261109-transfer1"></script>
 <link rel="stylesheet" href="/admin/painel/catalog-photos.css?v=20261025-video1">
 <script src="/admin/painel/app.catalogo.photos.js?v=20261025-video1"></script>
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
@@ -307,7 +308,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261101-viagens1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261109-transfer1"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -339,7 +340,7 @@
 <link rel="stylesheet" href="/admin/painel/compras-lotes.css?v=20260915-lot1">
 <link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20260915-lotsale1">
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
-<link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20260915-lot2">
+<link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20261109-transfer1">
 <link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20260915-finance1">
 <link rel="stylesheet" href="/admin/painel/caixa-chat.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/caixa-chat-customer.css?v=20261019-chat1" />
@@ -3917,11 +3918,11 @@
     </div>
     <template x-if="currentPage === 'estoque' && isMatrixPanel() && ['lotes','lotes-movimentos'].includes(stockTab)">
       <section class="tire-lots" aria-label="Lotes de pneus">
-        <div class="tl-breadcrumb">Matriz / Estoque</div>
+        <div class="tl-breadcrumb">Matriz / Estoque</div><p x-show="st.message" role="status" x-text="st.message"></p>
         <header class="tl-heading"><div><h1>Lotes de pneus</h1><p>Acompanhe as entradas, o saldo e o custo dos pneus disponíveis.</p></div>
-          <div class="tl-actions" x-show="adminUser?.role === 'owner'"><button class="tl-btn" @click="tireLotSeparationOpen()"><i data-lucide="git-fork"></i>Registrar separação</button><button class="tl-btn tl-primary" @click="tireLotBuy()"><i data-lucide="shopping-cart"></i>Comprar lote <i data-lucide="arrow-up-right"></i></button></div>
+          <div class="tl-actions" x-show="adminUser?.role === 'owner'"><button class="tl-btn" @click="stOpen('to_lot')"><i data-lucide="git-fork"></i>Formar lote</button><button class="tl-btn tl-primary" @click="tireLotBuy()"><i data-lucide="shopping-cart"></i>Comprar lote <i data-lucide="arrow-up-right"></i></button></div>
         </header>
-        <nav class="tl-tabs" aria-label="Seções do estoque de lotes"><button @click="stockTab='visao'; loadAtacado(); tireLotIcons()">Pneus cadastrados</button><button @click="tireLotsOpen('lotes')" :class="{active:stockTab==='lotes'}" :aria-current="stockTab==='lotes'?'page':null">Lotes</button><button @click="tireLotsOpen('lotes-movimentos')" :class="{active:stockTab==='lotes-movimentos'}" :aria-current="stockTab==='lotes-movimentos'?'page':null">Movimentações</button></nav><div class="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-xs"><label class="vehicle-filter">Tipo de veículo<select aria-label="Tipo de veículo" x-model="tireLotVehicleType" @change="tireLots.page=1; tireLotsLoad(); tireLotsLoadMovements()"><option value="all">Todos os pneus</option><option value="motorcycle">Moto</option><option value="car">Carro</option><option value="unknown">Não identificado</option><option value="mixed">Lotes mistos</option></select></label><span class="text-gray-500">Tipo de veículo é diferente de novo ou meia-vida. Sem classificação fica como não identificado.</span></div>
+        <div class="tl-actions"><button class="tl-btn" @click="stHistory()">Histórico de transferências</button></div><nav class="tl-tabs" aria-label="Seções do estoque de lotes"><button @click="stockTab='visao'; loadAtacado(); tireLotIcons()">Pneus cadastrados</button><button @click="tireLotsOpen('lotes')" :class="{active:stockTab==='lotes'}" :aria-current="stockTab==='lotes'?'page':null">Lotes</button><button @click="tireLotsOpen('lotes-movimentos')" :class="{active:stockTab==='lotes-movimentos'}" :aria-current="stockTab==='lotes-movimentos'?'page':null">Movimentações</button></nav><div class="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-xs"><label class="vehicle-filter">Tipo de veículo<select aria-label="Tipo de veículo" x-model="tireLotVehicleType" @change="tireLots.page=1; tireLotsLoad(); tireLotsLoadMovements()"><option value="all">Todos os pneus</option><option value="motorcycle">Moto</option><option value="car">Carro</option><option value="unknown">Não identificado</option><option value="mixed">Lotes mistos</option></select></label><span class="text-gray-500">Tipo de veículo é diferente de novo ou meia-vida. Sem classificação fica como não identificado.</span></div>
         <div x-show="tireLots.error" class="tl-error" role="alert"><span x-text="tireLots.error"></span><button @click="tireLotsLoad()">Tentar novamente</button></div>
         <div class="tl-card tl-kpis" :aria-busy="tireLots.loading">
           <div class="tl-kpi"><span class="tl-round"><i data-lucide="boxes"></i></span><div><strong x-text="tireLots.summary?.open_lots ?? '—'"></strong><span>Lotes abertos</span><small>Apenas lotes recebidos no estoque.</small></div></div>
@@ -3962,7 +3963,7 @@
               <template x-if="tireLotSelected.origin_type==='separation'"><dl><dt>Pneus de origem</dt><dd x-text="tireLotSelected.origin_snapshot.measure+' · '+(tireLotSelected.origin_snapshot.brand || 'Sem marca')"></dd><dt>Separado em</dt><dd x-text="tireLotDate(tireLotSelected.created_at)"></dd><dt>Motivo</dt><dd x-text="tireLotSelected.origin_snapshot.reason"></dd></dl></template>
               <div class="tl-payment"><i data-lucide="circle-check"></i><span x-text="tireLotSelected.origin_type==='separation'?'Custo transferido da origem, sem novo pagamento.':tireLotSelected.status==='cancelled'?'Compra cancelada.':tireLotSelected.payment_status==='paid'?'Pagamento registrado na compra.':'Pagamento a acompanhar em Compras.'"></span></div>
             </section>
-            <div class="tl-sale"><button class="tl-btn tl-primary" @click="lsOpen(tireLotSelected)" :disabled="adminUser?.role !== 'owner' || !panelPageEnabled('vendas') || tireLotSelected.available_quantity <= 0" aria-describedby="lot-sale-next"><i data-lucide="play"></i>Iniciar venda com este lote <i data-lucide="arrow-right"></i></button><small id="lot-sale-next">Continua em Vendas → Lotes. Você pode incluir outros lotes.</small></div>
+            <div class="tl-actions" x-show="adminUser?.role==='owner'"><button class="tl-btn" @click="stOpen('to_stock',tireLotSelected)" :disabled="tireLotSelected.available_quantity<=0 || tireLotSelected.status!=='open'">Desmembrar lote</button><button class="tl-btn" @click="stOpen('loss',tireLotSelected)" :disabled="tireLotSelected.available_quantity<=0 || tireLotSelected.status!=='open'">Registrar perda</button></div><button class="tl-link" @click="stHistory(tireLotSelected.id)">Ver destinos e histórico do lote</button><div class="tl-sale"><button class="tl-btn tl-primary" @click="lsOpen(tireLotSelected)" :disabled="adminUser?.role !== 'owner' || !panelPageEnabled('vendas') || tireLotSelected.available_quantity <= 0" aria-describedby="lot-sale-next"><i data-lucide="play"></i>Iniciar venda com este lote <i data-lucide="arrow-right"></i></button><small id="lot-sale-next">Continua em Vendas → Lotes. Você pode incluir outros lotes.</small></div>
           </aside></template>
           <aside class="tl-card tl-empty" x-show="stockTab==='lotes' && !tireLotSelected"><i data-lucide="boxes" style="margin:25px auto 12px;width:36px;height:36px"></i><h2>Detalhes do lote</h2><p>Selecione um lote para acompanhar saldo, custo e origem.</p></aside>
         </div>
@@ -3984,6 +3985,52 @@
         </section></div></template>
       </section>
     </template>
+
+    <section x-show="currentPage==='estoque' && isMatrixPanel() && st.historyOpen" x-cloak id="stock-transfer-history" class="tire-lots" aria-labelledby="stock-transfer-history-title">
+      <div class="tl-card"><header><h2 id="stock-transfer-history-title">Histórico de transferências e triagem</h2><button class="tl-btn" @click="st.historyOpen=false">Fechar histórico</button></header>
+        <div class="tl-actions"><button class="tl-btn" @click="stHistory()">Todas as transferências</button><button class="tl-btn" @click="stHistoryLoad()">Atualizar</button></div>
+        <p x-show="st.message" role="status" x-text="st.message"></p><p x-show="st.error" class="tl-error" role="alert" x-text="st.error"></p>
+        <template x-for="t in st.history" :key="t.id"><article class="st-history-item">
+          <header><strong x-text="stLabel(t.kind)+' · '+t.lot_code"></strong><span x-text="tireLotDate(t.created_at,true)"></span></header>
+          <p x-text="t.quantity+' pneus · '+formatCurrency(Number(t.cost))+' de custo · '+t.created_by"></p><p x-text="t.reason"></p>
+          <p x-show="t.purchase_id" x-text="'Compra de origem: '+t.purchase_id"></p><button class="tl-link" x-show="t.group_id && hasPanelModule('compras')" @click="viagemAbrir(t.group_id)" x-text="'Viagem: '+t.group_name"></button>
+          <template x-for="item in t.items" :key="item.stock_id"><div><span x-text="item.quantity+' × '+item.measure+' · '+item.brand+' · '+stConditionLabel(item.tire_condition)+' · '+formatCurrency(Number(item.cost))"></span> <button class="tl-link" @click="stHistory('',item.stock_id)">Histórico desta variante</button></div></template>
+          <span x-show="t.reversed">Estornada — original preservado.</span><button class="tl-btn" x-show="adminUser?.role==='owner' && t.kind!=='reversal' && !t.reversed" @click="stOpen('reversal',t)">Estornar movimentação</button>
+        </article></template>
+        <p x-show="!st.history.length">Nenhuma transferência registrada para este filtro.</p>
+        <footer><button class="tl-btn" :disabled="st.page<=1" @click="st.page--; stHistoryLoad()">Anterior</button><span x-text="st.page+' · '+st.total+' registros'"></span><button class="tl-btn" :disabled="st.page*25>=st.total" @click="st.page++; stHistoryLoad()">Próxima</button></footer>
+      </div>
+    </section>
+    <template x-if="st.open"><div class="tl-modal-backdrop" @keydown.escape.window="stClose()">
+      <section class="tire-lots tl-card tl-modal st-dialog" role="dialog" aria-modal="true" aria-labelledby="stock-transfer-title" @keydown.tab="stTrap($event)">
+        <header><h2 id="stock-transfer-title" tabindex="-1" x-text="stLabel(st.kind)"></h2><button class="tl-btn" :disabled="st.busy" @click="stClose()" aria-label="Fechar transferência">Fechar</button></header>
+        <p x-show="st.pending" role="status">Há uma tentativa salva. Confirme a mesma tentativa para consultar ou concluir sem duplicar.</p>
+        <form class="tl-form" @submit.prevent="st.kind==='reversal' ? stConfirm() : stPreview()" @input="if(!st.pending)st.preview=null" @change="if(!st.pending)st.preview=null">
+          <fieldset :disabled="st.busy || !!st.pending">
+            <p x-show="st.lot && st.kind!=='reversal'" x-text="(st.lot?.lot_code||'')+' · '+(st.lot?.description||'')"></p>
+            <template x-if="st.kind==='to_lot'"><div><label>Buscar estoque<input x-model="tireLots.sourceSearch" @input.debounce.300ms="tireLotSourcesLoad()" placeholder="Medida ou marca"></label><label>Variante de origem<select x-model="st.stock_id" required><option value="">Selecione</option><template x-for="source in tireLots.sources" :key="source.id"><option :value="source.id" x-text="source.measure+' · '+source.brand+' · '+stConditionLabel(source.tire_condition)+' · '+source.available_quantity+' disponíveis'"></option></template></select></label><label>Nome do lote<input x-model="st.description" maxlength="200" required></label></div></template>
+            <template x-if="st.kind==='to_stock'"><div><label>Buscar produto cadastrado<input x-model="st.search" @input.debounce.300ms="stProducts()" placeholder="Medida ou marca"></label><p>Somente produtos ativos com condição e tipo de veículo definidos. Não cria medida nem preço automaticamente.</p>
+              <template x-for="(item,index) in st.items" :key="index"><div class="st-product-row"><label>Produto de destino<select x-model="item.product_id" required><option value="">Selecione o produto</option><template x-for="p in st.products" :key="p.id"><option :value="p.id" x-text="stProductLabel(p)"></option></template></select></label><label>Quantidade<input type="number" min="1" max="100000" step="1" x-model.number="item.quantity" required></label><button type="button" class="tl-btn" :disabled="st.items.length===1" @click="st.items.splice(index,1);st.preview=null">Remover linha</button></div></template>
+              <button class="tl-btn" type="button" :disabled="st.items.length>=50" @click="st.items.push({product_id:'',quantity:1});st.preview=null">Adicionar outra medida</button>
+            </div></template>
+            <template x-if="['to_lot','loss'].includes(st.kind)"><label>Quantidade<input type="number" min="1" max="100000" step="1" x-model.number="st.quantity" required></label></template>
+            <label>Motivo<textarea x-model="st.reason" minlength="5" maxlength="500" required placeholder="Descreva a triagem ou a correção"></textarea></label>
+          </fieldset>
+          <div class="tl-info" x-show="st.kind==='to_stock'">Os pneus passam a compor o estoque identificado e podem ficar disponíveis para vendas e para o bot, conforme as regras atuais. Nenhum preço de venda será criado.</div>
+          <div class="tl-error" x-show="st.kind==='loss'">Registre apenas pneus inutilizáveis: reduz os pneus e o valor do estoque, com impacto no resultado. Não gera saída de caixa.</div>
+          <div class="tl-info" x-show="st.kind==='reversal'">Só será permitido estornar se o lote e as variantes não tiveram alterações posteriores e não possuem reservas. O histórico será preservado.</div>
+          <div x-show="st.preview" class="st-preview" role="status"><h3>Conferência antes de confirmar</h3>
+            <p x-text="'Lote: '+(st.preview?.lot?.quantity_on_hand||0)+' → '+(st.preview?.remaining_quantity||0)+' pneus'"></p>
+            <p x-text="'Custo '+(st.kind==='loss'?'da perda':'transferido')+': '+formatCurrency(Number(st.preview?.cost||0))"></p>
+            <template x-for="(item,index) in st.preview?.items||[]" :key="index"><p x-text="item.after.measure+' · '+item.after.brand+' · '+stConditionLabel(item.after.tire_condition)+': '+(item.before?.quantity_on_hand||0)+' → '+item.after.quantity_on_hand+' pneus · custo médio final '+formatCurrency(Number(item.after.unit_cost))"></p></template>
+            <p x-show="st.kind!=='loss'">Transferência interna: sem nova compra, pagamento, receita ou despesa. O valor total do estoque é preservado.</p>
+          </div>
+          <p class="tl-error" x-show="st.error" role="alert" x-text="st.error"></p>
+          <footer><button class="tl-btn" type="button" :disabled="st.busy" @click="stClose()">Voltar</button><button class="tl-btn" type="submit" x-show="st.kind!=='reversal' && !st.pending" :disabled="st.busy">Conferir saldos e custos</button><button class="tl-btn tl-primary" type="button" x-show="st.preview || st.pending || st.kind==='reversal'" :disabled="st.busy || (st.kind==='reversal' && st.reason.trim().length<5)" @click="stConfirm()" x-text="st.busy?'Confirmando…':st.pending?'Confirmar a mesma tentativa':'Confirmar movimentação'"></button></footer>
+        </form>
+      </section>
+    </div></template>
+
     <template x-if="currentPage === 'estoque' && isMatrixPanel() && stockTab === 'custos'">
       <section class="stock-costs" x-effect="stockCosts.mode; stockCosts.condition; stockCosts.search; $nextTick(() => window.lucide?.createIcons())" aria-labelledby="sc-heading" :aria-busy="stockCosts.loading" x-init="$nextTick(() => window.lucide?.createIcons())">
         <div :inert="stockCosts.dialog ? true : null">
@@ -4062,7 +4109,7 @@
             </div></template>
             <template x-if="stockCosts.dialog==='detail' && stockCosts.detail"><div>
               <p>Composição por marca · estoque físico atual</p><div class="sc-insight"><i data-lucide="box"></i><b x-text="scQuantity(stockCosts.detail.quantity_on_hand)+' pneus · '+formatCurrency(stockCosts.detail.capital)+' em capital'"></b></div>
-              <div class="sc-scroll"><table class="sc-table"><thead><tr><th>Marca</th><th>Em estoque</th><th>Reservados</th><th>Disponíveis</th><th>Custo médio</th><th>Capital</th></tr></thead><tbody><template x-for="variant in stockCosts.detail.variants" :key="variant.id"><tr><td x-text="variant.brand||'Sem marca'"></td><td x-text="scQuantity(variant.quantity_on_hand)"></td><td x-text="scQuantity(variant.quantity_reserved)"></td><td x-text="scQuantity(variant.quantity_available)"></td><td x-text="formatCurrency(variant.unit_cost)"></td><td x-text="formatCurrency(variant.capital)"></td></tr></template></tbody></table></div>
+              <div class="sc-scroll"><table class="sc-table"><thead><tr><th>Marca</th><th>Em estoque</th><th>Reservados</th><th>Disponíveis</th><th>Custo médio</th><th>Capital</th></tr></thead><tbody><template x-for="variant in stockCosts.detail.variants" :key="variant.id"><tr><td><span x-text="variant.brand||'Sem marca'"></span><button class="tl-link" @click="scClose();stHistory('',variant.id)">Origem e transferências</button></td><td x-text="scQuantity(variant.quantity_on_hand)"></td><td x-text="scQuantity(variant.quantity_reserved)"></td><td x-text="scQuantity(variant.quantity_available)"></td><td x-text="formatCurrency(variant.unit_cost)"></td><td x-text="formatCurrency(variant.capital)"></td></tr></template></tbody></table></div>
               <p>As reservas já estão incluídas no capital. O custo médio exibido é arredondado; o cálculo usa a precisão registrada.</p>
             </div></template>
           </section></div>

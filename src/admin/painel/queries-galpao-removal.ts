@@ -6,6 +6,7 @@ import { canonicalCatalogBrand } from './catalog-brand.js';
 import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inventory.js';
 import { deleteWholesaleStock } from './queries-galpao.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
+import { tireTransfersReady } from './tire-transfer-read.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, operationFingerprint,
   recordIntegrityEvent,
@@ -59,6 +60,11 @@ export async function deleteWholesaleStockComRotulo(
     const before = current.rows[0];
     if (!before) throw new Error('measure_not_found');
     if (Number(before.quantity_reserved) > 0) throw new Error('stock_has_reservations');
+    if (await tireTransfersReady(client)) {
+      const history = await client.query(`SELECT 1 FROM commerce.tire_stock_transfer_items
+        WHERE environment=$1 AND stock_id=$2 LIMIT 1`, [environment, before.id]);
+      if (history.rowCount) throw Error('stock_has_transfer_history');
+    }
     await setGalpaoMovContext(client, {
       source: 'remocao', nature: 'inventory_writeoff', reason,
       ref: operation.idempotencyKey,

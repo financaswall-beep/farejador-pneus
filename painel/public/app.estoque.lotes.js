@@ -24,7 +24,8 @@ window.PAINEL_MODULES.estoqueLotes = function () {
         purchase_cancel: 'Cancelamento da compra ' + (row.purchase_code || ''),
         sale: 'Venda de lotes #' + String(row.order_id || '').slice(0,8),
         sale_cancel: 'Cancelamento da venda #' + String(row.order_id || '').slice(0,8),
-        separation_in: 'Separação do estoque cadastrado' })[row.source] || 'Movimentação do lote';
+        separation_in: 'Formação a partir do estoque cadastrado', transfer_out: 'Desmembramento para estoque identificado',
+        transfer_reversal: 'Estorno de transferência / triagem', triage_loss: 'Perda de pneus na triagem' })[row.source] || 'Movimentação do lote';
     },
     async tireLotsOpen(tab = 'lotes') {
       this.stockTab = tab;

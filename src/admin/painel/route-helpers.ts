@@ -109,6 +109,7 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
       || err.message.startsWith('stock_measure_missing')
       || err.message === 'stock_measure_brand_conflict'
       || err.message === 'stock_has_reservations'
+      || err.message === 'stock_has_transfer_history'
       || err.message === 'catalog_product_not_found'
       || err.message === 'purchase_order_not_open'
       || err.message === 'purchase_already_linked'

@@ -8,7 +8,8 @@ import {
 interface MatrizInventoryAdjustment {
   id: string;
   environment: 'prod' | 'test';
-  stock_movement_id: string;
+  stock_movement_id: string | null;
+  lot_movement_id?: string | null;
   measure: string;
   direction: 'gain' | 'loss';
   nature: string;
@@ -74,6 +75,7 @@ export async function ensureMatrizInventoryAdjustmentPosting(
     lines: adjustmentLines(adjustment, amount),
     metadata: {
       stock_movement_id: adjustment.stock_movement_id,
+      ...(adjustment.lot_movement_id ? { lot_movement_id: adjustment.lot_movement_id } : {}),
       measure: adjustment.measure,
       direction: adjustment.direction,
       nature: adjustment.nature,

@@ -15,8 +15,10 @@ window.PAINEL_MODULES.galpao = function () {
         catalog_product_not_found: 'A medida existe, mas o produto correspondente não foi encontrado no Catálogo.',
         brand_required: 'Informe a marca do pneu.',
         tire_condition_required: 'Selecione a condição do pneu.',
+        stock_has_reservations: 'Não é possível remover: há unidades reservadas para pedidos em aberto.',
+        stock_has_transfer_history: 'Esta variante possui histórico de transferências. Use Corrigir saldo ou a correção de marca/condição, preservando a origem.',
       };
-      return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
+      return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : acao === 'remover' ? 'remover' : 'salvar'} (${code}).`;
     },
     stockPrecisaRepor(row) {
       return row.min_quantity != null
@@ -132,9 +134,7 @@ window.PAINEL_MODULES.galpao = function () {
         void this.loadStockReconciliation();
         void this.loadGalpaoFilme(); // a remoção entra no filme
       } catch (err) {
-        this.stockMsg = { ok: false, text: err.message === 'stock_has_reservations'
-          ? 'Não é possível remover: há unidades reservadas para pedidos em aberto.'
-          : `Não consegui remover (${err.message}).` };
+        this.stockMsg = { ok: false, text: this.stockErrText(err.message, 'remover') };
       }
     },
     // ── Auditoria 07-07: busca + "repor primeiro" — a lista que a tabela renderiza ──

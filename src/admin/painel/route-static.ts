@@ -52,6 +52,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.bot.chat.js','caixa-chat.js','caixa-chat-view.js','caixa-chat-channels.js','caixa-chat-media.js','caixa-chat-customer.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
+    'app.estoque.transferencias.js',
     'app.estoque.custos.js', 'app.vendas.lotes.js',
     'app.marketing.geography.js','app.marketing.geography.actions.js','app.marketing.geography.mock.js',
     'app.marketing.creatives.js', 'app.marketing.creatives.chart.js', 'app.marketing.creatives.mock.js',

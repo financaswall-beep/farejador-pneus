@@ -9,3 +9,10 @@
 @media(max-width:1200px){.tl-heading{align-items:flex-start;flex-wrap:wrap}.tl-grid{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}.tl-card-head{flex-wrap:wrap}.tl-kpi{gap:12px;padding:0 14px}.tl-kpi strong{font-size:24px}.tl-round{width:48px;height:48px}.tl-kpi span:not(.tl-round){font-size:14px}.tl-balance strong{font-size:30px}.tl-lot-label{gap:8px;min-width:145px}.tl-lot-label>svg{width:24px}}
 @media(max-width:980px){.tl-grid{grid-template-columns:1fr}.tl-detail{gap:14px}.tl-movements{min-height:280px}.tl-kpi small{font-size:11px}.tl-kpi{align-items:flex-start}.tl-kpi .tl-round{display:none}}
 @media(max-width:600px){.tire-lots{padding:16px 12px}.tire-lots h1{font-size:29px}.tl-heading p{font-size:14px}.tl-actions{width:100%;gap:8px}.tl-actions .tl-btn{flex:1;padding:10px;font-size:12px}.tl-kpis{grid-template-columns:1fr;padding:0}.tl-kpi{padding:14px 16px;border-right:0;border-bottom:1px solid #e1eaf0;align-items:center}.tl-kpi:last-child{border-bottom:0}.tl-kpi .tl-round{display:flex}.tl-kpi strong{font-size:26px}.tl-tabs{gap:3px}.tl-tabs button{padding:0 9px 11px;font-size:13px}.tl-tools{width:100%}.tl-search{max-width:none;flex:1}.tl-table{min-width:560px}.tl-card{padding:13px}.tl-info{align-items:flex-start}.tl-modal-backdrop{padding:10px}.tl-modal{max-height:94vh}.tl-origin-head{align-items:flex-start;flex-wrap:wrap}}
+/* Transferências usam os mesmos controles do estoque e ficam legíveis no celular. */
+.st-dialog { max-height: 90vh; overflow-y: auto; }
+.st-product-row { display: grid; gap: 12px; margin-block: 12px; padding-block: 12px; border-bottom: 1px solid #dde5e2; }
+.st-preview { border: 1px solid #bdd9ce; border-radius: 12px; padding: 16px; background: #f2faf6; }
+.st-history-item { border-bottom: 1px solid #dde5e2; padding-block: 16px; overflow-wrap: anywhere; }
+.st-history-item header { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.st-history-item .tl-link { margin: 8px; }
