@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import type { RegisterWalkinOrderInput } from '../../src/admin/painel/queries-pedidos.js';
+import { registerWalkinOrderSchema } from '../../src/admin/painel/route-schemas-orders.js';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 
 describe('venda walk-in atomica da Matriz', () => {
@@ -214,6 +215,44 @@ describe('venda walk-in atomica da Matriz', () => {
     expect(Number(after.lucro_total) - Number(before.lucro_total)).toBe(150);
     expect(after.vendas_count - before.vendas_count).toBe(1);
     expect(after.itens_sem_custo - before.itens_sem_custo).toBe(0);
+  });
+
+  it.each([150.5,90.25])('grava preço humano %s, referência, receita e lucro sem alterar o catálogo',async price => {
+    const fixture=await createProduct({quantity:5,cost:40}),idempotencyKey=key('preco-negociado');
+    const before=await getVarejoResumo('tudo','test',db.pool);
+    const body=registerWalkinOrderSchema.parse({...saleInput(fixture.productId,idempotencyKey),
+      items:[{product_id:fixture.productId,quantity:2,unit_price:price,reference_unit_price:120}]});
+    const input={...body,environment:'test' as const,actor_label:'Proprietário',seller_collaborator_id:sellerId};
+    const result=await registerWalkinOrder(input,db.pool);
+    expect(await registerWalkinOrder(input,db.pool)).toEqual(result);
+    const stored=(await db.pool.query(`SELECT o.total_amount::float8 total,oi.unit_price::float8 price,
+      oi.reference_unit_price::float8 reference,oi.matriz_unit_cost::float8 cost
+      FROM commerce.orders o JOIN commerce.order_items oi ON oi.order_id=o.id AND oi.environment=o.environment
+      WHERE o.id=$1 AND o.environment='test'`,[result.order_id])).rows[0];
+    expect(stored).toEqual({total:price*2,price,reference:120,cost:40});
+    const after=await getVarejoResumo('tudo','test',db.pool);
+    expect(Number(after.faturamento)-Number(before.faturamento)).toBe(price*2);
+    expect(Number(after.lucro_total)-Number(before.lucro_total)).toBe(price*2-80);
+    const revenue=(await db.pool.query(`SELECT count(*)::int count,sum(e.amount)::float8 amount
+      FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+      WHERE t.environment='test' AND t.source_id=$1 AND t.source_type='commerce.order.revenue' AND e.side='credit'`,[result.order_id])).rows[0];
+    expect(revenue).toEqual({count:1,amount:price*2});
+    expect((await db.pool.query(`SELECT price_amount::float8 price FROM commerce.matriz_current_prices
+      WHERE environment='test' AND product_id=$1`,[fixture.productId])).rows[0].price).toBe(120);
+    expect((await db.pool.query(`SELECT quantity_on_hand FROM commerce.wholesale_stock
+      WHERE environment='test' AND measure=$1`,[fixture.measure])).rows[0].quantity_on_hand).toBe(3);
+    const audit=(await db.pool.query(`SELECT payload_after FROM audit.events
+      WHERE environment='test' AND entity_id=$1 AND event_type='walkin_order_created'`,[result.order_id])).rows[0];
+    expect(audit.payload_after.items[0]).toMatchObject({unit_price:price,reference_unit_price:120});
+  });
+  it('continua recusando referência desatualizada e preço divergente sem referência',async()=>{
+    const fixture=await createProduct({quantity:5,cost:40});
+    for(const reference of [119,undefined]) {
+      const input={...saleInput(fixture.productId,key('preco-referencia-antiga')),
+        items:[{product_id:fixture.productId,quantity:1,unit_price:150,reference_unit_price:reference}]};
+      await expect(registerWalkinOrder(input,db.pool)).rejects.toThrow('catalog_price_changed');
+      expect(await countOrders([input.idempotency_key])).toBe(0);
+    }
   });
 
   it('fecha venda pelo Caixa e grava pedido, baixa, receita e custo na mesma verdade', async () => {

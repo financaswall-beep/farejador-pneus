@@ -134,7 +134,7 @@
 <script src="/admin/painel/app.partner-catalogo.js?v=20260906-applications1"></script>
 <script src="/admin/painel/app.municipios.js?v=20260821-cidades1"></script>
 <script src="/admin/painel/business-time.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.format.js?v=20260822-continuity1"></script>
+<script src="/admin/painel/app.format.js?v=20261111-preco-manual1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260822-continuity1"></script>
@@ -303,7 +303,7 @@
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260917-bot-cost1"></script>
-<script src="/admin/painel/app.pedidos.parceiros.js?v=20261109-clientes1"></script>
+<script src="/admin/painel/app.pedidos.parceiros.js?v=20261111-preco-manual1"></script>
 <script src="/admin/painel/app.resumo.js?v=20260917-bot-cost1"></script>
 <script src="/admin/painel/app.resumo.chart.js?v=20260916-overview1"></script>
 <script src="/admin/painel/app.core.js?v=20260916-overview1"></script>
@@ -11900,13 +11900,15 @@
                      class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
             </div>
             <div class="col-span-3">
-              <label class="text-xs text-gray-500 block mb-1">Preço un.</label>
-              <input type="number" min="0" step="0.01" x-model.number="saleForm.unit_price"
-                     readonly
-                     class="w-full bg-gray-100 border border-gray-200 rounded px-3 py-2 text-sm font-semibold text-gray-700 cursor-not-allowed" />
+              <label for="sale-unit-price" class="text-xs text-gray-500 block mb-1">Preço vendido (un.) · R$</label>
+              <input id="sale-unit-price" type="number" inputmode="decimal" min="0" max="99999999.99" step="0.01" x-model.number="saleForm.unit_price"
+                     :readonly="!!modalConv" :disabled="orderSubmitting" aria-describedby="sale-price-help"
+                     :class="modalConv?'bg-gray-100 cursor-not-allowed':'bg-white focus:ring-emerald-200'"
+                     class="w-full border border-gray-200 rounded px-3 py-2 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2" />
             </div>
             <div class="col-span-1"></div>
           </div>
+          <p id="sale-price-help" x-show="!modalConv" class="mt-2 text-xs text-gray-500">O catálogo sugere o preço inicial. Informe o valor por unidade negociado nesta venda.</p>
           <p x-show="saleForm.product_id" class="mt-2 text-xs"
              :class="saleStockError() ? 'text-rose-600' : 'text-emerald-700'"
              x-text="saleStockError() || ('Disponível no galpão: ' + (selectedProduct()?.total_stock_available ?? selectedProduct()?.official_quantity_on_hand) + ' un')"></p>
@@ -11914,7 +11916,7 @@
                class="mt-3 grid grid-cols-3 gap-2 border-t border-gray-200 pt-3 text-xs">
             <div><p class="text-gray-400">Custo do estoque</p><p class="mt-1 font-semibold" x-text="formatCurrency(Number(selectedProduct()?.official_unit_cost || 0))"></p></div>
             <div><p class="text-gray-400">Preço do Catálogo</p><p class="mt-1 font-semibold" x-text="formatCurrency(Number(selectedProduct()?.price_amount || 0))"></p></div>
-            <div><p class="text-gray-400">Lucro bruto estimado</p><p class="mt-1 font-semibold text-emerald-700" x-text="formatCurrency(Number(selectedProduct()?.price_amount || 0) - Number(selectedProduct()?.official_unit_cost || 0))"></p></div>
+            <div><p class="text-gray-400">Lucro bruto estimado</p><p class="mt-1 font-semibold" :class="Number(saleForm.unit_price || 0) >= Number(selectedProduct()?.official_unit_cost || 0)?'text-emerald-700':'text-rose-700'" x-text="formatCurrency(Number(saleForm.quantity || 0) * (Number(saleForm.unit_price || 0) - Number(selectedProduct()?.official_unit_cost || 0)))"></p></div>
           </div>
         </div>
       </div>

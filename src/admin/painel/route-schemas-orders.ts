@@ -1,6 +1,6 @@
 import { saleAddressSchema } from './sale-address.js';
 import { z } from 'zod';
-import { assertRetailSaleMoney } from './sales-money.js';
+import { assertRetailSaleMoney, hasCentPrecision } from './sales-money.js';
 
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
@@ -17,6 +17,16 @@ const orderItemsSchema = z.array(orderItemSchema)
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
   }
   });
+
+// Somente a venda humana de balcão aceita preço negociado separado da referência.
+// Chamadas antigas sem referência continuam sujeitas à comparação do preço vendido.
+const walkinOrderItemsSchema = z.array(orderItemSchema.extend({
+  reference_unit_price: z.number().nonnegative().max(99_999_999.99)
+    .refine(hasCentPrecision, 'unit_price_cent_precision').optional(),
+})).min(1, 'sale_items_required').max(100, 'sale_items_limit').superRefine((items, ctx) => {
+  try { assertRetailSaleMoney(items); }
+  catch (error) { ctx.addIssue({ code:z.ZodIssueCode.custom,message:(error as Error).message }); }
+});
 
 // S6 da auditoria 2026-05-21: pedido de entrega exige endereco.
 export const requireDeliveryAddress = (data: { fulfillment_mode: string; delivery_address?: string | null; delivery_address_fields?: unknown }): boolean =>
@@ -51,7 +61,7 @@ export const registerWalkinOrderSchema = z.object({
   customer_name: z.string().trim().min(1).max(200).nullable().optional(),
   customer_phone: z.string().min(1).max(40).nullable().optional(),
   unit_id: z.string().uuid().nullable().optional(),
-  items: orderItemsSchema,
+  items: walkinOrderItemsSchema,
   payment_method: z.string().min(1).nullable(),
   payment_due_on: z.string().date().nullable().optional(),
   fulfillment_mode: z.enum(['delivery', 'pickup']),

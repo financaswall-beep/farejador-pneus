@@ -124,6 +124,12 @@ window.PAINEL_MODULES.format = function () {
       const available = Number(product.total_stock_available ?? product.official_quantity_on_hand ?? 0);
       if (!Number.isInteger(requested) || requested <= 0) return 'Informe uma quantidade válida.';
       if (requested > available) return `Só tem ${available} dessa medida no galpão.`;
+      const price = this.saleForm.unit_price;
+      if (price === '' || price == null || !Number.isFinite(Number(price)) || Number(price) < 0
+        || Number(price) > 99_999_999.99) return 'Informe um preço de venda válido.';
+      if (Math.abs(Number(price) * 100 - Math.round(Number(price) * 100)) > 1e-7) {
+        return 'O preço precisa ter no máximo duas casas decimais.';
+      }
       return null;
     },
 

@@ -58,6 +58,8 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         quantity: Number(this.saleForm.quantity || 1),
         unit_price: Number(this.saleForm.unit_price || 0),
       }];
+      const reference = typeof this.selectedProduct === 'function' ? this.selectedProduct()?.price_amount : null;
+      if (!this.modalConv && reference != null) items[0].reference_unit_price = Number(reference);
       const deliveryAddress = this.saleForm.fulfillment_mode === 'delivery'
         ? this.saleForm.delivery_address
         : null;
