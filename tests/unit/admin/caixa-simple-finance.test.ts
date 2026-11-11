@@ -35,6 +35,7 @@ vi.mock('../../../src/admin/painel/queries-financeiro-read-switch.js', () => ({
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 
 import { getMatrizSimpleFinance } from '../../../src/admin/caixa/simple-finance.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from '../../../src/admin/painel/matriz-effective-cash.js';
 
 describe('Financeiro simples da Matriz', () => {
   it('le exclusivamente o livro central no intervalo e reaproveita a comissao da folha', async () => {
@@ -50,6 +51,6 @@ describe('Financeiro simples da Matriz', () => {
     });
     expect(query).toHaveBeenCalledOnce();
     expect(query.mock.calls[0]?.[1]?.[0]).toBe('test');
-    expect(query.mock.calls[0]?.[0]).not.toContain('reversal_of_transaction_id=t.id');
+    expect(query.mock.calls[0]?.[0]).toContain(EFFECTIVE_CASH_TRANSACTION_SQL);
   });
 });

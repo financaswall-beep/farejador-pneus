@@ -237,6 +237,10 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       }
     },
     finExtratoStatus(row) {
+      if (row.cash_entry_error) return {
+        label: row.reversal_of_transaction_id ? 'Correção · fora do caixa' : 'Cancelado por erro · fora do caixa',
+        cls: 'bg-gray-100 text-gray-600',
+      };
       const labels = {
         aberto: 'Em aberto', parcial: 'Parcial', liquidado: 'Liquidado',
         estornado: 'Estornado', estorno: 'Estorno', registrado: 'Registrado',

@@ -77,6 +77,7 @@ window.PAINEL_MODULES.financeiroVisao = function () {
       return (this.finCaixaExtrato?.rows || []).filter(r => ['entrada', 'saida'].includes(r.direction)).slice(0, 3);
     },
     finVisaoDetalheMovimento(row) {
+      if (row.cash_entry_error) return this.financeDate(row.cash_on) + ' · Cancelamento por erro · fora do caixa';
       const method = { dinheiro: 'Dinheiro', pix: 'Pix', transferencia: 'Transferência' }[row.metadata?.payment_method];
       return this.financeDate(row.cash_on) + ' · ' + (method || row.origin);
     },

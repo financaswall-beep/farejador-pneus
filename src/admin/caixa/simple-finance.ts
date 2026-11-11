@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from '../painel/matriz-effective-cash.js';
 import { getMatrizLedgerOpenItems } from '../painel/matriz-ledger-open-items.js';
 import { getMatrizLedgerIntegrationHealth } from '../painel/matriz-ledger-integration-health.js';
 import { getMatrizCollaboratorManagement } from '../painel/queries-colaboradores-gestao.js';
@@ -38,6 +39,7 @@ async function getCashSummary(
        SELECT t.id
          FROM finance.matriz_ledger_transactions t
         WHERE t.environment=$1 AND t.cash_on>=$2::date AND t.cash_on<$3::date
+          AND (${EFFECTIVE_CASH_TRANSACTION_SQL})
      )
      SELECT COALESCE(sum(e.amount) FILTER (
               WHERE e.account_code='cash' AND e.side='debit'),0)::numeric(14,2)::text entradas,

@@ -1,3 +1,5 @@
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
+
 // Only account entries determine values. Transaction headers can contain several accounting legs.
 export const financialMovementsSql=`SELECT t.id,t.source_type,
   COALESCE(b.source_id,o.source_id,t.metadata->>'source_id',t.source_id) AS source_id,t.description,
@@ -8,6 +10,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
   COALESCE(t.metadata->>'category',b.metadata->>'category',o.metadata->>'category') AS category,
   t.metadata->>'payment_method' AS payment_method,t.metadata->>'cash_account' AS cash_account,
   t.reversal_of_transaction_id AS reversal_of,
+  (t.cash_on IS NOT NULL AND NOT (${EFFECTIVE_CASH_TRANSACTION_SQL})) AS cash_entry_error,
   EXISTS(SELECT 1 FROM finance.matriz_ledger_transactions r WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id) AS reversed,
   COALESCE(sum(CASE e.side WHEN 'credit' THEN e.amount ELSE -e.amount END) FILTER(WHERE e.account_class='revenue' AND e.account_code<>'inventory_gain'),0)::float8 AS revenue,
   COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END) FILTER(WHERE e.account_code='cost_of_goods_sold'),0)::float8 AS cost,
@@ -40,7 +43,8 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
 export const financialOpeningSql=`SELECT t.source_type,
   COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::float8 AS amount
   FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id AND e.environment=t.environment
-  WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<$2::date GROUP BY t.source_type`;
+  WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<$2::date
+    AND (${EFFECTIVE_CASH_TRANSACTION_SQL}) GROUP BY t.source_type`;
 
 export const financialPendingCostSql=`SELECT (CASE WHEN o.fulfillment_mode='delivery' THEN o.delivered_at ELSE o.created_at END
   AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,

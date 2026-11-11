@@ -162,13 +162,9 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
       const [year, value] = month.split('-').map(Number);
       const days = new Date(Date.UTC(year, value, 0)).getUTCDate();
       const grouped = new Map();
-      for (const row of (this.finCaixaExtrato?.rows || [])) {
-        const date = String(row.cash_on || '').slice(0, 10);
-        if (!date) continue;
-        const item = grouped.get(date) || { entrada: 0, saida: 0 };
-        if (row.direction === 'entrada') item.entrada += Number(row.amount || 0);
-        if (row.direction === 'saida') item.saida += Number(row.amount || 0);
-        grouped.set(date, item);
+      const daily = this.finOverview?.period === month ? this.finOverview.days : [];
+      for (const row of daily || []) {
+        grouped.set(row.date, { entrada: Number(row.incoming), saida: Number(row.outgoing) });
       }
       const rows = Array.from({ length: days }, (_, index) => {
         const day = index + 1;

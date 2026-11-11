@@ -18,6 +18,7 @@ export interface OperationFinanceEntry {
   amount: number;
   entry_date: string;
   occurred_at: string | null;
+  cash_entry_error?: boolean;
 }
 
 export interface OperationFinanceEntriesPayload {

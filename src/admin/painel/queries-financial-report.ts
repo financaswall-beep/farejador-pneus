@@ -9,14 +9,15 @@ export function buildFinancialReport(data:FinancialSnapshot,filter:FinancialRepo
   const rows=data.movements.map(row=>({...row,origin:financialOrigin(row.source_type),result:financialResult(row)})).filter(row=>originMatches(row.origin));
   const competence=rows.filter(row=>row.competence_on>=filter.from&&row.competence_on<=filter.to&&(row.revenue||row.cost||row.expense||row.gain||row.loss));
   const cash=rows.filter(row=>row.cash_on&&row.cash_on>=filter.from&&row.cash_on<=filter.to&&(row.cash_in||row.cash_out));
+  const effectiveCash=cash.filter(row=>!row.cash_entry_error);
   const pending=data.pending_cost.filter(()=>originMatches('varejo'));
   const opening=sum(data.opening.filter(row=>originMatches(financialOrigin(row.source_type))),row=>row.amount);
   const revenue=sum(competence,r=>r.revenue),cost=sum(competence,r=>r.cost),expense=sum(competence,r=>r.expense),gain=sum(competence,r=>r.gain),loss=sum(competence,r=>r.loss);
   const pendingRevenue=sum(pending,r=>r.amount),result=money(revenue-pendingRevenue-cost-expense-loss+gain);
-  const incoming=sum(cash,r=>r.cash_in),outgoing=sum(cash,r=>r.cash_out);
+  const incoming=sum(effectiveCash,r=>r.cash_in),outgoing=sum(effectiveCash,r=>r.cash_out);
   let cumulative=0;
   const daily=financialDays(filter.from,filter.to).map(day=>{
-    const items=competence.filter(r=>r.competence_on===day),payments=cash.filter(r=>r.cash_on===day);
+    const items=competence.filter(r=>r.competence_on===day),payments=effectiveCash.filter(r=>r.cash_on===day);
     const value=money(sum(items,r=>r.result)-sum(pending.filter(r=>r.day===day),r=>r.amount));cumulative=money(cumulative+value);
     return{day,result:value,cumulative,cash_in:sum(payments,r=>r.cash_in),cash_out:sum(payments,r=>r.cash_out)};
   });
@@ -49,12 +50,13 @@ export function buildFinancialReport(data:FinancialSnapshot,filter:FinancialRepo
     .sort((a,b)=>b.cash_on!.localeCompare(a.cash_on!)||b.id.localeCompare(a.id));
   const projectedRows=projected.filter(row=>(filter.direction==='all'||filter.direction==='in'&&row.side==='receivable'||filter.direction==='out'&&row.side==='payable')
     &&searchMatches(row.name+' '+row.source_id)).sort((a,b)=>a.due_on!.localeCompare(b.due_on!)||a.id.localeCompare(b.id));
+  const filteredCash=cashRows.filter(row=>!row.cash_entry_error);
   return{filters:filter,as_of:data.as_of,today:data.today,integration_status:data.integration_status,
     summary:{revenue,cost,expense,inventory_gain:gain,inventory_loss:loss,pending_revenue:pendingRevenue,pending_items:sum(pending,r=>r.items),
       result,margin:revenue>0?money(result/revenue*100):null,partial:pending.length>0||data.integration_status==='yellow',
       opening,incoming,outgoing,net:money(incoming-outgoing),closing:money(opening+incoming-outgoing)},
     daily,origins,expenses,position,agenda,titles,result_rows:resultRows,cash_rows:cashRows,
-    cash_filtered:{incoming:sum(cashRows,r=>r.cash_in),outgoing:sum(cashRows,r=>r.cash_out)},
+    cash_filtered:{incoming:sum(filteredCash,r=>r.cash_in),outgoing:sum(filteredCash,r=>r.cash_out)},
     projection:{from:data.today,to:forecastEnd,daily:forecast,rows:projectedRows,
       incoming:sum(projected,r=>r.side==='receivable'?r.amount:0),outgoing:sum(projected,r=>r.side==='payable'?r.amount:0)},
   };

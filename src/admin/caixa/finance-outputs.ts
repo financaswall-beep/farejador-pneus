@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from '../painel/matriz-effective-cash.js';
 import { simpleFinanceRangeDays, type SimpleFinanceRange } from '../../shared/simple-finance.js';
 import type {
   OperationFinanceEntriesPayload,
@@ -17,6 +18,7 @@ interface MatrizFinanceOutputRow {
   amount: string;
   entry_date: string;
   occurred_at: string;
+  cash_entry_error: boolean;
   total_amount: string;
   total_count: number;
 }
@@ -50,6 +52,7 @@ export async function getMatrizFinanceOutputs(
                 (now() AT TIME ZONE 'America/Sao_Paulo')::date+1) end_date
      ), outputs AS (
        SELECT t.id::text,t.source_type,t.description,
+              NOT (${EFFECTIVE_CASH_TRANSACTION_SQL}) AS cash_entry_error,
               COALESCE(t.metadata->>'payment_method',t.metadata->>'paymentMethod') payment_method,
               e.amount,to_char(t.cash_on,'YYYY-MM-DD') entry_date,t.created_at occurred_at
          FROM finance.matriz_ledger_transactions t
@@ -59,7 +62,8 @@ export async function getMatrizFinanceOutputs(
          WHERE t.environment=$1 AND t.cash_on>=b.start_date AND t.cash_on<b.end_date
            AND e.account_code='cash' AND e.side='credit'
       ), counted AS (
-       SELECT *,sum(amount) OVER()::text total_amount,count(*) OVER()::int total_count
+       SELECT *,COALESCE(sum(amount) FILTER (WHERE NOT cash_entry_error) OVER(),0)::text total_amount,
+              count(*) OVER()::int total_count
          FROM outputs
      )
      SELECT * FROM counted ORDER BY entry_date DESC,occurred_at DESC,id DESC LIMIT 200`,
@@ -75,6 +79,7 @@ export async function getMatrizFinanceOutputs(
       origin: details.origin,
       payment_method: row.payment_method,
       amount: Number(row.amount),
+      cash_entry_error: row.cash_entry_error,
       entry_date: row.entry_date,
       occurred_at: row.occurred_at,
     };

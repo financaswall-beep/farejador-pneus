@@ -53,7 +53,8 @@ window.PAINEL_MODULES.relatoriosFinanceiroPdf=function(){return{
         cells.forEach(([value,x])=>out+=text(fit(value,x===38?46:25),x,y,8,x===38));
         if(titles)out+=text(this.rfinOrigin(r.origin),38,y-11,7,false,muted);
         else if(cash||tab==='result'){out+=text(fit(r.description,54),38,y-11,7,false,muted)+text(fit(r.reference||r.source_id,28),336,y-11,7,false,muted);
-          if(r.reversal_of)out+=text('Estorno',704,y-11,7,false,muted);}
+          if(cash&&r.cash_entry_error)out+=text('Fora do total',704,y-11,7,false,muted);
+          else if(r.reversal_of)out+=text('Estorno',704,y-11,7,false,muted);}
         out+=rule(y-19);
       });if(!rows.length)out+=text('Nenhum registro encontrado neste recorte.',38,389,10,false,muted);
       out+=text((rows.length?start+1:0)+' a '+Math.min(start+10,rows.length)+' de '+rows.length+' registros.',30,49,8,false,muted);pages.push(out);

@@ -43,6 +43,49 @@ describe('cancelamento de despesa por erro sem devolução fictícia', () => {
     const agenda = await open('test', db.pool);
     expect([...agenda.a_pagar.itens, ...agenda.a_receber.itens].filter(r => r.id === id)).toEqual([]);
   }
+  async function cashPeriod(through: string) {
+    const month = through.slice(0, 7);
+    const { getMatrizFinanceOverview } = await import('../../src/admin/painel/matriz-finance-overview.js');
+    const { getMatrizCentralLedgerFinancialTruth } = await import('../../src/admin/painel/matriz-ledger-financial-read.js');
+    const { getMatrizLedgerStatement } = await import('../../src/admin/painel/matriz-ledger-statement.js');
+    const { getMatrizFinanceEntries } = await import('../../src/admin/caixa/finance-entries.js');
+    const { getMatrizFinanceOutputs } = await import('../../src/admin/caixa/finance-outputs.js');
+    const { financialReportQuery } = await import('../../src/admin/painel/financial-report-filter.js');
+    const { readFinancialSnapshot } = await import('../../src/admin/painel/financial-report-data.js');
+    const { buildFinancialReport } = await import('../../src/admin/painel/queries-financial-report.js');
+    const filter = financialReportQuery.parse({ from: month + '-01', to: through });
+    const [overview, truth, statement, entries, outputs, snapshot] = await Promise.all([
+      getMatrizFinanceOverview(month, 'test', db.pool),
+      getMatrizCentralLedgerFinancialTruth('test', db.pool, month),
+      getMatrizLedgerStatement({ period: month, basis: 'caixa', environment: 'test' }, db.pool),
+      getMatrizFinanceEntries('30d', db.pool, month),
+      getMatrizFinanceOutputs('30d', db.pool, month),
+      readFinancialSnapshot(filter, 'test', db.pool),
+    ]);
+    const report = buildFinancialReport(snapshot, filter);
+    const opening = Number(truth.caixa.saldo_anterior);
+    const closing = Number(truth.caixa.saldo_atual);
+    const incoming = Number(truth.caixa.entradas_registradas);
+    const outgoing = Number(truth.caixa.saidas_registradas);
+    expect(Number(overview.opening)).toBe(opening);
+    expect(report.summary).toMatchObject({ incoming, outgoing, opening, closing });
+    expect(report.cash_filtered).toEqual({ incoming, outgoing });
+    expect([Number(statement.summary.entradas), Number(statement.summary.saidas)]).toEqual([incoming, outgoing]);
+    expect([entries.total, outputs.total]).toEqual([incoming, outgoing]);
+    const days = overview.days.map(day => ({
+      day: day.date, cash_in: Number(day.incoming), cash_out: Number(day.outgoing),
+    }));
+    expect(report.daily.map(({ day, cash_in, cash_out }) => ({ day, cash_in, cash_out }))).toEqual(days);
+    return { totals: { opening, closing, incoming, outgoing }, days, rows: statement.rows,
+      reportRows: report.cash_rows, appEntries: entries.rows, appOutputs: outputs.rows };
+  }
+  async function cashDates() {
+    const result = await db.pool.query<{ today: string; last_month_end: string }>(
+      `SELECT today::text, (date_trunc('month', today)::date - 1)::text last_month_end
+       FROM (SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date today) dates`,
+    );
+    return result.rows[0]!;
+  }
   it('anula à vista, preserva o original e não altera uma compra de estoque', async () => {
     const { registerWholesalePurchase: register } = await import('../../src/admin/painel/queries-fornecedores-registro.js');
     const supplier = (await db.pool.query(`INSERT INTO commerce.wholesale_suppliers(environment,name)
@@ -98,15 +141,24 @@ describe('cancelamento de despesa por erro sem devolução fictícia', () => {
     await cancel(input(e.id), 'owner:test', 'test', db.pool); await zero(e.id);
   });
   it('recusa devolução parcialmente recebida e desfaz toda a tentativa', async () => {
+    const { today } = await cashDates();
+    const beforeCash = await cashPeriod(today);
     const e = await create();
     await remove(e.id, 'test', db.pool, { reason: 'devolução real', idempotency_key: randomUUID() });
     const title = (await open('test', db.pool)).a_receber.itens.find(r => r.id === e.id)!;
     const { settleMatrizLedgerOpenItem: settle } = await import('../../src/admin/painel/matriz-ledger-settlement.js');
-    await settle({ environment: 'test', obligation_id: title.obligation_id!, amount: 100,
+    const refund = await settle({ environment: 'test', obligation_id: title.obligation_id!, amount: 100,
       actor_label: 'owner:test', idempotency_key: randomUUID() }, db.pool);
     const before = await net(e.id);
     await expect(cancel(input(e.id), 'owner:test', 'test', db.pool)).rejects.toThrow('expense_refund_has_payments');
     expect(await net(e.id)).toEqual(before);
+    const afterCash = await cashPeriod(today);
+    expect(afterCash.totals.incoming).toBe(beforeCash.totals.incoming + 100);
+    expect(afterCash.totals.outgoing).toBe(beforeCash.totals.outgoing + 3900);
+    expect(afterCash.totals.closing).toBe(beforeCash.totals.closing - 3800);
+    expect(afterCash.appEntries.find(r => r.id === refund.payment_ids[0])).toMatchObject({
+      amount: 100, entry_date: today, cash_entry_error: false,
+    });
   });
   it('isola ambiente e serializa cancelamentos concorrentes', async () => {
     const e = await create();
@@ -133,14 +185,38 @@ describe('cancelamento de despesa por erro sem devolução fictícia', () => {
     await expect(cancel(input(approved.expense_id), 'owner:test', 'test', db.pool)).rejects.toThrow('expense_cancellation_linked');
     expect(await net(approved.expense_id)).toEqual(before);
   });
-  it('corrige saldo e gráfico sem apagar a saída histórica', async () => {
-    const e = await create(true, '2026-07-01T15:00:00Z');
-    await cancel(input(e.id), 'owner:test', 'test', db.pool);
-    const { getMatrizFinanceOverview: overview } = await import('../../src/admin/painel/matriz-finance-overview.js');
-    const old = await overview('2026-07', 'test', db.pool);
-    expect(Number(old.days.find(d => d.date === '2026-07-01')!.outgoing)).toBe(3900);
-    const reversed = await db.pool.query(`SELECT cash_on::text date FROM finance.matriz_ledger_transactions
-      WHERE environment='test' AND source_id=$1 AND source_type='commerce.matriz_expense.cancel'`, [e.id]);
-    expect(reversed.rows[0].date).not.toBe('2026-07-01'); await zero(e.id);
+  it('ajusta o caixa nos dois meses e mantém as datas, o motivo e o vínculo no histórico', async () => {
+    const { today, last_month_end } = await cashDates();
+    const beforeLast = await cashPeriod(last_month_end);
+    const beforeCurrent = await cashPeriod(today);
+    const firstDay = today.slice(0, 7) + '-01';
+    const previous = await create(true, last_month_end + 'T00:00:00-03:00');
+    const current = await create(true, firstDay + 'T00:00:00-03:00');
+    await cancel(input(previous.id), 'owner:test', 'test', db.pool);
+    await cancel(input(current.id), 'owner:test', 'test', db.pool);
+
+    const last = await cashPeriod(last_month_end);
+    const now = await cashPeriod(today);
+    expect(last.totals).toEqual(beforeLast.totals);
+    expect(last.days).toEqual(beforeLast.days);
+    expect(now.totals).toEqual(beforeCurrent.totals);
+    expect(now.days).toEqual(beforeCurrent.days);
+    expect(now.totals.opening).toBe(last.totals.closing);
+
+    for (const [id, date, period] of [[previous.id, last_month_end, last], [current.id, firstDay, now]] as const) {
+      const original = period.rows.find(r => r.source_id === id && r.source_type === 'commerce.matriz_expense.accrual');
+      const correction = now.rows.find(r => r.source_id === id && r.status === 'estorno');
+      expect(original).toMatchObject({
+        cash_on: date, direction: 'saida', status: 'estornado', amount: '3900.00', cash_entry_error: true,
+      });
+      expect(correction).toMatchObject({
+        cash_on: today, reversal_of_transaction_id: original!.id, amount: '3900.00', cash_entry_error: true,
+        metadata: { correction_type: 'entry_error', reason: 'Duplicidade com compra por lote' },
+      });
+      expect(period.appOutputs.find(r => r.id === original!.id)).toMatchObject({ amount: 3900, cash_entry_error: true });
+      expect(now.appEntries.find(r => r.id === correction!.id)).toMatchObject({ kind: 'other', amount: 3900, cash_entry_error: true });
+      expect(period.reportRows.find(r => r.id === original!.id)?.cash_entry_error).toBe(true);
+      expect(now.reportRows.find(r => r.id === correction!.id)?.cash_entry_error).toBe(true);
+    }
   });
 });

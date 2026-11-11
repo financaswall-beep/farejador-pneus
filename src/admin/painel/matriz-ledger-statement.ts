@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
 
 type Environment = 'prod' | 'test';
 export type MatrizLedgerStatementBasis = 'competencia' | 'caixa';
@@ -20,6 +21,7 @@ export interface MatrizLedgerStatementRow {
   metadata: Record<string, unknown>;
   reversal_of_transaction_id: string | null;
   reversed: boolean;
+  cash_entry_error: boolean;
   paid_amount: string;
   open_amount: string | null;
   status: 'aberto' | 'parcial' | 'liquidado' | 'estornado' | 'estorno' | 'registrado';
@@ -128,6 +130,7 @@ export async function getMatrizLedgerStatement(
                 (to_date($2,'YYYY-MM')+interval '1 month')::date month_end
        ), selected AS (
          SELECT t.*,
+                (t.cash_on IS NOT NULL AND NOT ${EFFECTIVE_CASH_TRANSACTION_SQL}) AS cash_entry_error,
                 EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
                   WHERE r.environment=t.environment
                     AND r.reversal_of_transaction_id=t.id) reversed,
@@ -150,7 +153,7 @@ export async function getMatrizLedgerStatement(
        SELECT s.id,s.source_type,s.source_id,s.transaction_kind,s.amount::text,
               s.competence_on::text,s.due_on::text,s.cash_on::text,s.description,
               s.created_by,s.created_at::text,s.metadata,s.reversal_of_transaction_id,
-              s.reversed,s.paid_amount,
+              s.reversed,s.cash_entry_error,s.paid_amount,
               CASE WHEN s.obligation_amount IS NULL THEN NULL
                 WHEN s.reversed OR s.reversal_of_transaction_id IS NOT NULL THEN '0.00'
                 ELSE GREATEST(s.obligation_amount::numeric-s.paid_amount::numeric,0)
@@ -172,7 +175,7 @@ export async function getMatrizLedgerStatement(
         GROUP BY s.id,s.source_type,s.source_id,s.transaction_kind,s.amount,
                  s.competence_on,s.due_on,s.cash_on,s.description,s.created_by,
                  s.created_at,s.metadata,s.reversal_of_transaction_id,s.reversed,
-                 s.paid_amount,s.obligation_amount
+                 s.paid_amount,s.obligation_amount,s.cash_entry_error
         ORDER BY ${dateColumn.replace('t.', 's.')} DESC,s.created_at DESC,s.id DESC
         LIMIT $4 OFFSET $5`,
       params,
@@ -184,16 +187,16 @@ export async function getMatrizLedgerStatement(
          SELECT to_date($2,'YYYY-MM') month_start,
                 (to_date($2,'YYYY-MM')+interval '1 month')::date month_end
        ), tx AS (
-          SELECT t.id,t.reversal_of_transaction_id
+          SELECT t.id,${EFFECTIVE_CASH_TRANSACTION_SQL} AS effective_cash
             FROM finance.matriz_ledger_transactions t,bounds b
            WHERE t.environment=$1
              AND ${dateColumn}>=b.month_start AND ${dateColumn}<b.month_end
         )
        SELECT
          COALESCE(sum(e.amount) FILTER (WHERE e.account_code='cash'
-           AND e.side='debit'),0)::numeric(14,2)::text entradas,
+           AND tx.effective_cash AND e.side='debit'),0)::numeric(14,2)::text entradas,
          COALESCE(sum(e.amount) FILTER (WHERE e.account_code='cash'
-           AND e.side='credit'),0)::numeric(14,2)::text saidas,
+           AND tx.effective_cash AND e.side='credit'),0)::numeric(14,2)::text saidas,
          COALESCE(sum(CASE e.side WHEN 'credit' THEN e.amount ELSE -e.amount END)
            FILTER (WHERE e.account_class='revenue'),0)::numeric(14,2)::text receitas,
          COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)

@@ -1,6 +1,7 @@
 export interface FinancialMovement {
   id:string;source_type:string;source_id:string;description:string;reference:string|null;party:string|null;
   competence_on:string;cash_on:string|null;category:string|null;payment_method:string|null;cash_account:string|null;
+  cash_entry_error?:boolean;
   reversal_of:string|null;reversed:boolean;revenue:number;cost:number;expense:number;gain:number;loss:number;cash_in:number;cash_out:number;
 }
 export interface FinancialTitle {

@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
 
 /** Séries completas do livro central, sem o limite de linhas do extrato. */
 export async function getMatrizFinanceOverview(
@@ -16,7 +17,8 @@ export async function getMatrizFinanceOverview(
          LEAST((to_date($2,'YYYY-MM')+interval '1 month - 1 day')::date,
            (now() AT TIME ZONE 'America/Sao_Paulo')::date) ends
      ), ledger AS (
-       SELECT t.cash_on,t.competence_on,e.account_code,e.account_class,e.side,e.amount
+       SELECT CASE WHEN e.account_code='cash' AND ${EFFECTIVE_CASH_TRANSACTION_SQL} THEN t.cash_on END cash_on,
+         t.competence_on,e.account_code,e.account_class,e.side,e.amount
        FROM finance.matriz_ledger_transactions t
        JOIN finance.matriz_ledger_entries e
          ON e.environment=t.environment AND e.transaction_id=t.id

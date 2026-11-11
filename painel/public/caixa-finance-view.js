@@ -117,7 +117,7 @@
     visual.appendChild(icon(incoming > 0 ? 'in' : 'out'));
     const copy = node('span', undefined, 'mf-entry-copy');
     copy.append(node('strong', row.description || origins[row.origin] || 'Movimentação'), node('small',
-      [preview ? day(row.cash_on) : incoming > 0 ? 'Recebimento' : 'Pagamento', row.payment_method || origins[row.origin], row.reversal_of ? 'Estorno' : row.reversed ? 'Estornado posteriormente' : ''].filter(Boolean).join(' · ')));
+      [preview ? day(row.cash_on) : incoming > 0 ? 'Recebimento' : 'Pagamento', row.payment_method || origins[row.origin], row.reversal_of ? 'Estorno' : row.reversed ? 'Estornado posteriormente' : '', row.cash_entry_error && 'Fora do total'].filter(Boolean).join(' · ')));
     const value = node('span', undefined, 'mf-entry-amount');
     amount(value, [incoming > 0 ? '+ ' + money(incoming) : '', outgoing > 0 ? '− ' + money(outgoing) : ''].filter(Boolean).join(' / '));
     article.append(visual, copy, value, icon('chevron'));
@@ -129,6 +129,7 @@
       if (incoming) values.push(['Entrada no caixa', money(incoming)]);
       if (outgoing) values.push(['Saída do caixa', money(outgoing)]);
       lines(body, values, true);
+      if (row.cash_entry_error) body.appendChild(node('p', 'Erro de lançamento. O valor consta no histórico e fica fora do total de caixa.'));
       lines(body, [['Data do caixa', C.dateTime.format(new Date(row.cash_on + 'T12:00:00-03:00')).split(',')[0]],
         ['Origem', origins[row.origin] || 'Financeiro'], ['Referência', row.reference || 'Não informada'],
         ['Forma de pagamento', row.payment_method || 'Não informada'], ['Conta', row.cash_account || 'Não informada']], false);
@@ -143,7 +144,7 @@
     const label = node('label', 'Motivo do cancelamento por erro ou duplicidade');
     const reason = node('textarea'); reason.required = true; reason.minLength = 2; reason.maxLength = 300;
     reason.id = 'mf-cancel-reason'; label.htmlFor = reason.id;
-    const note = node('p', 'Cancela este lançamento e corrige o caixa hoje. Compras e estoque são preservados. Não transfere dinheiro nem registra receita de venda.');
+    const note = node('p', 'O cancelamento fica registrado hoje e retira o valor dos totais do período original. Compras e estoque são preservados. Não transfere dinheiro nem registra receita de venda.');
     const button = node('button', 'Estornar e cancelar lançamento', 'mf-primary'); button.type = 'submit';
     const error = node('p'); error.setAttribute('role', 'status');
     form.append(label, reason, note, button, error); body.appendChild(form);

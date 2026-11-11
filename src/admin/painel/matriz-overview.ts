@@ -7,6 +7,7 @@ import { getMatrizLedgerOpenItems } from './matriz-ledger-open-items.js';
 import { readOverviewSales, readOverviewBotCost } from './matriz-overview-sales.js';
 import { readOverviewAttention, readOverviewLeads } from './matriz-overview-operations.js';
 import { reportAddDays } from './report-period.js';
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
 
 export function overviewPeriod(period:'today'|'7d'|'month',month:string,now=new Date()) {
   const today=businessDateSaoPaulo(now);
@@ -24,7 +25,8 @@ async function readFinance(db:Pool,environment:'prod'|'test',month:string,today:
     db.query(`SELECT COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::text balance
       FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e
         ON e.transaction_id=t.id AND e.environment=t.environment
-      WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<=$2::date`,[environment,today]),
+      WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<=$2::date
+        AND ${EFFECTIVE_CASH_TRANSACTION_SQL}`,[environment,today]),
   ]);
   const cents=(n:string)=>Math.round(Number(n)*100);
   const sum=(items:{valor:string}[])=>items.reduce((total,item)=>total+cents(item.valor),0);

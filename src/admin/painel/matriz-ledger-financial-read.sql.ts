@@ -1,3 +1,5 @@
+import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
+
 /** Shared monthly financial reconciliation, including Meta and Google origins. */
 export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
        SELECT COALESCE(to_date($3,'YYYY-MM'),
@@ -12,7 +14,8 @@ export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
                 date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date)
                 +interval '1 month')::timestamp AT TIME ZONE 'America/Sao_Paulo') month_end_ts
      ), ledger AS (
-       SELECT t.id,t.source_type,t.source_id,t.competence_on,t.cash_on,
+       SELECT t.id,t.source_type,t.source_id,t.competence_on,
+              CASE WHEN e.account_code='cash' AND ${EFFECTIVE_CASH_TRANSACTION_SQL} THEN t.cash_on END cash_on,
               e.account_code,e.account_class,e.side,e.amount
          FROM finance.matriz_ledger_transactions t
          JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id

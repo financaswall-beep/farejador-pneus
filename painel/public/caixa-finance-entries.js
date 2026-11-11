@@ -112,7 +112,7 @@
     subtitle.textContent = row.subtitle || row.origin || 'Movimentação financeira';
     const meta = document.createElement('small');
     const time = row.occurred_at ? timeLabel.format(new Date(row.occurred_at)) : '';
-    meta.textContent = [paymentLabel(row.payment_method), time].filter(Boolean).join(' · ');
+    meta.textContent = [paymentLabel(row.payment_method), time, row.cash_entry_error && 'Erro de lançamento · fora do total'].filter(Boolean).join(' · ');
     copy.append(title, subtitle, meta);
     const amount = document.createElement('b');
     amount.textContent = Caixa.currency.format(Number(row.amount || 0));
@@ -123,6 +123,7 @@
   function renderMethods(rows) {
     const totals = new Map();
     rows.forEach(function (row) {
+      if (row.cash_entry_error) return;
       const label = paymentLabel(row.payment_method);
       totals.set(label, (totals.get(label) || 0) + Number(row.amount || 0));
     });
@@ -161,7 +162,7 @@
       const title = document.createElement('h4');
       const total = document.createElement('strong');
       title.textContent = dayTitle(day);
-      total.textContent = Caixa.currency.format(dayRows.reduce(function (sum, row) {
+      total.textContent = Caixa.currency.format(dayRows.filter(row => !row.cash_entry_error).reduce(function (sum, row) {
         return sum + Number(row.amount || 0);
       }, 0));
       header.append(title, total); section.appendChild(header);
