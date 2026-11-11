@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-11-09T05:52:34.078Z",
-  "total": 596,
+  "total": 599,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -225,6 +225,7 @@
     "GET /admin/painel/app.estoque.transferencias.js PUBLICA",
     "GET /admin/painel/app.financeiro.baixas.js PUBLICA",
     "GET /admin/painel/app.financeiro.despesas.js PUBLICA",
+    "GET /admin/painel/app.financeiro.entradas.js PUBLICA",
     "GET /admin/painel/app.financeiro.indicadores.js PUBLICA",
     "GET /admin/painel/app.financeiro.js PUBLICA",
     "GET /admin/painel/app.financeiro.retiradas.js PUBLICA",
@@ -535,6 +536,8 @@
     "POST /admin/api/matriz/despesas/comprovantes/:id/ler GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas/remove GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/despesas/settle GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/matriz/financeiro/entries GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/matriz/financeiro/entries/:id/reverse GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/financeiro/ledger/settle GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/financeiro/ledger/write-off GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/matriz/financeiro/settle GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",

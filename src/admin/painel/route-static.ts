@@ -75,7 +75,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.logistica.conciliacao.js', 'app.logistica.historico.js', 'app.logistica.entregas.js', 'app.logistica.operacao.js', 'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
     'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.payroll.js', 'app.colaboradores.gestao.js', 'app.colaboradores.finance.js', 'app.colaboradores.permissions.js', 'app.colaboradores.performance.js', 'app.sino.js', 'app.financeiro.js',
     'app.financeiro.baixas.js',
-    'app.financeiro.visao.js', 'app.financeiro.visao.chart.js', 'app.financeiro.retiradas.js',
+    'app.financeiro.visao.js', 'app.financeiro.visao.chart.js', 'app.financeiro.retiradas.js', 'app.financeiro.entradas.js',
     'app.financeiro.indicadores.js', 'app.financeiro.despesas.js', 'expense-receipt-viewer.js', // fatia 07-14 do financeiro (fiscal 300)
     'app.galpao.contagem.js', 'app.galpao.ajuste.js', 'app.galpao.multibrand.js', 'app.galpao.correcao.js', 'app.galpao.js', 'app.catalogo.ficha.js', 'app.catalogo.descobertas.js', 'app.vehicle-types.js', 'app.catalogo.js', 'app.catalogo.bootstrap.js', 'app.catalogo.compatibilidade.js', 'app.catalogo.marca.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',

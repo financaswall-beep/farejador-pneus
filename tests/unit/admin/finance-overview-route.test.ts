@@ -10,6 +10,7 @@ vi.mock('../../../src/shared/logger.js',()=>({logger:{error:vi.fn()}}));
 vi.mock('../../../src/admin/painel/route-helpers.js',()=>({operatorLabel:()=> 'owner:test'}));
 vi.mock('../../../src/admin/painel/matriz-finance-overview.js',()=>({getMatrizFinanceOverview:svc.read}));
 vi.mock('../../../src/admin/painel/matriz-owner-withdrawal.js',()=>({createOwnerWithdrawal:svc.create,reverseOwnerWithdrawal:svc.reverse}));
+vi.mock('../../../src/admin/painel/route-financeiro-entries.js',()=>({registerFinanceEntryRoutes:vi.fn()}));
 import { registerFinanceiroOverview } from '../../../src/admin/painel/route-financeiro-overview.js';
 const body={amount:100,occurred_at:'2026-09-01T12:00:00-03:00',reason:'Uso pessoal',payment_method:'dinheiro',cash_account:'Caixa principal',idempotency_key:'withdrawal-test-01'};
 describe('rotas financeiras de retirada',()=>{

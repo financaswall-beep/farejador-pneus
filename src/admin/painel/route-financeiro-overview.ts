@@ -7,6 +7,7 @@ import { isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { operatorLabel } from './route-helpers.js';
 import { getMatrizFinanceOverview } from './matriz-finance-overview.js';
 import { createOwnerWithdrawal, reverseOwnerWithdrawal } from './matriz-owner-withdrawal.js';
+import { registerFinanceEntryRoutes } from './route-financeiro-entries.js';
 
 const date = z.string().datetime({ offset: true }).refine(isNotFutureBusinessDate, 'future_date');
 const correction = z.object({
@@ -22,6 +23,7 @@ export const ownerWithdrawalSchema = correction.extend({
 const enabled = () => env.MATRIZ_CENTRAL_LEDGER && env.MATRIZ_CENTRAL_LEDGER_READ;
 
 export async function registerFinanceiroOverview(fastify: FastifyInstance) {
+  await registerFinanceEntryRoutes(fastify);
   fastify.get('/admin/api/matriz/financeiro/overview', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!enabled()) return reply.code(409).send({ error: 'central_ledger_read_disabled' });
     const query = z.object({ mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).safeParse(request.query);

@@ -281,6 +281,7 @@
 <script src="/admin/painel/app.financeiro.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.visao.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.visao.chart.js?v=20260915-finance1"></script>
+<script src="/admin/painel/app.financeiro.entradas.js?v=20261111-entradas1"></script>
 <script src="/admin/painel/app.financeiro.retiradas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260915-finance1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260903-finance-carry1"></script>
@@ -310,7 +311,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261111-registry1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261111-entradas1"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -344,7 +345,7 @@
 <link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20260915-lotsale1">
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20261109-transfer1">
-<link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20260915-finance1">
+<link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20261111-entradas1">
 <link rel="stylesheet" href="/admin/painel/caixa-chat.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/caixa-chat-customer.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/bot-chat.css?v=20261019-chat-height2" />
@@ -5769,7 +5770,7 @@
     <div x-show="currentPage === 'financeiro' && isMatrixPanel()" class="finance-page min-h-screen">
       <header class="fv-heading">
         <div><small>Matriz / Gestão</small><h1 id="financeiro-heading">Financeiro</h1><p>Seu dinheiro, seus resultados e o que precisa de atenção.</p></div>
-        <div class="fv-actions"><button x-show="finTab === 'visao'" @click="finVisaoExportar()" :disabled="finVisaoLoading || finOverviewLoading || !finOverview || !!financeiroLoadError" class="fv-button"><i data-lucide="download"></i>Exportar CSV</button><button x-show="adminUser?.role === 'owner'" @click="finOpenTab('despesas')" class="fv-button fv-primary"><i data-lucide="plus"></i>Nova despesa</button></div>
+        <div class="fv-actions"><button x-show="finTab === 'visao'" @click="finVisaoExportar()" :disabled="finVisaoLoading || finOverviewLoading || !finOverview || !!financeiroLoadError" class="fv-button"><i data-lucide="download"></i>Exportar CSV</button><button x-show="adminUser?.role === 'owner'" @click="finEntradaAbrir()" class="fv-button fv-primary"><i data-lucide="arrow-down-left"></i>Nova entrada</button><button x-show="adminUser?.role === 'owner'" @click="finOpenTab('despesas')" class="fv-button fv-primary"><i data-lucide="plus"></i>Nova despesa</button></div>
       </header>
       <nav class="fv-nav" aria-label="Seções do Financeiro">
         <template x-for="t in [{ id: 'visao', label: 'Visão geral' }, { id: 'cobrancas', label: 'Cobranças' }, { id: 'pagar', label: 'Contas a pagar' }, { id: 'despesas', label: 'Despesas' }, { id: 'extrato', label: 'Lançamentos' }, { id: 'indicadores', label: 'Indicadores' }]" :key="t.id">
@@ -5795,6 +5796,32 @@
         </button>
       </div>
 
+      <p x-show="finEntradaAviso" role="status" class="fv-notice" x-text="finEntradaAviso"></p>
+      <dialog id="fin-entry-dialog" class="fv-dialog fi-dialog" aria-labelledby="fi-dialog-title"
+        x-effect="if(finEntrada.open && !$el.open) $el.showModal(); else if(!finEntrada.open && $el.open) $el.close()"
+        @keydown.escape.stop @cancel.prevent="finEntradaFechar()">
+        <div class="fv-card-head"><h2 id="fi-dialog-title" x-text="finEntrada.row?'Estornar entrada':'Nova entrada'"></h2><button class="fv-button" type="button" aria-label="Fechar entrada" :disabled="finEntrada.saving" @click="finEntradaFechar()"><i data-lucide="x"></i></button></div>
+        <p x-text="finEntrada.row?'O estorno corrige o lançamento e mantém o original no histórico. Não faz transferência bancária.':'Registre dinheiro já recebido, sem criar venda nem movimentar estoque.'"></p>
+        <p x-show="finEntrada.row" class="fv-notice" x-text="finEntrada.row?.description"></p>
+        <form @submit.prevent="finEntradaSalvar()">
+          <fieldset :disabled="finEntrada.saving" :aria-busy="finEntrada.saving">
+            <div x-show="!finEntrada.row">
+              <label for="fin-entry-kind">Tipo de entrada<select id="fin-entry-kind" x-model="finEntrada.kind"><option value="income">Receita avulsa do negócio</option><option value="owner_contribution">Aporte do proprietário</option></select></label>
+              <p class="fv-notice" x-text="finEntrada.kind==='owner_contribution'?'Dinheiro do proprietário colocado na empresa. Aumenta o caixa, sem contar como receita ou lucro.':'Receita fora de uma venda registrada. Entra no caixa e no resultado; não soma vendas nem baixa pneus.'"></p>
+              <label for="fin-entry-amount">Valor recebido (R$)<input id="fin-entry-amount" x-model="finEntrada.amount" @blur="finEntradaFormatarValor()" inputmode="decimal" placeholder="0,00" :required="!finEntrada.row"></label>
+              <label x-show="finEntrada.kind==='income'" for="fin-entry-category">Categoria<select id="fin-entry-category" x-model="finEntrada.category"><option value="servicos">Serviços</option><option value="alugueis">Aluguéis recebidos</option><option value="outras_receitas">Outras receitas</option></select></label>
+            </div>
+            <label for="fin-entry-reason"><span x-text="finEntrada.row?'Motivo do estorno':'Descrição da entrada'"></span><input id="fin-entry-reason" x-model="finEntrada.description" required minlength="3" maxlength="400" placeholder="Descreva a origem deste valor"></label>
+            <label for="fin-entry-date"><span x-text="finEntrada.row?'Data do estorno':'Data do recebimento'"></span><input id="fin-entry-date" type="date" x-model="finEntrada.date" :max="finHoje()" :min="finEntrada.row?.cash_on||''" required></label>
+            <div x-show="!finEntrada.row" class="fi-fields">
+              <label for="fin-entry-payment">Forma de recebimento<select id="fin-entry-payment" x-model="finEntrada.payment_method"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="cartao">Cartão recebido</option></select></label>
+              <label for="fin-entry-account">Conta / caixa de destino<input id="fin-entry-account" x-model="finEntrada.cash_account" :required="!finEntrada.row" minlength="2" maxlength="80" placeholder="Ex.: Caixa principal ou banco"></label>
+            </div>
+          </fieldset>
+          <p x-show="finEntrada.error" x-text="finEntrada.error" role="alert" class="fv-notice warning"></p>
+          <div class="fv-actions"><button type="button" class="fv-button" :disabled="finEntrada.saving" @click="finEntradaFechar()">Cancelar</button><button type="submit" class="fv-button fv-primary" :disabled="finEntrada.saving" x-text="finEntrada.saving?'Registrando…':finEntrada.row?'Confirmar estorno':'Registrar entrada'"></button></div>
+        </form>
+      </dialog>
       <div x-show="finRetirada.open" x-cloak class="fv-dialog-backdrop" @click.self="finRetiradaFechar()" @keydown.escape.window="finRetiradaFechar()">
         <section class="fv-dialog" role="dialog" aria-modal="true" aria-labelledby="fv-withdrawal-title" @keydown="finRetiradaTeclado($event)">
           <div class="fv-card-head"><h2 id="fv-withdrawal-title" x-text="finRetirada.row ? 'Estornar retirada' : 'Retirada do dono'"></h2><button type="button" @click="finRetiradaFechar()" :disabled="finRetirada.saving" aria-label="Fechar"><i data-lucide="x"></i></button></div>
@@ -6164,7 +6191,7 @@
                           <td class="px-5 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="financeDate(row.competence_on)"></p><p class="text-[11px] text-gray-400" x-text="row.cash_on ? 'Caixa ' + financeDate(row.cash_on) : 'Sem movimento de caixa'"></p></td>
                           <td class="px-4 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="row.origin"></p><p class="text-[10px] text-gray-400 font-mono" x-text="row.source_type"></p></td>
                           <td class="px-4 py-3 max-w-[360px]"><p class="font-medium text-gray-800 truncate" x-text="row.description"></p><p class="text-[11px] text-gray-400 truncate" x-text="row.created_by"></p></td>
-                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><button x-show="adminUser?.role==='owner' &amp;&amp; row.source_type==='commerce.matriz_expense.accrual' &amp;&amp; !row.reversed" @click="despesaCancelarErro(row, true)" class="block mt-2 text-xs text-rose-700 hover:underline">Cancelar por erro / duplicidade</button><button x-show="adminUser?.role==='owner' && row.source_type==='finance.owner_withdrawal' && !row.reversed" @click="finRetiradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar retirada</button><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
+                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><button x-show="adminUser?.role==='owner' &amp;&amp; row.source_type==='commerce.matriz_expense.accrual' &amp;&amp; !row.reversed" @click="despesaCancelarErro(row, true)" class="block mt-2 text-xs text-rose-700 hover:underline">Cancelar por erro / duplicidade</button><button x-show="adminUser?.role==='owner' && row.source_type==='finance.manual_entry' && !row.reversed" @click="finEntradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar entrada</button><button x-show="adminUser?.role==='owner' && row.source_type==='finance.owner_withdrawal' && !row.reversed" @click="finRetiradaAbrir(row)" class="block mt-2 text-xs text-rose-700 hover:underline">Estornar retirada</button><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
                           <td class="px-5 py-3 text-right font-semibold num" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td>
                         </tr>
                       </template>

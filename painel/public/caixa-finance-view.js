@@ -96,7 +96,7 @@
   function resultDetail(payload) {
     const r = payload.truth.competencia, body = dialog('Como o resultado foi formado');
     body.appendChild(node('p', 'Competência: ' + payload.period.split('-').reverse().join('/')));
-    const rows = [['Vendas', money(r.receita_total)], ['Custo dos pneus vendidos', '− ' + money(r.custo_conhecido)], ['Despesas e perdas', '− ' + money(r.despesas)]];
+    const rows = [['Receitas', money(r.receita_total)], ['Custo dos pneus vendidos', '− ' + money(r.custo_conhecido)], ['Despesas e perdas', '− ' + money(r.despesas)]];
     if (number(r.receita_custo_pendente)) rows.push(['Vendas com custo pendente, fora do resultado', '− ' + money(r.receita_custo_pendente)]);
     if (number(r.ajustes_estoque.ganhos)) rows.push(['Ganhos de estoque', '+ ' + money(r.ajustes_estoque.ganhos)]);
     rows.push([el('mf-result-label').textContent, r.status === 'divergente' ? 'Indisponível' : money(r.lucro_confirmado)]);

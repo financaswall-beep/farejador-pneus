@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-11-09T05:55:27.974Z",
-  "total": 3171,
+  "total": 3177,
   "propriedades": {
     "abrirCadastroCliente": "function",
     "abrirClienteLead": "function",
@@ -877,6 +877,12 @@
     "finCobrancasAbertas": "function",
     "finConfirmarBaixa": "function",
     "finConfirmarPerda": "function",
+    "finEntrada": "value:object",
+    "finEntradaAbrir": "function",
+    "finEntradaAviso": "value:string",
+    "finEntradaFechar": "function",
+    "finEntradaFormatarValor": "function",
+    "finEntradaSalvar": "function",
     "finExtrato": "value:null",
     "finExtratoFiltro": "value:object",
     "finExtratoLoading": "value:boolean",
