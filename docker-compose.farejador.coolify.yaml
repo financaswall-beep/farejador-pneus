@@ -93,6 +93,7 @@ services:
       GOOGLE_ADS_WHATSAPP_NUMBER: ${GOOGLE_ADS_WHATSAPP_NUMBER:-}
       GOOGLE_ADS_WEBSITE_URL: ${GOOGLE_ADS_WEBSITE_URL:-}
       # Etapa 9: rollout em gates separados; ambos permanecem false no deploy inicial.
+      MATRIZ_CUSTOMER_REGISTRY: ${MATRIZ_CUSTOMER_REGISTRY:-false}
       MATRIZ_CUSTOMER_IDENTITY: ${MATRIZ_CUSTOMER_IDENTITY:-false}
       MATRIZ_CUSTOMER_PRIVACY: ${MATRIZ_CUSTOMER_PRIVACY:-false}
     restart: always

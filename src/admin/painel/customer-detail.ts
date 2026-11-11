@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { readRegistryEntry } from './customer-registry.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { safeCustomerDisplayName } from '../../shared/customer-name.js';
 import { loadCustomerLeadLocations } from './customer-lead-location.js';
@@ -27,6 +28,7 @@ export async function getCustomerDetail(
 ) {
   const profile = (await dbPool.query<Profile>(customerProfileSql[source], [environment,id])).rows[0];
   if (!profile) return null;
+  const registry = await readRegistryEntry(environment,source,id,dbPool);
   const limit = Math.min(30, Math.max(1, options.limit ?? 10));
   const offset = Math.max(0, options.offset ?? 0);
   const args: unknown[] = [environment,id,limit,offset];
@@ -37,7 +39,10 @@ export async function getCustomerDetail(
   return {
     customer: {
       id: `${source}:${id}`,source,source_id:id,
-      name: safeCustomerDisplayName(profile.name).name,phone:profile.phone,email:profile.email,
+      name: registry?.name ?? safeCustomerDisplayName(profile.name).name,
+      phone:registry ? registry.phone : profile.phone,email:registry ? registry.email : profile.email,
+      registry: registry ? Object.fromEntries(Object.entries(registry).filter(([key]) =>
+        !['environment','updated_by','updated_at'].includes(key))) : null,
       created_at:profile.created_at,origin:profile.origin,
       unit_name:profile.unit_name ?? history.last_unit_name,
       lead_conversation_id:profile.lead_conversation_id ?? null,

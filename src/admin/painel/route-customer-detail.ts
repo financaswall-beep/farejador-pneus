@@ -19,6 +19,7 @@ export async function registerCustomerDetailRoute(fastify: FastifyInstance): Pro
     if (!params.success || !query.success) return reply.status(400).send({ error:'invalid_request' });
     try {
       const result = await getCustomerDetail(env.FAREJADOR_ENV,params.data.source,params.data.id,query.data);
+      if (result && getAdminContext(request).role !== 'owner') result.customer.registry = null;
       return result ? reply.send(result) : reply.status(404).send({ error:'customer_not_found' });
     } catch {
       // A ficha contém dados pessoais; não ecoar SQL nem detalhes do cadastro em erros/logs.

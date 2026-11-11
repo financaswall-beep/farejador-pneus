@@ -11,6 +11,7 @@ window.PAINEL_MODULES.clientes = function () {
       try {
         const payload = await this.apiGet('/admin/api/clientes');
         this.clientes = Array.isArray(payload.rows) ? payload.rows : [];
+        this.customerRegistryEnabled = payload.customer_registry_enabled === true;
         for (const c of this.clientes) this.registrarBotControle?.(c.lead_conversation_id,{mode:c.lead_bot_mode,version:c.lead_bot_version});
         this.chatwootBaseUrl = payload.chatwoot_base_url || this.chatwootBaseUrl;
         this.clientesParceiros = Array.isArray(payload.partners) ? payload.partners : [];
@@ -80,6 +81,7 @@ window.PAINEL_MODULES.clientes = function () {
     limparClientesFiltros() {
       this.clientesBusca = '';
       this.clientesTipo = 'todos';
+      this.clientesPerfil = 'todos';
       this.clientesOrigem = 'todos';
       this.clientesStatus = 'todos';
       this.clientesClasse = 'todos';
@@ -92,7 +94,8 @@ window.PAINEL_MODULES.clientes = function () {
     clientesFiltrados() {
       const q = this.clienteTexto(this.clientesBusca);
       return this.clientes.filter((c) => {
-        const hit = !q || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name, c.last_item,
+        const phoneQuery = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g,'') : '';
+        const hit = !q || (phoneQuery.length >= 3 && String(c.phone || '').replace(/\D/g,'').includes(phoneQuery)) || this.clienteTexto([c.name, c.phone, c.email, c.origin, c.partner_name, c.last_item,
           ...(c.lead_interests || []).map(item => item.measure)].join(' ')).includes(q);
         const tipo = this.clientesTipo === 'todos' || c.kind === this.clientesTipo;
         const origem = this.clientesOrigem === 'todos' || c.source === this.clientesOrigem;
@@ -100,7 +103,8 @@ window.PAINEL_MODULES.clientes = function () {
         const classe = this.clientesClasse === 'todos' || (this.clientesClasse === 'vip' ? c.is_vip : !c.is_vip);
         const dias = this.clienteDias(c.last_interaction_at || c.last_purchase_at);
         const periodo = this.clientesPeriodo === 'todos' || dias === null || dias <= Number(this.clientesPeriodo);
-        return hit && tipo && origem && status && classe && periodo;
+        const perfil = !this.clientesPerfil || this.clientesPerfil === 'todos' || this.clientePerfil(c) === this.clientesPerfil;
+        return hit && tipo && origem && status && classe && periodo && perfil;
       });
     },
     clientesPaginados(rows) {
@@ -246,9 +250,13 @@ window.PAINEL_MODULES.clientes = function () {
       return `Olá, ${primeiro}! Separei uma condição de pneu${medida}. Posso te enviar os valores e opções disponíveis?`;
     },
     abrirWhatsAppCliente(c, mensagem = '') {
+      if (window.CustomerFields && !window.CustomerFields.nationalPhone(c?.phone)) {
+        alert('Revise o telefone completo com DDD no cadastro antes de abrir o WhatsApp.'); return;
+      }
       const phone = String(c?.phone || '').replace(/\D/g, '');
       if (!phone) { alert('Este cliente não tem telefone cadastrado.'); return; }
-      const numero = phone.startsWith('55') ? phone : `55${phone}`;
+      const national = window.CustomerFields?.nationalPhone(c?.phone);
+      const numero = national ? `55${national}` : (phone.startsWith('55') ? phone : `55${phone}`);
       window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank', 'noopener');
     },
     clientesParceirosFiltrados() {
@@ -265,9 +273,13 @@ window.PAINEL_MODULES.clientes = function () {
     },
     exportarClientes() {
       if (this.customerIdentityEnabled) { this.exportCustomerIdentities(); return; }
-      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const body = this.clientesFiltrados().map((c) => [c.name, this.clienteTipoLabel(c.kind), c.phone, c.email, c.origin, c.is_vip ? 'VIP' : '', c.purchases, c.total_spent, c.last_purchase_at].map(esc).join(';'));
-      const csv = ['Cliente;Tipo;Telefone;Email;Origem;Classe;Compras;Total comprado;Última compra', ...body].join('\r\n');
+      const esc = (v) => {
+        const value = String(v ?? '');
+        return `"${(/^\s*[=+@-]/.test(value) ? "'"+value : value).replace(/"/g, '""')}"`;
+      };
+      const body = this.clientesFiltrados().map((c) => [c.name, this.clienteTipoLabel(c.kind), this.clientePerfilLabel(c),
+        c.phone ? this.clienteTelefone(c.phone) : '', c.email, c.origin, c.is_vip ? 'VIP' : '', c.purchases, c.total_spent, c.last_purchase_at].map(esc).join(';'));
+      const csv = ['Cliente;Tipo;Perfil comercial;Telefone;Email;Origem;Classe;Compras;Total comprado;Última compra', ...body].join('\r\n');
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
       link.download = `clientes-${window.FarejadorTime.businessDate()}.csv`;

@@ -16,6 +16,7 @@ vi.mock('../../../src/admin/painel/route-helpers.js',() => ({ dashboardPayload:v
 vi.mock('../../../src/admin/painel/route-clientes-identity.js',() => ({ registerCustomerIdentityRoutes:vi.fn() }));
 vi.mock('../../../src/admin/painel/route-clientes-privacy.js',() => ({ registerCustomerPrivacyRoutes:vi.fn() }));
 vi.mock('../../../src/admin/painel/route-customer-detail.js',() => ({ registerCustomerDetailRoute:vi.fn() }));
+vi.mock('../../../src/admin/painel/route-customer-registry.js',() => ({ registerCustomerRegistryRoutes:vi.fn() }));
 vi.mock('../../../src/shared/clientes-kanban.notify.js',() => ({ subscribeClientesKanban:vi.fn() }));
 
 const id = '10000000-0000-4000-8000-000000000001';

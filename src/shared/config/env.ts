@@ -76,7 +76,7 @@ const envSchema = z.object({
   BOT_AUTO_RESOLVE_ENABLED: booleanStringSchema,
   BOT_AUTO_RESOLVE_IDLE_BUSINESS_HOURS: z.string().transform(Number)
     .pipe(z.number().int().min(1).max(72)).default('8'),
-  MATRIZ_CUSTOMER_IDENTITY: booleanStringSchema,
+  MATRIZ_CUSTOMER_IDENTITY: booleanStringSchema, MATRIZ_CUSTOMER_REGISTRY: booleanStringSchema,
   MATRIZ_CUSTOMER_PRIVACY: booleanStringSchema,
   ...marketingEnvShape,
   // Chat unificado do Portal Parceiro (Fatia 1): espelha mensagens do Chatwoot em

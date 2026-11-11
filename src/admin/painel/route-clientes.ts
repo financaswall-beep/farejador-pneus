@@ -10,6 +10,7 @@ import { registerCustomerPrivacyRoutes } from './route-clientes-privacy.js';
 import { updateCustomerLeadBoard } from './customer-lead-board.js';
 import { getCustomerLeadAvatar } from './customer-lead-avatar.js';
 import { registerCustomerDetailRoute } from './route-customer-detail.js';
+import { registerCustomerRegistryRoutes } from './route-customer-registry.js';
 
 const MAX_SSE_PER_IP = 12;
 const sseByIp = new Map<string, number>();
@@ -47,7 +48,8 @@ export async function registerPainelClientes(fastify: FastifyInstance): Promise<
       return reply.status(403).send({ error: 'admin_owner_required' });
     }
     const data = await getClientesPainel();
-    const payload = { ...dashboardPayload(data.rows), partners: data.partners };
+    const payload = { ...dashboardPayload(data.rows), partners: data.partners,
+      customer_registry_enabled: env.MATRIZ_CUSTOMER_REGISTRY && getAdminContext(request).role === 'owner' };
     if (!env.MATRIZ_CUSTOMER_IDENTITY) return reply.status(200).send(payload);
     return reply.status(200).send({ ...payload, customer_identity: {
       enabled: true, privacy_enabled: env.MATRIZ_CUSTOMER_PRIVACY, policy: 'owner_full_pii',
@@ -136,5 +138,6 @@ export async function registerPainelClientes(fastify: FastifyInstance): Promise<
 
   await registerCustomerIdentityRoutes(fastify);
   await registerCustomerDetailRoute(fastify);
+  await registerCustomerRegistryRoutes(fastify);
   await registerCustomerPrivacyRoutes(fastify);
 }

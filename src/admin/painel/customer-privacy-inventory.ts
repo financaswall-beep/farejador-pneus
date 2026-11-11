@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
+import { customerRegistryForIdentity } from './customer-registry.js';
 
 export interface PrivacyInventoryItem {
   surface: string;
@@ -90,6 +91,8 @@ export async function inventoryCustomerPrivacy(
   if (!row) throw new Error('identity_not_found');
   const anonymization = requestType === 'anonymization';
   const items = [
+    item('commerce.customer_registry',String((await customerRegistryForIdentity(environment,identityId,dbPool)).length),
+      anonymization?'pending':'included','human-reviewed commercial profile; anonymization follows the source records'),
     item('source_records',row.source_records,anonymization?'pending':'included',
       anonymization?'anonymization_execution_disabled':'customer-provided profile data'),
     item('core_conversations',row.core_conversations,anonymization?'pending':'included','conversation scope'),

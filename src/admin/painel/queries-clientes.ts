@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { readCustomerRegistry } from './customer-registry.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { applyClienteBusinessRules, getClienteLeadBoardStates } from './queries-clientes-board.js';
@@ -284,5 +285,11 @@ export async function getClientesPainel(
   const rows = applyClienteBusinessRules(
     [...chatwoot.rows, ...balcao.rows, ...parceiro.rows, ...atacado.rows], leadBoard,
   );
+  const registry = await readCustomerRegistry(environment,dbPool);
+  for (const row of rows) {
+    const entry = registry.get(row.id);
+    if (entry) Object.assign(row,{name:entry.name,phone:entry.phone,email:entry.email || null,
+      commercial_profile:entry.commercial_profile,registry_version:entry.version,name_needs_review:false});
+  }
   return { rows, partners: partners.rows };
 }

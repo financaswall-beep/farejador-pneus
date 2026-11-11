@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { getClientePainelV2ById } from './queries-clientes-v2.js';
+import { customerRegistryForIdentity } from './customer-registry.js';
 
 export interface PortabilityPackage {
   generated_at: string;
@@ -12,6 +13,7 @@ export interface PortabilityPackage {
   transactions: Array<Record<string, unknown>>;
   purposes: string[];
   excluded: string[];
+  commercial_registry: Array<Record<string,unknown>>;
 }
 
 const scopeCte = `WITH links AS (
@@ -70,6 +72,7 @@ export async function buildPortabilityPackage(
   ]);
   return {
     generated_at:new Date().toISOString(),identity_id:identityId,
+    commercial_registry:await customerRegistryForIdentity(environment,identityId,dbPool),
     profile_sources:profile.sources.map((source) => ({ source_type:source.source_type,name:source.name,
       phone:source.phone,email:source.email,document_number:source.document_number,updated_at:source.updated_at })),
     conversations:[...messages.rows,...partnerMessages.rows],attachments:attachments.rows,

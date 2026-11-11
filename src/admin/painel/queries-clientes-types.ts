@@ -4,6 +4,7 @@ import type { LeadInterest } from './customer-lead-interests.js';
 export interface ClientePainelRow {
   id: string; source: 'chatwoot' | 'balcao' | 'parceiro' | 'atacado'; source_id: string;
   name: string; phone: string | null; email: string | null;
+  commercial_profile?: 'varejo' | 'atacado' | 'nao_classificado'; registry_version?: number;
   kind: 'pessoa_fisica' | 'borracharia' | 'parceiro' | 'nao_classificado';
   is_vip: boolean; origin: string; status: 'ativo' | 'inativo';
   purchases: number; total_spent: number; avg_ticket: number; gross_profit: number;
