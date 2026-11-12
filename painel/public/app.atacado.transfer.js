@@ -10,6 +10,8 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
     },
     atacadoBuyerChanged() {
       const units = this.atacadoBuyerUnits();
+      if (this.atacadoBuyerSelecionado()?.is_partner && this.atacadoForm.payment_status === 'installments')
+        this.atacadoForm.payment_status = 'pending';
       this.atacadoForm.receiving_unit_id = units.length === 1 ? units[0].partner_unit_id : '';
     },
     atacadoStartAddition(v) {
@@ -53,6 +55,8 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         await this.loadAtacadoCargo();
         this.atacadoArrival = {
           open: true, order: v, saving: false, error: null,
+          payment_status: 'pending', entry_method: 'Pix', installment_count: 1,
+          due_date: String(v.due_date || '').slice(0,10),
           items: (v.items || []).filter((item) => !item.source_cargo_lot_id).map((item) => ({
             ...item, accepted_quantity: Number(item.quantity),
           })),
@@ -90,12 +94,16 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         state.error = 'Confira as quantidades aceitas, os extras e os preços.';
         return;
       }
+      const terms = state.payment_status === 'installments'
+        ? window.SalePaymentPlan.build(state,this.atacadoArrivalTotal(),this.finHoje()) : null;
+      if (terms?.error) { state.error = terms.error; return; }
       const scope = state.order.id;
       const key = window.PAINEL_INTEGRITY.operation('partner-arrival-adjustment', scope).key;
       state.saving = true;
       state.error = null;
       try {
         const result = await this.apiPost(`/admin/api/wholesale/sales/${state.order.id}/arrival-adjustment`, {
+          ...(terms ? { payment_plan: terms.plan } : {}),
           items: state.items.map((item) => ({
             order_item_id: item.id, accepted_quantity: Number(item.accepted_quantity),
           })),
@@ -147,7 +155,12 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         return;
       }
       const requestNow = new Date().toISOString();
-      body.sold_at = this.atacadoBusinessInstant(soldDate, this.finHoje(), requestNow);
+      if (f.payment_status === 'installments' && f.plan_sold_date !== soldDate) {
+        f.plan_sold_date = soldDate;
+        f.plan_sold_at = this.atacadoBusinessInstant(soldDate, this.finHoje(), requestNow);
+      }
+      body.sold_at = f.payment_status === 'installments' ? f.plan_sold_at
+        : this.atacadoBusinessInstant(soldDate, this.finHoje(), requestNow);
       if (f.parent_order_id) {
         body.parent_order_id = f.parent_order_id;
       } else if (f.buyerKey === 'new') {
@@ -186,7 +199,17 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         return;
       }
       body.items = items;
-      if (this.atacadoFinance && f.payment_status === 'pending') {
+      if (f.payment_status === 'installments') {
+        if (body.partner_unit_id || !this.atacadoFinance?.sale_plan_enabled) {
+          this.atacadoMsg = { ok: false, text: 'Confira a condição de pagamento para esta venda.' };
+          return;
+        }
+        const terms = window.SalePaymentPlan.build(f, this.atacadoFormTotal(), soldDate);
+        if (terms.error) { this.atacadoMsg = { ok: false, text: terms.error }; return; }
+        body.payment_plan = terms.plan;
+        body.payment_status = 'pending';
+        body.due_date = terms.plan.installments[0].due_date;
+      } else if (this.atacadoFinance && f.payment_status === 'pending') {
         if (!f.due_date) {
           this.atacadoMsg = { ok: false, text: 'Informe o vencimento da venda fiada.' };
           return;

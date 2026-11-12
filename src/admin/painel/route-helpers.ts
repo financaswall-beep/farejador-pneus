@@ -30,6 +30,10 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     return { status: 500, error: 'internal_server_error' };
   }
 
+  if (['sale_plan_invalid','sale_plan_dates_invalid','sale_plan_total_mismatch'].includes(err.message))
+    return { status: 400, error: err.message };
+  if (['sale_plan_finance_required','sale_plan_in_transit','sale_installment_changed'].includes(err.message))
+    return { status: 409, error: err.message };
   const dbError = err as Error & { code?: string; constraint?: string };
   if (['purchase_group_closed','purchase_group_not_empty','purchase_already_grouped',
     'expense_already_grouped','purchase_order_split_across_groups','expense_owned_by_other_module',

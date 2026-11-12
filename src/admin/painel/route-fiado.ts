@@ -15,7 +15,7 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
     if (!env.WHOLESALE_FINANCE) {
       return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
     }
-    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...(await getWholesaleFinance()) });
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, sale_plan_enabled: env.MATRIZ_CENTRAL_LEDGER && env.MATRIZ_CENTRAL_LEDGER_READ, ...(await getWholesaleFinance()) });
   });
 
   // Últimas vendas de atacado (vivas e canceladas — trilha visível). É de onde se cancela.

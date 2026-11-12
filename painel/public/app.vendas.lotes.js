@@ -5,7 +5,7 @@ window.PAINEL_MODULES.vendasLotes = function () {
   const cents=value=>Math.round(Number(value||0)*100);
   const prorate=(value,qty,total)=>total>0?Number((BigInt(value)*BigInt(qty)*2n+BigInt(total))/(BigInt(total)*2n)):0;
   return {
-    lotSales:{view:'new',form:form(),lots:[],buyers:[],rows:[],total:0,page:1,loading:false,request:0,error:'',message:'',saving:false,pending:null,finance:false,selected:null,cancelOpen:false,cancelReason:'',cancelPending:null},
+    lotSales:{view:'new',form:form(),lots:[],buyers:[],rows:[],total:0,page:1,loading:false,request:0,error:'',message:'',saving:false,pending:null,finance:false,planEnabled:false,selected:null,cancelOpen:false,cancelReason:'',cancelPending:null},
     lsIcons(){this.$nextTick(()=>window.lucide?.createIcons());},
     lsAmount(value){const text=String(value??'').replace(/R\$|\s/g,'');const grouped=/^\d{1,3}(?:\.\d{3})+$/.test(text);const n=Number(text.includes(',')||grouped?text.replace(/\./g,'').replace(',','.'):text);return Number.isFinite(n)?n:0;},
     lsMoneyValid(value){const text=String(value??'').trim().replace(/^R\$\s*/, '');return !text || /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?$/.test(text) || /^\d+(?:\.\d{1,2})?$/.test(text);},
@@ -26,7 +26,7 @@ window.PAINEL_MODULES.vendasLotes = function () {
         const [data,buyers]=await Promise.all([this.apiGet('/admin/api/wholesale/lot-sales?page='+s.page),this.apiGet('/admin/api/wholesale/buyers')]);
         if(request!==s.request)return;
         if(data.ready===false){s.lots=[];s.rows=[];s.total=0;s.selected=null;s.finance=false;s.error='A venda de lotes precisa da atualização 0232 do banco. Nenhuma venda será lançada antes dela.';return;}
-        s.rows=data.rows;s.total=data.total;s.lots=data.lots;s.buyers=buyers.rows||[];s.finance=data.finance_enabled;
+        s.rows=data.rows;s.total=data.total;s.lots=data.lots;s.buyers=buyers.rows||[];s.finance=data.finance_enabled;s.planEnabled=data.sale_plan_enabled;
         if(s.selected)s.selected=s.rows.find(row=>row.id===s.selected.id)||null;
         this.lsIcons();
       }catch(_){if(request===s.request){s.lots=[];s.rows=[];s.total=0;s.selected=null;s.error='Não foi possível consultar os lotes e as vendas. Tente novamente.';}}
@@ -61,17 +61,27 @@ window.PAINEL_MODULES.vendasLotes = function () {
       if(this.lsPlan.some(row=>!row.valid)||this.lsSelectedQuantity!==qty)return 'Distribua exatamente a quantidade vendida, respeitando o saldo disponível.';
       if(!this.lsMoneyValid(f.amount)||!this.lsMoneyValid(f.discount)||this.lsAmount(f.amount)<=0||this.lsAmount(f.amount)>99999999.99||this.lsAmount(f.discount)<0||this.lsNet<=0)return 'Confira o valor negociado e o desconto.';
       if(!f.sold_on||f.sold_on>today())return 'A data da venda não pode estar no futuro.';
+      if(f.payment_status==='installments') {
+        if(!s.planEnabled)return 'O parcelamento precisa do Financeiro central ativo.';
+        return window.SalePaymentPlan.build(f,this.lsNet,f.sold_on).error;
+      }
       if(f.payment_status==='pending'&&(!f.due_date||f.due_date<f.sold_on))return 'Informe um vencimento igual ou posterior à venda.';
       return '';
     },
     lsManual(){const allocations={};for(const row of this.lsPlan)allocations[row.id]=row.quantity;this.lotSales.form.allocations=allocations;this.lotSales.form.mode='manual';},
-    lsError(error){return ({lot_sale_stock_changed:'O saldo mudou. Atualize os lotes e confira a distribuição.',lot_sale_cost_changed:'O custo mudou. Atualize os lotes e revise o resumo antes de confirmar.',lot_sale_lot_unavailable:'Um lote selecionado não está mais disponível.',lot_sale_before_receipt:'A venda não pode ter data anterior ao recebimento dos lotes.',lot_sale_finance_required:'Ative o financeiro integrado antes de confirmar.',lot_sales_migration_required:'Falta aplicar a atualização 0232 do banco.',idempotency_conflict:'Esta confirmação já foi usada com outros dados.',sale_already_cancelled:'A venda já foi cancelada.',due_date_invalid:'Confira o vencimento.',buyer_not_found:'O cliente não está mais disponível. Selecione novamente.',sold_at_future:'A data da venda não pode estar no futuro.'})[error.message]||'Não foi possível confirmar o resultado. Tente novamente com os mesmos dados.';},
+    lsError(error){return window.SalePaymentPlan?.messages[error.message] || ({lot_sale_stock_changed:'O saldo mudou. Atualize os lotes e confira a distribuição.',lot_sale_cost_changed:'O custo mudou. Atualize os lotes e revise o resumo antes de confirmar.',lot_sale_lot_unavailable:'Um lote selecionado não está mais disponível.',lot_sale_before_receipt:'A venda não pode ter data anterior ao recebimento dos lotes.',lot_sale_finance_required:'Ative o financeiro integrado antes de confirmar.',lot_sales_migration_required:'Falta aplicar a atualização 0232 do banco.',idempotency_conflict:'Esta confirmação já foi usada com outros dados.',sale_already_cancelled:'A venda já foi cancelada.',due_date_invalid:'Confira o vencimento.',buyer_not_found:'O cliente não está mais disponível. Selecione novamente.',sold_at_future:'A data da venda não pode estar no futuro.'})[error.message]||'Não foi possível confirmar o resultado. Tente novamente com os mesmos dados.';},
     async lsSubmit(){
       const s=this.lotSales,f=s.form;if(s.saving)return;if(!s.pending&&this.lsProblem){s.message=this.lsProblem;return;}
       if(!s.pending){
         const buyer=this.lsBuyer;
+        let payment = {payment_status:f.payment_status};
+        if (f.payment_status==='installments') {
+          const plan = window.SalePaymentPlan.build(f,this.lsNet,f.sold_on).plan;
+          payment = {payment_status:'pending', payment_plan:plan, due_date:plan.installments[0].due_date};
+        } else if (f.payment_status==='paid') payment.payment_method=f.payment_method;
+        else payment.due_date=f.due_date;
         s.pending={description:f.description,sold_on:f.sold_on,amount:this.lsAmount(f.amount),discount:this.lsAmount(f.discount),expected_cost:this.lsCost,
-          payment_status:f.payment_status,...(f.payment_status==='paid'?{payment_method:f.payment_method}:{due_date:f.due_date}),notes:f.notes,
+          ...payment,notes:f.notes,
           allocations:this.lsUsed.map(row=>({lot_id:row.id,quantity:row.quantity})),idempotency_key:crypto.randomUUID(),
           ...(f.new_buyer?{new_customer:{name:f.name,phone:f.phone}}:buyer.customer_id?{customer_id:buyer.customer_id}:{partner_id:buyer.partner_id})};
       }

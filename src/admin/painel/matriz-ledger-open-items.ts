@@ -1,70 +1,12 @@
+import { salePlanSnapshotSql } from './sale-payment-plan.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { moneyCents } from './stage5-integrity.js';
 import { businessDateSaoPaulo } from '../../shared/business-time.js';
 
-export type FinanceiroSettlementMode =
-  | 'wholesale_sale' | 'retail_sale' | 'commission' | 'monthly_fee'
-  | 'wholesale_purchase' | 'expense' | 'commission_refund'
-  | 'central_obligation' | 'central_account';
-
-export interface FinanceiroReceivableItem {
-  tipo: 'fiado' | 'varejo' | 'comissao' | 'mensalidade'
-    | 'devolucao_fornecedor' | 'devolucao_despesa';
-  id: string;
-  nome: string;
-  valor: string;
-  due_date: string | null;
-  overdue: boolean;
-  phone: string | null;
-  count?: number;
-  categoria?: string;
-  obligation_id?: string;
-  account_code?: string;
-  settlement_mode?: FinanceiroSettlementMode;
-}
-
-export interface FinanceiroPayableItem {
-  tipo: 'fornecedor' | 'despesa' | 'folha' | 'estorno_comissao'
-    | 'marketing' | 'devolucao_cliente';
-  id: string;
-  nome: string;
-  categoria?: string;
-  valor: string;
-  due_date: string | null;
-  overdue: boolean;
-  obligation_id?: string;
-  account_code?: string;
-  settlement_mode?: FinanceiroSettlementMode;
-}
-
-export interface MatrizLedgerOpenItems {
-  a_receber: { total: string; vencidos_count: number; itens: FinanceiroReceivableItem[] };
-  a_pagar: { total: string; vencidos_count: number; itens: FinanceiroPayableItem[] };
-}
-
-interface OpenRow {
-  obligation_id: string;
-  source_type: string;
-  source_id: string;
-  account_code: string;
-  balance: string;
-  due_date: string | null;
-  overdue: boolean;
-  description: string;
-  category: string | null;
-  partner_id: string | null;
-  partner_name: string | null;
-  partner_phone: string | null;
-  customer_name: string | null;
-  customer_phone: string | null;
-  supplier_name: string | null;
-  original_amount: string;
-  settled_amount: string;
-  installment_number?: number;
-  installments_count?: number;
-}
+import type { MatrizLedgerOpenItems, FinanceiroReceivableItem, FinanceiroPayableItem, OpenRow } from './matriz-ledger-open-item-types.js';
+export type { FinanceiroSettlementMode, MatrizLedgerOpenItems, FinanceiroReceivableItem, FinanceiroPayableItem } from './matriz-ledger-open-item-types.js';
 
 const RECEIVABLE_ACCOUNTS = new Set([
   'accounts_receivable', 'network_commission_receivable',
@@ -103,7 +45,9 @@ function receivable(row: OpenRow): FinanceiroReceivableItem {
   const retail = row.source_type === 'commerce.order.revenue';
   return {
     ...base, tipo: retail ? 'varejo' : 'fiado',
-    nome: retail ? row.description : (row.customer_name ?? row.description),
+    ...(row.sale_plan ? { sale_installment: row.installment_number } : {}),
+    nome: row.sale_plan ? `${row.customer_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
+      : retail ? row.description : (row.customer_name ?? row.description),
     phone: retail ? null : row.customer_phone,
     settlement_mode: retail ? 'retail_sale' : 'wholesale_sale',
   };
@@ -161,7 +105,7 @@ export async function getMatrizLedgerOpenItems(
          FROM finance.matriz_ledger_payments WHERE environment=$1
         GROUP BY obligation_transaction_id
      )
-     SELECT t.id obligation_id,t.source_type,t.source_id,e.account_code,
+     SELECT ${salePlanSnapshotSql} AS sale_plan,t.id obligation_id,t.source_type,t.source_id,e.account_code,
             (e.amount-COALESCE(paid.amount,0))::numeric(14,2)::text balance,
             e.amount::numeric(14,2)::text original_amount,
             COALESCE(paid.settled_amount,0)::numeric(14,2)::text settled_amount,
@@ -186,6 +130,7 @@ export async function getMatrizLedgerOpenItems(
        LEFT JOIN commerce.wholesale_suppliers ws ON ws.environment=wp.environment
         AND ws.id=wp.supplier_id
       WHERE t.environment=$1
+        AND (NOT (t.metadata ? 'sale_plan') OR wo.status='confirmed')
         AND t.reversal_of_transaction_id IS NULL
         AND ((e.account_class='asset' AND e.side='debit'
               AND e.account_code=ANY($2::text[]))
@@ -228,6 +173,15 @@ export async function getMatrizLedgerOpenItems(
   const today = businessDateSaoPaulo(new Date());
   const expanded: OpenRow[] = [];
   for (const row of result.rows) {
+    if (row.sale_plan) {
+      for (const part of row.sale_plan.installments) {
+        if (part.balance <= 0) continue;
+        expanded.push({ ...row, source_id: `${row.source_id}:${part.number}`,
+          balance: money(part.balance), due_date: part.due_date, overdue: part.due_date < today,
+          installment_number: part.number, installments_count: row.sale_plan.installments.length });
+      }
+      continue;
+    }
     const schedule = installments.get(row.source_id);
     if (!schedule?.length || row.source_type !== 'commerce.wholesale_purchase.accrual') {
       expanded.push(row);

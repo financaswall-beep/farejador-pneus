@@ -1,3 +1,4 @@
+import { orderSalePlanSql, type SalePaymentSnapshot } from './sale-payment-plan.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -15,6 +16,7 @@ import { cancelLinkedPartnerPurchase } from './wholesale-partner-bridge.js';
 import { cancelLotSaleInTransaction } from './cancel-lot-sale.js';
 
 export interface WholesaleSaleRow {
+  sale_plan: SalePaymentSnapshot | null;
   is_lot_sale: boolean;
   id: string;
   buyer_id: string;
@@ -57,7 +59,7 @@ export async function listWholesaleSales(
             linked.expected_units,linked.received_units,
             c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
             COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
-            o.payment_status,o.due_date,o.status,
+            o.payment_status,o.due_date,o.status,${orderSalePlanSql} AS sale_plan,
             (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id=o.id)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
               'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,'vehicle_type',i.vehicle_type,
@@ -104,7 +106,7 @@ export async function listWholesaleSalesHistory(
             linked.expected_units,linked.received_units,
             c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
             COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
-            o.payment_status,o.due_date,o.status,
+            o.payment_status,o.due_date,o.status,${orderSalePlanSql} AS sale_plan,
             (SELECT count(*) FROM commerce.wholesale_order_items i
               WHERE i.order_id=o.id AND i.environment=o.environment)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(

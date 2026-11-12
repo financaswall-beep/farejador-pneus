@@ -1,3 +1,4 @@
+import type { SalePaymentPlan } from './sale-payment-plan.js';
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import {
@@ -75,6 +76,7 @@ export async function postPartnerArrivalLedgerAdjustment(
   orderId: string,
   actorLabel: string,
   settledAt = new Date().toISOString(),
+  plan?: SalePaymentPlan,
 ): Promise<void> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return;
   const result = await client.query<{ dispatched_cogs: string }>(
@@ -93,7 +95,7 @@ export async function postPartnerArrivalLedgerAdjustment(
   await ensureDispatchLedger(client, environment, orderId, Number(state.dispatched_cogs));
   const sale = await getWholesaleSaleLedgerState(client, environment, orderId);
   const recognized = { ...sale, soldAt: settledAt, createdBy: actorLabel };
-  await ensureWholesaleSaleRevenue(client, recognized);
+  await ensureWholesaleSaleRevenue(client, recognized, plan);
   await ensureWholesaleSaleCogs(client, recognized);
 }
 

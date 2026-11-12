@@ -1,3 +1,5 @@
+import { validateSalePaymentPlan } from './sale-payment-plan.js';
+import { businessDateSaoPaulo } from '../../shared/business-time.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -26,45 +28,8 @@ import { postPartnerTransferDispatchLedger } from './partner-transfer-arrival-le
 import { resolveAdditionBuyer, resolveWholesaleBuyer } from './queries-atacado-sale-buyer.js';
 import { normalizeSameDayFutureInstant } from './wholesale-business-time.js';
 
-interface SaleItemInput {
-  measure: string;
-  brand?: string | null;
-  tire_condition: TireCondition | string;
-  quantity: number;
-  unit_price: number;
-}
-
-export interface RegisterWholesaleSaleInput {
-  environment?: 'prod' | 'test';
-  customer_id?: string | null;
-  partner_id?: string | null;
-  new_customer?: { name: string; phone?: string | null } | null;
-  items: SaleItemInput[];
-  sold_at?: string | null;
-  paid_at?: string | null;
-  notes?: string | null;
-  created_by: string;
-  seller_collaborator_id?: string | null;
-  payment_status?: 'paid' | 'pending';
-  due_date?: string | null;
-  idempotency_key: string;
-  parent_order_id?: string | null;
-  partner_unit_id?: string | null;
-}
-
-export interface RegisterWholesaleSaleResult {
-  order_id: string;
-  buyer_id: string;
-  buyer_name: string;
-  total_amount: string;
-  items_count: number;
-  parent_order_id: string | null;
-  partner_unit_id: string | null;
-  linked_partner_purchase_id: string | null;
-  status: 'pending' | 'confirmed';
-  payment_status: 'pending' | 'paid';
-  partner_payment_terms: 'cash_on_arrival' | 'credit' | null;
-}
+import type { RegisterWholesaleSaleInput, RegisterWholesaleSaleResult, SaleItemInput } from './wholesale-sale-types.js';
+export type { RegisterWholesaleSaleInput, RegisterWholesaleSaleResult } from './wholesale-sale-types.js';
 
 async function canonicalSaleItems(
   client: PoolClient,
@@ -142,7 +107,7 @@ export async function registerWholesaleSaleOnClient(
   preserveStockIdentity = false,
 ): Promise<RegisterWholesaleSaleResult> {
   const rawItems = input.items ?? [];
-  assertWholesaleSaleMoney(rawItems);
+  const totalCents = assertWholesaleSaleMoney(rawItems);
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const requestNow = new Date();
   const writeInput: RegisterWholesaleSaleInput = {
@@ -162,6 +127,7 @@ export async function registerWholesaleSaleOnClient(
       phone: input.new_customer.phone ? normalizeBrazilianPhone(input.new_customer.phone) : null } : null,
     sold_at: input.sold_at ?? null, paid_at: input.paid_at ?? null,
     notes: input.notes?.trim() || null,
+    ...(input.payment_plan ? { payment_plan: input.payment_plan } : {}),
     payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
     seller_collaborator_id: input.seller_collaborator_id ?? null,
     parent_order_id: input.parent_order_id ?? null,
@@ -195,6 +161,12 @@ export async function registerWholesaleSaleOnClient(
   const partnerUnit = await resolveWholesalePartnerUnit(
     client, environment, buyer.partner_id, requestedPartnerUnitId,
   );
+  if (input.payment_plan) {
+    if (!env.WHOLESALE_FINANCE || !env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) throw new Error('sale_plan_finance_required');
+    if (partnerUnit) throw new Error('sale_plan_in_transit');
+    validateSalePaymentPlan(input.payment_plan, totalCents, input.payment_status,
+      businessDateSaoPaulo(writeInput.sold_at!), input.due_date);
+  }
   const orderId = await insertSaleHeader(
     client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, writeInput,
   );
@@ -258,7 +230,7 @@ export async function registerWholesaleSaleOnClient(
       );
     } else {
       const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
-      await ensureWholesaleSaleRevenue(client, ledgerState);
+      await ensureWholesaleSaleRevenue(client, ledgerState, input.payment_plan);
       await ensureWholesaleSaleCogs(client, ledgerState);
     }
   }

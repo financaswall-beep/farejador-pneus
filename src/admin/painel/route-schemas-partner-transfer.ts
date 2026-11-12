@@ -1,3 +1,4 @@
+import { salePaymentPlanSchema } from './sale-payment-plan.js';
 import { z } from 'zod';
 import { hasCentPrecision } from './sales-money.js';
 
@@ -8,6 +9,7 @@ export const partnerArrivalAdjustmentSchema = z.object({
     order_item_id: z.string().uuid(),
     accepted_quantity: z.number().int().min(0).max(100000),
   })).min(1).max(50),
+  payment_plan: salePaymentPlanSchema.optional(),
   cargo_additions: z.array(z.object({
     cargo_lot_id: z.string().uuid(),
     quantity: z.number().int().positive().max(100000),

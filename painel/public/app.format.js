@@ -59,7 +59,7 @@ window.PAINEL_MODULES.format = function () {
         matrix_partner_arrival_total_mismatch: 'Os valores do acerto não fecharam. Recarregue e confira antes de confirmar.',
         matrix_partner_original_ledger_missing: 'O lançamento financeiro original da saída não foi encontrado.',
       };
-      return map[code] || `Não consegui registrar (${code}).`;
+      return window.SalePaymentPlan?.messages[code] || map[code] || `Não consegui registrar (${code}).`;
     },
 
     timeAgo(value) {

@@ -1,3 +1,4 @@
+import { orderSalePlanSql } from './sale-payment-plan.js';
 // Obra 300 (2026-07-05): fatia do banco da MATRIZ — visão consolidada do Financeiro da matriz (só leitura).
 // VERBATIM das linhas 2208-2441 do queries.ts pré-obra (commit 2628748).
 // Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
@@ -104,22 +105,22 @@ export async function getMatrizFinanceiroVisao(
             [environment, month],
           ).then((r) => r.rows[0]!.realizado)
         : Promise.resolve(null),
-      // Fiado do mês em aberto: soma dos ITENS (line_total) das vendas confirmed pending —
-      // a MESMA base do denominador (faturamento do atacado = SUM(oi.line_total) do getWholesaleResumo).
-      // Antes somava o header (total_amount) contra itens no denominador → venda sem item
-      // estourava o % (500%). Agora numerador e denominador batem; clamp em 100 no cálculo.
+      // Mantém a base por itens para vendas antigas. No parcelado conta só o saldo em aberto.
       env.WHOLESALE_FINANCE
         ? dbPool.query<{ aberto: string }>(
-            `SELECT COALESCE(SUM(oi.unit_price*CASE
+            `SELECT COALESCE(sum(open_amount),0) AS aberto FROM (
+               SELECT COALESCE((${orderSalePlanSql}->>'balance')::numeric,
+                      SUM(oi.unit_price*CASE
                        WHEN o.partner_transfer_status IN ('settled','received')
-                         THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END), 0) AS aberto
+                         THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END)) AS open_amount
                FROM commerce.wholesale_orders o
                JOIN commerce.wholesale_order_items oi
                  ON oi.order_id = o.id AND oi.environment = o.environment
               WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
                 AND (o.partner_transfer_status IS NULL
                   OR o.partner_transfer_status IN ('settled','received'))
-                AND ${monthRange(wholesaleRecognizedLocal)}`,
+                AND ${monthRange(wholesaleRecognizedLocal)}
+              GROUP BY o.id) sales`,
             [environment, month],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),

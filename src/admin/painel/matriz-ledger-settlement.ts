@@ -5,6 +5,7 @@ import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 import { matrizLedgerActor } from './matriz-ledger-posting.js';
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   moneyCents, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
+import { syncPartnerInstallmentDueDate } from './partner-installment-due-date.js';
 import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
 import {
   lockSettlementObligation as lockObligation,
@@ -16,6 +17,7 @@ type Target = { obligation_id: string; account_code?: never } |
   { obligation_id?: never; account_code: 'marketing_payable' };
 export type MatrizLedgerSettlementInput = Target & {
   amount?: number;
+  sale_installment?: { order_id: string; number: number };
   payment_method?: string;
   paid_at?: string;
   cash_account?: string;
@@ -56,7 +58,11 @@ async function settleObligation(
   );
   const balanceCents = moneyCents(Number(obligation.open_amount));
   const balance = balanceCents / 100;
-  const amount = requestedAmount(input.amount, balance);
+  const target = input.sale_installment;
+  const part = target && obligation.sale_plan?.installments.find(row => row.number === target.number);
+  if (target && (!part || target.order_id !== obligation.source_id || part.balance <= 0))
+    throw new Error('sale_installment_changed');
+  const amount = requestedAmount(input.amount, part ? part.balance : balance);
   const amountCents = moneyCents(amount);
   const remainingCents = balanceCents - amountCents;
   const remaining = (remainingCents / 100).toFixed(2);
@@ -85,6 +91,7 @@ async function settleObligation(
   const paymentId = await recordPayment(
     client, operation.environment, obligation, amount, paidAt, actor,
     sourceType, sourceId, {
+      ...(target ? { sale_installment: target.number } : {}),
       obligation_id: obligation.id, source_type: obligation.source_type,
       source_id: obligation.source_id, payment_method: method ?? null,
       cash_account: input.cash_account?.trim() || null,
@@ -117,6 +124,8 @@ async function settleObligation(
       client, operation.environment, obligation.source_id, paidAt, actor,
       method ?? null, amount, operation.idempotencyKey,
     );
+    if (!full && obligation.sale_plan && obligation.source_type === 'commerce.wholesale_order.arrival_revenue')
+      await syncPartnerInstallmentDueDate(client, operation.environment, obligation.id, obligation.source_id);
   }
   if (wholesalePurchase && full) {
     const updated = await client.query(
@@ -210,6 +219,7 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
     environment, domain: 'matriz_ledger.settle',
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({
+      ...(input.sale_installment ? { sale_installment: input.sale_installment } : {}),
       target, amount_cents: input.amount === undefined ? null : moneyCents(input.amount),
       payment_method: input.payment_method?.trim().toLowerCase() ?? null,
       paid_at: input.paid_at ?? null,

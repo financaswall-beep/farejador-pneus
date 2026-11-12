@@ -1,3 +1,4 @@
+import { orderSalePlanSql } from './sale-payment-plan.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -31,16 +32,17 @@ export async function getWholesaleFinance(
 ): Promise<WholesaleFinanceResumo> {
   const receivables = await dbPool.query<WholesaleFinanceOpenRow>(
     `SELECT o.id,c.name AS counterparty,c.phone,
-            COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
+            COALESCE((plan.snapshot->>'balance')::numeric,o.settled_total_amount,o.total_amount) AS total_amount,
             o.sold_at AS registered_at,
-            o.due_date,(o.due_date IS NOT NULL
-              AND o.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
+            COALESCE((plan.snapshot->>'next_due')::date,o.due_date) due_date,
+            (COALESCE((plan.snapshot->>'next_due')::date,o.due_date)<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
-      WHERE o.environment=$1 AND o.status='confirmed' AND o.payment_status='pending'
+       LEFT JOIN LATERAL (SELECT ${orderSalePlanSql} snapshot) plan ON true
+      WHERE COALESCE((plan.snapshot->>'balance')::numeric,1)>0 AND o.environment=$1 AND o.status='confirmed' AND o.payment_status='pending'
         AND (o.partner_transfer_status IS NULL
           OR o.partner_transfer_status IN ('settled','received'))
-      ORDER BY (o.due_date IS NULL),o.due_date,o.sold_at`, [environment]);
+      ORDER BY due_date NULLS LAST,o.sold_at`, [environment]);
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
     `WITH settled AS (
        SELECT t.source_id purchase_id,

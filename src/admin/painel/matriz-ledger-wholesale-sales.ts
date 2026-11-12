@@ -1,3 +1,6 @@
+import { lockMatrizObligationBreakdown } from './matriz-ledger-obligation-lock.js';
+import { recordSettlementPayment, lockSettlementObligation } from './matriz-ledger-settlement-payment.js';
+import type { SalePaymentPlan } from './sale-payment-plan.js';
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import {
@@ -73,6 +76,7 @@ async function existingTransaction(
 export async function ensureWholesaleSaleRevenue(
   client: PoolClient,
   sale: WholesaleSaleLedgerState,
+  plan?: SalePaymentPlan,
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   if (sale.partnerTransferStatus === 'in_transit') return null;
@@ -89,7 +93,7 @@ export async function ensureWholesaleSaleRevenue(
       : null);
   if (existing) return existing;
   const debitAccount = sale.paymentStatus === 'pending' ? 'accounts_receivable' : 'cash';
-  return postMatrizLedgerTransaction(client, {
+  const revenueId = await postMatrizLedgerTransaction(client, {
     environment: sale.environment, sourceType, sourceId: sale.orderId,
     kind: sale.paymentStatus === 'pending' ? 'sale_receivable' : 'sale_cash',
     amount, occurredAt: sale.soldAt,
@@ -103,9 +107,17 @@ export async function ensureWholesaleSaleRevenue(
     ],
     metadata: {
       order_id: sale.orderId, buyer_id: sale.buyerId,
-      payment_status: sale.paymentStatus,
+      payment_status: sale.paymentStatus, ...(plan ? { sale_plan: plan } : {}),
     },
   });
+  if (plan && plan.received > 0) {
+    const obligation = await lockSettlementObligation(client, sale.environment, revenueId);
+    await recordSettlementPayment(client, sale.environment, obligation, plan.received,
+      sale.soldAt, matrizLedgerActor(sale.createdBy), 'commerce.wholesale_order.partial_payment',
+      sale.orderId + ':entrada', { source_id: sale.orderId, obligation_id: revenueId,
+        payment_method: plan.method, cash_account: 'Caixa principal', note: 'Entrada da venda' });
+  }
+  return revenueId;
 }
 
 export async function ensureWholesaleSaleCogs(
@@ -154,15 +166,24 @@ export async function postWholesaleSalePayment(
     ...sale, paymentStatus: 'pending', paidAt: null,
   });
   if (!obligationId) return null;
+  const prior = await existingTransaction(client, sale, 'commerce.wholesale_order.payment');
+  if (prior) {
+    await client.query(`SELECT finance.record_matriz_ledger_payment($1::env_t,$2,$3,$4::timestamptz,$5,NULL)`,
+      [sale.environment, obligationId, prior, paidAt, matrizLedgerActor(paidBy)]);
+    return prior;
+  }
+  const breakdown = await lockMatrizObligationBreakdown(client, sale.environment, obligationId);
+  const balance = matrizLedgerAmount(breakdown.open_amount, 'sale_ledger_balance_invalid');
+  if (balance === 0) throw new Error('central_obligation_not_open');
   const paymentId = await postMatrizLedgerTransaction(client, {
     environment: sale.environment,
     sourceType: 'commerce.wholesale_order.payment', sourceId: sale.orderId,
-    kind: 'payment', amount, occurredAt: paidAt, cashAt: paidAt,
+    kind: 'payment', amount: balance, occurredAt: paidAt, cashAt: paidAt,
     description: 'Recebimento de venda no atacado',
     createdBy: matrizLedgerActor(paidBy),
     lines: [
-      { account_code: 'cash', account_class: 'asset', side: 'debit', amount },
-      { account_code: 'accounts_receivable', account_class: 'asset', side: 'credit', amount },
+      { account_code: 'cash', account_class: 'asset', side: 'debit', amount: balance },
+      { account_code: 'accounts_receivable', account_class: 'asset', side: 'credit', amount: balance },
     ],
     metadata: {
       order_id: sale.orderId, buyer_id: sale.buyerId,

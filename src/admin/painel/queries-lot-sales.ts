@@ -1,3 +1,4 @@
+import { orderSalePlanSql } from './sale-payment-plan.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -20,7 +21,7 @@ export async function listLotSales(page=1, db: Pool = defaultPool) {
   const result = await db.query(`WITH sales AS (
     SELECT o.id,o.sold_at,o.buyer_id,c.name buyer_name,o.status,o.payment_status,o.due_date,o.paid_at,
       o.lot_sale_description description,o.payment_method payment_method,o.notes,o.cancel_reason,
-      o.total_amount,o.lot_sale_discount discount,
+      ${orderSalePlanSql} AS sale_plan,o.total_amount,o.lot_sale_discount discount,
       COALESCE((SELECT sum(quantity) FROM commerce.wholesale_order_items i WHERE i.environment=o.environment AND i.order_id=o.id),0) quantity,
       COALESCE((SELECT sum(round(quantity*unit_cost,2)) FROM commerce.wholesale_order_items i WHERE i.environment=o.environment AND i.order_id=o.id),0) cost,
       (SELECT jsonb_agg(jsonb_build_object('lot_id',l.id,'lot_code','LT-'||lpad(l.lot_number::text,6,'0'),

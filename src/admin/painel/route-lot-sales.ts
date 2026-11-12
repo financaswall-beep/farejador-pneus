@@ -13,7 +13,7 @@ export async function registerLotSaleRoutes(app: FastifyInstance) {
     if (!query.success) return reply.status(400).send({error:'invalid_query'});
     if (!await lotSalesReady()) return {ready:false,rows:[],lots:[],total:0,finance_enabled:false};
     const [history,lots]=await Promise.all([listLotSales(query.data.page),listSaleLots()]);
-    return {ready:true,...history,lots,finance_enabled:env.WHOLESALE_FINANCE&&env.MATRIZ_CENTRAL_LEDGER};
+    return {ready:true,...history,lots,sale_plan_enabled:env.MATRIZ_CENTRAL_LEDGER_READ,finance_enabled:env.WHOLESALE_FINANCE&&env.MATRIZ_CENTRAL_LEDGER};
   });
   app.post('/admin/api/wholesale/lot-sales',{preHandler:requireAdminOwner},async(request,reply)=>{
     const body=lotSaleSchema.safeParse(request.body);

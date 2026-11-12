@@ -37,6 +37,7 @@ const settleLedgerItemSchema = z.object({
 });
 
 const writeOffCreditSchema = z.object({
+  sale_installment: z.number().int().min(1).max(120).optional(),
   obligation_id: z.string().uuid(),
   amount: settlementAmountSchema.optional(),
   occurred_at: paidAtSchema.optional(),

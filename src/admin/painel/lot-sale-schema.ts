@@ -1,3 +1,4 @@
+import { salePaymentPlanSchema } from './sale-payment-plan.js';
 import { z } from 'zod';
 const amount = z.number().finite().min(0).max(99_999_999.99).multipleOf(0.01);
 export const lotSaleSchema = z.object({
@@ -5,6 +6,7 @@ export const lotSaleSchema = z.object({
   new_customer: z.object({ name: z.string().trim().min(2).max(160), phone: z.string().trim().max(32).optional() }).optional(),
   description: z.string().trim().min(2).max(200),
   sold_on: z.string().date(), amount: amount.refine(value => value > 0), discount: amount.default(0),
+  payment_plan: salePaymentPlanSchema.optional(),
   expected_cost: amount, payment_status: z.enum(['paid','pending']),
   payment_method: z.enum(['Pix','Dinheiro','Cartão']).optional(), due_date: z.string().date().optional(),
   notes: z.string().trim().max(1000).default(''), idempotency_key: z.string().uuid(),

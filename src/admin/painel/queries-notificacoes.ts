@@ -1,3 +1,4 @@
+import { orderSalePlanSql } from './sale-payment-plan.js';
 // SINO da matriz (2026-07-06): agregador das notificações REAIS do painel.
 // O sino do topo existia desde o desenho e nunca tocou (notificacoes: [] morto).
 // Aqui ele ganha as fontes que JÁ EXISTEM no banco — nenhuma tabela nova:
@@ -45,7 +46,20 @@ export async function getMatrizNotificacoes(
     pagar_count: number; pagar_total: string;
     galpao_repor: MatrizNotificacoesPayload['galpao_repor'] | null;
   }>(
-    `SELECT
+    `WITH credit_sales AS MATERIALIZED (
+       SELECT o.due_date,COALESCE(o.settled_total_amount,o.total_amount) amount,${orderSalePlanSql} plan
+         FROM commerce.wholesale_orders o
+        WHERE o.environment=$1 AND o.status='confirmed' AND o.payment_status='pending'
+          AND (o.partner_transfer_status IS NULL OR o.partner_transfer_status IN ('settled','received'))
+     ), overdue_sales AS (
+       SELECT amount balance FROM credit_sales WHERE plan IS NULL
+         AND due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date
+       UNION ALL
+       SELECT p.balance FROM credit_sales,
+         jsonb_to_recordset(plan->'installments') AS p(balance numeric,due_date date)
+        WHERE p.balance>0 AND p.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date
+     )
+     SELECT
        (SELECT json_agg(json_build_object(
                  'order_id', o.id, 'customer_name', c.name,
                  'reason', o.delivery_failure_reason)
@@ -55,18 +69,8 @@ export async function getMatrizNotificacoes(
          WHERE o.environment = $1 AND o.delivery_status = 'failed'
            AND o.status <> 'cancelled' AND ${MAIN_DELIVERY_GUARD}) AS entregas_falhadas,
 
-       (SELECT count(*)::int FROM commerce.wholesale_orders w
-         WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
-           AND (w.partner_transfer_status IS NULL
-             OR w.partner_transfer_status IN ('settled','received'))
-           AND w.due_date IS NOT NULL
-           AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_count,
-       (SELECT COALESCE(sum(COALESCE(w.settled_total_amount,w.total_amount)), 0)::text FROM commerce.wholesale_orders w
-         WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
-           AND (w.partner_transfer_status IS NULL
-             OR w.partner_transfer_status IN ('settled','received'))
-           AND w.due_date IS NOT NULL
-           AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_total,
+       (SELECT count(*)::int FROM overdue_sales) AS fiado_count,
+       (SELECT COALESCE(sum(balance),0)::text FROM overdue_sales) AS fiado_total,
 
        (SELECT count(*)::int + (SELECT count(*)::int FROM commerce.matriz_expenses e
                                  WHERE e.environment = $1 AND e.deleted_at IS NULL

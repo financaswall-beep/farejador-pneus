@@ -1,3 +1,4 @@
+import { validateSalePaymentPlan } from './sale-payment-plan.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -33,6 +34,10 @@ export async function registerLotSale(raw: LotSaleInput, actor: string, sellerId
     if (cost!==moneyCents(input.expected_cost)) throw new Error('lot_sale_cost_changed');
     const buyer=await resolveWholesaleBuyer(client,environment,{...input,items:[],created_by:actor});
     const total=moneyCents(input.amount)-moneyCents(input.discount);
+    if (input.payment_plan) {
+      if (!env.MATRIZ_CENTRAL_LEDGER_READ) throw new Error('sale_plan_finance_required');
+      validateSalePaymentPlan(input.payment_plan,total,input.payment_status,input.sold_on,input.due_date);
+    }
     const soldAt=input.sold_on===today?new Date().toISOString():input.sold_on+'T23:59:59.999-03:00';
     const order=await client.query(`INSERT INTO commerce.wholesale_orders
       (environment,buyer_id,sold_at,total_amount,created_by,notes,payment_status,due_date,paid_at,status,
@@ -60,7 +65,7 @@ export async function registerLotSale(raw: LotSaleInput, actor: string, sellerId
     }
     await client.query('UPDATE commerce.wholesale_orders SET total_amount=$3::numeric/100 WHERE environment=$1 AND id=$2',[environment,id,total]);
     const ledger=await getWholesaleSaleLedgerState(client,environment,id);
-    await ensureWholesaleSaleRevenue(client,ledger); await ensureWholesaleSaleCogs(client,ledger);
+    await ensureWholesaleSaleRevenue(client,ledger,input.payment_plan); await ensureWholesaleSaleCogs(client,ledger);
     const result={order_id:id,total_amount:total/100,cost:cost/100};
     await recordIntegrityEvent(client,{environment,domain:'tire_lot_sale',entityTable:'commerce.wholesale_orders',entityId:id,
       eventType:'created',actorLabel:actor,idempotencyKey:input.idempotency_key,after:{...result,allocations}});

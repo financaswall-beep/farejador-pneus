@@ -1,6 +1,6 @@
 {
   "geradoEm": "2026-11-09T05:52:34.078Z",
-  "total": 599,
+  "total": 600,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -427,6 +427,7 @@
     "GET /admin/painel/relatorios-parceiros.css PUBLICA",
     "GET /admin/painel/relatorios.css PUBLICA",
     "GET /admin/painel/resumo.css PUBLICA",
+    "GET /admin/painel/sale-payment-plan.js PUBLICA",
     "GET /admin/painel/stock-waitlist-view.js PUBLICA",
     "GET /admin/painel/stock-waitlist.css PUBLICA",
     "GET /admin/painel/stock-waitlist.js PUBLICA",

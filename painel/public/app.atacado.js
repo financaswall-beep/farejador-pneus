@@ -221,7 +221,12 @@ window.PAINEL_MODULES.atacado = function () { return {
         ...linhas,
         '',
         `Total: ${this.formatCurrency(Number(v.total_amount))}`,
-        `Pagamento: ${pagamento}`,
+        ...(v.sale_plan ? [
+          `Recebido: ${this.formatCurrency(v.sale_plan.received)}`,
+          `Saldo a receber: ${this.formatCurrency(v.sale_plan.balance)}`,
+          ...v.sale_plan.installments.filter(part => part.balance > 0).map(part =>
+            `Parcela ${part.number} · ${this.atacadoDateOnly(part.due_date)} · ${this.formatCurrency(part.balance)} a receber`),
+        ] : [`Pagamento: ${pagamento}`]),
         '',
         'Qualquer coisa é só chamar. Obrigado pela parceria! 🤝',
       ].join('\n');

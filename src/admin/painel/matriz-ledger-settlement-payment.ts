@@ -1,3 +1,4 @@
+import { salePlanSnapshotSql, type SalePaymentSnapshot } from './sale-payment-plan.js';
 import { lockMatrizObligation } from './matriz-ledger-obligation-lock.js';
 import type { PoolClient } from 'pg';
 import {
@@ -14,6 +15,7 @@ export interface SettlementObligationRow {
   account_code: string;
   account_class: MatrizLedgerAccountClass;
   open_amount: string;
+  sale_plan?: SalePaymentSnapshot | null;
 }
 
 const CENTRAL_ACCOUNTS = new Set([
@@ -63,7 +65,7 @@ export async function lockSettlementObligation(
 ): Promise<SettlementObligationRow> {
   await lockMatrizObligation(client, environment, obligationId);
   const result = await client.query<SettlementObligationRow>(
-    `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
+    `SELECT ${salePlanSnapshotSql} AS sale_plan,t.id,t.source_type,t.source_id,e.account_code,e.account_class,
             (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind IN ('settlement','writeoff','adjustment')
               THEN p.amount ELSE -p.amount END)
               FROM finance.matriz_ledger_payments p

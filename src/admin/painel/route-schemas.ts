@@ -1,4 +1,5 @@
 // Obra 300 (2026-07-05): mezanino da portaria da matriz — schemas zod + publicDir.
+import { salePaymentPlanSchema } from './sale-payment-plan.js';
 import path from 'node:path';
 import { z } from 'zod';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
@@ -132,8 +133,7 @@ export const registerWholesaleSaleSchema = z
     paid_at: z.string().datetime({ offset: true }).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
     idempotency_key: idempotencyKeySchema,
-    // FINANCEIRO (0115): 'pending' = fiado (a receber), com vencimento obrigatório.
-    // Ignorados com WHOLESALE_FINANCE off (a venda nasce 'paid', como hoje).
+    payment_plan: salePaymentPlanSchema.optional(),
     payment_status: z.enum(['paid', 'pending']).optional(),
     due_date: z.string().date().nullable().optional(),
   })

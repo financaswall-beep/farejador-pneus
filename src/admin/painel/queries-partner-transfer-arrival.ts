@@ -1,3 +1,6 @@
+import { validateSalePaymentPlan, type SalePaymentPlan } from './sale-payment-plan.js';
+import { businessDateSaoPaulo } from '../../shared/business-time.js';
+import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -14,6 +17,7 @@ type Environment = 'prod' | 'test';
 export interface PartnerArrivalAdjustmentInput {
   order_id: string;
   items: Array<{ order_item_id: string; accepted_quantity: number }>;
+  payment_plan?: SalePaymentPlan;
   cargo_additions?: Array<{ cargo_lot_id: string; quantity: number; unit_price: number }>;
   idempotency_key: string;
   actor_label: string;
@@ -37,6 +41,7 @@ export async function settlePartnerArrivalOnClient(
   const operation = { environment, domain: 'matrix_partner.arrival',
     idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
       order_id: input.order_id, items: input.items,
+      ...(input.payment_plan ? { payment_plan: input.payment_plan } : {}),
       cargo_additions: cargoAdditions, actor_label: input.actor_label,
     }) };
   const started = await beginIntegrityOperation<Record<string, unknown>>(client, operation);
@@ -104,30 +109,38 @@ export async function settlePartnerArrivalOnClient(
   if (moneyCents(Number(total.rows[0]!.total_amount)) !== finalTotalCents) {
     throw new Error('matrix_partner_arrival_total_mismatch');
   }
+  const plan = input.payment_plan;
+  const dueDate = plan?.installments[0]?.due_date;
+  if (plan) {
+    if (!env.WHOLESALE_FINANCE || !env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ)
+      throw new Error('sale_plan_finance_required');
+    if (order.partner_payment_terms !== 'credit') throw new Error('sale_plan_invalid');
+    validateSalePaymentPlan(plan, finalTotalCents, 'pending', businessDateSaoPaulo(settledAt), dueDate);
+  }
   await client.query(
     `UPDATE commerce.wholesale_orders
-        SET settled_total_amount=$3,partner_transfer_status='settled',status='confirmed',partner_settled_at=$4::timestamptz,
+        SET due_date=COALESCE($5::date,due_date),settled_total_amount=$3,partner_transfer_status='settled',status='confirmed',partner_settled_at=$4::timestamptz,
             payment_status=CASE WHEN partner_payment_terms='cash_on_arrival'
                                 THEN 'paid' ELSE 'pending' END,
             paid_at=CASE WHEN partner_payment_terms='cash_on_arrival'
                          THEN $4::timestamptz ELSE NULL END
       WHERE environment=$1 AND id=$2`,
-    [environment, input.order_id, total.rows[0]!.total_amount, settledAt],
+    [environment, input.order_id, total.rows[0]!.total_amount, settledAt, dueDate ?? null],
   );
   await client.query(
     `UPDATE commerce.partner_purchases
         SET total_amount=$3,
             payment_status=CASE WHEN $4='cash_on_arrival' THEN 'paid_now' ELSE 'payable' END,
-            payable_due_date=CASE WHEN $4='cash_on_arrival' THEN NULL ELSE payable_due_date END,
+            payable_due_date=CASE WHEN $4='cash_on_arrival' THEN NULL ELSE COALESCE($5::date,payable_due_date) END,
             payment_method=CASE WHEN $4='cash_on_arrival'
                                 THEN 'Pago à Matriz no acerto' ELSE payment_method END
       WHERE environment=$1 AND id=$2`,
     [environment, order.purchase_id, total.rows[0]!.total_amount,
-      order.partner_payment_terms],
+      order.partner_payment_terms,dueDate ?? null],
   );
   const payable = await client.query(
     `UPDATE finance.partner_payables
-        SET amount=$3,
+        SET due_date=COALESCE($6::date,due_date),amount=$3,
             status=CASE WHEN $3::numeric=0 THEN 'cancelled'
                         WHEN $4='cash_on_arrival' THEN 'paid' ELSE 'open' END,
             paid_at=CASE WHEN $3::numeric>0 AND $4='cash_on_arrival'
@@ -138,12 +151,14 @@ export async function settlePartnerArrivalOnClient(
       WHERE environment=$1 AND source_purchase_id=$2 AND deleted_at IS NULL
         AND status='open'`,
     [environment, order.purchase_id, total.rows[0]!.total_amount,
-      order.partner_payment_terms, settledAt],
+      order.partner_payment_terms, settledAt,dueDate ?? null],
   );
   if (!payable.rowCount) throw new Error('matrix_partner_payable_not_open');
   await postPartnerArrivalLedgerAdjustment(
-    client, environment, input.order_id, input.actor_label, settledAt,
+    client, environment, input.order_id, input.actor_label, settledAt, plan,
   );
+  if (plan && plan.received > 0) await settleLinkedPartnerPayable(client, environment,
+    input.order_id, settledAt, input.actor_label, plan.method, plan.received, input.order_id + ':entrada');
   const result = {
     order_id: input.order_id, purchase_id: order.purchase_id,
     partner_transfer_status: 'settled', total_amount: total.rows[0]!.total_amount,

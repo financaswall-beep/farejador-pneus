@@ -57,7 +57,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
     'app.estoque.transferencias.js',
-    'app.estoque.custos.js', 'app.vendas.lotes.js',
+    'app.estoque.custos.js', 'sale-payment-plan.js', 'app.vendas.lotes.js',
     'app.marketing.geography.js','app.marketing.geography.actions.js','app.marketing.geography.mock.js',
     'app.marketing.creatives.js', 'app.marketing.creatives.chart.js', 'app.marketing.creatives.mock.js',
     'app.relatorios.demanda.js', 'app.relatorios.demanda.view.js', 'app.relatorios.demanda.charts.js', 'app.relatorios.demanda.export.js', 'app.relatorios.demanda.pdf.js',

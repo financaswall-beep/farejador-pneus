@@ -1,3 +1,4 @@
+import { salePlanSnapshotSql, type SalePaymentSnapshot } from './sale-payment-plan.js';
 import { lockMatrizObligation } from './matriz-ledger-obligation-lock.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
@@ -15,6 +16,7 @@ type Environment = 'prod' | 'test';
 
 export interface MatrizCreditWriteoffInput {
   obligation_id: string;
+  sale_installment?: number;
   amount?: number;
   occurred_at?: string;
   reason: string;
@@ -35,6 +37,7 @@ interface ObligationRow {
   source_type: string;
   source_id: string;
   open_amount: string;
+  sale_plan: SalePaymentSnapshot | null;
 }
 
 async function lockReceivable(
@@ -44,7 +47,7 @@ async function lockReceivable(
 ): Promise<ObligationRow> {
   await lockMatrizObligation(client, environment, obligationId);
   const result = await client.query<ObligationRow>(
-    `SELECT t.id,t.source_type,t.source_id,
+    `SELECT ${salePlanSnapshotSql} AS sale_plan,t.id,t.source_type,t.source_id,
             (e.amount-COALESCE((SELECT sum(CASE
               WHEN p.payment_kind IN ('settlement','writeoff','adjustment') THEN p.amount
               ELSE -p.amount END)
@@ -80,6 +83,7 @@ export async function writeOffMatrizCredit(
     domain: 'matriz_ledger.credit_writeoff',
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({
+      ...(input.sale_installment ? { sale_installment: input.sale_installment } : {}),
       obligation_id: input.obligation_id,
       amount_cents: input.amount == null ? null : moneyCents(input.amount),
       occurred_at: input.occurred_at ?? null,
@@ -96,9 +100,12 @@ export async function writeOffMatrizCredit(
     }
     const obligation = await lockReceivable(client, environment, input.obligation_id);
     const balanceCents = moneyCents(Number(obligation.open_amount));
-    const amountCents = input.amount == null ? balanceCents : moneyCents(input.amount);
+    const part = input.sale_installment && obligation.sale_plan?.installments.find(row => row.number === input.sale_installment);
+    if (input.sale_installment && (!part || part.balance <= 0)) throw new Error('sale_installment_changed');
+    const maximum = part ? moneyCents(part.balance) : balanceCents;
+    const amountCents = input.amount == null ? maximum : moneyCents(input.amount);
     if (amountCents <= 0) throw new Error('credit_writeoff_amount_invalid');
-    if (amountCents > balanceCents) throw new Error('credit_writeoff_exceeds_balance');
+    if (amountCents > maximum) throw new Error('credit_writeoff_exceeds_balance');
     const amount = amountCents / 100;
     const occurredAt = normalizeBusinessFactInstant(
       input.occurred_at, new Date(), 'occurred_at_future',
@@ -118,6 +125,7 @@ export async function writeOffMatrizCredit(
         { account_code: 'accounts_receivable', account_class: 'asset', side: 'credit', amount },
       ],
       metadata: {
+        ...(part ? { sale_installment: part.number } : {}),
         obligation_id: obligation.id,
         source_type: obligation.source_type,
         source_id: obligation.source_id,

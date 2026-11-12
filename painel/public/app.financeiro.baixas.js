@@ -113,6 +113,10 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       const operation = window.PAINEL_INTEGRITY.operation(
         'finance-settlement-facade', targetKey,
       );
+      if (!operation.paid_at) {
+        operation.paid_at = this.businessFactInstant(modal.payment_date);
+        window.PAINEL_INTEGRITY.save?.();
+      }
       const target = mode === 'central_account'
         ? { account_code: item.account_code || undefined }
         : ['retail_sale', 'wholesale_sale', 'wholesale_purchase',
@@ -127,7 +131,7 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
           target_id: item.id,
           ...target,
           amount: this.finPermiteParcial(item) ? amount : undefined,
-          paid_at: this.businessFactInstant(modal.payment_date),
+          paid_at: operation.paid_at,
           payment_method: String(modal.payment_method).trim(),
           cash_account: String(modal.cash_account || '').trim() || undefined,
           note: String(modal.note || '').trim() || undefined,
@@ -160,13 +164,14 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
         return;
       }
       if (!confirm('Confirmar perda de crédito? Isso reduz o resultado e não cria entrada no caixa.')) return;
-      const targetKey = `writeoff:${item.obligation_id}:${amount}:${modal.payment_date}:${reason}`;
+      const targetKey = `writeoff:${item.obligation_id}:${item.sale_installment || 0}:${amount}:${modal.payment_date}:${reason}`;
       const operation = window.PAINEL_INTEGRITY.operation('finance-credit-writeoff', targetKey);
       this.finQuitando = true;
       modal.error = null;
       try {
         await this.apiPost('/admin/api/matriz/financeiro/ledger/write-off', {
           obligation_id: item.obligation_id,
+          sale_installment: item.sale_installment,
           amount,
           occurred_at: this.businessFactInstant(modal.payment_date),
           reason,
