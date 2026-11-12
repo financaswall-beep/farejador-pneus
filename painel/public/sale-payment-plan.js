@@ -46,5 +46,63 @@ window.SalePaymentPlan = (() => {
     sale_plan_dates_invalid: 'Confira a ordem dos vencimentos.',
     sale_plan_total_mismatch: 'A entrada e as parcelas precisam somar o valor da venda.',
   };
-  return { build, edit, messages };
+  function dateEditor() {
+    return {
+      target: null, date: '', saving: false, stale: false, error: '', attempt: null,
+      openDate(target) {
+        if (this.saving || this.adminUser?.role !== 'owner') return;
+        this.target = target;
+        this.date = target.due;
+        this.error = '';
+        this.stale = false;
+        this.attempt = null;
+        this.$root.showModal();
+      },
+      async refreshSale(id) {
+        if (this.currentPage === 'financeiro') {
+          await this.loadFinanceiro();
+          if (this.financeiroLoadError) throw new Error('finance_refresh_failed');
+          return;
+        }
+        if (this.vendasTab === 'lotes') {
+          await this.loadLotSalesPage();
+          if (this.lotSales.error) throw new Error('sales_refresh_failed');
+          return;
+        }
+        const data = await this.apiGet('/admin/api/wholesale/sales');
+        this.atacadoVendas = data.rows || [];
+        if (this.vendaAtacadoSelecionada?.id === id)
+          this.vendaAtacadoSelecionada = this.atacadoVendas.find(row => row.id === id) || null;
+      },
+      async saveDate() {
+        const target = this.target;
+        if (!target || this.saving || this.stale || !this.date || this.date === target.due) return;
+        if (this.attempt?.due_date !== this.date) this.attempt = {
+          due_date: this.date, expected_due_date: target.due, idempotency_key: crypto.randomUUID(),
+        };
+        this.error = '';
+        this.saving = true;
+        let saved = false;
+        try {
+          await this.apiPost('/admin/api/wholesale/sales/' + target.orderId + '/installments/' + target.number + '/due-date', this.attempt);
+          saved = true;
+          await this.refreshSale(target.orderId);
+          this.$root.close();
+        } catch (err) {
+          this.stale = saved || err.message === 'sale_installment_changed' || err.message === 'sale_not_found';
+          if (saved) this.error = 'Vencimento salvo. Atualize a tela para consultar a nova data.';
+          else if (this.stale) {
+            this.error = 'A parcela mudou ou foi encerrada. Confira o vencimento atual antes de tentar novamente.';
+            await this.refreshSale(target.orderId).catch(() => {});
+          } else this.error = ({
+            installment_before_sale: 'Escolha uma data a partir da data da venda ou do acerto da chegada.',
+            invalid_installment_date: 'Confira a data informada.',
+            installment_date_migration_required: 'A alteração de vencimentos precisa da atualização 0283 do banco.',
+            sale_plan_finance_required: messages.sale_plan_finance_required,
+          })[err.message] || 'Não foi possível confirmar a alteração. Tente novamente.';
+        } finally { this.saving = false; }
+      },
+    };
+  }
+  return { build, edit, messages, dateEditor };
 })();

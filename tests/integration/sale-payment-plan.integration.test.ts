@@ -32,36 +32,69 @@ async function openParts(id: string) {
 const sale = () => ({ items: [{ measure: '96/90-19', brand: 'Marca', tire_condition: 'novo', quantity: 2, unit_price: 50 }],
   payment_status: 'pending' as const, due_date: today, created_by: actor, idempotency_key: randomUUID() });
 
+async function reschedule(id: string, number: number, oldDate: string, newDate: string, key = randomUUID()) {
+  const { changeSaleInstallmentDueDate } = await import('../../src/admin/painel/sale-installment-due-date.js');
+  return changeSaleInstallmentDueDate({ order_id:id, number, expected_due_date:oldDate,
+    due_date:newDate, idempotency_key:key },actor,db.pool);
+}
+
 it('atacado separa entrada e parcelas, aceita baixa fora de ordem e quita apenas o saldo', async () => {
   const { registerWholesaleSale } = await import('../../src/admin/painel/queries-atacado-vendas.js');
   const { settleMatrizLedgerOpenItem } = await import('../../src/admin/painel/matriz-ledger-settlement.js');
   const { settleWholesaleOrderPayment } = await import('../../src/admin/painel/queries-financeiro-integridade.js');
   const { getWholesaleFinance } = await import('../../src/admin/painel/queries-fiado-despesas.js');
   const { listWholesaleSales } = await import('../../src/admin/painel/queries-atacado-cancelar.js');
-  const input = { ...sale(), new_customer: { name: 'Borracharia parcelas' }, payment_plan: plan };
-  await expect(registerWholesaleSale({ ...input, payment_plan: { ...plan, received: 20 } },db.pool)).rejects.toThrow('sale_plan_total_mismatch');
+  const oldDate = '2020-05-02';
+  const input = { ...sale(), sold_at:'2020-05-01T15:00:00Z', due_date:oldDate,
+    new_customer: { name: 'Borracharia parcelas' },
+    payment_plan:{...plan,installments:[{due_date:oldDate,amount:30},plan.installments[1]!]} };
+  await expect(registerWholesaleSale({ ...input, payment_plan: { ...input.payment_plan, received: 20 } },db.pool)).rejects.toThrow('sale_plan_total_mismatch');
   const result = await registerWholesaleSale(input,db.pool);
   expect(await registerWholesaleSale(input,db.pool)).toEqual(result);
   const id = result.order_id;
   const { getMatrizFinanceiroVisao } = await import('../../src/admin/painel/queries-financeiro-visao.js');
   const { getMatrizNotificacoes } = await import('../../src/admin/painel/queries-notificacoes.js');
-  const overview = await getMatrizFinanceiroVisao('test',db.pool);
+  const overview = await getMatrizFinanceiroVisao('test',db.pool,oldDate.slice(0,7));
   expect(Number(overview.a_receber.total)).toBe(79.99);
   expect(overview.indicadores.fiado_aberto_pct).toBeCloseTo(80,0);
-  expect((await getMatrizNotificacoes('test',db.pool)).fiado_vencido.count).toBe(0);
+  expect((await getMatrizNotificacoes('test',db.pool)).fiado_vencido.count).toBe(1);
   const rows = await openParts(id);
   expect(rows.map(row => row.valor)).toEqual(['30.00','49.99']);
+  const due = '2098-12-05';
+  const key = randomUUID();
+  const financialState = async () => (await db.pool.query(`SELECT
+    (SELECT count(*) FROM finance.matriz_ledger_transactions) txs,
+    (SELECT count(*) FROM finance.matriz_ledger_payments) payments,
+    (SELECT sum(quantity_on_hand) FROM commerce.wholesale_stock) stock`)).rows[0];
+  const before = await financialState();
+  const changed = await reschedule(id,1,oldDate,due,key);
+  expect(await reschedule(id,1,oldDate,due,key)).toEqual(changed);
+  expect((await getMatrizNotificacoes('test',db.pool)).fiado_vencido.count).toBe(0);
+  expect(await financialState()).toEqual(before);
+  expect((await openParts(id)).map(row => [row.due_date,row.valor])).toEqual([[due,'30.00'],['2099-01-01','49.99']]);
+  expect((await listWholesaleSales('test',db.pool)).find(row=>row.id===id)?.sale_plan)
+    .toMatchObject({next_due:due,balance:79.99,received:20.01});
+  await expect(reschedule(id,1,oldDate,'2098-12-06')).rejects.toThrow('sale_installment_changed');
+  await expect(reschedule(id,1,due,'2000-01-01')).rejects.toThrow('installment_before_sale');
+  const edits = await db.pool.query(`SELECT payload_before,payload_after,actor_label FROM audit.events
+    WHERE entity_id=$1 AND event_type='installment_due_date_changed'`,[id]);
+  expect(edits.rows).toEqual([{payload_before:{number:1,due_date:oldDate},payload_after:{number:1,due_date:due},actor_label:actor}]);
+  const races = await Promise.allSettled(['2098-12-06','2098-12-07'].map(d => reschedule(id,1,due,d)));
+  expect(races.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+  expect(races.find(r=>r.status==='rejected')).toMatchObject({reason:{message:'sale_installment_changed'}});
   const baixa = { environment: 'test' as const, obligation_id: rows[1]!.obligation_id!,
     sale_installment: { order_id:id, number:2 }, amount:49.99, payment_method:'Pix', idempotency_key:randomUUID() };
   const paid = await settleMatrizLedgerOpenItem(baixa,db.pool);
   expect(await settleMatrizLedgerOpenItem(baixa,db.pool)).toEqual(paid);
   await expect(settleMatrizLedgerOpenItem({...baixa,idempotency_key:randomUUID()},db.pool)).rejects.toThrow('sale_installment_changed');
+  await expect(reschedule(id,2,'2099-01-01',due)).rejects.toThrow('sale_installment_changed');
   expect((await openParts(id)).map(row=>row.valor)).toEqual(['30.00']);
   expect(Number((await getWholesaleFinance('test',db.pool)).receivables.find(row=>row.id===id)?.total_amount)).toBe(30);
   await settleWholesaleOrderPayment(id,'test',db.pool,{idempotency_key:randomUUID(),payment_method:'Pix'});
   expect((await listWholesaleSales('test',db.pool)).find(row=>row.id===id)).toMatchObject({
     payment_status:'paid',sale_plan:{received:100,balance:0} });
   expect(await openParts(id)).toEqual([]);
+  await expect(reschedule(id,1,due,'2098-12-08')).rejects.toThrow('sale_installment_changed');
 });
 
 it('lote desconta o desconto antes de parcelar e ao cancelar devolve apenas o dinheiro recebido',async () => {
@@ -84,8 +117,12 @@ it('lote desconta o desconto antes de parcelar e ao cancelar devolve apenas o di
     sale_installment:2, amount:10, reason:'Perda comprovada', idempotency_key:randomUUID() },db.pool);
   expect((await openParts(sale.order_id)).map(p=>p.valor)).toEqual(['30.00','39.99']);
   expect((await listLotSales(1,db.pool)).rows[0].sale_plan.received).toBe(20.01);
+  await reschedule(sale.order_id,2,'2099-01-01','2099-02-05');
+  const lotPlan = (await listLotSales(1,db.pool)).rows[0].sale_plan;
+  expect(lotPlan.installments[1]).toMatchObject({due_date:'2099-02-05',balance:39.99,amount:49.99});
   await cancelWholesaleSale({order_id:sale.order_id,reason:'Desistência da compra',cancelled_by:actor,idempotency_key:randomUUID()},db.pool);
   expect(await openParts(sale.order_id)).toEqual([]);
+  await expect(reschedule(sale.order_id,1,today,'2099-02-05')).rejects.toThrow('sale_installment_changed');
   const refund=await db.pool.query(`SELECT e.amount FROM finance.matriz_ledger_transactions t
     JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id WHERE t.source_id=$1 AND e.account_code='customer_refund_payable'`,[sale.order_id]);
   expect(Number(refund.rows[0].amount)).toBe(20.01);
@@ -103,6 +140,11 @@ it('apura a entrada do parceiro sobre o valor aceito na chegada e espelha a baix
   await settlePartnerArrival(arrival,db.pool);
   const parts=await openParts(original.order_id);
   expect(parts.map(row=>row.valor)).toEqual(['10.00','19.99']);
+  await reschedule(original.order_id,1,today,'2098-12-05');
+  const corrected=await db.pool.query(`SELECT o.due_date::text sale,p.payable_due_date::text purchase,f.due_date::text payable
+    FROM commerce.wholesale_orders o JOIN commerce.partner_purchases p ON p.source_wholesale_order_id=o.id
+    JOIN finance.partner_payables f ON f.source_purchase_id=p.id WHERE o.id=$1`,[original.order_id]);
+  expect(corrected.rows[0]).toEqual({sale:'2098-12-05',purchase:'2098-12-05',payable:'2098-12-05'});
   const {settleMatrizLedgerOpenItem}=await import('../../src/admin/painel/matriz-ledger-settlement.js');
   await settleMatrizLedgerOpenItem({environment:'test', obligation_id:parts[0]!.obligation_id!,
     sale_installment:{order_id:original.order_id,number:1}, payment_method:'Pix',idempotency_key:randomUUID()},db.pool);

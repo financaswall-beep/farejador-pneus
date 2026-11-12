@@ -18,7 +18,8 @@ export async function syncPartnerInstallmentDueDate(client: PoolClient,
       WHERE environment=$1 AND source_wholesale_order_id=$2 AND payment_status='payable'
         AND deleted_at IS NULL RETURNING id`, [environment, orderId, due]);
   if (!purchase.rows[0]) throw new Error('matrix_partner_payable_not_open');
-  await client.query(`UPDATE finance.partner_payables SET due_date=$3::date, updated_at=now()
+  const payable = await client.query(`UPDATE finance.partner_payables SET due_date=$3::date, updated_at=now()
     WHERE environment=$1 AND source_purchase_id=$2 AND status='open' AND deleted_at IS NULL`,
     [environment, purchase.rows[0].id, due]);
+  if (!payable.rowCount) throw new Error('matrix_partner_payable_not_open');
 }

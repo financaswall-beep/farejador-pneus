@@ -11,12 +11,31 @@ import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
 import { registerSalesReportRoutes } from './route-sales-report.js';
 import { registerLotSaleRoutes } from './route-lot-sales.js';
+import { changeSaleInstallmentDueDate, installmentDateBody, installmentDateParams } from './sale-installment-due-date.js';
 import { registerWholesaleRequestRoutes } from './route-partner-wholesale-requests.js';
 
 export async function registerPainelAtacado(fastify: FastifyInstance): Promise<void> {
   await registerSalesReportRoutes(fastify);
   await registerLotSaleRoutes(fastify);
   registerWholesaleRequestRoutes(fastify);
+  fastify.post('/admin/api/wholesale/sales/:order_id/installments/:number/due-date', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = installmentDateParams.safeParse(request.params);
+    const body = installmentDateBody.safeParse(request.body);
+    if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_installment_date' });
+    try {
+      return await changeSaleInstallmentDueDate({ ...params.data, ...body.data }, operatorLabel(request));
+    } catch (error) {
+      const code = (error as Error).message;
+      if (code === 'installment_before_sale') return reply.status(400).send({ error: code });
+      if (code === 'sale_not_found') return reply.status(404).send({ error: code });
+      if (code === 'installment_date_migration_required') return reply.status(503).send({ error: code });
+      if (['central_obligation_not_open','central_obligation_not_actionable','matrix_partner_payable_not_open'].includes(code))
+        return reply.status(409).send({ error: 'sale_installment_changed' });
+      const mapped = mapWriteError(error);
+      if (mapped.status === 500) logger.error({ err: error }, 'alteração de vencimento de parcela falhou');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
   const reconcilePartnerCostSchema = z.object({
     item_id: z.string().uuid(),
     unit_cost: z.number().nonnegative(),

@@ -46,10 +46,15 @@ export const salePlanSnapshotSql = `CASE WHEN t.metadata ? 'sale_plan' THEN (
            COALESCE(sum(amount) FILTER (WHERE number IS NULL),0)
              - (t.metadata->'sale_plan'->>'received')::numeric generic
       FROM payments
+  ), corrections AS MATERIALIZED (
+    -- A leitura também funciona antes da aplicação da migration 0283.
+    SELECT to_jsonb(o)->'installment_due_dates' dates FROM commerce.wholesale_orders o
+     WHERE o.environment=t.environment AND o.id=t.source_id::uuid
   ), parts AS (
-    SELECT n, part->>'due_date' due_date,(part->>'amount')::numeric amount,
+    SELECT n, COALESCE(dates->>n::text,part->>'due_date') due_date,(part->>'amount')::numeric amount,
            (part->>'amount')::numeric-COALESCE((SELECT sum(amount) FROM payments WHERE number=n),0) unallocated
       FROM jsonb_array_elements(t.metadata->'sale_plan'->'installments') WITH ORDINALITY AS plan(part,n)
+      LEFT JOIN corrections ON true
   ), balances AS (
     SELECT parts.*, GREATEST(0,LEAST(unallocated,
              sum(unallocated) OVER (ORDER BY n)-totals.generic)) balance
