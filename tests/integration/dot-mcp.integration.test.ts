@@ -20,7 +20,7 @@ beforeAll(async () => {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test', DATABASE_SSL: 'false',
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-emergency',
     ADMIN_BEARER_FALLBACK_ENABLED: 'true', DOT_MCP_ENABLED: 'true', DOT_MCP_PUBLIC_ORIGIN: origin,
-    DOT_MCP_REDIRECT_URIS: callback, MATRIZ_CENTRAL_LEDGER: 'true', MATRIZ_CENTRAL_LEDGER_READ: 'true',MATRIZ_LOGISTICS:'true',
+    DOT_MCP_REDIRECT_URIS: callback, MATRIZ_CENTRAL_LEDGER: 'true', MATRIZ_CENTRAL_LEDGER_READ: 'true',MATRIZ_LOGISTICS:'true', WHOLESALE_FINANCE:'true', WHOLESALE_STOCK_DECREMENT:'true',
   });
   db = await startPostgres();
   process.env.DATABASE_URL = db.connectionString;
@@ -184,6 +184,7 @@ it('expõe somente as 30 consultas permitidas; tentativas de escrita e argumento
   expect(credential.result.isError).toBe(true);
 });
 
+
 it('refresh gira a credencial e reutilização revoga toda a conexão', async () => {
   const initial = (await exchange(await newCode())).json();
   const rotated = await token({grant_type:'refresh_token',refresh_token:initial.refresh_token});
@@ -321,4 +322,85 @@ it('consentimento expirado, vínculo prod/test e role de parceiro são bloqueado
     await restricted.query('SET ROLE farejador_partner_app');
     await expect(restricted.query('SELECT * FROM network.dot_oauth_tokens')).rejects.toMatchObject({code:'42501'});
   }finally{await restricted.query('RESET ROLE');restricted.release();}
+});
+
+it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', async () => {
+  // O restante da suíte compartilha o IP do Fastify injetado. Inicia a janela deste cenário.
+  (await import('../../src/shared/rate-limit.js')).__resetRateLimit();
+  const { randomUUID } = await import('node:crypto');
+  const { registerWholesaleSale } = await import('../../src/admin/painel/queries-atacado-vendas.js');
+  const { changeSaleInstallmentDueDate } = await import('../../src/admin/painel/sale-installment-due-date.js');
+  const { businessDateSaoPaulo } = await import('../../src/shared/business-time.js');
+  const original = businessDateSaoPaulo(new Date()), next = '2099-07-05';
+  const product = await db.pool.query(`INSERT INTO commerce.products(environment,product_code,product_name,product_type,brand)
+    VALUES ('test','dot-review','Pneu revisão','tire','Milly') RETURNING id`);
+  await db.pool.query(`INSERT INTO commerce.tire_specs(environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
+    VALUES ('test',$1,'90/90-19',90,90,19)`,[product.rows[0].id]);
+  await db.pool.query(`INSERT INTO commerce.wholesale_stock(environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+    VALUES('test','90/90-19','Milly','novo',10,20)`);
+  const input={items:[{measure:'90/90-19',brand:'Milly',tire_condition:'novo',quantity:1,unit_price:100}],
+    new_customer:{name:'Cliente Dot'},payment_status:'pending' as const,due_date:original,created_by:'teste',
+    payment_plan:{received:0,installments:[{due_date:original,amount:100}]},idempotency_key:randomUUID()};
+  const {order_id}=await registerWholesaleSale(input,db.pool);
+  const access=(await exchange(await newCode())).json().access_token;
+  const other=(await exchange(await newCode())).json().access_token;
+  const grant=(await db.pool.query(`SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1`,
+    [createHash('sha256').update(access).digest('hex')])).rows[0].grant_id;
+  const permission='/admin/api/dot/connections/'+grant+'/installments';
+  const enable=(enabled:boolean)=>app.inject({method:'PUT',url:permission,headers:headers(),payload:{enabled}});
+  const args={order_id,number:1,expected_due_date:original,due_date:next};
+  const tool=async(name:string,args:object,token=access)=>(await rpc(token,'tools/call',{name,arguments:args})).json();
+  const proposal=()=>tool('preparar_alteracao_vencimento',args);
+  expect((await proposal()).error).toBeTruthy();
+  expect((await enable(true)).statusCode).toBe(200);
+  expect((await tool('preparar_alteracao_vencimento',args,other)).error).toBeTruthy();
+  const found=await tool('consultar_parcelas_para_revisao',{cliente:'Cliente Dot'});
+  expect(found.result.structuredContent.vendas).toEqual([expect.objectContaining({order_id})]);
+  const modern=await app.inject({method:'POST',url:'/admin/dot/mcp',headers:{host:'farejador.example',authorization:'Bearer '+access,
+    'mcp-protocol-version':'2026-07-28','mcp-method':'tools/list'},payload:{jsonrpc:'2.0',id:1,method:'tools/list',
+    params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'teste',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}}});
+  expect(modern.json().result.tools.some((t:{name:string})=>t.name==='preparar_alteracao_vencimento')).toBe(true);
+  const pending=(await proposal()).result.structuredContent;
+  expect(pending).toMatchObject({status:'aguardando_confirmacao',saldo:100,cliente:'Cliente Dot'});
+  expect((await proposal()).result.structuredContent.proposta).toBe(pending.proposta);
+  const path=(id:string)=>'/admin/api/dot/installment-reviews/'+id;
+  const submit=(id:string,action='confirm')=>app.inject({method:'POST',url:path(id)+'/'+action,headers:headers()});
+  const date=async()=>(await db.pool.query('SELECT due_date::text FROM commerce.wholesale_orders WHERE id=$1',[order_id])).rows[0].due_date;
+  expect(await date()).toBe(original);
+  expect((await app.inject({method:'POST',url:path(pending.proposta)+'/confirm',headers:{authorization:'Bearer '+access}})).statusCode).not.toBe(200);
+  expect((await app.inject({method:'POST',url:path(pending.proposta)+'/confirm',headers:{...headers(),origin:'https://other.example'}})).statusCode).toBe(403);
+  expect((await submit(pending.proposta,'restore')).statusCode).toBe(404);
+  expect((await enable(false)).statusCode).toBe(200);
+  expect((await enable(true)).statusCode).toBe(200);
+  expect((await submit(pending.proposta)).statusCode).toBe(404);
+  const expired=(await proposal()).result.structuredContent.proposta;
+  await db.pool.query("UPDATE network.dot_installment_reviews SET expires_at=now()-interval '1 second' WHERE id=$1",[expired]);
+  expect((await submit(expired)).statusCode).toBe(410);
+  const active=(await proposal()).result.structuredContent.proposta;
+  expect((await app.inject({url:path(active),headers:headers()})).json().status).toBe('pendente');
+  expect((await Promise.all([submit(active),submit(active)])).map(r=>r.json().status)).toEqual(['confirmado','confirmado']);
+  expect(await date()).toBe(next);
+  const audit=async()=>(await db.pool.query(`SELECT count(*)::int n FROM audit.events WHERE entity_id=$1
+    AND event_type='installment_due_date_changed'`,[order_id])).rows[0].n;
+  expect(await audit()).toBe(1);
+  expect((await enable(false)).statusCode).toBe(200);
+  expect((await submit(active,'restore')).json().status).toBe('restaurado');
+  expect((await submit(active,'restore')).json().status).toBe('restaurado');
+  expect(await date()).toBe(original);
+  expect(await audit()).toBe(2);
+  await enable(true);
+  expect((await tool('consultar_proposta_vencimento',{proposta:active})).result.structuredContent.status).toBe('restaurado');
+  const stale=(await proposal()).result.structuredContent.proposta;
+  await changeSaleInstallmentDueDate({...args,due_date:'2098-06-10',idempotency_key:randomUUID()},'outro operador',db.pool);
+  expect((await submit(stale)).statusCode).toBe(409);
+  expect(await date()).toBe('2098-06-10');
+  const partial=(await tool('preparar_alteracao_vencimento',{...args,expected_due_date:'2098-06-10'})).result.structuredContent;
+  const {settleMatrizLedgerOpenItem}=await import('../../src/admin/painel/matriz-ledger-settlement.js');
+  const obligation=(await db.pool.query(`SELECT id FROM finance.matriz_ledger_transactions
+    WHERE source_type='commerce.wholesale_order.revenue' AND source_id=$1`,[order_id])).rows[0].id;
+  await settleMatrizLedgerOpenItem({environment:'test',obligation_id:obligation,sale_installment:{order_id,number:1},
+    amount:20,payment_method:'Pix',idempotency_key:randomUUID()},db.pool);
+  expect((await submit(partial.proposta)).statusCode).toBe(409);
+  expect(await date()).toBe('2098-06-10');
+  await enable(false);
 });

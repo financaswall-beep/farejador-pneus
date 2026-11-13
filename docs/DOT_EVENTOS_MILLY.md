@@ -4,6 +4,12 @@ Implementação inicial de 24/10/2026; ampliação de avisos e controles em 25/1
 O monitor começa desligado (`DOT_EVENTS_ENABLED=false`).
 Os dados comerciais continuam somente leitura. Não há respostas automáticas para clientes nem alterações em pedidos/estoque/caixa.
 
+## Propostas de vencimento
+
+Em **Avisos do assistente → Permissões da Milly**, o proprietário pode permitir propostas de vencimento para uma conexão. A Milly procura parcelas em aberto de atacado ou lote e devolve um link válido por 15 minutos. Abra o link com a sessão do proprietário, confira comprador, venda, parcela, saldo e datas e clique em **Confirmar novo vencimento**. O painel verifica a situação atual e registra a autorização no histórico da venda.
+
+O mesmo link permite **Restaurar vencimento anterior** enquanto a parcela continuar aberta com o vencimento confirmado. **Voltar para somente consulta** cancela propostas pendentes daquela conexão. As configurações de avisos são independentes.
+
 ## Avisos disponíveis
 
 - `farejador.conversa.atualizada`: conversa com novas mensagens públicas, encerramento e espera sem resposta.

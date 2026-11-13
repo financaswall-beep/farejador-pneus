@@ -11538,6 +11538,7 @@
         <p class="text-gray-600 mt-2">Escolha o que merece atenção. O assistente confere os fatos antes de avisar você.</p></header>
       <p x-show="adminUser?.role !== 'owner'" class="rounded-xl bg-white border border-gray-200 p-5">Somente o proprietário pode configurar os avisos.</p>
       <div x-show="adminUser?.role === 'owner'">
+        <a href="/admin/dot/connections" class="mb-4 inline-block text-emerald-700 underline">Permissões da Milly</a>
         <p x-show="dotAlerts.loading" role="status" class="p-5">Carregando preferências…</p>
         <p x-show="dotAlerts.error" x-text="dotAlerts.error" role="alert" class="p-4 mb-4 rounded-xl bg-red-50 text-red-800"></p>
         <p x-show="dotAlerts.message" x-text="dotAlerts.message" role="status" class="p-4 mb-4 rounded-xl bg-emerald-50 text-emerald-800"></p>

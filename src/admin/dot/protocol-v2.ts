@@ -44,13 +44,13 @@ export async function handleModernDot(request:FastifyRequest,reply:FastifyReply,
     if(method==='server/discover') {
       z.object({}).strict().parse(args);
       result={supportedVersions:[VERSION],capabilities:{tools:{},...(dotEventsAvailable()?{events:{}}:{})},
-        instructions:dotInstructions(),ttlMs:0,cacheScope:'private',
+        instructions:dotInstructions(identity),ttlMs:0,cacheScope:'private',
         _meta:{'io.modelcontextprotocol/serverInfo':{name:'Farejador — Matriz',version:'1.3.0'}}};
     }else if(method==='tools/list'||method==='events/list') {
       const list=emptyParams.parse(args);
       if(list.cursor)throw new Error('invalid_cursor');
       if(method==='events/list'&&!dotEventsAvailable())return error(404,-32601,'Eventos indisponíveis',id);
-      result={...(method==='tools/list'?{tools:listedDotTools()}:{events:eventDefinitions}),ttlMs:0,cacheScope:'private'};
+      result={...(method==='tools/list'?{tools:listedDotTools(identity)}:{events:eventDefinitions}),ttlMs:0,cacheScope:'private'};
     }else if(method==='tools/call') {
       const tool=z.object({name:z.string(),arguments:z.record(z.unknown()).optional()}).strict().parse(args);
       result=await invokeDotTool(identity,tool.name,tool.arguments);

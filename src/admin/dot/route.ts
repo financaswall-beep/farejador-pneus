@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { rateLimitHit } from '../../shared/rate-limit.js';
 import { dotConfig, DOT_MCP_PATH, DOT_SCOPE } from './config.js';
+import { registerInstallmentReviews } from './route-installment-reviews.js';
 import { registerDotOAuth } from './route-oauth.js';
 import { validateDotAccess } from './token-store.js';
 import { createDotMcpServer } from './mcp-server.js';
@@ -16,6 +17,7 @@ export async function registerDotRoutes(fastify:FastifyInstance) {
   if(!config)return;
   await fastify.register(async app=>{
     await registerDotOAuth(app,config);
+    registerInstallmentReviews(app,config.origin);
     app.get('/admin/dot/consent.js',async(_request,reply)=>reply.type('text/javascript; charset=utf-8')
       .header('Cache-Control','no-store').send(await readFile('painel/public/dot-consent.js','utf8')));
     app.route({method:['GET','POST','DELETE'],url:DOT_MCP_PATH,bodyLimit:16*1024,handler:async(request,reply)=>{
