@@ -18,6 +18,7 @@ type Target = { obligation_id: string; account_code?: never } |
 export type MatrizLedgerSettlementInput = Target & {
   amount?: number;
   sale_installment?: { order_id: string; number: number };
+  purchase_installment?: number;
   payment_method?: string;
   paid_at?: string;
   cash_account?: string;
@@ -91,15 +92,17 @@ async function settleObligation(
     ? obligation.source_id
     : paymentSourceId(operation.idempotencyKey, operation.fingerprint);
   if (sourceId === obligation.source_id) {
-    const corrected=await client.query(`SELECT 1 FROM finance.matriz_ledger_transactions t
-      JOIN finance.matriz_ledger_transactions r ON r.reversal_of_transaction_id=t.id AND r.environment=t.environment
-      WHERE t.environment=$1 AND t.source_type=$2 AND t.source_id=$3`,[operation.environment,sourceType,sourceId]);
-    if(corrected.rowCount) sourceId=paymentSourceId(operation.idempotencyKey,operation.fingerprint);
+    // Uma baixa anterior pode ter quitado o título antes do estorno de OUTRA parcela.
+    // O replay da mesma operação já foi resolvido antes de chegar aqui.
+    const previousFull=await client.query(`SELECT 1 FROM finance.matriz_ledger_transactions
+      WHERE environment=$1 AND source_type=$2 AND source_id=$3`,[operation.environment,sourceType,sourceId]);
+    if(previousFull.rowCount) sourceId=paymentSourceId(operation.idempotencyKey,operation.fingerprint);
   }
   const paymentId = await recordPayment(
     client, operation.environment, obligation, amount, paidAt, actor,
     sourceType, sourceId, {
       ...(target ? { sale_installment: target.number } : {}),
+      ...(input.purchase_installment ? { purchase_installment: input.purchase_installment } : {}),
       settlement_key:operation.idempotencyKey, obligation_id: obligation.id, source_type: obligation.source_type,
       source_id: obligation.source_id, payment_method: method ?? null,
       cash_account: input.cash_account?.trim() || null,
@@ -229,6 +232,7 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({
       ...(input.sale_installment ? { sale_installment: input.sale_installment } : {}),
+      ...(input.purchase_installment ? { purchase_installment: input.purchase_installment } : {}),
       target, amount_cents: input.amount === undefined ? null : moneyCents(input.amount),
       payment_method: input.payment_method?.trim().toLowerCase() ?? null,
       paid_at: input.paid_at ?? null,

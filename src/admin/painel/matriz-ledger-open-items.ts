@@ -1,4 +1,5 @@
 import { salePlanSnapshotSql } from './sale-payment-plan.js';
+import { purchaseInstallmentBalancesSql } from './purchase-installment-balances.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -48,7 +49,7 @@ function receivable(row: OpenRow): FinanceiroReceivableItem {
   const retail = row.source_type === 'commerce.order.revenue';
   return {
     ...base, tipo: retail ? 'varejo' : 'fiado',
-    ...(row.sale_plan ? { sale_installment: row.installment_number } : {}),
+    ...(row.sale_plan ? { sale_installment: row.installment_number, order_id: row.order_id } : {}),
     nome: row.sale_plan ? `${row.customer_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
       : retail ? row.description : (row.customer_name ?? row.description),
     phone: retail ? null : row.customer_phone,
@@ -73,6 +74,7 @@ function payable(row: OpenRow): FinanceiroPayableItem {
   };
   if (row.source_type === 'commerce.wholesale_purchase.accrual') return {
     ...base, tipo: 'fornecedor',
+    ...(row.installment_number ? { parcela_compra: row.installment_number } : {}),
     nome: row.installment_number
       ? `${row.supplier_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
       : row.supplier_name ?? row.description,
@@ -105,16 +107,12 @@ export async function getMatrizLedgerOpenItems(
     `WITH paid AS (
        SELECT obligation_transaction_id,
               sum(CASE WHEN payment_kind IN ('settlement','writeoff','adjustment')
-                THEN amount ELSE -amount END) amount,
-              sum(CASE WHEN payment_kind='settlement' THEN amount
-                WHEN payment_kind='reversal' THEN -amount ELSE 0 END) settled_amount
+                THEN amount ELSE -amount END) amount
          FROM finance.matriz_ledger_payments WHERE environment=$1
         GROUP BY obligation_transaction_id
      )
      SELECT ${salePlanSnapshotSql} AS sale_plan,t.id obligation_id,t.source_type,t.source_id,e.account_code,
             (e.amount-COALESCE(paid.amount,0))::numeric(14,2)::text balance,
-            e.amount::numeric(14,2)::text original_amount,
-            COALESCE(paid.settled_amount,0)::numeric(14,2)::text settled_amount,
             t.due_on::text due_date,
             (t.due_on IS NOT NULL
               AND t.due_on<(now() AT TIME ZONE 'America/Sao_Paulo')::date) overdue,
@@ -163,12 +161,12 @@ export async function getMatrizLedgerOpenItems(
     .filter((row) => row.source_type === 'commerce.wholesale_purchase.accrual')
     .map((row) => row.source_id);
   const installmentRows = purchaseIds.length ? await dbPool.query<{
-    purchase_id: string; installment_number: number; due_date: string; amount: string;
+    purchase_id: string; installment_number: number; due_date: string; balance: string;
   }>(
-    `SELECT purchase_id,installment_number,due_date::text,amount::text
-       FROM commerce.wholesale_purchase_installments
-      WHERE environment=$1 AND purchase_id=ANY($2::uuid[])
-      ORDER BY purchase_id,installment_number`, [environment, purchaseIds],
+    `SELECT p.id purchase_id,i.installment_number,i.due_date::text,i.balance::text
+       FROM commerce.wholesale_purchases p CROSS JOIN LATERAL (${purchaseInstallmentBalancesSql}) i
+      WHERE p.environment=$1 AND p.id=ANY($2::uuid[])
+      ORDER BY p.id,i.installment_number`, [environment, purchaseIds],
   ) : { rows: [] };
   const installments = new Map<string, typeof installmentRows.rows>();
   for (const row of installmentRows.rows) {
@@ -182,7 +180,7 @@ export async function getMatrizLedgerOpenItems(
     if (row.sale_plan) {
       for (const part of row.sale_plan.installments) {
         if (part.balance <= 0) continue;
-        expanded.push({ ...row, source_id: `${row.source_id}:${part.number}`,
+        expanded.push({ ...row, order_id: row.source_id, source_id: `${row.source_id}:${part.number}`,
           balance: money(part.balance), due_date: part.due_date, overdue: part.due_date < today,
           installment_number: part.number, installments_count: row.sale_plan.installments.length });
       }
@@ -193,12 +191,8 @@ export async function getMatrizLedgerOpenItems(
       expanded.push(row);
       continue;
     }
-    let paidCents = moneyCents(Number(row.settled_amount));
     for (const installment of schedule) {
-      const amountCents = moneyCents(Number(installment.amount));
-      const applied = Math.min(amountCents, paidCents);
-      paidCents -= applied;
-      const openCents = amountCents - applied;
+      const openCents = moneyCents(Number(installment.balance));
       if (openCents <= 0) continue;
       expanded.push({ ...row,
         source_id: `${row.source_id}:${installment.installment_number}`,

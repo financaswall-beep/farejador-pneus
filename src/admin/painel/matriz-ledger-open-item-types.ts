@@ -16,6 +16,7 @@ export interface FinanceiroReceivableItem {
   phone: string | null;
   count?: number;
   sale_installment?: number;
+  order_id?: string;
   categoria?: string;
   obligation_id?: string;
   account_code?: string;
@@ -29,6 +30,7 @@ export interface FinanceiroPayableItem {
   nome: string;
   categoria?: string;
   valor: string;
+  parcela_compra?: number;
   due_date: string | null;
   overdue: boolean;
   obligation_id?: string;
@@ -42,6 +44,7 @@ export interface MatrizLedgerOpenItems {
 }
 
 export interface OpenRow {
+  order_id?: string;
   obligation_id: string;
   source_type: string;
   source_id: string;
@@ -57,8 +60,6 @@ export interface OpenRow {
   customer_name: string | null;
   customer_phone: string | null;
   supplier_name: string | null;
-  original_amount: string;
-  settled_amount: string;
   sale_plan?: SalePaymentSnapshot | null;
   installment_number?: number;
   installments_count?: number;

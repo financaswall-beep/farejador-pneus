@@ -4,6 +4,7 @@ const money = z.number().finite().nonnegative().max(9_999_999_999.99).multipleOf
 export const salePaymentPlanSchema = z.object({
   received: money,
   method: z.enum(['Pix', 'Dinheiro', 'Cartão']).optional(),
+  cash_account: z.string().trim().min(2).max(80).optional(),
   installments: z.array(z.object({
     due_date: z.string().date(), amount: money.positive(),
   }).strict()).min(1).max(120),
@@ -35,6 +36,7 @@ export const salePlanSnapshotSql = `CASE WHEN t.metadata ? 'sale_plan' THEN (
   WITH payments AS (
     SELECT CASE WHEN p.payment_kind='reversal' THEN -p.amount ELSE p.amount END amount,
            p.payment_kind,
+           COALESCE(original_tx.source_id,tx.source_id)=t.source_id||':entrada' AS is_down_payment,
            (COALESCE(original_tx.metadata,tx.metadata)->>'sale_installment')::int number
       FROM finance.matriz_ledger_payments p
       JOIN finance.matriz_ledger_transactions tx ON tx.id=p.payment_transaction_id
@@ -43,8 +45,7 @@ export const salePlanSnapshotSql = `CASE WHEN t.metadata ? 'sale_plan' THEN (
      WHERE p.environment=t.environment AND p.obligation_transaction_id=t.id
   ), totals AS (
     SELECT COALESCE(sum(amount) FILTER (WHERE payment_kind IN ('settlement','reversal')),0) received,
-           COALESCE(sum(amount) FILTER (WHERE number IS NULL),0)
-             - (t.metadata->'sale_plan'->>'received')::numeric generic
+           COALESCE(sum(amount) FILTER (WHERE number IS NULL AND NOT is_down_payment),0) generic
       FROM payments
   ), corrections AS MATERIALIZED (
     -- to_jsonb mantém a leitura compatível durante o deploy das colunas opcionais.

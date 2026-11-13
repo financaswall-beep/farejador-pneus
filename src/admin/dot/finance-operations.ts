@@ -90,11 +90,13 @@ export async function renegotiate(db:PoolClient,data:z.infer<typeof agreementInp
   return {order_id:obligation.source_id,acordo:after};
 }
 
-export const reversalInput=z.object({pagamento_id:id,valor_esperado:money,motivo:label,ocorrido_em:instant,idempotency_key:id}).strict();
+export const reversalInput=z.object({pagamento_id:id,valor_esperado:money,motivo:label,ocorrido_em:instant,
+  vencimento_entrada_estornada:z.string().date().optional(),idempotency_key:id}).strict();
 export async function reverseSettlement(db:PoolClient,data:z.infer<typeof reversalInput>,actor:string) {
   const environment=env.FAREJADOR_ENV;
   const row=(await db.query(`SELECT p.id,p.amount,p.paid_at,p.obligation_transaction_id obligation_id,
-    o.source_type origin,o.source_id, t.id tx,t.metadata,t.source_type FROM finance.matriz_ledger_payments p
+    o.source_type origin,o.source_id,o.competence_on::text sold_on,t.source_id payment_source_id,
+    t.id tx,t.metadata,t.source_type FROM finance.matriz_ledger_payments p
     JOIN finance.matriz_ledger_transactions o ON o.id=p.obligation_transaction_id AND o.environment=p.environment
     JOIN finance.matriz_ledger_transactions t ON t.id=p.payment_transaction_id AND t.environment=p.environment
     WHERE p.environment=$1 AND t.id=$2 AND p.payment_kind='settlement'`,[environment,data.pagamento_id])).rows[0];
@@ -105,6 +107,23 @@ export async function reverseSettlement(db:PoolClient,data:z.infer<typeof revers
   if (breakdown.reversed || moneyCents(+row.amount)!==moneyCents(data.valor_esperado) || new Date(data.ocorrido_em)<new Date(row.paid_at))
     throw Error('baixa_diverge_da_autorizacao');
   const isSale=['commerce.wholesale_order.arrival_revenue','commerce.wholesale_order.revenue'].includes(row.origin);
+  const isDownPayment=isSale && row.payment_source_id===row.source_id+':entrada';
+  if (isDownPayment) {
+    const due=data.vencimento_entrada_estornada;
+    if (!due) throw Error('informe_o_vencimento_da_entrada_estornada');
+    if (due < row.sold_on) throw Error('installment_before_sale');
+    // Mantém os números das parcelas já usadas em baixas e suas datas revisadas.
+    // A entrada reaberta ganha uma parcela própria, mesmo se a venda já estiver quitada.
+    const agreement=await db.query(`UPDATE commerce.wholesale_orders o SET installment_agreement=
+      COALESCE(o.installment_agreement, t.metadata->'sale_plan'->'installments')
+        || jsonb_build_array(jsonb_build_object('due_date',$4::text,'amount',$5::numeric))
+      FROM finance.matriz_ledger_transactions t WHERE o.environment=$1 AND o.id=$2
+        AND t.environment=o.environment AND t.id=$3 AND t.metadata ? 'sale_plan'
+        AND o.status='confirmed'
+        AND jsonb_array_length(COALESCE(o.installment_agreement,t.metadata->'sale_plan'->'installments'))<120
+      RETURNING o.id`,[environment,row.source_id,row.obligation_id,due,row.amount]);
+    if (!agreement.rowCount) throw Error('entrada_sem_espaco_no_acordo');
+  } else if (data.vencimento_entrada_estornada) throw Error('vencimento_exclusivo_da_entrada');
   const linked=isSale && (await db.query('SELECT id FROM commerce.partner_purchases WHERE environment=$1 AND source_wholesale_order_id=$2 AND deleted_at IS NULL',[environment,row.source_id])).rows[0];
   if(linked) {
     await db.query("SELECT set_config('app.matrix_partner_bridge','on',true)");
@@ -113,7 +132,7 @@ export async function reverseSettlement(db:PoolClient,data:z.infer<typeof revers
       SELECT e.environment,e.unit_id,e.payable_id,-e.amount,$4::timestamptz,e.payment_method,$5,$6,e.id
       FROM finance.partner_payable_events e JOIN finance.partner_payables f ON f.environment=e.environment AND f.id=e.payable_id
       WHERE e.environment=$1 AND f.source_purchase_id=$2 AND e.idempotency_key=$3 AND e.amount=$7 AND f.deleted_at IS NULL RETURNING id`,
-      [environment,linked.id,row.metadata.settlement_key ?? (await db.query(`SELECT idempotency_key FROM audit.events
+      [environment,linked.id,(isDownPayment ? row.payment_source_id : row.metadata.settlement_key) ?? (await db.query(`SELECT idempotency_key FROM audit.events
          WHERE environment=$1 AND entity_id=$2 AND event_type='central_settlement'`,[environment,row.tx])).rows[0]?.idempotency_key,
        data.ocorrido_em,data.idempotency_key,actor,row.amount]);
     if (!event.rowCount) throw Error('pagamento_espelhado_nao_identificado');
@@ -124,11 +143,14 @@ export async function reverseSettlement(db:PoolClient,data:z.infer<typeof revers
     JSON.stringify({...row.metadata,correction_type:'entry_error',reason:data.motivo})])).rows[0]!.id;
   await db.query('SELECT finance.record_matriz_ledger_payment($1::env_t,$2,$3,$4::timestamptz,$5,$6)',
     [environment,row.obligation_id,reverse,data.ocorrido_em,actor,row.id]);
+  const reopened=await lockSettlementObligation(db,environment,row.obligation_id);
   if(isSale) {
     const updated=await db.query(`UPDATE commerce.wholesale_orders SET payment_status='pending',paid_at=NULL
       WHERE environment=$1 AND id=$2 AND status='confirmed' RETURNING id`,[environment,row.source_id]);
     if(!updated.rowCount) throw Error('sale_installment_changed');
-    const due=(await lockSettlementObligation(db,environment,row.obligation_id)).sale_plan?.next_due;
+    if (reopened.sale_plan && moneyCents(reopened.sale_plan.balance)!==moneyCents(Number(reopened.open_amount)))
+      throw Error('acordo_inconsistente');
+    const due=reopened.sale_plan?.next_due;
     if (due) await db.query('UPDATE commerce.wholesale_orders SET due_date=$3 WHERE environment=$1 AND id=$2',[environment,row.source_id,due]);
     if (linked) {
       const dueDate=due ?? (await db.query('SELECT due_date::text d FROM commerce.wholesale_orders WHERE environment=$1 AND id=$2',[environment,row.source_id])).rows[0]?.d;
@@ -143,5 +165,9 @@ export async function reverseSettlement(db:PoolClient,data:z.infer<typeof revers
     const updated=await db.query("UPDATE commerce.orders SET payment_method='A receber' WHERE environment=$1 AND id=$2 AND status<>'cancelled' RETURNING id",[environment,row.source_id]);
     if(!updated.rowCount) throw Error('receivable_not_found');
   }
-  return {estorno_id:reverse,obligation_id:row.obligation_id,saldo:(await lockSettlementObligation(db,environment,row.obligation_id)).open_amount};
+  const part=reopened.sale_plan?.installments.find(p=>p.number===row.metadata.sale_installment);
+  return {estorno_id:reverse,pagamento_id:row.tx,valor_estornado:row.amount,obligation_id:row.obligation_id,
+    saldo:reopened.open_amount,...(part?{parcela_reaberta:part}:{}),
+    ...(isDownPayment?{entrada_reaberta:reopened.sale_plan?.installments.at(-1)}:{}),
+    ...(row.metadata.purchase_installment?{parcela_compra:row.metadata.purchase_installment}:{})};
 }

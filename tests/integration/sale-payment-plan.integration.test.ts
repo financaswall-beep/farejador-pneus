@@ -167,4 +167,17 @@ it('apura a entrada do parceiro sobre o valor aceito na chegada e espelha a baix
   const mirrorAfter=await db.pool.query(`SELECT f.status,f.due_date::text due,sum(e.amount)::text paid FROM finance.partner_payables f
     JOIN finance.partner_payable_events e ON e.payable_id=f.id WHERE f.source_purchase_id=$1 GROUP BY f.id`,[original.linked_partner_purchase_id]);
   expect(mirrorAfter.rows[0]).toEqual({status:'open',due:'2099-02-01',paid:'20.01'});
+  const cash=await db.pool.query("SELECT id FROM finance.matriz_ledger_transactions WHERE environment='test' AND source_id=$1",[original.order_id+':entrada']);
+  const correction=await db.pool.connect();
+  try {
+    await correction.query('BEGIN');
+    const reopened=await reverseSettlement(correction,{pagamento_id:cash.rows[0].id,valor_esperado:20.01,
+      ocorrido_em:new Date().toISOString(),motivo:'Entrada da carga informada por engano',
+      vencimento_entrada_estornada:'2099-01-20',idempotency_key:randomUUID()},actor);
+    expect(reopened).toMatchObject({saldo:'50.00',entrada_reaberta:{amount:20.01,balance:20.01,due_date:'2099-01-20'}});
+    await correction.query('COMMIT');
+  } catch(error){ await correction.query('ROLLBACK'); throw error; } finally{correction.release();}
+  const partnerState=await db.pool.query(`SELECT f.due_date::text due,sum(e.amount)::text paid FROM finance.partner_payables f
+    JOIN finance.partner_payable_events e ON e.payable_id=f.id WHERE f.source_purchase_id=$1 GROUP BY f.id`,[original.linked_partner_purchase_id]);
+  expect(partnerState.rows[0]).toEqual({due:'2099-01-20',paid:'0.00'});
 });

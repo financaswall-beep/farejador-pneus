@@ -25,7 +25,7 @@ const simple=(description:string,read:(ctx:DotReadContext)=>Promise<Record<strin
 const views=<const T extends [string,...string[]]>(values:T)=>pageInput.extend({visao:z.enum(values).default(values[0])}).strict();
 export const expandedTools={
   consultar_varejo_matriz:simple('Histórico dos pedidos de varejo da Matriz e seus itens, descontos, valores e situação. Até 50 pedidos/página.',readDotRetail),
-  consultar_atacado_matriz:tool('Vendas do atacado, compradores por código e medidas vendidas. Custos pendentes e trânsito não são lucro realizado.',
+  consultar_atacado_matriz:tool('Histórico de vendas de atacado e lote. Na visão vendas, sale_plan informa o recebido, o saldo e as parcelas do acordo. Use referencia para uma venda específica e confira o período da venda.',
     views(['vendas','compradores','medidas','inativos']),(ctx,input)=>readDotWholesale(ctx,input.visao)),
   consultar_movimentos_estoque_matriz:simple('Entradas, saídas, perdas e contagens do estoque físico da Matriz, com custos e quantidades.',readDotMovements),
   consultar_lotes_matriz:tool('Lotes de pneus: posição atual, origem, movimentos/separações e vendas. Referência é o código UUID do lote.',

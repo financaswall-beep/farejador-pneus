@@ -289,7 +289,7 @@ it('as cinco consultas rodam contra o banco reconstruído sem alterar dados come
   expect(after).toEqual(before);
 });
 
-it('executa com permissão financeira, repete sem duplicar e estorna apenas o pagamento selecionado',async()=>{
+async function ownerFinanceMcp() {
   const token=(await exchange(await newCode())).json().access_token;
   const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
     [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
@@ -302,6 +302,11 @@ it('executa com permissão financeira, repete sem duplicar e estorna apenas o pa
     expect(result.result.isError,JSON.stringify(result.result.content)).not.toBe(true);
     return result.result.structuredContent;
   };
+  return {token,permission,call};
+}
+
+it('executa com permissão financeira, repete sem duplicar e estorna apenas o pagamento selecionado',async()=>{
+  const {token,permission,call}=await ownerFinanceMcp();
   const now=new Date().toISOString();
   const service={cliente:'Oficina fictícia',descricao:'Montagem',valor:965,competencia:now,vencimento:'2099-12-05',idempotency_key:randomUUID()};
   const [first,repeat]=await Promise.all([call('criar_cobranca_servico',service),call('criar_cobranca_servico',service)]);
@@ -361,6 +366,107 @@ it('executa com permissão financeira, repete sem duplicar e estorna apenas o pa
   expect(agreement.acordo).toMatchObject({received:400,balance:800,next_due:'2100-02-05'});
   await permission(false);
   expect((await rpc(token,'tools/call',{name:'registrar_baixa_financeira',arguments:pay})).json().error.message).toContain('modo de consulta');
+});
+
+it('registra diesel pago, anexa nota à despesa pendente e apura a viagem com compras em trânsito',async()=>{
+  const {call,token}=await ownerFinanceMcp();
+  const {createPurchaseGroup}=await import('../../src/admin/painel/queries-purchase-groups-write.js');
+  const {registerWholesalePurchase}=await import('../../src/admin/painel/queries-fornecedores-registro.js');
+  const group=await createPurchaseGroup({name:'Viagem de compra dos pneus',actor:'teste',idempotency_key:randomUUID()},db.pool);
+  const other=await createPurchaseGroup({name:'Segunda viagem de compra',actor:'teste',idempotency_key:randomUUID()},db.pool);
+  const trips=await call('consultar_viagens_de_compra',{status:'open'});
+  expect(trips.rows.map((g:{id:string})=>g.id)).toEqual(expect.arrayContaining([group.id,other.id]));
+  const purchase=await registerWholesalePurchase({group_id:group.id,new_supplier:{name:'Fornecedor viagem fictício'},
+    items:[],lot:{description:'Lote de teste em trânsito',quantity:10,total_cost:750},freight_amount:70,
+    receipt_status:'pending',payment_status:'pending',due_date:'2099-12-05',created_by:'teste',idempotency_key:randomUUID()},db.pool);
+  const when='2026-01-02T02:30:00Z';
+  const expense={category:'combustivel',amount:180,description:'Diesel da viagem teste',payment_status:'paid',
+    payment_method:'Pix',cash_account:'Conta da viagem',paid_at:when,occurred_at:when,group_id:group.id,idempotency_key:randomUUID()};
+  const diesel=await call('lancar_despesa_matriz',expense);
+  expect(await call('lancar_despesa_matriz',expense)).toEqual(diesel);
+  const summary=await call('consultar_viagens_de_compra',{viagem_id:group.id});
+  expect(summary.purchases[0].id).toBe(purchase.purchase_id);
+  expect(summary.summary).toMatchObject({expenses:'180.00',freight_included:'70.00',cost_per_tire:'100.00',provisional:true});
+  const cash=await db.pool.query(`SELECT t.cash_on::text,t.metadata->>'cash_account' conta,e.amount::text
+    FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+    WHERE t.environment='test' AND t.source_id=$1 AND e.account_code='cash'`,[diesel.id]);
+  expect(cash.rows).toEqual([{cash_on:'2026-01-01',conta:'Conta da viagem',amount:'180.00'}]);
+  const pending=await call('lancar_despesa_matriz',{category:'combustivel',amount:180,description:'Pagar depois',
+    occurred_at:when,payment_status:'pending',due_date:'2099-12-05',idempotency_key:randomUUID()});
+  const jpg=await (await import('sharp')).default({create:{width:9,height:9,channels:3,background:'blue'}}).jpeg().toBuffer();
+  const attachment={expense_id:pending.id,valor_esperado:180,data_esperada:'2026-01-01',imagem_base64:jpg.toString('base64'),idempotency_key:randomUUID()};
+  const wrong=await rpc(token,'tools/call',{name:'anexar_comprovante_despesa',arguments:{...attachment,data_esperada:'2026-01-02'}});
+  expect(wrong.json().result.isError).toBe(true);
+  const receipt=await call('anexar_comprovante_despesa',attachment);
+  expect(await call('anexar_comprovante_despesa',attachment)).toEqual(receipt);
+  const due=await call('consultar_titulos_financeiros',{lado:'a_pagar',busca:pending.id});
+  expect(due.itens).toMatchObject([{valor:'180.00',due_date:'2099-12-05'}]);
+  const saved=await db.pool.query(`SELECT e.payment_status,r.id comprovante FROM commerce.matriz_expenses e
+    JOIN commerce.matriz_expense_receipts r ON r.environment=e.environment AND r.expense_id=e.id WHERE e.id=$1`,[pending.id]);
+  expect(saved.rows).toEqual([{payment_status:'pending',comprovante:receipt.receipt_id}]);
+  const out=await db.pool.query("SELECT id FROM finance.matriz_ledger_transactions WHERE environment='test' AND source_id=$1 AND cash_on IS NOT NULL",[pending.id]);
+  expect(out.rowCount).toBe(0);
+});
+
+it('preserva o acordo de lote em repetição, correção entre parcelas e estorno da entrada',async()=>{
+  const {call,token}=await ownerFinanceMcp();
+  const {registerWholesalePurchase}=await import('../../src/admin/painel/queries-fornecedores-registro.js');
+  const lot=await registerWholesalePurchase({new_supplier:{name:'Fornecedor lote de teste'},items:[],
+    lot:{description:'Lote para corrigir baixa',quantity:10,total_cost:500},payment_status:'paid',payment_method:'Pix',
+    receipt_status:'received',created_by:'teste',idempotency_key:randomUUID()},db.pool);
+  const day=(await import('../../src/shared/business-time.js')).businessDateSaoPaulo(new Date());
+  const sale={new_customer:{name:'Comprador das parcelas de teste'},amount:1200,description:'Venda do lote',
+    sold_on:day,expected_cost:100,allocations:[{lot_id:lot.lot_id,quantity:2}],payment_status:'pending',due_date:'2099-12-05',
+    payment_plan:{received:300,method:'Pix',cash_account:'Conta Pix da loja',
+      installments:[{amount:450,due_date:'2099-12-05'},{amount:450,due_date:'2100-01-05'}]},idempotency_key:randomUUID()};
+  const writes=await Promise.all([sale,{...sale,idempotency_key:randomUUID()}].map(args=>
+    rpc(token,'tools/call',{name:'registrar_venda_lote',arguments:args}).then(r=>r.json())));
+  const order=writes.find(r=>r.result?.structuredContent)?.result.structuredContent;
+  expect(order).toBeDefined();
+  expect(writes.find(r=>r.error)?.error.data.vendas).toMatchObject([{order_id:order.order_id,acordo:{received:300,balance:900}}]);
+  const agenda=async()=> (await call('consultar_titulos_financeiros',{lado:'a_receber',busca:order.order_id})).itens;
+  const [first,second]=await agenda();
+  const target=(part:{order_id:string;sale_installment:number})=>({order_id:part.order_id,number:part.sale_installment});
+  const pay={obligation_id:first.obligation_id,lado:'a_receber',paid_at:new Date().toISOString(),payment_method:'Pix',cash_account:'Conta Pix da loja'};
+  const received=await call('registrar_baixa_financeira',{...pay,sale_installment:target(first),amount:300,idempotency_key:randomUUID()});
+  const fix={pagamento_id:received.payment_ids[0],valor_esperado:300,motivo:'Parcela errada',ocorrido_em:new Date().toISOString(),
+    destino:{...pay,sale_installment:target(second)},idempotency_key:randomUUID()};
+  const changed=await call('estornar_baixa_financeira',fix);
+  expect(await call('estornar_baixa_financeira',fix)).toEqual(changed);
+  expect(changed).toMatchObject({parcela_reaberta:{number:1,balance:450},baixa_corrigida:{remaining_balance:'600.00',installment_remaining_balance:'150.00'}});
+  const upfront=(await db.pool.query("SELECT id,metadata->>'cash_account' conta FROM finance.matriz_ledger_transactions WHERE source_id=$1",[order.order_id+':entrada'])).rows[0];
+  expect(upfront.conta).toBe('Conta Pix da loja');
+  const reverse={pagamento_id:upfront.id,valor_esperado:300,motivo:'Entrada não ocorreu',ocorrido_em:new Date().toISOString(),idempotency_key:randomUUID()};
+  const missing=await rpc(token,'tools/call',{name:'estornar_baixa_financeira',arguments:reverse});
+  expect(missing.json().result.content[0].text).toContain('informe_o_vencimento');
+  expect((await call('estornar_baixa_financeira',{...reverse,vencimento_entrada_estornada:'2100-03-05'})).saldo).toBe('900.00');
+  expect((await agenda()).map((part:{valor:string})=>part.valor)).toEqual(['450.00','150.00','300.00']);
+  const plan=await call('renegociar_parcelas_venda',{obligation_id:first.obligation_id,saldo_esperado:900,
+    parcelas:[{amount:900,due_date:'2100-04-01'}],idempotency_key:randomUUID()});
+  expect(plan.acordo).toMatchObject({received:300,balance:900});
+});
+
+it('reabre a parcela de fornecedor identificada mesmo após pagamento das parcelas seguintes',async()=>{
+  const {call}=await ownerFinanceMcp();
+  const {registerWholesalePurchase}=await import('../../src/admin/painel/queries-fornecedores-registro.js');
+  const purchase=await registerWholesalePurchase({new_supplier:{name:'Fornecedor parcelado de teste'},items:[],
+    lot:{description:'Parcelas do fornecedor',quantity:10,total_cost:1200},payment_status:'pending',receipt_status:'pending',
+    installments:[{amount:965,due_date:'2099-12-05'},{amount:235,due_date:'2100-01-05'}],created_by:'teste',idempotency_key:randomUUID()},db.pool);
+  const agenda=async()=> (await call('consultar_titulos_financeiros',{lado:'a_pagar',busca:purchase.purchase_id})).itens;
+  const [first,second]=await agenda();
+  const pay={obligation_id:first.obligation_id,lado:'a_pagar',paid_at:new Date().toISOString(),payment_method:'Pix',cash_account:'Conta teste'};
+  const settle=(number:number,amount:number)=>call('registrar_baixa_financeira',{...pay,parcela_compra:number,amount,idempotency_key:randomUUID()});
+  const initial=await settle(first.parcela_compra,300);
+  expect(initial.installment_remaining_balance).toBe('665.00');
+  await settle(second.parcela_compra,235);
+  expect(await agenda()).toMatchObject([{parcela_compra:1,valor:'665.00'}]);
+  await settle(first.parcela_compra,665);
+  const fix=await call('estornar_baixa_financeira',{pagamento_id:initial.payment_ids[0],valor_esperado:300,
+    motivo:'Pagamento registrado em duplicidade',ocorrido_em:new Date().toISOString(),idempotency_key:randomUUID()});
+  expect(fix.saldo).toBe('300.00');
+  expect(await agenda()).toMatchObject([{parcela_compra:1,valor:'300.00'}]);
+  expect((await settle(first.parcela_compra,300)).remaining_balance).toBe('0.00');
+  expect(await agenda()).toHaveLength(0);
 });
 
 it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async()=>{

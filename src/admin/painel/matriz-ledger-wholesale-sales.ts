@@ -115,7 +115,7 @@ export async function ensureWholesaleSaleRevenue(
     await recordSettlementPayment(client, sale.environment, obligation, plan.received,
       sale.soldAt, matrizLedgerActor(sale.createdBy), 'commerce.wholesale_order.partial_payment',
       sale.orderId + ':entrada', { source_id: sale.orderId, obligation_id: revenueId,
-        payment_method: plan.method, cash_account: 'Caixa principal', note: 'Entrada da venda' });
+        payment_method: plan.method, cash_account: plan.cash_account ?? 'Caixa principal', note: 'Entrada da venda' });
   }
   return revenueId;
 }

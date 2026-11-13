@@ -15,12 +15,14 @@ import { storeReceiptOnClient,lockExpenseReceipt,linkExpenseReceipt } from '../p
 import { downloadReceiptFile } from './events/https.js';
 import { reencodePhoto } from '../../parceiro/photo-upload.js';
 import { lotSaleSchema } from '../painel/lot-sale-schema.js';
+import { checkExistingLotSale } from './lot-sale-check.js';
 import { registerLotSaleOnClient } from '../painel/register-lot-sale.js';
 import { registerWholesaleSaleSchema } from '../painel/route-schemas.js';
 import { registerWholesaleSaleOnClient } from '../painel/queries-atacado-vendas.js';
 import { listSaleLots } from '../painel/queries-lot-sales.js';
 import { settleMatrizLedgerOpenItemOnClient } from '../painel/matriz-ledger-settlement.js';
 import { lockSettlementObligation } from '../painel/matriz-ledger-settlement-payment.js';
+import { purchaseInstallmentBalancesSql } from '../painel/purchase-installment-balances.js';
 import { manualEntrySchema, reverseManualEntrySchema } from '../painel/manual-finance-entry-schema.js';
 import { createManualEntryOnClient, reverseManualFinanceEntry } from '../painel/manual-finance-entry.js';
 import { listPurchaseGroups,getPurchaseGroup } from '../painel/queries-purchase-groups.js';
@@ -75,17 +77,20 @@ write('lancar_despesa_matriz','Registra uma despesa paga ou a pagar, com categor
     if (data.payment_status==='paid' && data.due_date) throw Error('despesa_paga_nao_aceita_vencimento');
     return createMatrizExpenseOnClient(db,{...data,created_by:actor});
   });
-const attachment=z.object({expense_id:id,valor_esperado:money,receipt_id:id.optional(),
+const attachment=z.object({expense_id:id,valor_esperado:money,data_esperada:z.string().date().optional(),receipt_id:id.optional(),
   arquivo:z.object({download_url:z.string().url().max(8192),file_id:z.string().min(1).max(200),mime_type:z.string().max(100).optional(),
     file_name:z.string().max(300).optional()}).strict().optional(),
   imagem_base64:z.string().min(16).max(1400000).regex(/^[A-Za-z0-9+/]+={0,2}$/).optional(),idempotency_key:id}).strict()
   .refine(d=>[d.receipt_id,d.imagem_base64,d.arquivo].filter(Boolean).length===1);
-write('anexar_comprovante_despesa','Anexa foto JPEG, PNG ou WebP (até 1 MB) ou comprovante existente pelo UUID. Confira despesa, valor e data. A foto não dá baixa.',attachment,
+write('anexar_comprovante_despesa','Anexa foto JPEG, PNG ou WebP (até 1 MB) ou comprovante existente pelo UUID. Confira o valor e informe data_esperada, o dia de occurred_at em São Paulo. A foto não dá baixa.',attachment,
   async(db,data,actor)=>{
     if (!env.MATRIZ_EXPENSES) throw Error('expenses_disabled');
     const environment=env.FAREJADOR_ENV;
-    const current=(await db.query('SELECT amount FROM commerce.matriz_expenses WHERE environment=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE',[environment,data.expense_id])).rows[0];
-    if(!current || Number(current.amount)!==data.valor_esperado) throw Error('despesa_diverge_da_autorizacao');
+    const current=(await db.query(`SELECT amount,(occurred_at AT TIME ZONE 'America/Sao_Paulo')::date::text dia
+      FROM commerce.matriz_expenses WHERE environment=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE`,
+      [environment,data.expense_id])).rows[0];
+    if(!current || Number(current.amount)!==data.valor_esperado || (data.data_esperada && current.dia!==data.data_esperada))
+      throw Error('despesa_diverge_da_autorizacao');
     let receipt=data.receipt_id;
     if(!receipt) {
       const bytes=data.arquivo?await downloadReceiptFile(data.arquivo.download_url):Buffer.from(data.imagem_base64!,'base64');
@@ -104,8 +109,15 @@ write('anexar_comprovante_despesa','Anexa foto JPEG, PNG ou WebP (até 1 MB) ou 
 const page=z.number().int().min(1).max(10000).default(1);
 read('consultar_lotes_para_venda','Lotes disponíveis com UUID, quantidade em mãos, reservas e custo remanescente para calcular a alocação.',z.object({pagina:page}).strict(),
   async({pagina})=>{const rows=await listSaleLots();return {lotes:rows.slice((pagina-1)*50,pagina*50),proxima_pagina:rows.length>pagina*50?pagina+1:null};});
-write('registrar_venda_lote','Venda única de lote com comprador, quantidades, custo conferido, valor negociado, entrada e parcelas. Confira se a venda já existe.',lotSaleSchema,
-  (db,data,actor,identity)=>registerLotSaleOnClient(db,data,actor,identity.collaborator_id));
+const voiceLotSale=lotSaleSchema.innerType().extend({
+  vendas_distintas_de:z.array(id).max(100).optional(),
+}).strict();
+write('registrar_venda_lote','Venda única de lote com comprador, quantidades, valor, entrada e parcelas. Localize a venda antes de criar. vendas_distintas_de só se o dono identificar outra venda real com os mesmos dados.',voiceLotSale,
+  async(db,{vendas_distintas_de,...fields},actor,identity)=>{
+    const sale=lotSaleSchema.parse(fields);
+    await checkExistingLotSale(db,sale,vendas_distintas_de??[]);
+    return registerLotSaleOnClient(db,sale,actor,identity.collaborator_id);
+  });
 write('registrar_venda_atacado','Venda do estoque de atacado com itens, comprador, entrada e parcelas. Respeita o fluxo de venda ao parceiro.',registerWholesaleSaleSchema,
   (db,data,actor,identity)=>{
     if(!env.WHOLESALE_FINANCE || !data.payment_status) throw Error('informe_situacao_da_venda_e_habilite_atacado');
@@ -132,19 +144,20 @@ async function settleTitle(db:PoolClient,data:z.infer<typeof settlement>,actor:s
   if(target.sale_plan && !data.sale_installment) throw Error('informe_a_parcela_da_venda');
   let balance:number|undefined;
   if(target.source_type==='commerce.wholesale_purchase.accrual') {
-    const first=(await db.query(`WITH schedule AS (SELECT installment_number,amount,
-      sum(amount) OVER (ORDER BY installment_number DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) later
-      FROM commerce.wholesale_purchase_installments WHERE environment=$1 AND purchase_id=$2)
-      SELECT installment_number,least(amount,$3::numeric-(later-amount)) balance FROM schedule
-      WHERE $3::numeric>later-amount ORDER BY installment_number LIMIT 1`,[env.FAREJADOR_ENV,target.source_id,target.open_amount])).rows[0];
-    if(!first && data.parcela_compra) throw Error('parcela_compra_invalida');
-    if(first && (data.parcela_compra!==first.installment_number || data.amount>Number(first.balance))) throw Error('confira_primeira_parcela_aberta_da_compra');
-    if(first) balance=Number(first.balance);
+    const part=(await db.query(`SELECT i.installment_number,i.balance FROM commerce.wholesale_purchases p
+      CROSS JOIN LATERAL (${purchaseInstallmentBalancesSql}) i
+      WHERE p.environment=$1 AND p.id=$2 AND i.balance>0 AND ($3::int IS NULL OR i.installment_number=$3)
+      ORDER BY i.installment_number LIMIT 1`,[env.FAREJADOR_ENV,target.source_id,data.parcela_compra??null])).rows[0];
+    if(!part && data.parcela_compra) throw Error('parcela_compra_invalida');
+    if(part && !data.parcela_compra) throw Error('informe_a_parcela_da_compra');
+    if(part && data.amount>Number(part.balance)) throw Error('settlement_exceeds_balance');
+    if(part) balance=Number(part.balance);
   } else if(data.parcela_compra) throw Error('parcela_compra_invalida');
-  const result=await settleMatrizLedgerOpenItemOnClient(db,{...data,actor_label:actor});
+  const result=await settleMatrizLedgerOpenItemOnClient(db,{...data,purchase_installment:data.parcela_compra,actor_label:actor});
   return balance===undefined?result:{...result,installment_remaining_balance:(balance-data.amount).toFixed(2)};
 }
-write('registrar_baixa_financeira','Recebimento ou pagamento já realizado, inclusive parcial e devoluções existentes. Para venda parcelada informe a parcela. Compra parcelada baixa a mais antiga aberta.',settlement, settleTitle);
+write('registrar_baixa_financeira','Recebimento ou pagamento já realizado, inclusive parcial e devoluções existentes. Informe a parcela indicada pelo dono em vendas e compras parceladas.',settlement,
+  (db,data,actor)=>settleTitle(db,data,actor));
 const correction=reversalInput.extend({destino:settlement.omit({idempotency_key:true,amount:true}).optional()});
 write('estornar_baixa_financeira','Corrige uma baixa central específica pelo ID da transação e valor original. Se o dono indicar a parcela certa, informe destino para estornar e reaplicar na mesma transação.',correction,
   async(db,data,actor)=>{
@@ -160,8 +173,9 @@ write('registrar_entrada_avulsa','Registra receita avulsa recebida ou aporte do 
 const manualReverse=reverseManualEntrySchema.extend({entrada_id:id});
 write('estornar_entrada_avulsa','Estorna um aporte ou receita avulsa pelo UUID e motivo.',manualReverse,
   (db,{entrada_id,...data},actor)=>reverseManualFinanceEntry(entrada_id,data,actor,env.FAREJADOR_ENV,db));
-read('consultar_viagens_de_compra','Lista viagens ou detalha uma viagem com despesas, compras, frete e custo por pneu.',z.object({viagem_id:id.optional(),pagina:page}).strict(),
-  data=>data.viagem_id?getPurchaseGroup(data.viagem_id):listPurchaseGroups(env.FAREJADOR_ENV,undefined,{page:data.pagina}));
+read('consultar_viagens_de_compra','Lista viagens por situação ou detalha compras, gastos, frete e custo por pneu. Quando houver mais de uma viagem compatível, peça ao dono que identifique a viagem.',z.object({
+  viagem_id:id.optional(),status:z.enum(['open','closed']).optional(),pagina:page}).strict(),
+  data=>data.viagem_id?getPurchaseGroup(data.viagem_id):listPurchaseGroups(env.FAREJADOR_ENV,undefined,{page:data.pagina,status:data.status}));
 write('vincular_gasto_a_viagem','Vincula uma despesa existente à viagem de compra. Use desvincular apenas quando autorizado.',z.object({
   group_id:id,expense_id:id,desvincular:z.boolean().default(false),idempotency_key:id}).strict(), async(db,data,actor)=>{
   await linkPurchaseGroupInTransaction(db,{...data,environment:env.FAREJADOR_ENV,actor,kind:'expense',record_id:data.expense_id,unlink:data.desvincular});

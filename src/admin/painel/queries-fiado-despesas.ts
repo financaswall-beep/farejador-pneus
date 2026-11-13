@@ -1,4 +1,5 @@
 import { orderSalePlanSql } from './sale-payment-plan.js';
+import { purchaseInstallmentBalancesSql } from './purchase-installment-balances.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -46,8 +47,8 @@ export async function getWholesaleFinance(
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
     `WITH settled AS (
        SELECT t.source_id purchase_id,
-              COALESCE(sum(CASE WHEN pay.payment_kind IN ('settlement','writeoff','adjustment')
-                THEN pay.amount ELSE -pay.amount END),0) paid
+              COALESCE(sum(CASE WHEN pay.payment_kind='settlement' THEN pay.amount
+                WHEN pay.payment_kind='reversal' THEN -pay.amount ELSE 0 END),0) paid
          FROM finance.matriz_ledger_transactions t
          LEFT JOIN finance.matriz_ledger_payments pay
            ON pay.environment=t.environment AND pay.obligation_transaction_id=t.id
@@ -67,13 +68,8 @@ export async function getWholesaleFinance(
        LEFT JOIN settled st ON st.purchase_id=p.id::text
        LEFT JOIN LATERAL (
          SELECT schedule.due_date
-           FROM (
-             SELECT i.due_date,i.installment_number,
-                    sum(i.amount) OVER (ORDER BY i.installment_number) cumulative
-               FROM commerce.wholesale_purchase_installments i
-              WHERE i.environment=p.environment AND i.purchase_id=p.id
-           ) schedule
-          WHERE schedule.cumulative>COALESCE(st.paid,0)
+           FROM (${purchaseInstallmentBalancesSql}) schedule
+          WHERE schedule.balance>0
           ORDER BY schedule.installment_number LIMIT 1
        ) next_due ON true
       WHERE p.environment=$1 AND p.status<>'cancelled' AND p.payment_status='pending'

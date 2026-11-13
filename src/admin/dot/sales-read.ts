@@ -1,5 +1,6 @@
 import { readPage, type DotReadContext } from './read-model.js';
 import { paymentMethodSql } from './safe-values.js';
+import { orderSalePlanSql } from '../painel/sale-payment-plan.js';
 
 export function readDotRetail(ctx:DotReadContext) {
   return readPage(ctx,`SELECT o.id,o.order_number,o.created_at,o.status,o.fulfillment_mode,o.source,
@@ -55,6 +56,7 @@ export function readDotWholesale(ctx:DotReadContext,view:'vendas'|'compradores'|
     'Itens brutos antes de descontos do pedido; custo conhecido não equivale a lucro confirmado.');
   return readPage(ctx,`SELECT o.id,o.buyer_id,o.sold_at,o.status,o.payment_status,${paymentMethodSql('o.payment_method')} payment_method,o.due_date,o.paid_at,
     o.partner_transfer_status,o.is_lot_sale,COALESCE(o.settled_total_amount,o.total_amount)::text total_amount,
+    ${orderSalePlanSql} sale_plan,
     (SELECT count(*)::int FROM commerce.wholesale_order_items i WHERE i.environment=o.environment AND i.order_id=o.id) items_count,
     COALESCE((SELECT jsonb_agg(x ORDER BY x.id) FROM (SELECT i.id,i.tire_lot_id,
       CASE WHEN i.tire_lot_id IS NULL THEN i.measure ELSE NULL END measure,i.brand,i.tire_condition,
