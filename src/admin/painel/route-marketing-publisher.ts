@@ -50,7 +50,7 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
         const config = publisherConfig();
         const schema = await pool.query<{
             ready: boolean;
-        }>(`SELECT to_regclass('ops.publisher_posts') IS NOT NULL
+        }>(`SELECT to_regclass('ops.publisher_posts') IS NOT NULL AND to_regclass('ops.publisher_post_photos') IS NOT NULL
       AND EXISTS (SELECT 1 FROM information_schema.columns
         WHERE table_schema='ops' AND table_name='publisher_media' AND column_name='inspection')
       AND EXISTS (SELECT 1 FROM information_schema.columns
@@ -78,6 +78,8 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
                 ...(bucket.status === 'rejected' ? ['publisher_storage_unavailable'] : [])] };
     }, false));
     app.post(base + '/connections', options, guarded(async () => ({ connections: await new PublisherGraph().connections() })));
+    app.get(base + '/posts/:id/media', options, guarded(async request =>
+        listMedia(pool, environment, new PublisherStorage(), params.parse(request.params).id)));
     app.post(base + '/media', options, guarded(async (request) => {
         return reserveMedia(pool, environment, uploadSchema.parse(request.body), actor(request).displayName);
     }));

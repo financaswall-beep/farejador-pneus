@@ -151,6 +151,8 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
             this.mpMessage = '';
             let completed = 0;
             try {
+                if (this.mpCarousel && (files.some(file => !this.mpFileMime(file).startsWith('image/'))
+                    || files.length + this.mpMediaIds().length > 10)) throw Error('publisher_carousel_photos_feed_limit');
                 for (const file of files) {
                     const mime = this.mpFileMime(file);
                     const limit = Math.min(this.mpConfig.max_file_bytes, mime.startsWith('image/') ? this.mpConfig.max_photo_bytes || 8 * 1024 * 1024 : Infinity);
@@ -225,10 +227,7 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
                 if (this.mpResumeMedia?.id === media.id)
                     this.mpResumeMedia = null;
                 this.mpMedia = this.mpMedia.filter(item => item.id !== media.id);
-                if (this.mpForm?.media_id === media.id) {
-                    this.mpForm.media_id = null;
-                    this.mpDirty = true;
-                }
+                if (this.mpMediaIds().includes(media.id)) this.mpRemoveSelected(media.id);
                 this.mpMessage = 'Arquivo removido da biblioteca.';
                 await this.mpLoad(true);
             }
@@ -239,7 +238,13 @@ window.PAINEL_MODULES.marketingPublisherMedia = function () {
                 this.mpBusy = false;
             }
         },
-        async mpPrepareFormats(media = this.mpSelectedMedia()) {
+        async mpPrepareFormats(media) {
+            if (!media) {
+                const photos = this.mpPhotos();
+                if (photos.length !== this.mpMediaIds().length) throw Error('publisher_media_not_ready');
+                for (const selected of photos) await this.mpPrepareFormats(selected);
+                return;
+            }
             const profiles = media?.inspection?.prepared;
             if (!media || profiles?.version === 1 && profiles.profiles?.vertical && (media.kind === 'video' || profiles.profiles.feed)) return;
             const uploading = this.mpUploadBusy, phase = this.mpUploadPhase, name = this.mpUploadName;

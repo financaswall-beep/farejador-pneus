@@ -9,9 +9,11 @@ export const destinationSchema = z.object({
 export const draftSchema = z.object({
     version: z.number().int().min(0), title: z.string().trim().min(1).max(180),
     media_id: idSchema.nullable(), caption: z.string().max(2200),
+    media_ids: z.array(idSchema).max(10).optional(),
     destinations: z.array(destinationSchema).max(2).refine(d => new Set(d.map(v => v.platform)).size === d.length),
     delete_after_publish: z.boolean().default(true),
-}).strict();
+}).strict().refine(d => !d.media_ids || ((d.media_ids[0] ?? null) === d.media_id
+    && new Set(d.media_ids).size === d.media_ids.length));
 export type Draft = z.infer<typeof draftSchema>;
 export type Destination = z.infer<typeof destinationSchema>;
 export const uploadSchema = z.object({

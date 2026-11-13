@@ -10,6 +10,19 @@ function state() {
   const s=window.PAINEL_MODULES.marketingPublisher();s.$nextTick=(fn:()=>void)=>fn();s.apiPut=vi.fn().mockResolvedValue({version:1});
   s.apiPost=vi.fn().mockResolvedValue({});s.apiGet=vi.fn().mockResolvedValue({config:{enabled:true},posts:[],media:[]});s.mpFresh();return s;
 }
+it('edita o carrossel compartilhado pelo app e site, preserva a capa e submete a ordem após reabrir',async()=>{
+  const p=state();
+  const [a,b,c]=['a','b','c'].map(id=>({id,name:id+'.jpg',kind:'photo'}));
+  p.mpMedia=[a,b,c];p.mpCarouselMode(true);
+  p.mpSelectMedia(a);p.mpSelectMedia(b);p.mpSelectMedia(c);p.mpSelectMedia(c);
+  p.mpMovePhoto(c.id,-1);p.mpRemoveSelected(a.id);
+  expect(p.mpPayload()).toMatchObject({media_id:'c',media_ids:['c','b']});
+  const draft={...p.mpPayload(),id:'draft',version:1};p.mpFresh();await p.mpEdit(draft);
+  expect(p.mpCarousel).toBe(true);expect(p.mpPhotos().map((x:any)=>x.id)).toEqual(['c','b']);
+  p.mpSelectMedia({id:'video',kind:'video',name:'clip.mp4'});
+  expect(p.mpMediaIds()).toEqual(['c','b']);p.mpConfig={sending:true};await p.mpSubmit();
+  expect(p.apiPut.mock.calls[0][1].media_ids).toEqual(['c','b']);
+});
 it('distingue tamanho das versões adaptadas do original que ainda está preservado',()=>{
   const s=state();expect(s.mpMediaSize({bytes:65*1024*1024,inspection:{prepared:{profiles:{vertical:{bytes:2.5*1024*1024}}}}})).toBe('2.5 MB preparados · 65.0 MB original');
   expect(s.mpMediaSize({bytes:1024*1024})).toBe('1.0 MB');

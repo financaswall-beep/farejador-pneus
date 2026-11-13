@@ -10,7 +10,7 @@ import { PublisherError } from '../../../src/marketing/publisher/model.js';
 import type { PublisherStorage } from '../../../src/marketing/publisher/storage.js';
 
 const pool = {} as Pool;
-const graph = { prepare: vi.fn(), ready: vi.fn(), publish: vi.fn(), verify: vi.fn(),
+const graph = { prepare: vi.fn(), prepareCarousel: vi.fn(), ready: vi.fn(), publish: vi.fn(), verify: vi.fn(),
   assertPermissions: vi.fn(), reconcile: vi.fn() };
 const storage = { signedUrl: vi.fn(), assertPrivateBucket: vi.fn() };
 const task = (extra: Partial<Task> = {}): Task => ({

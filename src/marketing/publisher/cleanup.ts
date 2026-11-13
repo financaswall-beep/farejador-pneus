@@ -25,7 +25,8 @@ export async function deleteMedia(pool: Pool, environment: Environment, id: stri
     const expired = Boolean((await client.query(`SELECT 1 FROM ops.publisher_media
       WHERE environment=$1 AND id=$2 AND updated_at<now()-interval '24 hours'`, [environment, id])).rowCount);
     const references = await client.query<{ id: string }>(`SELECT p.id FROM ops.publisher_posts p
-      WHERE p.environment=$1 AND p.media_id=$2 AND
+      WHERE p.environment=$1 AND (p.media_id=$2 OR EXISTS (SELECT 1 FROM ops.publisher_post_photos f
+        WHERE f.environment=p.environment AND f.post_id=p.id AND f.media_id=$2)) AND
       (p.status NOT IN ('published','cancelled') OR ($3::boolean AND p.status='published' AND NOT p.delete_after_publish)
         OR EXISTS (SELECT 1 FROM ops.publisher_destinations d WHERE d.environment=p.environment AND d.post_id=p.id
           AND d.status<>'published' AND p.status<>'cancelled'))`, [environment, id, automatic]);
@@ -35,8 +36,9 @@ export async function deleteMedia(pool: Pool, environment: Environment, id: stri
       return false;
     }
     if (automatic && media.status !== 'deleting') {
-      const published = await client.query(`SELECT 1 FROM ops.publisher_posts
-        WHERE environment=$1 AND media_id=$2 AND status='published' AND delete_after_publish`, [environment, id]);
+      const published = await client.query(`SELECT 1 FROM ops.publisher_posts p
+        WHERE p.environment=$1 AND (p.media_id=$2 OR EXISTS (SELECT 1 FROM ops.publisher_post_photos f
+          WHERE f.environment=p.environment AND f.post_id=p.id AND f.media_id=$2)) AND p.status='published' AND p.delete_after_publish`, [environment, id]);
       const pending = ['uploading', 'failed'].includes(media.status) && !media.upload_completed_at && expired;
       if (!published.rowCount && !pending) {
         await client.query('COMMIT');
@@ -87,7 +89,8 @@ export async function cleanupMedia(pool: Pool, environment: Environment, storage
     (m.status='deleting' AND (m.error_code IS DISTINCT FROM $2 OR m.updated_at<now()-$3*interval '1 hour')
       OR m.status IN ('uploading','failed') AND m.upload_completed_at IS NULL AND m.updated_at<now()-interval '24 hours'
       OR m.status='ready' AND EXISTS(SELECT 1 FROM ops.publisher_posts p WHERE p.environment=m.environment
-        AND p.media_id=m.id AND p.status='published' AND p.delete_after_publish))
+        AND (p.media_id=m.id OR EXISTS (SELECT 1 FROM ops.publisher_post_photos f
+          WHERE f.environment=p.environment AND f.post_id=p.id AND f.media_id=m.id)) AND p.status='published' AND p.delete_after_publish))
     ORDER BY m.updated_at LIMIT 20`, [environment, CANCELLED_UPLOAD, CANCELLED_UPLOAD_GRACE_HOURS])).rows;
   let failure: unknown;
   for (const { id } of ids) {

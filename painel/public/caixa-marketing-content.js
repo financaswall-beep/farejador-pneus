@@ -12,6 +12,7 @@
       const play = V.node('span', label, 'mk-video-label'); play.prepend(V.icon('play')); thumb.appendChild(play);
     }
     const copy = V.node('div', null, 'mk-post-copy'); copy.append(V.node('h4', post.title), V.networks(post.destinations || post.deliveries), V.badge(post.status));
+    if (post.media_ids?.length > 1) copy.appendChild(V.node('small', 'Carrossel · ' + post.media_ids.length + ' fotos', 'mk-muted'));
     if (post.scheduled_at) copy.appendChild(V.node('small', V.date(post.scheduled_at), 'mk-muted'));
     const open = V.button(post.status === 'draft' ? 'Continuar edição' : 'Ver detalhes', () => openPost(post), 'mk-link', 'chevron');
     card.append(thumb, copy, open); return card;
@@ -19,7 +20,7 @@
   function openPost(post) {
     if (M.busy()) return;
     const p = M.publisher;
-    if (post.status === 'draft') { p.mpEdit(post); M.go('compose'); return; }
+    if (post.status === 'draft') { void p.mpEdit(post).then(() => { if (M.active() && M.publisher === p) M.go('compose'); }); return; }
     const body = V.dialog(post.title);
     body.append(V.badge(post.status), V.node('p', post.caption || 'Sem legenda', 'mk-post-caption'));
     if (post.scheduled_at) body.appendChild(V.node('p', 'Horário de Brasília: ' + V.date(post.scheduled_at), 'mk-muted'));

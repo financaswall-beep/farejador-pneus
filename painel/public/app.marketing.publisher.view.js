@@ -8,6 +8,8 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
   <div class="mp-columns" x-show="mpTab==='create'">
     <aside class="mp-card mp-library">
       <h3><i data-lucide="folder"></i>Biblioteca de mídia</h3>
+      <button class="mp-button" type="button" :disabled="!mpForm||mpBusy||mpUploadBusy" :aria-pressed="mpCarousel" @click="mpCarouselMode(!mpCarousel)" x-text="mpCarousel?'Voltar a uma mídia':'Montar carrossel de fotos'"></button>
+      <p class="mp-muted" x-show="mpCarousel">Selecione de 2 a 10 fotos. A primeira é a capa.</p>
       <label class="mp-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar arquivo" aria-label="Buscar arquivo" x-model="mpSearch"></label>
       <div class="mp-chips"><button @click="mpKind='all'" :aria-pressed="mpKind==='all'">Todos</button><button @click="mpKind='video'" :aria-pressed="mpKind==='video'">Vídeos</button><button @click="mpKind='photo'" :aria-pressed="mpKind==='photo'">Fotos</button></div>
       <label class="mp-upload" @dragover.prevent @drop.prevent="mpUploadFiles($event)" :class="{'mp-disabled':!mpConfig?.enabled||!mpConfig?.storage_ready||mpUploadBusy}">
@@ -20,8 +22,8 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
       <small class="mp-muted mp-upload-help">Envio retomável com adaptação automática de fotos e vídeos. Se interromper, selecione o mesmo arquivo para continuar.</small>
       <div class="mp-media-grid">
         <template x-for="media in mpVisibleMedia()" :key="media.id">
-          <div class="mp-media-tile"><button type="button" @click="mpSelectMedia(media)" :disabled="mpBusy||mpMediaNeedsRecovery(media)" :class="{'is-selected':mpForm?.media_id===media.id}">
-            <img :src="mpThumbnail(media)" @error="media.thumbnail_url=null" :alt="media.name" loading="lazy"><span class="mp-tile-kind" x-show="media.kind==='video'&&media.duration"><i data-lucide="play"></i><span x-text="Math.round(Number(media.duration))+'s'"></span></span><span class="mp-tile-check" x-show="mpForm?.media_id===media.id">✓</span>
+          <div class="mp-media-tile"><button type="button" @click="mpSelectMedia(media)" :disabled="mpBusy||mpUploadBusy||mpMediaNeedsRecovery(media)||(mpCarousel&&(media.kind!=='photo'||mpMediaIds().length>=10&&!mpMediaIds().includes(media.id)))" :class="{'is-selected':mpMediaIds().includes(media.id)}">
+            <img :src="mpThumbnail(media)" @error="media.thumbnail_url=null" :alt="media.name" loading="lazy"><span class="mp-tile-kind" x-show="media.kind==='video'&&media.duration"><i data-lucide="play"></i><span x-text="Math.round(Number(media.duration))+'s'"></span></span><span class="mp-tile-check" x-show="mpMediaIds().includes(media.id)">✓</span>
           </button><div><span x-text="media.name"></span><button class="mp-icon" type="button" @click="mpRemoveMedia(media)" :disabled="mpBusy||mpUploadBusy" :aria-label="'Remover '+media.name"><i data-lucide="trash-2"></i></button></div>
             <small class="mp-error-text" x-show="media.thumbnail_error&&media.status==='ready'">Miniatura indisponível; mídia preservada.</small>
             <div class="mp-media-recovery" x-show="mpMediaNeedsRecovery(media)">
@@ -34,14 +36,21 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
         </template>
       </div>
       <div class="mp-empty" x-show="!mpVisibleMedia().length && !mpUploadBusy"><i data-lucide="images"></i><p>Sua biblioteca começa aqui.</p><small>Envie uma foto ou um vídeo para criar a publicação.</small></div>
-      <div class="mp-selected-file" x-show="mpSelectedMedia()"><h4>Arquivo selecionado</h4><div><img :src="mpThumbnail(mpSelectedMedia())" alt=""><span><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpMediaSize(mpSelectedMedia())"></small></span></div></div>
+      <div class="mp-selected-file" x-show="mpSelectedMedia()&&!mpCarousel"><h4>Arquivo selecionado</h4><div><img :src="mpThumbnail(mpSelectedMedia())" alt=""><span><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpMediaSize(mpSelectedMedia())"></small></span></div></div>
     </aside>
     <section class="mp-card mp-editor">
       <div class="mp-card-heading"><h3>Editar publicação</h3><small :class="mpDirty?'mp-muted':''" x-text="mpDirty?'Alterações não salvas':mpForm?.version?'Rascunho salvo':'Novo rascunho'"></small></div>
       <template x-if="mpForm"><fieldset :disabled="mpBusy">
         <label class="mp-label">Título interno<input maxlength="180" type="text" x-model="mpForm.title" @input="mpDirty=true" placeholder="Ex.: Pneus para rodar tranquilo"></label>
         <div class="mp-label">Mídia da publicação</div>
-        <div class="mp-editor-media" x-show="mpSelectedMedia()"><img :src="mpThumbnail(mpSelectedMedia())" alt=""><div><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpSelectedMedia()?.kind==='video'?'Vídeo · '+Math.round(Number(mpSelectedMedia()?.duration))+' segundos':'Foto'"></small><button class="mp-link" @click="mpOpenPreview(mpSelectedMedia())" type="button">Ver mídia <i data-lucide="external-link"></i></button></div><button class="mp-icon" type="button" @click="mpForm.media_id=null;mpDirty=true" aria-label="Desmarcar mídia"><i data-lucide="x"></i></button></div>
+        <div class="mp-editor-media" x-show="mpSelectedMedia()&&!mpCarousel"><img :src="mpThumbnail(mpSelectedMedia())" alt=""><div><strong x-text="mpSelectedMedia()?.name"></strong><small x-text="mpSelectedMedia()?.kind==='video'?'Vídeo · '+Math.round(Number(mpSelectedMedia()?.duration))+' segundos':'Foto'"></small><button class="mp-link" @click="mpOpenPreview(mpSelectedMedia())" type="button">Ver mídia <i data-lucide="external-link"></i></button></div><button class="mp-icon" type="button" @click="mpRemoveSelected(mpForm.media_id)" aria-label="Desmarcar mídia"><i data-lucide="x"></i></button></div>
+        <ol class="mp-carousel-list" aria-label="Ordem das fotos" x-show="mpCarousel"><template x-for="(photo,i) in mpPhotos()" :key="photo.id"><li>
+          <button type="button" class="mp-link" @click="mpOpenPreview(photo,'feed')" :aria-label="'Ampliar '+photo.name"><img :src="mpThumbnail(photo)" alt=""></button>
+          <span x-text="(i+1)+'. '+photo.name+(i===0?' · Capa':'')"></span>
+          <button type="button" class="mp-icon" :disabled="i===0||mpUploadBusy" @click="mpMovePhoto(photo.id,-1)" :aria-label="'Mover '+photo.name+' para antes'">↑</button>
+          <button type="button" class="mp-icon" :disabled="i===mpPhotos().length-1||mpUploadBusy" @click="mpMovePhoto(photo.id,1)" :aria-label="'Mover '+photo.name+' para depois'">↓</button>
+          <button type="button" class="mp-icon" :disabled="mpUploadBusy" @click="mpRemoveSelected(photo.id)" :aria-label="'Retirar '+photo.name">×</button>
+        </li></template></ol>
         <div class="mp-empty mp-editor-placeholder" x-show="!mpSelectedMedia()"><i data-lucide="image-plus"></i><p>Escolha uma mídia na biblioteca.</p></div>
         <div class="mp-caption-heading"><h4>Texto da publicação</h4><button class="mp-button mp-ai" type="button" @click="mpGenerateCaption()" :disabled="mpAiBusy||!mpBrief.trim()||!mpConfig?.ai_ready||!mpConfig?.enabled"><i data-lucide="sparkles"></i><span x-text="mpAiBusy?'Gerando…':'Gerar texto com IA'"></span></button></div>
         <label class="mp-label"><span>O que você quer destacar?</span><input maxlength="1200" type="text" x-model="mpBrief" placeholder="Pneus para moto, atendimento e entrega"></label>
@@ -49,7 +58,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
         <div class="mp-caption-footer"><small>Revise o texto gerado antes de publicar.</small><small x-text="mpForm.caption.length+' / 2200'"></small></div>
         <h4 class="mp-preview-title">Prévia por rede <small>Confira a mídia completa antes de publicar.</small></h4>
         <div class="mp-preview-grid"><template x-for="destination in mpForm.destinations.filter(d=>d.selected)" :key="destination.platform"><article class="mp-network-preview" :class="destination.format==='feed'?'mp-preview-feed':'mp-preview-vertical'">
-          <header><img :src="'/assets/brands/'+destination.platform+'.svg'" :alt="destination.platform"><span><strong x-text="destination.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="mpFormat(destination.format)"></small></span></header>
+          <header><img :src="'/assets/brands/'+destination.platform+'.svg'" :alt="destination.platform"><span><strong x-text="destination.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="mpCarousel?(destination.platform==='instagram'?'Carrossel':'Publicação com fotos')+' · '+mpPhotos().length+' fotos':mpFormat(destination.format)"></small></span></header>
           <button type="button" @click="mpOpenPreview(mpSelectedMedia(),destination.format)" :disabled="!mpSelectedMedia()||mpUploadBusy"><img x-show="mpSelectedMedia()" :src="mpThumbnail(mpSelectedMedia())" alt="Abrir prévia adaptada"><span x-show="!mpSelectedMedia()">Sem mídia</span></button>
           <p x-show="destination.format!=='story'" x-text="(mpCustom?destination.caption:mpForm.caption)||'Sua legenda aparecerá aqui.'"></p><small x-show="destination.format==='story'">Story utiliza a mídia. A legenda não é sobreposta ao arquivo.</small>
         </article></template></div>
@@ -60,7 +69,7 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
       <template x-if="mpForm"><fieldset :disabled="mpBusy">
         <template x-for="destination in mpForm.destinations" :key="destination.platform"><div class="mp-destination">
           <label><input type="checkbox" x-model="destination.selected" @change="mpDirty=true"><img :src="'/assets/brands/'+destination.platform+'.svg'" :alt="destination.platform"><span><strong x-text="destination.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="destination.platform==='instagram'?'@2wp.pneus':'2W Pneus'"></small></span></label>
-          <select x-model="destination.format" @change="mpDirty=true" :aria-label="'Formato no '+destination.platform"><option value="feed" :disabled="mpSelectedMedia()?.kind==='video'">Feed</option><option value="reel" :disabled="mpSelectedMedia()?.kind==='photo'">Reel</option><option value="story">Story</option></select>
+          <select x-model="destination.format" @change="mpDirty=true" :aria-label="'Formato no '+destination.platform"><option value="feed" :disabled="mpSelectedMedia()?.kind==='video'">Feed</option><option value="reel" :disabled="mpCarousel||mpSelectedMedia()?.kind==='photo'">Reel</option><option value="story" :disabled="mpCarousel">Story</option></select>
         </div></template>
         <p class="mp-muted">Ajuste automático sem cortes: foto em Feed 4:5 ou Story 9:16; vídeo em Reel ou Story 9:16. Reels também são compartilhados no Feed do Instagram. Clique na prévia para conferir o enquadramento.</p>
         <p class="mp-notice mp-warning" x-show="mpKnownPermissionBlock()">Há destinos sem permissão de publicação. Confira Gerenciar contas.</p>
@@ -85,10 +94,12 @@ window.MARKETING_PUBLISHER_TEMPLATE = `
   </section>
   <section class="mp-card mp-history" x-show="mpTab==='drafts'">
     <div class="mp-card-heading"><div><h3 x-text="mpTab==='drafts'?'Seus rascunhos':'Publicações e acompanhamento'"></h3><p class="mp-muted" x-text="mpTab==='drafts'?'Retome seus conteúdos antes de publicar.':'Confira o resultado de cada rede. Envios incertos não são repetidos automaticamente.'"></p></div><button class="mp-button" @click="mpNew()"><i data-lucide="plus"></i>Nova publicação</button></div>
-    <div class="mp-history-filters"><label class="mp-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar publicação" x-model="mpHistorySearch" aria-label="Buscar publicação"></label><select x-model="mpHistoryNetwork" aria-label="Filtrar por rede"><option value="all">Todas as redes</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select><button class="mp-button" @click="mpLoad()" :disabled="mpLoading"><i data-lucide="refresh-cw"></i>Atualizar</button></div>
+    <div class="mp-history-filters"><button class="mp-button" type="button" :disabled="!mpForm||mpBusy||mpUploadBusy" :aria-pressed="mpCarousel" @click="mpCarouselMode(!mpCarousel)" x-text="mpCarousel?'Voltar a uma mídia':'Montar carrossel de fotos'"></button>
+      <p class="mp-muted" x-show="mpCarousel">Selecione de 2 a 10 fotos. A primeira é a capa.</p>
+      <label class="mp-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar publicação" x-model="mpHistorySearch" aria-label="Buscar publicação"></label><select x-model="mpHistoryNetwork" aria-label="Filtrar por rede"><option value="all">Todas as redes</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option></select><button class="mp-button" @click="mpLoad()" :disabled="mpLoading"><i data-lucide="refresh-cw"></i>Atualizar</button></div>
     <div class="mp-post-list"><template x-for="post in mpFilteredPosts()" :key="post.id"><article class="mp-post-card">
       <div class="mp-card-heading"><div><h4 x-text="post.title"></h4><small class="mp-muted" x-text="mpDateLabel(post.scheduled_at||post.updated_at)"></small></div><span class="mp-badge" :class="'mp-state-'+post.status" x-text="mpStatus(post.status)"></span></div>
-      <p class="mp-post-caption" x-text="post.caption"></p><small class="mp-muted" x-text="post.media_name||'Mídia ainda não selecionada'"></small>
+      <p class="mp-post-caption" x-text="post.caption"></p><small class="mp-muted" x-text="post.media_ids?.length>1?'Carrossel · '+post.media_ids.length+' fotos':post.media_name||'Mídia ainda não selecionada'"></small>
       <div class="mp-deliveries"><template x-for="delivery in post.deliveries" :key="delivery.platform"><div><img :src="'/assets/brands/'+delivery.platform+'.svg'" :alt="delivery.platform"><span><strong x-text="delivery.platform==='instagram'?'Instagram':'Facebook'"></strong><small x-text="mpFormat(delivery.format)+' · '+mpStatus(delivery.status)"></small><small class="mp-error-text" x-show="delivery.error_code" x-text="delivery.status==='uncertain'?'Confira na rede antes de tentar outro envio.':mpErrorText({message:delivery.error_code})"></small></span><a class="mp-link" x-show="delivery.post_url" :href="delivery.post_url" target="_blank" rel="noopener noreferrer">Ver na rede ↗</a><button class="mp-link" x-show="delivery.status==='uncertain'" type="button" @click="mpOpenReconciliation(post,delivery)" :disabled="mpBusy">Registrar conferência</button></div></template></div>
       <div class="mp-actions"><button class="mp-button mp-primary" x-show="post.status==='draft'" @click="mpEdit(post)">Continuar edição →</button><button class="mp-button" x-show="post.status==='draft'" @click="mpAction(post,'cancel')" :disabled="mpBusy">Descartar rascunho</button><button class="mp-button" x-show="post.deliveries.some(d=>d.status==='failed')" @click="mpAction(post,'retry')" :disabled="mpBusy||!mpConfig?.sending">Repetir destinos com falha</button></div>
     </article></template></div>

@@ -13,7 +13,13 @@
       const card = V.node('article', null, 'mk-card mk-library-item'), ready = !p.mpMediaNeedsRecovery(media);
       const preview = V.button('', () => void M.preview(media), 'mk-library-preview'); preview.replaceChildren(V.image(media.thumbnail_url, media.name, 'mk-library-image')); preview.setAttribute('aria-label', 'Ver ' + media.name); V.disabled(preview, !ready);
       card.append(preview, V.node('strong', media.name), V.node('small', p.mpMediaSize(media) + (media.duration ? ' · ' + Math.round(Number(media.duration)) + 's' : ''), 'mk-muted'));
-      if (ready) card.appendChild(V.button('Usar esta mídia', () => { p.mpSelectMedia(media); M.go('compose'); }, 'mk-primary'));
+      if (ready) {
+        const selected = p.mpCarousel && p.mpMediaIds().includes(media.id);
+        const use = V.button(selected ? 'Foto adicionada' : p.mpCarousel ? 'Adicionar ao carrossel' : 'Usar esta mídia',
+          () => { p.mpSelectMedia(media); M.go('compose'); }, 'mk-primary');
+        V.disabled(use, p.mpCarousel && (selected || media.kind !== 'photo' || p.mpMediaIds().length >= 10));
+        card.appendChild(use);
+      }
       else {
         card.appendChild(V.badge(media.status));
         if (p.mpMediaCanFinalize(media)) card.appendChild(V.button('Conferir arquivo', () => void M.run(() => p.mpReprocessMedia(media)), 'mk-outline'));

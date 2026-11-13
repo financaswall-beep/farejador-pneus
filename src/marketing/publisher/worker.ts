@@ -13,6 +13,39 @@ import { validateDestinationMedia } from './media-validation.js';
 import { preparedPublishPath } from './media-formats.js';
 
 const MAX_SAFE_RETRIES = 5;
+function validateTaskMedia(task: Task) {
+  validateDestinationMedia(task, [task]);
+  if (!task.other_photos?.length) return;
+  if (task.kind !== 'photo' || task.format !== 'feed') throw new PublisherError('publisher_carousel_photos_feed', 400);
+  for (const photo of task.other_photos) {
+    if (photo.kind !== 'photo' || photo.status !== 'ready') throw new PublisherError('publisher_media_not_ready');
+    validateDestinationMedia(photo, [task]);
+  }
+}
+
+/** Cada item privado é registrado antes de iniciar o próximo. Somente o conjunto é publicado. */
+async function prepareCarousel(db: Pool, environment: Environment, task: Task, graph: PublishingGraph, storage: PublisherStorage) {
+  const photos = [task, ...task.other_photos!];
+  const children = task.child_container_ids ?? [];
+  const next = photos[children.length];
+  if (next) {
+    const url = await storage.signedUrl(preparedPublishPath(next, 'feed'), 3600);
+    const child = await graph.prepare(task, url, true);
+    await setDelivery(db, environment, task, 'preparing', { children: [...children, child], delaySeconds: 0 });
+    return;
+  }
+  if (task.platform === 'instagram') {
+    const ready = await Promise.all(children.map(container_id => graph.ready({ ...task, container_id })));
+    if (ready.some(done => !done)) {
+      await setDelivery(db, environment, task, 'preparing');
+      return;
+    }
+    const container = await graph.prepareCarousel(task, children);
+    await setDelivery(db, environment, task, 'processing', { container });
+  } else {
+    await setDelivery(db, environment, task, 'processing', { container: children[0] });
+  }
+}
 function expired(task: Task, verification = false): boolean {
   const start = verification ? task.public_started_at ?? task.started_at : task.started_at;
   return start !== null && Date.now() - new Date(start).getTime() > 2 * 3_600_000;
@@ -41,8 +74,12 @@ export async function publishTick(db: Pool, environment: Environment, graph: Pub
         await setDelivery(db, environment, task, 'failed', { error: 'publisher_processing_timeout' });
         return true;
       }
-      validateDestinationMedia(task, [task]);
+      validateTaskMedia(task);
       await storage.assertPrivateBucket();
+      if (task.other_photos?.length) {
+        await prepareCarousel(db, environment, task, graph, storage);
+        return true;
+      }
       const url = await storage.signedUrl(preparedPublishPath(task, task.format), 3600);
       const container = await graph.prepare(task, url);
       await setDelivery(db, environment, task, 'processing', { container });
@@ -58,7 +95,9 @@ export async function publishTick(db: Pool, environment: Environment, graph: Pub
         return true;
       }
       // Segurança e permissões são revalidadas antes de cruzar a fronteira pública.
-      validateDestinationMedia(task, [task]);
+      validateTaskMedia(task);
+      if (task.other_photos?.length && task.child_container_ids?.length !== task.other_photos.length + 1)
+        throw new PublisherError('publisher_carousel_incomplete', 409);
       await storage.assertPrivateBucket();
       await graph.assertPermissions(task);
       if (!await setDelivery(db, environment, task, 'publishing')) return true;

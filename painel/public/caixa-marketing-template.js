@@ -14,6 +14,7 @@ window.MATRIX_MARKETING_TEMPLATE = `
     <button id="mk-connections-home" class="mk-action" type="button"><span data-mk-icon="link"></span><span>Contas conectadas</span><span data-mk-icon="chevron"></span></button>
   </section>
   <section id="mk-compose" class="mk-page hidden" aria-label="Criar conteúdo">
+    <button id="mk-carousel" type="button" class="mk-outline" aria-pressed="false">Montar carrossel de fotos</button>
     <div class="mk-sources"><button id="mk-camera" type="button"><span data-mk-icon="camera"></span>Câmera</button><button id="mk-gallery" type="button"><span data-mk-icon="image"></span>Galeria</button><button id="mk-library" type="button"><span data-mk-icon="folder"></span>Biblioteca</button></div>
     <input id="mk-photo-file" type="file" accept="image/*,.heic,.heif" capture="environment" hidden /><input id="mk-video-file" type="file" accept="video/mp4,video/quicktime,video/*" capture="environment" hidden /><input id="mk-gallery-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime" hidden /><input id="mk-resume-file" type="file" accept="image/*,video/*,.heic,.heif" hidden />
     <div id="mk-media-preview" class="mk-composer-preview"></div>

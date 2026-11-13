@@ -79,6 +79,10 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 publisher_ai_rate_limit: 'Limite de 10 gerações de texto por hora atingido.', publisher_ai_missing: 'A geração de texto ainda não está configurada.',
                 publisher_already_started: 'O envio já começou. Aguarde a confirmação antes de tomar outra ação.',
                 publisher_retry_not_allowed: 'Só é possível repetir destinos com falha confirmada. Envios incertos precisam de conferência.',
+                publisher_carousel_photos_feed: 'O carrossel aceita somente fotos para o Feed.',
+                publisher_carousel_photos_feed_limit: 'Selecione somente fotos, até 10 por carrossel.',
+                publisher_carousel_update_client: 'Atualize o app ou o site para editar todas as fotos deste carrossel.',
+                publisher_carousel_incomplete: 'Faltou preparar uma das fotos. Confira a publicação antes de repetir.',
                 invalid_publisher_request: 'Confira os campos e os limites antes de continuar.' };
             return messages[error?.message] || 'Não foi possível concluir. As alterações foram mantidas; atualize para conferir o estado antes de tentar novamente.';
         },
@@ -88,6 +92,8 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 (!query || media.name.toLocaleLowerCase('pt-BR').includes(query)));
         },
         mpSelectedMedia() { return this.mpMedia.find(media => media.id === this.mpForm?.media_id && !this.mpMediaNeedsRecovery(media)) || null; },
+        mpMediaIds() { return this.mpForm?.media_ids || (this.mpForm?.media_id ? [this.mpForm.media_id] : []); },
+        mpPhotos() { return this.mpMediaIds().map(id => this.mpMedia.find(m => m.id === id)).filter(Boolean); },
         mpThumbnail(media) {
             return media?.thumbnail_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120"%3E%3Crect width="160" height="120" fill="%23eef3f5"/%3E%3Cg stroke="%238293a1" stroke-width="3" fill="none"%3E%3Crect x="52" y="37" width="56" height="46" rx="5"/%3E%3Ccircle cx="68" cy="51" r="5"/%3E%3Cpath d="M55 77l17-17 12 11 11-10 10 16"/%3E%3C/g%3E%3C/svg%3E';
         },
@@ -122,7 +128,8 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 (this.mpHistoryNetwork === 'all' || p.destinations.some(d => d.platform === this.mpHistoryNetwork)));
         },
         mpPayload() {
-            return { version: this.mpForm.version, title: this.mpForm.title, media_id: this.mpForm.media_id, caption: this.mpForm.caption,
+            return { version: this.mpForm.version, title: this.mpForm.title, media_id: this.mpForm.media_id,
+                media_ids: this.mpMediaIds(), caption: this.mpForm.caption,
                 delete_after_publish: this.mpForm.delete_after_publish, destinations: this.mpForm.destinations.filter(d => d.selected)
                     .map(d => ({ platform: d.platform, format: d.format, ...(this.mpCustom ? { caption: d.caption } : {}) })) };
         },

@@ -19,6 +19,26 @@ function preflight(extra: Record<string, unknown> = {}) {
 beforeEach(() => fetcher.mockReset());
 
 describe('Publicação Meta nas contas fixadas', () => {
+  it('envia cada foto privada e publica o conjunto na ordem escolhida no Instagram e no Facebook', async () => {
+    const graph = new PublisherGraph(config, fetcher);
+    const ig = task({ media_kind: 'photo', format: 'feed' });
+    preflight(); fetcher.mockResolvedValueOnce(json({ id: '91' }));
+    await graph.prepare(ig, 'https://storage.invalid/capa', true);
+    const body = (index: number) => new URLSearchParams(String(fetcher.mock.calls[index]?.[1]?.body));
+    expect(body(2).get('is_carousel_item')).toBe('true');
+    expect(body(2).has('caption')).toBe(false);
+    preflight(); fetcher.mockResolvedValueOnce(json({ id: '301' }));
+    expect(await graph.prepareCarousel(ig, ['91','73'])).toBe('301');
+    expect(Object.fromEntries(body(5))).toMatchObject({ media_type:'CAROUSEL', children:'91,73', caption:'Pneus' });
+    fetcher.mockResolvedValueOnce(json({id:'302'}));
+    await graph.publish(ig);
+    expect(body(6).get('creation_id')).toBe('301');
+    const fb=task({platform:'facebook',account_id:accounts.facebook.id,media_kind:'photo',format:'feed',child_container_ids:['91','73']});
+    preflight(); fetcher.mockResolvedValueOnce(json({id:'91'})); await graph.prepare(fb,'https://storage.invalid/capa',true);
+    expect(body(9).get('published')).toBe('false');
+    fetcher.mockResolvedValueOnce(json({id:'302'})); await graph.publish(fb);
+    expect(JSON.parse(body(10).get('attached_media')!)).toEqual([{media_fbid:'91'},{media_fbid:'73'}]);
+  });
   it('cria container IG sem publicar e utiliza token da Página após validar permissões', async () => {
     preflight(); fetcher.mockResolvedValueOnce(json({ id: '301' }));
     const graph = new PublisherGraph(config, fetcher);

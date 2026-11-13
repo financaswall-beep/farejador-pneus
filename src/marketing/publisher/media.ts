@@ -130,10 +130,13 @@ export async function finalizeMedia(pool: Pool, environment: Environment, id: st
 }
 
 /** Falhas por miniatura são isoladas e a concorrência de assinaturas fica limitada. */
-export async function listMedia(pool: Pool, environment: Environment, storage = new PublisherStorage()) {
+export async function listMedia(pool: Pool, environment: Environment, storage = new PublisherStorage(), postId?: string) {
+  const postFilter = postId ? `AND id IN (SELECT p.media_id FROM ops.publisher_posts p WHERE p.environment=$1 AND p.id=$2
+    UNION ALL SELECT f.media_id FROM ops.publisher_post_photos f WHERE f.environment=$1 AND f.post_id=$2)` : '';
   const media = (await pool.query<Media>(`SELECT id,name,kind,mime,bytes,status,original_path,publish_path,thumbnail_path,
     width,height,duration,inspection,error_code,upload_completed_at,updated_at FROM ops.publisher_media
-    WHERE environment=$1 AND status IN ('ready','uploading','failed') ORDER BY created_at DESC LIMIT 100`, [environment])).rows;
+    WHERE environment=$1 AND status IN ('ready','uploading','failed')
+    ${postFilter} ORDER BY created_at DESC LIMIT 100`, postId ? [environment, postId] : [environment])).rows;
   const results: { [key: string]: unknown }[] = [];
   for (let offset = 0; offset < media.length; offset += 8) {
     results.push(...await Promise.all(media.slice(offset, offset + 8).map(async ({ original_path: _original,

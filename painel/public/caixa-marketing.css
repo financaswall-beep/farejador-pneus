@@ -107,3 +107,5 @@
   .is-matrix-marketing .mk-segment button { font-size: 16px !important; padding-inline: 3px; }
   .is-matrix-marketing .mk-calendar-row .mk-post-card { grid-template-columns: 1fr; }.is-matrix-marketing .mk-calendar-row .mk-post-image { width: 100%; height: 100px; min-height: 0; }
 }
+.mk-carousel-photo { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .5rem 0; }
+.mk-carousel-photo > span { flex: 1 1 35%; min-width: 0; overflow-wrap: anywhere; }

@@ -8,8 +8,9 @@ window.PAINEL_MODULES.marketingPublisher = function () {
         mpSearch: '', mpKind: 'all', mpHistorySearch: '', mpHistoryNetwork: 'all', mpUploadProgress: null,
         mpForm: null, mpDirty: false, mpBrief: '', mpAiBusy: false, mpCustom: false, mpWhen: 'now', mpDate: '', mpTime: '09:00',
         mpConnectionsOpen: false, mpConnections: [], mpConnectionBusy: false, mpPreview: null, mpTimer: null, mpCalendarMonth: '',
-        mpReconciliation: null,
+        mpReconciliation: null, mpCarousel: false,
         mpFresh() {
+            this.mpCarousel = false;
             this.mpForm = { id: crypto.randomUUID(), version: 0, title: '', media_id: null, caption: '', delete_after_publish: true,
                 destinations: [{ platform: 'instagram', format: 'feed', selected: true, caption: '' }, { platform: 'facebook', format: 'feed', selected: true, caption: '' }] };
             this.mpDirty = false;
@@ -35,7 +36,9 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                 }
                 const data = await this.apiGet('/admin/api/marketing/publisher');
                 this.mpConfig = data.config;
-                this.mpMedia = data.media;
+                const selectedIds = this.mpMediaIds();
+                const retained = this.mpMedia.filter(m => selectedIds.includes(m.id) && !data.media.some(item => item.id === m.id));
+                this.mpMedia = [...data.media, ...retained];
                 this.mpPosts = data.posts;
                 this.mpWarnings = data.warnings || [];
                 if (!this.mpForm) {
@@ -68,13 +71,47 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             this.mpReconciliation = null;
             this.mpConnectionsOpen = false;
         },
+        mpCarouselMode(enabled) {
+            if (!enabled && this.mpMediaIds().length > 1 &&
+                !window.confirm('Usar somente a primeira foto nesta publicação?')) return;
+            if (enabled && this.mpSelectedMedia()?.kind === 'video') {
+                this.mpError = 'Retire o vídeo antes de montar um carrossel de fotos.';
+                return;
+            }
+            this.mpCarousel = enabled;
+            this.mpSetMediaIds(this.mpMediaIds().slice(0, 1));
+            if (enabled) this.mpForm.destinations.forEach(d => { d.format = 'feed'; });
+            this.mpError = '';
+        },
+        mpSetMediaIds(ids) {
+            this.mpForm.media_ids = ids;
+            this.mpForm.media_id = ids[0] || null;
+            this.mpDirty = true;
+        },
+        mpRemoveSelected(id) {
+            this.mpSetMediaIds(this.mpMediaIds().filter(value => value !== id));
+        },
+        mpMovePhoto(id, direction) {
+            const ids = [...this.mpMediaIds()], index = ids.indexOf(id), target = index + direction;
+            if (index < 0 || target < 0 || target >= ids.length) return;
+            [ids[index], ids[target]] = [ids[target], ids[index]];
+            this.mpSetMediaIds(ids);
+        },
         mpSelectMedia(media) {
             if (this.mpMediaNeedsRecovery(media))
                 return;
             if (!this.mpForm)
                 this.mpFresh();
-            this.mpForm.media_id = media.id;
-            this.mpDirty = true;
+            if (this.mpCarousel) {
+                const ids = this.mpMediaIds();
+                if (ids.includes(media.id)) return;
+                if (media.kind !== 'photo' || ids.length >= 10) {
+                    this.mpError = 'O carrossel aceita de 2 a 10 fotos.';
+                    return;
+                }
+                this.mpSetMediaIds([...ids, media.id]);
+            } else this.mpSetMediaIds([media.id]);
+            this.mpError = '';
             if (!this.mpForm.title)
                 this.mpForm.title = media.name.replace(/\.[^.]+$/, '');
             this.mpForm.destinations.forEach(destination => {
@@ -119,6 +156,10 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                 this.mpError = 'Escolha uma foto ou um vídeo.';
                 return;
             }
+            if (this.mpCarousel && this.mpMediaIds().length < 2) {
+                this.mpError = 'Escolha pelo menos duas fotos para o carrossel.';
+                return;
+            }
             const selected = this.mpForm.destinations.filter(d => d.selected);
             if (!selected.length) {
                 this.mpError = 'Escolha pelo menos uma rede social.';
@@ -154,9 +195,10 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                 this.mpBusy = false;
             }
         },
-        mpEdit(post) {
+        async mpEdit(post) {
             if (this.mpDirty && !window.confirm('Abrir outro rascunho e descartar as alterações não salvas?'))
                 return;
+            this.mpCarousel = post.media_ids?.length > 1;
             this.mpForm = { ...post, destinations: ['instagram', 'facebook'].map(platform => {
                     const d = post.destinations.find(d => d.platform === platform);
                     return { ...(d || { platform, format: 'feed', caption: '' }), selected: Boolean(d) };
@@ -164,6 +206,12 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             this.mpCustom = post.destinations.some(d => Object.hasOwn(d, 'caption'));
             this.mpTab = 'create';
             this.mpDirty = false;
+            if (this.mpMediaIds().some(id => !this.mpMedia.some(m => m.id === id))) {
+                try {
+                    const media = await this.apiGet('/admin/api/marketing/publisher/posts/' + post.id + '/media');
+                    if (this.mpForm.id === post.id) this.mpMedia.push(...media.filter(m => !this.mpMedia.some(item => item.id === m.id)));
+                } catch (error) { this.mpError = this.mpErrorText(error); }
+            }
         },
         mpNew() {
             if (this.mpDirty && !window.confirm('Descartar as alterações não salvas?')) return;

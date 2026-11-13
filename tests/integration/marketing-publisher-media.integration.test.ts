@@ -50,7 +50,7 @@ beforeAll(async () => {
     await embedded.exec(`CREATE TYPE env_t AS ENUM('prod','test');CREATE SCHEMA ops;CREATE SCHEMA analytics;
       CREATE ROLE farejador_partner_app;CREATE FUNCTION ops.enforce_environment_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN IF NEW.environment IS DISTINCT FROM OLD.environment THEN RAISE EXCEPTION 'environment_immutable';END IF;RETURN NEW;END $$;`);
-    for (const file of ['0246_marketing_publisher.sql', '0247_marketing_publisher_recovery.sql']) {
+    for (const file of ['0246_marketing_publisher.sql', '0247_marketing_publisher_recovery.sql', '0287_publisher_carousel.sql']) {
       await embedded.exec(await readFile(`db/migrations/${file}`, 'utf8'));
     }
     const query = async (sql: string, params?: unknown[]) => {
@@ -62,7 +62,7 @@ beforeAll(async () => {
 }, 180000);
 afterAll(async () => { if (container) await stopPostgres(container); if (embedded) await embedded.close(); });
 beforeEach(async () => {
-  await pool.query('TRUNCATE ops.publisher_events,ops.publisher_destinations,ops.publisher_posts,ops.publisher_media');
+  await pool.query('TRUNCATE ops.publisher_events,ops.publisher_destinations,ops.publisher_post_photos,ops.publisher_posts,ops.publisher_media');
   storage = new TestStorage(); config.MARKETING_LIBRARY_MAX_MB = 20000;
 });
 async function jpeg() {

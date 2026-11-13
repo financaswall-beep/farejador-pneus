@@ -4,6 +4,7 @@ import { accountId, type Destination } from './model.js';
 import { parsePublicationLink, resolvePublicationLink } from './publication-link.js';
 
 export interface Delivery extends Destination {
+  child_container_ids?: string[];
   account_id: string;
   container_id: string | null;
   provider_id: string | null;
@@ -17,7 +18,8 @@ export interface PublicationProof {
 }
 export interface PublishingGraph {
   assertPermissions(d: Delivery): Promise<void>;
-  prepare(d: Delivery, url: string): Promise<string>;
+  prepare(d: Delivery, url: string, carouselItem?: boolean): Promise<string>;
+  prepareCarousel(d: Delivery, children: string[]): Promise<string>;
   ready(d: Delivery): Promise<boolean>;
   publish(d: Delivery): Promise<string>;
   verify(d: Delivery): Promise<{ confirmed: boolean; url: string | null }>;
@@ -77,11 +79,18 @@ export class PublisherGraph extends CommentsGraph implements PublishingGraph {
     if (!report.permissions_checked) throw new MetaCommentError('publisher_permissions_unchecked');
     if (report.missing_permissions.length) throw new MetaCommentError('publisher_permissions_missing');
   }
-  async prepare(d: Delivery, url: string): Promise<string> {
+  async prepareCarousel(d: Delivery, children: string[]): Promise<string> {
+    await this.assertPermissions(d);
+    return providerId((await this.call(`${d.account_id}/media`, 'POST', {
+      media_type: 'CAROUSEL', children: children.join(','), caption: d.caption ?? '',
+    })).id);
+  }
+  async prepare(d: Delivery, url: string, carouselItem = false): Promise<string> {
     await this.assertPermissions(d);
     if (d.platform === 'instagram') {
       const params: Record<string, string> = d.media_kind === 'photo' ? { image_url: url } : { video_url: url };
-      if (d.format === 'story') params.media_type = 'STORIES';
+      if (carouselItem) params.is_carousel_item = 'true';
+      else if (d.format === 'story') params.media_type = 'STORIES';
       else {
         params.caption = d.caption ?? '';
         if (d.format === 'reel') { params.media_type = 'REELS'; params.share_to_feed = 'true'; }
@@ -133,7 +142,8 @@ export class PublisherGraph extends CommentsGraph implements PublishingGraph {
     if (d.media_kind === 'photo') {
       const edge = d.format === 'story' ? 'photo_stories' : 'feed';
       const params: Record<string, string> = d.format === 'story' ? { photo_id: d.container_id } : {
-        message: d.caption ?? '', attached_media: JSON.stringify([{ media_fbid: d.container_id }]), published: 'true',
+        message: d.caption ?? '', attached_media: JSON.stringify((d.child_container_ids?.length
+          ? d.child_container_ids : [d.container_id]).map(media_fbid => ({ media_fbid }))), published: 'true',
       };
       const result = await this.call(`${d.account_id}/${edge}`, 'POST', params);
       if (d.format === 'story' && result.success === true) {
@@ -207,7 +217,7 @@ export class PublisherGraph extends CommentsGraph implements PublishingGraph {
         }
       }
     }
-    if (d.container_id) {
+    if (d.container_id && (d.platform === 'instagram' || d.media_kind === 'video')) {
       const result = await this.call(d.container_id, 'GET', { fields: d.platform === 'instagram' ? 'status_code' : 'status' });
       const terminal = d.platform === 'instagram' ? ['ERROR', 'EXPIRED'].includes(result.status_code)
         : d.media_kind === 'video' && ['error', 'failed'].includes(result.status?.publishing_phase?.status);

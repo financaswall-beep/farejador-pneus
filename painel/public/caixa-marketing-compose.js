@@ -4,6 +4,29 @@
   const mark = () => { M.publisher.mpDirty = true; };
   function mediaPreview(host, compact = false) {
     const p = M.publisher, media = p.mpSelectedMedia(); host.replaceChildren();
+    if (p.mpCarousel) {
+      const photos = p.mpPhotos();
+      host.appendChild(V.node('strong', 'Carrossel · ' + photos.length + '/10 fotos'));
+      if (!photos.length) V.empty(host, 'Escolha de 2 a 10 fotos na galeria ou na biblioteca.');
+      photos.forEach((photo, i) => {
+        const row = V.node('div', null, 'mk-carousel-photo');
+        const preview = V.button('', () => void M.preview(photo, 'feed'), 'mk-preview-small');
+        preview.replaceChildren(V.image(photo.thumbnail_url, photo.name));
+        preview.setAttribute('aria-label', 'Ver ' + photo.name);
+        row.append(preview, V.node('span', (i + 1) + '. ' + photo.name + (i === 0 ? ' · Capa' : '')));
+        if (!compact) {
+          for (const [step, label] of [[-1, 'Antes'], [1, 'Depois']]) {
+            const move = V.button(label, () => { p.mpMovePhoto(photo.id, step); M.render(); });
+            V.disabled(move, i + step < 0 || i + step >= photos.length);
+            move.setAttribute('aria-label', 'Mover ' + photo.name + ' para ' + label.toLowerCase()); row.appendChild(move);
+          }
+          row.appendChild(V.button('Retirar', () => { p.mpRemoveSelected(photo.id); M.render(); }));
+        }
+        host.appendChild(row);
+      });
+      if (compact) host.appendChild(V.button('Editar fotos', () => M.go('compose')));
+      return;
+    }
     if (!media) { V.empty(host, 'Escolha uma foto ou um vídeo para começar.'); return; }
     const picture = V.image(media.thumbnail_url, media.name, compact ? 'mk-thumb' : 'mk-compose-image');
     picture.classList.toggle('is-video', media.kind === 'video');
@@ -13,13 +36,20 @@
     if (compact) {
       const copy = V.node('div'); copy.append(V.node('strong', p.mpForm.title || media.name), V.node('small', media.kind === 'video' ? 'Vídeo' + (media.duration ? ' · ' + Math.round(Number(media.duration)) + ' segundos' : '') : 'Foto'));
       host.append(copy, V.button('Editar', () => M.go('compose'), 'mk-link'));
-    } else host.appendChild(V.button('Trocar arquivo', () => { M.state.libraryReturn = 'compose'; M.go('library'); }, 'mk-link', 'refresh'));
+    } else {
+      host.appendChild(V.button('Trocar arquivo', () => { M.state.libraryReturn = 'compose'; M.go('library'); }, 'mk-link', 'refresh'));
+      host.appendChild(V.button('Retirar', () => { p.mpRemoveSelected(media.id); M.render(); }));
+    }
   }
   M.pages.compose = () => {
     const p = M.publisher;
     M.el('post-title').value = p.mpForm.title; M.el('caption').value = p.mpForm.caption;
     M.el('caption-count').textContent = p.mpForm.caption.length + '/2200';
     mediaPreview(M.el('media-preview'));
+    M.el('carousel').textContent = p.mpCarousel ? 'Voltar a uma mídia' : 'Montar carrossel de fotos';
+    M.el('carousel').setAttribute('aria-pressed', String(p.mpCarousel));
+    M.el('gallery-file').multiple = p.mpCarousel;
+    M.el('gallery-file').accept = p.mpCarousel ? 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif' : 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime';
     V.disabled(M.el('ai'), !p.mpConfig?.ai_ready);
     ['camera', 'gallery'].forEach(id => V.disabled(M.el(id), !p.mpConfig?.storage_ready || !p.mpConfig?.enabled));
   };
@@ -41,7 +71,7 @@
       checkbox.addEventListener('change', () => { destination.selected = checkbox.checked; mark(); reviewControls(); });
       label.append(checkbox, V.network(destination.platform));
       const format = V.node('select'); format.setAttribute('aria-label', 'Formato no ' + V.platform(destination.platform));
-      (media?.kind === 'video' ? ['reel', 'story'] : ['feed', 'story']).forEach(value => { const option = V.node('option', p.mpFormat(value)); option.value = value; format.appendChild(option); });
+      (p.mpCarousel ? ['feed'] : media?.kind === 'video' ? ['reel', 'story'] : ['feed', 'story']).forEach(value => { const option = V.node('option', p.mpFormat(value)); option.value = value; format.appendChild(option); });
       format.value = destination.format; format.addEventListener('change', () => { destination.format = format.value; mark(); });
       row.append(label, format); host.append(row, V.button('Ver prévia no ' + V.platform(destination.platform), () => void M.preview(media, destination.format), 'mk-link'));
       const caption = V.field('Legenda no ' + V.platform(destination.platform), 'textarea', destination.caption || '', value => { destination.caption = value; mark(); });
@@ -56,10 +86,12 @@
   function validate() {
     const p = M.publisher;
     if (!p.mpSelectedMedia()) return 'Escolha uma foto ou um vídeo antes de continuar.';
+    if (p.mpCarousel && p.mpMediaIds().length < 2) return 'Escolha pelo menos duas fotos para o carrossel.';
     if (!p.mpForm.title.trim()) return 'Informe um nome para organizar este conteúdo.';
     return null;
   }
   M.el('new').addEventListener('click', () => { if (!M.busy()) { M.publisher.mpNew(); M.go('compose'); } });
+  M.el('carousel').addEventListener('click', () => { M.publisher.mpCarouselMode(!M.publisher.mpCarousel); M.render(); });
   M.el('post-title').addEventListener('input', () => { M.publisher.mpForm.title = M.el('post-title').value; mark(); });
   M.el('caption').addEventListener('input', () => { M.publisher.mpForm.caption = M.el('caption').value; M.el('caption-count').textContent = M.el('caption').value.length + '/2200'; mark(); });
   M.el('continue').addEventListener('click', () => {
@@ -94,6 +126,7 @@
   M.el('cleanup').addEventListener('change', () => { M.publisher.mpForm.delete_after_publish = M.el('cleanup').checked; mark(); });
   M.el('custom-enabled').addEventListener('change', () => { M.publisher.mpCustom = M.el('custom-enabled').checked; mark(); M.el('custom-fields').classList.toggle('hidden', !M.publisher.mpCustom); });
   M.el('camera').addEventListener('click', () => {
+    if (M.publisher.mpCarousel) { M.el('photo-file').click(); return; }
     const body = V.dialog('Capturar conteúdo');
     body.append(V.button('Tirar foto', () => { M.closeDialog(); M.el('photo-file').click(); }, 'mk-primary', 'camera'), V.button('Gravar vídeo', () => { M.closeDialog(); M.el('video-file').click(); }, 'mk-outline', 'play'));
   });

@@ -19,7 +19,7 @@ import {startPostgres,stopPostgres,type IntegrationDb} from './helpers/postgres.
 import type {PublisherStorage} from '../../src/marketing/publisher/storage.js';
 
 let pool:Pool;let container:IntegrationDb|undefined;let embedded:any;
-const env='test' as const;const graph={assertPermissions:vi.fn(),prepare:vi.fn(),ready:vi.fn(),publish:vi.fn(),verify:vi.fn(),reconcile:vi.fn()};
+const env='test' as const;const graph={assertPermissions:vi.fn(),prepare:vi.fn(),prepareCarousel:vi.fn(),ready:vi.fn(),publish:vi.fn(),verify:vi.fn(),reconcile:vi.fn()};
 const storage={assertPrivateBucket:vi.fn().mockResolvedValue({maxBytes:null,allowedMimes:null}),
   signedUrl:vi.fn().mockResolvedValue('https://storage.invalid/signed'),remove:vi.fn().mockResolvedValue(undefined)} as unknown as PublisherStorage;
 beforeAll(async()=>{
@@ -32,6 +32,7 @@ beforeAll(async()=>{
       BEGIN IF NEW.environment IS DISTINCT FROM OLD.environment THEN RAISE EXCEPTION 'environment_immutable';END IF;RETURN NEW;END $$;`);
     await embedded.exec(await readFile('db/migrations/0246_marketing_publisher.sql','utf8'));
     await embedded.exec(await readFile('db/migrations/0247_marketing_publisher_recovery.sql','utf8'));
+    await embedded.exec(await readFile('db/migrations/0287_publisher_carousel.sql','utf8'));
     const query=async(sql:string,params?:unknown[])=>{
       const result=await embedded.query(sql,params);
       for(const row of result.rows)for(const key of ['created_at','updated_at','scheduled_at','started_at','public_started_at','lease_until','deleted_at'])if(row[key]&&!(row[key] instanceof Date))row[key]=new Date(row[key]);
@@ -42,7 +43,7 @@ beforeAll(async()=>{
 },180000);
 afterAll(async()=>{if(container)await stopPostgres(container);if(embedded)await embedded.close();});
 beforeEach(async()=>{
-  await pool.query('TRUNCATE ops.publisher_events,ops.publisher_destinations,ops.publisher_posts,ops.publisher_media,analytics.publisher_captions');
+  await pool.query('TRUNCATE ops.publisher_events,ops.publisher_destinations,ops.publisher_post_photos,ops.publisher_posts,ops.publisher_media,analytics.publisher_captions');
   vi.clearAllMocks();graph.assertPermissions.mockResolvedValue(undefined);graph.prepare.mockResolvedValue('301');
   graph.ready.mockResolvedValue(true);graph.publish.mockResolvedValue('302');graph.verify.mockResolvedValue({confirmed:true,url:'https://www.instagram.com/p/302/'});
   graph.reconcile.mockResolvedValue({outcome:'unknown',evidence:'ambiguous'});
@@ -59,10 +60,10 @@ async function post(media_id:string,destinations:any[]=[{platform:'instagram',fo
 }
 async function due(){await pool.query(`UPDATE ops.publisher_destinations SET next_attempt_at=now()-interval '1 second',lease_until=NULL WHERE environment='test'`);}
 async function finish(){for(let i=0;i<12;i++){await due();if(!await publishTick(pool,env,graph,storage))break;}}
-it('aplica schema com RLS; portal parceiro não consegue ler nenhuma das cinco tabelas',async()=>{
+it('aplica schema com RLS; portal parceiro não consegue ler as tabelas da Central',async()=>{
   const result=await pool.query(`SELECT c.relname,c.relrowsecurity,has_table_privilege('farejador_partner_app',c.oid,'SELECT') readable
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relname LIKE 'publisher_%' AND n.nspname IN ('ops','analytics') AND c.relkind='r'`);
-  expect(result.rows).toHaveLength(5);for(const row of result.rows)expect(row).toMatchObject({relrowsecurity:true,readable:false});
+  expect(result.rows).toHaveLength(6);for(const row of result.rows)expect(row).toMatchObject({relrowsecurity:true,readable:false});
 });
 it('submissão é idempotente e edição antiga não reescreve uma publicação em andamento',async()=>{
   const p=await post(await asset());
@@ -75,6 +76,41 @@ it('agendamento em Brasília não sai antes do horário e cancelamento impede o 
   const p=await post(await asset());const future=new Date(Date.now()+3600000).toISOString();
   await submitPost(pool,env,p.id,p.version,future,'owner');expect(await claimDelivery(pool,env)).toBeNull();
   await postAction(pool,env,p.id,'cancel','owner');await due();expect(await publishTick(pool,env,graph,storage)).toBe(false);expect(graph.publish).not.toHaveBeenCalled();
+});
+it('preserva a ordem do carrossel, protege cada arquivo e retoma cada rede sem publicar fotos isoladas',async()=>{
+  const photos = [await asset(),await asset(),await asset()];
+  await pool.query("UPDATE ops.publisher_media SET kind='photo',mime='image/jpeg',width=1080,height=1350 WHERE id=ANY($1::uuid[])",[photos]);
+  const input = {version:0,title:'Pneus da semana',media_id:photos[0]!,media_ids:photos,caption:'Oferta',delete_after_publish:true,
+    destinations:[{platform:'facebook' as const,format:'feed' as const},{platform:'instagram' as const,format:'feed' as const}]};
+  const postId=randomUUID();
+  const p=await saveDraft(pool,env,postId,input,'owner');
+  await expect(saveDraft(pool,env,postId,{...input,version:p.version,media_ids:undefined},'owner')).rejects.toThrow('publisher_carousel_update_client');
+  await expect(saveDraft(pool,env,postId,{...input,version:p.version,destinations:[{platform:'instagram',format:'story'}]},'owner')).rejects.toThrow('publisher_carousel_photos_feed');
+  const ordered=[photos[2]!,photos[0]!,photos[1]!];
+  const edited=await saveDraft(pool,env,postId,{...input,version:p.version,media_id:ordered[0]!,media_ids:ordered},'owner');
+  await expect(deleteMedia(pool,env,ordered[2]!,false,storage)).rejects.toThrow('publisher_media_in_use');
+  await submitPost(pool,env,postId,edited.version,new Date(Date.now()+3600000).toISOString(),'owner');
+  expect(await claimDelivery(pool,env)).toBeNull();
+  vi.mocked(storage.signedUrl).mockImplementation(async path=>'https://storage.invalid/'+path);
+  const children=['101','102','103'];
+  graph.prepare.mockImplementation(async (_task,url,child) => {
+    expect(child).toBe(true);
+    const index=ordered.findIndex(id=>url.includes(id));expect(index).toBeGreaterThanOrEqual(0);return children[index];
+  });
+  graph.prepareCarousel.mockResolvedValue('888');
+  graph.ready.mockResolvedValueOnce(false);
+  try {
+    for(let i=0;i<32;i++){await due();if(!await publishTick(pool,env,graph,storage)) break;}
+    expect(graph.prepare).toHaveBeenCalledTimes(6);
+    expect(graph.prepareCarousel).toHaveBeenCalledTimes(1);
+    expect(graph.prepareCarousel).toHaveBeenCalledWith(expect.objectContaining({platform:'instagram'}),children);
+    expect(graph.publish).toHaveBeenCalledTimes(2);
+    expect(graph.publish).toHaveBeenCalledWith(expect.objectContaining({platform:'facebook',child_container_ids:children}));
+    expect(graph.publish).toHaveBeenCalledWith(expect.objectContaining({platform:'instagram',container_id:'888'}));
+    expect((await pool.query('SELECT status FROM ops.publisher_posts WHERE id=$1',[postId])).rows[0].status).toBe('published');
+    await cleanupMedia(pool,env,storage);
+    expect((await pool.query("SELECT id FROM ops.publisher_media WHERE status='deleted'")).rows).toHaveLength(3);
+  } finally {vi.mocked(storage.signedUrl).mockResolvedValue('https://storage.invalid/signed');}
 });
 it('altera somente o horário da publicação e dos destinos, com versão e auditoria idempotentes',async()=>{
   const p=await post(await asset()),first=new Date(Date.now()+3600000).toISOString(),next=new Date(Date.now()+7200000).toISOString();
