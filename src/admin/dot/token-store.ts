@@ -7,7 +7,10 @@ import { DOT_ACCESS_SECONDS, DOT_SCOPE, type DotConfig } from './config.js';
 import { dotHash, dotSecret } from './consent-store.js';
 import type { dotTokenBody } from './oauth-validation.js';
 
-export interface DotIdentity { grant_id: string; person_id: string; collaborator_id: string; installment_reviews_enabled?: boolean }
+export interface DotIdentity {
+  grant_id: string; person_id: string; collaborator_id: string;
+  installment_reviews_enabled?: boolean; installment_chat_confirmation?: boolean;
+}
 const activeOwner = `JOIN network.matriz_collaborators mc ON mc.id=g.collaborator_id
   AND mc.environment=g.environment AND mc.person_id=g.person_id AND mc.panel_role='owner' AND mc.revoked_at IS NULL
   JOIN network.partner_people p ON p.id=g.person_id AND p.environment=g.environment AND p.revoked_at IS NULL`;
@@ -66,7 +69,8 @@ export async function exchangeDotToken(config: DotConfig, body: z.infer<typeof d
 export async function validateDotAccess(config: DotConfig, token: string): Promise<DotIdentity|null> {
   if (!/^da_[a-f0-9]{64}$/.test(token)) return null;
   const result = await pool.query<DotIdentity>(`SELECT g.id grant_id,g.person_id,g.collaborator_id,
-    COALESCE((to_jsonb(g)->>'installment_reviews_enabled')::boolean,false) installment_reviews_enabled
+    COALESCE((to_jsonb(g)->>'installment_reviews_enabled')::boolean,false) installment_reviews_enabled,
+    COALESCE((to_jsonb(g)->>'installment_chat_confirmation')::boolean,false) installment_chat_confirmation
     FROM network.dot_oauth_grants g JOIN network.dot_oauth_tokens t ON t.grant_id=g.id AND t.environment=g.environment
     ${activeOwner} WHERE ${activeGrant} AND t.access_hash=$4 AND t.rotated_at IS NULL AND t.access_expires_at>now()`,
   [env.FAREJADOR_ENV,config.clientId,config.resource,dotHash(token)]);
@@ -81,7 +85,8 @@ export async function revokeDotToken(config: DotConfig, token: string) {
 }
 export async function listDotConnections(personId: string) {
   return (await pool.query(`SELECT id,created_at,expires_at,revoked_at,
-    (to_jsonb(g)->>'installment_reviews_enabled')::boolean installment_reviews_enabled FROM network.dot_oauth_grants g
+    (to_jsonb(g)->>'installment_reviews_enabled')::boolean installment_reviews_enabled,
+    (to_jsonb(g)->>'installment_chat_confirmation')::boolean installment_chat_confirmation FROM network.dot_oauth_grants g
     WHERE environment=$1 AND person_id=$2 AND code_used_at IS NOT NULL
     ORDER BY created_at DESC LIMIT 50`,[env.FAREJADOR_ENV,personId])).rows;
 }

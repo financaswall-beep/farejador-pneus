@@ -26,7 +26,9 @@ async function transact<T>(work: (db: PoolClient) => Promise<T>) {
   } finally { db.release(); }
 }
 
-const activeGrant = `SELECT g.installment_reviews_enabled FROM network.dot_oauth_grants g
+const activeGrant = `SELECT g.installment_reviews_enabled,
+     COALESCE((to_jsonb(g)->>'installment_chat_confirmation')::boolean,false) installment_chat_confirmation
+   FROM network.dot_oauth_grants g
    JOIN network.matriz_collaborators c ON c.id=g.collaborator_id AND c.environment=g.environment
      AND c.person_id=g.person_id AND c.panel_role='owner' AND c.revoked_at IS NULL
    JOIN network.partner_people p ON p.id=g.person_id AND p.environment=g.environment AND p.revoked_at IS NULL
@@ -37,17 +39,17 @@ const activeGrant = `SELECT g.installment_reviews_enabled FROM network.dot_oauth
 async function lockGrant(db: PoolClient, person: string, grant: string) {
   const config=dotConfig();
   if (!config) throw new Error('dot_grant_unavailable');
-  const row = (await db.query<{installment_reviews_enabled:boolean}>(activeGrant,
+  const row = (await db.query<{installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
     [env.FAREJADOR_ENV,person,grant,config.clientId,config.resource,DOT_SCOPE])).rows[0];
   if (!row) throw new Error('dot_grant_unavailable');
-  return row.installment_reviews_enabled;
+  return row;
 }
 
-export async function setInstallmentPermission(person: string, grant: string, enabled: boolean) {
+export async function setInstallmentPermission(person: string, grant: string, enabled: boolean, chatConfirmation = false) {
   return transact(async db => {
     await lockGrant(db,person,grant);
-    await db.query(`UPDATE network.dot_oauth_grants SET installment_reviews_enabled=$4
-      WHERE environment=$1 AND person_id=$2 AND id=$3`,[env.FAREJADOR_ENV,person,grant,enabled]);
+    await db.query(`UPDATE network.dot_oauth_grants SET installment_reviews_enabled=$4, installment_chat_confirmation=$5
+      WHERE environment=$1 AND person_id=$2 AND id=$3`,[env.FAREJADOR_ENV,person,grant,enabled,enabled && chatConfirmation]);
     if (!enabled) await db.query(`DELETE FROM network.dot_installment_reviews
       WHERE environment=$1 AND grant_id=$2 AND confirmed_at IS NULL`,[env.FAREJADOR_ENV,grant]);
     return { enabled };
@@ -56,7 +58,8 @@ export async function setInstallmentPermission(person: string, grant: string, en
 
 export async function proposeInstallment(identity: DotIdentity, proposal: Proposal) {
   return transact(async db => {
-    if (!await lockGrant(db,identity.person_id,identity.grant_id)) throw new Error('dot_review_disabled');
+    const grant = await lockGrant(db,identity.person_id,identity.grant_id);
+    if (!grant.installment_reviews_enabled) throw new Error('dot_review_disabled');
     const { order_id, number, due_date, expected_due_date } = proposal;
     const { current, buyerName } = await readOpenInstallment(db,order_id,number,due_date);
     if (current.due_date !== expected_due_date || due_date === expected_due_date) throw new Error('sale_installment_changed');
@@ -71,8 +74,13 @@ export async function proposeInstallment(identity: DotIdentity, proposal: Propos
       RETURNING id,expires_at`,args)).rows[0];
     return { status:'aguardando_confirmacao', proposta:row.id, cliente:buyerName, parcela:number, saldo:current.balance,
       vencimento_atual:expected_due_date, novo_vencimento:due_date, expires_at:row.expires_at,
-      confirm_url:env.DOT_MCP_PUBLIC_ORIGIN + '/admin/dot/connections?proposta=' + row.id };
+      confirmacao:grant.installment_chat_confirmation?'conversa':'painel',
+      ...(grant.installment_chat_confirmation ? {} : {confirm_url:installmentReviewUrl(row.id)}) };
   });
+}
+
+export function installmentReviewUrl(id: string) {
+  return env.DOT_MCP_PUBLIC_ORIGIN + '/admin/dot/connections?proposta=' + id;
 }
 
 const reviewSql = `SELECT r.id,r.grant_id,r.order_id,r.installment_number,r.old_due::text,r.new_due::text,
@@ -83,14 +91,20 @@ const reviewSql = `SELECT r.id,r.grant_id,r.order_id,r.installment_number,r.old_
   JOIN commerce.wholesale_customers c ON c.environment=o.environment AND c.id=o.buyer_id
   WHERE r.environment=$1 AND g.person_id=$2 AND r.id=$3`;
 
-export async function reviewInstallment(person: string, id: string, action: 'view' | 'confirm' | 'restore') {
+type ReviewCaller = { person: string; action: 'view' | 'confirm' | 'restore' }
+  | { person: string; action: 'confirm-in-chat'; grantId: string };
+
+export async function reviewInstallment(id: string, caller: ReviewCaller) {
   return transact(async db => {
+    const {person,action}=caller;
     const args = [env.FAREJADOR_ENV,person,id];
     // Mesma ordem de travas de desativar: conexão, proposta e depois venda.
     const grant = (await db.query(`SELECT grant_id FROM network.dot_installment_reviews
       WHERE environment=$1 AND id=$2`,[env.FAREJADOR_ENV,id])).rows[0];
-    if (!grant) throw new Error('dot_review_missing');
-    const enabled = await lockGrant(db,person,grant.grant_id);
+    if (!grant || (caller.action==='confirm-in-chat' && caller.grantId!==grant.grant_id)) throw new Error('dot_review_missing');
+    const permission = await lockGrant(db,person,grant.grant_id);
+    if (action==='confirm-in-chat' && !(permission.installment_reviews_enabled && permission.installment_chat_confirmation))
+      throw new Error('dot_review_disabled');
     const row = (await db.query(reviewSql+' FOR UPDATE OF r',args)).rows[0];
     if (!row) throw new Error('dot_review_missing');
     if (row.restored_at) return { ...row, status:'restaurado' };
@@ -103,10 +117,11 @@ export async function reviewInstallment(person: string, id: string, action: 'vie
       return { ...row, status:'restaurado' };
     }
     if (row.confirmed_at) return { ...row, status:'confirmado' };
-    if (!enabled || row.expired) throw new Error('dot_review_expired');
+    if (!permission.installment_reviews_enabled || row.expired) throw new Error('dot_review_expired');
     if (action === 'view') return { ...row, status:'pendente' };
     await changeInstallmentInTransaction(db,{order_id:row.order_id,number:row.installment_number,
-      expected_due_date:row.old_due,due_date:row.new_due,idempotency_key:id},'Milly · dono '+person,Number(row.balance));
+      expected_due_date:row.old_due,due_date:row.new_due,idempotency_key:id},
+      action==='confirm-in-chat'?'Milly · autorização na conversa · dono '+person:'Milly · dono '+person,Number(row.balance));
     await db.query(`UPDATE network.dot_installment_reviews SET confirmed_at=now() WHERE environment=$1 AND id=$2`,
       [env.FAREJADOR_ENV,id]);
     return { ...row, status:'confirmado' };

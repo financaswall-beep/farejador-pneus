@@ -18,15 +18,15 @@ function fail(reply:FastifyReply,error:unknown) {
 export function registerInstallmentReviews(app:FastifyInstance,origin:string) {
   app.put('/admin/api/dot/connections/:id/installments',{preHandler:dotHumanOwner},async(req,reply)=>{
     if(req.headers.origin!==origin)return reply.code(403).send({error:'csrf_rejected'});
-    const id=params.safeParse(req.params),body=z.object({enabled:z.boolean()}).strict().safeParse(req.body);
+    const id=params.safeParse(req.params),body=z.object({enabled:z.boolean(),chat_confirmation:z.boolean().optional()}).strict().safeParse(req.body);
     if(!id.success||!body.success)return reply.code(400).send({error:'invalid_request'});
-    try{return await setInstallmentPermission(getAdminContext(req).personId!,id.data.id,body.data.enabled);}
+    try{return await setInstallmentPermission(getAdminContext(req).personId!,id.data.id,body.data.enabled,body.data.chat_confirmation);}
     catch(error){return fail(reply,error);}
   });
   app.get('/admin/api/dot/installment-reviews/:id',{preHandler:dotHumanOwner},async(req,reply)=>{
     const id=params.safeParse(req.params);
     if(!id.success)return reply.code(400).send({error:'invalid_request'});
-    try{return await reviewInstallment(getAdminContext(req).personId!,id.data.id,'view');}
+    try{return await reviewInstallment(id.data.id,{person:getAdminContext(req).personId!,action:'view'});}
     catch(error){return fail(reply,error);}
   });
   for (const action of ['confirm','restore'] as const) {
@@ -34,7 +34,7 @@ export function registerInstallmentReviews(app:FastifyInstance,origin:string) {
       if(req.headers.origin!==origin)return reply.code(403).send({error:'csrf_rejected'});
       const id=params.safeParse(req.params);
       if(!id.success || req.body!=null && !z.object({}).strict().safeParse(req.body).success)return reply.code(400).send({error:'invalid_request'});
-      try{return await reviewInstallment(getAdminContext(req).personId!,id.data.id,action);}
+      try{return await reviewInstallment(id.data.id,{person:getAdminContext(req).personId!,action});}
       catch(error){return fail(reply,error);}
     });
   }

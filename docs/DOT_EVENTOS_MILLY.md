@@ -6,7 +6,7 @@ Os dados comerciais continuam somente leitura. Não há respostas automáticas p
 
 ## Propostas de vencimento
 
-Em **Avisos do assistente → Permissões da Milly**, o proprietário pode permitir propostas de vencimento para uma conexão. A Milly procura parcelas em aberto de atacado ou lote e devolve um link válido por 15 minutos. Abra o link com a sessão do proprietário, confira comprador, venda, parcela, saldo e datas e clique em **Confirmar novo vencimento**. O painel verifica a situação atual e registra a autorização no histórico da venda.
+Em **Avisos do assistente → Permissões da Milly**, o proprietário escolhe como autorizar mudanças de vencimento em parcelas abertas de atacado ou lote. Com **Permitir confirmação por voz ou texto**, basta autorizar a parcela e a nova data na conversa. A Milly prepara a proposta e confirma pela mesma conexão. O Farejador confere o vencimento e o saldo antes de gravar e registra a mudança no histórico da venda. Com **Confirmar vencimentos só no painel**, a Milly entrega um link válido por 15 minutos para o proprietário conferir e confirmar. Conexões já configuradas para confirmação no painel conservam esse modo até o proprietário escolher outro.
 
 O mesmo link permite **Restaurar vencimento anterior** enquanto a parcela continuar aberta com o vencimento confirmado. **Voltar para somente consulta** cancela propostas pendentes daquela conexão. As configurações de avisos são independentes.
 

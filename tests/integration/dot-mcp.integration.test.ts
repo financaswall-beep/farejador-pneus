@@ -347,10 +347,11 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   const grant=(await db.pool.query(`SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1`,
     [createHash('sha256').update(access).digest('hex')])).rows[0].grant_id;
   const permission='/admin/api/dot/connections/'+grant+'/installments';
-  const enable=(enabled:boolean)=>app.inject({method:'PUT',url:permission,headers:headers(),payload:{enabled}});
+  const enable=(enabled:boolean,chat_confirmation=false)=>app.inject({method:'PUT',url:permission,headers:headers(),payload:{enabled,chat_confirmation}});
   const args={order_id,number:1,expected_due_date:original,due_date:next};
   const tool=async(name:string,args:object,token=access)=>(await rpc(token,'tools/call',{name,arguments:args})).json();
   const proposal=()=>tool('preparar_alteracao_vencimento',args);
+  const confirmInChat=(proposta:string,token=access)=>tool('confirmar_alteracao_vencimento',{proposta,autorizado_pelo_dono:true},token);
   expect((await proposal()).error).toBeTruthy();
   expect((await enable(true)).statusCode).toBe(200);
   expect((await tool('preparar_alteracao_vencimento',args,other)).error).toBeTruthy();
@@ -360,12 +361,15 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
     'mcp-protocol-version':'2026-07-28','mcp-method':'tools/list'},payload:{jsonrpc:'2.0',id:1,method:'tools/list',
     params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'teste',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}}});
   expect(modern.json().result.tools.some((t:{name:string})=>t.name==='preparar_alteracao_vencimento')).toBe(true);
+  expect(modern.json().result.tools.some((t:{name:string})=>t.name==='confirmar_alteracao_vencimento')).toBe(false);
   const pending=(await proposal()).result.structuredContent;
   expect(pending).toMatchObject({status:'aguardando_confirmacao',saldo:100,cliente:'Cliente Dot'});
   expect((await proposal()).result.structuredContent.proposta).toBe(pending.proposta);
   const path=(id:string)=>'/admin/api/dot/installment-reviews/'+id;
   const submit=(id:string,action='confirm')=>app.inject({method:'POST',url:path(id)+'/'+action,headers:headers()});
   const date=async()=>(await db.pool.query('SELECT due_date::text FROM commerce.wholesale_orders WHERE id=$1',[order_id])).rows[0].due_date;
+  expect(await date()).toBe(original);
+  expect((await confirmInChat(pending.proposta)).result.isError).toBe(true);
   expect(await date()).toBe(original);
   expect((await app.inject({method:'POST',url:path(pending.proposta)+'/confirm',headers:{authorization:'Bearer '+access}})).statusCode).not.toBe(200);
   expect((await app.inject({method:'POST',url:path(pending.proposta)+'/confirm',headers:{...headers(),origin:'https://other.example'}})).statusCode).toBe(403);
@@ -376,9 +380,23 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   const expired=(await proposal()).result.structuredContent.proposta;
   await db.pool.query("UPDATE network.dot_installment_reviews SET expires_at=now()-interval '1 second' WHERE id=$1",[expired]);
   expect((await submit(expired)).statusCode).toBe(410);
-  const active=(await proposal()).result.structuredContent.proposta;
+  expect((await enable(true,true)).statusCode).toBe(200);
+  expect((await confirmInChat(expired)).result.isError).toBe(true);
+  const chatProposal=(await proposal()).result.structuredContent;
+  expect(chatProposal.confirmacao).toBe('conversa');
+  expect(chatProposal.confirm_url).toBeUndefined();
+  const active=chatProposal.proposta;
+  const otherGrant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(other).digest('hex')])).rows[0].grant_id;
+  expect((await app.inject({method:'PUT',url:'/admin/api/dot/connections/'+otherGrant+'/installments',headers:headers(),
+    payload:{enabled:true,chat_confirmation:true}})).statusCode).toBe(200);
+  expect((await confirmInChat(active,other)).result.isError).toBe(true);
+  expect((await tool('confirmar_alteracao_vencimento',{proposta:active})).error).toBeTruthy();
+  expect(await date()).toBe(original);
   expect((await app.inject({url:path(active),headers:headers()})).json().status).toBe('pendente');
-  expect((await Promise.all([submit(active),submit(active)])).map(r=>r.json().status)).toEqual(['confirmado','confirmado']);
+  const confirmed=await Promise.all([confirmInChat(active),confirmInChat(active)]);
+  for (const response of confirmed) expect(response.result.structuredContent).toMatchObject({status:'confirmado',vencimento:next,parcela:1,saldo:100});
+  expect((await submit(active)).json().status).toBe('confirmado');
   expect(await date()).toBe(next);
   const audit=async()=>(await db.pool.query(`SELECT count(*)::int n FROM audit.events WHERE entity_id=$1
     AND event_type='installment_due_date_changed'`,[order_id])).rows[0].n;
@@ -388,11 +406,12 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await submit(active,'restore')).json().status).toBe('restaurado');
   expect(await date()).toBe(original);
   expect(await audit()).toBe(2);
-  await enable(true);
+  await enable(true,true);
   expect((await tool('consultar_proposta_vencimento',{proposta:active})).result.structuredContent.status).toBe('restaurado');
   const stale=(await proposal()).result.structuredContent.proposta;
   await changeSaleInstallmentDueDate({...args,due_date:'2098-06-10',idempotency_key:randomUUID()},'outro operador',db.pool);
   expect((await submit(stale)).statusCode).toBe(409);
+  expect((await confirmInChat(stale)).result.isError).toBe(true);
   expect(await date()).toBe('2098-06-10');
   const partial=(await tool('preparar_alteracao_vencimento',{...args,expected_due_date:'2098-06-10'})).result.structuredContent;
   const {settleMatrizLedgerOpenItem}=await import('../../src/admin/painel/matriz-ledger-settlement.js');
@@ -401,6 +420,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   await settleMatrizLedgerOpenItem({environment:'test',obligation_id:obligation,sale_installment:{order_id,number:1},
     amount:20,payment_method:'Pix',idempotency_key:randomUUID()},db.pool);
   expect((await submit(partial.proposta)).statusCode).toBe(409);
+  expect((await confirmInChat(partial.proposta)).result.isError).toBe(true);
   expect(await date()).toBe('2098-06-10');
   await enable(false);
 });

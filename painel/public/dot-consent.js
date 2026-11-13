@@ -44,22 +44,34 @@
         if (active) {
           if (typeof row.installment_reviews_enabled === 'boolean') {
             const enabled = row.installment_reviews_enabled;
+            const chat = enabled && row.installment_chat_confirmation === true;
             const mode = document.createElement('p');
-            mode.textContent = enabled ? 'Propostas de vencimento habilitadas' : 'Somente consulta';
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.textContent = enabled ? 'Voltar para somente consulta' : 'Permitir propostas de vencimento';
-            toggle.addEventListener('click', async () => {
-              toggle.disabled = true;
-              try {
-                await api('/admin/api/dot/connections/' + encodeURIComponent(row.id) + '/installments', {
-                  method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!enabled}),
-                });
-                message.textContent = enabled ? 'Somente consulta. Propostas pendentes canceladas.' : 'Propostas de vencimento habilitadas.';
-                await loadConnections();
-              } catch (error) { message.textContent = error.message; toggle.disabled = false; }
-            });
-            box.append(mode,toggle);
+            mode.textContent = chat ? 'Você pode confirmar vencimentos por voz ou texto com a Milly.'
+              : enabled ? 'Você confirma vencimentos no painel.' : 'Somente consulta';
+            box.append(mode);
+            function permissionButton(label, allowReviews, allowChat) {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.textContent = label;
+              button.addEventListener('click', async () => {
+                const buttons = box.querySelectorAll('button');
+                buttons.forEach(item => { item.disabled = true; });
+                try {
+                  await api('/admin/api/dot/connections/' + encodeURIComponent(row.id) + '/installments', {
+                    method:'PUT',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({enabled:allowReviews,chat_confirmation:allowChat}),
+                  });
+                  message.textContent = '';
+                  await loadConnections();
+                } catch (error) { message.textContent = error.message; }
+                finally { buttons.forEach(item => { item.disabled = false; }); }
+              });
+              box.append(button);
+            }
+            if (!chat && typeof row.installment_chat_confirmation === 'boolean')
+              permissionButton('Permitir confirmação por voz ou texto', true, true);
+            if (!enabled || chat) permissionButton('Confirmar vencimentos só no painel', true, false);
+            if (enabled) permissionButton('Voltar para somente consulta', false, false);
           }
           const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Desconectar Dot';
           button.addEventListener('click', async () => {
