@@ -7,6 +7,7 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+import { settleMatrizLedgerOpenItemOnClient } from './matriz-ledger-settlement.js';
 import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
 import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 
@@ -61,6 +62,23 @@ async function settleWholesalePayment(
     const paidAt = normalizeBusinessFactInstant(
       options.paid_at, new Date(), 'paid_at_future',
     ) ?? new Date().toISOString();
+    // Um pagamento final estornado já ocupa a chave histórica da origem. A nova
+    // baixa precisa de identidade própria e deve usar o saldo reaberto da obrigação.
+    const corrected=(saleLedger || purchaseLedger) && (await client.query<{id:string}>(`SELECT t.id
+      FROM finance.matriz_ledger_transactions t WHERE t.environment=$1 AND t.source_id=$2
+        AND t.source_type=ANY($3::text[]) AND EXISTS (SELECT 1 FROM finance.matriz_ledger_payments p
+          JOIN finance.matriz_ledger_transactions x ON x.id=p.payment_transaction_id AND x.environment=p.environment
+          WHERE p.environment=t.environment AND p.obligation_transaction_id=t.id AND x.source_type='finance.settlement.reversal')`,
+      [environment,entityId,sale?['commerce.wholesale_order.revenue','commerce.wholesale_order.arrival_revenue']:['commerce.wholesale_purchase.accrual']])).rows[0];
+    if (corrected) {
+      const settled=await settleMatrizLedgerOpenItemOnClient(client,{environment,obligation_id:corrected.id,
+        paid_at:paidAt,payment_method:options.payment_method??undefined,cash_account:options.cash_account??undefined,
+        note:options.note??undefined,actor_label:options.actor_label,idempotency_key:options.idempotency_key});
+      const result={id:entityId,paid_at:settled.settled_at};
+      await completeIntegrityOperation(client,operation,table,entityId,result);
+      await client.query('COMMIT');
+      return result;
+    }
     const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE ${table} SET payment_status='paid',paid_at=$3::timestamptz
         ${sale ? ',payment_method=COALESCE($4,payment_method)' : ''}

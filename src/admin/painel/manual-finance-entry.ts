@@ -1,14 +1,17 @@
 import {manualEntrySchema,reverseManualEntrySchema,type ManualFinanceEntry,type ManualFinanceCorrection} from './manual-finance-entry-schema.js';
-import type {Pool} from 'pg';
+import type {Pool,PoolClient} from 'pg';
 import {pool} from '../../persistence/db.js';
 import {env} from '../../shared/config/env.js';
 import {postMatrizLedgerTransaction} from './matriz-ledger-posting.js';
 
 /** A própria transação imutável é a fonte da entrada avulsa; não gera venda nem estoque. */
 export async function createManualFinanceEntry(input:ManualFinanceEntry,actor:string,environment=env.FAREJADOR_ENV,db:Pool=pool){
-  const data=manualEntrySchema.parse(input),contribution=data.kind==='owner_contribution';
   const client=await db.connect();
-  try {
+  try { return await createManualEntryOnClient(client,input,actor,environment); }
+  finally {client.release();}
+}
+export async function createManualEntryOnClient(client:PoolClient,input:ManualFinanceEntry,actor:string,environment=env.FAREJADOR_ENV) {
+  const data=manualEntrySchema.parse(input),contribution=data.kind==='owner_contribution';
     const id=await postMatrizLedgerTransaction(client,{
       environment,sourceType:'finance.manual_entry',sourceId:data.idempotency_key,
       kind:contribution?'owner_contribution':'manual_income',amount:data.amount,
@@ -22,10 +25,9 @@ export async function createManualFinanceEntry(input:ManualFinanceEntry,actor:st
         payment_method:data.payment_method,cash_account:data.cash_account},
     });
     return {id};
-  } finally {client.release();}
 }
 export async function reverseManualFinanceEntry(id:string,input:ManualFinanceCorrection,actor:string,
-  environment=env.FAREJADOR_ENV,db:Pool=pool){
+  environment=env.FAREJADOR_ENV,db:Pick<Pool,'query'>=pool){
   const data=reverseManualEntrySchema.parse(input);
   const found=await db.query<{id:string}>(`SELECT finance.reverse_matriz_ledger_transaction(
     $1::env_t,t.id,'finance.manual_entry.reversal',$3,

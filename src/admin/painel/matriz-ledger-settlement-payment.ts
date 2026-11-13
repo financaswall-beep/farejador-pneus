@@ -78,13 +78,13 @@ export async function lockSettlementObligation(
           (e.account_code='accounts_receivable'
             AND e.account_class='asset' AND e.side='debit'
             AND t.source_type=ANY(ARRAY[
-              'commerce.order.revenue',
+              'finance.service_receivable','commerce.order.revenue',
               'commerce.wholesale_order.revenue',
               'commerce.wholesale_order.arrival_revenue'
             ]::text[]))
           OR (e.account_code='accounts_payable'
             AND e.account_class='liability' AND e.side='credit'
-            AND t.source_type='commerce.wholesale_purchase.accrual')
+            AND t.source_type IN ('commerce.wholesale_purchase.accrual','finance.recurring_expense'))
           OR (e.account_code=ANY(ARRAY[
               'supplier_refund_receivable',
               'expense_refund_receivable',
@@ -109,10 +109,10 @@ export async function lockSettlementObligation(
   const row = result.rows[0];
   const operational = row && (
     (row.account_code === 'accounts_receivable'
-      && ['commerce.order.revenue','commerce.wholesale_order.revenue',
+      && ['finance.service_receivable','commerce.order.revenue','commerce.wholesale_order.revenue',
         'commerce.wholesale_order.arrival_revenue'].includes(row.source_type))
     || (row.account_code === 'accounts_payable'
-      && row.source_type === 'commerce.wholesale_purchase.accrual')
+      && ['commerce.wholesale_purchase.accrual','finance.recurring_expense'].includes(row.source_type))
   );
   if (!row || (!CENTRAL_ACCOUNTS.has(row.account_code) && !operational)) {
     throw new Error('central_obligation_not_actionable');

@@ -15,6 +15,8 @@ export interface MatrizExpenseLedgerState {
   dueDate: string | null;
   paidAt: string | null;
   createdBy: string | null;
+  paymentMethod?: string;
+  cashAccount?: string;
   competenceMonth?: string | null;
   documentDate?: string | null;
 }
@@ -87,6 +89,8 @@ export async function ensureMatrizExpenseAccrual(
       },
     ],
     metadata: {
+      ...(expense.paymentStatus === 'paid' && expense.paymentMethod ? {payment_method:expense.paymentMethod} : {}),
+      ...(expense.paymentStatus === 'paid' && expense.cashAccount ? {cash_account:expense.cashAccount} : {}),
       expense_id: expense.expenseId, category: expense.category,
       competence_month: expense.competenceMonth ?? null,
       document_date: expense.documentDate ?? null,

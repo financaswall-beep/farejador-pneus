@@ -4,6 +4,8 @@ export const financialCents=(value:number)=>Math.round(value*100);
 export const financialSum=<T>(rows:T[],value:(row:T)=>number)=>rows.reduce((total,row)=>total+financialCents(value(row)),0)/100;
 export const financialMoney=(value:number)=>financialCents(value)/100;
 export const financialOrigin=(value:string)=>{
+  if(value.startsWith('finance.recurring_expense'))return 'despesas';
+  if(value==='finance.service_receivable')return 'financeiro';
   if(value.startsWith('commerce.wholesale_order.'))return'atacado';
   if(value.startsWith('commerce.order.'))return'varejo';
   if(value.startsWith('commerce.wholesale_purchase.'))return'compras';

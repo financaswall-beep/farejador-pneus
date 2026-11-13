@@ -15,6 +15,8 @@ export interface CreateMatrizExpenseInput {
   group_id?: string | null;
   receipt_id?: string;
   receipt_confirmed?: boolean;
+  payment_method?: string;
+  cash_account?: string;
   category: string;
   description?: string | null;
   amount: number;
@@ -30,6 +32,8 @@ export interface CreateMatrizExpenseInput {
 }
 export interface MatrizExpenseTransactionInput {
   environment: 'prod' | 'test';
+  payment_method?: string;
+  cash_account?: string;
   category: string;
   description?: string | null;
   amount: number;
@@ -86,7 +90,7 @@ export async function insertMatrizExpenseInTransaction(
     amount: expense.amount, occurredAt: expense.occurred_at,
     paymentStatus: expense.payment_status, dueDate: expense.due_date,
     paidAt: expense.paid_at, createdBy: input.created_by ?? null,
-    competenceMonth, documentDate,
+    competenceMonth, documentDate, paymentMethod: input.payment_method, cashAccount: input.cash_account,
   });
   return expense;
 }
@@ -95,12 +99,25 @@ export async function createMatrizExpense(
   input: CreateMatrizExpenseInput,
   dbPool: Pool = defaultPool,
 ): Promise<MatrizExpenseRow> {
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await createMatrizExpenseOnClient(client, input);
+    await client.query('COMMIT');
+    return result;
+  } catch(error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+  finally { client.release(); }
+}
+
+export async function createMatrizExpenseOnClient(client: PoolClient, input: CreateMatrizExpenseInput) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   if (input.receipt_id && (input.receipt_confirmed !== true || !input.payment_status)) throw Error('expense_receipt_confirmation_required');
   const paymentStatus = input.payment_status ?? 'paid';
   const operation = { environment, domain: 'matriz_expense.create',
     idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
       ...(input.group_id ? { group_id: input.group_id } : {}),
+      ...(input.payment_method ? {payment_method:input.payment_method} : {}),
+      ...(input.cash_account ? {cash_account:input.cash_account} : {}),
       category: input.category, description: input.description?.trim() || null,
       amount_cents: moneyCents(input.amount), payment_status: paymentStatus,
       due_date: paymentStatus === 'pending' ? (input.due_date ?? null) : null,
@@ -110,40 +127,27 @@ export async function createMatrizExpense(
       competence_month: input.competence_month ?? null,
       ...(input.receipt_id ? { receipt_id: input.receipt_id } : {}),
     }) };
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    const started = await beginIntegrityOperation<MatrizExpenseRow>(client, operation);
-    if (started.replayed) {
-      await client.query('COMMIT');
-      return started.result;
-    }
-    if (input.receipt_id) await lockExpenseReceipt(client, environment, input.receipt_id);
-    const created = await insertMatrizExpenseInTransaction(client, {
-      environment, category: input.category, description: input.description,
-      amount: input.amount, payment_status: paymentStatus,
-      due_date: input.due_date, paid_at: input.paid_at,
-      occurred_at: input.occurred_at, document_date: input.document_date,
-      competence_month: input.competence_month, created_by: input.created_by,
-    });
-    if (input.receipt_id) await linkExpenseReceipt(client, environment, input.receipt_id, created.id);
-    await linkPurchaseGroupInTransaction(client, { environment, group_id: input.group_id,
-      kind: 'expense', record_id: created.id, actor: input.created_by ?? 'admin', idempotency_key: input.idempotency_key });
-    const result = integrityResult(created);
-    await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
-      entityTable: 'commerce.matriz_expenses', entityId: result.id,
-      eventType: 'created', actorLabel: input.created_by,
-      idempotencyKey: operation.idempotencyKey, after: result });
-    await completeIntegrityOperation(client, operation,
-      'commerce.matriz_expenses', result.id, result);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+  const started = await beginIntegrityOperation<MatrizExpenseRow>(client, operation);
+  if (started.replayed) return started.result;
+  if (input.receipt_id) await lockExpenseReceipt(client, environment, input.receipt_id);
+  const created = await insertMatrizExpenseInTransaction(client, {
+    environment, category: input.category, description: input.description, payment_method:input.payment_method, cash_account:input.cash_account,
+    amount: input.amount, payment_status: paymentStatus,
+    due_date: input.due_date, paid_at: input.paid_at,
+    occurred_at: input.occurred_at, document_date: input.document_date,
+    competence_month: input.competence_month, created_by: input.created_by,
+  });
+  if (input.receipt_id) await linkExpenseReceipt(client, environment, input.receipt_id, created.id);
+  await linkPurchaseGroupInTransaction(client, { environment, group_id: input.group_id,
+    kind: 'expense', record_id: created.id, actor: input.created_by ?? 'admin', idempotency_key: input.idempotency_key });
+  const result = integrityResult(created);
+  await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
+    entityTable: 'commerce.matriz_expenses', entityId: result.id,
+    eventType: 'created', actorLabel: input.created_by,
+    idempotencyKey: operation.idempotencyKey, after: result });
+  await completeIntegrityOperation(client, operation,
+    'commerce.matriz_expenses', result.id, result);
+  return result;
 }
 
 async function lockExpense(client: PoolClient, expenseId: string, environment: 'prod' | 'test') {
@@ -161,7 +165,17 @@ export async function settleMatrizExpense(
   dbPool: Pool = defaultPool,
   options: MatrizWriteOptions,
 ): Promise<{ id: string; paid_at: string }> {
-  const client = await dbPool.connect();
+  const client=await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result=await settleMatrizExpenseOnClient(client,expenseId,environment,options);
+    await client.query('COMMIT');
+    return result;
+  } catch(error) { await client.query('ROLLBACK').catch(()=>undefined); throw error; }
+  finally { client.release(); }
+}
+
+export async function settleMatrizExpenseOnClient(client:PoolClient,expenseId:string,environment:'prod'|'test',options:MatrizWriteOptions) {
   const operation = { environment, domain: 'matriz_expense.pay',
     idempotencyKey: options.idempotency_key,
     fingerprint: operationFingerprint({
@@ -170,65 +184,55 @@ export async function settleMatrizExpense(
       cash_account: options.cash_account?.trim().toLowerCase() ?? null,
       note: options.note?.trim() || null,
     }) };
-  try {
-    await client.query('BEGIN');
-    const started = await beginIntegrityOperation<{ id: string; paid_at: string }>(client, operation);
-    if (started.replayed) {
-      await client.query('COMMIT');
-      return started.result;
-    }
-    const current = await lockExpense(client, expenseId, environment);
-    if (!current || current.deleted_at || current.payment_status !== 'pending') throw new Error('expense_not_found');
-    const expenseLedger = env.MATRIZ_CENTRAL_LEDGER
-      ? await getMatrizExpenseLedgerState(client, environment, expenseId) : null;
-    const payroll = await client.query<{
-      id: string; payroll_period_id: string; payment_status: string;
-    }>(
-      `SELECT id,payroll_period_id,payment_status FROM finance.matriz_payroll_items
-        WHERE environment=$1 AND source_expense_id=$2 FOR UPDATE`, [environment, expenseId]);
-    if (payroll.rows[0] && payroll.rows[0].payment_status !== 'pending') {
-      throw new Error('payroll_payment_conflict');
-    }
-    const paidAt = normalizeBusinessFactInstant(
-      options.paid_at, new Date(), 'paid_at_future',
-    ) ?? new Date().toISOString();
-    const paid = await client.query<{ id: string; paid_at: string }>(
-      `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=$3::timestamptz
-        WHERE id=$1 AND environment=$2 RETURNING id,paid_at`,
-      [expenseId, environment, paidAt]);
-    const result = integrityResult(paid.rows[0]!);
-    if (expenseLedger) await postMatrizExpensePayment(
-      client, expenseLedger, result.paid_at, options.actor_label, options,
-    );
-    if (payroll.rows[0]) {
-      await client.query(
-        `UPDATE finance.matriz_payroll_items
-            SET payment_status='paid',paid_at=$2::timestamptz,paid_by=$3
-          WHERE id=$1`, [payroll.rows[0].id, result.paid_at, options.actor_label ?? null]);
-      await client.query(
-        `UPDATE finance.matriz_payroll_periods SET status=CASE WHEN EXISTS
-          (SELECT 1 FROM finance.matriz_payroll_items
-            WHERE payroll_period_id=$1 AND payment_status='pending') THEN 'partial' ELSE 'paid' END
-         WHERE id=$1`, [payroll.rows[0].payroll_period_id]);
-    }
-    await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
-      entityTable: 'commerce.matriz_expenses', entityId: expenseId,
-      eventType: 'payment_settled', actorLabel: options.actor_label,
-      idempotencyKey: operation.idempotencyKey,
-      before: { payment_status: 'pending', amount: current.amount },
-      after: { payment_status: 'paid', paid_at: result.paid_at,
-        payroll_item_id: payroll.rows[0]?.id ?? null,
-        payment_method: options.payment_method?.trim() || null,
-        cash_account: options.cash_account?.trim() || null,
-        note: options.note?.trim() || null } });
-    await completeIntegrityOperation(client, operation,
-      'commerce.matriz_expenses', expenseId, result);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
+  const started = await beginIntegrityOperation<{ id: string; paid_at: string }>(client, operation);
+  if (started.replayed) {
+    return started.result;
   }
+  const current = await lockExpense(client, expenseId, environment);
+  if (!current || current.deleted_at || current.payment_status !== 'pending') throw new Error('expense_not_found');
+  const expenseLedger = env.MATRIZ_CENTRAL_LEDGER
+    ? await getMatrizExpenseLedgerState(client, environment, expenseId) : null;
+  const payroll = await client.query<{
+    id: string; payroll_period_id: string; payment_status: string;
+  }>(
+    `SELECT id,payroll_period_id,payment_status FROM finance.matriz_payroll_items
+      WHERE environment=$1 AND source_expense_id=$2 FOR UPDATE`, [environment, expenseId]);
+  if (payroll.rows[0] && payroll.rows[0].payment_status !== 'pending') {
+    throw new Error('payroll_payment_conflict');
+  }
+  const paidAt = normalizeBusinessFactInstant(
+    options.paid_at, new Date(), 'paid_at_future',
+  ) ?? new Date().toISOString();
+  const paid = await client.query<{ id: string; paid_at: string }>(
+    `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=$3::timestamptz
+      WHERE id=$1 AND environment=$2 RETURNING id,paid_at`,
+    [expenseId, environment, paidAt]);
+  const result = integrityResult(paid.rows[0]!);
+  if (expenseLedger) await postMatrizExpensePayment(
+    client, expenseLedger, result.paid_at, options.actor_label, options,
+  );
+  if (payroll.rows[0]) {
+    await client.query(
+      `UPDATE finance.matriz_payroll_items
+          SET payment_status='paid',paid_at=$2::timestamptz,paid_by=$3
+        WHERE id=$1`, [payroll.rows[0].id, result.paid_at, options.actor_label ?? null]);
+    await client.query(
+      `UPDATE finance.matriz_payroll_periods SET status=CASE WHEN EXISTS
+        (SELECT 1 FROM finance.matriz_payroll_items
+          WHERE payroll_period_id=$1 AND payment_status='pending') THEN 'partial' ELSE 'paid' END
+       WHERE id=$1`, [payroll.rows[0].payroll_period_id]);
+  }
+  await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
+    entityTable: 'commerce.matriz_expenses', entityId: expenseId,
+    eventType: 'payment_settled', actorLabel: options.actor_label,
+    idempotencyKey: operation.idempotencyKey,
+    before: { payment_status: 'pending', amount: current.amount },
+    after: { payment_status: 'paid', paid_at: result.paid_at,
+      payroll_item_id: payroll.rows[0]?.id ?? null,
+      payment_method: options.payment_method?.trim() || null,
+      cash_account: options.cash_account?.trim() || null,
+      note: options.note?.trim() || null } });
+  await completeIntegrityOperation(client, operation,
+    'commerce.matriz_expenses', expenseId, result);
+  return result;
 }

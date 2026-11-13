@@ -146,11 +146,25 @@ it('apura a entrada do parceiro sobre o valor aceito na chegada e espelha a baix
     JOIN finance.partner_payables f ON f.source_purchase_id=p.id WHERE o.id=$1`,[original.order_id]);
   expect(corrected.rows[0]).toEqual({sale:'2098-12-05',purchase:'2098-12-05',payable:'2098-12-05'});
   const {settleMatrizLedgerOpenItem}=await import('../../src/admin/painel/matriz-ledger-settlement.js');
-  await settleMatrizLedgerOpenItem({environment:'test', obligation_id:parts[0]!.obligation_id!,
+  const baixaParceiro=await settleMatrizLedgerOpenItem({environment:'test', obligation_id:parts[0]!.obligation_id!,
     sale_installment:{order_id:original.order_id,number:1}, payment_method:'Pix',idempotency_key:randomUUID()},db.pool);
   const due=await db.pool.query('SELECT due_date::text FROM finance.partner_payables WHERE source_purchase_id=$1',[original.linked_partner_purchase_id]);
   expect(due.rows[0].due_date).toBe('2099-01-01');
   const mirrored=await db.pool.query(`SELECT e.amount FROM finance.partner_payable_events e
     JOIN finance.partner_payables p ON p.id=e.payable_id WHERE p.source_purchase_id=$1`,[original.linked_partner_purchase_id]);
   expect(mirrored.rows.map(row=>Number(row.amount)).sort((a,b)=>a-b)).toEqual([10,20.01]);
+  const { reverseSettlement,renegotiate }=await import('../../src/admin/dot/finance-operations.js');
+  const client=await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await reverseSettlement(client,{pagamento_id:baixaParceiro.payment_ids[0]!,valor_esperado:10,
+      ocorrido_em:new Date().toISOString(),motivo:'Parcela errada',idempotency_key:randomUUID()},actor);
+    const changed=await renegotiate(client,{obligation_id:parts[0]!.obligation_id!,saldo_esperado:29.99,
+      parcelas:[{due_date:'2099-02-01',amount:15},{due_date:'2099-03-01',amount:14.99}],idempotency_key:randomUUID()},actor);
+    expect(changed.acordo).toMatchObject({balance:29.99,received:20.01,next_due:'2099-02-01'});
+    await client.query('COMMIT');
+  } catch(error){ await client.query('ROLLBACK'); throw error; } finally{client.release();}
+  const mirrorAfter=await db.pool.query(`SELECT f.status,f.due_date::text due,sum(e.amount)::text paid FROM finance.partner_payables f
+    JOIN finance.partner_payable_events e ON e.payable_id=f.id WHERE f.source_purchase_id=$1 GROUP BY f.id`,[original.linked_partner_purchase_id]);
+  expect(mirrorAfter.rows[0]).toEqual({status:'open',due:'2099-02-01',paid:'20.01'});
 });

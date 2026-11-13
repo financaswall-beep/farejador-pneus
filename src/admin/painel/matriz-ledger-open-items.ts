@@ -42,6 +42,9 @@ function receivable(row: OpenRow): FinanceiroReceivableItem {
     ...base, tipo: 'devolucao_despesa', nome: row.description, phone: null,
     categoria: row.category ?? undefined, settlement_mode: 'central_obligation',
   };
+  if (row.source_type === 'finance.service_receivable') return {
+    ...base,tipo:'servico',nome:row.description,phone:null,settlement_mode:'central_obligation',
+  };
   const retail = row.source_type === 'commerce.order.revenue';
   return {
     ...base, tipo: retail ? 'varejo' : 'fiado',
@@ -74,6 +77,9 @@ function payable(row: OpenRow): FinanceiroPayableItem {
       ? `${row.supplier_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
       : row.supplier_name ?? row.description,
     settlement_mode: 'wholesale_purchase',
+  };
+  if (row.source_type === 'finance.recurring_expense') return {
+    ...base,tipo:'despesa',nome:row.description,categoria:row.category ?? undefined,settlement_mode:'central_obligation',
   };
   const payroll = row.category === 'funcionario';
   return {

@@ -1,7 +1,7 @@
 export function dotPage(requestToken?:string) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="dot-request" content="${requestToken??''}"><title>Dot · Matriz 2W</title>
-    <script defer src="/admin/dot/consent.js?v=20261112-conversa-2"></script>
+    <script defer src="/admin/dot/consent.js?v=20261113-financeiro"></script>
     <style>body{margin:0;background:#f4f7f6;color:#172724;font:18px system-ui,sans-serif}header{background:#1d2b2c;color:white;padding:24px;font-weight:800}
     [hidden]{display:none!important}main{max-width:560px;margin:32px auto;padding:24px;background:white;border:1px solid #d8e4df;border-radius:16px}h1{font-size:30px;margin-top:0}
     p,li{line-height:1.6}button{display:block;width:100%;padding:16px;margin:12px 0;border:1px solid #006044;border-radius:10px;background:#006044;color:white;font:700 18px system-ui;cursor:pointer}
@@ -16,9 +16,9 @@ export function dotPage(requestToken?:string) {
     O assistente não pode alterar registros comerciais, enviar mensagens a clientes ou executar pagamentos. Senhas, tokens e chaves de integração ficam protegidos.</p>
     <p>Quando você pedir acompanhamento no Dot e o recurso estiver habilitado, o Farejador poderá enviar eventos de conversas e entregas para análise.
     Conectar sozinho não ativa avisos. Você pode pedir para parar o acompanhamento ou desconectar abaixo.</p>
-    <p>Após conectar, você pode permitir alterações de vencimento e escolher onde confirmar cada mudança, na conversa com a Milly ou na Matriz. A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
+    <p>Após conectar, você pode habilitar lançamentos financeiros por voz ou texto. Também pode permitir alterações de vencimento e escolher onde confirmar cada mudança, na conversa com a Milly ou na Matriz. A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
     <button id="allow" type="button">Autorizar consultas</button><button id="deny" class="secondary" type="button">Agora não</button>`:
     `<section id="review" hidden><h1>Conferir vencimento</h1><p id="review-detail"></p><p id="review-state" role="status"></p><button id="undo-date" class="secondary" hidden type="button">Restaurar vencimento anterior</button></section>
-     <section id="manage"><h1>Permissões da Milly</h1><p>Escolha como autorizar mudanças de vencimento em cada conexão.</p><div id="connections"></div></section><a href="/admin/painel">Voltar à Matriz</a>`}
+     <section id="manage"><h1>Permissões da Milly</h1><p>Escolha as permissões de lançamentos financeiros e de vencimentos de cada conexão.</p><div id="connections"></div></section><a href="/admin/painel">Voltar à Matriz</a>`}
     <p id="message" class="error" role="status" aria-live="polite"></p></main></body></html>`;
 }

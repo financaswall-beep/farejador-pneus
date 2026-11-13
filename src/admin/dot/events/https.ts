@@ -30,6 +30,17 @@ export type WebhookSender=(url:string,body:string,headers:Record<string,string>)
 export const sendWebhook:WebhookSender=(raw,body,headers)=>sendPublicRequest(raw,'POST',body,headers);
 export const getPublicHealth=(raw:string)=>sendPublicRequest(raw,'GET','',{});
 async function sendPublicRequest(raw:string,method:'GET'|'POST',body:string,headers:Record<string,string>) {
+  const result=await boundedHttps(raw,method,body,headers,8192);
+  return {status:result.status,body:result.body.toString('utf8')};
+}
+
+export async function downloadReceiptFile(raw:string) {
+  const result=await boundedHttps(raw,'GET','',{},1024*1024);
+  if(result.status!==200 || !result.body.length) throw Error('arquivo_indisponivel');
+  return result.body;
+}
+
+async function boundedHttps(raw:string,method:'GET'|'POST',body:string,headers:Record<string,string>,maxBytes:number) {
   const url=callbackUrl(raw);
   if(Buffer.byteLength(body)>256*1024)throw new Error('payload_too_large');
   let timer:NodeJS.Timeout|undefined;
@@ -39,7 +50,7 @@ async function sendPublicRequest(raw:string,method:'GET'|'POST',body:string,head
   ]).finally(()=>clearTimeout(timer));
   if(!addresses.length||addresses.some(item=>!publicAddress(item.address)))throw new Error('invalid_callback');
   const address=addresses.find(item=>item.family===4)??addresses[0]!;
-  return new Promise<{status:number;body:string}>((resolve,reject)=>{
+  return new Promise<{status:number;body:Buffer}>((resolve,reject)=>{
     const req=request(url,{method,agent:false,family:address.family,...{autoSelectFamily:false},
       headers:{...headers,'content-length':Buffer.byteLength(body)},
       lookup:(_host,_options,done)=>done(null,address.address,address.family),
@@ -47,10 +58,10 @@ async function sendPublicRequest(raw:string,method:'GET'|'POST',body:string,head
       const chunks:Buffer[]=[];let size=0;
       response.on('data',(chunk:Buffer)=>{
         size+=chunk.length;
-        if(size>8192)req.destroy(new Error('callback_response_too_large'));else chunks.push(chunk);
+        if(size>maxBytes)req.destroy(new Error('callback_response_too_large'));else chunks.push(chunk);
       });
       response.on('error',()=>reject(new Error('callback_network_error')));
-      response.on('end',()=>resolve({status:response.statusCode??0,body:Buffer.concat(chunks).toString('utf8')}));
+      response.on('end',()=>resolve({status:response.statusCode??0,body:Buffer.concat(chunks)}));
     });
     const deadline=setTimeout(()=>req.destroy(new Error('callback_timeout')),10_000);
     req.on('close',()=>clearTimeout(deadline));

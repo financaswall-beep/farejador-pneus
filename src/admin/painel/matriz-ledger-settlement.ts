@@ -31,6 +31,7 @@ export interface MatrizLedgerSettlementResult {
   direction: 'receivable' | 'payable';
   amount: string;
   remaining_balance: string;
+  installment_remaining_balance?: string;
   payment_ids: string[];
   settled_at: string;
 }
@@ -84,15 +85,22 @@ async function settleObligation(
       : wholesalePurchase
         ? (full ? 'commerce.wholesale_purchase.payment'
           : 'commerce.wholesale_purchase.partial_payment')
+        : obligation.source_type==='finance.recurring_expense' ? 'finance.recurring_expense.payment'
         : 'finance.matriz_ledger_obligation.settlement';
-  const sourceId = (retail || wholesaleSale || wholesalePurchase) && full
+  let sourceId = (retail || wholesaleSale || wholesalePurchase) && full
     ? obligation.source_id
     : paymentSourceId(operation.idempotencyKey, operation.fingerprint);
+  if (sourceId === obligation.source_id) {
+    const corrected=await client.query(`SELECT 1 FROM finance.matriz_ledger_transactions t
+      JOIN finance.matriz_ledger_transactions r ON r.reversal_of_transaction_id=t.id AND r.environment=t.environment
+      WHERE t.environment=$1 AND t.source_type=$2 AND t.source_id=$3`,[operation.environment,sourceType,sourceId]);
+    if(corrected.rowCount) sourceId=paymentSourceId(operation.idempotencyKey,operation.fingerprint);
+  }
   const paymentId = await recordPayment(
     client, operation.environment, obligation, amount, paidAt, actor,
     sourceType, sourceId, {
       ...(target ? { sale_installment: target.number } : {}),
-      obligation_id: obligation.id, source_type: obligation.source_type,
+      settlement_key:operation.idempotencyKey, obligation_id: obligation.id, source_type: obligation.source_type,
       source_id: obligation.source_id, payment_method: method ?? null,
       cash_account: input.cash_account?.trim() || null,
       note: input.note?.trim() || null,
@@ -141,6 +149,7 @@ async function settleObligation(
     target_id: obligation.id,
     direction: obligation.account_class === 'asset' ? 'receivable' : 'payable',
     amount: (amountCents / 100).toFixed(2), remaining_balance: remaining,
+    ...(part ? {installment_remaining_balance: ((moneyCents(part.balance)-amountCents)/100).toFixed(2)} : {}),
     payment_ids: [paymentId], settled_at: paidAt,
   });
 }
@@ -232,42 +241,40 @@ export async function settleMatrizLedgerOpenItem(
   input: MatrizLedgerSettlementInput,
   dbPool: Pool = defaultPool,
 ): Promise<MatrizLedgerSettlementResult> {
-  if (!env.MATRIZ_CENTRAL_LEDGER) throw new Error('central_ledger_disabled');
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const operation = settlementOperation(environment, input);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const started = await beginIntegrityOperation<MatrizLedgerSettlementResult>(
-      client, operation,
-    );
-    if (started.replayed) {
-      await client.query('COMMIT');
-      return started.result;
-    }
-    const paidAt = normalizeBusinessFactInstant(input.paid_at, new Date(), 'paid_at_future') ?? new Date().toISOString();
-    const actor = matrizLedgerActor(input.actor_label);
-    const result = input.obligation_id
-      ? await settleObligation(client, operation, input, paidAt, actor)
-      : await settleMarketing(client, operation, input, paidAt, actor);
-    const auditEntityId = result.payment_ids[0]!;
-    await recordIntegrityEvent(client, {
-      environment, domain: 'matriz_finance',
-      entityTable: 'finance.matriz_ledger_transactions',
-      entityId: auditEntityId, eventType: 'central_settlement',
-      actorLabel: actor, idempotencyKey: operation.idempotencyKey,
-      after: result,
-    });
-    await completeIntegrityOperation(
-      client, operation, 'finance.matriz_ledger_transactions',
-      auditEntityId, result,
-    );
+    const result = await settleMatrizLedgerOpenItemOnClient(client, input);
     await client.query('COMMIT');
     return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+  } catch(error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+  finally { client.release(); }
+}
+
+export async function settleMatrizLedgerOpenItemOnClient(client: PoolClient, input: MatrizLedgerSettlementInput) {
+  if (!env.MATRIZ_CENTRAL_LEDGER) throw new Error('central_ledger_disabled');
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const operation = settlementOperation(environment, input);
+  const started = await beginIntegrityOperation<MatrizLedgerSettlementResult>(
+    client, operation,
+  );
+  if (started.replayed) return started.result;
+  const paidAt = normalizeBusinessFactInstant(input.paid_at, new Date(), 'paid_at_future') ?? new Date().toISOString();
+  const actor = matrizLedgerActor(input.actor_label);
+  const result = input.obligation_id
+    ? await settleObligation(client, operation, input, paidAt, actor)
+    : await settleMarketing(client, operation, input, paidAt, actor);
+  const auditEntityId = result.payment_ids[0]!;
+  await recordIntegrityEvent(client, {
+    environment, domain: 'matriz_finance',
+    entityTable: 'finance.matriz_ledger_transactions',
+    entityId: auditEntityId, eventType: 'central_settlement',
+    actorLabel: actor, idempotencyKey: operation.idempotencyKey,
+    after: result,
+  });
+  await completeIntegrityOperation(
+    client, operation, 'finance.matriz_ledger_transactions',
+    auditEntityId, result,
+  );
+  return result;
 }

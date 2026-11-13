@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createHash, randomBytes } from 'node:crypto';
-import { beforeAll, afterAll, expect, it, vi } from 'vitest';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { beforeAll, beforeEach, afterAll, expect, it, vi } from 'vitest';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 
 let db: IntegrationDb;
@@ -20,7 +20,7 @@ beforeAll(async () => {
     NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test', DATABASE_SSL: 'false',
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-emergency',
     ADMIN_BEARER_FALLBACK_ENABLED: 'true', DOT_MCP_ENABLED: 'true', DOT_MCP_PUBLIC_ORIGIN: origin,
-    DOT_MCP_REDIRECT_URIS: callback, MATRIZ_CENTRAL_LEDGER: 'true', MATRIZ_CENTRAL_LEDGER_READ: 'true',MATRIZ_LOGISTICS:'true', WHOLESALE_FINANCE:'true', WHOLESALE_STOCK_DECREMENT:'true',
+    DOT_MCP_REDIRECT_URIS: callback, MATRIZ_CENTRAL_LEDGER: 'true', MATRIZ_CENTRAL_LEDGER_READ: 'true',MATRIZ_EXPENSES:'true',MATRIZ_LOGISTICS:'true', WHOLESALE_FINANCE:'true', WHOLESALE_STOCK_DECREMENT:'true',
   });
   db = await startPostgres();
   process.env.DATABASE_URL = db.connectionString;
@@ -38,6 +38,11 @@ beforeAll(async () => {
   await registerDotRoutes(app);
   await app.ready();
 }, 240_000);
+
+beforeEach(async()=>{
+  const {__resetRateLimit}=await import('../../src/shared/rate-limit.js');
+  __resetRateLimit();
+});
 
 afterAll(async () => {
   if (app) await app.close();
@@ -164,12 +169,14 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(34);
-  const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento'];
+  expect(listing.result.tools).toHaveLength(51);
+  const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
+    'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem'];
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
   }
+  expect(listing.result.tools.find((t:{name:string})=>t.name==='anexar_comprovante_despesa')._meta['openai/fileParams']).toEqual(['arquivo']);
   for (const name of writes) {
     expect(listing.result.tools.map((tool:{name:string})=>tool.name)).toContain(name);
     const denied=(await rpc(access,'tools/call',{name,arguments:{}})).json();
@@ -282,6 +289,80 @@ it('as cinco consultas rodam contra o banco reconstruído sem alterar dados come
   expect(after).toEqual(before);
 });
 
+it('executa com permissão financeira, repete sem duplicar e estorna apenas o pagamento selecionado',async()=>{
+  const token=(await exchange(await newCode())).json().access_token;
+  const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
+  const permission=(enabled:boolean)=>app.inject({method:'PUT',url:'/admin/api/dot/connections/'+grant+'/finance',
+    headers:headers(),payload:{enabled}});
+  expect((await permission(true)).statusCode).toBe(200);
+  const call=async(name:string,args:object)=>{
+    const result=(await rpc(token,'tools/call',{name,arguments:args})).json();
+    expect(result.error,JSON.stringify(result.error)).toBeUndefined();
+    expect(result.result.isError,JSON.stringify(result.result.content)).not.toBe(true);
+    return result.result.structuredContent;
+  };
+  const now=new Date().toISOString();
+  const service={cliente:'Oficina fictícia',descricao:'Montagem',valor:965,competencia:now,vencimento:'2099-12-05',idempotency_key:randomUUID()};
+  const [first,repeat]=await Promise.all([call('criar_cobranca_servico',service),call('criar_cobranca_servico',service)]);
+  expect(first).toEqual(repeat);
+  const pay={obligation_id:first.obligation_id,lado:'a_receber',amount:300,paid_at:now,payment_method:'Pix',cash_account:'Conta teste',idempotency_key:randomUUID()};
+  const payment=await call('registrar_baixa_financeira',pay);
+  expect(payment.remaining_balance).toBe('665.00');
+  expect(await call('registrar_baixa_financeira',pay)).toEqual(payment);
+  const reverse={pagamento_id:payment.payment_ids[0],valor_esperado:300,motivo:'Parcela incorreta',ocorrido_em:new Date().toISOString(),idempotency_key:randomUUID()};
+  const invalidDestination=await rpc(token,'tools/call',{name:'estornar_baixa_financeira',arguments:{...reverse,destino:{
+    obligation_id:randomUUID(),lado:'a_receber',paid_at:now,payment_method:'Pix',cash_account:'Conta teste'}}});
+  expect(invalidDestination.json().result.isError).toBe(true);
+  expect((await call('consultar_titulos_financeiros',{lado:'a_receber',busca:'Oficina fictícia'})).itens[0].valor).toBe('665.00');
+  expect((await call('estornar_baixa_financeira',reverse)).saldo).toBe('965.00');
+  const cat=(await db.pool.query("SELECT slug FROM commerce.matriz_expense_categories WHERE environment='test' AND archived_at IS NULL ORDER BY slug LIMIT 1")).rows[0].slug;
+  const recurring={descricao:'Aluguel de teste',categoria:cat,valor_mensal:4500,primeiro_vencimento:'2099-01-31',meses:3,idempotency_key:randomUUID()};
+  const scheduled=await call('agendar_despesas_mensais',recurring);
+  expect(scheduled.parcelas.map((r:{vencimento:string})=>r.vencimento)).toEqual(['2099-01-31','2099-02-28','2099-03-31']);
+  expect(await call('agendar_despesas_mensais',recurring)).toEqual(scheduled);
+  expect((await call('consultar_titulos_financeiros',{lado:'a_pagar',busca:'Aluguel de teste'})).itens).toHaveLength(3);
+  const {createPurchaseGroup}=await import('../../src/admin/painel/queries-purchase-groups-write.js');
+  const trip=await createPurchaseGroup({name:'Viagem teste Milly',actor:'teste',idempotency_key:randomUUID()},db.pool);
+  const expense={category:cat,description:'Diesel de teste',amount:180,payment_status:'pending',due_date:'2099-01-01',idempotency_key:randomUUID()};
+  const expenseRow=await call('lancar_despesa_matriz',expense);
+  expect((await call('vincular_gasto_a_viagem',{group_id:trip.id,expense_id:expenseRow.id,idempotency_key:randomUUID()})).vinculado).toBe(true);
+  const tripData=await call('consultar_viagens_de_compra',{viagem_id:trip.id});
+  expect(tripData.expenses).toEqual(expect.arrayContaining([expect.objectContaining({id:expenseRow.id})]));
+  const item=(await call('consultar_titulos_financeiros',{lado:'a_pagar',busca:expenseRow.id})).itens[0];
+  expect((await call('registrar_baixa_financeira',{...pay,obligation_id:item.obligation_id,lado:'a_pagar',amount:180,idempotency_key:randomUUID()})).remaining_balance).toBe('0.00');
+  const jpg=await (await import('sharp')).default({create:{width:8,height:8,channels:3,background:'white'}}).jpeg().toBuffer();
+  const proof={expense_id:expenseRow.id,valor_esperado:180,imagem_base64:jpg.toString('base64'),idempotency_key:randomUUID()};
+  expect((await call('anexar_comprovante_despesa',proof)).expense_id).toBe(expenseRow.id);
+  const income={kind:'owner_contribution',description:'Aporte de teste',amount:2000,occurred_at:now,payment_method:'pix',cash_account:'Conta teste',idempotency_key:randomUUID()};
+  const entry=await call('registrar_entrada_avulsa',income);
+  const day=(await import('../../src/shared/business-time.js')).businessDateSaoPaulo(new Date(now));
+  const bank=await call('conferir_extrato_bancario',{de:day,ate:day,conta:'Conta teste',movimentos:[{dia:day,direcao:'entrada',valor:2000}]});
+  expect(bank.comparacao[0]).toMatchObject({status:'correspondencia_unica',candidatos:[entry.id]});
+  expect((await call('simular_compra_de_lote',{compra_sem_frete:2000,frete:500,gastos_adicionais:0,coletados:100,aproveitaveis:80,
+    desembolso_ate_a_data:2500,ate:day})).custo_por_aproveitavel).toBe(31.25);
+  await call('estornar_entrada_avulsa',{entrada_id:entry.id,reason:'Correção teste',occurred_at:new Date().toISOString(),idempotency_key:randomUUID()});
+  const supplier=(await db.pool.query("INSERT INTO commerce.wholesale_suppliers(environment,name) VALUES('test','Fornecedor Milly teste') RETURNING id")).rows[0].id;
+  const {registerWholesalePurchase}=await import('../../src/admin/painel/queries-fornecedores-registro.js');
+  const purchase=await registerWholesalePurchase({supplier_id:supplier,items:[],lot:{description:'Lote de teste',quantity:10,total_cost:50},
+    receipt_status:'received',payment_status:'paid',payment_method:'Pix',created_by:'teste',idempotency_key:randomUUID()},db.pool);
+  const sale={new_customer:{name:'Cliente lote fictício'},amount:1200,description:'Lote exemplo',sold_on:day,expected_cost:10,
+    allocations:[{lot_id:purchase.lot_id,quantity:2}],payment_status:'pending',due_date:'2099-12-05',
+    payment_plan:{received:300,method:'Pix',installments:[{amount:450,due_date:'2099-12-05'},{amount:450,due_date:'2100-01-05'}]},idempotency_key:randomUUID()};
+  const order=await call('registrar_venda_lote',sale);
+  expect(await call('registrar_venda_lote',sale)).toEqual(order);
+  const titles=(await call('consultar_titulos_financeiros',{lado:'a_receber',busca:order.order_id})).itens;
+  expect(titles.map((t:{valor:string})=>t.valor)).toEqual(['450.00','450.00']);
+  const received=await call('registrar_baixa_financeira',{...pay,obligation_id:titles[0].obligation_id,
+    sale_installment:{order_id:order.order_id,number:1},amount:100,idempotency_key:randomUUID()});
+  expect(received).toMatchObject({remaining_balance:'800.00',installment_remaining_balance:'350.00'});
+  const agreement=await call('renegociar_parcelas_venda',{obligation_id:titles[0].obligation_id,saldo_esperado:800,
+    parcelas:[{amount:800,due_date:'2100-02-05'}],idempotency_key:randomUUID()});
+  expect(agreement.acordo).toMatchObject({received:400,balance:800,next_due:'2100-02-05'});
+  await permission(false);
+  expect((await rpc(token,'tools/call',{name:'registrar_baixa_financeira',arguments:pay})).json().error.message).toContain('modo de consulta');
+});
+
 it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async()=>{
   const {Client}=await import('@modelcontextprotocol/sdk/client/index.js');
   const {StreamableHTTPClientTransport}=await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
@@ -300,7 +381,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(34);
+    expect((await client.listTools()).tools).toHaveLength(51);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}

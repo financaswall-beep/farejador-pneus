@@ -1,5 +1,8 @@
 # Dot: consultas da Matriz
 
+O catálogo atual, as permissões financeiras por conexão e os comandos por voz estão no [manual do MCP da Milly](MCP_MILLY.md).
+
+
 Conector MCP dentro do Farejador, exclusivamente para consultas autorizadas pelo proprietário. Desativado por padrão.
 
 ## O que consulta

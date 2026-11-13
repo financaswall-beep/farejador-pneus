@@ -86,6 +86,7 @@ export async function revokeDotToken(config: DotConfig, token: string) {
 export async function listDotConnections(personId: string) {
   return (await pool.query(`SELECT id,created_at,expires_at,revoked_at,
     (to_jsonb(g)->>'installment_reviews_enabled')::boolean installment_reviews_enabled,
+    (to_jsonb(g)->>'finance_operations_enabled')::boolean finance_operations_enabled,
     (to_jsonb(g)->>'installment_chat_confirmation')::boolean installment_chat_confirmation FROM network.dot_oauth_grants g
     WHERE environment=$1 AND person_id=$2 AND code_used_at IS NOT NULL
     ORDER BY created_at DESC LIMIT 50`,[env.FAREJADOR_ENV,personId])).rows;

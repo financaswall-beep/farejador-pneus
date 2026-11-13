@@ -2,7 +2,8 @@ import type { FastifyInstance,FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { getAdminContext } from '../auth.js';
 import { dotHumanOwner } from './route-oauth.js';
-import { reviewInstallment,setInstallmentPermission } from './installment-reviews.js';
+import { lockGrant,transact,reviewInstallment,setInstallmentPermission } from './installment-reviews.js';
+import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 
 const params=z.object({id:z.string().uuid()});
@@ -22,6 +23,18 @@ export function registerInstallmentReviews(app:FastifyInstance,origin:string) {
     if(!id.success||!body.success)return reply.code(400).send({error:'invalid_request'});
     try{return await setInstallmentPermission(getAdminContext(req).personId!,id.data.id,body.data.enabled,body.data.chat_confirmation);}
     catch(error){return fail(reply,error);}
+  });
+  app.put('/admin/api/dot/connections/:id/finance',{preHandler:dotHumanOwner},async(req,reply)=>{
+    if(req.headers.origin!==origin)return reply.code(403).send({error:'csrf_rejected'});
+    const id=params.safeParse(req.params),body=z.object({enabled:z.boolean()}).strict().safeParse(req.body);
+    if(!id.success||!body.success)return reply.code(400).send({error:'invalid_request'});
+    const person=getAdminContext(req).personId!;
+    try { return await transact(async db=>{
+      await lockGrant(db,person,id.data.id);
+      await db.query('UPDATE network.dot_oauth_grants SET finance_operations_enabled=$3 WHERE environment=$1 AND id=$2',
+        [env.FAREJADOR_ENV,id.data.id,body.data.enabled]);
+      return body.data;
+    }); } catch(error){return fail(reply,error);}
   });
   app.get('/admin/api/dot/installment-reviews/:id',{preHandler:dotHumanOwner},async(req,reply)=>{
     const id=params.safeParse(req.params);

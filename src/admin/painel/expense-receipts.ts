@@ -19,28 +19,31 @@ export async function getExpenseReceipt(id: string, environment = env.FAREJADOR_
   return result.rows[0] ?? null;
 }
 export async function addExpenseReceipt(bytes: Buffer, actor: string, environment = env.FAREJADOR_ENV, db: Pool = defaultPool) {
+  const client=await db.connect();
+  let saved;
+  try {
+    await client.query('BEGIN');
+    saved=await storeReceiptOnClient(client,bytes,actor,environment);
+    await client.query('COMMIT');
+  } catch(error) { await client.query('ROLLBACK'); throw error; }
+  finally {client.release();}
+  return { receipt:await getExpenseReceipt(saved.id,environment,db),duplicate:saved.duplicate };
+}
+export async function storeReceiptOnClient(client:PoolClient,bytes:Buffer,actor:string,environment=env.FAREJADOR_ENV) {
   const hash = createHash('sha256').update(bytes).digest();
   // A mesma foto já usada pela logística não pode virar uma segunda despesa avulsa.
-  const trip = await db.query(`SELECT r.id FROM commerce.matriz_trip_receipt_blobs b
+  const trip = await client.query(`SELECT r.id FROM commerce.matriz_trip_receipt_blobs b
     JOIN commerce.matriz_trip_receipts r ON r.environment=b.environment AND r.id=b.receipt_id
     WHERE b.environment=$1 AND b.content_sha256=$2 LIMIT 1`, [environment, hash]);
   if (trip.rows.length) throw Error('receipt_belongs_to_trip');
-  const client = await db.connect();
-  let id: string | undefined;
-  let duplicate = false;
-  try {
-    await client.query('BEGIN');
     const created = await client.query<{ id: string }>(`INSERT INTO commerce.matriz_expense_receipts
       (environment,content_sha256,mime,size_bytes,created_by) VALUES ($1,$2,'image/jpeg',$3,$4)
       ON CONFLICT (environment,content_sha256) DO NOTHING RETURNING id`, [environment, hash, bytes.length, actor]);
-    id = created.rows[0]?.id;
-    duplicate = !id;
+    let id = created.rows[0]?.id;
+    const duplicate = !id;
     if (id) await client.query(`INSERT INTO commerce.matriz_expense_receipt_blobs(environment,receipt_id,bytes) VALUES ($1,$2,$3)`, [environment, id, bytes]);
     else id = (await client.query<{ id: string }>(`SELECT id FROM commerce.matriz_expense_receipts WHERE environment=$1 AND content_sha256=$2`, [environment, hash])).rows[0]!.id;
-    await client.query('COMMIT');
-  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-  finally { client.release(); }
-  return { receipt: await getExpenseReceipt(id!, environment, db), duplicate };
+    return {id:id!,duplicate};
 }
 export async function getExpenseReceiptImage(id: string, linkedOnly: boolean, environment = env.FAREJADOR_ENV, db: Pool = defaultPool) {
   return (await db.query<{ bytes: Buffer; mime: string }>(`SELECT b.bytes,r.mime FROM commerce.matriz_expense_receipts r

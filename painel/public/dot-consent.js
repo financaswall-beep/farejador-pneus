@@ -47,7 +47,7 @@
             const chat = enabled && row.installment_chat_confirmation === true;
             const mode = document.createElement('p');
             mode.textContent = chat ? 'Você pode confirmar vencimentos por voz ou texto com a Milly.'
-              : enabled ? 'Você confirma vencimentos no painel.' : 'Somente consulta';
+              : enabled ? 'Você confirma vencimentos no painel.' : 'Alteração de vencimento desativada';
             box.append(mode);
             function permissionButton(label, allowReviews, allowChat) {
               const button = document.createElement('button');
@@ -71,7 +71,23 @@
             if (!chat && typeof row.installment_chat_confirmation === 'boolean')
               permissionButton('Permitir confirmação por voz ou texto', true, true);
             if (!enabled || chat) permissionButton('Confirmar vencimentos só no painel', true, false);
-            if (enabled) permissionButton('Voltar para somente consulta', false, false);
+            if (enabled) permissionButton('Desativar alteração de vencimento', false, false);
+          }
+          if (typeof row.finance_operations_enabled === 'boolean') {
+            const finance = document.createElement('button');
+            finance.type = 'button';
+            finance.textContent = row.finance_operations_enabled ? 'Desativar lançamentos financeiros' : 'Permitir lançamentos financeiros por voz ou texto';
+            finance.onclick = async () => {
+              finance.disabled = true;
+              try {
+                await api('/admin/api/dot/connections/' + encodeURIComponent(row.id) + '/finance', {
+                  method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!row.finance_operations_enabled}),
+                });
+                message.textContent = '';
+                await loadConnections();
+              } catch(error) { message.textContent = error.message; finance.disabled = false; }
+            };
+            box.append(finance);
           }
           const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Desconectar Dot';
           button.addEventListener('click', async () => {

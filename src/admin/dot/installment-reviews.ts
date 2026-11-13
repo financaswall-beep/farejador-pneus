@@ -13,7 +13,7 @@ export const proposalSchema = z.object({
 }).strict();
 type Proposal = z.infer<typeof proposalSchema>;
 
-async function transact<T>(work: (db: PoolClient) => Promise<T>) {
+export async function transact<T>(work: (db: PoolClient) => Promise<T>) {
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
@@ -27,6 +27,7 @@ async function transact<T>(work: (db: PoolClient) => Promise<T>) {
 }
 
 const activeGrant = `SELECT g.installment_reviews_enabled,
+     COALESCE((to_jsonb(g)->>'finance_operations_enabled')::boolean,false) finance_operations_enabled,
      COALESCE((to_jsonb(g)->>'installment_chat_confirmation')::boolean,false) installment_chat_confirmation
    FROM network.dot_oauth_grants g
    JOIN network.matriz_collaborators c ON c.id=g.collaborator_id AND c.environment=g.environment
@@ -36,10 +37,10 @@ const activeGrant = `SELECT g.installment_reviews_enabled,
      AND g.expires_at>clock_timestamp() AND g.code_used_at IS NOT NULL
      AND g.client_id=$4 AND g.resource=$5 AND g.scope=$6 FOR UPDATE OF g`;
 
-async function lockGrant(db: PoolClient, person: string, grant: string) {
+export async function lockGrant(db: PoolClient, person: string, grant: string) {
   const config=dotConfig();
   if (!config) throw new Error('dot_grant_unavailable');
-  const row = (await db.query<{installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
+  const row = (await db.query<{finance_operations_enabled:boolean;installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
     [env.FAREJADOR_ENV,person,grant,config.clientId,config.resource,DOT_SCOPE])).rows[0];
   if (!row) throw new Error('dot_grant_unavailable');
   return row;

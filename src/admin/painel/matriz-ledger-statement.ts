@@ -72,6 +72,8 @@ const OBLIGATION_ACCOUNTS = [
 ];
 
 function originOf(sourceType: string): string {
+  if (sourceType.startsWith('finance.recurring_expense')) return 'Despesas recorrentes';
+  if (sourceType==='finance.service_receivable') return 'Serviços a receber';
   if (sourceType.startsWith('finance.manual_entry')) return 'Entrada avulsa / aporte';
   if (sourceType.startsWith('finance.owner_withdrawal')) return 'Retirada do dono';
   if (sourceType.startsWith('commerce.wholesale_purchase')) return 'Compras';

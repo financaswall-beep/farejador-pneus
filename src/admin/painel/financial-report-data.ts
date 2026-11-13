@@ -8,7 +8,7 @@ import { financialMovementsSql,financialOpeningSql,financialPendingCostSql } fro
 import { FinancialReportLimitError,type FinancialReportFilter } from './financial-report-filter.js';
 import type { FinancialSnapshot,FinancialMovement,FinancialTitle } from './financial-report-types.js';
 
-const titleOrigins:Record<string,string>={fiado:'atacado',varejo:'varejo',comissao:'comissao',mensalidade:'mensalidades',
+const titleOrigins:Record<string,string>={servico:'financeiro',fiado:'atacado',varejo:'varejo',comissao:'comissao',mensalidade:'mensalidades',
   fornecedor:'compras',devolucao_fornecedor:'compras',despesa:'despesas',folha:'despesas',devolucao_despesa:'despesas',
   estorno_comissao:'comissao',marketing:'marketing',devolucao_cliente:'financeiro'};
 export async function readFinancialSnapshot(filter:FinancialReportFilter,environment=env.FAREJADOR_ENV,db:Pool=pool):Promise<FinancialSnapshot>{

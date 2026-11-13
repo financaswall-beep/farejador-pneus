@@ -84,7 +84,7 @@ export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
            AND source_type LIKE 'commerce.wholesale_purchase.%'),0) cash_purchases,
        COALESCE((SELECT sum(CASE side WHEN 'credit' THEN amount ELSE -amount END)
          FROM cash_month WHERE account_code='cash'
-           AND source_type LIKE 'commerce.matriz_expense.%'),0) cash_expenses,
+           AND (source_type LIKE 'commerce.matriz_expense.%' OR source_type='finance.recurring_expense.payment')),0) cash_expenses,
        COALESCE((SELECT sum(CASE side WHEN 'credit' THEN amount ELSE -amount END)
          FROM cash_month WHERE account_code='cash'
            AND source_type='network.commission_refund.payment'),0)
@@ -180,6 +180,9 @@ export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
          WHERE environment=$1 AND deleted_at IS NOT NULL
            AND (deleted_at AT TIME ZONE 'America/Sao_Paulo')::date>=b.month_start
            AND (deleted_at AT TIME ZONE 'America/Sao_Paulo')::date<b.month_end),0)
+       +COALESCE((SELECT sum(t.amount) FROM finance.matriz_ledger_transactions t,bounds b
+         WHERE t.environment=$1 AND t.source_type='finance.recurring_expense'
+           AND t.competence_on>=b.month_start AND t.competence_on<b.month_end),0)
          source_expenses,
        COALESCE((SELECT sum(CASE side WHEN 'debit' THEN amount ELSE -amount END)
          FROM month_ledger WHERE account_class='expense'

@@ -6,7 +6,7 @@ export type FinanceiroSettlementMode =
   | 'central_obligation' | 'central_account';
 
 export interface FinanceiroReceivableItem {
-  tipo: 'fiado' | 'varejo' | 'comissao' | 'mensalidade'
+  tipo: 'servico' | 'fiado' | 'varejo' | 'comissao' | 'mensalidade'
     | 'devolucao_fornecedor' | 'devolucao_despesa';
   id: string;
   nome: string;
