@@ -249,14 +249,14 @@ it('monitor externo envia somente o próprio sinal e não consome pendências de
 it('MCP 2.0 descobre eventos e ferramentas com autenticação, cabeçalhos e cache privado',async()=>{
   expect((await rpc('server/discover')).json()).toMatchObject({result:{resultType:'complete',supportedVersions:['2026-07-28'],capabilities:{events:{}},cacheScope:'private'}});
   expect((await rpc('events/list')).json().result.events).toHaveLength(8);
-  expect((await rpc('tools/list')).json().result.tools).toHaveLength(31);
+  expect((await rpc('tools/list')).json().result.tools).toHaveLength(35);
   expect((await rpc('events/list',{}, {authorization:''})).statusCode).toBe(401);
   expect((await rpc('tools/list',{}, {'mcp-method':'tools/call'})).json().error.code).toBe(-32020);
   expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}},{'mcp-name':'wrong'})).json().error.code).toBe(-32020);
   expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);
   const legacy=await app.inject({method:'POST',url:'/admin/dot/mcp',headers:{host:'farejador.example',authorization:'Bearer '+token,
     'content-type':'application/json',accept:'application/json, text/event-stream'},payload:{jsonrpc:'2.0',id:1,method:'tools/list'}});
-  expect(legacy.json().result.tools).toHaveLength(31);
+  expect(legacy.json().result.tools).toHaveLength(35);
 });
 it('challenge é obrigatório; filtros canônicos tornam a assinatura idempotente, com segredo cifrado',async()=>{
   const id=randomUUID(),send=vi.fn(echo);
@@ -462,7 +462,7 @@ it('flag desligada mantém consultas e não anuncia eventos',async()=>{
   try {
     config.DOT_EVENTS_ENABLED=false;
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
-    expect((await rpc('tools/list')).json().result.tools).toHaveLength(30);
+    expect((await rpc('tools/list')).json().result.tools).toHaveLength(34);
     expect((await rpc('events/list')).statusCode).toBe(404);
   }finally{config.DOT_EVENTS_ENABLED=previous;}
 });
@@ -480,7 +480,7 @@ it('chave inválida preserva HTTP e consultas, mas bloqueia descoberta, assinatu
     await fresh.ready();
     expect((await fresh.inject({method:'GET',url:'/livez'})).statusCode).toBe(200);
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
-    expect((await rpc('tools/list')).json().result.tools).toHaveLength(31);
+    expect((await rpc('tools/list')).json().result.tools).toHaveLength(35);
     expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);
     const status=(await rpc('tools/call',{name:'consultar_acompanhamento_matriz',arguments:{}})).json().result.structuredContent;
     expect(status).toMatchObject({enabled:false,reason:'invalid_encryption_key',subscriptions:null,last_24h:null});

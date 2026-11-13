@@ -161,13 +161,19 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
   expect(stored.rows).toHaveLength(1);
 });
 
-it('expõe somente as 30 consultas permitidas; tentativas de escrita e argumentos extras são recusados', async () => {
+it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(30);
+  expect(listing.result.tools).toHaveLength(34);
+  const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento'];
   for (const tool of listing.result.tools) {
-    expect(tool.annotations.readOnlyHint).toBe(true);
+    expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
+  }
+  for (const name of writes) {
+    expect(listing.result.tools.map((tool:{name:string})=>tool.name)).toContain(name);
+    const denied=(await rpc(access,'tools/call',{name,arguments:{}})).json();
+    expect(denied.error.message).toContain('modo de consulta');
   }
   const invalid = (await rpc(access,'tools/call',{name:'alterar_estoque',arguments:{}})).json();
   expect(invalid.error).toBeTruthy();
@@ -294,7 +300,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(30);
+    expect((await client.listTools()).tools).toHaveLength(34);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -361,7 +367,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
     'mcp-protocol-version':'2026-07-28','mcp-method':'tools/list'},payload:{jsonrpc:'2.0',id:1,method:'tools/list',
     params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'teste',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}}});
   expect(modern.json().result.tools.some((t:{name:string})=>t.name==='preparar_alteracao_vencimento')).toBe(true);
-  expect(modern.json().result.tools.some((t:{name:string})=>t.name==='confirmar_alteracao_vencimento')).toBe(false);
+  expect(modern.json().result.tools.some((t:{name:string})=>t.name==='confirmar_alteracao_vencimento')).toBe(true);
   const pending=(await proposal()).result.structuredContent;
   expect(pending).toMatchObject({status:'aguardando_confirmacao',saldo:100,cliente:'Cliente Dot'});
   expect((await proposal()).result.structuredContent.proposta).toBe(pending.proposta);
@@ -384,7 +390,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await enable(true,true)).statusCode).toBe(200);
   expect((await confirmInChat(expired)).result.isError).toBe(true);
   const chatProposal=(await proposal()).result.structuredContent;
-  expect(chatProposal.confirmacao).toBe('conversa');
+  expect(chatProposal).toMatchObject({confirmacao:'conversa',ferramenta_confirmacao:'confirmar_alteracao_vencimento'});
   expect(chatProposal.confirm_url).toBeUndefined();
   const active=chatProposal.proposta;
   const otherGrant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
@@ -392,6 +398,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await app.inject({method:'PUT',url:'/admin/api/dot/connections/'+otherGrant+'/installments',headers:headers(),
     payload:{enabled:true,chat_confirmation:true}})).statusCode).toBe(200);
   expect((await confirmInChat(active,other)).result.isError).toBe(true);
+  expect((await tool('confirmar_alteracao_vencimento',{proposta:active,autorizado_pelo_dono:false})).error).toBeTruthy();
   expect((await tool('confirmar_alteracao_vencimento',{proposta:active})).error).toBeTruthy();
   expect(await date()).toBe(original);
   expect((await app.inject({url:path(active),headers:headers()})).json()).toMatchObject({status:'pendente',confirmacao:'conversa'});

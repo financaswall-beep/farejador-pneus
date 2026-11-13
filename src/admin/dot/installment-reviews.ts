@@ -75,7 +75,9 @@ export async function proposeInstallment(identity: DotIdentity, proposal: Propos
     return { status:'aguardando_confirmacao', proposta:row.id, cliente:buyerName, parcela:number, saldo:current.balance,
       vencimento_atual:expected_due_date, novo_vencimento:due_date, expires_at:row.expires_at,
       confirmacao:grant.installment_chat_confirmation?'conversa':'painel',
-      ...(grant.installment_chat_confirmation ? {} : {confirm_url:installmentReviewUrl(row.id)}) };
+      ...(grant.installment_chat_confirmation
+        ? {ferramenta_confirmacao:'confirmar_alteracao_vencimento'}
+        : {confirm_url:installmentReviewUrl(row.id)}) };
   });
 }
 

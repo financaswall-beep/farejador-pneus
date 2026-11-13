@@ -31,7 +31,7 @@ export const installmentTools = [
 ];
 export const confirmInstallmentTool = definition(confirm,
   'Grava o vencimento da proposta após autorização explícita do dono por voz ou texto nesta conversa. Use a proposta que corresponde à parcela e à data autorizadas.',
-  {proposta:uuid,autorizado_pelo_dono:{type:'boolean',const:true}},['proposta','autorizado_pelo_dono']);
+  {proposta:uuid,autorizado_pelo_dono:{type:'boolean',description:'Informe true somente quando o dono já tiver autorizado esta mudança.'}},['proposta','autorizado_pelo_dono']);
 
 export async function invokeInstallmentTool(identity:DotIdentity,name:string,args:unknown) {
   if (!identity.installment_reviews_enabled) throw new McpError(ErrorCode.InvalidRequest,'Conexão em modo de consulta.');
@@ -69,7 +69,7 @@ export async function invokeInstallmentTool(identity:DotIdentity,name:string,arg
     const message=code==='installment_before_sale'?'Vencimento anterior à venda.':
       code==='dot_review_expired'?'Proposta expirada. Consulte a parcela e prepare uma nova proposta.':
       code==='dot_review_missing'?'Proposta indisponível para esta conexão. Consulte a parcela novamente.':
-      code==='dot_review_disabled'||code==='dot_grant_unavailable'?'Permissão desativada.':
+      code==='dot_review_disabled'||code==='dot_grant_unavailable'?'A conexão não tem permissão para esta operação. Confira o modo da proposta e as Permissões da Milly na Matriz.':
       code==='sale_plan_finance_required'?'Financeiro central indisponível.':
       ['sale_installment_changed','sale_not_found','central_obligation_not_open','central_obligation_not_actionable'].includes(code)?
         'A parcela mudou ou está encerrada. Consulte novamente.':'Não foi possível concluir a operação da parcela.';
