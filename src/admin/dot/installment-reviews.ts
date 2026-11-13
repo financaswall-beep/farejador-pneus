@@ -118,7 +118,7 @@ export async function reviewInstallment(id: string, caller: ReviewCaller) {
     }
     if (row.confirmed_at) return { ...row, status:'confirmado' };
     if (!permission.installment_reviews_enabled || row.expired) throw new Error('dot_review_expired');
-    if (action === 'view') return { ...row, status:'pendente' };
+    if (action === 'view') return { ...row, status:'pendente', confirmacao:permission.installment_chat_confirmation?'conversa':'painel' };
     await changeInstallmentInTransaction(db,{order_id:row.order_id,number:row.installment_number,
       expected_due_date:row.old_due,due_date:row.new_due,idempotency_key:id},
       action==='confirm-in-chat'?'Milly · autorização na conversa · dono '+person:'Milly · dono '+person,Number(row.balance));

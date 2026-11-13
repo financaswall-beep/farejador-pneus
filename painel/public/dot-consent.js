@@ -88,7 +88,6 @@
   async function showReview(id) {
     document.getElementById('manage').hidden = true;
     document.getElementById('review').hidden = false;
-    const confirm = document.getElementById('confirm-date');
     const undo = document.getElementById('undo-date');
     const state = document.getElementById('review-state');
     const path = '/admin/api/dot/installment-reviews/' + encodeURIComponent(id);
@@ -100,27 +99,30 @@
         ' · Parcela ' + row.installment_number + ' · Saldo na proposta ' + money +
         ' · De ' + date(row.old_due) + ' para ' + date(row.new_due) + '.';
       const confirmed = () => {
-        confirm.hidden = true;
         undo.hidden = false;
         state.textContent = 'Alteração confirmada para ' + date(row.new_due) + '.';
       };
       if (row.status === 'restaurado') state.textContent = 'Vencimento restaurado para '+date(row.old_due)+'.';
       else if (row.status === 'confirmado') confirmed();
-      else {
+      else if (row.status === 'pendente' && row.confirmacao === 'conversa') {
+        state.textContent = 'A Milly recebe sua autorização por voz ou texto na conversa.';
+      } else if (row.status === 'pendente' && row.confirmacao === 'painel') {
         state.textContent = 'Confira os dados antes de confirmar.';
-        confirm.hidden = false;
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.textContent = 'Confirmar novo vencimento';
+        undo.before(confirm);
+        confirm.onclick = async () => {
+          confirm.disabled = true;
+          try {
+            const saved = await api(path+'/confirm',{method:'POST'});
+            message.textContent = '';
+            confirm.remove();
+            if (saved.status === 'restaurado') state.textContent = 'Vencimento já restaurado para '+date(row.old_due)+'.';
+            else confirmed();
+          } catch (error) { message.textContent = error.message; confirm.disabled = false; }
+        };
       }
-      confirm.onclick = async () => {
-        confirm.disabled = true;
-        try {
-          const saved = await api(path+'/confirm',{method:'POST'});
-          message.textContent = '';
-          if (saved.status === 'restaurado') {
-            confirm.hidden = true; state.textContent = 'Vencimento já restaurado para '+date(row.old_due)+'.';
-          } else confirmed();
-        }
-        catch (error) { message.textContent = error.message; confirm.disabled = false; }
-      };
       undo.onclick = async () => {
         if (!window.confirm('Restaurar o vencimento desta parcela para '+date(row.old_due)+'?')) return;
         undo.disabled = true;

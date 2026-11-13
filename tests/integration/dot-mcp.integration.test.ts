@@ -368,6 +368,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   const path=(id:string)=>'/admin/api/dot/installment-reviews/'+id;
   const submit=(id:string,action='confirm')=>app.inject({method:'POST',url:path(id)+'/'+action,headers:headers()});
   const date=async()=>(await db.pool.query('SELECT due_date::text FROM commerce.wholesale_orders WHERE id=$1',[order_id])).rows[0].due_date;
+  expect((await app.inject({url:path(pending.proposta),headers:headers()})).json()).toMatchObject({status:'pendente',confirmacao:'painel'});
   expect(await date()).toBe(original);
   expect((await confirmInChat(pending.proposta)).result.isError).toBe(true);
   expect(await date()).toBe(original);
@@ -393,7 +394,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await confirmInChat(active,other)).result.isError).toBe(true);
   expect((await tool('confirmar_alteracao_vencimento',{proposta:active})).error).toBeTruthy();
   expect(await date()).toBe(original);
-  expect((await app.inject({url:path(active),headers:headers()})).json().status).toBe('pendente');
+  expect((await app.inject({url:path(active),headers:headers()})).json()).toMatchObject({status:'pendente',confirmacao:'conversa'});
   const confirmed=await Promise.all([confirmInChat(active),confirmInChat(active)]);
   for (const response of confirmed) expect(response.result.structuredContent).toMatchObject({status:'confirmado',vencimento:next,parcela:1,saldo:100});
   expect((await submit(active)).json().status).toBe('confirmado');
