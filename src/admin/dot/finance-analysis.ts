@@ -3,7 +3,7 @@ import { env } from '../../shared/config/env.js';
 import { businessDateSaoPaulo } from '../../shared/business-time.js';
 import { getMatrizLedgerOpenItems } from '../painel/matriz-ledger-open-items.js';
 import { EFFECTIVE_CASH_TRANSACTION_SQL } from '../painel/matriz-effective-cash.js';
-import { readDotFinance } from './finance-read.js';
+import { readDotFinancePosition } from './finance-read.js';
 import { withDotReadOnly } from './read-only.js';
 import { money } from './finance-operations.js';
 
@@ -26,8 +26,8 @@ export const simulate=(data:z.infer<typeof simulationInput>)=>withDotReadOnly(as
   const today=businessDateSaoPaulo(new Date());
   const total=Math.round(data.compra_sem_frete*100)+Math.round(data.frete*100)+Math.round(data.gastos_adicionais*100);
   if (data.aproveitaveis>data.coletados || data.ate<today || Math.round(data.desembolso_ate_a_data*100)>total) throw Error('cenario_invalido');
-  const cash=await readDotFinance(db,today.slice(0,7));
-  if (!cash.available || !cash.cash) throw Error('financeiro_indisponivel');
+  const cash=await readDotFinancePosition(db,today.slice(0,7));
+  if (!cash.available) throw Error('financeiro_indisponivel');
   const open=await getMatrizLedgerOpenItems(env.FAREJADOR_ENV,db);
   const sum=(rows:typeof open.a_pagar.itens | typeof open.a_receber.itens)=>rows.reduce((n,r)=>
     n+(r.due_date && r.due_date>=today && r.due_date<=data.ate ? Math.round(Number(r.valor)*100):0),0);

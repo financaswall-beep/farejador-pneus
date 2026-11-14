@@ -11,9 +11,10 @@ export async function withDotReadOnly<T>(work: (db: Pool) => Promise<T>, db: Poo
     return result;
   }) as Pool['query'];
   try {
-    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    await client.query("SET LOCAL statement_timeout='15s'");
-    await client.query("SET LOCAL idle_in_transaction_session_timeout='20s'");
+    // Constant SQL with no parameters: PostgreSQL sets up the snapshot in one round trip.
+    await client.query(`BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+      SET LOCAL statement_timeout='15s';
+      SET LOCAL idle_in_transaction_session_timeout='20s'`);
     const result = await work({query} as Pool);
     await pending;
     await client.query('COMMIT');

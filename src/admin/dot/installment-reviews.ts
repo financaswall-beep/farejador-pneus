@@ -100,16 +100,18 @@ type ReviewCaller = { person: string; action: 'view' | 'confirm' | 'restore' }
 export async function reviewInstallment(id: string, caller: ReviewCaller) {
   return transact(async db => {
     const {person,action}=caller;
-    const args = [env.FAREJADOR_ENV,person,id];
     // Mesma ordem de travas de desativar: conexão, proposta e depois venda.
-    const grant = (await db.query(`SELECT grant_id FROM network.dot_installment_reviews
-      WHERE environment=$1 AND id=$2`,[env.FAREJADOR_ENV,id])).rows[0];
-    if (!grant || (caller.action==='confirm-in-chat' && caller.grantId!==grant.grant_id)) throw new Error('dot_review_missing');
-    const permission = await lockGrant(db,person,grant.grant_id);
+    // A chamada por voz já traz a conexão autenticada; só o link do painel precisa localizá-la.
+    const grantId = caller.action==='confirm-in-chat' ? caller.grantId :
+      (await db.query<{grant_id:string}>(`SELECT grant_id FROM network.dot_installment_reviews
+        WHERE environment=$1 AND id=$2`,[env.FAREJADOR_ENV,id])).rows[0]?.grant_id;
+    if (!grantId) throw new Error('dot_review_missing');
+    const permission = await lockGrant(db,person,grantId);
+    const row = (await db.query(reviewSql+' AND r.grant_id=$4 FOR UPDATE OF r',
+      [env.FAREJADOR_ENV,person,id,grantId])).rows[0];
+    if (!row) throw new Error('dot_review_missing');
     if (action==='confirm-in-chat' && !(permission.installment_reviews_enabled && permission.installment_chat_confirmation))
       throw new Error('dot_review_disabled');
-    const row = (await db.query(reviewSql+' FOR UPDATE OF r',args)).rows[0];
-    if (!row) throw new Error('dot_review_missing');
     if (row.restored_at) return { ...row, status:'restaurado' };
     if (action === 'restore') {
       if (!row.confirmed_at) throw new Error('dot_review_missing');

@@ -46,11 +46,12 @@ export const dotTools:Tool[]=[...definitions.map(([name,description,properties])
   annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}]}}));
 
-export const dotServerVersion = '1.6.0';
+export const dotServerVersion = '1.6.1';
 
 export function dotInstructions() {
   return 'Para mudar um vencimento a pedido do dono, localize a parcela e prepare a proposta. O campo confirmacao informa o modo autorizado para a conexão. '
       +'Em conversa, use confirmar_alteracao_vencimento após autorização explícita dada diretamente pelo dono por voz ou texto para a parcela e a nova data. Se ele já autorizou, prossiga. Em painel, apresente o confirm_url. '
+      +'Se a proposta já foi identificada e autorizada nesta conversa, chame diretamente a ferramenta de confirmação no modo indicado. Ela revalida a proposta e a parcela. '
       +'Esclareça parcelas ambíguas. Se os dados autorizados mudarem, apresente os dados atuais e peça nova autorização. Só informe que gravou após o retorno confirmado. '
       +'Para as demais funções financeiras, consulte o título, venda, viagem ou despesa correspondente e esclareça dados ambíguos. '
       +'Um pedido explícito do dono por voz ou texto autoriza executar aquela operação. Não peça nova confirmação se ele já autorizou. '
@@ -64,7 +65,7 @@ export function dotInstructions() {
       +'Informe período, unidade monetária, fuso e pendências de conciliação. Não invente zeros em fonte indisponível. '
       +'Use pagina para percorrer listas truncadas. Posição atual e histórico por período são distintos. '
       +'O proprietário autorizou dados pessoais, conversas, documentos, folha individual e financeiro dos parceiros. '
-      +'As consultas resumidas mantêm projeções compactas: use listar_fontes_matriz e consultar_registros_matriz para detalhes completos, consultar_relatorio_painel para relatórios e consultar_anexo_matriz para arquivos. '
+      +'Quando uma ferramenta específica responde à pergunta, use-a diretamente. Para conversão, medidas procuradas, faltas ou fila do bot, use consultar_bot_matriz. Use consultar_registros_matriz para detalhes completos e listar_fontes_matriz quando precisar descobrir a fonte ou seus campos. Use consultar_relatorio_painel para relatórios e consultar_anexo_matriz para arquivos. '
       +'O conector não envia mensagens a clientes nem executa pagamentos. '
       +(dotEventsAvailable()?monitorInstructions:'Acompanhamento automático indisponível ou desativado.');
 }

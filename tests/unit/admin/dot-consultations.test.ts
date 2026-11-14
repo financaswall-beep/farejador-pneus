@@ -93,10 +93,13 @@ describe('consultas do Dot',()=>{
       valor:'4321.00',due_date:null,overdue:false,nome:'PII-SENTINEL'}]},a_pagar:{itens:[
       {id:'expense-code',tipo:'despesa',valor:'50.00',due_date:'2026-10-25',overdue:false,nome:'PII-SENTINEL',phone:'PII-SENTINEL'},
       {id:'salary-code',tipo:'folha',valor:'4321.00',due_date:'2026-10-25',overdue:false,nome:'PII-SENTINEL'}]}});
+    mocks.open.mockClear();
     const result=await runDotConsultation('consultar_financeiro_matriz',{visao:'a_pagar'});
+    expect(mocks.open).toHaveBeenCalledTimes(1);
     expect(result.rows).toEqual([{id:'expense-code',tipo:'despesa',valor:'50.00',due_date:'2026-10-25',overdue:false}]);
     expect(JSON.stringify(result)).not.toMatch(/PII-SENTINEL|salary-code|4321/);
     const receivable=await runDotConsultation('consultar_financeiro_matriz',{visao:'a_receber'});
+    expect(mocks.open).toHaveBeenCalledTimes(2);
     expect(receivable.rows).toEqual([]);
     expect(JSON.stringify(receivable)).not.toMatch(/PII-SENTINEL|salary-refund|4321/);
   });

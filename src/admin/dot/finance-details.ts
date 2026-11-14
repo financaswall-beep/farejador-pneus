@@ -1,12 +1,13 @@
 import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { getMatrizLedgerOpenItems } from '../painel/matriz-ledger-open-items.js';
-import { readDotFinance } from './finance-read.js';
+import { readDotFinance, readDotFinancePosition } from './finance-read.js';
 import { pageRows,project } from './read-model.js';
 
 export async function readDotFinanceDetails(db:Pool,month:string,view:'resumo'|'a_receber'|'a_pagar',page:number) {
-  const finance=await readDotFinance(db,month);
-  if(view==='resumo'||!finance.available)return finance;
+  if(view==='resumo')return readDotFinance(db,month);
+  const finance=await readDotFinancePosition(db,month);
+  if(!finance.available)return finance;
   const open=await getMatrizLedgerOpenItems(env.FAREJADOR_ENV,db);
   const source=view==='a_receber'?open.a_receber.itens:open.a_pagar.itens;
   const rows=source.filter(row=>row.tipo!=='folha'&&row.categoria!=='funcionario')

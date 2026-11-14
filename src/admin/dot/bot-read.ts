@@ -15,12 +15,14 @@ export async function readDotBot(ctx:DotReadContext,view:'conversao'|'demanda'|'
     FROM core.conversations c LEFT JOIN analytics.current_classifications cc ON cc.environment=c.environment
       AND cc.conversation_id=c.id AND cc.dimension='final_outcome'
     WHERE c.environment=$1 AND c.chatwoot_account_id=${account} AND c.deleted_at IS NULL
-      AND (c.started_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date
+      AND c.started_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND c.started_at < (($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
       AND ($4::uuid IS NULL OR c.id=$4) AND $5='' GROUP BY 1`,'id DESC',
   'Coorte por início da conversa na conta conectada. Pedido válido no atendimento não comprova realização ou recebimento.');
   if(view==='espera')return readPage(ctx,`SELECT tire_size AS id,tire_size,tire_condition,status,count(*)::int interests,
     min(consent_at) oldest_consent_at,max(consent_at) latest_consent_at FROM ops.stock_interests
-    WHERE environment=$1 AND (consent_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date
+    WHERE environment=$1 AND consent_at >= ($2::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND consent_at < (($3::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
       AND ($4::uuid IS NULL OR id=$4) AND ($5='' OR tire_size ILIKE '%'||$5||'%')
       AND EXISTS(SELECT 1 FROM core.conversations c WHERE c.environment=ops.stock_interests.environment
         AND c.id=ops.stock_interests.conversation_id AND c.chatwoot_account_id=${account} AND c.deleted_at IS NULL)

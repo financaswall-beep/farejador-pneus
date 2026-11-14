@@ -5,7 +5,7 @@ import { fullReportInput,runFullReport } from './full-reports.js';
 import { attachmentInput,readFullAttachment } from './full-attachments.js';
 import { withDotReadOnly } from './read-only.js';
 import { getMatrizLedgerStatement } from '../painel/matriz-ledger-statement.js';
-import { readDotFinance } from './finance-read.js';
+import { readDotFinancePosition } from './finance-read.js';
 import { dotPeriod } from './period.js';
 import { creativeInput,readFullCreative } from './full-creative.js';
 
@@ -45,7 +45,7 @@ export async function runFullTool(name:FullToolName,raw:unknown):Promise<Record<
     if(name==='consultar_registros_matriz')return readFullRecords(db,raw);
     if(name==='consultar_relatorio_painel')return runFullReport(db,raw);
     const input=statementInput.parse(raw),month=dotPeriod({periodo:'mes',mes:input.mes}).month;
-    const finance=await readDotFinance(db,month);
+    const finance=await readDotFinancePosition(db,month);
     if(!finance.available)return finance;
     const statement=await getMatrizLedgerStatement({period:month,basis:input.base,limit:50,offset:(input.pagina-1)*50},db);
     return {...statement,available:true,pagina:input.pagina,proxima_pagina:statement.total>input.pagina*50?input.pagina+1:null,

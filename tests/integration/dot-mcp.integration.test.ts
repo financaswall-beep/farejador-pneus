@@ -226,6 +226,12 @@ it('revogação explícita, reset de senha e perda de papel não ressuscitam com
 
 it('PostgreSQL bloqueia fisicamente qualquer escrita dentro da consulta', async () => {
   const { withDotReadOnly } = await import('../../src/admin/dot/read-only.js');
+  const settings=await withDotReadOnly(async read=>(await read.query(`SELECT
+    current_setting('transaction_read_only') AS read_only,
+    current_setting('transaction_isolation') AS isolation,
+    current_setting('statement_timeout') AS statement_timeout,
+    current_setting('idle_in_transaction_session_timeout') AS idle_timeout`)).rows[0],db.pool);
+  expect(settings).toEqual({read_only:'on',isolation:'repeatable read',statement_timeout:'15s',idle_timeout:'20s'});
   await expect(withDotReadOnly(async read => read.query(`UPDATE network.partner_people SET username=username WHERE id=$1`,[person]),db.pool))
     .rejects.toMatchObject({code:'25006'});
   expect((await db.pool.query('SELECT 1 ok')).rows[0].ok).toBe(1);
