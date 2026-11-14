@@ -23,6 +23,8 @@ const titles:Record<string,string>={customers:'Clientes da Matriz',contacts:'Con
   matriz_collaborators:'Colaboradores da Matriz',matriz_payroll_items:'Folha individual da Matriz',
   partner_payroll_items:'Folha individual dos parceiros',matriz_delivery_trips:'Rotas de entrega',
   matriz_trip_receipts:'Notas fiscais das rotas',matriz_expense_receipts:'Comprovantes de despesas',
+  matriz_reporting_entries:'Partidas efetivas da loja, com divisão das compras e dos recebimentos',
+  purchase_sharing:'Divisão de compras e titulares do lote', matriz_ledger_entries:'Partidas originais, anteriores à atribuição de compras compartilhadas',
   matriz_ledger_transactions:'Lançamentos do livro financeiro',publisher_posts:'Publicações e legendas',
   publisher_media:'Fotos e vídeos de marketing',meta_comments:'Comentários das redes sociais',
   partner_access_tokens:'Cadastros de colaboradores dos parceiros (sem credenciais)',partner_people:'Usuários (sem credenciais)'};

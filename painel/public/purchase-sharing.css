@@ -1,0 +1,13 @@
+dialog.purchase-sharing {box-sizing:border-box;width:min(36rem,94vw);max-height:90dvh;margin:auto;padding:1.2rem;border:1px solid #cad5d0;border-radius:14px;background:#fff;color:#172c23;overflow:auto;font:inherit}
+.purchase-sharing::backdrop {background:#10251dcc}
+.purchase-sharing header,.purchase-sharing fieldset {display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap}
+.purchase-sharing h2 {font-size:1.2rem;font-weight:700}
+.purchase-sharing p {font-size:.9rem;margin:.45rem 0;line-height:1.45}
+.purchase-sharing details {border:1px solid #d7e1db;border-radius:8px;padding:.7rem;margin:.7rem 0;background:#fff}
+.purchase-sharing summary {cursor:pointer;font-weight:600}
+.purchase-sharing label {display:grid;gap:.25rem;font-size:.9rem;flex:1;min-width:7rem}
+.purchase-sharing form,.purchase-sharing fieldset {display:grid;gap:.6rem;margin:.65rem 0}
+.purchase-sharing input,.purchase-sharing select,.purchase-sharing button {font:inherit;padding:.55rem .65rem;border:1px solid #aebdb4;border-radius:7px;background:#fff;color:#193c2c;min-width:0}
+.purchase-sharing button {cursor:pointer;font-weight:600}
+.purchase-sharing button[type=submit] {background:#126348;color:white;border-color:#126348}
+.purchase-sharing [role=status]:not(:empty) {position:sticky;top:0;background:#eef6f1;padding:.6rem;border-radius:6px;z-index:1}

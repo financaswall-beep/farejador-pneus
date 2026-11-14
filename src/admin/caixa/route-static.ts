@@ -165,6 +165,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-purchases-items.js', 'caixa-purchases-items.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-purchases-review.js', 'caixa-purchases-review.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-purchases-wizard.js', 'caixa-purchases-wizard.js', 'text/javascript; charset=utf-8');
+  text('/operacao/purchase-sharing.js', 'purchase-sharing.js', 'text/javascript; charset=utf-8');
+  text('/operacao/purchase-sharing.css', 'purchase-sharing.css', 'text/css; charset=utf-8');
   text('/operacao/caixa-purchases-detail.js', 'caixa-purchases-detail.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-purchases.css', 'caixa-purchases.css', 'text/css; charset=utf-8');
   text('/operacao/purchase-price-utils.js', 'purchase-price-utils.js', 'text/javascript; charset=utf-8');

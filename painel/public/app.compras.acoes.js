@@ -3,6 +3,10 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.comprasAcoes = function () {
   return {
+    compraAbrirDivisao(compra) {
+      const base = '/admin/api/wholesale/purchases';
+      return window.FarejadorPurchaseSharing.open(compra.id, (path, body) => body ? this.apiPost(base + path, body) : this.apiGet(base + path));
+    },
     compraData(c) {
       if (!c?.purchased_at) return '—';
       return window.FarejadorTime.formatDate(c.purchased_at);

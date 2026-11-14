@@ -34,7 +34,7 @@ export const fullDefinitions:[FullToolName,string,Record<string,object>,string[]
   ['consultar_anexo_matriz','Lê a imagem ou arquivo cadastrado, pelo ID da nota, evidência, anexo de mensagem ou mídia de marketing; foto_pneu usa ID da solicitação e indice da foto. Retorna conteúdo autenticado, sem criar links públicos. Vídeos de marketing retornam miniatura.',
     {tipo:{type:'string',enum:['nota_rota','nota_despesa','foto_pneu','evidencia_estoque','mensagem','marketing']},id:{type:'string',format:'uuid'},
       indice:{type:'integer',minimum:1,maximum:50},variante:{type:'string',enum:['original','miniatura']}},['tipo','id']],
-  ['consultar_extrato_matriz','Extrato financeiro completo por lançamento, com descrição, origem, responsável, parcelas, estornos e saldos. Base caixa ou competência. Valores em reais e conciliação verificada.',
+  ['consultar_extrato_matriz','Em compras compartilhadas, gross_amount é o valor integral e cash_amount é a parte movimentada pela loja. Extrato financeiro completo por lançamento, com descrição, origem, responsável, parcelas, estornos e saldos. Base caixa ou competência. Valores em reais e conciliação verificada.',
     {mes:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'},base:{type:'string',enum:['competencia','caixa']},pagina:page},[]],
 ];
 export async function runFullTool(name:FullToolName,raw:unknown):Promise<Record<string,unknown>> {

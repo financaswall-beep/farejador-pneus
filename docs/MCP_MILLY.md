@@ -44,6 +44,12 @@ Os valores e nomes a seguir são exemplos fictícios.
 - **Conferência bancária.** Informe `de`, `ate`, `conta` e até 200 movimentos com `dia`, `direcao` (entrada/saida), `valor` e referência opcional. Período máximo de 31 dias de diferença entre as datas. Divida o período se o caixa tiver mais de 500 linhas.
 - **Simulação.** Informe o valor de compra excluindo frete. O custo inclui compra, frete e gastos extras. O caixa projetado parte do registrado e considera entradas e saídas abertas com vencimento desde hoje até o horizonte informado. O cálculo depende da quantidade aproveitável estimada e dos pagamentos realmente ocorrerem.
 
+## Compras compartilhadas
+
+Em `consultar_compras_matriz`, a visão `compras` identifica as compras com `shared_purchase`. Para conferi-las, use `visao: "divisao"` e informe o UUID da compra em `referencia`. A consulta distingue o custo integral do lote, a parte da loja no custo (`store_cost`), o pagamento da loja ao fornecedor (`supplier_cash`), os recebimentos das vendas vinculadas ao lote e os reembolsos. A contribuição restante representa o acordo de custo com o participante. A compra pode ainda ter parcelas abertas com o fornecedor.
+
+Ao responder quanto a loja gastou em uma compra compartilhada, informe o custo integral, a parte da loja e o valor efetivamente pago no período. Para movimentos e saldos por mês, use `consultar_extrato_matriz` na base de caixa. Para custo por pneu, use o custo integral e a quantidade do lote. O proprietário registra ou corrige a divisão em **Compras → Histórico → Dividir compra**, no painel ou no aplicativo.
+
 ## Consultas disponíveis no MCP
 
 | Área | Ferramentas |

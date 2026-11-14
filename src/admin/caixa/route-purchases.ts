@@ -15,6 +15,7 @@ import { purchaseReportQuerySchema } from '../painel/purchase-report-query.js';
 import { calculateWholesalePurchaseMoney } from '../painel/purchase-money.js';
 import { calculateLotPurchaseMoney } from '../painel/lot-purchase-money.js';
 import { mapWriteError } from '../painel/route-helpers.js';
+import { registerPurchaseSharingRoutes } from '../painel/route-purchase-sharing.js';
 import { registerCaixaPurchaseGroupRoutes } from './route-purchase-groups.js';
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
@@ -50,6 +51,7 @@ export function registerCaixaPurchaseRoutes(
   };
   const options = { preHandler: [flagGate, requireAuth, requireStock, owner] };
   registerCaixaPurchaseGroupRoutes(fastify, options);
+  registerPurchaseSharingRoutes(fastify,base,options.preHandler,actor);
 
   fastify.get(base + '/medidas', options, async () => ({
     rows: await listWholesaleMeasures(env.FAREJADOR_ENV),

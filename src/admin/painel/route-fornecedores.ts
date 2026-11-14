@@ -11,6 +11,7 @@ import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, linkWholesalePurchaseOrderSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 import { registerPurchaseReportRoutes } from './route-purchase-report.js';
 import { registerLotPurchaseSchema } from './route-schemas-lot-purchases.js';
+import { registerPurchaseSharingRoutes } from './route-purchase-sharing.js';
 import { registerPurchaseGroupRoutes } from './route-purchase-groups.js';
 
 import { purchaseReportQuerySchema } from './purchase-report-query.js';
@@ -18,6 +19,7 @@ import { purchaseReportQuerySchema } from './purchase-report-query.js';
 import { priceReportQuerySchema } from './price-report-query.js';
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
+  registerPurchaseSharingRoutes(fastify,'/admin/api/wholesale/purchases',[requireAdminOwner],operatorLabel);
   await registerPurchaseReportRoutes(fastify);
   await registerPurchaseGroupRoutes(fastify);
   fastify.post('/admin/api/wholesale/lot-purchases', { preHandler: requireAdminOwner }, async (request, reply) => {

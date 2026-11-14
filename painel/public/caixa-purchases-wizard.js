@@ -128,6 +128,8 @@
         (result.stock_applied ? 'Recebimento confirmado.' : 'Aguardando conferência de chegada.') +
         (result.catalog_blockers?.length ? ' Há pneus que precisam de configuração no Catálogo antes da venda.' : '') +
         (result.lot_code && result.stock_applied ? ' Lote ' + result.lot_code + ' disponível para triagem no web.' : ''), true);
+      const share = P.el('button', 'pc-button', 'Dividir compra'); share.type = 'button';
+      share.onclick = () => window.FarejadorPurchaseSharing.open(result.purchase_id, P.request); P.id('notice').append(share);
       void P.load(); void P.summary();
     } catch (error) { if (error.message !== 'invalid_session') P.formError(P.message(error)); }
     finally { P.footer(); }

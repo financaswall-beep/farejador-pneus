@@ -196,7 +196,7 @@ window.PAINEL_MODULES.compras = function () {
         const estoqueTxt = result.stock_applied ? ' O galpão já recebeu.' : ' Aguardando recebimento; o galpão não mudou.';
         const catalogoTxt = result.catalog_blockers?.length
           ? ` Atenção: ${result.catalog_blockers.length} variante(s) precisam de produto ou preço no Catálogo antes da venda.` : '';
-        this.compraMsg = { ok: true, text: `${result.order_code} · compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
+        this.compraMsg = { ok: true, purchase_id: result.purchase_id, text: `${result.order_code} · compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
         this.compraForm = {
           supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',

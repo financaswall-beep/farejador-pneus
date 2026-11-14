@@ -11,6 +11,8 @@ export interface MatrizLedgerStatementRow {
   source_type: string;
   source_id: string;
   transaction_kind: string;
+  gross_amount?: string;
+  cash_amount?: string;
   amount: string;
   competence_on: string;
   due_on: string | null;
@@ -145,14 +147,15 @@ export async function getMatrizLedgerStatement(
                    WHERE e.account_code=ANY($3::text[])
                      AND ((e.account_class='asset' AND e.side='debit')
                        OR (e.account_class='liability' AND e.side='credit')))
-                   FROM finance.matriz_ledger_entries e
+                   FROM finance.matriz_reporting_entries e
                   WHERE e.environment=t.environment AND e.transaction_id=t.id)
                   ::numeric(14,2)::text obligation_amount
            FROM finance.matriz_ledger_transactions t,bounds b
           WHERE t.environment=$1
             AND ${dateColumn}>=b.month_start AND ${dateColumn}<b.month_end
        )
-       SELECT s.id,s.source_type,s.source_id,s.transaction_kind,s.amount::text,
+       SELECT s.id,s.source_type,s.source_id,s.transaction_kind,${basis==='caixa' ? "COALESCE(sum(e.amount) FILTER (WHERE e.account_code='cash'),0)" : 's.amount'}::text amount,
+              s.amount::text gross_amount,COALESCE(sum(e.amount) FILTER (WHERE e.account_code='cash'),0)::numeric(14,2)::text cash_amount,
               s.competence_on::text,s.due_on::text,s.cash_on::text,s.description,
               s.created_by,s.created_at::text,s.metadata,s.reversal_of_transaction_id,
               s.reversed,s.cash_entry_error,s.paid_amount,
@@ -172,12 +175,13 @@ export async function getMatrizLedgerStatement(
               ) ORDER BY e.line_no) entries,
               count(*) OVER()::int total_count
          FROM selected s
-         JOIN finance.matriz_ledger_entries e
+         JOIN finance.matriz_reporting_entries e
            ON e.environment=s.environment AND e.transaction_id=s.id
         GROUP BY s.id,s.source_type,s.source_id,s.transaction_kind,s.amount,
                  s.competence_on,s.due_on,s.cash_on,s.description,s.created_by,
                  s.created_at,s.metadata,s.reversal_of_transaction_id,s.reversed,
                  s.paid_amount,s.obligation_amount,s.cash_entry_error
+        ${basis==='caixa' ? "HAVING bool_or(e.account_code='cash')" : ''}
         ORDER BY ${dateColumn.replace('t.', 's.')} DESC,s.created_at DESC,s.id DESC
         LIMIT $4 OFFSET $5`,
       params,
@@ -204,7 +208,7 @@ export async function getMatrizLedgerStatement(
          COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
            FILTER (WHERE e.account_class='expense'),0)::numeric(14,2)::text despesas
          FROM tx
-         JOIN finance.matriz_ledger_entries e ON e.environment=$1
+         JOIN finance.matriz_reporting_entries e ON e.environment=$1
           AND e.transaction_id=tx.id`,
       [environment, input.period],
     ),

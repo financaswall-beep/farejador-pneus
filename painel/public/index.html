@@ -150,14 +150,16 @@
 <script src="/admin/painel/app.estoque.custos.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.estoque.lotes.js?v=20261109-transfer1"></script>
 <script src="/admin/painel/app.estoque.transferencias.js?v=20261109-transfer1"></script>
-<script src="/admin/painel/app.compras.js?v=20261101-viagens1"></script>
+<script src="/admin/painel/app.compras.js?v=20261113-share"></script>
 <script src="/admin/painel/purchase-price-utils.js?v=20260918-prices1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260918-prices1"></script>
 <script src="/admin/painel/app.compras.reposicao.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
 <script src="/admin/painel/app.compras.historico.js?v=20260825-purchase-history2"></script>
-<script src="/admin/painel/app.compras.acoes.js?v=20260915-lot1"></script>
+<link rel="stylesheet" href="/admin/painel/purchase-sharing.css?v=1">
+<script src="/admin/painel/purchase-sharing.js?v=1"></script>
+<script src="/admin/painel/app.compras.acoes.js?v=20261113-share"></script>
 <script src="/admin/painel/app.logistica.historico.js?v=20260917-historico1"></script>
 <script src="/admin/painel/app.logistica.conciliacao.js?v=20261003-semcomprovante2"></script>
 <script src="/admin/painel/app.logistica.entregas.js?v=20260917-entregas1"></script>
@@ -3383,7 +3385,7 @@
         </div>
       </div>
 
-      <div x-show="compraMsg" x-cloak class="mb-4 text-sm px-4 py-3 rounded-xl border" :class="compraMsg && compraMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'" x-text="compraMsg ? compraMsg.text : ''"></div>
+      <div x-show="compraMsg" x-cloak class="mb-4 text-sm px-4 py-3 rounded-xl border" :class="compraMsg && compraMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'" role="status"><span x-text="compraMsg ? compraMsg.text : ''"></span> <button type="button" x-show="compraMsg?.purchase_id" @click="compraAbrirDivisao({id:compraMsg.purchase_id})" class="ml-2 underline">Dividir compra</button></div>
 
       <div x-show="adminUser?.role !== 'owner'" x-cloak class="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         Compras está em modo somente leitura para este perfil. Registrar, receber, cancelar, pagar ou alterar fornecedores exige acesso de proprietário.
@@ -3397,6 +3399,7 @@
           </header>
           <div x-show="lotPurchaseMsg" class="lot-purchase-message" :class="{ ok: lotPurchaseMsg?.ok }" role="status" aria-live="polite">
             <span x-text="lotPurchaseMsg?.text"></span>
+            <button type="button" x-show="lotPurchaseResult && lotPurchaseMsg?.ok" @click="compraAbrirDivisao({id:lotPurchaseResult.purchase_id})" class="ml-2 underline">Dividir compra</button>
             <button type="button" x-show="lotPurchaseResult && lotPurchaseMsg?.ok" class="ml-2 underline" @click="comprasOpenTab('historico')">Ver no histórico</button>
           </div>
           <form @submit.prevent="lotPurchaseSubmit()" class="lot-purchase-grid">
@@ -12086,6 +12089,7 @@
 
     <div class="p-6">
       <div x-show="compraDialog.kind === 'details' && compraDetalhe" x-effect="if(compraDialog.open && compraDialog.kind==='details' && compraDetalhe) viagemCompraEtiqueta(compraDetalhe); else viagemCompraEtiquetaId='' " class="space-y-5">
+        <button x-show="adminUser?.role==='owner'" @click="compraAbrirDivisao(compraDetalhe)" class="rounded-lg border px-4 py-2 text-sm font-semibold text-emerald-800">Dividir compra</button>
         <section class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><h3 class="text-sm font-semibold text-emerald-950">Viagem de compra</h3><p x-show="viagemCompraEtiquetaLoading" class="mt-2 text-xs">Carregando vínculo…</p><template x-if="viagemCompraEtiquetaData"><div class="mt-2 flex flex-wrap items-center justify-between gap-3"><button @click="compraCloseDialog();viagemAbrir(viagemCompraEtiquetaData.id)" class="text-sm font-semibold text-emerald-800" x-text="viagemCompraEtiquetaData.code+' · '+viagemCompraEtiquetaData.name"></button><button x-show="adminUser?.role === 'owner' && viagemCompraEtiquetaData.status==='open'" @click="viagemVinculo(viagemCompraEtiquetaData.id,'purchase',compraDetalhe.id,true)" :disabled="viagemSaving" class="text-xs text-rose-700">Desvincular</button></div></template><div x-show="!viagemCompraEtiquetaData && !viagemCompraEtiquetaLoading && adminUser?.role === 'owner' && compraDetalhe?.status!=='cancelled'" class="mt-3 flex flex-wrap gap-2"><select x-model="viagemCompraSelecionada" class="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"><option value="">Vincular a uma viagem</option><template x-for="g in viagensAbertas" :key="'vinculo-compra-'+g.id"><option :value="g.id" x-text="g.code+' · '+g.name"></option></template></select><button @click="viagemVinculo(viagemCompraSelecionada,'purchase',compraDetalhe.id,false)" :disabled="!viagemCompraSelecionada || viagemSaving" class="rounded-lg bg-emerald-800 px-3 py-2 text-xs text-white disabled:opacity-50">Vincular</button></div><p x-show="viagensError" x-text="viagensError" role="alert" class="mt-2 text-xs text-rose-700"></p></section>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><p class="text-xs text-gray-500">Data</p><p class="font-semibold mt-1" x-text="compraData(compraDetalhe)"></p></div>

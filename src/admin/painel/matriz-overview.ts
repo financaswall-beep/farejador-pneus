@@ -23,7 +23,7 @@ async function readFinance(db:Pool,environment:'prod'|'test',month:string,today:
   const [truth,open,cash]=await Promise.all([
     getMatrizCentralLedgerFinancialTruth(environment,db,month),getMatrizLedgerOpenItems(environment,db),
     db.query(`SELECT COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::text balance
-      FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e
+      FROM finance.matriz_ledger_transactions t JOIN finance.matriz_reporting_entries e
         ON e.transaction_id=t.id AND e.environment=t.environment
       WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<=$2::date
         AND ${EFFECTIVE_CASH_TRANSACTION_SQL}`,[environment,today]),

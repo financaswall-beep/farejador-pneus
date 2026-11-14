@@ -46,7 +46,7 @@ async function getCashSummary(
             COALESCE(sum(e.amount) FILTER (
               WHERE e.account_code='cash' AND e.side='credit'),0)::numeric(14,2)::text saidas
        FROM tx
-       JOIN finance.matriz_ledger_entries e
+       JOIN finance.matriz_reporting_entries e
          ON e.environment=$1 AND e.transaction_id=tx.id`,
     [environment, start, end],
   );

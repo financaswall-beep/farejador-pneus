@@ -50,7 +50,7 @@ export async function getMatrizFinanceEntries(
               COALESCE(t.metadata->>'payment_method',t.metadata->>'paymentMethod') payment_method,
               e.amount,to_char(t.cash_on,'YYYY-MM-DD') entry_date,t.created_at occurred_at
          FROM finance.matriz_ledger_transactions t
-         JOIN finance.matriz_ledger_entries e
+         JOIN finance.matriz_reporting_entries e
            ON e.environment=t.environment AND e.transaction_id=t.id
          CROSS JOIN bounds b
          WHERE t.environment=$1 AND t.cash_on>=b.start_date AND t.cash_on<b.end_date

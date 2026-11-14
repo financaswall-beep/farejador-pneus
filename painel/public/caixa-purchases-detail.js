@@ -61,6 +61,10 @@
     if (row.notes) host.append(P.el('p', 'pc-muted', row.notes));
     if (row.cancel_reason) host.append(P.el('p', 'pc-notice', 'Cancelamento: ' + row.cancel_reason));
     if (P.metal?.active()) P.metalView.detail(row, receiving, inputs);
+    if (!receiving && !s.pending) {
+      const share = P.el('button', 'pc-button', 'Dividir compra'); share.type = 'button';
+      share.onclick = () => window.FarejadorPurchaseSharing.open(row.id, P.request); host.append(share);
+    }
     P.id('confirm-receipt').hidden = !receiving; locks();
     if (!P.id('dialog').open) { if (P.metal?.active()) P.metal.showDetail(); else P.id('dialog').showModal(); }
   };

@@ -9,7 +9,7 @@ import { logger } from '../../shared/logger.js';
 import { sendStatic } from './route-helpers.js';
 
 export async function registerPainelStatic(fastify: FastifyInstance): Promise<void> {
-  for (const file of ['customer-fields.js','app.clientes.cadastro.js','clientes-cadastro.css']) {
+  for (const file of ['purchase-sharing.css','purchase-sharing.js','customer-fields.js','app.clientes.cadastro.js','clientes-cadastro.css']) {
     fastify.get(`/admin/painel/${file}`,async (_request,reply) => sendStatic(reply,file,
       file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8'));
   }

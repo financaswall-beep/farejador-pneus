@@ -18,7 +18,7 @@ export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
               CASE WHEN e.account_code='cash' AND ${EFFECTIVE_CASH_TRANSACTION_SQL} THEN t.cash_on END cash_on,
               e.account_code,e.account_class,e.side,e.amount
          FROM finance.matriz_ledger_transactions t
-         JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+         JOIN finance.matriz_reporting_entries e ON e.transaction_id=t.id
         WHERE t.environment=$1
      ), month_ledger AS (
        SELECT l.* FROM ledger l,bounds b

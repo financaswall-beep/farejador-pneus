@@ -20,7 +20,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
   COALESCE(sum(e.amount) FILTER(WHERE e.account_code='cash' AND e.side='debit'),0)::float8 AS cash_in,
   COALESCE(sum(e.amount) FILTER(WHERE e.account_code='cash' AND e.side='credit'),0)::float8 AS cash_out
   FROM finance.matriz_ledger_transactions t
-  JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id AND e.environment=t.environment
+  JOIN finance.matriz_reporting_entries e ON e.transaction_id=t.id AND e.environment=t.environment
   LEFT JOIN LATERAL(SELECT base.source_id,base.metadata FROM finance.matriz_ledger_payments p
     JOIN finance.matriz_ledger_transactions base ON base.id=p.obligation_transaction_id AND base.environment=p.environment
     WHERE p.environment=t.environment AND p.payment_transaction_id=t.id ORDER BY p.id LIMIT 1) b ON true
@@ -42,7 +42,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
 
 export const financialOpeningSql=`SELECT t.source_type,
   COALESCE(sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END),0)::float8 AS amount
-  FROM finance.matriz_ledger_transactions t JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id AND e.environment=t.environment
+  FROM finance.matriz_ledger_transactions t JOIN finance.matriz_reporting_entries e ON e.transaction_id=t.id AND e.environment=t.environment
   WHERE t.environment=$1 AND e.account_code='cash' AND t.cash_on<$2::date
     AND (${EFFECTIVE_CASH_TRANSACTION_SQL}) GROUP BY t.source_type`;
 

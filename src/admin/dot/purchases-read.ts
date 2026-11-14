@@ -1,7 +1,15 @@
 import { readPage, rejectFilters, type DotReadContext } from './read-model.js';
+import { env } from '../../shared/config/env.js';
+import { readPurchaseSharing } from '../painel/purchase-sharing-read.js';
 import { paymentMethodSql } from './safe-values.js';
 
-export function readDotPurchases(ctx:DotReadContext,view:'compras'|'pedidos'|'fornecedores'|'precos') {
+export async function readDotPurchases(ctx:DotReadContext,view:'compras'|'pedidos'|'fornecedores'|'precos'|'divisao') {
+  if(view==='divisao') {
+    rejectFilters(ctx,'medida');
+    if(!ctx.input.referencia) throw Error('Informe a referência da compra.');
+    const state=await readPurchaseSharing(ctx.db,env.FAREJADOR_ENV,ctx.input.referencia);
+    return {...state,participants:state.participants.map(({name: _name,...participant})=>participant)};
+  }
   if(view==='pedidos'||view==='fornecedores')rejectFilters(ctx,'medida');
   if(view==='pedidos')return readPage(ctx,`SELECT o.id,o.order_number,o.supplier_id,o.status,o.created_at,
     count(p.id)::int purchases_count,COALESCE(sum(p.total_amount) FILTER(WHERE p.status<>'cancelled'),0)::text total_amount
@@ -29,6 +37,7 @@ export function readDotPurchases(ctx:DotReadContext,view:'compras'|'pedidos'|'fo
     GROUP BY p.supplier_id,i.measure,i.brand,i.tire_condition,i.vehicle_type`,
   'last_purchase_at DESC,id,supplier_id,brand,tire_condition','Custos de compras recebidas; média ponderada pela quantidade aceita no período.');
   return readPage(ctx,`SELECT p.id,p.supplier_id,p.purchase_order_id,p.purchase_kind,p.status,p.purchased_at,p.stock_applied,
+    EXISTS(SELECT FROM finance.purchase_sharing sh WHERE sh.environment=p.environment AND sh.purchase_id=p.id AND jsonb_array_length(sh.participants)>0) shared_purchase,
     p.products_amount,p.freight_amount,p.discount_amount,p.total_amount,p.payment_status,${paymentMethodSql('p.payment_method')} payment_method,p.due_date,p.paid_at,
     (SELECT count(*)::int FROM commerce.wholesale_purchase_lines i WHERE i.environment=p.environment AND i.purchase_id=p.id) items_count,
     COALESCE((SELECT jsonb_agg(x ORDER BY x.id) FROM (SELECT i.id,i.item_kind,
