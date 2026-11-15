@@ -62,13 +62,12 @@ async function settleWholesalePayment(
     const paidAt = normalizeBusinessFactInstant(
       options.paid_at, new Date(), 'paid_at_future',
     ) ?? new Date().toISOString();
-    // Um pagamento final estornado já ocupa a chave histórica da origem. A nova
-    // baixa precisa de identidade própria e deve usar o saldo reaberto da obrigação.
+    // Compras podem ter baixas parciais. Vendas corrigidas também precisam do saldo atual.
     const corrected=(saleLedger || purchaseLedger) && (await client.query<{id:string}>(`SELECT t.id
       FROM finance.matriz_ledger_transactions t WHERE t.environment=$1 AND t.source_id=$2
-        AND t.source_type=ANY($3::text[]) AND EXISTS (SELECT 1 FROM finance.matriz_ledger_payments p
+        AND t.source_type=ANY($3::text[]) AND (t.source_type='commerce.wholesale_purchase.accrual' OR EXISTS (SELECT 1 FROM finance.matriz_ledger_payments p
           JOIN finance.matriz_ledger_transactions x ON x.id=p.payment_transaction_id AND x.environment=p.environment
-          WHERE p.environment=t.environment AND p.obligation_transaction_id=t.id AND x.source_type='finance.settlement.reversal')`,
+          WHERE p.environment=t.environment AND p.obligation_transaction_id=t.id AND x.source_type='finance.settlement.reversal'))`,
       [environment,entityId,sale?['commerce.wholesale_order.revenue','commerce.wholesale_order.arrival_revenue']:['commerce.wholesale_purchase.accrual']])).rows[0];
     if (corrected) {
       const settled=await settleMatrizLedgerOpenItemOnClient(client,{environment,obligation_id:corrected.id,

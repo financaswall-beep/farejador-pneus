@@ -11,6 +11,7 @@ import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseC
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpenseRemoveSchema, matrizExpensesQuerySchema } from './route-schemas.js';
 import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
+import { registerSupplierAdvances } from './route-supplier-advances.js';
 import { registerFinanceiroOverview } from './route-financeiro-overview.js';
 import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
 import { registerExpenseReceiptRoutes } from './route-expense-receipts.js';
@@ -23,6 +24,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   await registerFinancialReportRoutes(fastify);
   await registerPainelFinanceiroLedger(fastify);
   await registerFinanceiroOverview(fastify);
+  registerSupplierAdvances(fastify);
   fastify.post('/admin/api/matriz/despesas/cancel-error', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.code(404).send({ error: 'expenses_disabled' });
     const parsed = cancelExpenseSchema.safeParse(request.body);

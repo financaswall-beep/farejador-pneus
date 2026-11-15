@@ -1,3 +1,4 @@
+import { restorePurchaseCredits } from './supplier-advance-ledger.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -337,6 +338,18 @@ export async function confirmWholesalePurchase(
     }
     const previousTotalCents = moneyCents(Number(purchase.rows[0].total_amount));
     if (adjusted.totalCents !== previousTotalCents) {
+      if (env.MATRIZ_CENTRAL_LEDGER) {
+        const row=(await client.query(`SELECT finance.matriz_ledger_obligation_balance(environment,id) balance
+          FROM finance.matriz_ledger_transactions WHERE environment=$1 AND source_type='commerce.wholesale_purchase.accrual'
+          AND transaction_kind='purchase_payable' AND source_id=$2`,[environment,input.purchase_id])).rows[0];
+        if (row) {
+          const excess=previousTotalCents-adjusted.totalCents-moneyCents(Number(row.balance));
+          if (excess>0) {
+            await restorePurchaseCredits(client,environment,input.purchase_id,input.confirmed_by,'Conferência de quantidade',excess/100);
+            purchase.rows[0].payment_status=(await client.query('SELECT payment_status FROM commerce.wholesale_purchases WHERE environment=$1 AND id=$2',[environment,input.purchase_id])).rows[0].payment_status;
+          }
+        }
+      }
       await postWholesalePurchaseQuantityAdjustment(client, {
         environment, purchaseId: input.purchase_id,
         supplierId: purchase.rows[0].supplier_id,

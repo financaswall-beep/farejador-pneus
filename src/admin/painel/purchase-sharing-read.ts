@@ -37,18 +37,43 @@ const flowsSql = `WITH sales AS (
   SELECT t.id,CASE WHEN t.source_type='commerce.wholesale_order.revenue_cancel' THEN 'sale_refund' ELSE 'sale' END,s.order_id,s.lot_total FROM sales s JOIN finance.matriz_ledger_transactions t
     ON t.environment=$1 AND t.source_id=s.order_id::text
     AND t.source_type IN ('commerce.wholesale_order.revenue','commerce.wholesale_order.arrival_revenue','commerce.wholesale_order.revenue_cancel') AND t.reversal_of_transaction_id IS NULL
+), linked_advances AS (
+  SELECT DISTINCT advance_id FROM finance.supplier_advance_movements WHERE environment=$1 AND purchase_id=$2
+), advance_usage AS (
+  SELECT m.advance_id,m.purchase_id,sum(-m.delta) applied,min(m.created_at) first_applied
+  FROM linked_advances l JOIN finance.supplier_advance_movements m ON m.advance_id=l.advance_id
+  WHERE m.environment=$1 AND m.source_type IN ('finance.supplier_advance.apply','finance.supplier_advance.restore')
+  GROUP BY m.advance_id,m.purchase_id
+), advance_funding AS (
+  SELECT u.*,t.amount original,COALESCE(s.external,0) external,
+    GREATEST(u.applied-COALESCE(s.external,0),0) store_needed
+  FROM advance_usage u JOIN finance.matriz_ledger_transactions t ON t.environment=$1 AND t.id=u.advance_id
+  LEFT JOIN LATERAL(SELECT sum(amount) AS external FROM finance.purchase_cash_shares
+    WHERE environment=$1 AND transaction_id=u.advance_id AND purchase_id=u.purchase_id) s ON true
+), distributed AS (
+  SELECT *,original-sum(external) OVER(PARTITION BY advance_id) store_funds,
+    COALESCE(sum(store_needed) OVER(PARTITION BY advance_id ORDER BY first_applied,purchase_id
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) used_before
+  FROM advance_funding
+), advances AS (
+  -- Um crédito recomposto pode financiar outra compra. O desembolso já atribuído
+  -- ao participante continua na compra de origem e só o caixa disponível é distribuído.
+  SELECT advance_id id,applied,external+LEAST(store_needed,GREATEST(store_funds-used_before,0)) gross
+  FROM distributed WHERE purchase_id=$2
 ), candidates AS (
   SELECT * FROM origins UNION
   SELECT p.payment_transaction_id,o.kind,o.order_id,o.lot_total FROM origins o
   JOIN finance.matriz_ledger_payments p ON p.environment=$1 AND p.obligation_transaction_id=o.id
     AND p.payment_kind='settlement'
+  UNION SELECT a.id,'supplier',NULL::uuid,NULL::numeric FROM advances a WHERE a.applied>0 OR a.gross>0
 )
-SELECT t.id,c.kind,c.order_id,t.cash_on::text AS day,e.amount::text gross,c.lot_total::text,
-  COALESCE((SELECT sum(s.amount) FROM finance.purchase_cash_shares s WHERE s.environment=t.environment
-    AND s.transaction_id=t.id AND s.purchase_id<>$2),0)::text other_external,
+SELECT t.id,c.kind,c.order_id,t.cash_on::text AS day,CASE WHEN a.id IS NULL THEN e.amount ELSE a.gross END::text gross,c.lot_total::text,
+  CASE WHEN a.id IS NOT NULL THEN '0' ELSE COALESCE((SELECT sum(s.amount) FROM finance.purchase_cash_shares s WHERE s.environment=t.environment
+    AND s.transaction_id=t.id AND s.purchase_id<>$2),0)::text END other_external,
   COALESCE((SELECT jsonb_agg(jsonb_build_object('id',s.participant_id,'value',s.amount) ORDER BY s.participant_id)
     FROM finance.purchase_cash_shares s WHERE s.environment=t.environment AND s.transaction_id=t.id AND s.purchase_id=$2),'[]') allocations
 FROM candidates c JOIN finance.matriz_ledger_transactions t ON t.environment=$1 AND t.id=c.id
+LEFT JOIN advances a ON a.id=t.id
 JOIN finance.matriz_ledger_entries e ON e.environment=t.environment AND e.transaction_id=t.id AND e.account_code='cash'
  AND e.side=CASE WHEN c.kind IN ('sale','supplier_refund') THEN 'debit' ELSE 'credit' END
 WHERE t.cash_on IS NOT NULL AND NOT EXISTS(SELECT FROM finance.matriz_ledger_transactions r

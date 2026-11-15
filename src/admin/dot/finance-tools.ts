@@ -1,3 +1,8 @@
+import {advanceIssueSchema,advanceApplySchema,advanceRefundSchema,advanceRestoreSchema,advanceVoidSchema} from '../painel/supplier-advance-schema.js';
+import {runSupplierAdvance,MatchingAdvance} from '../painel/supplier-advances.js';
+import {supplierFinanceSummary,supplierFinanceDetail} from '../painel/supplier-finance-read.js';
+import {createOwnerWithdrawalOnClient,reverseOwnerWithdrawal} from '../painel/matriz-owner-withdrawal.js';
+import {ownerWithdrawalSchema} from '../painel/route-financeiro-overview.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { McpError, ErrorCode, type Tool } from '@modelcontextprotocol/sdk/types.js';
@@ -183,6 +188,23 @@ write('vincular_gasto_a_viagem','Vincula uma despesa existente à viagem de comp
 });
 read('conferir_extrato_bancario','Compara linhas de um extrato apresentado pelo dono com o caixa registrado para a conta e período. Identifica coincidências e ambiguidades.',bankInput,compareStatement);
 read('simular_compra_de_lote','Estima custo unitário e impacto no caixa pelo desembolso previsto e contas abertas no período. Informe compra sem frete e frete separado.',simulationInput,simulate);
+read('consultar_financeiro_fornecedores','Saldos da Matriz por fornecedor. Com UUID, detalha créditos, compras, movimentos e parcelas.',z.object({supplier_id:id.optional()}).strict(),
+  async data=>data.supplier_id?supplierFinanceDetail(data.supplier_id):{fornecedores:await supplierFinanceSummary()});
+write('registrar_retirada_do_dono','Saída efetiva para uso pessoal do dono, sem despesa operacional.',ownerWithdrawalSchema,
+  (db,data,actor)=>createOwnerWithdrawalOnClient(db,data,actor));
+write('estornar_retirada_do_dono','Corrige a retirada identificada pelo UUID.',ownerWithdrawalSchema.pick({reason:true,occurred_at:true,idempotency_key:true}).extend({withdrawal_id:id}),
+  (db,data,actor)=>reverseOwnerWithdrawal(data.withdrawal_id,data,actor,env.FAREJADOR_ENV,db));
+write('registrar_adiantamento_fornecedor','Registra dinheiro já entregue ao fornecedor antes da compra. Se houver correspondência, confira o lançamento existente antes de declarar um pagamento distinto.',advanceIssueSchema.omit({action:true}),
+  async(db,data,actor)=>{try{return await runSupplierAdvance(db,{...data,action:'issue'},actor);}
+    catch(error){if(error instanceof MatchingAdvance)throw new McpError(ErrorCode.InvalidParams,error.message+' '+JSON.stringify(error.matches));throw error;}});
+write('usar_adiantamento_fornecedor','Aplica crédito existente à compra e parcela indicadas, sem saída de caixa.',advanceApplySchema.omit({action:true}),
+  (db,data,actor)=>runSupplierAdvance(db,{...data,action:'apply'},actor));
+write('desfazer_abatimento_fornecedor','Recompõe crédito aplicado indevidamente, total ou parcial.',advanceRestoreSchema.omit({action:true}),
+  (db,data,actor)=>runSupplierAdvance(db,{...data,action:'restore'},actor));
+write('registrar_devolucao_adiantamento','Registra dinheiro efetivamente devolvido pelo fornecedor.',advanceRefundSchema.omit({action:true}),
+  (db,data,actor)=>runSupplierAdvance(db,{...data,action:'refund'},actor));
+write('estornar_adiantamento_fornecedor','Corrige um registro de adiantamento feito por engano.',advanceVoidSchema.omit({action:true}),
+  (db,data,actor)=>runSupplierAdvance(db,{...data,action:'void'},actor));
 export const financeTools=[...tools.values()].map(t=>t.descriptor);
 export function hasFinanceTool(name:string) {return tools.has(name);}
 export async function invokeFinanceTool(identity:DotIdentity,name:string,args:unknown) {

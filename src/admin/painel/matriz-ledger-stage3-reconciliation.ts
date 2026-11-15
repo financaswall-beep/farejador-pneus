@@ -41,7 +41,8 @@ async function backfillPurchases(
             SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=p.environment AND t.source_id=p.id::text
                AND t.source_type='commerce.wholesale_purchase.accrual'
-               AND t.transaction_kind='purchase_payable')
+               AND t.transaction_kind='purchase_payable'
+               AND finance.matriz_ledger_obligation_balance(t.environment,t.id)>0)
             AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=p.environment AND t.source_id=p.id::text
                AND t.source_type='commerce.wholesale_purchase.payment'))
@@ -76,8 +77,8 @@ async function backfillPurchases(
   );
   for (const row of rows.rows) {
     const state = await getWholesalePurchaseLedgerState(client, environment, row.id);
-    const original = await client.query<{ transaction_kind: string; in_transit: boolean }>(
-      `SELECT t.transaction_kind,EXISTS (
+    const original = await client.query<{ transaction_kind: string; in_transit: boolean; open_balance: string }>(
+      `SELECT t.transaction_kind,finance.matriz_ledger_obligation_balance(t.environment,t.id) open_balance,EXISTS (
           SELECT 1 FROM finance.matriz_ledger_entries e
            WHERE e.transaction_id=t.id AND e.account_code='inventory_in_transit'
         ) in_transit
@@ -93,9 +94,9 @@ async function backfillPurchases(
       );
     }
     if (state.paymentStatus === 'paid'
-      && original.rows[0]?.transaction_kind === 'purchase_payable') {
+      && original.rows[0]?.transaction_kind === 'purchase_payable' && Number(original.rows[0].open_balance)>0) {
       await postWholesalePurchasePayment(
-        client, state, state.paidAt ?? state.purchasedAt, 'system:stage3-backfill',
+        client, {...state,totalAmount:original.rows[0].open_balance}, state.paidAt ?? state.purchasedAt, 'system:stage3-backfill',
       );
     }
     if (row.status === 'cancelled' && row.cancelled_at) {

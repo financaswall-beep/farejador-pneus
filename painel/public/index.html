@@ -152,7 +152,8 @@
 <script src="/admin/painel/app.estoque.transferencias.js?v=20261109-transfer1"></script>
 <script src="/admin/painel/app.compras.js?v=20261113-share"></script>
 <script src="/admin/painel/purchase-price-utils.js?v=20260918-prices1"></script>
-<script src="/admin/painel/app.compras.relatorios.js?v=20261101-viagens1"></script>
+<script src="/admin/painel/app.compras.fornecedor.js?v=20261115"></script>
+<script src="/admin/painel/app.compras.relatorios.js?v=20261115-fornecedores"></script>
 <script src="/admin/painel/app.compras.precos.js?v=20260918-prices1"></script>
 <script src="/admin/painel/app.compras.reposicao.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.compras.reposicao.pdf.js?v=20260825-replenishment3"></script>
@@ -314,7 +315,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261111-entradas1"></script>
+<script src="/admin/painel/app.montagem.js?v=20261115-fornecedores"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -348,6 +349,7 @@
 <link rel="stylesheet" href="/admin/painel/vendas-lotes.css?v=20260915-lotsale1">
 <link rel="stylesheet" href="/admin/painel/estoque-custos.css?v=20260915-cost1">
 <link rel="stylesheet" href="/admin/painel/estoque-lotes.css?v=20261109-transfer1">
+<link rel="stylesheet" href="/admin/painel/fornecedor-financeiro.css?v=20261115">
 <link rel="stylesheet" href="/admin/painel/financeiro-visao.css?v=20261111-entradas1">
 <link rel="stylesheet" href="/admin/painel/caixa-chat.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/caixa-chat-customer.css?v=20261019-chat1" />
@@ -3341,8 +3343,8 @@
       </div>
     </div>
 
-    <div x-show="currentPage === 'compras' && isMatrixPanel()" x-effect="if(currentPage === 'compras') viagensEnsure()" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
-      <section x-show="comprasTab !== 'lote'" aria-labelledby="compras-heading"
+    <div x-show="currentPage === 'compras' && isMatrixPanel()" x-effect="if(currentPage === 'compras') viagensEnsure()" :class="{'sf-workspace':comprasTab==='fornecedores'}" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+      <section x-show="comprasTab !== 'lote' && comprasTab !== 'fornecedores'" aria-labelledby="compras-heading"
                class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
         <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
           <h1 id="compras-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Compras</h1>
@@ -3367,6 +3369,7 @@
         </div>
       </section>
 
+      <header x-show="comprasTab==='fornecedores'" x-cloak class="sf-head"><div><small>Matriz / Compras</small><h1 x-text="sfProfile?(sfCommercial().name||'Ficha do fornecedor'):'Fornecedores'"></h1><p x-text="sfProfile?'Ficha do fornecedor':'Consulte as compras e os saldos de cada fornecedor.'"></p></div><button x-show="sfProfile" @click="sfBack()">← Voltar aos fornecedores</button></header>
       <div x-show="comprasTab !== 'lote'" class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
         <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
           <nav aria-label="Seções de Compras" class="flex items-center gap-1 overflow-x-auto">
@@ -3751,7 +3754,63 @@
       </div>
 
       <!-- FORNECEDORES: compromisso comercial inclui mercadoria em trânsito; preço usa só recebidas. -->
-      <div x-show="comprasTab === 'fornecedores'" x-cloak class="space-y-5">
+      <div x-show="comprasTab === 'fornecedores'" x-cloak class="sf-area space-y-5">
+        <p role="alert" class="sf-alert" x-show="sfError"><span x-text="sfError"></span> <button type="button" @click="sfLoadSummary();sfRefresh()">Atualizar</button></p>
+        <p role="status" x-show="sfNotice" x-text="sfNotice"></p>
+        <label x-show="sfReceiptTarget" class="sf-link">Anexar comprovante pendente<input type="file" accept="image/jpeg,image/png,image/webp" @change="sfReceipt(sfReceiptTarget,$event.target.files[0])"></label>
+        <div class="sf-metrics" x-show="sfCanRead()" aria-label="Saldos de fornecedores">
+  <article><span>A pagar</span><i data-lucide="receipt"></i><strong x-text="sfTotal('payable')"></strong><small>Saldo das compras em aberto</small></article>
+  <article class="sf-feature"><span>Adiantamentos disponíveis</span><i data-lucide="wallet"></i><strong x-text="sfTotal('available')"></strong><small>Crédito para usar em compras</small></article>
+  <article><span>A recuperar</span><i data-lucide="undo-2"></i><strong x-text="sfTotal('recoverable')"></strong><small>Devoluções ou ajustes de compras</small></article>
+</div>
+        <template x-if="sfProfile"><div class="sf-profile">
+  <nav class="sf-tabs" aria-label="Ficha do fornecedor"><template x-for="tab in (sfCanRead()?['Resumo','Compras','Financeiro','Medidas e preços','Cadastro']:['Resumo','Compras','Medidas e preços','Cadastro'])" :key="tab"><button type="button" :aria-pressed="sfTab===tab" @click="sfTab=tab" x-text="tab"></button></template></nav>
+  <section x-show="sfTab==='Resumo'" class="sf-card"><h3>Resumo do fornecedor</h3><p x-text="sfCommercial().name"></p><p x-text="(sfCommercial().pending_receipts??0)+' compras em trânsito'"></p><p x-text="'Total comprometido · '+sfMoney(sfCommercial().total_spent||0)"></p></section>
+  <section x-show="sfTab==='Cadastro'" class="sf-card"><h3>Cadastro do fornecedor</h3><dl><template x-for="item in [['Nome',sfCommercial().name],['Telefone',sfCommercial().phone],['Documento',sfCommercial().document],['Observações',sfCommercial().notes]]"><div><dt x-text="item[0]"></dt><dd x-text="item[1]||'—'"></dd></div></template></dl><button type="button" x-show="adminUser?.role==='owner' && !sfCommercial().archived && sfCommercial().supplier_id" @click="fornecedorOpenArchive(sfCommercial())">Arquivar fornecedor</button></section>
+  <section x-show="sfTab==='Medidas e preços'" class="sf-card"><h3>Medidas recebidas</h3><template x-for="m in sfCommercial().measures||[]"><p x-text="m.measure+' · '+m.qty_total+' un.'"></p></template><button type="button" @click="comprasPriceFilters.supplierId=sfProfile;comprasOpenTab('precos')">Ver preços por medida</button></section>
+  <section x-show="sfTab==='Compras'" class="sf-card"><h3>Compras do fornecedor</h3><button type="button" @click="comprasSupplierHistory({supplier_id:sfProfile})">Abrir histórico completo</button>
+  <template x-for="p in sfDetail?.purchases||[]" :key="p.id"><p x-text="p.purchased_at.slice(0,10).split('-').reverse().join('/')+' · '+sfMoney(p.total_amount)+' · '+({pending:'Em trânsito',confirmed:'Recebida',cancelled:'Cancelada'}[p.status])"></p></template></section>
+  <div x-show="sfTab==='Financeiro'"><p x-show="sfLoading" role="status">Carregando o financeiro…</p>
+  <template x-if="sfDetail"><div class="sf-panels"><div class="sf-activity">
+  <section class="sf-card"><h3><i data-lucide="history"></i>Movimentos do fornecedor</h3>
+    <p x-show="!sfDetail.movements.length&&!sfDetail.cash.length">Nenhum movimento registrado.</p>
+    <template x-for="m in sfDetail.movements" :key="m.id"><div class="sf-move"><div><b x-text="m.description"></b><small x-text="m.day.split('-').reverse().join('/')+(m.reversed?' · Estornado':'')"></small></div><strong x-text="sfMoney(m.amount)"></strong>
+      <div class="sf-row-actions"><template x-for="digest in m.receipts" :key="digest"><a :href="sfReceiptUrl(m.id,digest)" target="_blank" rel="noopener">Ver comprovante</a></template>
+        <template x-if="sfWritable && adminUser?.role==='owner' && !m.reversed && m.source_type.endsWith('.issue')"><label class="sf-link">Anexar comprovante<input type="file" accept="image/jpeg,image/png,image/webp" @change="sfReceipt(m.id,$event.target.files[0]);$event.target.value=''"></label></template>
+        <button type="button" x-show="sfWritable && adminUser?.role==='owner' && !m.reversed && m.source_type.endsWith('.apply')" @click="sfBegin('restore',m)">Desfazer abatimento</button>
+        <button type="button" x-show="sfWritable && adminUser?.role==='owner' && !m.reversed && m.source_type.endsWith('.issue') && Number(sfDetail.credits.find(c=>c.id===m.id)?.available)===Number(m.amount)" @click="sfBegin('void',m)">Corrigir registro</button>
+      </div></div></template>
+    <template x-for="m in sfDetail.cash" :key="m.id"><div class="sf-move"><div><b x-text="m.description"></b><small x-text="m.day.split('-').reverse().join('/')"></small></div><strong x-text="sfMoney(m.amount)"></strong></div></template>
+    <button type="button" @click="comprasSupplierHistory({supplier_id:sfProfile})"><i data-lucide="search"></i>Localizar compra</button>
+  </section>
+  <section class="sf-card sf-payables"><h3><i data-lucide="calendar-days"></i>Parcelas em aberto</h3>
+    <p x-show="!sfDetail.payables.length">Nenhuma parcela em aberto.</p>
+    <template x-for="p in sfDetail.payables" :key="sfPurchaseKey(p)"><div class="sf-move"><div><b x-text="(p.installment_number?'Parcela '+p.installment_number:'Compra')+' · '+p.purchase_id.slice(0,8)"></b><small x-text="p.due?'Vence em '+p.due.split('-').reverse().join('/'):'Sem vencimento'"></small></div><strong x-text="sfMoney(p.balance)"></strong></div></template>
+  </section></div>
+  <section class="sf-card sf-actions" x-show="adminUser?.role==='owner' && sfWritable">
+    <div x-show="!sfForm"><h3><i data-lucide="wallet"></i>Adiantamentos</h3><button type="button" class="sf-primary" x-show="!sfDetail.supplier.archived" @click="sfBegin('issue')">Registrar adiantamento</button>
+      <button type="button" :disabled="!sfDetail.payables.length || !sfDetail.credits.some(c=>Number(c.available)>0)" @click="sfBegin('apply')">Usar adiantamento</button>
+      <button type="button" :disabled="!sfDetail.credits.some(c=>Number(c.available)>0)" @click="sfBegin('refund')">Registrar devolução recebida</button></div>
+    <template x-if="sfForm"><form @submit.prevent="sfSave()"><fieldset :disabled="sfSaving"><h3><i data-lucide="wallet"></i><span x-text="({issue:'Registrar adiantamento',apply:'Usar adiantamento',refund:'Registrar devolução recebida',restore:'Desfazer abatimento',void:'Corrigir adiantamento'})[sfForm.action]"></span></h3>
+      <template x-if="['apply','refund'].includes(sfForm.action)"><label>Adiantamento de origem<select x-model="sfForm.source" required><option value="">Escolha o crédito</option><template x-for="c in sfDetail.credits.filter(c=>Number(c.available)>0)" :key="c.id"><option :value="c.id" :selected="c.id===sfForm.source" x-text="c.day.split('-').reverse().join('/')+' · '+sfMoney(c.available)+' disponíveis · '+c.id.slice(0,8)"></option></template></select></label></template>
+      <template x-if="sfForm.action==='apply'"><label>Compra e parcela<select x-model="sfForm.purchase" required><option value="">Selecione a compra</option><template x-for="p in sfDetail.payables" :key="sfPurchaseKey(p)"><option :value="sfPurchaseKey(p)" x-text="p.purchase_id.slice(0,8)+' · '+(p.installment_number?'Parcela '+p.installment_number:'Compra')+' · '+(p.due||'Sem vencimento')+' · '+sfMoney(p.balance)"></option></template></select></label></template>
+      <div class="sf-pair"><label>Valor (R$)<input x-ref="sfAmount" x-model="sfForm.amount" inputmode="decimal" required :readonly="sfForm.action==='void'" placeholder="0,00"></label><label>Data<input x-model="sfForm.date" type="date" :max="finHoje()" required></label></div>
+      <template x-if="['issue','refund'].includes(sfForm.action)"><div class="sf-pair"><label>Forma<select x-model="sfForm.method"><option value="pix">Pix</option><option value="transferencia">Transferência</option><option value="dinheiro">Dinheiro</option></select></label><label x-text="sfForm.action==='refund'?'Conta de destino':'Conta de origem'" class="sr-only" for="sf-account"></label><label><span x-text="sfForm.action==='refund'?'Conta de destino':'Conta de origem'"></span><input id="sf-account" x-model="sfForm.account" required minlength="2"></label></div></template>
+      <label x-show="sfForm.action==='issue'">Referência bancária (opcional)<input x-model="sfForm.reference" maxlength="100"></label>
+      <label>Motivo<input x-model="sfForm.reason" minlength="3" maxlength="300" required></label>
+      <label x-show="sfForm.action==='issue'">Comprovante (opcional)<input type="file" accept="image/jpeg,image/png,image/webp" @change="sfFile=$event.target.files[0]"></label>
+      <dl><div><dt x-text="sfForm.action==='refund'?'Entrada de caixa':'Saída de caixa agora'"></dt><dd x-text="sfMoney(['issue','refund'].includes(sfForm.action)?sfNumber()||0:0)"></dd></div>
+      <div x-show="sfForm.action==='issue'"><dt>Saldo adiantado após registrar</dt><dd x-text="sfMoney(Number(sfRows.find(r=>r.id===sfProfile)?.available||0)+(sfNumber()||0))"></dd></div>
+      <div x-show="sfForm.action==='issue'"><dt>Saldo adiantado antes</dt><dd x-text="sfBalance(sfProfile,'available')"></dd></div>
+      <div x-show="['apply','refund'].includes(sfForm.action)"><dt>Disponível neste adiantamento</dt><dd x-text="sfMoney(sfAvailable())"></dd></div>
+      <div x-show="['apply','refund'].includes(sfForm.action)"><dt>Crédito após a operação</dt><dd x-text="sfMoney(Math.max(0,sfAvailable()-(sfNumber()||0)))"></dd></div>
+      <div x-show="sfForm.action==='apply'"><dt>Restante da parcela</dt><dd x-text="sfSelectedPayable()?sfMoney(Math.max(0,Number(sfSelectedPayable().balance)-(sfNumber()||0))):'—'"></dd></div></dl>
+      <template x-if="sfForm.matches.length"><div role="alert"><p>Confira os movimentos já registrados.</p><template x-for="m in sfForm.matches" :key="m.id"><button type="button" @click="sfUseExisting(m)" x-text="'Usar registro de '+m.day.split('-').reverse().join('/')+' · '+sfMoney(m.amount)+' · '+m.id.slice(0,8)"></button></template><button type="button" @click="sfForm.distinct=sfForm.matches.map(m=>m.id);sfForm.matches=[];sfError=''">É outro pagamento</button></div></template>
+      <footer><button type="button" @click="sfForm=null;sfError=''">Cancelar</button><button class="sf-primary" type="submit" :disabled="sfSaving || sfForm.matches.length || (sfForm.action==='apply' && sfNumber()>Number(sfSelectedPayable()?.balance||0)) || (['apply','refund'].includes(sfForm.action) && sfNumber()>sfAvailable())" x-text="sfSaving?'Registrando…':'Confirmar'"></button></footer>
+    </fieldset></form></template>
+  </section></div></template></div>
+</div></template>
+        <details x-show="!sfProfile"><summary>Indicadores de compras</summary>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Fornecedores ativos</p><p class="text-2xl font-semibold num" x-text="comprasSupplierCards().active"></p></div></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trophy" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Maior fornecedor</p><p class="text-lg font-semibold truncate" x-text="comprasSupplierCards().top?.name || '—'"></p><p class="text-[11px] text-gray-500" x-show="comprasSupplierCards().top" x-text="formatCurrency(Number(comprasSupplierCards().top?.total_spent || 0)) + ' comprometidos'"></p></div></div>
@@ -3759,13 +3818,15 @@
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Sem comprar há 60 dias</p><p class="text-2xl font-semibold text-amber-600 num" x-text="comprasSupplierCards().stale"></p></div></div>
         </div>
 
+        </details>
         <div x-show="comprasErrors.suppliers" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível atualizar os fornecedores. Os dados anteriores foram mantidos.</span><button @click="loadComprasSuppliers()" class="font-semibold hover:underline">Tentar novamente</button></div>
-        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
+        <div x-show="!sfProfile" class="sf-list grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
           <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div class="p-5 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"><div><h3 class="text-base font-semibold">Fornecedores</h3><p class="text-xs text-gray-500 mt-1">De quem você compra, quanto já comprometeu e quem ficou parado.</p></div><div class="flex flex-col sm:flex-row gap-2"><div class="relative"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasSupplierSearch" type="search" placeholder="Buscar fornecedor" class="w-full sm:w-64 pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div><button x-show="adminUser?.role === 'owner'" @click="fornecedorOpenCreate()" class="px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50 inline-flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Novo fornecedor</button></div></div>
-            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[850px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium">Contato</th><th class="px-4 py-3 font-medium text-center">Compras</th><th class="px-4 py-3 font-medium text-right">Total comprometido</th><th class="px-4 py-3 font-medium">Última compra</th><th class="px-4 py-3 font-medium">Situação</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+            <details x-show="sfCanRead() && sfRows.some(r=>r.archived)" class="sf-archived"><summary>Fornecedores arquivados</summary><template x-for="r in sfRows.filter(r=>r.archived)" :key="r.id"><button type="button" @click="sfOpen(r.id)" x-text="r.name+' · '+sfMoney(r.available)+' em adiantamentos'"></button></template></details>
+            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[850px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium">Contato</th><th class="px-4 py-3 font-medium text-center">Compras</th><th class="px-4 py-3 font-medium text-right">Total comprometido</th><th x-show="sfCanRead()" class="px-4 py-3 text-right">A pagar</th><th class="px-4 py-3 font-medium">Última compra</th><th class="px-4 py-3 font-medium">Situação</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
               <tbody class="divide-y divide-gray-100">
-                <template x-for="s in comprasSupplierRows()" :key="s.supplier_id"><tr @click="comprasSupplierSelect(s)" class="cursor-pointer hover:bg-gray-50" :class="comprasSupplierSelectedId === s.supplier_id ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-100' : ''"><td class="px-5 py-3 font-medium" x-text="s.name"></td><td class="px-4 py-3 text-gray-500" x-text="s.phone || '—'"></td><td class="px-4 py-3 text-center num"><span x-text="s.purchases_count"></span><span x-show="Number(s.pending_receipts)>0" class="ml-1 text-[10px] text-amber-600" x-text="'+'+s.pending_receipts+' em trânsito'"></span></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(s.total_spent || 0))"></td><td class="px-4 py-3 text-gray-500" x-text="fornecedorLastPurchase(s)"></td><td class="px-4 py-3"><span class="inline-flex text-xs px-2.5 py-1 rounded-full" :class="fornecedorStatus(s).cls" x-text="fornecedorStatus(s).label"></span></td><td class="px-5 py-3 text-right"><button @click.stop="comprasSupplierSelect(s)" class="p-2 rounded-lg hover:bg-white text-gray-500" aria-label="Selecionar fornecedor"><i data-lucide="chevron-right" class="w-4 h-4"></i></button></td></tr></template>
+                <template x-for="s in comprasSupplierRows()" :key="s.supplier_id"><tr @click="comprasSupplierSelect(s)" class="cursor-pointer hover:bg-gray-50" :class="comprasSupplierSelectedId === s.supplier_id ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-100' : ''"><td class="px-5 py-3 font-medium" x-text="s.name"></td><td class="px-4 py-3 text-gray-500" x-text="s.phone || '—'"></td><td class="px-4 py-3 text-center num"><span x-text="s.purchases_count"></span><span x-show="Number(s.pending_receipts)>0" class="ml-1 text-[10px] text-amber-600" x-text="'+'+s.pending_receipts+' em trânsito'"></span></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(s.total_spent || 0))"></td><td x-show="sfCanRead()" class="px-4 py-3 text-right" x-text="sfBalance(s.supplier_id,'payable')"></td><td class="px-4 py-3 text-gray-500" x-text="fornecedorLastPurchase(s)"></td><td class="px-4 py-3"><span class="inline-flex text-xs px-2.5 py-1 rounded-full" :class="fornecedorStatus(s).cls" x-text="fornecedorStatus(s).label"></span></td><td class="px-5 py-3 text-right"><button @click.stop="comprasSupplierSelect(s)" class="p-2 rounded-lg hover:bg-white text-gray-500" aria-label="Selecionar fornecedor"><i data-lucide="chevron-right" class="w-4 h-4"></i></button></td></tr></template>
                 <tr x-show="comprasLoading.suppliers"><td colspan="7" class="px-5 py-12 text-center text-gray-500">Carregando fornecedores…</td></tr>
                 <tr x-show="!comprasLoading.suppliers && comprasSupplierRows().length === 0"><td colspan="7" class="px-5 py-12 text-center text-gray-500">Nenhum fornecedor encontrado.</td></tr>
               </tbody>
@@ -3779,6 +3840,10 @@
               <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between gap-4"><dt class="text-gray-500">Telefone</dt><dd class="font-medium text-right" x-text="comprasSupplierSelected().phone || '—'"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Documento</dt><dd class="font-medium text-right" x-text="comprasSupplierSelected().document || '—'"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Em trânsito</dt><dd class="font-medium text-right text-amber-700" x-text="comprasSupplierSelected().pending_receipts"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Títulos abertos</dt><dd class="font-medium text-right text-amber-700" x-text="comprasSupplierSelected().open_payments"></dd></div></dl>
               <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-3 gap-3"><div><p class="text-lg font-semibold num" x-text="comprasSupplierSelected().purchases_count"></p><p class="text-[11px] text-gray-500">compras</p></div><div><p class="text-lg font-semibold num" x-text="formatCurrency(Number(comprasSupplierSelected().total_spent || 0))"></p><p class="text-[11px] text-gray-500">comprometido</p></div><div><p class="text-sm font-semibold" x-text="fornecedorLastPurchase(comprasSupplierSelected())"></p><p class="text-[11px] text-gray-500">última compra</p></div></div>
               <div class="mt-5 pt-5 border-t border-gray-100"><p class="text-sm font-semibold mb-2">Medidas mais recebidas</p><div class="space-y-1.5"><template x-for="m in (comprasSupplierSelected().measures || []).slice(0, 4)" :key="m.measure"><div class="flex items-center justify-between text-sm"><span x-text="m.measure"></span><span class="text-gray-500 num" x-text="m.qty_total + ' un'"></span></div></template><p x-show="!(comprasSupplierSelected().measures || []).length" class="text-xs text-gray-500">Nenhuma mercadoria recebida ainda.</p></div></div>
+              <div x-show="sfCanRead()" class="sf-balance">A pagar <b x-text="sfBalance(comprasSupplierSelectedId,'payable')"></b></div>
+              <div x-show="sfCanRead()" class="sf-balance">A recuperar <b x-text="sfBalance(comprasSupplierSelectedId,'recoverable')"></b></div>
+              <div x-show="sfCanRead()" class="sf-balance">Adiantamento disponível <b x-text="sfBalance(comprasSupplierSelectedId,'available')"></b></div>
+              <button type="button" class="sf-primary" @click="sfOpen(comprasSupplierSelectedId)">Abrir ficha do fornecedor</button>
               <button @click="comprasSupplierHistory(comprasSupplierSelected())" class="mt-5 w-full px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Ver histórico</button>
               <button x-show="adminUser?.role === 'owner'" @click="fornecedorOpenArchive(comprasSupplierSelected())" class="mt-2 w-full px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg">Arquivar fornecedor</button>
             </div></template>
@@ -5872,16 +5937,19 @@
         </form>
       </dialog>
       <div x-show="finRetirada.open" x-cloak class="fv-dialog-backdrop" @click.self="finRetiradaFechar()" @keydown.escape.window="finRetiradaFechar()">
-        <section class="fv-dialog" role="dialog" aria-modal="true" aria-labelledby="fv-withdrawal-title" @keydown="finRetiradaTeclado($event)">
+        <section class="fv-dialog sf-withdrawal" role="dialog" aria-modal="true" aria-labelledby="fv-withdrawal-title" @keydown="finRetiradaTeclado($event)">
           <div class="fv-card-head"><h2 id="fv-withdrawal-title" x-text="finRetirada.row ? 'Estornar retirada' : 'Retirada do dono'"></h2><button type="button" @click="finRetiradaFechar()" :disabled="finRetirada.saving" aria-label="Fechar"><i data-lucide="x"></i></button></div>
           <p x-text="finRetirada.row ? 'Corrija um registro de retirada feito por engano. O estorno devolve o valor ao caixa e mantém o histórico.' : 'Registre o dinheiro retirado para uso pessoal. Diminui o caixa sem reduzir o resultado do mês.'"></p>
           <div x-show="!finRetirada.row" class="fv-notice">Para salário do dono (pró-labore) ou contas da loja, use Despesas.</div>
-          <form @submit.prevent="finRetiradaSalvar()"><label x-show="!finRetirada.row">Valor retirado (R$)<input x-ref="finRetiradaFirst" x-model="finRetirada.amount" inputmode="decimal" placeholder="0,00" :required="!finRetirada.row" :disabled="finRetirada.saving"></label>
+          <form @submit.prevent="finRetiradaSalvar()"><div class="sf-withdraw-fields"><label x-show="!finRetirada.row">Valor retirado (R$)<input x-ref="finRetiradaFirst" x-model="finRetirada.amount" inputmode="decimal" placeholder="0,00" :required="!finRetirada.row" :disabled="finRetirada.saving"></label>
             <p x-show="finRetirada.row" x-text="'Valor do estorno: '+formatCurrency(Number(finRetirada.row?.amount || 0))"></p>
             <label>Data<input type="date" x-model="finRetirada.date" :max="finHoje()" :min="finRetirada.row?.cash_on || null" required :disabled="finRetirada.saving"></label>
             <div x-show="!finRetirada.row"><label>Como retirou?<select x-model="finRetirada.payment_method" :disabled="finRetirada.saving"><option value="dinheiro">Dinheiro</option><option value="pix">Pix</option><option value="transferencia">Transferência</option></select></label><label>De onde saiu o dinheiro?<input x-model="finRetirada.cash_account" maxlength="80" :required="!finRetirada.row" :disabled="finRetirada.saving" placeholder="Ex.: Caixa principal ou conta da empresa"></label></div>
             <label for="fv-withdrawal-reason" x-text="finRetirada.row ? 'Motivo do estorno' : 'Motivo da retirada'"></label><textarea id="fv-withdrawal-reason" x-ref="finRetiradaReason" x-model="finRetirada.reason" aria-label="Motivo" minlength="3" maxlength="400" rows="2" required :disabled="finRetirada.saving"></textarea>
             <p x-show="finRetirada.error" x-text="finRetirada.error" class="fv-notice alert" role="alert"></p>
+            </div><aside class="sf-receipt"><i data-lucide="wallet"></i><h3>Resumo da movimentação</h3>
+            <div class="sf-balance"><span x-text="finRetirada.row?'Volta ao caixa':'Sai do caixa'"></span><strong x-text="formatCurrency(finRetirada.row?Number(finRetirada.row.amount):finParseValor(finRetirada.amount)||0)"></strong></div>
+            <div class="sf-balance"><span>Efeito no resultado da loja</span><strong x-text="formatCurrency(0)"></strong></div></aside>
             <div class="fv-actions"><button type="button" class="fv-button" @click="finRetiradaFechar()" :disabled="finRetirada.saving">Cancelar</button><button type="submit" class="fv-button fv-primary" :disabled="finRetirada.saving" x-text="finRetirada.saving ? 'Registrando…' : finRetirada.row ? 'Confirmar estorno' : 'Registrar retirada'"></button></div>
           </form>
         </section>

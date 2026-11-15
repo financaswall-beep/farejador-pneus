@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { postMatrizLedgerTransaction } from './matriz-ledger-posting.js';
@@ -15,6 +15,10 @@ export async function createOwnerWithdrawal(
 ) {
   const client = await dbPool.connect();
   try {
+    return await createOwnerWithdrawalOnClient(client,input,actor,environment);
+  } finally { client.release(); }
+}
+export async function createOwnerWithdrawalOnClient(client:PoolClient,input:OwnerWithdrawalInput,actor:string,environment=env.FAREJADOR_ENV){
     const id = await postMatrizLedgerTransaction(client, {
       environment, sourceType: 'finance.owner_withdrawal',
       sourceId: input.idempotency_key, kind: 'owner_withdrawal', amount: input.amount,
@@ -27,13 +31,12 @@ export async function createOwnerWithdrawal(
       metadata: { reason: input.reason, payment_method: input.payment_method, cash_account: input.cash_account },
     });
     return { id };
-  } finally { client.release(); }
 }
 
 /** Corrige uma retirada, mantendo original e estorno no histórico. */
 export async function reverseOwnerWithdrawal(
   id: string, input: { reason: string; occurred_at: string; idempotency_key: string },
-  actor: string, environment = env.FAREJADOR_ENV, dbPool: Pool = defaultPool,
+  actor: string, environment = env.FAREJADOR_ENV, dbPool: Pick<Pool,'query'> = defaultPool,
 ) {
   const result = await dbPool.query<{ id: string }>(
     `SELECT finance.reverse_matriz_ledger_transaction(

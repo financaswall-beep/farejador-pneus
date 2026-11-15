@@ -12,6 +12,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
       const tasks = [
         this.loadComprasOverview(), this.loadComprasHistory(),
         this.loadComprasSuppliers(), this.loadComprasPrices(),];
+      if (this.comprasTab === 'fornecedores') tasks.push(this.sfLoadSummary?.());
       if (this.viagensLoaded) tasks.push(this.viagensLoad());
       const base = await Promise.allSettled(baseJobs.map(([, request]) => request));
       base.forEach((result, index) => {
@@ -121,9 +122,11 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.compr
         this.compraMsg = { ok: false, text: 'Este perfil acompanha Compras somente para leitura.' };
         return;
       }
+      if (this.sfSaving) return;
+      if (tab !== 'fornecedores' && this.sfProfile) this.sfBack();
       this.comprasTab = tab;
       if (tab === 'historico') void this.loadComprasHistory();
-      if (tab === 'fornecedores') void this.loadComprasSuppliers();
+      if (tab === 'fornecedores') { void this.loadComprasSuppliers(); void this.sfLoadSummary?.(); }
       if (tab === 'precos') void this.loadComprasPrices();
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },

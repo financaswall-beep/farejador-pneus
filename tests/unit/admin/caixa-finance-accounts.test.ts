@@ -7,7 +7,7 @@ vi.mock('../../../src/admin/painel/finance-settlement-service.js', async importO
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test' } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 import { registerCaixaFinanceAccountsRoutes } from '../../../src/admin/caixa/route-finance-accounts.js';
-const payment = { settlement_mode: 'wholesale_purchase', target_id: 'purchase:1',
+const payment = { settlement_mode: 'wholesale_purchase', target_id: '22222222-2222-4222-8222-222222222222:1',
   obligation_id: '11111111-1111-4111-8111-111111111111', amount: 80,
   paid_at: '2026-01-01T15:00:00Z', payment_method: 'pix', cash_account: 'Caixa principal', idempotency_key: 'app-account-test-1' };
 async function appFor(role = 'owner', authenticated = true, allowed = true) {
@@ -29,7 +29,7 @@ describe('baixa de contas do app pelo serviço web', () => {
       const app = await appFor(role, authenticated, allowed); const res = await app.inject({ method: 'POST', url: '/api/caixa/financeiro-contas/baixar', payload: payment });
       expect(res.statusCode).toBe(status); expect(settle).not.toHaveBeenCalled(); await app.close();
     });
-  it.each([{ amount: 1.005 }, { amount: -1 }, { obligation_id: undefined }, { payment_method: '' },
+  it.each([{ target_id: 'purchase:1' }, { amount: 1.005 }, { amount: -1 }, { obligation_id: undefined }, { payment_method: '' },
     { paid_at: '2199-12-31T12:00:00Z' }, { settlement_mode: 'expense', amount: 5 }])('recusa baixa inválida %j', async changes => {
     const app = await appFor(); const res = await app.inject({ method: 'POST', url: '/api/caixa/financeiro-contas/baixar', payload: { ...payment, ...changes } });
     expect(res.statusCode).toBe(400); expect(settle).not.toHaveBeenCalled(); await app.close();

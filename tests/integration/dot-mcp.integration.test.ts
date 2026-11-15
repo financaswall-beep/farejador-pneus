@@ -36,6 +36,7 @@ beforeAll(async () => {
   const { registerDotRoutes } = await import('../../src/admin/dot/route.js');
   app = Fastify({ trustProxy: true });
   await registerDotRoutes(app);
+  (await import('../../src/admin/painel/route-supplier-advances.js')).registerSupplierAdvances(app);
   await app.ready();
 }, 240_000);
 
@@ -169,9 +170,10 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(51);
+  expect(listing.result.tools).toHaveLength(59);
   const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
-    'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem'];
+    'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
+    'usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
@@ -493,7 +495,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(51);
+    expect((await client.listTools()).tools).toHaveLength(59);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -624,4 +626,30 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await confirmInChat(partial.proposta)).result.isError).toBe(true);
   expect(await date()).toBe('2098-06-10');
   await enable(false);
+});
+
+it('reconhece o mesmo Pix no painel e na Milly e permite retirar dinheiro do dono',async()=>{
+  const {call}=await ownerFinanceMcp();
+  const supplier=(await db.pool.query("INSERT INTO commerce.wholesale_suppliers(environment,name) VALUES('test','Fornecedor referência Pix') RETURNING id")).rows[0].id;
+  const body={supplier_id:supplier,occurred_at:'2026-10-15T15:00:00Z',amount:500,payment_method:'pix',cash_account:'Conta de teste',
+    bank_reference:'E-TEST-'+randomUUID(),reason:'Reserva de pneus',idempotency_key:randomUUID()};
+  const endpoint='/admin/api/matriz/financeiro/fornecedores';
+  const posted=await app.inject({method:'POST',url:endpoint+'/movimentos',headers:headers(),payload:{...body,action:'issue'}});
+  expect(posted.statusCode).toBe(201);
+  const credit=await call('registrar_adiantamento_fornecedor',{...body,idempotency_key:randomUUID()});
+  expect(credit.id).toBe(posted.json().id);
+  const detail=await call('consultar_financeiro_fornecedores',{supplier_id:supplier});
+  expect(Number(detail.credits[0].available)).toBe(500);
+  const photo=await (await import('sharp')).default({create:{width:10,height:10,channels:3,background:'green'}}).png().toBuffer();
+  const upload=await app.inject({method:'POST',url:endpoint+'/adiantamentos/'+credit.id+'/comprovantes',headers:headers(),payload:{image:photo.toString('base64')}});
+  expect(upload.statusCode).toBe(200);
+  const photoUrl=endpoint+'/adiantamentos/'+credit.id+'/comprovantes/'+upload.json().digest;
+  expect((await app.inject({url:photoUrl})).statusCode).toBe(401);
+  expect((await app.inject({url:photoUrl,headers:headers()})).headers['content-type']).toBe('image/jpeg');
+  const ambiguous=await app.inject({method:'POST',url:endpoint+'/movimentos',headers:headers(),payload:{...body,bank_reference:undefined,action:'issue',idempotency_key:randomUUID()}});
+  expect(ambiguous.statusCode).toBe(409);expect(ambiguous.json().matches[0].id).toBe(credit.id);
+  const withdrawal={amount:633.77,occurred_at:body.occurred_at,payment_method:'pix',cash_account:'Conta de teste',reason:'Uso pessoal',idempotency_key:randomUUID()};
+  const owner=await call('registrar_retirada_do_dono',withdrawal);
+  expect(await call('registrar_retirada_do_dono',withdrawal)).toEqual(owner);
+  expect((await call('estornar_retirada_do_dono',{withdrawal_id:owner.id,reason:'Teste de estorno',occurred_at:body.occurred_at,idempotency_key:randomUUID()})).id).toBeTruthy();
 });

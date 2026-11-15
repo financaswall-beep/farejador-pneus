@@ -1,3 +1,4 @@
+import { restorePurchaseCredits } from './supplier-advance-ledger.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -152,6 +153,11 @@ export async function cancelWholesalePurchase(
       ? current.rows[0].purchase_kind === 'lot'
         ? [await reverseLotPurchaseStock(client, environment, input.purchase_id, input.cancelled_by)]
         : await reversePurchaseStock(client, environment, input.purchase_id) : [];
+    if (env.MATRIZ_CENTRAL_LEDGER) {
+      await restorePurchaseCredits(client, environment, input.purchase_id, input.cancelled_by, reason);
+      // Valida as reversões de baixas antes do estorno da obrigação na mesma transação.
+      await client.query('SET CONSTRAINTS finance.matriz_ledger_payment_integrity IMMEDIATE');
+    }
     const updated = await client.query<{ cancelled_at: string }>(
       `UPDATE commerce.wholesale_purchases
           SET status='cancelled',cancelled_at=now(),cancelled_by=$3,cancel_reason=$4

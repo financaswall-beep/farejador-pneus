@@ -1,3 +1,4 @@
+import { purchaseSchedule } from './purchase-installment-balances.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -19,6 +20,7 @@ export type MatrizLedgerSettlementInput = Target & {
   amount?: number;
   sale_installment?: { order_id: string; number: number };
   purchase_installment?: number;
+  purchase_id?: string;
   payment_method?: string;
   paid_at?: string;
   cash_account?: string;
@@ -64,7 +66,17 @@ async function settleObligation(
   const part = target && obligation.sale_plan?.installments.find(row => row.number === target.number);
   if (target && (!part || target.order_id !== obligation.source_id || part.balance <= 0))
     throw new Error('sale_installment_changed');
-  const amount = requestedAmount(input.amount, part ? part.balance : balance);
+  if (input.purchase_id && (obligation.source_type !== 'commerce.wholesale_purchase.accrual'
+      || obligation.source_id !== input.purchase_id)) throw new Error('settlement_target_invalid');
+  let available = part ? part.balance : balance;
+  if (input.purchase_installment !== undefined) {
+    if (obligation.source_type !== 'commerce.wholesale_purchase.accrual') throw new Error('settlement_target_invalid');
+    const schedule = await purchaseSchedule(client, operation.environment, obligation.source_id);
+    const selected = schedule.find(row => row.installment_number === input.purchase_installment);
+    if (!selected || Number(selected.balance) <= 0) throw new Error('settlement_target_invalid');
+    available = Math.min(balance,Number(selected.balance));
+  }
+  const amount = requestedAmount(input.amount, available);
   const amountCents = moneyCents(amount);
   const remainingCents = balanceCents - amountCents;
   const remaining = (remainingCents / 100).toFixed(2);
@@ -232,6 +244,7 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({
       ...(input.sale_installment ? { sale_installment: input.sale_installment } : {}),
+      ...(input.purchase_id ? {purchase_id:input.purchase_id} : {}),
       ...(input.purchase_installment ? { purchase_installment: input.purchase_installment } : {}),
       target, amount_cents: input.amount === undefined ? null : moneyCents(input.amount),
       payment_method: input.payment_method?.trim().toLowerCase() ?? null,

@@ -56,7 +56,7 @@ export const settleFinanceItemSchema = z.object({
       message: 'settlement_target_invalid',
     });
   }
-  if (body.settlement_mode === 'wholesale_sale' && body.target_id.includes(':')
+  if (['wholesale_sale','wholesale_purchase'].includes(body.settlement_mode) && body.target_id.includes(':')
       && !/^[0-9a-f-]{36}:[1-9]\d{0,2}$/i.test(body.target_id)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['target_id'], message: 'settlement_target_invalid' });
   }
@@ -86,6 +86,8 @@ export async function settleFinanceItem(data: z.infer<typeof settleFinanceItemSc
       : { obligation_id: data.obligation_id! };
     result = await settleMatrizLedgerOpenItem({
       ...target, amount: data.amount, ...details,
+      ...(data.settlement_mode === 'wholesale_purchase' ? { purchase_id: data.target_id.split(':')[0],
+        purchase_installment: data.target_id.includes(':') ? Number(data.target_id.split(':')[1]) : undefined } : {}),
       ...(data.settlement_mode === 'wholesale_sale' && data.target_id.includes(':')
         ? { sale_installment: { order_id: data.target_id.split(':')[0]!,
           number: Number(data.target_id.split(':')[1]) } } : {}),

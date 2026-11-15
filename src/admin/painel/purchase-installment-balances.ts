@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 // A compra externa tem o alias p. Baixas antigas sem número mantêm a ordem original.
 // Uma devolução parcial de mercadoria pode reduzir ou retirar parcelas do cronograma.
 export const purchaseInstallmentBalancesSql = `
@@ -24,3 +25,11 @@ export const purchaseInstallmentBalancesSql = `
   SELECT installment_number,due_date,amount,
     GREATEST(0,LEAST(amount-applied,sum(amount-applied) OVER (ORDER BY installment_number)-unassigned.paid)) balance
   FROM parts CROSS JOIN unassigned`;
+
+export async function purchaseSchedule(client: PoolClient, environment: string, purchaseId: string) {
+  return (await client.query<{installment_number:number; due_date:string; amount:string; balance:string}>(
+    `SELECT s.installment_number,s.due_date::text,s.amount::text,s.balance::text
+     FROM commerce.wholesale_purchases p CROSS JOIN LATERAL (${purchaseInstallmentBalancesSql}) s
+     WHERE p.environment=$1 AND p.id=$2 ORDER BY s.installment_number`, [environment,purchaseId],
+  )).rows;
+}
