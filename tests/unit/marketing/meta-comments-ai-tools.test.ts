@@ -14,6 +14,15 @@ const call = (name = 'consultar_pneu', args: unknown = {medida:'130 70 13',marca
   ({type:'function_call',name,arguments:JSON.stringify(args),call_id:id,id:`fc_${id}`,status:'completed'});
 
 describe('comentários com ferramentas comerciais', () => {
+  it('entrega ao atendente o comentário e a legenda com a posição de cada foto', async () => {
+    const caption = 'Comente a foto.\n\nFoto 1: 90/90-12 · Meia-vida\nFoto 2: 175/65R14 · Novo';
+    const request = vi.fn().mockResolvedValue(response([message(reply('Vou conferir.'))]));
+    await decideComment('Quero o da foto 2', caption, request, {platform:'instagram',lookup:vi.fn()});
+    const input = JSON.parse(request.mock.calls[0]![0]).input;
+    const context = JSON.parse(input.find((item:{role:string})=>item.role==='user').content);
+    expect(context).toMatchObject({publication:caption,comment:'Quero o da foto 2',consultas_disponiveis:true});
+    expect(input[0].content).toContain('pergunte qual foto ou medida');
+  });
   it('consulta antes da resposta, preserva reasoning e mede todas as rodadas', async () => {
     const reasoning = {type:'reasoning',id:'rs_1',summary:[],encrypted_content:'encrypted-test'};
     const tool = call();

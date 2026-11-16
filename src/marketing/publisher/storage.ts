@@ -35,7 +35,7 @@ export class PublisherStorage {
   }
 
   private async request(path: string, method = 'GET', body?: string | Uint8Array | Readable,
-    headers: Record<string, string> = {}, objectLookup = false): Promise<Response> {
+    headers: Record<string, string> = {}, objectLookup = false, timeoutMs = 30_000): Promise<Response> {
     let response: Response;
     try {
       response = await this.fetcher(`${this.base()}${path}`, {
@@ -44,7 +44,7 @@ export class PublisherStorage {
           Authorization: `Bearer ${env.SUPABASE_STORAGE_SERVICE_KEY}`,
           apikey: env.SUPABASE_STORAGE_SERVICE_KEY!, 'Content-Type': 'application/json', ...headers,
         },
-        ...(body ? { body: body as FetchBody } : {}), signal: AbortSignal.timeout(30_000),
+        ...(body ? { body: body as FetchBody } : {}), signal: AbortSignal.timeout(timeoutMs),
         ...(body instanceof Readable ? { duplex: 'half' as const } : {}),
       });
     } catch {
@@ -206,7 +206,7 @@ export class PublisherStorage {
     const stream = createReadStream(file, { highWaterMark: 256 * 1024 });
     try {
       const response = await this.request(`/object/${target}`, 'POST', stream,
-        { 'Content-Type': mime, 'Content-Length': String(bytes), 'x-upsert': 'true' });
+        { 'Content-Type': mime, 'Content-Length': String(bytes), 'x-upsert': 'true' }, false, 180_000);
       await response.body?.cancel();
     } finally { stream.destroy(); }
   }

@@ -80,6 +80,22 @@
             if (!enabled || chat) permissionButton('Confirmar vencimentos só no painel', true, false);
             if (enabled) permissionButton('Desativar alteração de vencimento', false, false);
           }
+          if (typeof row.publisher_enabled === 'boolean') {
+            const publish = document.createElement('button');
+            publish.type = 'button';
+            publish.textContent = row.publisher_enabled ? 'Desativar publicações da Milly' : 'Permitir preparar, publicar e agendar posts';
+            publish.onclick = async () => {
+              publish.disabled = true;
+              try {
+                await api('/admin/api/dot/connections/' + encodeURIComponent(row.id) + '/publisher', {
+                  method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!row.publisher_enabled}),
+                });
+                message.textContent = '';
+                await loadConnections();
+              } catch(error) { message.textContent = error.message; publish.disabled = false; }
+            };
+            box.append(publish);
+          }
           if (typeof row.finance_operations_enabled === 'boolean') {
             const finance = document.createElement('button');
             finance.type = 'button';

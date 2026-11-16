@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { publisherTransaction, type PublisherDatabase } from './transaction.js';
 import { accountId, PublisherError, type Draft, type Environment, type Destination } from './model.js';
 import { postMediaIdsSql, validatePostMedia } from './post-photos.js';
 
@@ -21,10 +22,8 @@ export async function publisherEvent(client: PoolClient, environment: Environmen
   await client.query(`INSERT INTO ops.publisher_events(environment,post_id,event,actor,payload)
     VALUES($1,$2,$3,$4,$5)`, [environment, postId, event, actor, JSON.stringify(payload)]);
 }
-export async function saveDraft(pool: Pool, environment: Environment, id: string, data: Draft, actor: string) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+export async function saveDraft(pool: PublisherDatabase, environment: Environment, id: string, data: Draft, actor: string) {
+  return publisherTransaction(pool, async client => {
     const prior = (await client.query<Post>(
       `SELECT p.*, ${postMediaIdsSql} media_ids FROM ops.publisher_posts p WHERE p.environment=$1 AND p.id=$2 FOR UPDATE OF p`, [environment, id])).rows[0];
     if ((prior && (prior.status !== 'draft' || prior.version !== data.version)) || (!prior && data.version !== 0)) {
@@ -45,27 +44,18 @@ export async function saveDraft(pool: Pool, environment: Environment, id: string
     if (ids.length > 1) await client.query(`INSERT INTO ops.publisher_post_photos(environment,post_id,position,media_id)
       SELECT $1,$2,ordinality+1,photo FROM unnest($3::uuid[]) WITH ORDINALITY AS photos(photo,ordinality)`, [environment,id,ids.slice(1)]);
     await publisherEvent(client, environment, id, 'draft_saved', actor);
-    await client.query('COMMIT');
     return { ...result.rows[0]!, media_ids: ids };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
-export async function submitPost(pool: Pool, environment: Environment, id: string, version: number,
+export async function submitPost(pool: PublisherDatabase, environment: Environment, id: string, version: number,
   scheduledAt: string | null, actor: string, now = new Date()) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  return publisherTransaction(pool, async client => {
     const post = (await client.query<Post>(
       `SELECT p.*, ${postMediaIdsSql} media_ids FROM ops.publisher_posts p WHERE p.environment=$1 AND p.id=$2 FOR UPDATE OF p`, [environment, id])).rows[0];
     if (!post) throw new PublisherError('publisher_post_not_found', 404);
     // Uma resposta perdida pode ser consultada sem repetir a mesma publicação.
     if (post.status !== 'draft') {
       if (post.version === version + 1 && ['scheduled', 'publishing', 'published', 'partial', 'failed'].includes(post.status)) {
-        await client.query('COMMIT');
         return post;
       }
       throw new PublisherError('publisher_version_conflict');
@@ -88,20 +78,12 @@ export async function submitPost(pool: Pool, environment: Environment, id: strin
     [environment, id, scheduledAt ? 'scheduled' : 'publishing', date]);
     await publisherEvent(client, environment, id, scheduledAt ? 'scheduled' : 'submitted', actor,
       { scheduled_at: date.toISOString() });
-    await client.query('COMMIT');
     return { ...updated.rows[0]!, media_ids: post.media_ids };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
-export async function postAction(pool: Pool, environment: Environment, id: string,
+export async function postAction(pool: PublisherDatabase, environment: Environment, id: string,
   action: 'cancel' | 'retry', actor: string) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  return publisherTransaction(pool, async client => {
     const post = (await client.query<Post>(
       `SELECT p.*, ${postMediaIdsSql} media_ids FROM ops.publisher_posts p WHERE p.environment=$1 AND p.id=$2 FOR UPDATE OF p`, [environment, id])).rows[0];
     if (!post) throw new PublisherError('publisher_post_not_found', 404);
@@ -109,7 +91,6 @@ export async function postAction(pool: Pool, environment: Environment, id: strin
       'SELECT status,platform FROM ops.publisher_destinations WHERE environment=$1 AND post_id=$2 FOR UPDATE', [environment, id])).rows;
     if (action === 'cancel') {
       if (post.status === 'cancelled') {
-        await client.query('COMMIT');
         return { id };
       }
       if (post.status !== 'draft' && (destinations.some(d => d.status !== 'queued') || post.status !== 'scheduled')) {
@@ -134,14 +115,8 @@ export async function postAction(pool: Pool, environment: Environment, id: strin
         WHERE environment=$1 AND id=$2`, [environment, id]);
     }
     await publisherEvent(client, environment, id, action, actor);
-    await client.query('COMMIT');
     return { id };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
 export async function listPosts(pool: Pool, environment: Environment) {
   return (await pool.query(`SELECT p.*,${postMediaIdsSql} media_ids,m.name media_name,m.kind media_kind,

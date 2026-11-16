@@ -13,6 +13,7 @@ import { env } from '../../shared/config/env.js';
 import { monitorInstructions } from './events/model.js';
 import { monitorStatus,monitorTool } from './events/status.js';
 import { dotEventsAvailable } from './events/availability.js';
+import { hasPublisherTool, invokePublisherTool, publisherTools } from './publisher-tools.js';
 import { caseTools,invokeCaseTool } from './events/internal-cases.js';
 
 const periodProperties={periodo:{type:'string',enum:['hoje','7dias','30dias','mes'],default:'hoje'},
@@ -47,7 +48,7 @@ export const dotTools:Tool[]=[...definitions.map(([name,description,properties])
   annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}]}}));
 
-export const dotServerVersion = '1.8.0';
+export const dotServerVersion = '1.9.0';
 
 export function dotInstructions() {
   return 'Para mudar um vencimento a pedido do dono, localize a parcela e prepare a proposta. O campo confirmacao informa o modo autorizado para a conexão. '
@@ -68,6 +69,8 @@ export function dotInstructions() {
       +'Use pagina para percorrer listas truncadas. Posição atual e histórico por período são distintos. '
       +'O proprietário autorizou dados pessoais, conversas, documentos, folha individual e financeiro dos parceiros. '
       +'Quando uma ferramenta específica responde à pergunta, use-a diretamente. Para conversão, medidas procuradas, faltas ou fila do bot, use consultar_bot_matriz. Use consultar_registros_matriz para detalhes completos e listar_fontes_matriz quando precisar descobrir a fonte ou seus campos. Use consultar_relatorio_painel para relatórios e consultar_anexo_matriz para arquivos. '
+      +'No publicador da 2W, importe os anexos ou consulte as mídias prontas, escreva uma legenda em português a partir dos fatos confirmados e prepare o rascunho. Para promoção de pneus, identifique medida, condição e, em um carrossel com produtos diferentes, as fotos de cada um. Convide o cliente a dizer qual foto quando houver mais de uma opção. Pergunte quando faltar a identificação. Em conteúdo institucional use pneus vazio. '
+      +'“Prepara” termina no rascunho. “Publica” ou “agenda” dado pelo dono autoriza o envio na rede e horário pedidos. Para eventos automáticos, prepare o rascunho e aguarde o pedido do dono para publicar. Se horário, redes ou post forem ambíguos, esclareça. Apresente o estado devolvido por rede e só confirme a publicação quando constar publicada. '
       +'O conector não envia mensagens a clientes nem executa pagamentos. '
       +(dotEventsAvailable()?monitorInstructions:'Acompanhamento automático indisponível ou desativado.');
 }
@@ -77,9 +80,10 @@ export function listedDotTools():Tool[] {
   const tools = env.DOT_EVENTS_ENABLED?[...dotTools,monitoring,...(dotEventsAvailable()?caseTools:[])]:dotTools;
   // O cliente pode guardar o catálogo obtido antes de o dono escolher como confirmar.
   // A chamada continua validando a permissão atual da conexão para cada operação.
-  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools];
+  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools,...publisherTools];
 }
 export async function invokeDotTool(identity:DotIdentity,name:string,args:unknown) {
+    if(hasPublisherTool(name)) return invokePublisherTool(identity,name,args);
     if(dotEventsAvailable() && caseTools.some(tool=>tool.name===name)) return invokeCaseTool(identity,name,args);
     if(hasFinanceTool(name)) return invokeFinanceTool(identity,name,args);
     if(name===confirmInstallmentTool.name || installmentTools.some(tool=>tool.name===name)) return invokeInstallmentTool(identity,name,args);

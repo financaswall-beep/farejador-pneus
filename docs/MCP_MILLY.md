@@ -31,6 +31,15 @@ Os valores e nomes a seguir são exemplos fictícios.
 | “Compara esse extrato da conta da empresa com o Farejador.” | `conferir_extrato_bancario` compara as linhas fornecidas pelo dono por conta, dia, direção e valor. Duplicidades e contas não identificadas ficam para revisão. A comparação é de leitura. |
 | “Se eu comprar 100 pneus por R$ 2.000, pagar R$ 500 de frete e aproveitar 80, quanto sai cada pneu?” | `simular_compra_de_lote` calcula R$ 25 por coletado e R$ 31,25 por aproveitável nesse exemplo. Informe gastos extras, desembolso até a data e horizonte para estimar o caixa. O preço de venda opcional estima o resultado caso venda todos os aproveitáveis. |
 
+### Publicar e agendar na 2W
+
+Em **Permissões da Milly**, habilite **Permitir preparar, publicar e agendar posts** na conexão usada para marketing. Atualize o catálogo do conector após o deploy. A permissão é independente do financeiro. O publicador usa a biblioteca, as contas Meta e as configurações de envio da Central de Publicações.
+
+- **Preparar**. Envie uma foto ou um vídeo como anexo ou escolha mídias prontas em `consultar_publicador`. A Milly chama `importar_midia_publicacao` para cada anexo, escreve a legenda e salva o rascunho com `preparar_publicacao`. Carrosséis usam até dez fotos no feed. Para vídeo, escolha Reel ou Story.
+- **Legenda de pneus**. Informe medida e condição. Em carrosséis com produtos diferentes, indique o pneu de cada foto. A legenda dos feeds e Reels leva a referência para o bot de comentários. “Quero o da foto 2” identifica a medida correspondente. Se houver dúvida o atendente pede a foto ou medida. Preço e estoque passam pela consulta comercial do bot.
+- **Publicar ou agendar**. Peça “publique este Reel no Instagram agora” ou “agende o carrossel para sexta, às 18h de Brasília”. A ferramenta `publicar_ou_agendar_post` exige o UUID, a versão do rascunho e o horário com fuso ou `null` para agora. Um evento de acompanhamento pode gerar uma sugestão. A publicação requer um pedido do dono.
+- **Alterar e acompanhar**. `reagendar_publicacao` e `cancelar_publicacao` atuam antes de o envio começar. `consultar_publicador` traz o estado e o link de cada destino quando disponível. Em caso de falha em uma das redes, consulte o mesmo post antes de decidir como prosseguir.
+
 ### Fornecedores e compras
 
 A permissão **Permitir lançamentos financeiros por voz ou texto** também habilita a gestão de fornecedores e o registro de compras.

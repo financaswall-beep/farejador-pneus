@@ -17,7 +17,7 @@ const headers = () => ({ cookie, origin, host: 'farejador.example', 'x-forwarded
 
 beforeAll(async () => {
   Object.assign(process.env, {
-    NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test', DATABASE_SSL: 'false',
+    MARKETING_PUBLISHER_ENABLED:'true', NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test', DATABASE_SSL: 'false',
     CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-emergency',
     ADMIN_BEARER_FALLBACK_ENABLED: 'true', DOT_MCP_ENABLED: 'true', DOT_MCP_PUBLIC_ORIGIN: origin,
     DOT_MCP_REDIRECT_URIS: callback, MATRIZ_CENTRAL_LEDGER: 'true', MATRIZ_CENTRAL_LEDGER_READ: 'true',MATRIZ_EXPENSES:'true',MATRIZ_LOGISTICS:'true', WHOLESALE_FINANCE:'true', WHOLESALE_STOCK_DECREMENT:'true',
@@ -170,8 +170,8 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(64);
-  const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
+  expect(listing.result.tools).toHaveLength(70);
+  const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
     'usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
@@ -496,7 +496,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(64);
+    expect((await client.listTools()).tools).toHaveLength(70);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -753,4 +753,84 @@ it('registra compra por item e lote no MCP, preserva saldos ao arquivar e revert
   expect(detail.payables.map((p:{balance:string})=>Number(p.balance))).toEqual([200,120]);
   expect((await fail('registrar_compra_lote_fornecedor',{...lot,idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
   expect((await fail('editar_fornecedor',{supplier_id,changes:{notes:'Após arquivo'},idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
+});
+
+it('publicador exige autorização própria, importa anexos e mantém legenda, ordem e agenda pela mesma fila do painel', async () => {
+  const {token,call} = await ownerFinanceMcp();
+  const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
+  const url='/admin/api/dot/connections/'+grant+'/publisher';
+  const permit=(enabled:boolean)=>app.inject({method:'PUT',url,headers:headers(),payload:{enabled}});
+  const raw=async(name:string,args:object)=>(await rpc(token,'tools/call',{name,arguments:args})).json();
+  expect((await raw('preparar_publicacao',{})).error.message).toContain('modo de consulta');
+  expect((await app.inject({method:'PUT',url,headers:{...headers(),origin:'https://other.example'},payload:{enabled:true}})).statusCode).toBe(403);
+  expect((await permit(true)).statusCode).toBe(200);
+
+  const {PublisherStorage}=await import('../../src/marketing/publisher/storage.js');
+  const downloads=await import('../../src/admin/dot/publisher-download.js');
+  const config=await import('../../src/marketing/publisher/config.js');
+  const {readFile,writeFile}=await import('node:fs/promises');
+  const jpeg=await (await import('sharp')).default({create:{width:32,height:32,channels:3,background:'red'}}).jpeg().toBuffer();
+  const storage=PublisherStorage.prototype;
+  const objects=new Map<string,Buffer>();
+  const fetched=vi.spyOn(downloads,'downloadPublisherFile').mockImplementation(async(_url,file)=>{
+    await writeFile(file,jpeg);return {bytes:jpeg.length,mime:'image/jpeg'};
+  });
+  vi.spyOn(storage,'assertPrivateBucket').mockResolvedValue({maxBytes:null,allowedMimes:null});
+  vi.spyOn(storage,'uploadSession').mockImplementation(async path=>({upload_url:'test',resumable:{object:path,bucket:'test',endpoint:'test',token:'test',chunk_size:100}}));
+  const {PublisherError}=await import('../../src/marketing/publisher/model.js');
+  vi.spyOn(storage,'info').mockImplementation(async path=>{
+    const bytes=objects.get(path);
+    if (!bytes) throw new PublisherError('publisher_storage_object_missing',404);
+    return {bytes:bytes.length,mime:'image/jpeg'};
+  });
+  vi.spyOn(storage,'putFile').mockImplementation(async(path,file)=>{objects.set(path,await readFile(file));});
+  vi.spyOn(storage,'put').mockImplementation(async(path,bytes)=>{objects.set(path,bytes);});
+  vi.spyOn(storage,'read').mockImplementation(async path=>objects.get(path)!);
+  try {
+    const attachment={arquivo:{file_id:'test-a',file_name:'pneu.jpg',download_url:'https://example.invalid/one'},idempotency_key:randomUUID()};
+    const first=await call('importar_midia_publicacao',attachment);
+    const replay=await call('importar_midia_publicacao',{...attachment,arquivo:{...attachment.arquivo,download_url:'https://example.invalid/renewed'}});
+    expect(replay).toEqual(first);expect(fetched).toHaveBeenCalledTimes(1);
+    const nextFile={...attachment,arquivo:{file_id:'test-b',download_url:'https://example.invalid/two'},idempotency_key:randomUUID()};
+    const [second,concurrent]=await Promise.all([call('importar_midia_publicacao',nextFile),call('importar_midia_publicacao',nextFile)]);
+    expect(concurrent).toEqual(second);
+    const conflict=await raw('importar_midia_publicacao',{...nextFile,arquivo:{...nextFile.arquivo,file_id:'changed'}});
+    expect(conflict.result.content[0].text).toBe('idempotency_conflict');
+    const midias=[second.media_id,first.media_id];
+    const input={post_id:randomUUID(),versao:0,midias,destinos:[{platform:'instagram',format:'feed'},{platform:'facebook',format:'feed'}],
+      titulo:'Pneus da loja',legenda:'Comente o número da foto que você quer.',pneus:[
+        {medida:'90/90-12',condicao:'meia_vida',fotos:[1]},{medida:'175/65R14',condicao:'novo',fotos:[2]}],idempotency_key:randomUUID()};
+    expect((await raw('preparar_publicacao',{...input,pneus:input.pneus.map(p=>({...p,fotos:[1]}))})).result.isError).toBe(true);
+    const draft=await call('preparar_publicacao',input);
+    expect(draft.midias).toEqual(midias);
+    expect(draft.legenda).toContain('Foto 2: 175/65R14 · Novo');
+    expect(await call('preparar_publicacao',input)).toEqual(draft);
+    const post_id=draft.post_id;
+    const send={post_id,versao:draft.versao,agendado_para:new Date(Date.now()+3600000).toISOString(),idempotency_key:randomUUID()};
+    expect((await raw('publicar_ou_agendar_post',send)).result.content[0].text).toBe('publisher_send_disabled');
+    // Apenas a fila local de teste. Nenhum worker, credencial ou chamada Meta.
+    vi.spyOn(config,'requireSending').mockImplementation(()=>{});
+    const [scheduled,again]=await Promise.all([call('publicar_ou_agendar_post',send),call('publicar_ou_agendar_post',send)]);
+    expect(again).toEqual(scheduled);expect(scheduled.status).toBe('scheduled');
+    const deliveries=await db.pool.query('SELECT platform,caption FROM ops.publisher_destinations WHERE post_id=$1',[post_id]);
+    expect(deliveries.rows).toHaveLength(2);
+    for(const d of deliveries.rows) expect(d.caption).toBe(draft.legenda);
+    const listed=await call('consultar_publicador',{post_id});
+    expect(listed.posts[0]).toMatchObject({status:'scheduled',midias});
+    const changed=await call('reagendar_publicacao',{post_id,versao:scheduled.versao,agendado_para:new Date(Date.now()+7200000).toISOString(),idempotency_key:randomUUID()});
+    expect((await raw('cancelar_publicacao',{post_id,versao:scheduled.versao,idempotency_key:randomUUID()})).result.isError).toBe(true);
+    const cancel={post_id,versao:changed.versao,idempotency_key:randomUUID()};
+    expect(await call('cancelar_publicacao',cancel)).toMatchObject({status:'cancelled'});
+    expect((await call('consultar_publicador',{post_id})).posts[0].entregas.every((d:{status:string})=>d.status==='cancelled')).toBe(true);
+
+    const video=randomUUID();
+    await db.pool.query(`INSERT INTO ops.publisher_media(environment,id,name,kind,mime,bytes,status,original_path,publish_path,width,height,duration,created_by,inspection)
+      VALUES('test',$1,'reel.mp4','video','video/mp4',500,'ready',$2,$2,1080,1920,15,'test','{"verified":true,"video_codec":"h264","fps":30}')`,[video,'test/'+video+'/original.mp4']);
+    const reel=await call('preparar_publicacao',{...input,post_id:randomUUID(),midias:[video],destinos:[{platform:'instagram',format:'reel'}],
+      pneus:[{medida:'90/90-12',condicao:'meia_vida'}],idempotency_key:randomUUID()});
+    expect((await call('publicar_ou_agendar_post',{post_id:reel.post_id,versao:reel.versao,agendado_para:null,idempotency_key:randomUUID()})).status).toBe('publishing');
+    expect((await permit(false)).statusCode).toBe(200);
+    expect((await raw('publicar_ou_agendar_post',send)).error.message).toContain('modo de consulta');
+  } finally {vi.restoreAllMocks();}
 });

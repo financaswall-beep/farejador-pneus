@@ -27,6 +27,7 @@ export async function transact<T>(work: (db: PoolClient) => Promise<T>) {
 }
 
 const activeGrant = `SELECT g.installment_reviews_enabled,${monitorOwnerSql} AS monitor_owner_approval,
+     COALESCE((to_jsonb(g)->>'publisher_enabled')::boolean,false) publisher_enabled,
      COALESCE((to_jsonb(g)->>'finance_operations_enabled')::boolean,false) finance_operations_enabled,
      (g.installment_chat_confirmation AND NOT ${monitorOwnerSql}) installment_chat_confirmation
    FROM network.dot_oauth_grants g
@@ -42,7 +43,7 @@ export async function lockGrant(db: PoolClient, person: string, grant: string) {
   if (!config) throw new Error('dot_grant_unavailable');
   // A assinatura toma a versão exclusiva desta trava ao ativar o acompanhamento pela primeira vez.
   await db.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',[`${env.FAREJADOR_ENV}:${person}:dot-events`]);
-  const row = (await db.query<{monitor_owner_approval:boolean;finance_operations_enabled:boolean;installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
+  const row = (await db.query<{publisher_enabled:boolean;monitor_owner_approval:boolean;finance_operations_enabled:boolean;installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
     [env.FAREJADOR_ENV,person,grant,config.clientId,config.resource,DOT_SCOPE])).rows[0];
   if (!row) throw new Error('dot_grant_unavailable');
   return row;

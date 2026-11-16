@@ -40,16 +40,20 @@ export async function downloadReceiptFile(raw:string) {
   return result.body;
 }
 
-async function boundedHttps(raw:string,method:'GET'|'POST',body:string,headers:Record<string,string>,maxBytes:number) {
-  const url=callbackUrl(raw);
-  if(Buffer.byteLength(body)>256*1024)throw new Error('payload_too_large');
+export async function resolvePublicAddress(url:URL) {
   let timer:NodeJS.Timeout|undefined;
   const addresses=await Promise.race([
     lookup(url.hostname.replace(/^\[|\]$/g,''),{all:true,verbatim:true}),
     new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('callback_timeout')),3000);}),
   ]).finally(()=>clearTimeout(timer));
   if(!addresses.length||addresses.some(item=>!publicAddress(item.address)))throw new Error('invalid_callback');
-  const address=addresses.find(item=>item.family===4)??addresses[0]!;
+  return addresses.find(item=>item.family===4)??addresses[0]!;
+}
+
+async function boundedHttps(raw:string,method:'GET'|'POST',body:string,headers:Record<string,string>,maxBytes:number) {
+  const url=callbackUrl(raw);
+  if(Buffer.byteLength(body)>256*1024)throw new Error('payload_too_large');
+  const address=await resolvePublicAddress(url);
   return new Promise<{status:number;body:Buffer}>((resolve,reject)=>{
     const req=request(url,{method,agent:false,family:address.family,...{autoSelectFamily:false},
       headers:{...headers,'content-length':Buffer.byteLength(body)},

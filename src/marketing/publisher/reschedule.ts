@@ -1,13 +1,11 @@
-import type { Pool } from 'pg';
+import { publisherTransaction, type PublisherDatabase } from './transaction.js';
 import { PublisherError, type Environment } from './model.js';
 import { publisherEvent, type Post } from './posts.js';
 
 /** Usa o mesmo lock de publicação da fila; um destino iniciado nunca muda de horário. */
-export async function reschedulePost(db: Pool, environment: Environment, id: string, version: number,
+export async function reschedulePost(db: PublisherDatabase, environment: Environment, id: string, version: number,
   scheduledAt: string, actor: string, now = new Date()) {
-  const client = await db.connect();
-  try {
-    await client.query('BEGIN');
+  return publisherTransaction(db, async client => {
     const post = (await client.query<Post>(
       'SELECT * FROM ops.publisher_posts WHERE environment=$1 AND id=$2 FOR UPDATE', [environment, id])).rows[0];
     if (!post) throw new PublisherError('publisher_post_not_found', 404);
@@ -18,7 +16,7 @@ export async function reschedulePost(db: Pool, environment: Environment, id: str
       const repeated = await client.query(`SELECT 1 FROM ops.publisher_events WHERE environment=$1 AND post_id=$2
         AND event='rescheduled' AND payload->>'previous_version'=$3 AND payload->>'scheduled_at'=$4 LIMIT 1`,
       [environment, id, String(version), target.toISOString()]);
-      if (repeated.rows.length) { await client.query('COMMIT'); return post; }
+      if (repeated.rows.length) return post;
     }
     if (post.version !== version) throw new PublisherError('publisher_version_conflict');
     if (post.status !== 'scheduled') throw new PublisherError('publisher_already_started');
@@ -37,7 +35,6 @@ export async function reschedulePost(db: Pool, environment: Environment, id: str
     [environment, id, target.toISOString()])).rows[0]!;
     await publisherEvent(client, environment, id, 'rescheduled', actor,
       { previous_version: version, previous_scheduled_at: post.scheduled_at, scheduled_at: target.toISOString() });
-    await client.query('COMMIT'); return updated;
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
+    return updated;
+  });
 }

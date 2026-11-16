@@ -92,7 +92,7 @@ Em **Avisos do assistente**, o proprietário pode pausar tudo, escolher categori
 Os limites são propostas ajustáveis, não regras comerciais preexistentes.
 `GET/PUT /admin/api/dot/alerts` exigem sessão humana de proprietário; PUT exige mesma origem, schema estrito e versão atual.
 Histórico privado imutável registra autor/versão/preferências. Pausa ou desativação cancela envios pendentes.
-O MCP não oferece ferramenta para alterar esses controles ou dados comerciais. Ligar uma categoria não cria assinatura no Dot.
+O dono configura os avisos no painel. O publicador e o financeiro têm permissões próprias em **Permissões da Milly**. Ligar uma categoria não cria assinatura no Dot.
 A chave deve ser gerada no ambiente seguro e guardada nos secrets do Coolify, nunca no Git, logs ou conversa.
 Preservar a chave entre deploys. Trocar a chave exige desligar eventos e refazer assinaturas, ou uma migração de recifragem.
 O boot com eventos solicitados valida chave e tabelas. Configuração incompleta bloqueia apenas os eventos:
