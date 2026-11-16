@@ -50,7 +50,8 @@ window.PAINEL_MODULES.marketingPublisher = function () {
                     this.mpCalendarMonth = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date());
                 clearTimeout(this.mpTimer);
                 if (this.currentPage === 'marketing' && this.marketingTab === 'comentarios' && this.moView === 'publisher'
-                    && this.mpPosts.some(p => ['scheduled', 'publishing'].includes(p.status)))
+                    && this.mpPosts.some(p => ['scheduled', 'publishing'].includes(p.status) ||
+                        p.deliveries?.some(d => ['queued', 'sending'].includes(d.removal_state))))
                     this.mpTimer = setTimeout(() => {
                         if (this.currentPage === 'marketing' && this.marketingTab === 'comentarios' && this.moView === 'publisher')
                             void this.mpLoad(true);
@@ -185,6 +186,21 @@ window.PAINEL_MODULES.marketingPublisher = function () {
             finally {
                 this.mpBusy = false;
             }
+        },
+        async mpRemoveInstagram(post) {
+            if (this.mpBusy || this.marketingIsMock?.()) return;
+            const scope = post.media_ids?.length > 1 ? 'O carrossel inteiro será excluído.' : '';
+            if (!window.confirm('Excluir “' + post.title + '” do Instagram da 2W? ' + scope)) return;
+            this.mpBusy = true;
+            this.mpError = '';
+            try {
+                await this.apiPost('/admin/api/marketing/publisher/posts/' + post.id + '/instagram/remove',
+                    { versao: post.version, confirmado: true });
+                await this.mpLoad(true);
+                return true;
+            } catch (error) {
+                this.mpError = this.mpErrorText(error);
+            } finally { this.mpBusy = false; }
         },
         mpOpenReconciliation(post, delivery) {
             if (this.mpBusy || delivery.status !== 'uncertain' || this.marketingIsMock?.())

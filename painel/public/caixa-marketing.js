@@ -96,7 +96,8 @@
     if (M.state.page === 'results') await M.loadResults?.();
     if (['insights', 'sales', 'history'].includes(M.state.page) && M.state.selected) await M.loadDetail?.();
     clearTimeout(timer);
-    if (p.mpPosts.some(post => ['scheduled', 'publishing'].includes(post.status))) timer = setTimeout(() => {
+    if (p.mpPosts.some(post => ['scheduled', 'publishing'].includes(post.status) ||
+      post.deliveries?.some(d => ['queued','sending'].includes(d.removal_state)))) timer = setTimeout(() => {
       if (M.active() && !M.busy() && ['home', 'calendar'].includes(M.state.page)) void M.load();
     }, 15000);
   };

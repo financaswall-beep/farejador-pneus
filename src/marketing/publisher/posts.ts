@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { publisherTransaction, type PublisherDatabase } from './transaction.js';
-import { accountId, PublisherError, type Draft, type Environment, type Destination } from './model.js';
+import { accountId, PublisherError, visiblePostStatus, type Draft, type Environment, type Destination } from './model.js';
 import { postMediaIdsSql, validatePostMedia } from './post-photos.js';
 
 export interface Post {
@@ -120,9 +120,12 @@ export async function postAction(pool: PublisherDatabase, environment: Environme
 }
 export async function listPosts(pool: Pool, environment: Environment) {
   return (await pool.query(`SELECT p.*,${postMediaIdsSql} media_ids,m.name media_name,m.kind media_kind,
-    coalesce((SELECT jsonb_agg(jsonb_build_object('platform',d.platform,'format',d.format,'status',d.status,
-      'post_url',d.post_url,'error_code',d.error_code,'provider_id',d.provider_id,'container_id',d.container_id) ORDER BY d.platform)
+    coalesce((SELECT jsonb_agg(jsonb_build_object('platform',d.platform,'format',d.format,
+      'status',CASE WHEN d.removal_state='deleted' THEN 'deleted' ELSE d.status END,
+      'removal_state',d.removal_state,'post_url',d.post_url,'error_code',coalesce(d.removal_error,d.error_code),
+      'provider_id',d.provider_id,'container_id',d.container_id) ORDER BY d.platform)
       FROM ops.publisher_destinations d WHERE d.environment=p.environment AND d.post_id=p.id),'[]') deliveries
     FROM ops.publisher_posts p LEFT JOIN ops.publisher_media m ON m.environment=p.environment AND m.id=p.media_id
-    WHERE p.environment=$1 ORDER BY p.updated_at DESC LIMIT 200`, [environment])).rows;
+    WHERE p.environment=$1 ORDER BY p.updated_at DESC LIMIT 200`, [environment])).rows
+    .map(post => ({ ...post, status: visiblePostStatus(post.status, post.deliveries) }));
 }

@@ -54,3 +54,10 @@ export function publicationStatus(statuses: string[]): string {
         return 'cancelled';
     return 'failed';
 }
+
+/** O histórico de entrega é preservado no banco; o painel e o MCP mostram o estado atual. */
+export function visiblePostStatus(status: string, deliveries: { status: string }[]): string {
+    if (!deliveries.some(d => d.status === 'deleted')) return status;
+    if (deliveries.every(d => d.status === 'deleted')) return 'deleted';
+    return status === 'published' ? 'partial' : status;
+}

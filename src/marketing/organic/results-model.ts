@@ -1,5 +1,6 @@
 import type { OrganicPublication } from '../../social-comments/publications.js';
 import type { CommentsConfig, Platform } from '../../social-comments/config.js';
+import { visiblePostStatus } from '../publisher/model.js';
 
 export interface PostReference { platform: Platform; account_id: string; post_id: string }
 export interface ResultDelivery extends PostReference {
@@ -21,7 +22,7 @@ export function activeOrganicPlatforms(config: CommentsConfig): Platform[] {
     Boolean(platform === 'instagram' ? config.instagramId : config.pageId));
 }
 export function deliveryViews(deliveries: ResultDelivery[]) {
-  const published = deliveries.filter(d => d.status === 'published');
+  const published = deliveries.filter(d => d.status === 'published' || d.status === 'deleted');
   const known = published.filter(d => d.views !== null && Number.isSafeInteger(d.views) && d.views >= 0);
   return { views: known.length ? known.reduce((sum, d) => sum + d.views!, 0) : null,
     views_complete: published.length > 0 && known.length === published.length };
@@ -36,12 +37,12 @@ export function mergeOrganicResults(posts: OrganicPublication[], central: Centra
     const deliveries = post.deliveries.filter(d => active.includes(d.platform));
     if (!deliveries.length) continue;
     const linked = deliveries.filter(d => d.status === 'published' && d.post_id).map(d => lookup.get(key(d))).filter(Boolean);
-    for (const d of deliveries) if (d.status === 'published' && d.post_id) consumed.add(key(d));
+    for (const d of deliveries) if ((d.status === 'published' || d.status === 'deleted') && d.post_id) consumed.add(key(d));
     const first = linked[0];
     const published = deliveries.map(d => d.published_at).filter((d): d is string => Boolean(d));
     rows.push({ id: post.id, key: `publisher:${post.id}`, publisher_id: post.id,
       platform: deliveries[0]!.platform, account_id: deliveries[0]!.account_id,
-      title: post.title, caption: post.caption, status: post.status, deliveries, version: post.version,
+      title: post.title, caption: post.caption, status: visiblePostStatus(post.status, deliveries), deliveries, version: post.version,
       published_at: published.sort()[0] ?? post.scheduled_at ?? post.created_at,
       format: first?.format ?? (deliveries[0]!.format === 'reel' ? 'reel' : 'unknown'),
       image_url: first?.image_url ?? post.image_url ?? null, url: first?.url ?? deliveries[0]!.post_url,

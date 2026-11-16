@@ -170,8 +170,8 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(70);
-  const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
+  expect(listing.result.tools).toHaveLength(71);
+  const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','excluir_publicacao_instagram','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
     'usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
@@ -496,7 +496,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(70);
+    expect((await client.listTools()).tools).toHaveLength(71);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -830,6 +830,14 @@ it('publicador exige autorização própria, importa anexos e mantém legenda, o
     const reel=await call('preparar_publicacao',{...input,post_id:randomUUID(),midias:[video],destinos:[{platform:'instagram',format:'reel'}],
       pneus:[{medida:'90/90-12',condicao:'meia_vida'}],idempotency_key:randomUUID()});
     expect((await call('publicar_ou_agendar_post',{post_id:reel.post_id,versao:reel.versao,agendado_para:null,idempotency_key:randomUUID()})).status).toBe('publishing');
+    const removal = {post_id:reel.post_id,versao:reel.versao+1,confirmado:true,idempotency_key:randomUUID()};
+    expect((await raw('excluir_publicacao_instagram', removal)).result.isError).toBe(true);
+    await db.pool.query("UPDATE ops.publisher_destinations SET status='published',provider_id='70001' WHERE environment='test' AND post_id=$1 AND platform='instagram'",[reel.post_id]);
+    expect((await raw('excluir_publicacao_instagram',{...removal,confirmado:false})).error).toBeTruthy();
+    const [removed,repeated]=await Promise.all([call('excluir_publicacao_instagram',removal),call('excluir_publicacao_instagram',removal)]);
+    expect(removed).toEqual(repeated);
+    expect(removed.exclusao).toBe('queued');
+    expect((await call('consultar_publicador',{post_id:reel.post_id})).posts[0].entregas[0].exclusao).toBe('queued');
     expect((await permit(false)).statusCode).toBe(200);
     expect((await raw('publicar_ou_agendar_post',send)).error.message).toContain('modo de consulta');
   } finally {vi.restoreAllMocks();}

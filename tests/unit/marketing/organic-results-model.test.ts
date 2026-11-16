@@ -4,6 +4,16 @@ import type { OrganicPublication } from '../../../src/social-comments/publicatio
 import { buildOrganicReport } from '../../../src/marketing/organic/report.js';
 import { organicPublicationWindow } from '../../../src/admin/painel/marketing-organic-period.js';
 
+it('uma listagem da Meta em cache não ressuscita publicação excluída pela Central',()=>{
+  const saved=central();
+  const media=native('instagram','301');
+  saved.status='published';
+  saved.deliveries=[{...saved.deliveries[0]!,platform:'instagram',account_id:'200',status:'deleted',post_id:'301',post_url:null,views:15}];
+  const rows=mergeOrganicResults([media],[saved],['instagram']);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({status:'deleted',url:null,views:15});
+});
+
 const native=(platform:'instagram'|'facebook',id:string):OrganicPublication=>({platform,id,
   account_id:platform==='instagram'?'200':'100',title:'Mesmo texto',caption:'Pneus',published_at:'2026-09-29T12:00:00Z',
   format:'image',image_url:null,url:null});

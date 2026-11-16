@@ -15,6 +15,7 @@ import { PublisherGraph } from '../../marketing/publisher/graph.js';
 import { reconcileDestination, reconciliationSchema } from '../../marketing/publisher/reconciliation.js';
 import { generateCaption } from '../../marketing/publisher/caption.js';
 import { reschedulePost } from '../../marketing/publisher/reschedule.js';
+import { removalInput, requestInstagramRemoval } from '../../marketing/publisher/instagram-removal.js';
 export interface MarketingPublisherAccess {
     base?: string;
     preHandler?: RouteShorthandOptions['preHandler'];
@@ -54,7 +55,7 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
       AND EXISTS (SELECT 1 FROM information_schema.columns
         WHERE table_schema='ops' AND table_name='publisher_media' AND column_name='inspection')
       AND EXISTS (SELECT 1 FROM information_schema.columns
-        WHERE table_schema='ops' AND table_name='publisher_destinations' AND column_name='retry_attempts') ready`);
+        WHERE table_schema='ops' AND table_name='publisher_destinations' AND column_name='removal_state') ready`);
         const ready = schema.rows[0]?.ready === true;
         if (!config.enabled || !ready)
             return { config: { ...config, schema_ready: ready }, posts: [], media: [], warnings: [] };
@@ -119,6 +120,11 @@ export async function registerMarketingPublisher(app: FastifyInstance, access: M
         if (body.action === 'retry')
             requireSending();
         return postAction(pool, environment, params.parse(request.params).id, body.action, actor(request).displayName);
+    }));
+    app.post(base + '/posts/:id/instagram/remove', options, guarded(async request => {
+        requireSending();
+        const body = removalInput.parse(request.body);
+        return requestInstagramRemoval(pool, environment, params.parse(request.params).id, body.versao, actor(request).displayName);
     }));
     app.post(base + '/posts/:id/reconcile', options, guarded(async (request) => {
         return reconcileDestination(pool, environment, params.parse(request.params).id, reconciliationSchema.parse(request.body), actor(request).displayName, new PublisherGraph());

@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-15T04:34:36.897Z",
-  "total": 3219,
+  "geradoEm": "2026-11-16T04:11:05.869Z",
+  "total": 3221,
   "propriedades": {
     "abrirCadastroCliente": "function",
     "abrirClienteLead": "function",
@@ -1981,6 +1981,8 @@
     "mpReadUploadSession": "function",
     "mpReconcile": "function",
     "mpReconciliation": "value:null",
+    "mpRemovalLabel": "function",
+    "mpRemoveInstagram": "function",
     "mpRemoveMedia": "function",
     "mpRemoveSelected": "function",
     "mpReprocessMedia": "function",

@@ -2,14 +2,24 @@ import {it,expect,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {createContext,runInContext} from 'node:vm';
 import {randomUUID} from 'node:crypto';
-function state() {
-  const window:any={MARKETING_PUBLISHER_TEMPLATE:'static',confirm:()=>true,lucide:{createIcons:()=>undefined}};
+function state(confirm=()=>true) {
+  const window:any={MARKETING_PUBLISHER_TEMPLATE:'static',confirm,lucide:{createIcons:()=>undefined}};
   const context=createContext({window,crypto:{randomUUID},setTimeout:()=>0,clearTimeout:()=>undefined,Intl,Date});
   runInContext(readFileSync('painel/public/app.marketing.publisher.helpers.js','utf8'),context);
   runInContext(readFileSync('painel/public/app.marketing.publisher.js','utf8'),context);
   const s=window.PAINEL_MODULES.marketingPublisher();s.$nextTick=(fn:()=>void)=>fn();s.apiPut=vi.fn().mockResolvedValue({version:1});
   s.apiPost=vi.fn().mockResolvedValue({});s.apiGet=vi.fn().mockResolvedValue({config:{enabled:true},posts:[],media:[]});s.mpFresh();return s;
 }
+it('exclusão identifica o carrossel e só envia o pedido confirmado para Instagram',async()=>{
+  const confirm=vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+  const s=state(confirm);
+  const post={id:'post',title:'Pneus da semana',version:3,media_ids:['a','b']};
+  await s.mpRemoveInstagram(post);
+  expect(s.apiPost).not.toHaveBeenCalled();
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('O carrossel inteiro'));
+  await s.mpRemoveInstagram(post);
+  expect(s.apiPost.mock.calls).toEqual([['/admin/api/marketing/publisher/posts/post/instagram/remove',{versao:3,confirmado:true}]]);
+});
 it('edita o carrossel compartilhado pelo app e site, preserva a capa e submete a ordem após reabrir',async()=>{
   const p=state();
   const [a,b,c]=['a','b','c'].map(id=>({id,name:id+'.jpg',kind:'photo'}));

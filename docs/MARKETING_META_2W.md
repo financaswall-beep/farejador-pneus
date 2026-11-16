@@ -7,6 +7,10 @@
 - App Meta: `1474949829779264`.
 - A conta de anúncios continua sendo configurada por `META_ADS_ACCOUNT_ID`; ligar uma página nova não troca automaticamente a conta de anúncios nem o dataset CAPI.
 
+## Exclusão de publicações do Instagram
+
+O publicador da Matriz e a ferramenta da Milly `excluir_publicacao_instagram` podem excluir um post publicado pelo Farejador em @2wp.pneus. Para habilitar a operação, configure no Coolify `META_INSTAGRAM_DELETE_USER_TOKEN` com um token de usuário do mesmo aplicativo, obtido via Facebook Login com `instagram_basic` e `instagram_manage_contents` para a conta da 2W. O histórico identifica a rede e só mostra a exclusão confirmada quando a Meta devolve o ID da mídia excluída. [Referência de mídia do Instagram](https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/#deleting)
+
 ## O que a integração mede
 
 O webhook da Meta precisa entregar o ID do anúncio e da mensagem. O Farejador casa essa mensagem com a conversa do Chatwoot; uma venda realizada vinculada à mesma conversa recebe a atribuição do último anúncio elegível em até sete dias. O painel de Marketing lê a campanha desse anúncio e mostra vendas, receita e margem quando o custo dos pneus é conhecido.

@@ -4,6 +4,7 @@ const flag = z.enum(['true', 'false']).default('false').transform(v => v === 'tr
 export const publisherEnvShape = {
     MARKETING_PUBLISHER_ENABLED: flag,
     MARKETING_PUBLISHER_SEND_ENABLED: flag,
+    META_INSTAGRAM_DELETE_USER_TOKEN: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
     SUPABASE_STORAGE_URL: z.preprocess(emptyToUndefined, z.string().url().refine(v => {
         const u = new URL(v);
         return u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash;

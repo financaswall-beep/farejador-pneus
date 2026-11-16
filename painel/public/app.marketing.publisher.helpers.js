@@ -69,6 +69,11 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 publisher_media_too_large: 'Foto: até 8 MB. Vídeo: até o limite mostrado na biblioteca.', publisher_library_full: 'A biblioteca atingiu o limite operacional. Libere arquivos antes de enviar outros.',
                 publisher_version_conflict: 'Este rascunho mudou em outra aba ou a resposta anterior se perdeu. Atualize e reabra o rascunho para conferir.',
                 publisher_media_in_use: 'Este arquivo está vinculado a um rascunho ou envio. Cancele a publicação antes de removê-lo.',
+                publisher_removal_credentials_missing: 'Configure o token de usuário do Facebook para excluir no Instagram.',
+                publisher_removal_permission_missing: 'O token precisa das permissões instagram_basic e instagram_manage_contents na Meta.',
+                publisher_removal_user_token_invalid: 'Confira a validade do token de usuário e o aplicativo da Meta.',
+                publisher_removal_receipt_unknown: 'A Meta não confirmou a exclusão. Confira o post no Instagram.',
+                publisher_removal_requires_published_instagram: 'Selecione um post com entrega confirmada no Instagram da 2W.',
                 publisher_upload_mismatch: 'O arquivo enviado não corresponde ao arquivo reservado. Envie novamente.',
                 publisher_media_invalid: 'Não foi possível validar a mídia. Use JPG, PNG, WebP, HEIC, MP4 ou MOV compatível.',
                 publisher_upload_failed: 'O envio foi interrompido. Escolha o mesmo arquivo em Continuar envio para retomar os bytes já recebidos.',
@@ -157,10 +162,14 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
         mpCount(status) { return this.mpPosts.filter(p => p.status === status).length; },
         mpAttention() {
             return this.mpPosts.filter(post => post.deliveries?.length ?
-                post.deliveries.some(delivery => ['failed', 'uncertain'].includes(delivery.status)) : post.status === 'failed').length;
+                post.deliveries.some(delivery => ['failed', 'uncertain'].includes(delivery.status) || ['failed','uncertain'].includes(delivery.removal_state)) : post.status === 'failed').length;
         },
         mpUpcoming() { return this.mpPosts.filter(p => p.status === 'scheduled').sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at)).slice(0, 3); },
-        mpStatus(status) { return ({ draft: 'Rascunho', scheduled: 'Agendada', publishing: 'Enviando', published: 'Publicada', partial: 'Publicado parcialmente', failed: 'Precisa de atenção', cancelled: 'Cancelada', queued: 'Na fila', uploading: 'Envio pendente', ready: 'Pronto para publicar', preparing: 'Preparando', processing: 'Processando', verifying: 'Conferindo', uncertain: 'Conferir na rede' })[status] || status; },
+        mpStatus(status) { return ({ deleted: 'Excluída', draft: 'Rascunho', scheduled: 'Agendada', publishing: 'Enviando', published: 'Publicada', partial: 'Publicado parcialmente', failed: 'Precisa de atenção', cancelled: 'Cancelada', queued: 'Na fila', uploading: 'Envio pendente', ready: 'Pronto para publicar', preparing: 'Preparando', processing: 'Processando', verifying: 'Conferindo', uncertain: 'Conferir na rede' })[status] || status; },
+        mpRemovalLabel(state) {
+            return ({queued:'Exclusão na fila',sending:'Exclusão em andamento',uncertain:'Conferir exclusão no Instagram',
+                failed:'Falha ao excluir',deleted:'Excluída'})[state];
+        },
         mpFormat(format) { return ({ feed: 'Feed', reel: 'Reel', story: 'Story' })[format] || format; },
         mpDateLabel(date) { return date ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date(date)) : 'Sem agendamento'; },
         mpBytes(bytes) { return Number(bytes) >= 1024 * 1024 * 1024 ? (Number(bytes) / 1024 / 1024 / 1024).toFixed(1) + ' GB' : (Number(bytes) / 1024 / 1024).toFixed(1) + ' MB'; },
@@ -170,7 +179,7 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
             return bytes > 0 ? this.mpBytes(bytes) + ' preparados · ' + this.mpBytes(media.bytes) + ' original' : this.mpBytes(media?.bytes || 0);
         },
         mpFilteredPosts() {
-            const states = this.mpTab === 'drafts' ? ['draft'] : ['published', 'partial', 'failed', 'publishing', 'cancelled'];
+            const states = this.mpTab === 'drafts' ? ['draft'] : ['published', 'partial', 'failed', 'publishing', 'cancelled', 'deleted'];
             const q = this.mpHistorySearch.toLocaleLowerCase('pt-BR');
             return this.mpPosts.filter(p => states.includes(p.status) && (!q || p.title.toLocaleLowerCase('pt-BR').includes(q)) &&
                 (this.mpHistoryNetwork === 'all' || p.destinations.some(d => d.platform === this.mpHistoryNetwork)));
@@ -220,7 +229,7 @@ window.PAINEL_MODULES.marketingPublisherHelpers = function () {
                 if (day < 1)
                     return { key: 'empty' + i, day: null, posts: [] };
                 const date = this.mpCalendarMonth + '-' + String(day).padStart(2, '0');
-                return { key: date, day, posts: this.mpPosts.filter(p => p.scheduled_at && ['scheduled', 'publishing', 'published', 'partial', 'failed'].includes(p.status) &&
+                return { key: date, day, posts: this.mpPosts.filter(p => p.scheduled_at && ['scheduled', 'publishing', 'published', 'partial', 'failed', 'deleted'].includes(p.status) &&
                         new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(p.scheduled_at)) === date) };
             });
         },

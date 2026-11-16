@@ -7,7 +7,8 @@ import type {Pool} from 'pg';
 vi.mock('../../src/shared/config/env.js',()=>({env:{FAREJADOR_ENV:'test',MARKETING_PUBLISHER_ENABLED:true,
   MARKETING_MEDIA_MAX_MB:500,MARKETING_LIBRARY_MAX_MB:20000,META_GRAPH_API_VERSION:'v26.0'}}));
 vi.mock('../../src/persistence/db.js',()=>({pool:{}}));
-import {saveDraft,submitPost,postAction} from '../../src/marketing/publisher/posts.js';
+import {saveDraft,submitPost,postAction,listPosts} from '../../src/marketing/publisher/posts.js';
+import {instagramRemovalTick,requestInstagramRemoval} from '../../src/marketing/publisher/instagram-removal.js';
 import {reschedulePost} from '../../src/marketing/publisher/reschedule.js';
 import {claimDelivery} from '../../src/marketing/publisher/queue.js';
 import {publishTick} from '../../src/marketing/publisher/worker.js';
@@ -33,6 +34,7 @@ beforeAll(async()=>{
     await embedded.exec(await readFile('db/migrations/0246_marketing_publisher.sql','utf8'));
     await embedded.exec(await readFile('db/migrations/0247_marketing_publisher_recovery.sql','utf8'));
     await embedded.exec(await readFile('db/migrations/0287_publisher_carousel.sql','utf8'));
+    await embedded.exec(await readFile('db/migrations/0292_instagram_publication_removal.sql','utf8'));
     const query=async(sql:string,params?:unknown[])=>{
       const result=await embedded.query(sql,params);
       for(const row of result.rows)for(const key of ['created_at','updated_at','scheduled_at','started_at','public_started_at','lease_until','deleted_at'])if(row[key]&&!(row[key] instanceof Date))row[key]=new Date(row[key]);
@@ -60,6 +62,54 @@ async function post(media_id:string,destinations:any[]=[{platform:'instagram',fo
 }
 async function due(){await pool.query(`UPDATE ops.publisher_destinations SET next_attempt_at=now()-interval '1 second',lease_until=NULL WHERE environment='test'`);}
 async function finish(){for(let i=0;i<12;i++){await due();if(!await publishTick(pool,env,graph,storage))break;}}
+it('exclui somente a entrega confirmada do Instagram e mantém o Facebook e o histórico',async()=>{
+  const p=await post(await asset());
+  await expect(requestInstagramRemoval(pool,env,p.id,p.version,'dono')).rejects.toThrow('publisher_removal_requires_published_instagram');
+  const sent=await submitPost(pool,env,p.id,p.version,null,'dono');
+  await finish();
+  const removal={removePublishedMedia:vi.fn().mockResolvedValue(undefined)};
+  await expect(requestInstagramRemoval(pool,'prod',p.id,sent.version,'dono')).rejects.toThrow('publisher_post_not_found');
+  await expect(requestInstagramRemoval(pool,env,p.id,p.version,'dono')).rejects.toThrow('publisher_version_conflict');
+  for(let i=0;i<2;i++) expect(await requestInstagramRemoval(pool,env,p.id,sent.version,'dono')).toMatchObject({exclusao:'queued'});
+  expect(await instagramRemovalTick(pool,env,removal)).toBe(true);
+  expect(await instagramRemovalTick(pool,env,removal)).toBe(false);
+  expect(await requestInstagramRemoval(pool,env,p.id,sent.version,'dono')).toMatchObject({exclusao:'deleted'});
+  expect(removal.removePublishedMedia).toHaveBeenCalledTimes(1);
+  const [listed]=await listPosts(pool,env);
+  expect(listed).toMatchObject({status:'partial',deliveries:[
+    {platform:'facebook',status:'published'},{platform:'instagram',status:'deleted',post_url:null,provider_id:'302'},
+  ]});
+});
+it('não repete DELETE após perda do recibo ou interrupção do worker',async()=>{
+  const p=await post(await asset(),[{platform:'instagram',format:'reel'}]);
+  const sent=await submitPost(pool,env,p.id,p.version,null,'dono'); await finish();
+  await requestInstagramRemoval(pool,env,p.id,sent.version,'dono');
+  const removal={removePublishedMedia:vi.fn().mockRejectedValue(new MetaCommentError('meta_connection_unknown',true))};
+  await instagramRemovalTick(pool,env,removal);
+  expect(await requestInstagramRemoval(pool,env,p.id,sent.version,'dono')).toMatchObject({exclusao:'uncertain'});
+  await pool.query("UPDATE ops.publisher_destinations SET removal_state='sending',removal_updated_at=now()-interval '3 minutes' WHERE environment=$1 AND post_id=$2",[env,p.id]);
+  await instagramRemovalTick(pool,env,removal);
+  expect(await instagramRemovalTick(pool,env,removal)).toBe(false);
+  expect(removal.removePublishedMedia).toHaveBeenCalledTimes(1);
+  expect((await listPosts(pool,env))[0]?.deliveries[0]).toMatchObject({removal_state:'uncertain'});
+});
+it('falha definitiva permite novo pedido, com uma única exclusão mesmo entre workers concorrentes',async()=>{
+  const p=await post(await asset(),[{platform:'instagram',format:'reel'}]);
+  const sent=await submitPost(pool,env,p.id,p.version,null,'dono'); await finish();
+  await requestInstagramRemoval(pool,env,p.id,sent.version,'dono');
+  const removal={removePublishedMedia:vi.fn()
+    .mockRejectedValueOnce(new MetaCommentError('publisher_removal_permission_missing'))
+    .mockResolvedValue(undefined)};
+  await instagramRemovalTick(pool,env,removal);
+  const [failed]=await listPosts(pool,env);
+  expect(failed?.deliveries[0]).toMatchObject({removal_state:'failed',error_code:'publisher_removal_permission_missing'});
+  await requestInstagramRemoval(pool,env,p.id,sent.version+1,'dono');
+  // PGlite usa uma única conexão. O PostgreSQL nativo também testa a disputa pelo lock.
+  if(process.env.PUBLISHER_EMBEDDED_DB==='1') await instagramRemovalTick(pool,env,removal);
+  else await Promise.all([instagramRemovalTick(pool,env,removal),instagramRemovalTick(pool,env,removal)]);
+  expect(removal.removePublishedMedia).toHaveBeenCalledTimes(2);
+  expect((await listPosts(pool,env))[0]).toMatchObject({status:'deleted',deliveries:[{status:'deleted',error_code:null}]});
+});
 it('aplica schema com RLS; portal parceiro não consegue ler as tabelas da Central',async()=>{
   const result=await pool.query(`SELECT c.relname,c.relrowsecurity,has_table_privilege('farejador_partner_app',c.oid,'SELECT') readable
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relname LIKE 'publisher_%' AND n.nspname IN ('ops','analytics') AND c.relkind='r'`);

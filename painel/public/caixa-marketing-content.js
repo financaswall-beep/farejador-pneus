@@ -26,6 +26,15 @@
     if (post.scheduled_at) body.appendChild(V.node('p', 'Horário de Brasília: ' + V.date(post.scheduled_at), 'mk-muted'));
     (post.deliveries || []).forEach(delivery => {
       const section = V.node('section', null, 'mk-delivery'); section.append(V.network(delivery.platform), V.badge(delivery.status));
+      if (delivery.removal_state && delivery.removal_state !== 'deleted') {
+        section.appendChild(V.node('small', p.mpRemovalLabel(delivery.removal_state), 'mk-muted'));
+      }
+      if (delivery.platform === 'instagram' && delivery.status === 'published' && p.mpConfig?.sending &&
+          (!delivery.removal_state || delivery.removal_state === 'failed')) {
+        section.appendChild(V.button('Excluir do Instagram', () => void M.run(async () => {
+          if (await p.mpRemoveInstagram(post)) M.closeDialog();
+        }), 'mk-link is-danger'));
+      }
       if (delivery.error_code) section.appendChild(V.node('p', p.mpErrorText({ message: delivery.error_code }), 'mk-muted'));
       const url = V.safeUrl(delivery.post_url, true);
       if (url) { const a = V.node('a', 'Ver na rede ↗', 'mk-link'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; section.appendChild(a); }

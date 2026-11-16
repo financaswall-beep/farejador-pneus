@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
 import { requireSending } from '../../marketing/publisher/config.js';
-import { destinationSchema, draftSchema, PublisherError } from '../../marketing/publisher/model.js';
+import { destinationSchema, draftSchema, PublisherError, visiblePostStatus } from '../../marketing/publisher/model.js';
 import { postMediaIdsSql } from '../../marketing/publisher/post-photos.js';
 import { saveDraft, submitPost, postAction } from '../../marketing/publisher/posts.js';
 import { reschedulePost } from '../../marketing/publisher/reschedule.js';
@@ -101,9 +101,10 @@ export async function readPublisher(db: Pick<PoolClient, 'query'>, data: z.infer
   }
   const rows = (await db.query(`SELECT p.id AS post_id,p.version AS versao,p.title AS titulo,p.caption AS legenda,
     p.destinations AS destinos,p.status,p.scheduled_at AS agendado_para,${postMediaIdsSql} AS midias,
-    ARRAY(SELECT jsonb_build_object('rede',d.platform,'status',d.status,'link',d.post_url,'erro',d.error_code)
+    ARRAY(SELECT jsonb_build_object('rede',d.platform,'status',CASE WHEN d.removal_state='deleted' THEN 'deleted' ELSE d.status END,
+      'link',d.post_url,'erro',coalesce(d.removal_error,d.error_code),'exclusao',d.removal_state)
       FROM ops.publisher_destinations d WHERE d.environment=p.environment AND d.post_id=p.id ORDER BY d.platform) AS entregas
     FROM ops.publisher_posts p WHERE p.environment=$1 AND ($2::uuid IS NULL OR p.id=$2)
     ORDER BY p.updated_at DESC,p.id LIMIT 21 OFFSET $3`,[env.FAREJADOR_ENV,data.post_id??null,offset])).rows;
-  return {posts:rows.slice(0,20),tem_mais:rows.length>20};
+  return {posts:rows.slice(0,20).map(p => ({...p,status:visiblePostStatus(p.status,p.entregas)})),tem_mais:rows.length>20};
 }

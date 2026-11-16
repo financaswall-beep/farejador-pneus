@@ -11,6 +11,8 @@ import { cleanupMedia } from './cleanup.js';
 import { PublisherError, type Environment } from './model.js';
 import { validateDestinationMedia } from './media-validation.js';
 import { preparedPublishPath } from './media-formats.js';
+import { instagramRemovalTick } from './instagram-removal.js';
+import { InstagramRemovalGraph } from './instagram-removal-graph.js';
 
 const MAX_SAFE_RETRIES = 5;
 function validateTaskMedia(task: Task) {
@@ -149,7 +151,10 @@ export function startPublisherWorker(): () => void {
   const run = async () => {
     if (stopped) return;
     try {
-      if (publisherConfig().sending) await publishTick(pool, env.FAREJADOR_ENV, new PublisherGraph());
+      if (publisherConfig().sending) {
+        await publishTick(pool, env.FAREJADOR_ENV, new PublisherGraph());
+        await instagramRemovalTick(pool, env.FAREJADOR_ENV, new InstagramRemovalGraph());
+      }
       if (++count % 12 === 0) await cleanupMedia(pool, env.FAREJADOR_ENV);
     } catch {
       logger.warn('Publisher operation deferred');

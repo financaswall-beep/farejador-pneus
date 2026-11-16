@@ -46,7 +46,7 @@ it('owner-only antes de banco, upload, IA e publicação',async()=>{
   const app=Fastify();await registerMarketingPublisher(app);
   try{
     for(const [method,url] of [['GET',base],['POST',base+'/media'],['POST',base+'/media/'+id+'/complete'],
-      ['POST',base+'/caption'],['POST',base+'/posts/'+id+'/submit'],['POST',base+'/posts/'+id+'/reconcile']] as const){
+      ['POST',base+'/posts/'+id+'/instagram/remove'],['POST',base+'/caption'],['POST',base+'/posts/'+id+'/submit'],['POST',base+'/posts/'+id+'/reconcile']] as const){
       expect((await app.inject({method,url,headers:{'x-role':'admin'},...(method==='POST'?{payload:{}}:{})})).statusCode).toBe(403);
     }
     expect(m.query).not.toHaveBeenCalled();expect(m.reserve).not.toHaveBeenCalled();expect(m.caption).not.toHaveBeenCalled();

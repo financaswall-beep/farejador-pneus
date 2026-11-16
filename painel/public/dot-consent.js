@@ -83,7 +83,7 @@
           if (typeof row.publisher_enabled === 'boolean') {
             const publish = document.createElement('button');
             publish.type = 'button';
-            publish.textContent = row.publisher_enabled ? 'Desativar publicações da Milly' : 'Permitir preparar, publicar e agendar posts';
+            publish.textContent = row.publisher_enabled ? 'Desativar publicações da Milly' : 'Permitir publicar, agendar e excluir do Instagram';
             publish.onclick = async () => {
               publish.disabled = true;
               try {

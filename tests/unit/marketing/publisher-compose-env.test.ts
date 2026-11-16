@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const compose = readFileSync('docker-compose.farejador.coolify.yaml', 'utf8');
-const metaKeys = ['META_COMMENTS_APP_ID', 'META_COMMENTS_PAGE_ACCESS_TOKEN', 'META_APP_SECRET',
+const metaKeys = ['META_INSTAGRAM_DELETE_USER_TOKEN', 'META_COMMENTS_APP_ID', 'META_COMMENTS_PAGE_ACCESS_TOKEN', 'META_APP_SECRET',
   'META_GRAPH_API_VERSION', 'MARKETING_PUBLISHER_ENABLED', 'MARKETING_PUBLISHER_SEND_ENABLED'];
 const baseEnv = {
   NODE_ENV: 'production', FAREJADOR_ENV: 'prod',

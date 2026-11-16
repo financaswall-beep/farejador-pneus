@@ -12,8 +12,9 @@ export async function centralResults(db: Pool, environment: string, config: Comm
   if (!ready) return { rows: [] as CentralResult[], available: false, truncated: false };
   const rows = (await db.query(`SELECT p.id,p.title,p.caption,p.status,p.version,p.scheduled_at,p.created_at,m.thumbnail_path,
       coalesce((SELECT jsonb_agg(jsonb_build_object('platform',d.platform,'account_id',d.account_id,
-        'post_id',coalesce(d.provider_id,''),'format',d.format,'status',d.status,'post_url',d.post_url,
-        'error_code',d.error_code,'published_at',CASE WHEN d.status='published' THEN d.updated_at END,
+        'post_id',coalesce(d.provider_id,''),'format',d.format,'status',CASE WHEN d.removal_state='deleted' THEN 'deleted' ELSE d.status END,
+        'post_url',d.post_url,'removal_state',d.removal_state,'error_code',coalesce(d.removal_error,d.error_code),
+        'published_at',CASE WHEN d.status='published' THEN d.updated_at END,
         'views',NULL,'observed_at',NULL) ORDER BY d.platform)
         FROM ops.publisher_destinations d WHERE d.environment=p.environment AND d.post_id=p.id),'[]') deliveries
     FROM ops.publisher_posts p LEFT JOIN ops.publisher_media m ON m.environment=p.environment AND m.id=p.media_id
@@ -49,7 +50,7 @@ export async function organicResults(db: Pool, environment: string, config: Comm
   try {
     historyReady = await metricHistoryReady(db);
     if (historyReady) {
-      const latest = await latestViewObservations(db, environment, rows.flatMap(row => row.deliveries.filter(d => d.status === 'published' && d.post_id)));
+      const latest = await latestViewObservations(db, environment, rows.flatMap(row => row.deliveries.filter(d => ['published','deleted'].includes(d.status) && d.post_id)));
       for (const row of rows) {
         for (const delivery of row.deliveries) {
           const observation = latest.find(o => o.platform === delivery.platform && o.account_id === delivery.account_id && o.post_id === delivery.post_id);
@@ -100,7 +101,7 @@ export async function organicResultMetrics(db: Pool, environment: string, config
   }));
   let history: Awaited<ReturnType<typeof dailyViewHistory>> = [];
   if (historyReady) {
-    try { history = await dailyViewHistory(db, environment, deliveries.filter(d => d.status === 'published' && d.post_id), days); }
+    try { history = await dailyViewHistory(db, environment, deliveries.filter(d => ['published','deleted'].includes(d.status) && d.post_id), days); }
     catch { historyReady = false; }
   }
   return { networks, history, history_ready: historyReady, active_platforms: active,

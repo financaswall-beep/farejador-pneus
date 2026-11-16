@@ -3,7 +3,8 @@ import { ErrorCode, McpError, type Tool } from '@modelcontextprotocol/sdk/types.
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { env } from '../../shared/config/env.js';
-import { requirePublisher } from '../../marketing/publisher/config.js';
+import { requirePublisher, requireSending } from '../../marketing/publisher/config.js';
+import { removalInput, requestInstagramRemoval } from '../../marketing/publisher/instagram-removal.js';
 import { PublisherError } from '../../marketing/publisher/model.js';
 import { beginIntegrityOperation, completeIntegrityOperation, operationFingerprint } from '../painel/stage5-integrity.js';
 import { DOT_SCOPE } from './config.js';
@@ -46,6 +47,11 @@ write('preparar_publicacao','Crie ou edite um rascunho com a legenda que você e
 write('publicar_ou_agendar_post','Somente a pedido do dono, publique agora (agendado_para=null) ou agende com data, hora e fuso. Use a versão do rascunho aprovado. Consulte o status por rede após o envio.',sendInput,sendPost,true);
 write('reagendar_publicacao','Mude a data/hora de um post agendado a pedido do dono, antes do início do envio.',rescheduleInput,movePost,true);
 write('cancelar_publicacao','Cancele um rascunho ou agendamento identificado pelo dono antes do início do envio.',cancelInput,cancelPost,true);
+write('excluir_publicacao_instagram','A pedido explícito do dono, exclua do Instagram da 2W o post já publicado identificado em consultar_publicador. Carrossel é excluído inteiro. Confira entregas.exclusao em consultar_publicador: queued/sending significa pendente, deleted confirma e uncertain exige conferência no Instagram. A cópia no Facebook é independente.',
+  removalInput.extend({post_id:z.string().uuid(),idempotency_key:z.string().uuid()}),async (db,data,actor)=>{
+    requireSending();
+    return requestInstagramRemoval(db,env.FAREJADOR_ENV,data.post_id,data.versao,actor);
+  },true);
 export const publisherTools=[...catalog.values()].map(t=>t.descriptor);
 export function hasPublisherTool(name:string) {return catalog.has(name);}
 export async function invokePublisherTool(identity:DotIdentity,name:string,args:unknown) {
