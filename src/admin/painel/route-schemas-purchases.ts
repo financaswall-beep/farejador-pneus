@@ -30,7 +30,7 @@ export const purchaseItemSchema = z.object({
   }),
 });
 
-export const registerPurchaseSchema = z.object({
+export const registerPurchaseFields = z.object({
   group_id: z.string().uuid().nullable().optional(),
   supplier_id: z.string().uuid().nullable().optional(),
   new_supplier: z.object({
@@ -56,7 +56,9 @@ export const registerPurchaseSchema = z.object({
   })).min(1).max(60).optional(),
   receipt_status: z.enum(['pending', 'received']).default('received'),
   idempotency_key: idempotencyKeySchema,
-}).refine(
+});
+
+export const registerPurchaseSchema = registerPurchaseFields.refine(
   (d) => !!d.supplier_id || !!d.new_supplier?.name.trim(),
   { message: 'supplier_required' },
 ).refine(

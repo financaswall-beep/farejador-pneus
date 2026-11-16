@@ -199,7 +199,7 @@ export async function cancelWholesalePurchase(
 export async function archiveWholesaleSupplier(
   supplierId: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<{ id: string }> {
   const result = await dbPool.query<{ id: string }>(
     `UPDATE commerce.wholesale_suppliers SET deleted_at=now()

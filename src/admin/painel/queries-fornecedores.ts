@@ -21,10 +21,16 @@ export async function listWholesaleSuppliers(
   return result.rows;
 }
 
+export interface SupplierFields {
+  name: string;
+  phone?: string | null;
+  document?: string | null;
+  notes?: string | null;
+}
+
 export async function registerWholesaleSupplier(
-  input: { name: string; phone?: string | null; document?: string | null;
-    notes?: string | null; environment?: 'prod' | 'test' },
-  dbPool: Pool = defaultPool,
+  input: SupplierFields & { environment?: 'prod' | 'test' },
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<WholesaleSupplierRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const name = input.name.trim();
@@ -35,6 +41,25 @@ export async function registerWholesaleSupplier(
     [environment, name, input.phone ? normalizeBrazilianPhone(input.phone) : null,
      input.document?.trim() || null, input.notes?.trim() || null]);
   return result.rows[0]!;
+}
+
+export async function updateWholesaleSupplier(
+  supplierId: string, changes: Partial<SupplierFields>,
+  environment: 'prod' | 'test', db: Pick<Pool, 'query'>,
+): Promise<WholesaleSupplierRow> {
+  const result = await db.query<WholesaleSupplierRow>(
+    `UPDATE commerce.wholesale_suppliers SET
+       name=COALESCE($3, name),
+       phone=CASE WHEN $4 THEN $5 ELSE phone END,
+       document=CASE WHEN $6 THEN $7 ELSE document END,
+       notes=CASE WHEN $8 THEN $9 ELSE notes END
+     WHERE id=$1 AND environment=$2 AND deleted_at IS NULL
+     RETURNING id,name,phone,document,notes`,
+    [supplierId, environment, changes.name?.trim(), changes.phone !== undefined,
+      normalizeBrazilianPhone(changes.phone), changes.document !== undefined,
+      changes.document?.trim() || null, changes.notes !== undefined, changes.notes?.trim() || null]);
+  if (!result.rows[0]) throw new Error('supplier_not_found');
+  return result.rows[0];
 }
 
 export async function getWholesaleSupplierRanking(

@@ -170,9 +170,10 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(59);
+  expect(listing.result.tools).toHaveLength(64);
   const writes = ['preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
+    'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
     'usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
@@ -495,7 +496,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(59);
+    expect((await client.listTools()).tools).toHaveLength(64);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -652,4 +653,68 @@ it('reconhece o mesmo Pix no painel e na Milly e permite retirar dinheiro do don
   const owner=await call('registrar_retirada_do_dono',withdrawal);
   expect(await call('registrar_retirada_do_dono',withdrawal)).toEqual(owner);
   expect((await call('estornar_retirada_do_dono',{withdrawal_id:owner.id,reason:'Teste de estorno',occurred_at:body.occurred_at,idempotency_key:randomUUID()})).id).toBeTruthy();
+});
+
+it('cadastra e altera o fornecedor, preservando campos e impedindo duplicação e edição entre ambientes', async () => {
+  const { call, token } = await ownerFinanceMcp();
+  const args = { name: 'Fornecedor Edição MCP', phone: '(21) 98888-4715', notes: 'Entregar no galpão',
+    document: '12345678999', idempotency_key: randomUUID() };
+  const [supplier, replay] = await Promise.all([call('cadastrar_fornecedor', args), call('cadastrar_fornecedor', args)]);
+  expect(replay).toEqual(supplier);
+  const supplier_id = supplier.supplier_id;
+  const fail = async (name: string, data: object) => (await rpc(token, 'tools/call', {name, arguments: data})).json();
+  const duplicate = await fail('cadastrar_fornecedor', {name: 'Fornecedor EDICAO MCP', idempotency_key: randomUUID()});
+  expect(duplicate.error.message).toContain('Já existe fornecedor');
+  const other = await call('cadastrar_fornecedor', {name: 'Outro fornecedor para edição', idempotency_key: randomUUID()});
+  expect((await fail('editar_fornecedor', {supplier_id: other.supplier_id, changes: {phone: args.phone},
+    idempotency_key: randomUUID()})).error.message).toContain('Já existe fornecedor');
+  const changes = {supplier_id, changes: {document: null, phone: '(21) 97777-4411'}, idempotency_key: randomUUID()};
+  const updated = await call('editar_fornecedor', changes);
+  expect(await call('editar_fornecedor', changes)).toEqual(updated);
+  expect((await fail('editar_fornecedor', {...changes, changes: {notes: 'Outro pedido'}})).result.content[0].text).toContain('idempotency_conflict');
+  const detail = await call('consultar_financeiro_fornecedores', {supplier_id});
+  expect(detail.supplier).toMatchObject({name: args.name, notes: args.notes, document: null, phone: '+5521977774411'});
+  const foreign = (await db.pool.query("INSERT INTO commerce.wholesale_suppliers(environment,name) VALUES ('prod','Isolado MCP') RETURNING id")).rows[0].id;
+  expect((await fail('editar_fornecedor', {...changes,supplier_id:foreign,idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
+  expect((await fail('arquivar_fornecedor', {supplier_id:foreign,idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
+});
+
+it('registra compra por item e lote no MCP, preserva saldos ao arquivar e reverte uma compra que falha', async () => {
+  const {call, token} = await ownerFinanceMcp();
+  const purchased_at = new Date().toISOString();
+  const name = 'Fornecedor de compras MCP';
+  const product = await db.pool.query(`INSERT INTO commerce.products(environment,product_code,product_name,product_type)
+    VALUES ('test','mcp-supplier-item','Pneu para compra MCP','tire') RETURNING id`);
+  await db.pool.query(`INSERT INTO commerce.tire_specs(environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
+    VALUES ('test',$1,'185/65R15',185,65,15)`, [product.rows[0].id]);
+  const item = {measure: '185/65R15',brand: 'Pirelli', tire_condition: 'meia_vida', quantity: 4, unit_cost: 80};
+  const catalog = {items: [item], new_supplier: {name}, purchased_at, receipt_status: 'pending',
+    payment_status: 'pending', installments: [{due_date:'2098-05-01',amount:200},{due_date:'2098-06-01',amount:120}],
+    idempotency_key: randomUUID()};
+  const fail = async (tool: string, args: object) => (await rpc(token,'tools/call',{name:tool,arguments:args})).json();
+  const failed = await fail('registrar_compra_fornecedor', {...catalog,group_id:randomUUID()});
+  expect(failed.result.content[0].text).toContain('purchase_group_not_found');
+  expect((await db.pool.query('SELECT id FROM commerce.wholesale_suppliers WHERE environment=$1 AND name=$2',['test',name])).rowCount).toBe(0);
+  const pending = await call('registrar_compra_fornecedor', catalog);
+  expect(await call('registrar_compra_fornecedor', catalog)).toEqual(pending);
+  const supplier_id = pending.supplier_id;
+  expect(pending).toMatchObject({total_amount:'320.00',stock_applied:false,payment_status:'pending'});
+  const lot = {supplier_id,lot:{description:'Lote de conferência MCP',quantity:12,total_cost:600}, purchased_at,
+    receipt_status:'received',received_at:purchased_at,payment_status:'paid',paid_at:purchased_at,
+    payment_method:'Pix',idempotency_key:randomUUID()};
+  expect((await fail('registrar_compra_lote_fornecedor',{...lot,receipt_status:undefined})).error).toBeTruthy();
+  const [received, retry] = await Promise.all([call('registrar_compra_lote_fornecedor',lot),call('registrar_compra_lote_fornecedor',lot)]);
+  expect(received).toMatchObject({total_amount:'600.00',stock_applied:true,lot_id:expect.any(String),payment_status:'paid'});
+  expect(retry).toEqual(received);
+  const archive = {supplier_id,idempotency_key:randomUUID()};
+  expect(await call('arquivar_fornecedor',archive)).toEqual({supplier_id,archived:true});
+  expect(await call('arquivar_fornecedor',archive)).toEqual({supplier_id,archived:true});
+  const detail = await call('consultar_financeiro_fornecedores',{supplier_id});
+  expect(detail.supplier.archived).toBe(true);
+  expect(detail.purchases).toHaveLength(2);
+  expect(detail.cash).toHaveLength(1);
+  expect(Number(detail.cash[0].amount)).toBe(600);
+  expect(detail.payables.map((p:{balance:string})=>Number(p.balance))).toEqual([200,120]);
+  expect((await fail('registrar_compra_lote_fornecedor',{...lot,idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
+  expect((await fail('editar_fornecedor',{supplier_id,changes:{notes:'Após arquivo'},idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
 });

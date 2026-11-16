@@ -31,6 +31,20 @@ Os valores e nomes a seguir são exemplos fictícios.
 | “Compara esse extrato da conta da empresa com o Farejador.” | `conferir_extrato_bancario` compara as linhas fornecidas pelo dono por conta, dia, direção e valor. Duplicidades e contas não identificadas ficam para revisão. A comparação é de leitura. |
 | “Se eu comprar 100 pneus por R$ 2.000, pagar R$ 500 de frete e aproveitar 80, quanto sai cada pneu?” | `simular_compra_de_lote` calcula R$ 25 por coletado e R$ 31,25 por aproveitável nesse exemplo. Informe gastos extras, desembolso até a data e horizonte para estimar o caixa. O preço de venda opcional estima o resultado caso venda todos os aproveitáveis. |
 
+### Fornecedores e compras
+
+A permissão **Permitir lançamentos financeiros por voz ou texto** também habilita a gestão de fornecedores e o registro de compras.
+
+| Pedido do dono | Ação da Milly |
+|---|---|
+| “Cadastre a Borracharia do João” | Consulte os fornecedores por nome em `consultar_financeiro_fornecedores`. Use `cadastrar_fornecedor` para criar a ficha. |
+| “Mude o telefone do João” | Identifique a ficha ativa e use `editar_fornecedor` com o UUID e os campos solicitados. Para apagar um campo opcional, envie `null`. |
+| “Exclua esse fornecedor” | `arquivar_fornecedor` retira a ficha dos cadastros ativos. Compras, saldos e créditos continuam consultáveis. |
+| “Comprei quatro pneus do João por R$ 80 cada” | Use `registrar_compra_fornecedor` com os itens, medida, marca, condição e custo unitário. Informe data, situação do pagamento e se os pneus chegaram. |
+| “Comprei um lote fechado de 30 pneus por R$ 1.200” | Use `registrar_compra_lote_fornecedor` com quantidade e preço total. Informe o vencimento se for a prazo e a data de recebimento se já chegou. |
+
+Consulte as compras existentes e reutilize o UUID do pedido em tentativas repetidas. Compra recebida dá entrada no galpão. Compra a prazo gera contas a pagar. Para abater dinheiro já adiantado, registre a compra a prazo e use `usar_adiantamento_fornecedor` na parcela autorizada.
+
 ### Alterar um vencimento
 
 `consultar_parcelas_para_revisao` localiza o comprador, a venda e a parcela em aberto. `preparar_alteracao_vencimento` confere a data atual e devolve a proposta. Quando `confirmacao=conversa`, a autorização explícita do dono permite usar `confirmar_alteracao_vencimento` imediatamente. Quando `confirmacao=painel`, a proposta traz o link do painel. `consultar_proposta_vencimento` informa a situação. A página de detalhes permite restaurar a data de uma proposta confirmada conforme o estado atual da parcela.

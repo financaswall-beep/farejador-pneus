@@ -13,12 +13,12 @@ export function dotPage(requestToken?:string) {
     <li>Cadastros e operação das lojas parceiras, inclusive seu financeiro</li><li>Clientes, nomes, telefones, endereços, documentos e conversas</li>
     <li>Marketing, textos, comentários e mídia cadastrada</li><li>Equipe, remuneração individual, folha, notificações e saúde do sistema</li></ul>
     <p><strong>Acesso amplo, somente para consulta.</strong> Você autoriza a leitura dos dados pessoais e comerciais acima.
-    O assistente não pode alterar registros comerciais, enviar mensagens a clientes ou executar pagamentos. Senhas, tokens e chaves de integração ficam protegidos.</p>
+    Nesta etapa, a Milly pode consultar os registros. O conector não envia mensagens a clientes nem executa pagamentos no banco. Senhas, tokens e chaves de integração ficam protegidos.</p>
     <p>Quando você pedir acompanhamento no Dot e o recurso estiver habilitado, o Farejador poderá enviar eventos de conversas e entregas para análise.
     Conectar sozinho não ativa avisos. Você pode pedir para parar o acompanhamento ou desconectar abaixo.</p>
-    <p>Após conectar, você pode habilitar lançamentos financeiros por voz ou texto. Também pode permitir alterações de vencimento e escolher onde confirmar cada mudança, na conversa com a Milly ou na Matriz. A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
+    <p>Após conectar, você pode permitir que a Milly registre lançamentos financeiros e compras e cadastre, edite ou arquive fornecedores por voz ou texto. Também pode permitir alterações de vencimento e escolher onde confirmar cada mudança, na conversa com a Milly ou na Matriz. A conexão vale por até 30 dias. Você pode desconectar a qualquer momento.</p>
     <button id="allow" type="button">Autorizar consultas</button><button id="deny" class="secondary" type="button">Agora não</button>`:
     `<section id="review" hidden><h1>Conferir vencimento</h1><p id="review-detail"></p><p id="review-state" role="status"></p><button id="undo-date" class="secondary" hidden type="button">Restaurar vencimento anterior</button></section>
-     <section id="manage"><h1>Permissões da Milly</h1><p>Escolha as permissões de lançamentos financeiros e de vencimentos de cada conexão.</p><div id="connections"></div></section><a href="/admin/painel">Voltar à Matriz</a>`}
+     <section id="manage"><h1>Permissões da Milly</h1><p>A permissão de lançamentos financeiros inclui registrar compras e cadastrar, editar ou arquivar fornecedores. A alteração de vencimentos tem permissão própria.</p><div id="connections"></div></section><a href="/admin/painel">Voltar à Matriz</a>`}
     <p id="message" class="error" role="status" aria-live="polite"></p></main></body></html>`;
 }

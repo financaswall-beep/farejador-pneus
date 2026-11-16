@@ -34,6 +34,12 @@ import { listPurchaseGroups,getPurchaseGroup } from '../painel/queries-purchase-
 import { linkPurchaseGroupInTransaction } from '../painel/purchase-group-links.js';
 import { beginIntegrityOperation,completeIntegrityOperation,operationFingerprint,recordIntegrityEvent } from '../painel/stage5-integrity.js';
 
+import {
+  createSupplierInput, editSupplierInput, archiveSupplierInput, createSupplier, editSupplier, archiveSupplier,
+  purchaseInput, lotPurchaseInput, registerSupplierPurchase,
+} from './supplier-operations.js';
+import { mapWriteError } from '../painel/route-helpers.js';
+
 const tools=new Map<string,{descriptor:Tool;call:(identity:DotIdentity,args:unknown)=>Promise<object>}>();
 function describe(name:string,description:string,schema:z.ZodTypeAny,write:boolean):Tool & {securitySchemes:{type:string;scopes:string[]}[]} {
   const { $schema,...json }=zodToJsonSchema(schema,{$refStrategy:'none',effectStrategy:'input'});
@@ -205,6 +211,11 @@ write('registrar_devolucao_adiantamento','Registra dinheiro efetivamente devolvi
   (db,data,actor)=>runSupplierAdvance(db,{...data,action:'refund'},actor));
 write('estornar_adiantamento_fornecedor','Corrige um registro de adiantamento feito por engano.',advanceVoidSchema.omit({action:true}),
   (db,data,actor)=>runSupplierAdvance(db,{...data,action:'void'},actor));
+write('cadastrar_fornecedor','Cadastra um fornecedor da Matriz por nome, telefone, documento e observações. Consulte primeiro se ele já existe.',createSupplierInput,createSupplier);
+write('editar_fornecedor','Atualiza o cadastro ativo pelo UUID. Envie em changes só os campos pedidos. Para limpar telefone, documento ou observações, envie null.',editSupplierInput,editSupplier);
+write('arquivar_fornecedor','Exclui o fornecedor do cadastro ativo pelo UUID, preservando compras, dívidas e adiantamentos.',archiveSupplierInput,archiveSupplier);
+write('registrar_compra_fornecedor','Registra compra formal por medida, marca, condição, quantidade e custo unitário. Informe pagamento e recebimento separadamente. Para lote fechado, use registrar_compra_lote_fornecedor.',purchaseInput,registerSupplierPurchase);
+write('registrar_compra_lote_fornecedor','Registra um lote fechado pelo total e quantidade de pneus. Informe pagamento, recebimento e respectivas datas. Compra a prazo exige vencimento.',lotPurchaseInput,registerSupplierPurchase);
 export const financeTools=[...tools.values()].map(t=>t.descriptor);
 export function hasFinanceTool(name:string) {return tools.has(name);}
 export async function invokeFinanceTool(identity:DotIdentity,name:string,args:unknown) {
@@ -213,6 +224,9 @@ export async function invokeFinanceTool(identity:DotIdentity,name:string,args:un
     return {content:[{type:'text' as const,text:JSON.stringify(data)}],structuredContent:{...data}};
   } catch(error) {
     if(error instanceof McpError) throw error;
+    if (mapWriteError(error).error === 'supplier_duplicate') {
+      throw new McpError(ErrorCode.InvalidParams,'Já existe fornecedor ativo com esse nome, telefone ou documento. Consulte o cadastro antes de continuar.');
+    }
     const message=error instanceof Error?error.message:'';
     if (error instanceof z.ZodError) throw new McpError(ErrorCode.InvalidParams,'Confira os dados: '+error.issues.map(issue=>issue.path.join('.')||issue.code).join(', '));
     const code=/^[a-z][a-z0-9_]{2,90}$/.test(message)?message:'operacao_indisponivel';

@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { RegisterWholesalePurchaseInput } from './queries-fornecedores-registro.js';
+import type { RegisterWholesalePurchaseInput } from './register-wholesale-purchase.js';
 import type { PurchaseItemInput } from './purchase-brand.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { addWholesaleStockEntry } from './queries-galpao.js';
