@@ -1,6 +1,54 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.marketingPublisherHelpers = function () {
     return {
+        mpCarouselMode(enabled) {
+            if (!enabled && this.mpMediaIds().length > 1 &&
+                !window.confirm('Usar somente a primeira foto nesta publicação?')) return;
+            if (enabled && this.mpSelectedMedia()?.kind === 'video') {
+                this.mpError = 'Retire o vídeo antes de montar um carrossel de fotos.';
+                return;
+            }
+            this.mpCarousel = enabled;
+            this.mpSetMediaIds(this.mpMediaIds().slice(0, 1));
+            if (enabled) this.mpForm.destinations.forEach(d => { d.format = 'feed'; });
+            this.mpError = '';
+        },
+        mpSetMediaIds(ids) {
+            this.mpForm.media_ids = ids;
+            this.mpForm.media_id = ids[0] || null;
+            this.mpDirty = true;
+        },
+        mpRemoveSelected(id) {
+            this.mpSetMediaIds(this.mpMediaIds().filter(value => value !== id));
+        },
+        mpMovePhoto(id, direction) {
+            const ids = [...this.mpMediaIds()], index = ids.indexOf(id), target = index + direction;
+            if (index < 0 || target < 0 || target >= ids.length) return;
+            [ids[index], ids[target]] = [ids[target], ids[index]];
+            this.mpSetMediaIds(ids);
+        },
+        mpSelectMedia(media) {
+            if (this.mpMediaNeedsRecovery(media))
+                return;
+            if (!this.mpForm)
+                this.mpFresh();
+            if (this.mpCarousel) {
+                const ids = this.mpMediaIds();
+                if (ids.includes(media.id)) return;
+                if (media.kind !== 'photo' || ids.length >= 10) {
+                    this.mpError = 'O carrossel aceita de 2 a 10 fotos.';
+                    return;
+                }
+                this.mpSetMediaIds([...ids, media.id]);
+            } else this.mpSetMediaIds([media.id]);
+            this.mpError = '';
+            if (!this.mpForm.title)
+                this.mpForm.title = media.name.replace(/\.[^.]+$/, '');
+            this.mpForm.destinations.forEach(destination => {
+                if (media.kind === 'photo' && destination.format === 'reel') destination.format = 'feed';
+                if (media.kind === 'video' && destination.format === 'feed') destination.format = 'reel';
+            });
+        },
         mpErrorText(error) {
             const messages = { publisher_disabled: 'A Central está desativada no servidor. Ative a configuração após aplicar a migration.',
                 publisher_send_disabled: 'O envio ainda não está habilitado. Confira as contas, as permissões e o Storage.',
