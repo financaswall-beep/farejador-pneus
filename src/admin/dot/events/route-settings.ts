@@ -16,10 +16,12 @@ export async function registerDotAlertSettings(app:FastifyInstance) {
   reply.header('Cache-Control','no-store');
   try {
    const person=getAdminContext(request).personId!;
-   const [config,subscriptions,external]=await Promise.all([readSettings(),dotConfig()?pool.query(`SELECT id,event_name,arguments,expires_at,last_delivery_at
+   const [config,subscriptions,external,cases]=await Promise.all([readSettings(),dotConfig()?pool.query(`SELECT id,event_name,arguments,expires_at,last_delivery_at
     FROM (${activeSubscriptionsSql} AND s.person_id=$4) active ORDER BY event_name,id`,[...subscriptionParams(),person]):Promise.resolve({rows:[]}),pool.query(
-    'SELECT status,consecutive_failures,last_checked_at FROM ops.dot_external_health WHERE environment=$1',[env.FAREJADOR_ENV])]);
-   return {...config,runtime:dotEventsState(),subscriptions:subscriptions.rows,external_monitor:external.rows[0]??null,
+    'SELECT status,consecutive_failures,last_checked_at FROM ops.dot_external_health WHERE environment=$1',[env.FAREJADOR_ENV]),
+    pool.query(`SELECT id,summary,priority,updated_at FROM ops.dot_internal_cases WHERE environment=$1 AND person_id=$2
+      AND closed_at IS NULL ORDER BY (priority='alta') DESC,updated_at DESC,id LIMIT 20`,[env.FAREJADOR_ENV,person])]);
+   return {...config,runtime:dotEventsState(),subscriptions:subscriptions.rows,external_monitor:external.rows[0]??null,pendencias:cases.rows,
     source_checks:signalSourceStatus(),timezone:'America/Sao_Paulo',
     rules:eventDefinitions.map(event=>({name:event.name,label:ruleLabels[event.name],description:event.description}))};
   }catch{return reply.code(503).send({error:'dot_settings_unavailable'});}

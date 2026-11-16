@@ -23,6 +23,7 @@ export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook)
     await collectEvents(db);
     await deliverEvents(db,send,undefined,async()=>{await lock.query('SELECT 1');});
     // Private technical history only. Preserve pending retries and live incident deduplication for seven days.
+    await db.query('DELETE FROM network.dot_operation_reviews WHERE environment=$1 AND expires_at<=now()',[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_event_deliveries WHERE environment=$1 AND status<>'pending' AND created_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_monitor_targets WHERE environment=$1 AND due_at IS NULL AND changed_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM network.dot_event_subscriptions WHERE environment=$1
@@ -41,6 +42,8 @@ export async function assertDotEventsSchema(db:Pool=pool) {
   await db.query('SELECT revision FROM ops.dot_monitor_targets LIMIT 0');
   await db.query('SELECT version,settings FROM network.dot_event_settings LIMIT 0');
   await db.query('SELECT status FROM ops.dot_external_health LIMIT 0');
+  await db.query('SELECT id FROM ops.dot_internal_cases LIMIT 0');
+  await db.query('SELECT executed_at FROM network.dot_operation_reviews LIMIT 0');
 }
 /** Fail closed for the optional monitor, without taking the commercial application offline. */
 export async function initializeDotEvents(db:Pool=pool) {

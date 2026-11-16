@@ -655,6 +655,38 @@ it('reconhece o mesmo Pix no painel e na Milly e permite retirar dinheiro do don
   expect((await call('estornar_retirada_do_dono',{withdrawal_id:owner.id,reason:'Teste de estorno',occurred_at:body.occurred_at,idempotency_key:randomUUID()})).id).toBeTruthy();
 });
 
+it('conexão de acompanhamento só grava após decisão humana vinculada aos dados', async()=>{
+  const {call,token}=await ownerFinanceMcp();
+  await db.pool.query(`INSERT INTO network.dot_monitor_owners
+    SELECT environment,person_id,client_id,resource FROM network.dot_oauth_grants WHERE id IN
+    (SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1)`,[createHash('sha256').update(token).digest('hex')]);
+  const data={name:'Fornecedor autorizado pelo dono',idempotency_key:randomUUID()};
+  const create=()=>call('cadastrar_fornecedor',data);
+  const count=async()=>(await db.pool.query("SELECT id FROM commerce.wholesale_suppliers WHERE environment='test' AND name=$1",[data.name])).rowCount;
+  const pending=await create();
+  expect(pending).toMatchObject({status:'aguardando_autorizacao',executada:false});
+  expect(await create()).toEqual(pending);
+  expect(await count()).toBe(0);
+  const changed=(await rpc(token,'tools/call',{name:'cadastrar_fornecedor',arguments:{...data,name:'Outro'}})).json();
+  expect(changed.result.isError).toBe(true);
+  const path='/admin/api/dot/operation-reviews/'+new URL(pending.confirm_url).searchParams.get('operacao');
+  const decision={decisao:'autorizada'};
+  expect((await app.inject({method:'POST',url:path,headers:{origin,authorization:'Bearer '+token},payload:decision})).statusCode).not.toBe(200);
+  expect((await app.inject({method:'POST',url:path,headers:{...headers(),origin:'https://outro.example'},payload:decision})).statusCode).toBe(403);
+  expect(await count()).toBe(0);
+  const approve=()=>app.inject({method:'POST',url:path,headers:headers(),payload:decision});
+  const [a,b]=await Promise.all([approve(),approve()]);
+  expect(a.json()).toEqual({status:'executada'});expect(b.json()).toEqual(a.json());
+  expect((await create()).supplier_id).toBeTruthy();expect(await count()).toBe(1);
+  const rejected=await call('cadastrar_fornecedor',{name:'Recusado',idempotency_key:randomUUID()});
+  const rejectPath='/admin/api/dot/operation-reviews/'+new URL(rejected.confirm_url).searchParams.get('operacao');
+  expect((await app.inject({method:'POST',url:rejectPath,headers:headers(),payload:{decisao:'recusada'}})).json().status).toBe('recusada');
+  expect((await app.inject({method:'POST',url:rejectPath,headers:headers(),payload:decision})).statusCode).toBe(409);
+  const other=await ownerFinanceMcp();
+  expect((await other.call('cadastrar_fornecedor',{name:'Outra conexão',idempotency_key:randomUUID()})).status).toBe('aguardando_autorizacao');
+  await db.pool.query("DELETE FROM network.dot_monitor_owners WHERE environment='test' AND person_id=$1",[person]);
+});
+
 it('cadastra e altera o fornecedor, preservando campos e impedindo duplicação e edição entre ambientes', async () => {
   const { call, token } = await ownerFinanceMcp();
   const args = { name: 'Fornecedor Edição MCP', phone: '(21) 98888-4715', notes: 'Entregar no galpão',
@@ -705,6 +737,10 @@ it('registra compra por item e lote no MCP, preserva saldos ao arquivar e revert
   expect((await fail('registrar_compra_lote_fornecedor',{...lot,receipt_status:undefined})).error).toBeTruthy();
   const [received, retry] = await Promise.all([call('registrar_compra_lote_fornecedor',lot),call('registrar_compra_lote_fornecedor',lot)]);
   expect(received).toMatchObject({total_amount:'600.00',stock_applied:true,lot_id:expect.any(String),payment_status:'paid'});
+  const {lotSignals}=await import('../../src/admin/dot/events/signals-internal.js');
+  const {defaultSettings}=await import('../../src/admin/dot/events/settings.js');
+  expect((await lotSignals(db.pool,defaultSettings(),new Date(Date.now()+1000))).map(signal=>signal.data.evidence))
+    .toContainEqual(expect.objectContaining({lot_id:received.lot_id,unidades_livres:12}));
   expect(retry).toEqual(received);
   const archive = {supplier_id,idempotency_key:randomUUID()};
   expect(await call('arquivar_fornecedor',archive)).toEqual({supplier_id,archived:true});

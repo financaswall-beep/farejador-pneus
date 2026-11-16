@@ -9,9 +9,11 @@ import { financeSignals } from './signals-finance.js';
 import { marketingSignals } from './signals-marketing.js';
 import { systemSignals } from './signals-system.js';
 import { externalHealthId,readExternalHealth } from './external-health.js';
+import { draftSignals,lotSignals } from './signals-internal.js';
 
 type Detector=(db:Pool,settings:DotSettings,now:Date)=>Promise<Snapshot[]>;
 const detectors:Partial<Record<EventName,Detector>>={
+ 'farejador.marketing.rascunho':draftSignals,'farejador.estoque.lote':lotSignals,
  'farejador.estoque.procura':demandSignals,'farejador.estoque.disponivel':restockSignals,
  'farejador.atendimento.inconsistencia':quoteSignals,'farejador.financeiro.atencao':financeSignals,
  'farejador.marketing.atencao':marketingSignals,'farejador.sistema.atencao':systemSignals,

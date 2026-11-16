@@ -17,7 +17,10 @@ export async function scanSignals(db:Pool,now=new Date(),onlySystem=false) {
   if(!matching.length||!ruleEnabled(settings,name))continue;
   // A failed source does not prevent independent categories from being checked.
   let rows;try{rows=await readSignals(name,db,now);}catch{continue;}
-  for(const snapshot of rows)for(const sub of matching)await enqueueSnapshot(db,sub,snapshot,now,now);
+  for(const snapshot of rows)for(const sub of matching){
+   const changedAt=name==='farejador.marketing.rascunho'||name==='farejador.estoque.lote'?snapshot.occurredAt:now;
+   await enqueueSnapshot(db,sub,snapshot,changedAt,now);
+  }
  }
  if(!onlySystem&&ruleEnabled(settings,'farejador.entrega.atencao')&&subs.some(s=>s.event_name==='farejador.entrega.atencao')) {
   const rows=await withDotReadOnly(async reader=>bounded((await reader.query<{id:string}>(`SELECT o.id

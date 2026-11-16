@@ -5,6 +5,8 @@ import { env } from '../../../shared/config/env.js';
 import { eventNames,type EventName } from './model.js';
 
 export const ruleLabels:Record<EventName,string>={
+ 'farejador.marketing.rascunho':'Revisar rascunhos de publicação',
+ 'farejador.estoque.lote':'Lotes disponíveis para conferir',
  'farejador.conversa.atualizada':'Atendimento e espera por resposta',
  'farejador.entrega.atencao':'Entregas com problema',
  'farejador.estoque.procura':'Procura recorrente sem estoque',
@@ -37,7 +39,10 @@ export function defaultSettings():DotSettings {
 export async function readSettings(db:Pick<Pool,'query'>=pool) {
  const row=(await db.query<{settings:unknown;version:number;updated_at:Date}>(
   'SELECT settings,version,updated_at FROM network.dot_event_settings WHERE environment=$1',[env.FAREJADOR_ENV])).rows[0];
- return {settings:row?settingsSchema.parse(row.settings):defaultSettings(),version:row?.version??0,updated_at:row?.updated_at??null};
+ // Preferências salvas antes da inclusão desses dois eventos conservam as escolhas originais.
+ const saved=row?z.object({events:z.record(z.boolean())}).passthrough().parse(row.settings):null;
+ return {settings:saved?settingsSchema.parse({...saved,events:{'farejador.marketing.rascunho':false,'farejador.estoque.lote':false,...saved.events}}):defaultSettings(),
+   version:row?.version??0,updated_at:row?.updated_at??null};
 }
 export function ruleEnabled(settings:DotSettings,name:EventName) {return !settings.paused&&settings.events[name]===true;}
 export async function saveSettings(settings:DotSettings,version:number,personId:string,db:Pool=pool) {
