@@ -7,7 +7,7 @@ import {explicitRestockPhone} from './restock-customer-input.js';
 
 export const STOCK_INTEREST_TOOL: ToolDefinition = { type: 'function', function: {
   name: 'registrar_interesse_reposicao',
-  description: 'Lista de espera quando falta pneu. Primeiro ofereça aviso pelo WhatsApp; após o aceite, peça o número com DDD no Instagram/Facebook. No WhatsApp com telefone cadastrado, OMITA telefone: o código recupera o número do contato; nunca peça novamente nem invente o número. Confirme medida, condição, tipo e quantidade desejados; pergunte somente o que falta. consentimento copia exatamente a resposta que autorizou o aviso (inclusive sim ou pode ser de boa, após sua oferta). Nunca invente consentimento, telefone, quantidade ou tipo. Não reserva nem envia aviso automaticamente. Para revogar use acao cancelar.',
+  description: 'Lista de espera para item com falta confirmada. Se há outro item pedido disponível, deixe o cliente decidir sobre ele. Ofereça o aviso pelo WhatsApp em uma pergunta própria; aceite da compra não autoriza o aviso. Após o aceite do aviso, peça o número com DDD no Instagram/Facebook. No WhatsApp com telefone cadastrado, OMITA telefone: o código recupera o número do contato; nunca peça novamente nem invente o número. Confirme medida, condição, tipo e quantidade desejados; pergunte somente o que falta. consentimento copia exatamente a resposta que autorizou o aviso (inclusive sim ou pode ser de boa, após sua oferta). Nunca invente consentimento, telefone, quantidade ou tipo. Não reserva nem envia aviso automaticamente. Para revogar use acao cancelar.',
   parameters: { type: 'object', additionalProperties: false,
     properties: { acao: { type: 'string', enum: ['registrar','cancelar'] }, medida: { type:'string' },
       condicao: { type:'string', enum:['novo','meia_vida','remold'] }, telefone:{type:'string',description:'Opcional no WhatsApp: omita para usar o telefone cadastrado do contato. Em outros canais, informe somente o número confirmado por texto pelo cliente.'}, consentimento:{type:'string'},
@@ -22,7 +22,20 @@ export function contextualRestockConsent(text:string, offer:string):boolean {
   const normalized=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
   const offered=/\b(avis\w*|notific\w*)\b/i.test(offer) && /\b(cheg\w*|reposi\w*|estoque)\b/i.test(offer)
     && /whats/i.test(offer);
-  return offered && (explicitRestockConsent(text) || /^(sim|pode(?: sim| ser)?|quero(?: sim)?|claro|beleza|blz|ok)(?:[,\s]+(?:de boa|por favor|obrigad[oa]))?[\s!.😊👍]*$/.test(normalized));
+  if (!offered) return false;
+  if (explicitRestockConsent(text)) return true;
+  const shortYes = /^(sim|pode(?: sim| ser)?|quero(?: sim)?|claro|beleza|blz|ok)(?:[,\s]+(?:de boa|por favor|obrigad[oa]))?[\s!.😊👍]*$/.test(normalized);
+  if (!shortYes) return false;
+  // Um “sim” pode responder à compra do item disponível. Só serve para a lista
+  // quando a pergunta que o cliente recebeu é especificamente sobre o aviso.
+  const questions = offer.match(/[^.!?\n]+\?+/g) ?? [];
+  if (questions.length > 1) return false;
+  const question = questions[0] ?? offer.trim().split(/[.!\n]+/).filter(Boolean).at(-1) ?? '';
+  if (!questions.length && !/\b(?:quer|gostaria|posso|podemos|autoriza|devo)\b/i.test(question)) return false;
+  const genericConfirmation = /^\s*(?:pode ser|tudo bem|pode|ok)\?+\s*$/i.test(question);
+  const proposal = genericConfirmation ? offer.slice(0, offer.lastIndexOf(question)) : question;
+  return /\b(?:avis\w*|notific\w*|mensagem)\b/i.test(proposal)
+    && !/\b(?:levar|fechar|comprar|reservar|retirar|ou)\b/i.test(proposal);
 }
 
 export function explicitRestockConsent(text: string): boolean {

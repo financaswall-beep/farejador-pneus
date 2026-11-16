@@ -43,7 +43,7 @@ export function formatCustomerContext(row: CustomerContextRow): string {
   if (firstName) {
     parts.push(`Nome conhecido do Chatwoot: ${firstName}. Use na saudação inicial e, no máximo, uma vez na confirmação final; não repita em perguntas intermediárias e NÃO pergunte novamente.`);
   } else {
-    parts.push('Nome não confirmado no Chatwoot. Pergunte o nome durante a conversa, sem interromper a cotação.');
+    parts.push('Nome não confirmado no Chatwoot. Peça o nome com os dados de fechamento quando o cliente decidir levar.');
   }
 
   const hasPhone = row.phone_e164 !== undefined ? normalizeCheckoutPhone(row.phone_e164) !== null : row.has_phone;
