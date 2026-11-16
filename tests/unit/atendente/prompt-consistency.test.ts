@@ -37,6 +37,14 @@ describe('consistência das regras centrais do prompt', () => {
     expect(SYSTEM_PROMPT).not.toContain('then send the store NAME, the written ADDRESS');
   });
 
+  it('distingue consulta, compra e decisão sobre parte do pedido', () => {
+    expect(SYSTEM_PROMPT).toContain('For an inquiry, answer it without collecting a name, payment or delivery/pickup choice');
+    expect(SYSTEM_PROMPT).toContain('When they choose to take the offered item, continue checkout');
+    expect(SYSTEM_PROMPT).toContain('ask whether the available item(s) alone would help');
+    expect(SYSTEM_PROMPT).toContain('Keep the alert a separate decision');
+    expect(SYSTEM_PROMPT).not.toContain('Which closing step am I in?');
+  });
+
   it('define pagamento no recebimento para entrega e retirada', () => {
     expect(SYSTEM_PROMPT).toContain('PAYMENT: ALWAYS ON RECEIPT, NEVER IN ADVANCE');
     expect(SYSTEM_PROMPT).toContain('"[forma] na entrega"');

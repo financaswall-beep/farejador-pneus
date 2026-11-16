@@ -57,7 +57,7 @@ describe('contexto de localização enviado ao modelo', () => {
     const input=JSON.parse(fetcher.mock.calls[0]?.[1].body).input;
     const system=input.find((message:{role:string})=>message.role==='system').content;
     expect(system).toContain('[VOCÊ JÁ PEDIU A LOCALIZAÇÃO NESTA CONVERSA]');
-    expect(system).toContain('Se AINDA NÃO houve cotação');
+    expect(system).toContain('só peça entrega/retirada se ele já decidiu levar');
     expect(system).not.toContain('[LOCALIZAÇÃO ANTES DA DISPONIBILIDADE DO PNEU]');
   });
 });

@@ -34,8 +34,8 @@ export function customerChoseDelivery(latestCustomerText: string | null | undefi
 
 export const DELIVERY_QUOTE_FIRST_NUDGE = `
 
-[CLIENTE ESCOLHEU ENTREGA E VOCÊ JÁ TEM A LOCALIZAÇÃO 📍] Você tem o pino do cliente — NÃO precisa do endereço escrito pra cotar o frete. Então:
-- SE ainda não cotou o frete: chame calcular_frete AGORA (SEM passar "bairro" — o sistema resolve a loja e o valor pela localização) e informe o frete, seguindo pro fechamento.
+[ENTREGA MENCIONADA COM PINO DISPONÍVEL 📍] Use a fala do cliente para distinguir uma dúvida de uma escolha. Uma pergunta sobre como funciona a entrega não escolhe modalidade. Responda à dúvida.
+- Se ele pediu o valor do frete ou escolheu receber o pneu e a cotação ainda falta, chame calcular_frete (SEM passar "bairro" — o sistema resolve a loja e o valor pela localização). Se só pediu o valor, responda e aguarde. Siga para o fechamento quando ele escolher comprar.
 - Peça a rua e o número só no FECHAMENTO, como detalhe pro entregador achar a porta — NUNCA como condição pra cotar o frete ou pra continuar. NÃO trave a venda exigindo o endereço antes de cotar.
 - NUNCA diga que precisa do endereço "pra calcular" o frete: você calcula pela localização que já recebeu.`;
 
