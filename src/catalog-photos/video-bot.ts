@@ -54,7 +54,7 @@ export async function requestCatalogVideos(client:PoolClient,environment:Environ
   results.push({product_id:id,status:existing?'video_enfileirado':'video_nao_enfileirado'});
  }
  return JSON.stringify({status:results.every(r=>r.status==='video_enfileirado')?'videos_enfileirados':'videos_parciais',solicitacoes:results,
-  orientacao:'O vídeo cadastrado vai como anexo. Ao cliente, uma frase curta, como "Olha o vídeo aí, amigo." Sem preço ou fila. Leia cada resultado: sem_video significa que não há vídeo; ofereça foto, sem enviar outra mídia sem ele pedir. Não confirme entrega nem estoque com base na fila.'});
+  orientacao:'O vídeo cadastrado vai como anexo. Se precisar de texto, apresente o vídeo brevemente com suas palavras. Sem preço ou fila. Leia cada resultado: sem_video significa que não há vídeo; ofereça foto, sem enviar outra mídia sem ele pedir. Não confirme entrega nem estoque com base na fila.'});
 }
 export async function authorizedCatalogVideo(client:PoolClient,row:OutboundRow){
  const payload=catalogVideoPayload(row.body);

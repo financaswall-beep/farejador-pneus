@@ -1,6 +1,3 @@
-export const CUSTOMER_LOCATION_REQUEST =
-  'Me manda sua localização fixa 📍 ou seu endereço, amigo, que eu vejo onde encontro esse pneu mais perto de você.';
-
 // Aceita a escrita de balcão ("130 70 13"), sem confundir datas/telefones usuais.
 const TIRE_SIZE_RE = /\b(?:(?:[6-9]\d|[1-3]\d{2})(?:\s*[/\-]\s*|\s+)(?:[2-9]\d|100)(?:\s*(?:ZR|R|B|[-/])\s*|\s+)(?:1\d|2\d)|\d{1,2}\.\d{2}\s*[-/]\s*\d{2})\b/i;
 const TIRE_REQUEST_RE = /\bpneu(?:s|zinho|zinhos)?\b|\b(?:dianteiro|traseiro)\b/i;
@@ -17,7 +14,7 @@ Este lembrete vale para busca/cotação de pneu. Se o assunto for pedido existen
 Para interesse em compra no atacado/revenda, siga WHOLESALE CONTACT antes deste lembrete: compartilhe o contato sem pedir localização nem buscar estoque de varejo. Se a intenção comercial estiver ambígua, esclareça uso próprio ou revenda; quantidade sozinha não define atacado.
 ${hasPin
     ? 'O cliente JÁ enviou o pino de localização. Use-o e consulte as ferramentas sem bairro. NÃO peça a localização novamente.'
-    : `Confira a mensagem atual e o histórico: se o cliente ainda NÃO informou localização, endereço ou região, peça somente a localização fixa ou o endereço e AGUARDE. Use: "${CUSTOMER_LOCATION_REQUEST}". Não comece com "tenho sim", "temos" ou outra confirmação; não antecipe preço, modelo/ano ou busca de estoque nessa etapa. Se o endereço/bairro/região JÁ foi informado, aproveite-o, registre a localização conforme a regra existente e siga para a consulta, sem pedir novamente.`}
+    : `Confira a mensagem atual e o histórico: se o cliente ainda NÃO informou localização, endereço ou região, peça somente a localização fixa ou o endereço e AGUARDE. Formule a pergunta com suas palavras, conforme a conversa. Não comece com "tenho sim", "temos" ou outra confirmação; não antecipe preço, modelo/ano ou busca de estoque nessa etapa. Se o endereço/bairro/região JÁ foi informado, aproveite-o, registre a localização conforme a regra existente e siga para a consulta, sem pedir novamente.`}
 Depois da localização: ${search}
 Se a ferramenta retornar precisa_municipio=true, pergunte somente a cidade do bairro, usando municipios_possiveis quando forem duas opções. Não invente municipio para evitar essa pergunta. Após a resposta, repita a busca com a cidade confirmada e o mesmo pneu/bairro; não peça novamente endereço ou pino.
 Só confirme disponibilidade com resultado DESTE TURNO para uma loja que possa atender. Aplicação/medida ou estoque_consultado=false não confirma estoque. Não invente bairro nem use disponibilidade de outra região.`;

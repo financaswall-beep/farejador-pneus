@@ -54,7 +54,7 @@ export async function tryMatrixCatalogPhoto(client:PoolClient,environment:Enviro
  }
  if(!accepted)return JSON.stringify({status:'foto_nao_enfileirada',orientacao:'O controle da conversa impediu o envio. Não prometa foto enviada.'});
  return JSON.stringify({status:queued?'foto_enfileirada':'foto_ja_enfileirada',product_id:productId,quantidade:photos.length,
-  origem:'galeria_matriz',tipo:'referencia',orientacao:'A imagem vai automaticamente como anexo. Ao cliente, só uma frase curta: "Olha a foto aí, amigo." Não acrescente preço, fila, expediente ou ressalvas. Estes controles são internos: não confirme entrega antes do eco, estoque ou reserva; não invente foto atual do exemplar. Para desgaste/estado atual, solicite foto_atual. Não crie outro pedido de foto neste turno.'});
+  origem:'galeria_matriz',tipo:'referencia',orientacao:'A imagem vai automaticamente como anexo. Se precisar de texto, apresente a foto brevemente com suas palavras. Não acrescente preço, fila, expediente ou ressalvas. Estes controles são internos: não confirme entrega antes do eco, estoque ou reserva; não invente foto atual do exemplar. Para desgaste/estado atual, solicite foto_atual. Não crie outro pedido de foto neste turno.'});
 }
 export async function authorizedCatalogPhoto(client:PoolClient,row:OutboundRow){
  const payload=catalogPhotoPayload(row.body);

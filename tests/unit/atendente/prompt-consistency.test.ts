@@ -38,7 +38,7 @@ describe('consistência das regras centrais do prompt', () => {
 
   it('avança após aceite implícito e não pede confirmação duplicada', () => {
     expect(SYSTEM_PROMPT).toContain('Do NOT ask for acceptance again');
-    expect(SYSTEM_PROMPT).toContain('Você: Show. É pra entregar no teu endereço ou retirar na loja?');
+    expect(SYSTEM_PROMPT).toContain('ask once whether they prefer delivery or pickup and end with OPCOES: Entrega | Retirada');
     expect(SYSTEM_PROMPT).not.toContain('Você: Show, [nome]. Bora fechar?');
   });
 
