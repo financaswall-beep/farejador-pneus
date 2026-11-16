@@ -89,6 +89,9 @@ export async function subscribe(identity:DotIdentity,raw:unknown,db:Pool=pool,se
       grant_id=$3,verified_at=CASE WHEN $6 THEN verified_at ELSE now() END,revoked_at=NULL,pending_nonce=NULL
       WHERE id=$1 AND environment=$2 AND pending_nonce=$8`,
     [id,env.FAREJADOR_ENV,identity.grant_id,seal(input.delivery.secret,id),expires,!!reuseVerification,rotating,nonce]);
+    await client.query(`INSERT INTO network.dot_monitor_owners(environment,person_id,client_id,resource)
+      SELECT environment,person_id,client_id,resource FROM network.dot_oauth_grants WHERE environment=$1 AND id=$2
+      ON CONFLICT DO NOTHING`,[env.FAREJADOR_ENV,identity.grant_id]);
     return {id,refreshBefore:expires.toISOString(),cursor:null,truncated:false};
   });
   }catch(error){

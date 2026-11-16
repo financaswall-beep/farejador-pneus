@@ -261,8 +261,8 @@
 <script src="/admin/painel/app.marketing.organic.mock.js?v=20260927-organic-flow1"></script>
 <script src="/admin/painel/app.marketing.organic.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.publisher.view.js?v=20261113-carrossel1"></script>
-<script src="/admin/painel/app.marketing.publisher.helpers.js?v=20261113-carrossel1"></script>
-<script src="/admin/painel/app.marketing.publisher.js?v=20261113-carrossel1"></script>
+<script src="/admin/painel/app.marketing.publisher.helpers.js?v=20261115"></script>
+<script src="/admin/painel/app.marketing.publisher.js?v=20261115"></script>
 <script src="/admin/painel/app.marketing.publisher.media.js?v=20261113-carrossel1"></script>
 <script src="/admin/painel/app.marketing.organic.summary.js?v=20260930-results1"></script>
 <script src="/admin/painel/app.marketing.organic.compare.js?v=20260930-results1"></script>
@@ -11614,6 +11614,12 @@
         <p x-show="dotAlerts.error" x-text="dotAlerts.error" role="alert" class="p-4 mb-4 rounded-xl bg-red-50 text-red-800"></p>
         <p x-show="dotAlerts.message" x-text="dotAlerts.message" role="status" class="p-4 mb-4 rounded-xl bg-emerald-50 text-emerald-800"></p>
         <button type="button" @click="dotAlertsLoad()" :disabled="dotAlerts.loading || dotAlerts.saving" class="mb-4 min-h-[44px] underline text-emerald-700 disabled:opacity-50">Recarregar preferências</button>
+        <section x-show="dotAlerts.data?.pendencias?.length" class="mb-4 rounded-xl border bg-white p-5">
+          <h3 class="font-semibold">Pendências abertas pela Milly</h3>
+          <ul class="divide-y"><template x-for="item in dotAlerts.data?.pendencias || []" :key="item.id">
+            <li class="py-3"><strong x-show="item.priority === 'alta'" class="text-red-800">Prioridade alta · </strong><span class="whitespace-pre-line" x-text="item.summary"></span></li>
+          </template></ul>
+        </section>
         <template x-if="dotAlerts.form">
           <form @submit.prevent="dotAlertsSave()" class="space-y-5">
             <fieldset :disabled="dotAlerts.saving" class="space-y-5">

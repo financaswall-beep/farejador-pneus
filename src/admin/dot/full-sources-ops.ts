@@ -2,6 +2,8 @@ import { source, type FullSource } from './full-source-model.js';
 
 // Explicit business columns. New DB columns never become public automatically.
 export const opsSources:FullSource[]=[
+  source('ops.publisher_posts','marketing','id title caption destinations status version scheduled_at created_at updated_at',
+    'scheduled_at created_at updated_at','id title status version'),
   source('ops.agent_incidents','bot',
     'id conversation_id agent_turn_id incident_type severity resolved_at resolved_by resolution_notes created_at',
     'resolved_at created_at','id conversation_id agent_turn_id incident_type severity resolved_by resolution_notes', 'conversation'),

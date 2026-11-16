@@ -2,11 +2,20 @@
 
 Implementação inicial de 24/10/2026; ampliação de avisos e controles em 25/10/2026 (migration 0276).
 O monitor começa desligado (`DOT_EVENTS_ENABLED=false`).
-Os dados comerciais continuam somente leitura. Não há respostas automáticas para clientes nem alterações em pedidos/estoque/caixa.
+O acompanhamento pode investigar, organizar pendências e preparar rascunhos privados. Qualquer lançamento financeiro da conexão de acompanhamento exige aprovação individual do dono.
+
+## Autonomia por evento
+
+Aplicar `0290_dot_monitor_actions.sql` antes do deploy da versão MCP 1.8.0. Depois, atualizar o conector. Em **Avisos do assistente**, habilitar **Revisar rascunhos de publicação** e **Lotes disponíveis para conferir**, e pedir à Milly para assinar os dois eventos junto aos anteriores. O próprio cliente renova suas assinaturas antes de `refreshBefore`. A assinatura, a entrega do evento e o aviso efetivamente visto pelo dono são verificações distintas.
+
+- `farejador.marketing.rascunho` acompanha edições de rascunhos no publicador da Matriz. A Milly pode consultar o texto e as legendas por destino em `ops.publisher_posts`. Um post criado diretamente no Instagram pode aparecer no contexto de um atendimento, mas não gera este evento do publicador.
+- `farejador.estoque.lote` acompanha movimentações registradas em lotes com saldo livre. A Milly pode pedir conferência e cruzar os dados com procura e entradas. Somente uma medida efetivamente identificada pode sustentar uma oferta.
+- Com o `eventId`, a Milly pode registrar, consultar e encerrar pendências internas. Os rascunhos e as tarefas ficam disponíveis ao dono por MCP. **Avisos do assistente** mostra até 20 abertas, priorizando as de prioridade alta. No ChatGPT, a Milly pode avisar o que fez de relevante e pedir decisão com os dados da operação.
+- A primeira assinatura verificada protege as conexões desta Milly para o mesmo dono e recurso, inclusive após reconectar, pausar ou expirar os avisos. A migration inclui assinaturas já verificadas. Propostas financeiras valem por 15 minutos. O dono confere os dados na Matriz, onde pode aprovar ou recusar. A aprovação conclui a operação quando os dados continuam válidos. Para fotos ou arquivos de comprovante, a Milly repete a mesma chamada após a aprovação, mantendo os bytes e a URL temporária fora da tabela de propostas.
 
 ## Propostas de vencimento
 
-Em **Avisos do assistente → Permissões da Milly**, o proprietário escolhe como autorizar mudanças de vencimento em parcelas abertas de atacado ou lote. Com **Permitir confirmação por voz ou texto**, basta autorizar a parcela e a nova data na conversa. A Milly prepara a proposta e confirma pela mesma conexão. O Farejador confere o vencimento e o saldo antes de gravar e registra a mudança no histórico da venda. Com **Confirmar vencimentos só no painel**, a Milly entrega um link válido por 15 minutos para o proprietário conferir e confirmar. Conexões já configuradas para confirmação no painel conservam esse modo até o proprietário escolher outro.
+Em **Avisos do assistente → Permissões da Milly**, o proprietário pode habilitar propostas de mudança de vencimento em parcelas abertas de atacado ou lote. Com o acompanhamento por eventos, a Milly entrega um link válido por 15 minutos para o dono conferir e confirmar. O Farejador revalida o vencimento e o saldo antes de gravar no histórico da venda. A opção de confirmação por voz ou texto continua disponível para proprietários que ainda não ativaram o acompanhamento com esse cliente.
 
 O mesmo link permite **Restaurar vencimento anterior** enquanto a parcela continuar aberta com o vencimento confirmado. **Voltar para somente consulta** cancela propostas pendentes daquela conexão. As configurações de avisos são independentes.
 
@@ -95,7 +104,7 @@ sem expor segredos nem inventar contadores. Corrigir as variáveis exige redeplo
 ## Ativação e prova real
 
 1. Aplicar a migration, configurar chave, habilitar flag e fazer deploy pelo Coolify.
-2. Atualizar ferramentas do plugin Farejador. Conferir os oito eventos e a ferramenta de acompanhamento.
+2. Atualizar as ferramentas do plugin Farejador. Na versão 1.8.0, conferir dez eventos e as ferramentas de pendências internas.
 3. No próprio Dot Milly, pedir assinatura para uma conversa escolhida, com `ids` contendo o UUID de `core.conversations`.
    Para entregas, usar UUID de `commerce.orders`. `ids:[]` não acompanha nada. Ausência do filtro acompanha novos acontecimentos.
 4. Confirmar `server/discover`, `events/list`, assinatura, verificação de callback e presença da assinatura na consulta de acompanhamento.
@@ -112,8 +121,8 @@ o sucesso ponta a ponta depende de observar a análise da Milly. Testes locais u
 Instrução inicial sugerida para o piloto:
 
 > Acompanhe os eventos desta conversa no Farejador. Consulte o histórico completo e os registros necessários antes de concluir.
-> Avise-me somente se houver uma decisão concreta para mim: humano necessário sem atendimento, venda travada,
-> informação contraditória ou conversa encerrada com pendência. Traga evidência, link e ação sugerida.
+> Organize as pendências e os rascunhos por conta própria. Avise-me do que fez de relevante e quando precisar de uma decisão minha.
+> Se precisar comprar, movimentar estoque, registrar dinheiro, publicar ou falar com alguém, mostre a proposta e aguarde minha autorização.
 > Não anuncie cada atualização, não envie avisos de que tudo está bem e não repita casos sem piora ou informação relevante.
 > Se eu disser que já estou cuidando, pare de cobrar esse caso. Não responda a clientes nem altere registros comerciais.
 

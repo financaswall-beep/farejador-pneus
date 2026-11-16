@@ -11,6 +11,9 @@ export interface DotIdentity {
   grant_id: string; person_id: string; collaborator_id: string;
   installment_reviews_enabled?: boolean; installment_chat_confirmation?: boolean;
 }
+export const monitorOwnerSql=`EXISTS(SELECT 1 FROM network.dot_monitor_owners owner_policy
+  WHERE owner_policy.environment=g.environment AND owner_policy.person_id=g.person_id
+    AND owner_policy.client_id=g.client_id AND owner_policy.resource=g.resource)`;
 const activeOwner = `JOIN network.matriz_collaborators mc ON mc.id=g.collaborator_id
   AND mc.environment=g.environment AND mc.person_id=g.person_id AND mc.panel_role='owner' AND mc.revoked_at IS NULL
   JOIN network.partner_people p ON p.id=g.person_id AND p.environment=g.environment AND p.revoked_at IS NULL`;
@@ -87,7 +90,7 @@ export async function listDotConnections(personId: string) {
   return (await pool.query(`SELECT id,created_at,expires_at,revoked_at,
     (to_jsonb(g)->>'installment_reviews_enabled')::boolean installment_reviews_enabled,
     (to_jsonb(g)->>'finance_operations_enabled')::boolean finance_operations_enabled,
-    (to_jsonb(g)->>'installment_chat_confirmation')::boolean installment_chat_confirmation FROM network.dot_oauth_grants g
+    ${monitorOwnerSql} AS monitor_owner_approval, (g.installment_chat_confirmation AND NOT ${monitorOwnerSql}) installment_chat_confirmation FROM network.dot_oauth_grants g
     WHERE environment=$1 AND person_id=$2 AND code_used_at IS NOT NULL
     ORDER BY created_at DESC LIMIT 50`,[env.FAREJADOR_ENV,personId])).rows;
 }

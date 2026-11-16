@@ -10,6 +10,8 @@
         sale_installment_changed: 'A parcela mudou ou foi encerrada. Consulte a venda.',
         proposta_indisponivel: 'Proposta indisponível. Confira a conexão ou peça uma nova proposta.',
         proposta_expirada: 'A proposta expirou. Peça uma nova proposta à Milly.',
+        proposta_decidida: 'A decisão já foi registrada. Recarregue para conferir.',
+        operacao_nao_concluida: 'A operação não foi concluída. Consulte os dados atuais com a Milly.',
       }[error];
       throw new Error(message || (response.status === 401 ? 'Entre novamente na Matriz para continuar.'
         : 'Não consegui concluir. Atualize esta página e tente novamente.'));
@@ -42,6 +44,11 @@
           + new Date(row.created_at).toLocaleString('pt-BR');
         box.append(label);
         if (active) {
+          if (row.monitor_owner_approval) {
+            const note = document.createElement('p');
+            note.textContent = 'Nesta conexão de acompanhamento, você aprova cada lançamento e alteração de vencimento na Matriz.';
+            box.append(note);
+          }
           if (typeof row.installment_reviews_enabled === 'boolean') {
             const enabled = row.installment_reviews_enabled;
             const chat = enabled && row.installment_chat_confirmation === true;
@@ -68,7 +75,7 @@
               });
               box.append(button);
             }
-            if (!chat && typeof row.installment_chat_confirmation === 'boolean')
+            if (!row.monitor_owner_approval && !chat && typeof row.installment_chat_confirmation === 'boolean')
               permissionButton('Permitir confirmação por voz ou texto', true, true);
             if (!enabled || chat) permissionButton('Confirmar vencimentos só no painel', true, false);
             if (enabled) permissionButton('Desativar alteração de vencimento', false, false);
@@ -76,7 +83,8 @@
           if (typeof row.finance_operations_enabled === 'boolean') {
             const finance = document.createElement('button');
             finance.type = 'button';
-            finance.textContent = row.finance_operations_enabled ? 'Desativar lançamentos financeiros' : 'Permitir lançamentos financeiros por voz ou texto';
+            finance.textContent = row.finance_operations_enabled ? 'Desativar lançamentos financeiros'
+              : row.monitor_owner_approval ? 'Permitir propostas financeiras para aprovação' : 'Permitir lançamentos financeiros por voz ou texto';
             finance.onclick = async () => {
               finance.disabled = true;
               try {
@@ -151,12 +159,70 @@
       };
     } catch(error) { message.textContent = error.message; }
   }
+  async function showOperation(id) {
+    document.getElementById('manage').hidden = true;
+    document.getElementById('operation').hidden = false;
+    const state = document.getElementById('operation-state');
+    const accept = document.getElementById('accept-operation');
+    const deny = document.getElementById('deny-operation');
+    const path = '/admin/api/dot/operation-reviews/' + encodeURIComponent(id);
+    const labels = {amount:'Valor (R$)',quantity:'Quantidade',name:'Nome',supplier_id:'Fornecedor',paid_at:'Pago em',
+      payment_method:'Forma de pagamento',cash_account:'Conta',note:'Observação',changes:'Alterações',document:'Documento',
+      phone:'Telefone',notes:'Observações',due_date:'Vencimento',total_amount:'Valor total (R$)',unit_cost:'Custo unitário (R$)'};
+    function fields(parent, value) {
+      for (const [key,item] of Object.entries(value)) {
+        const row = document.createElement('div');
+        const label = document.createElement('strong');
+        label.textContent = (labels[key] || key.replaceAll('_',' ')) + ' ';
+        row.append(label);
+        if (item !== null && typeof item === 'object') {
+          const list = document.createElement('ul');
+          for (const child of Array.isArray(item) ? item : [item]) {
+            const li = document.createElement('li');
+            if (child !== null && typeof child === 'object') fields(li, child);
+            else li.textContent = String(child);
+            list.append(li);
+          }
+          row.append(list);
+        } else row.append(document.createTextNode(item === null ? 'Limpar campo' : String(item)));
+        parent.append(row);
+      }
+    }
+    let needsFile = false;
+    function display(status) {
+      accept.hidden = deny.hidden = status !== 'pendente';
+      state.textContent = {pendente:'Confira os dados antes de autorizar.',recusada:'Operação recusada.',
+        autorizada:needsFile ? 'Autorização registrada. A Milly pode concluir usando o mesmo comprovante na conversa.'
+          : 'Autorização registrada. Aguardando conclusão da operação pela Milly.',
+        executada:'Operação registrada na Matriz.'}[status] || '';
+    }
+    try {
+      const row = await api(path);
+      needsFile = !!(row.dados.arquivo || row.dados.imagem_base64);
+      document.getElementById('operation-name').textContent = row.operacao.replaceAll('_',' ');
+      fields(document.getElementById('operation-detail'),row.dados);
+      display(row.status);
+      async function decide(decisao) {
+        accept.disabled = deny.disabled = true;
+        try {
+          const result = await api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decisao})});
+          display(result.status);
+          message.textContent = '';
+        } catch (error) { message.textContent = error.message; }
+        finally { accept.disabled = deny.disabled = false; }
+      }
+      accept.onclick = () => decide('autorizada');
+      deny.onclick = () => decide('recusada');
+    } catch(error) { message.textContent = error.message; }
+  }
   if (requestToken) {
     document.getElementById('allow').addEventListener('click', () => consent('allow'));
     document.getElementById('deny').addEventListener('click', () => consent('deny'));
   } else {
     const proposal = new URLSearchParams(location.search).get('proposta');
-    if (proposal) void showReview(proposal);
+    const operation = new URLSearchParams(location.search).get('operacao');
+    if (operation) void showOperation(operation);
+    else if (proposal) void showReview(proposal);
     else void loadConnections();
   }
 }());

@@ -76,6 +76,47 @@ function rpc(method:string,params:Record<string,unknown>={},headers:Record<strin
         'io.modelcontextprotocol/clientInfo':{name:'test',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}}}}});
 }
 
+it('transforma evento em tarefa interna uma vez, sem marcar o atendimento como resolvido',async()=>{
+  const c=await conversation();
+  await subscribe({ids:[c.id]});await message(c);await collect();
+  await delivery.deliverEvents(db.pool,async()=>({status:200,body:''}));
+  const evento=(await db.pool.query("SELECT id FROM ops.dot_event_deliveries WHERE entity_id=$1 AND status='sent'",[c.id])).rows[0].id;
+  const call=async(name:string,args:object)=>(await rpc('tools/call',{name,arguments:args})).json();
+  const args={evento,tipo:'revisar_bot',resumo:'Conferir repetição da pergunta sobre medida.'};
+  const [a,b]=await Promise.all([call('registrar_pendencia_interna',args),call('registrar_pendencia_interna',args)]);
+  const saved=a.result.structuredContent;
+  expect(saved.id).toBe(b.result.structuredContent.id);
+  expect([saved.alterada,b.result.structuredContent.alterada].sort()).toEqual([false,true]);
+  expect((await call('registrar_pendencia_interna',{...args,evento:'evt_'+'0'.repeat(64)})).error).toBeTruthy();
+  expect((await call('consultar_pendencias_internas',{})).result.structuredContent.pendencias).toEqual(expect.arrayContaining([
+    expect.objectContaining({id:saved.id,resumo:args.resumo,origem:c.id})]));
+  expect((await call('encerrar_pendencia_interna',{pendencia:saved.id,evento_esperado:evento})).result.structuredContent.alterada).toBe(true);
+  expect((await call('registrar_pendencia_interna',args)).result.structuredContent.alterada).toBe(false);
+  expect((await db.pool.query('SELECT current_status FROM core.conversations WHERE id=$1',[c.id])).rows[0].current_status).toBe('open');
+});
+
+it('enfileira rascunho criado após assinatura e descarta a revisão se for cancelado antes do envio',async()=>{
+  const name='farejador.marketing.rascunho';
+  const settings=await import('../../src/admin/dot/events/settings.js');
+  const config=settings.defaultSettings();config.events[name]=true;
+  await settings.saveSettings(config,0,identity.person_id,db.pool);
+  await subscribe({},name);
+  const post=randomUUID();
+  await db.pool.query("INSERT INTO ops.publisher_posts(environment,id,title,caption,created_by) VALUES('test',$1,'Título','Legenda privada','teste')",[post]);
+  const {scanSignals}=await import('../../src/admin/dot/events/scan.js');
+  const now=new Date(Date.now()+1000);
+  await scanSignals(db.pool,now);
+  const pending=(await db.pool.query("SELECT id,payload FROM ops.dot_event_deliveries WHERE payload->>'name'=$1",[name])).rows;
+  expect(pending).toHaveLength(1);
+  expect(pending[0].payload.data.evidence.post_id).toBe(post);
+  expect(JSON.stringify(pending[0].payload)).not.toContain('Legenda privada');
+  await db.pool.query("UPDATE ops.publisher_posts SET status='cancelled' WHERE id=$1",[post]);
+  const send=vi.fn(async()=>({status:200,body:''}));
+  await delivery.deliverEvents(db.pool,send,now);
+  expect(send).not.toHaveBeenCalled();
+  expect((await db.pool.query('SELECT status FROM ops.dot_event_deliveries WHERE id=$1',[pending[0].id])).rows[0].status).toBe('cancelled');
+});
+
 it('controles exigem sessão humana de dono, mesma origem e versão; guardam histórico imutável',async()=>{
  const {mintMatrizAdminSessionForPerson,ADMIN_SESSION_COOKIE}=await import('../../src/admin/session.js');
  const session=await mintMatrizAdminSessionForPerson('test',identity.person_id,identity.collaborator_id,db.pool);
@@ -248,15 +289,17 @@ it('monitor externo envia somente o próprio sinal e não consome pendências de
 });
 it('MCP 2.0 descobre eventos e ferramentas com autenticação, cabeçalhos e cache privado',async()=>{
   expect((await rpc('server/discover')).json()).toMatchObject({result:{resultType:'complete',supportedVersions:['2026-07-28'],capabilities:{events:{}},cacheScope:'private'}});
-  expect((await rpc('events/list')).json().result.events).toHaveLength(8);
-  expect((await rpc('tools/list')).json().result.tools).toHaveLength(65);
+  expect((await rpc('events/list')).json().result.events).toHaveLength(10);
+  const listed=(await rpc('tools/list')).json().result.tools;
+  expect(listed).toHaveLength(68);
+  expect(listed.map((t:{name:string})=>t.name)).toContain('registrar_pendencia_interna');
   expect((await rpc('events/list',{}, {authorization:''})).statusCode).toBe(401);
   expect((await rpc('tools/list',{}, {'mcp-method':'tools/call'})).json().error.code).toBe(-32020);
   expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}},{'mcp-name':'wrong'})).json().error.code).toBe(-32020);
   expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);
   const legacy=await app.inject({method:'POST',url:'/admin/dot/mcp',headers:{host:'farejador.example',authorization:'Bearer '+token,
     'content-type':'application/json',accept:'application/json, text/event-stream'},payload:{jsonrpc:'2.0',id:1,method:'tools/list'}});
-  expect(legacy.json().result.tools).toHaveLength(65);
+  expect(legacy.json().result.tools).toEqual(listed);
 });
 it('challenge é obrigatório; filtros canônicos tornam a assinatura idempotente, com segredo cifrado',async()=>{
   const id=randomUUID(),send=vi.fn(echo);
