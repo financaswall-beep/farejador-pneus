@@ -22,6 +22,14 @@ describe('consistência das regras centrais do prompt', () => {
     }
   });
 
+  it('responde o preço de um pneu em linguagem de conversa e identifica os preços de um par', () => {
+    const [conversation, receipt] = SYSTEM_PROMPT.split('Final confirmation — only after criar_pedido succeeded');
+    expect(conversation).toContain('give its verified price and condition in your own words');
+    expect(conversation).toContain('pair each price with its tire');
+    expect(conversation).not.toMatch(/\*(?:Dianteiro|Traseiro):\*/i);
+    expect(receipt).toContain('✅ *Total:*');
+  });
+
   it('separa pergunta institucional de retirada com produto', () => {
     expect(SYSTEM_PROMPT).toContain('A general institutional question such as "onde fica a matriz?"');
     expect(SYSTEM_PROMPT).toContain('PICKUP OF A CHOSEN TIRE');
