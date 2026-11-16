@@ -129,7 +129,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // prompt que mandam "pegue o bairro" — pra o bot CHAMAR a tool em vez de re-perguntar.
     const proximidadeHook =
       kmRounded != null
-        ? `\nGANCHO DE PROXIMIDADE (calor, sempre aproximado com "~", NUNCA o número cravado): o cliente está a ~${kmRounded} km da loja mais perto. Use assim: até 5 km → "tá colado / pertíssimo"; 5 a 10 km → "tá pertinho (uns ${kmRounded} km)"; ACIMA de 10 km → NÃO cite o km (longe vira atrito), siga normal. Encaixe leve antes da próxima pergunta e siga a conversa — não trave nisso.`
+        ? `\nGANCHO DE PROXIMIDADE (calor, sempre aproximado com "~", NUNCA o número cravado): o cliente está a ~${kmRounded} km da loja mais perto. Até 10 km você pode mencionar a proximidade com suas palavras; use o valor aproximado se for útil; ACIMA de 10 km → NÃO cite o km (longe vira atrito), siga normal. Encaixe leve antes da próxima pergunta e siga a conversa — não trave nisso.`
         : '';
     const pinNudge = customerPin
       ? env.DELIVERY_FREIGHT_FROM_PIN

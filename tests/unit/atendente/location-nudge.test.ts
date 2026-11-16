@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { CUSTOMER_LOCATION_REQUEST } from '../../../src/atendente-v2/product-search-nudge.js';
 import {
   botAskedForLocation,
   buildLocationReplyNudge,
@@ -23,14 +22,21 @@ describe('botAskedForLocation', () => {
 
   it('NÃO confunde ENVIAR a localização da loja (retirada) com PEDIR a do cliente', () => {
     expect(botAskedForLocation('Boa! Te passo a localização da loja e o mapa pra retirada.')).toBe(false);
+    expect(botAskedForLocation('Posso te passar o endereço da loja.')).toBe(false);
+    expect(botAskedForLocation('A entrega vai para o mesmo endereço da última vez?')).toBe(false);
   });
 });
 
 describe('buildLocationReplyNudge', () => {
-  it('reconhece a nova abertura e orienta cotar após o endereço, sem pular para a modalidade', () => {
-    const nudge = buildLocationReplyNudge(CUSTOMER_LOCATION_REQUEST, false);
-    expect(nudge).toContain('Se AINDA NÃO houve cotação, apresente as opções e preços retornados antes de perguntar entrega/retirada');
-    expect(buildLocationReplyNudge(CUSTOMER_LOCATION_REQUEST, true)).toBe('');
+  it.each([
+    'Bom dia! Consegue compartilhar o pino fixo ou me passar o endereço?',
+    'Me passa o endereço pra eu consultar?',
+    'Qual é o seu bairro?',
+    'Em que bairro você está?',
+    'Me manda sua localização fixa 📍 ou seu endereço, amigo.',
+  ])('mantém a continuação após uma pergunta livre ou antiga: %s', abertura => {
+    expect(buildLocationReplyNudge(abertura, false)).toBe(LOCATION_REPLY_NUDGE);
+    expect(buildLocationReplyNudge(abertura, true)).toBe('');
   });
 
   it('anexa o empurrão quando o bot pediu localização e NÃO há pino', () => {

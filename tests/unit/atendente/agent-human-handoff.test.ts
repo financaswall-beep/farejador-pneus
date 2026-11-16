@@ -1,6 +1,5 @@
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 import { functionItem,jsonResponse,reasoningItem,responseBody,textItem } from './responses-fixtures.js';
-import { CUSTOMER_LOCATION_REQUEST } from '../../../src/atendente-v2/product-search-nudge.js';
 const mocks=vi.hoisted(() => ({ may:vi.fn(),send:vi.fn(),tool:vi.fn(),history:vi.fn(),
   client:{ query:vi.fn(),release:vi.fn() } }));
 vi.mock('../../../src/persistence/db.js',() => ({ pool:{ connect:async()=>mocks.client } }));
@@ -25,20 +24,21 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 const job={ jobId:'job',conversationId:'conversation',triggerMessageId:'trigger',environment:'test' };
 describe('contexto de localização enviado ao modelo', () => {
-  it('aplica a abertura aprovada ao pedido de Twister que chega depois do cumprimento', async () => {
+  it('orienta pedir apenas a localização depois do cumprimento, sem prescrever a resposta', async () => {
     mocks.history.mockResolvedValue([
       { role:'user',content:'Ola meu amigo bom dia' },
       { role:'assistant',content:'Olá, bom dia! Como posso te ajudar?' },
       { role:'user',content:'entao to precisando de um pneuzinho traseiro da twister tem' },
     ]);
-    const fetcher=vi.fn().mockResolvedValue(jsonResponse(responseBody([textItem(CUSTOMER_LOCATION_REQUEST)])));
+    const fetcher=vi.fn().mockResolvedValue(jsonResponse(responseBody([textItem('Consegue me passar seu endereço ou o pino fixo?')])));
     vi.stubGlobal('fetch',fetcher);
     const { runAgentV2 }=await import('../../../src/atendente-v2/agent.js');
     await runAgentV2(job);
     const input=JSON.parse(fetcher.mock.calls[0]?.[1].body).input;
     const system=input.find((message:{role:string})=>message.role==='system').content;
     expect(system).toContain('[LOCALIZAÇÃO ANTES DA DISPONIBILIDADE DO PNEU]');
-    expect(system).toContain(CUSTOMER_LOCATION_REQUEST);
+    expect(system).toContain('Formule a pergunta com suas palavras');
+    expect(system).not.toContain('Me manda sua localização fixa');
     expect(system).not.toContain('Tenho sim.');
     expect(system).not.toContain('You MAY mention the price');
     expect(system).not.toContain('OBRIGATÓRIO: chame buscar_produto');
@@ -47,7 +47,7 @@ describe('contexto de localização enviado ao modelo', () => {
   it('na resposta com endereço, monta a continuação de cotação em vez de repetir a abertura', async () => {
     mocks.history.mockResolvedValue([
       { role:'user',content:'Tem pneu 90/90-12?' },
-      { role:'assistant',content:CUSTOMER_LOCATION_REQUEST },
+      { role:'assistant',content:'Pra eu conferir por aqui, consegue me passar o endereço?' },
       { role:'user',content:'Rua das Flores, 50, Alcântara, São Gonçalo' },
     ]);
     const fetcher=vi.fn().mockResolvedValue(jsonResponse(responseBody()));

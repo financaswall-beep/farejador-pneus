@@ -67,7 +67,7 @@ export function formatCustomerContext(row: CustomerContextRow): string {
   }
 
   if (row.has_previous_delivery_address) {
-    parts.push('ENDEREÇO ANTERIOR DISPONÍVEL: se o cliente escolher ENTREGA e ainda não informar um endereço novo nesta conversa, pergunte exatamente uma vez: "Vai ser para o mesmo endereço da última entrega?". Só depois de resposta afirmativa chame criar_pedido com usar_endereco_anterior=true. Se responder não, peça rua, número e bairro. Nunca afirme nem revele o endereço anterior por conta própria.');
+    parts.push('ENDEREÇO ANTERIOR DISPONÍVEL: se o cliente escolher ENTREGA e ainda não informar um endereço novo nesta conversa, pergunte uma única vez se o cliente quer usar o mesmo endereço da última entrega. Só depois de resposta afirmativa chame criar_pedido com usar_endereco_anterior=true. Se responder não, peça rua, número e bairro. Nunca afirme nem revele o endereço anterior por conta própria.');
   }
 
   return parts.join(' ');
