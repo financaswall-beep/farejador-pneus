@@ -74,6 +74,7 @@ function payable(row: OpenRow): FinanceiroPayableItem {
   };
   if (row.source_type === 'commerce.wholesale_purchase.accrual') return {
     ...base, tipo: 'fornecedor',
+    supplier_credit_available:row.supplier_credit_available,
     ...(row.installment_number ? { parcela_compra: row.installment_number } : {}),
     nome: row.installment_number
       ? `${row.supplier_name ?? row.description} · parcela ${row.installment_number}/${row.installments_count}`
@@ -119,7 +120,8 @@ export async function getMatrizLedgerOpenItems(
             t.description,t.metadata->>'category' category,
             t.metadata->>'partner_id' partner_id,
             COALESCE(np.trade_name,np.legal_name) partner_name,np.whatsapp_phone partner_phone,
-            wc.name customer_name,wc.phone customer_phone,ws.name supplier_name
+            wc.name customer_name,wc.phone customer_phone,ws.name supplier_name,
+            credits.available supplier_credit_available
        FROM finance.matriz_ledger_transactions t
        JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
        LEFT JOIN paid ON paid.obligation_transaction_id=t.id
@@ -133,6 +135,8 @@ export async function getMatrizLedgerOpenItems(
         AND wp.id::text=t.metadata->>'purchase_id'
        LEFT JOIN commerce.wholesale_suppliers ws ON ws.environment=wp.environment
         AND ws.id=wp.supplier_id
+       LEFT JOIN (SELECT supplier_id,sum(delta)::text available FROM finance.supplier_advance_movements
+         WHERE environment=$1 GROUP BY supplier_id) credits ON credits.supplier_id=ws.id
       WHERE t.environment=$1
         AND (NOT (t.metadata ? 'sale_plan') OR wo.status='confirmed')
         AND t.reversal_of_transaction_id IS NULL

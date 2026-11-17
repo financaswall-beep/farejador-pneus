@@ -27,6 +27,75 @@ async function lot(id:string){
   purchased_at:day,created_by:'teste',payment_status:'pending',receipt_status:'pending',installments:[{amount:750,due_date:'2026-11-01'},{amount:750,due_date:'2026-12-01'}],idempotency_key:randomUUID()},db.pool);
 }
 async function cash(){return Number((await db.pool.query("SELECT coalesce(sum(CASE WHEN side='credit' THEN amount ELSE -amount END),0) value FROM finance.matriz_ledger_entries WHERE environment='test' AND account_code='cash'")).rows[0].value);}
+it.each([[1000,1000,0,0],[1200,1000,200,0],[800,800,0,200]])(
+  'recebe lote de %i usando o crédito, preserva o custo dos pneus e repete sem duplicar',async(total,used,extra,left)=>{
+    const id=await supplier();
+    await run(issue(id,400)); await run(issue(id,600));
+    const before=await cash();
+    const command={environment:'test' as const,supplier_id:id,items:[],lot:{description:'Pneus',quantity:10,total_cost:total},
+      purchased_at:day,received_at:day,created_by:'teste',payment_status:'paid' as const,receipt_status:'received' as const,
+      supplier_credit_amount:used,...(extra ? {payment_method:'Pix',paid_at:day} : {}),idempotency_key:randomUUID()};
+    const result=await purchase.registerWholesalePurchase(command,db.pool);
+    expect(await purchase.registerWholesalePurchase(command,db.pool)).toEqual(result);
+    expect(result).toMatchObject({total_amount:total.toFixed(2),stock_applied:true,remaining_balance:'0.00',cash_paid:extra.toFixed(2)});
+    const stock=(await db.pool.query("SELECT quantity_on_hand,remaining_cost FROM commerce.tire_lots WHERE environment='test' AND purchase_id=$1",[result.purchase_id])).rows[0];
+    expect(Number(stock.quantity_on_hand)).toBe(10);expect(Number(stock.remaining_cost)).toBe(total);
+    expect(await cash()-before).toBe(extra);
+    const detail=await read.supplierFinanceDetail(id,db.pool,'test');
+    expect(detail.credits.reduce((sum,c)=>sum+Number(c.available),0)).toBe(left);
+    expect(detail.payables).toHaveLength(0);
+});
+it('compra por item com parcelas sobre a diferença e baixa mista posterior',async()=>{
+  const id=await supplier();await run(issue(id,1000));
+  const product=(await db.pool.query("INSERT INTO commerce.products(environment,product_code,product_name,product_type) VALUES ('test',$1,'Pneu','tire') RETURNING id",[randomUUID()])).rows[0].id;
+  await db.pool.query("INSERT INTO commerce.tire_specs(environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter) VALUES ('test',$1,'90/90-18',90,90,18)",[product]);
+  const before=await cash();
+  const order=await purchase.registerWholesalePurchase({environment:'test',supplier_id:id,
+    items:[{brand:'Pirelli',measure:'90/90-18',quantity:10,unit_cost:120,tire_condition:'meia_vida'}],
+    purchased_at:day,created_by:'teste',receipt_status:'pending',payment_status:'pending',supplier_credit_amount:900,
+    installments:[{amount:180,due_date:'2026-11-01'},{amount:120,due_date:'2026-12-01'}],idempotency_key:randomUUID()},db.pool);
+  const d=await read.supplierFinanceDetail(id,db.pool,'test');
+  expect(order.remaining_balance).toBe('300.00');
+  expect(d.payables.map(p=>Number(p.balance))).toEqual([180,120]);
+  const {getWholesalePurchaseReport}=await import('../../src/admin/painel/queries-compras-relatorios.js');
+  const report=await getWholesalePurchaseReport({period:'all',status:'all',payment:'all',supplierId:id,page:1,pageSize:10},'test',db.pool);
+  expect(report.rows[0]).toMatchObject({credit_applied:'900.00',remaining_balance:'300.00',
+    installments:[expect.objectContaining({balance:180}),expect.objectContaining({balance:120})]});
+  const {settleFinanceItem,settleFinanceItemSchema}=await import('../../src/admin/painel/finance-settlement-service.js');
+  const body=settleFinanceItemSchema.parse({settlement_mode:'wholesale_purchase',target_id:order.purchase_id+':2',
+    obligation_id:d.payables[1].obligation_id,amount:120,supplier_credit_amount:100,paid_at:day,
+    payment_method:'pix',cash_account:'Loja',idempotency_key:randomUUID()});
+  const result=await settleFinanceItem(body,'teste');
+  expect(await settleFinanceItem(body,'teste')).toEqual(result);
+  expect(result).toMatchObject({credit_applied:'100.00',cash_paid:'20.00',remaining_balance:'180.00'});
+  expect(await cash()-before).toBe(20);
+});
+it('duas compras concorrentes não consomem duas vezes o mesmo crédito nem deixam compra parcial',async()=>{
+  const id=await supplier();await run(issue(id,100));const before=await cash();
+  const create=()=>purchase.registerWholesalePurchase({environment:'test',supplier_id:id,items:[],
+    lot:{description:'Lote',quantity:2,total_cost:100},purchased_at:day,created_by:'teste',receipt_status:'pending',
+    payment_status:'paid',supplier_credit_amount:100,idempotency_key:randomUUID()},db.pool);
+  const attempts=await Promise.allSettled([create(),create()]);
+  expect(attempts.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+  const detail=await read.supplierFinanceDetail(id,db.pool,'test');
+  expect(detail.purchases).toHaveLength(1);expect(Number(detail.credits[0].available)).toBe(0);
+  expect(await cash()).toBe(before);
+});
+it('baixa só com crédito dispensa conta de caixa e impede usar créditos de outro fornecedor ou de data posterior',async()=>{
+  const id=await supplier(),other=await supplier(),order=await lot(id);
+  const detail=await read.supplierFinanceDetail(id,db.pool,'test');
+  await run(issue(other,1000));
+  await run({...issue(id,500),occurred_at:'2026-10-07T15:00:00Z'});
+  const before=await cash();
+  const {settleFinanceItem,settleFinanceItemSchema}=await import('../../src/admin/painel/finance-settlement-service.js');
+  const body=settleFinanceItemSchema.parse({settlement_mode:'wholesale_purchase',target_id:order.purchase_id+':1',
+    obligation_id:detail.payables[0].obligation_id,amount:500,supplier_credit_amount:500,paid_at:day,idempotency_key:randomUUID()});
+  await expect(settleFinanceItem(body,'teste')).rejects.toThrow('purchase_credit_unavailable');
+  const result=await settleFinanceItem({...body,paid_at:'2026-10-07T15:00:00Z'},'teste');
+  expect(result).toMatchObject({cash_paid:'0.00',credit_applied:'500.00',remaining_balance:'1000.00',installment_remaining_balance:'250.00'});
+  expect(await cash()).toBe(before);
+  expect(Number((await read.supplierFinanceDetail(other,db.pool,'test')).supplier_credit_available)).toBe(1000);
+});
 it('aplica na parcela escolhida, quita o restante e reprocessa duas vezes sem nova saída',async()=>{
  const id=await supplier(),start=await cash(),cmd=issue(id,500),credit=await run(cmd);
  expect(await run(cmd)).toEqual(credit);

@@ -29,7 +29,8 @@ const settlementModeSchema = z.enum([
   'central_obligation', 'central_account',
 ]);
 
-export const settleFinanceItemSchema = z.object({
+const cashSettlementSchema = z.object({
+  supplier_credit_amount: z.never().optional(),
   settlement_mode: settlementModeSchema,
   target_id: z.string().min(1).max(200),
   obligation_id: z.string().uuid().optional(),
@@ -71,8 +72,28 @@ export const settleFinanceItemSchema = z.object({
   }
 });
 
+export const purchaseCreditSettlementFields = z.object({
+  purchase_id:z.string().uuid(), obligation_id:z.string().uuid(), installment:z.number().int().positive().optional(),
+  amount:settlementAmountSchema, supplier_credit_amount:settlementAmountSchema, paid_at:paidAtSchema,
+  payment_method:requiredPaymentDetailsSchema.shape.payment_method.optional(),
+  cash_account:requiredPaymentDetailsSchema.shape.cash_account.optional(),
+  note:requiredPaymentDetailsSchema.shape.note, idempotency_key:z.string().min(8).max(200),
+});
+const creditSettlement = purchaseCreditSettlementFields.omit({purchase_id:true,installment:true}).extend({
+  settlement_mode:z.literal('wholesale_purchase'),
+  target_id:z.string().regex(/^[a-f\d-]{36}(:[1-9]\d{0,2})?$/i)
+    .refine(id => z.string().uuid().safeParse(id.split(':')[0]).success),
+}).refine(d => d.amount >= d.supplier_credit_amount && (d.amount === d.supplier_credit_amount ||
+  !!(d.payment_method && d.cash_account)), 'purchase_credit_invalid');
+export const settleFinanceItemSchema = z.union([cashSettlementSchema,creditSettlement]);
+
 /** Porta compartilhada pelo Financeiro web e app; mantém os serviços e a idempotência de cada domínio. */
 export async function settleFinanceItem(data: z.infer<typeof settleFinanceItemSchema>, actor: string) {
+  if (data.supplier_credit_amount !== undefined) {
+    const [purchase_id,part] = data.target_id.split(':');
+    return settleMatrizLedgerOpenItem({...data,purchase_id:purchase_id!,
+      purchase_installment:part ? Number(part) : undefined,actor_label:actor});
+  }
   const details = { paid_at: data.paid_at, payment_method: data.payment_method, cash_account: data.cash_account, note: data.note };
   let result: unknown;
   if (['retail_sale', 'wholesale_sale', 'wholesale_purchase',

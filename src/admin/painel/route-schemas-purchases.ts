@@ -11,6 +11,7 @@ const purchaseMoneySchema = z.number().min(0).max(9999999999.99).refine(hasCentP
 });
 
 const saoPauloDate = businessDateSaoPaulo;
+export const supplierCreditAmount = z.number().positive().max(999_999_999.99).refine(hasCentPrecision);
 
 export const registerSupplierSchema = z.object({
   name: z.string().min(1).max(200),
@@ -31,6 +32,7 @@ export const purchaseItemSchema = z.object({
 });
 
 export const registerPurchaseFields = z.object({
+  supplier_credit_amount: supplierCreditAmount.optional(),
   group_id: z.string().uuid().nullable().optional(),
   supplier_id: z.string().uuid().nullable().optional(),
   new_supplier: z.object({
@@ -78,10 +80,13 @@ export const registerPurchaseSchema = registerPurchaseFields.refine(
     const totals = calculateWholesalePurchaseMoney(
       d.items, d.freight_amount, d.discount_amount,
     );
+    const credit = Math.round((d.supplier_credit_amount ?? 0) * 100);
+    if (credit && (!d.supplier_id || d.new_supplier || credit > totals.totalCents))
+      ctx.addIssue({code:'custom',path:['supplier_credit_amount'],message:'purchase_credit_invalid'});
     if (d.payment_status === 'pending' && d.installments?.length) {
       const purchaseDate = d.purchased_at ? saoPauloDate(d.purchased_at) : null;
       const cents = d.installments.reduce((sum, row) => sum + Math.round(row.amount * 100), 0);
-      if (cents !== totals.totalCents) {
+      if (cents !== totals.totalCents - credit) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'installments_total_mismatch',
           path: ['installments'] });
       }

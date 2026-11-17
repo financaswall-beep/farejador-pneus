@@ -1,4 +1,5 @@
 import { purchaseSchedule } from './purchase-installment-balances.js';
+import { applyPurchaseCredit } from './purchase-credit.js';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -13,31 +14,8 @@ import {
   recordSettlementPayment as recordPayment,
   type SettlementObligationRow as ObligationRow,
 } from './matriz-ledger-settlement-payment.js';
-type Environment = 'prod' | 'test';
-type Target = { obligation_id: string; account_code?: never } |
-  { obligation_id?: never; account_code: 'marketing_payable' };
-export type MatrizLedgerSettlementInput = Target & {
-  amount?: number;
-  sale_installment?: { order_id: string; number: number };
-  purchase_installment?: number;
-  purchase_id?: string;
-  payment_method?: string;
-  paid_at?: string;
-  cash_account?: string;
-  note?: string;
-  actor_label?: string | null;
-  idempotency_key: string;
-  environment?: Environment;
-};
-export interface MatrizLedgerSettlementResult {
-  target_id: string;
-  direction: 'receivable' | 'payable';
-  amount: string;
-  remaining_balance: string;
-  installment_remaining_balance?: string;
-  payment_ids: string[];
-  settled_at: string;
-}
+import type {Environment, MatrizLedgerSettlementInput, MatrizLedgerSettlementResult} from './matriz-ledger-settlement-types.js';
+export type {MatrizLedgerSettlementInput,MatrizLedgerSettlementResult} from './matriz-ledger-settlement-types.js';
 function requestedAmount(value: number | undefined, balance: number): number {
   if (value !== undefined && Math.abs(value * 100 - Math.round(value * 100)) >= 1e-7) throw new Error('settlement_amount_cent_precision');
   const amount = value === undefined ? balance : moneyCents(value) / 100;
@@ -247,6 +225,7 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
       ...(input.purchase_id ? {purchase_id:input.purchase_id} : {}),
       ...(input.purchase_installment ? { purchase_installment: input.purchase_installment } : {}),
       target, amount_cents: input.amount === undefined ? null : moneyCents(input.amount),
+      ...(input.supplier_credit_amount ? {supplier_credit_cents: moneyCents(input.supplier_credit_amount)} : {}),
       payment_method: input.payment_method?.trim().toLowerCase() ?? null,
       paid_at: input.paid_at ?? null,
       cash_account: input.cash_account?.trim().toLowerCase() ?? null,
@@ -278,7 +257,9 @@ export async function settleMatrizLedgerOpenItemOnClient(client: PoolClient, inp
   if (started.replayed) return started.result;
   const paidAt = normalizeBusinessFactInstant(input.paid_at, new Date(), 'paid_at_future') ?? new Date().toISOString();
   const actor = matrizLedgerActor(input.actor_label);
-  const result = input.obligation_id
+  const result = input.supplier_credit_amount !== undefined
+    ? await settleWithCredit(client, operation, input, paidAt, actor)
+    : input.obligation_id
     ? await settleObligation(client, operation, input, paidAt, actor)
     : await settleMarketing(client, operation, input, paidAt, actor);
   const auditEntityId = result.payment_ids[0]!;
@@ -294,4 +275,23 @@ export async function settleMatrizLedgerOpenItemOnClient(client: PoolClient, inp
     auditEntityId, result,
   );
   return result;
+}
+
+async function settleWithCredit(client: PoolClient, operation: ReturnType<typeof settlementOperation>,
+  input: MatrizLedgerSettlementInput, at: string, actor: string): Promise<MatrizLedgerSettlementResult> {
+  const credit = input.supplier_credit_amount!;
+  if (!input.purchase_id || !input.obligation_id || input.sale_installment || !input.amount ||
+      !Number.isFinite(credit) || credit <= 0 || moneyCents(credit) > moneyCents(input.amount))
+    throw Error('purchase_credit_invalid');
+  const cash = (moneyCents(input.amount) - moneyCents(credit)) / 100;
+  if (cash > 0 && !input.payment_method?.trim()) throw Error('payment_details_required');
+  const applied = await applyPurchaseCredit(client, operation.environment, input.purchase_id,
+    input.obligation_id, input.purchase_installment, credit, at, actor);
+  const paid = cash ? await settleObligation(client, operation, {...input, amount:cash}, at, actor) : null;
+  return {target_id:input.obligation_id, direction:'payable', amount:input.amount.toFixed(2),
+    credit_applied:credit.toFixed(2), cash_paid:cash.toFixed(2),
+    remaining_balance:paid?.remaining_balance ?? applied.remaining.toFixed(2),
+    ...(applied.installmentRemaining !== undefined ? {installment_remaining_balance:
+      ((moneyCents(applied.installmentRemaining)-moneyCents(cash))/100).toFixed(2)} : {}),
+    payment_ids:[...applied.ids,...(paid?.payment_ids ?? [])], settled_at:at};
 }

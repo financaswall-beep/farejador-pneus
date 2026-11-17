@@ -26,6 +26,12 @@ export async function sendStatic(reply: FastifyReply, file: string, type: string
 }
 
 export function mapWriteError(err: unknown): { status: number; error: string } {
+  if (err instanceof Error && ['purchase_credit_unavailable','purchase_credit_disabled'].includes(err.message))
+    return {status:409,error:err.message};
+  if (err instanceof Error && ['purchase_credit_invalid','purchase_installment_required','payment_details_required','settlement_target_invalid'].includes(err.message))
+    return {status:400,error:err.message};
+  if (err instanceof Error && err.message==='Compra a prazo indisponível para este fornecedor ou data.')
+    return {status:409,error:'purchase_credit_target_unavailable'};
   if (!(err instanceof Error)) {
     return { status: 500, error: 'internal_server_error' };
   }

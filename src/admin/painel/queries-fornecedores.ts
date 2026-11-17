@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
+import { purchaseCreditEnabled } from './purchase-credit.js';
 
 export interface WholesaleSupplierRow {
   id: string;
@@ -9,15 +10,21 @@ export interface WholesaleSupplierRow {
   phone: string | null;
   document: string | null;
   notes: string | null;
+  supplier_credit_available?: string;
 }
 
 export async function listWholesaleSuppliers(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  includeCredit = false,
 ): Promise<WholesaleSupplierRow[]> {
+  const withCredit = includeCredit && purchaseCreditEnabled();
   const result = await dbPool.query<WholesaleSupplierRow>(
-    `SELECT id,name,phone,document,notes FROM commerce.wholesale_suppliers
-      WHERE environment=$1 AND deleted_at IS NULL ORDER BY name`, [environment]);
+    `SELECT s.id,s.name,s.phone,s.document,s.notes
+      ${withCredit ? ',coalesce(c.available,0)::text supplier_credit_available' : ''}
+      FROM commerce.wholesale_suppliers s
+      ${withCredit ? 'LEFT JOIN (SELECT supplier_id,sum(delta) available FROM finance.supplier_advance_movements WHERE environment=$1 GROUP BY supplier_id) c ON c.supplier_id=s.id' : ''}
+      WHERE s.environment=$1 AND s.deleted_at IS NULL ORDER BY s.name`, [environment]);
   return result.rows;
 }
 

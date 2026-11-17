@@ -42,7 +42,7 @@ window.PAINEL_MODULES.compras = function () {
       const others = this.compraForm.installments.reduce((sum, row, rowIndex) =>
         sum + (rowIndex === index ? 0 : (Number(row.amount) || 0)), 0);
       this.compraForm.installments[index].amount = Math.max(0,
-        Math.round((this.compraFormTotal() - others) * 100) / 100).toFixed(2);
+        Math.round((this.compraDiferenca(this.compraForm,this.compraFormTotal()) - others) * 100) / 100).toFixed(2);
     },
     comprasResumo() { const ativas = this.compras.filter((c) => c.status === 'confirmed'); return { registradas: this.fornecedorRanking.reduce((n, f) => n + Number(f.purchases_count || 0), 0), pneus: this.fornecedorBreakdown.reduce((n, r) => n + Number(r.qty_total || 0), 0), total: this.fornecedorRanking.reduce((n, f) => n + Number(f.total_spent || 0), 0), prazo: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_total || 0) : ativas.filter((c) => c.payment_status === 'pending').reduce((n, c) => n + Number(c.total_amount || 0), 0), prazoCount: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_count || 0) : ativas.filter((c) => c.payment_status === 'pending').length }; },
     fornecedorLastPurchase(s) {
@@ -140,7 +140,13 @@ window.PAINEL_MODULES.compras = function () {
         this.compraMsg = { ok: false, text: 'O desconto não pode ultrapassar produtos mais frete.' };
         return null;
       }
-      if (this.atacadoFinance && f.payment_status === 'pending') {
+      const credit = Number(f.creditAmount || 0);
+      if (credit && !this.compraCreditoValido(f,this.compraFormTotal())) {
+        this.compraMsg = {ok:false,text:'Confira o crédito do fornecedor e o valor da compra.'}; return null;
+      }
+      if (credit) body.supplier_credit_amount = credit;
+      const remaining = this.compraFormTotal() - credit;
+      if ((!credit || remaining > 0) && this.atacadoFinance && f.payment_status === 'pending') {
         const installments = (f.installments || []).map((row) => ({
           due_date: row.due_date, amount: Number(row.amount),
         }));
@@ -149,8 +155,8 @@ window.PAINEL_MODULES.compras = function () {
           return null;
         }
         const installmentsTotal = installments.reduce((sum, row) => sum + row.amount, 0);
-        if (Math.abs(installmentsTotal - this.compraFormTotal()) > 0.001) {
-          this.compraMsg = { ok: false, text: 'A soma das parcelas precisa fechar exatamente com o total da compra.' };
+        if (Math.abs(installmentsTotal - remaining) > 0.001) {
+          this.compraMsg = { ok: false, text: 'A soma das parcelas precisa fechar com o saldo a pagar.' };
           return null;
         }
         body.payment_status = 'pending';
@@ -158,9 +164,9 @@ window.PAINEL_MODULES.compras = function () {
         body.due_date = [...installments].sort((a, b) => a.due_date.localeCompare(b.due_date))[0].due_date;
       } else {
         body.payment_status = 'paid';
-        body.payment_method = f.payment_method || 'Não informado';
+        if (remaining > 0 || !credit) body.payment_method = f.payment_method || 'Não informado';
         const paidDate = f.payment_date || purchasedDate;
-        body.paid_at = this.businessFactInstant(paidDate);
+        if (remaining > 0 || !credit) body.paid_at = this.businessFactInstant(paidDate);
       }
       body.receipt_status = f.receipt_status;
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;
@@ -197,6 +203,7 @@ window.PAINEL_MODULES.compras = function () {
         const catalogoTxt = result.catalog_blockers?.length
           ? ` Atenção: ${result.catalog_blockers.length} variante(s) precisam de produto ou preço no Catálogo antes da venda.` : '';
         this.compraMsg = { ok: true, purchase_id: result.purchase_id, text: `${result.order_code} · compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
+        if (result.credit_applied) this.compraMsg.text+=this.compraCreditoRecibo(result);
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
         this.compraForm = {
           supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
@@ -218,6 +225,9 @@ window.PAINEL_MODULES.compras = function () {
     },
     compraErrText(code) {
       const map = {
+        purchase_credit_unavailable:'O saldo do fornecedor mudou ou não estava disponível na data da compra. Atualize e confira o valor.',
+        purchase_credit_invalid:'Confira o fornecedor e o valor de crédito a usar.',
+        purchase_credit_disabled:'O financeiro de compras está indisponível.',
         vehicle_type_conflict: 'O tipo de veículo diverge do catálogo ou do estoque. Confira carro/moto em cada item.',
         supplier_required: 'Escolha ou cadastre o fornecedor.',
         supplier_not_found: 'Fornecedor não encontrado.',

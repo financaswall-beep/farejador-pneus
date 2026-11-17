@@ -66,7 +66,7 @@ export function registerCaixaPurchaseRoutes(
   });
 
   fastify.get(base + '/contexto', options, async () => ({
-    suppliers: await listWholesaleSuppliers(env.FAREJADOR_ENV),
+    suppliers: await listWholesaleSuppliers(env.FAREJADOR_ENV,undefined,true),
     credit_enabled: env.WHOLESALE_FINANCE,
   }));
 
