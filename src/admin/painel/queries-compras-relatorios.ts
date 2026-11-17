@@ -1,4 +1,5 @@
 import { periodClause } from './purchase-period-clause.js';
+import { purchasePaymentDetailSql } from './purchase-installment-balances.js';
 export { getWholesalePriceReport } from './queries-compras-precos.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
@@ -111,12 +112,7 @@ export async function getWholesalePurchaseReport(
               'unit_cost',i.unit_cost,'line_total',i.line_total,
               'allocated_cost',i.allocated_cost
             ) ORDER BY i.measure,i.id) FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
-            ,COALESCE((SELECT jsonb_agg(jsonb_build_object(
-                'id',pi.id,'number',pi.installment_number,'due_date',pi.due_date,
-                'amount',pi.amount) ORDER BY pi.installment_number)
-              FROM commerce.wholesale_purchase_installments pi
-             WHERE pi.environment=p.environment AND pi.purchase_id=p.id),'[]'::jsonb)
-              AS installments
+            ,${purchasePaymentDetailSql}
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s
          ON s.id=p.supplier_id AND s.environment=p.environment

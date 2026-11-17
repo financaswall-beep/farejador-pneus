@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { purchasePaymentDetailSql } from './purchase-installment-balances.js';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { groupProjection, type PurchaseGroupRow } from './queries-purchase-groups-write.js';
@@ -22,9 +23,7 @@ async function records(client: PoolClient, environment: MatrizEnvironment, ids: 
       WHERE i.environment=p.environment AND i.purchase_id=p.id),0)::int items_count,
     COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY i.id) FROM commerce.wholesale_purchase_lines i
       WHERE i.environment=p.environment AND i.purchase_id=p.id),'[]') items,
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'number',i.installment_number,
-      'due_date',i.due_date,'amount',i.amount) ORDER BY i.installment_number)
-      FROM commerce.wholesale_purchase_installments i WHERE i.environment=p.environment AND i.purchase_id=p.id),'[]') installments
+    ${purchasePaymentDetailSql}
     FROM commerce.wholesale_purchase_group_purchases l
     JOIN commerce.wholesale_purchases p ON p.environment=l.environment AND p.id=l.purchase_id
     JOIN commerce.wholesale_suppliers s ON s.environment=p.environment AND s.id=p.supplier_id

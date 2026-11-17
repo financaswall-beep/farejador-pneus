@@ -2,6 +2,22 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.fornecedorFinanceiro = function () {
   const root='/admin/api/matriz/financeiro/fornecedores';
   return {
+    compraCreditoDisponivel(form) {
+      const supplier = this.fornecedores?.find(row => row.id === form?.supplierKey);
+      return Number(supplier?.supplier_credit_available || 0);
+    },
+    compraCreditoRecibo(result) {
+      return Number(result.credit_applied) ? ' Crédito usado: '+this.sfMoney(result.credit_applied)+
+        ' · saída de caixa: '+this.sfMoney(result.cash_paid)+' · saldo a pagar: '+this.sfMoney(result.remaining_balance)+'.' : '';
+    },
+    compraDiferenca(form,total) {
+      return (Math.round(total*100) - Math.round(Number(form?.creditAmount || 0)*100))/100;
+    },
+    compraCreditoValido(form,total) {
+      const amount = Number(form.creditAmount || 0);
+      return Number.isFinite(amount) && amount >= 0 && amount <= Math.min(this.compraCreditoDisponivel(form),total)
+        && Math.abs(amount*100-Math.round(amount*100)) < 1e-7;
+    },
     sfRows:[],sfReady:false,sfWritable:false,sfLoading:false,sfError:'',sfNotice:'',sfProfile:null,sfTab:'Financeiro',
     sfForm:null,sfSaving:false,sfDetail:null,sfLoadSeq:0,sfSummarySeq:0,sfFile:null,sfReceiptTarget:null,
     sfCanRead(){return this.isMatrixPanel() && (this.adminUser?.role==='owner'||this.hasPanelModule('financeiro'));},

@@ -6,9 +6,31 @@
     const data = s.draft.review;
     P.reviewFields.forEach(function (key) { data[key] = P.id(key).value; });
   };
+  P.availableAdvance = function () {
+    return s.draft && !s.draft.newSupplier ? Number(s.suppliers.find(row=>row.id===s.draft.supplier)?.supplier_credit_available || 0) : 0;
+  };
+  P.purchaseTotal = function () {
+    const d=s.draft, r=d.review;
+    const products=d.mode==='lot' ? Math.round(Number(d.lot.total_cost||0)*100) :
+      d.items.reduce((sum,i)=>sum+Number(i.quantity)*Math.round(Number(i.unit_cost||0)*100),0);
+    return (products+Math.round(Number(r.freight||0)*100)-Math.round(Number(r.discount||0)*100))/100;
+  };
+  P.advanceCovered = function () { return Number(s.draft.creditAmount)>0 && Number(s.draft.creditAmount)===P.purchaseTotal(); };
+  P.renderAdvance = function () {
+    const available=P.availableAdvance(), total=P.purchaseTotal();
+    const info=P.id('advance-info');
+    info.hidden=!available;info.textContent='Crédito com este fornecedor: '+P.money(available);
+    P.id('advance-fields').hidden=!available && !Number(s.draft.creditAmount);
+    P.id('advance-available').textContent=info.textContent;
+    const input=P.id('advance-amount');
+    if (input.value!==String(s.draft.creditAmount || '')) input.value=s.draft.creditAmount || '';
+    input.max=String(Math.max(0,Math.min(available,total)));
+    P.id('advance-difference').textContent='Falta pagar: '+P.money(total-Number(input.value));
+  };
   P.renderPayment = function () {
     const credit = P.id('payment').value === 'pending'; const lot = s.draft.mode === 'lot';
-    P.id('paid-fields').hidden = credit; P.id('credit-fields').hidden = !credit;
+    P.renderAdvance();
+    P.id('paid-fields').hidden = credit || P.advanceCovered(); P.id('credit-fields').hidden = !credit || P.advanceCovered();
     P.id('credit-note').hidden = s.credit;
     P.id('payment').querySelector('[value=pending]').disabled = !s.credit;
     P.id('due-date').parentElement.hidden = !lot && s.draft.installments.length > 0;
@@ -56,11 +78,13 @@
       freight_amount: Number(r.freight), discount_amount: Number(r.discount),
       payment_status: r.payment, receipt_status: r['receipt-status'] };
     if (d.group_id) payload.group_id = d.group_id;
+    if (Number(d.creditAmount)>0) payload.supplier_credit_amount=Number(d.creditAmount);
     if (d.newSupplier) payload.new_supplier = { name: d.supplierName.trim(), phone: d.supplierPhone.trim() || null, document: d.supplierDocument.trim() || null };
     else payload.supplier_id = d.supplier;
     if (r.reference.trim()) payload.supplier_reference = r.reference.trim();
     if (r.notes.trim()) payload.notes = r.notes.trim();
-    if (r.payment === 'paid') { payload.payment_method = r['payment-method']; payload.paid_at = instant(r['paid-date']); }
+    if (P.advanceCovered()) payload.payment_status='paid';
+    else if (r.payment === 'paid') { payload.payment_method = r['payment-method']; payload.paid_at = instant(r['paid-date']); }
     else if (d.mode === 'items' && d.installments.length) {
       payload.installments = d.installments.map(function (i) { return { due_date: i.due_date, amount: i.amount === '' ? null : Number(i.amount) }; });
     } else payload.due_date = r['due-date'];
@@ -72,7 +96,7 @@
   };
   P.verify = async function () {
     P.readReview(); P.persist();
-    if (s.draft.review.payment === 'paid' && !s.draft.review['paid-date']) throw Object.assign(new Error('payment_details_required'), { status: 400 });
+    if (!P.advanceCovered() && s.draft.review.payment === 'paid' && !s.draft.review['paid-date']) throw Object.assign(new Error('payment_details_required'), { status: 400 });
     const body = P.payload(); const fingerprint = JSON.stringify(body); const suffix = s.draft.mode === 'lot' ? '/lotes' : '';
     const values = await P.request(suffix + '/revisao', body);
     if (!['productsCents', 'freightCents', 'discountCents', 'totalCents'].every(function (key) { return Number.isSafeInteger(values[key]) && values[key] >= 0; })) throw new Error('invalid_response');
@@ -81,8 +105,12 @@
     const host = P.id('verified'); host.hidden = false;
     host.replaceChildren(P.el('h3', '', 'Valores conferidos'), P.reviewLine('Produtos', P.money(values.productsCents / 100)),
       P.reviewLine('Frete', P.money(values.freightCents / 100)), P.reviewLine('Desconto', '− ' + P.money(values.discountCents / 100)), P.reviewLine('Total da compra', P.money(values.totalCents / 100)));
+    if (body.supplier_credit_amount) host.append(P.reviewLine('Crédito utilizado',P.money(body.supplier_credit_amount)),
+      P.reviewLine(body.payment_status==='paid'?'Saída de caixa':'Saldo a pagar',P.money(values.totalCents/100-body.supplier_credit_amount)));
     P.totals(); P.footer(); host.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+  P.id('advance-amount').oninput=function(){s.draft.creditAmount=this.value;P.changed();P.renderPayment();};
+  P.id('use-advance').onclick=function(){s.draft.creditAmount=P.id('advance-amount').max;P.changed();P.renderPayment();};
   P.reviewFields.forEach(function (key) {
     P.id(key).addEventListener('input', function () { if (!s.draft) return; P.readReview(); P.changed(); P.renderPayment(); P.totals(); });
   });

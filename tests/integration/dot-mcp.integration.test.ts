@@ -170,11 +170,11 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(71);
+  expect(listing.result.tools).toHaveLength(72);
   const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','excluir_publicacao_instagram','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
-    'usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
+    'baixar_compra_com_credito','usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
   for (const tool of listing.result.tools) {
     expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
@@ -496,7 +496,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(71);
+    expect((await client.listTools()).tools).toHaveLength(72);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -753,6 +753,23 @@ it('registra compra por item e lote no MCP, preserva saldos ao arquivar e revert
   expect(detail.payables.map((p:{balance:string})=>Number(p.balance))).toEqual([200,120]);
   expect((await fail('registrar_compra_lote_fornecedor',{...lot,idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
   expect((await fail('editar_fornecedor',{supplier_id,changes:{notes:'Após arquivo'},idempotency_key:randomUUID()})).result.content[0].text).toContain('supplier_not_found');
+});
+
+it('Milly usa o crédito ao comprar e ao baixar a diferença em uma parcela existente',async()=>{
+  const {call}=await ownerFinanceMcp();
+  const {supplier_id}=await call('cadastrar_fornecedor',{name:'Fornecedor '+randomUUID(),idempotency_key:randomUUID()});
+  const at=new Date().toISOString();
+  await call('registrar_adiantamento_fornecedor',{supplier_id,amount:1000,occurred_at:at,payment_method:'pix',cash_account:'Loja',reason:'Compra de pneus',idempotency_key:randomUUID()});
+  const order=await call('registrar_compra_lote_fornecedor',{supplier_id,supplier_credit_amount:800,
+    lot:{description:'Lote de pneus',quantity:10,total_cost:1200},payment_status:'pending',receipt_status:'pending',
+    purchased_at:at,due_date:'2099-01-01',idempotency_key:randomUUID()});
+  expect(order).toMatchObject({remaining_balance:'400.00',cash_paid:'0.00',total_amount:'1200.00'});
+  const {payables}=await call('consultar_financeiro_fornecedores',{supplier_id});
+  const payment={obligation_id:payables[0].obligation_id,purchase_id:order.purchase_id,installment:1,amount:400,
+    supplier_credit_amount:200,payment_method:'pix',cash_account:'Loja',paid_at:at,idempotency_key:randomUUID()};
+  const paid=await call('baixar_compra_com_credito',payment);
+  expect(paid).toMatchObject({cash_paid:'200.00',credit_applied:'200.00',remaining_balance:'0.00'});
+  expect(await call('baixar_compra_com_credito',payment)).toEqual(paid);
 });
 
 it('publicador exige autorização própria, importa anexos e mantém legenda, ordem e agenda pela mesma fila do painel', async () => {

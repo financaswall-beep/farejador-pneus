@@ -28,6 +28,7 @@ import { listSaleLots } from '../painel/queries-lot-sales.js';
 import { settleMatrizLedgerOpenItemOnClient } from '../painel/matriz-ledger-settlement.js';
 import { lockSettlementObligation } from '../painel/matriz-ledger-settlement-payment.js';
 import { purchaseInstallmentBalancesSql } from '../painel/purchase-installment-balances.js';
+import { purchaseCreditSettlementFields } from '../painel/finance-settlement-service.js';
 import { manualEntrySchema, reverseManualEntrySchema } from '../painel/manual-finance-entry-schema.js';
 import { createManualEntryOnClient, reverseManualFinanceEntry } from '../painel/manual-finance-entry.js';
 import { listPurchaseGroups,getPurchaseGroup } from '../painel/queries-purchase-groups.js';
@@ -223,8 +224,15 @@ write('estornar_adiantamento_fornecedor','Corrige um registro de adiantamento fe
 write('cadastrar_fornecedor','Cadastra um fornecedor da Matriz por nome, telefone, documento e observações. Consulte primeiro se ele já existe.',createSupplierInput,createSupplier);
 write('editar_fornecedor','Atualiza o cadastro ativo pelo UUID. Envie em changes só os campos pedidos. Para limpar telefone, documento ou observações, envie null.',editSupplierInput,editSupplier);
 write('arquivar_fornecedor','Exclui o fornecedor do cadastro ativo pelo UUID, preservando compras, dívidas e adiantamentos.',archiveSupplierInput,archiveSupplier);
-write('registrar_compra_fornecedor','Registra compra formal por medida, marca, condição, quantidade e custo unitário. Informe pagamento e recebimento separadamente. Para lote fechado, use registrar_compra_lote_fornecedor.',purchaseInput,registerSupplierPurchase);
-write('registrar_compra_lote_fornecedor','Registra um lote fechado pelo total e quantidade de pneus. Informe pagamento, recebimento e respectivas datas. Compra a prazo exige vencimento.',lotPurchaseInput,registerSupplierPurchase);
+const creditInstructions=' Consulte consultar_financeiro_fornecedores e ofereça o saldo. Se o dono escolher usar crédito, informe supplier_credit_amount. Informe o custo integral dos pneus. paid quita a diferença já paga, pending deixa só a diferença a pagar. Parcelas somam a diferença.';
+write('registrar_compra_fornecedor','Registra compra por medida, marca, condição, quantidade e custo unitário. Informe recebimento separadamente.'+creditInstructions,purchaseInput,registerSupplierPurchase);
+write('registrar_compra_lote_fornecedor','Registra lote fechado pelo custo integral e quantidade de pneus. Informe recebimento separadamente.'+creditInstructions,lotPurchaseInput,registerSupplierPurchase);
+write('baixar_compra_com_credito','Baixa uma compra existente. Consulte os IDs no financeiro do fornecedor. amount é o total da baixa incluindo supplier_credit_amount. Informe installment para a parcela e, se houver diferença já paga, a conta e o meio de pagamento.',
+  purchaseCreditSettlementFields.extend({idempotency_key:id}).strict(),async(db,data,actor)=>{
+    if(data.amount<data.supplier_credit_amount || (data.amount>data.supplier_credit_amount && !(data.cash_account && data.payment_method)))
+      throw Error('purchase_credit_invalid');
+    return settleMatrizLedgerOpenItemOnClient(db,{...data,purchase_installment:data.installment,actor_label:actor});
+  });
 export const financeTools=[...tools.values()].map(t=>t.descriptor);
 export function hasFinanceTool(name:string) {return tools.has(name);}
 export async function invokeFinanceTool(identity:DotIdentity,name:string,args:unknown) {

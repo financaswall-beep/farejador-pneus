@@ -55,5 +55,6 @@ export async function supplierFinanceDetail(id:string,db:Reader=pool,environment
     FROM tx JOIN finance.matriz_ledger_transactions t ON t.id=tx.id AND t.environment=$1
     JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id AND e.account_code='cash'
     WHERE t.cash_on IS NOT NULL ORDER BY t.cash_on DESC,t.created_at DESC`,args)).rows;
-  return {supplier,credits,payables,movements,purchases,cash};
+  const available = credits.reduce((cents,row)=>cents+Math.round(Number(row.available)*100),0)/100;
+  return {supplier,credits,supplier_credit_available:available.toFixed(2),payables,movements,purchases,cash};
 }

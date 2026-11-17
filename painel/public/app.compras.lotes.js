@@ -91,8 +91,11 @@ window.PAINEL_MODULES.comprasLotes = function () {
       if (f.receipt_status === 'received' && (!f.received_at || f.received_at > today || f.received_at < f.purchased_at)) {
         return fail('O recebimento deve estar entre a data da compra e hoje.');
       }
-      if (f.payment_status === 'paid' && (!f.paid_at || f.paid_at > today || !f.payment_method)) return fail('Confira a data e a forma de pagamento.');
-      if (f.payment_status === 'pending') {
+      const credit = Number(f.creditAmount || 0);
+      if (credit && !this.compraCreditoValido(f,totals.total)) return fail('Confira o crédito do fornecedor e o valor do lote.');
+      const covered = credit > 0 && credit === totals.total;
+      if (!covered && f.payment_status === 'paid' && (!f.paid_at || f.paid_at > today || !f.payment_method)) return fail('Confira a data e a forma de pagamento.');
+      if (!covered && f.payment_status === 'pending') {
         if (!this.atacadoFinance) return fail('O financeiro de Compras precisa estar ativo para registrar a prazo.');
         if (!f.due_date || f.due_date < f.purchased_at) return fail('Informe um vencimento igual ou posterior à compra.');
       }
@@ -103,9 +106,10 @@ window.PAINEL_MODULES.comprasLotes = function () {
         lot: { vehicle_type: f.vehicle_type || null, description: f.description.trim(), quantity, total_cost: Number(f.total_cost) },
         purchased_at: this.businessFactInstant(f.purchased_at),
         ...(f.receipt_status === 'received' ? { received_at: this.businessFactInstant(f.received_at) } : {}),
-        ...(f.payment_status === 'paid' ? { paid_at: this.businessFactInstant(f.paid_at), payment_method: f.payment_method }
+        ...(credit ? {supplier_credit_amount:credit} : {}),
+        ...(covered ? {} : f.payment_status === 'paid' ? { paid_at: this.businessFactInstant(f.paid_at), payment_method: f.payment_method }
           : { due_date: f.due_date }),
-        receipt_status: f.receipt_status, payment_status: f.payment_status,
+        receipt_status: f.receipt_status, payment_status: covered ? 'paid' : f.payment_status,
         freight_amount: totals.freight, discount_amount: totals.discount,
         supplier_reference: f.supplier_reference.trim() || null, notes: f.notes.trim() || null,
         idempotency_key: f.idempotency_key,
@@ -130,10 +134,11 @@ window.PAINEL_MODULES.comprasLotes = function () {
         this.lotPurchaseMsg = { ok: true, text: `${result.lot_code} · ${result.order_code}: compra registrada. `
           + (result.stock_applied ? 'Lote recebido e saldo registrado. ' : 'Aguardando recebimento. ')
           + (body.payment_status === 'paid' ? 'Pagamento registrado.' : 'Conta a pagar registrada.') };
+        if (result.credit_applied) this.lotPurchaseMsg.text+=this.compraCreditoRecibo(result);
         await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);
       } catch (err) {
         // A network timeout may follow a committed purchase: retry the identical payload/key.
-        const correctable = ['supplier_not_found', 'supplier_required', 'supplier_duplicate',
+        const correctable = ['supplier_not_found', 'supplier_required', 'supplier_duplicate','purchase_credit_unavailable','purchase_credit_disabled',
           'lot_total_cost_invalid', 'lot_description_required', 'purchase_quantity_invalid',
           'purchased_at_future', 'paid_at_future', 'received_at_future', 'received_before_purchase',
           'due_date_before_purchase', 'discount_exceeds_purchase', 'wholesale_finance_disabled'];

@@ -20,6 +20,23 @@
     const date = field(form, direction === 'out' ? 'Data do pagamento' : 'Data do recebimento', 'date', today); date.max = today;
     const method = field(form, 'Forma de pagamento', 'select', '', [['', 'Selecione'], ['pix', 'Pix'], ['dinheiro', 'Dinheiro'], ['transferencia', 'Transferência'], ['cartao', 'Cartão'], ['boleto', 'Boleto'], ['outros', 'Outros']]);
     const cash = field(form, 'Conta do caixa', 'text', 'Caixa principal'); cash.maxLength = 80; cash.minLength = 2;
+    let credit;
+    if (row.settlement_mode === 'wholesale_purchase' && Number(row.supplier_credit_available)>0) {
+      const available = Number(row.supplier_credit_available);
+      form.appendChild(V.node('strong','Crédito disponível: '+V.money(available)));
+      credit = field(form,'Crédito a usar (R$)','number','0'); credit.step='0.01'; credit.min='0';
+      const use=V.node('button','Usar crédito','mf-primary'); use.type='button'; form.appendChild(use);
+      const difference=V.node('p',''); form.appendChild(difference);
+      function update() {
+        credit.max=String(Math.min(available,Number(amount.value)));
+        const rest=Number(amount.value)-Number(credit.value);
+        difference.textContent='Saída de caixa: '+V.money(rest);
+        method.required=cash.required=rest>0;
+        method.parentElement.hidden=cash.parentElement.hidden=rest===0;
+      }
+      use.onclick=()=>{credit.value=credit.max;update();};
+      credit.oninput=amount.oninput=update;update();
+    }
     const note = field(form, 'Observação (opcional)', 'text', ''); note.required = false; note.maxLength = 500;
     body.appendChild(form);
     const error = V.node('p', '', 'mf-inline-error hidden'); error.setAttribute('role', 'alert'); form.appendChild(error);
@@ -31,6 +48,10 @@
       const data = { settlement_mode: row.settlement_mode, target_id: row.id, obligation_id: row.obligation_id,
         account_code: row.account_code, payment_method: method.value, cash_account: cash.value.trim(), note: note.value.trim(), paid_at: paidAt };
       if (acceptsPartial) data.amount = Number(amount.value);
+      if (credit && Number(credit.value)>0) {
+        data.supplier_credit_amount=Number(credit.value);
+        if (data.amount===data.supplier_credit_amount) { delete data.payment_method; delete data.cash_account; }
+      }
       // Uma tentativa incerta reutiliza exatamente o mesmo corpo e a mesma chave.
       if (!attempt) attempt = { ...data, idempotency_key: 'app-account-' + crypto.randomUUID() };
       sending = true; pendingSession = C.sessionFingerprint(); submit.disabled = true; error.classList.add('hidden');
@@ -44,10 +65,10 @@
         C.showToast(direction === 'out' ? 'Pagamento registrado no Financeiro.' : 'Recebimento registrado no Financeiro.'); onSuccess();
       } catch (failure) {
         if (C.sessionFingerprint() !== session) return;
-        error.textContent = /not_open|not_found|nothing_open|conflict|exceeds_balance/.test(failure.message)
+        error.textContent = /not_open|not_found|nothing_open|conflict|exceeds_balance|purchase_credit_unavailable/.test(failure.message)
           ? 'Esta conta mudou. Feche os detalhes e atualize a lista antes de continuar.'
           : 'Não foi possível confirmar. Tente novamente com os mesmos dados ou atualize a lista para conferir se a baixa foi registrada.';
-        error.classList.remove('hidden'); submit.disabled = /not_open|not_found|nothing_open|conflict|exceeds_balance/.test(failure.message);
+        error.classList.remove('hidden'); submit.disabled = /not_open|not_found|nothing_open|conflict|exceeds_balance|purchase_credit_unavailable/.test(failure.message);
         submit.textContent = 'Tentar confirmar novamente';
       } finally { sending = false; if (pendingSession === session) pendingSession = null; }
     });

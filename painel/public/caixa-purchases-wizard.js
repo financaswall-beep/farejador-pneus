@@ -43,6 +43,7 @@
     P.id('supplier').disabled = d.newSupplier; P.id('new-supplier').hidden = !d.newSupplier;
     P.id('supplier-new-toggle').textContent = d.newSupplier ? 'Escolher fornecedor cadastrado' : '＋ Novo fornecedor';
     P.id('chosen-supplier').textContent = P.supplierName();
+    P.renderAdvance();
     const lot = d.mode === 'lot'; P.id('by-items').hidden = lot; P.id('by-lot').hidden = !lot;
     P.id('mode-items').setAttribute('aria-pressed', String(!lot)); P.id('mode-lot').setAttribute('aria-pressed', String(lot));
     if (d.step === 2) P.renderItems();
@@ -125,6 +126,7 @@
       const result = await operation; if (!result) return;
       P.id('wizard').hidden = true; P.id('home').hidden = false;
       P.notice('Compra ' + (result.order_code || result.purchase_id.slice(0, 8)) + ' registrada. ' +
+        (result.credit_applied ? 'Crédito usado: '+P.money(result.credit_applied)+' · saída de caixa: '+P.money(result.cash_paid)+' · saldo a pagar: '+P.money(result.remaining_balance)+'. ' : '') +
         (result.stock_applied ? 'Recebimento confirmado.' : 'Aguardando conferência de chegada.') +
         (result.catalog_blockers?.length ? ' Há pneus que precisam de configuração no Catálogo antes da venda.' : '') +
         (result.lot_code && result.stock_applied ? ' Lote ' + result.lot_code + ' disponível para triagem no web.' : ''), true);
@@ -147,9 +149,9 @@
     if (s.pending || s.busy || !window.confirm('Descartar o rascunho desta compra?')) return;
     s.draft = null; s.preview = null; P.persist(); P.id('wizard').hidden = true; P.id('home').hidden = false; P.notice('');
   });
-  P.id('supplier-new-toggle').addEventListener('click', function () { s.draft.newSupplier = !s.draft.newSupplier; P.changed(); P.renderStep(); });
+  P.id('supplier-new-toggle').addEventListener('click', function () { s.draft.creditAmount=''; s.draft.newSupplier = !s.draft.newSupplier; P.changed(); P.renderStep(); });
   P.id('change-supplier').addEventListener('click', function () { s.draft.step = 1; P.changed(); P.renderStep(); });
-  P.id('supplier').addEventListener('change', function () { s.draft.supplier = this.value; P.changed(); });
+  P.id('supplier').addEventListener('change', function () { s.draft.creditAmount=''; s.draft.supplier = this.value; P.changed(); P.renderAdvance(); });
   ['Name', 'Phone', 'Document'].forEach(function (key) {
     P.id('supplier-' + key.toLowerCase()).addEventListener('input', function () { s.draft['supplier' + key] = this.value; P.changed(); });
   });

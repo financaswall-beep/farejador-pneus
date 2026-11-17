@@ -31,6 +31,7 @@ export interface FinanceiroPayableItem {
   categoria?: string;
   valor: string;
   parcela_compra?: number;
+  supplier_credit_available?: string;
   due_date: string | null;
   overdue: boolean;
   obligation_id?: string;
@@ -60,6 +61,7 @@ export interface OpenRow {
   customer_name: string | null;
   customer_phone: string | null;
   supplier_name: string | null;
+  supplier_credit_available?: string;
   sale_plan?: SalePaymentSnapshot | null;
   installment_number?: number;
   installments_count?: number;

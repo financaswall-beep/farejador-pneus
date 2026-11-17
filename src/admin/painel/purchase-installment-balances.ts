@@ -33,3 +33,16 @@ export async function purchaseSchedule(client: PoolClient, environment: string, 
      WHERE p.environment=$1 AND p.id=$2 ORDER BY s.installment_number`, [environment,purchaseId],
   )).rows;
 }
+
+/** Histórico e baixa usam os mesmos saldos. A compra externa tem o alias p. */
+export const purchasePaymentDetailSql = `
+  (SELECT COALESCE(-sum(m.delta),0)::text FROM finance.supplier_advance_movements m
+    WHERE m.environment=p.environment AND m.purchase_id=p.id) AS credit_applied,
+  CASE WHEN p.status='cancelled' OR p.payment_status='paid' THEN '0.00'
+    ELSE COALESCE((SELECT finance.matriz_ledger_obligation_balance(p.environment,t.id)
+      FROM finance.matriz_ledger_transactions t WHERE t.environment=p.environment
+      AND t.source_type='commerce.wholesale_purchase.accrual' AND t.source_id=p.id::text),p.total_amount)::text END AS remaining_balance,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'number',s.installment_number,
+    'due_date',s.due_date,'amount',s.amount,'balance',s.balance) ORDER BY s.installment_number)
+    FROM (${purchaseInstallmentBalancesSql}) s JOIN commerce.wholesale_purchase_installments i
+      ON i.environment=p.environment AND i.purchase_id=p.id AND i.installment_number=s.installment_number),'[]') AS installments`;

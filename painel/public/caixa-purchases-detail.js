@@ -46,8 +46,10 @@
     const amounts = P.el('div', 'pc-card'); amounts.append(P.reviewLine('Produtos', P.money(row.products_amount)),
       P.reviewLine('Frete', P.money(row.freight_amount)), P.reviewLine('Desconto', '− ' + P.money(row.discount_amount)),
       P.reviewLine(receiving ? 'Total registrado' : 'Total', P.money(row.total_amount)));
+    if (Number(row.credit_applied)>0) amounts.append(P.reviewLine('Crédito utilizado',P.money(row.credit_applied)),
+      P.reviewLine('Saldo a pagar',P.money(row.remaining_balance)));
     if (row.payment_status === 'pending') {
-      (row.installments || []).forEach(function (item) { amounts.append(P.reviewLine('Parcela ' + item.number + ' · ' + P.day(item.due_date), P.money(item.amount))); });
+      (row.installments || []).forEach(function (item) { amounts.append(P.reviewLine('Saldo da parcela ' + item.number + ' · ' + P.day(item.due_date), P.money(item.balance ?? item.amount))); });
       if (!row.installments?.length && row.due_date) amounts.append(P.reviewLine('Vencimento', P.day(row.due_date)));
     } else if (row.paid_at) amounts.append(P.reviewLine('Pagamento', P.date(row.paid_at)));
     if (row.payment_method) amounts.append(P.reviewLine('Forma', row.payment_method));

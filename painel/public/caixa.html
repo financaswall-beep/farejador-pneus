@@ -56,14 +56,14 @@
   <script defer src="/operacao/caixa-sales-metal.js?v=20261026-sales1"></script>
   <script defer src="/operacao/caixa-navigation.js?v=20261101-trips1"></script>
   <script defer src="/operacao/caixa-sales.js?v=20261026-metal1"></script>
-  <script defer src="/operacao/caixa-purchases.js?v=20261027-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases.js?v=20261116-credito"></script>
   <script defer src="/operacao/caixa-purchases-list.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchases-items.js?v=20261027-purchases1"></script>
-  <script defer src="/operacao/caixa-purchases-review.js?v=20261101-trips1"></script>
-  <script defer src="/operacao/caixa-purchases-wizard.js?v=20261113-share"></script>
+  <script defer src="/operacao/caixa-purchases-review.js?v=20261116-credito"></script>
+  <script defer src="/operacao/caixa-purchases-wizard.js?v=20261116-credito"></script>
   <link rel="stylesheet" href="/operacao/purchase-sharing.css?v=1">
   <script defer src="/operacao/purchase-sharing.js?v=1"></script>
-  <script defer src="/operacao/caixa-purchases-detail.js?v=20261113-share"></script>
+  <script defer src="/operacao/caixa-purchases-detail.js?v=20261116-credito"></script>
   <script defer src="/operacao/purchase-price-utils.js?v=20260918-prices1"></script>
   <script defer src="/operacao/caixa-purchase-prices.js?v=20261027-purchases1"></script>
   <script defer src="/operacao/caixa-purchase-prices-detail.js?v=20261027-purchases1"></script>
@@ -82,7 +82,7 @@
   <script defer src="/operacao/caixa-finance-entries.js?v=20260918-finance1"></script>
   <script defer src="/operacao/caixa-finance-view.js?v=20261111-entradas1"></script>
   <script defer src="/operacao/caixa-finance-matrix.js?v=20261027-finance1"></script>
-  <script defer src="/operacao/caixa-finance-payment.js?v=20261027-finance1"></script>
+  <script defer src="/operacao/caixa-finance-payment.js?v=20261116-credito"></script>
   <script defer src="/operacao/caixa-finance-accounts.js?v=20261027-finance1"></script>
   <script defer src="/operacao/caixa-finance-commission-month.js?v=20261027-finance1"></script>
   <script defer src="/operacao/app.relatorios.pdf.core.js?v=20260922-finance1"></script>
@@ -180,7 +180,7 @@
   <link rel="stylesheet" href="/operacao/caixa-purchases-metal.css?v=20261027-purchases1" />
   <link rel="stylesheet" href="/operacao/caixa-purchases-metal-forms.css?v=20261027-purchases1" />
   <link rel="stylesheet" href="/operacao/caixa-purchases-metal-prices.css?v=20261027-purchases1" />
-  <script defer src="/operacao/caixa-purchases-metal-view.js?v=20261027-purchases1"></script>
+  <script defer src="/operacao/caixa-purchases-metal-view.js?v=20261116-credito"></script>
   <script defer src="/operacao/caixa-purchases-metal.js?v=20261027-purchases1"></script>
   <link rel="stylesheet" href="/operacao/caixa-finance-clean.css?v=20261027-finance1" />
   <link rel="stylesheet" href="/operacao/caixa-finance-clean-tools.css?v=20261027-finance1" />
@@ -847,6 +847,7 @@
                   <div class="pc-card pc-stack"><h3>De quem você comprou?</h3>
                     <label>Fornecedor<select id="purchase-supplier" required><option value="">Selecione um fornecedor</option></select></label>
                     <button id="purchase-supplier-new-toggle" class="pc-link" type="button">＋ Novo fornecedor</button>
+                    <strong id="purchase-advance-info" hidden></strong>
                     <div id="purchase-new-supplier" class="pc-stack" hidden>
                       <label>Nome do fornecedor<input id="purchase-supplier-name" maxlength="200" autocomplete="organization" /></label>
                       <label>Telefone (opcional)<input id="purchase-supplier-phone" type="tel" maxlength="40" /></label>
@@ -881,6 +882,11 @@
                     <label>Nota / referência do fornecedor (opcional)<input id="purchase-reference" maxlength="160" /></label>
                   </div>
                   <div class="pc-card pc-stack"><h3>Pagamento</h3>
+                    <div id="purchase-advance-fields" class="pc-stack" hidden>
+                      <strong id="purchase-advance-available"></strong><button type="button" class="pc-link" id="purchase-use-advance">Usar crédito</button>
+                      <label>Crédito a usar (R$)<input id="purchase-advance-amount" type="number" min="0" step="0.01" placeholder="0,00"></label>
+                      <span id="purchase-advance-difference" aria-live="polite"></span>
+                    </div>
                     <label>Situação<select id="purchase-payment"><option value="paid">Já pago</option><option value="pending">A prazo</option></select></label>
                     <p id="purchase-credit-note" class="pc-muted" hidden>Compras a prazo não estão habilitadas nesta matriz.</p>
                     <div id="purchase-paid-fields" class="pc-grid"><label>Forma de pagamento<select id="purchase-payment-method"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option><option value="cartao">Cartão</option><option value="boleto">Boleto</option><option value="outro">Outro</option></select></label><label>Pago em<input id="purchase-paid-date" type="date" /></label></div>

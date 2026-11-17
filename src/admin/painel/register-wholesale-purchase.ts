@@ -1,4 +1,7 @@
 import type { PoolClient } from 'pg';
+import { randomUUID } from 'node:crypto';
+import { applyPurchaseCredit, purchaseCreditEnabled } from './purchase-credit.js';
+import { settleMatrizLedgerOpenItemOnClient } from './matriz-ledger-settlement.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { ensureWholesalePurchaseAccrual } from './matriz-ledger-purchases.js';
@@ -20,6 +23,7 @@ import { resolveSupplier, applyPurchaseStock, type AllocatedPurchaseItem } from 
 import { linkPurchaseGroupInTransaction } from './purchase-group-links.js';
 
 export interface RegisterWholesalePurchaseInput {
+  supplier_credit_amount?: number;
   group_id?: string | null;
   environment?: 'prod' | 'test';
   supplier_id?: string | null;
@@ -44,6 +48,10 @@ export interface RegisterWholesalePurchaseInput {
 }
 
 export interface RegisterWholesalePurchaseResult {
+  credit_applied?: string;
+  cash_paid?: string;
+  remaining_balance?: string;
+  payment_status?: 'paid' | 'pending';
   lot_id?: string;
   lot_code?: string;
   purchase_id: string;
@@ -88,6 +96,7 @@ export async function registerWholesalePurchaseOnClient(
     idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
       ...(input.group_id ? { group_id: input.group_id } : {}),
       supplier_id: input.supplier_id ?? null,
+      ...(input.supplier_credit_amount !== undefined ? {supplier_credit_cents:moneyCents(input.supplier_credit_amount)} : {}),
       new_supplier: input.new_supplier ? { name: input.new_supplier.name.trim(),
         phone: input.new_supplier.phone ? normalizeBrazilianPhone(input.new_supplier.phone) : null,
         document: input.new_supplier.document?.replace(/\D/g, '') || null } : null,
@@ -124,15 +133,24 @@ export async function registerWholesalePurchaseOnClient(
     ...item, allocated_cost: totals.allocatedItemCents[index]! / 100,
   }));
   const supplier = await resolveSupplier(client, environment, input);
+  const credit = moneyCents(input.supplier_credit_amount ?? 0);
+  if (input.supplier_credit_amount !== undefined && (!input.supplier_id || input.new_supplier ||
+      credit <= 0 || credit > totals.totalCents)) throw Error('purchase_credit_invalid');
+  if (credit && !purchaseCreditEnabled()) throw Error('purchase_credit_disabled');
+  const remainder = totals.totalCents - credit;
   const order = await resolveWholesalePurchaseOrder(
     client, environment, supplier.id, input.created_by, input.purchase_order_id,
   );
-  const pendingPayment = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+  const pendingPayment = env.WHOLESALE_FINANCE && input.payment_status === 'pending' && (!credit || remainder > 0);
+  const createPayable = pendingPayment || credit > 0;
   if (pendingPayment && !input.due_date && !input.installments?.length) throw new Error('due_date_required');
+  // O cronograma do livro soma o custo integral. A primeira parcela recebe o crédito
+  // e o abatimento na mesma transação, deixando exatamente a parcela líquida combinada.
   const installments = pendingPayment
     ? (input.installments?.length ? input.installments : [{
-      due_date: input.due_date!, amount: totals.totalCents / 100,
-    }]).map((row, index) => ({ ...row, installment_number: index + 1 })) : [];
+      due_date: input.due_date!, amount: remainder / 100,
+    }]).map((row, index) => ({ ...row, installment_number: index + 1,
+      amount:(moneyCents(row.amount) + (index === 0 ? credit : 0)) / 100 })) : [];
   if (pendingPayment && (totals.totalCents <= 0
     || installments.reduce((sum, row) => sum + moneyCents(row.amount), 0)
       !== totals.totalCents)) {
@@ -151,12 +169,12 @@ export async function registerWholesalePurchaseOnClient(
        $4,$5,$6,$7::date,$8::timestamptz,$10,$11,$12,$13,$14,$15,$16)
      RETURNING id,purchased_at,paid_at`,
     [environment, supplier.id, purchasedAt ?? null, input.created_by, input.notes ?? null,
-     pendingPayment ? 'pending' : 'paid', dueDate,
-     env.WHOLESALE_FINANCE && !pendingPayment
+     createPayable ? 'pending' : 'paid', dueDate,
+     env.WHOLESALE_FINANCE && !createPayable
        ? paidAt ?? purchasedAt ?? requestNow.toISOString() : null,
      totals.totalCents / 100, order.id, input.supplier_reference?.trim() || null,
      totals.productsCents / 100, totals.freightCents / 100, totals.discountCents / 100,
-     input.payment_method?.trim() || null, input.lot ? 'lot' : 'catalog']);
+     credit && (!remainder || pendingPayment) ? null : input.payment_method?.trim() || null, input.lot ? 'lot' : 'catalog']);
   const purchaseId = purchase.rows[0]!.id;
   await linkPurchaseGroupInTransaction(client, { environment, group_id: input.group_id,
     kind: 'purchase', record_id: purchaseId, actor: input.created_by, idempotency_key: input.idempotency_key });
@@ -194,17 +212,31 @@ export async function registerWholesalePurchaseOnClient(
           SET status='confirmed',stock_applied=true,stock_applied_at=COALESCE($3::timestamptz,now()),stock_applied_by=$2
         WHERE id=$1`, [purchaseId, input.created_by, receivedAt]);
   }
-  await ensureWholesalePurchaseAccrual(client, {
+  const obligation = await ensureWholesalePurchaseAccrual(client, {
     environment, purchaseId, supplierId: supplier.id,
     totalAmount: totals.totalCents / 100,
     purchasedAt: purchase.rows[0]!.purchased_at,
-    paymentStatus: pendingPayment ? 'pending' : 'paid',
+    paymentStatus: createPayable ? 'pending' : 'paid',
     dueDate,
     paidAt: purchase.rows[0]!.paid_at,
     stockApplied: received, createdBy: input.created_by,
   });
+  if (credit) {
+    if (!obligation) throw Error('purchase_credit_disabled');
+    const at = purchasedAt ?? requestNow.toISOString();
+    await applyPurchaseCredit(client, environment, purchaseId, obligation,
+      installments[0]?.installment_number, credit / 100, at, input.created_by);
+    if (!pendingPayment && remainder) {
+      if (!input.payment_method?.trim() || !input.paid_at) throw Error('payment_details_required');
+      await settleMatrizLedgerOpenItemOnClient(client, {environment, purchase_id:purchaseId,
+        obligation_id:obligation, amount:remainder / 100, payment_method:input.payment_method,
+        paid_at:paidAt ?? at, actor_label:input.created_by, idempotency_key:randomUUID()});
+    }
+  }
   const catalogBlockers = input.lot ? [] : await getPurchaseCatalogBlockers(client, environment, items);
   const result = { purchase_id: purchaseId, supplier_id: supplier.id,
+    ...(credit ? {credit_applied:(credit/100).toFixed(2),cash_paid:((pendingPayment ? 0 : remainder)/100).toFixed(2),
+      remaining_balance:((pendingPayment ? remainder : 0)/100).toFixed(2),payment_status:pendingPayment ? 'pending' as const : 'paid' as const} : {}),
     supplier_name: supplier.name, total_amount: (totals.totalCents / 100).toFixed(2),
     items_count: input.lot ? 1 : items.length, status: received ? 'confirmed' as const : 'pending' as const,
     ...(lotRecord ? { lot_id: lotRecord.id, lot_code: lotRecord.lot_code } : {}),

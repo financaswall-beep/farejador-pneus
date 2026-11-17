@@ -79,7 +79,7 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       this.finBaixaModal = {
         open: true, item, direction,
         amount: Number(item.valor || 0).toFixed(2).replace('.', ','),
-        payment_date: this.finHoje(), payment_method: 'pix',
+        creditAmount:'', payment_date: this.finHoje(), payment_method: 'pix',
         cash_account: 'Caixa principal', note: '', error: null,
       };
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
@@ -109,7 +109,11 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
         return;
       }
       const mode = this.finSettlementMode(item);
-      const targetKey = `${mode}:${item.id}:${amount}:${modal.payment_date}`;
+      const credit = Number(modal.creditAmount || 0);
+      if (credit && (mode !== 'wholesale_purchase' || credit < 0 || credit > Math.min(amount,Number(item.supplier_credit_available || 0)))) {
+        modal.error='Confira o valor de crédito a usar nesta baixa.'; return;
+      }
+      const targetKey = `${mode}:${item.id}:${amount}:${modal.payment_date}` + (credit ? ':credito:'+credit : '');
       const operation = window.PAINEL_INTEGRITY.operation(
         'finance-settlement-facade', targetKey,
       );
@@ -132,8 +136,9 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
           ...target,
           amount: this.finPermiteParcial(item) ? amount : undefined,
           paid_at: operation.paid_at,
-          payment_method: String(modal.payment_method).trim(),
-          cash_account: String(modal.cash_account || '').trim() || undefined,
+          ...(credit ? {supplier_credit_amount:credit} : {}),
+          payment_method: credit===amount ? undefined : String(modal.payment_method).trim(),
+          cash_account: credit===amount ? undefined : String(modal.cash_account || '').trim() || undefined,
           note: String(modal.note || '').trim() || undefined,
           idempotency_key: operation.key,
         });

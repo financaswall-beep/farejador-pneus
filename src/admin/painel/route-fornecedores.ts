@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth, requireAdminOwner } from '../auth.js';
+import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseAnalytics, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, linkWholesalePurchaseOrder, listWholesalePurchaseOrders, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
@@ -41,8 +41,8 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     return reply.status(200).send(dashboardPayload(await listWholesalePurchaseOrders(parsed.data)));
   });
 
-  fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
-    return reply.status(200).send(dashboardPayload(await listWholesaleSuppliers()));
+  fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleSuppliers(env.FAREJADOR_ENV,undefined,getAdminContext(request).role==='owner')));
   });
 
   // Cadastra um fornecedor (nome + telefone).

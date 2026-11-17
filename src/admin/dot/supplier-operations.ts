@@ -72,7 +72,7 @@ function validatePurchase(data: Catalog | Lot) {
   if (!env.WHOLESALE_FINANCE) throw Error('wholesale_finance_disabled');
   if (Boolean(data.supplier_id) === Boolean(data.new_supplier)) throw Error('informe_um_fornecedor');
   if (data.payment_status === 'paid') {
-    if (!data.paid_at || !data.payment_method) throw Error('informe_data_e_meio_do_pagamento');
+    if (!data.supplier_credit_amount && (!data.paid_at || !data.payment_method)) throw Error('informe_data_e_meio_do_pagamento');
     if (data.due_date || ('installments' in data && data.installments)) throw Error('compra_paga_com_vencimento');
   } else if (data.paid_at) throw Error('compra_pendente_com_data_de_pagamento');
   if (data.receipt_status === 'pending' && 'received_at' in data && data.received_at) {
@@ -86,5 +86,5 @@ export async function registerSupplierPurchase(client: PoolClient, data: Catalog
     ? { ...registerLotPurchaseSchema.parse(data), items: [] }
     : registerPurchaseSchema.parse(data);
   const result = await registerWholesalePurchaseOnClient(client, { ...purchase, created_by: actor });
-  return { ...result, payment_status: data.payment_status };
+  return { ...result, payment_status: result.payment_status ?? data.payment_status };
 }

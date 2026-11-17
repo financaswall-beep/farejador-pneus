@@ -37,7 +37,8 @@ function app() {
   const window: any = { PAINEL_MODULES: {}, PAINEL_INTEGRITY: { operation: () => ({ key: 'fixed-request-key' }), complete: vi.fn() } };
   const sessionStorage = { getItem: (k: string) => storage.get(k), setItem: (k: string,v: string) => storage.set(k,v), removeItem: (k: string) => storage.delete(k) };
   vm.runInNewContext(fs.readFileSync('painel/public/app.compras.lotes.js','utf8'), { window, sessionStorage, Intl });
-  const state: any = { ...window.PAINEL_MODULES.comprasLotes(), adminUser: { role: 'owner', id: 'test' },
+  vm.runInNewContext(fs.readFileSync('painel/public/app.compras.fornecedor.js','utf8'), {window});
+  const state: any = { ...window.PAINEL_MODULES.comprasLotes(), ...window.PAINEL_MODULES.fornecedorFinanceiro(), adminUser: { role: 'owner', id: 'test' },
     serverEnvironment: 'test', atacadoFinance: true, finHoje: () => '2026-09-15',
     businessFactInstant: (d: string) => d+'T15:00:00Z', compraErrText: (s: string) => s,
     loadCompras: vi.fn(), loadFinanceiro: vi.fn(), loadSino: vi.fn(), $nextTick: vi.fn(),
@@ -47,6 +48,17 @@ function app() {
   return state;
 }
 describe('envio de compra no navegador', () => {
+  it('envia crédito e o custo integral do lote e só pede pagamento se restar diferença',()=>{
+    const a=app();
+    a.fornecedores=[{id:'thiago',supplier_credit_available:'1000.00'}];
+    Object.assign(a.lotPurchaseForm,{supplierKey:'thiago',total_cost:800,creditAmount:800,paid_at:'',payment_method:''});
+    const covered=a.lotPurchaseBuildBody();
+    expect(covered).toMatchObject({supplier_credit_amount:800,payment_status:'paid',lot:{total_cost:800}});
+    expect(covered).not.toHaveProperty('payment_method');
+    Object.assign(a.lotPurchaseForm,{total_cost:1200,creditAmount:1000,payment_status:'pending',due_date:'2026-10-01'});
+    expect(a.lotPurchaseBuildBody()).toMatchObject({supplier_credit_amount:1000,due_date:'2026-10-01',lot:{total_cost:1200}});
+    a.lotPurchaseForm.creditAmount=1100;expect(a.lotPurchaseBuildBody()).toBeNull();
+  });
   it('salvar rascunho não registra compra ou movimenta estoque', () => {
     const a=app(); a.lotPurchaseSaveDraft(); expect(a.apiPost).not.toHaveBeenCalled();
     a.lotPurchaseForm=null; a.lotPurchaseOpen(); expect(a.lotPurchaseForm.quantity).toBe('80');

@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { calculateLotPurchaseMoney } from './lot-purchase-money.js';
+import { supplierCreditAmount } from './route-schemas-purchases.js';
 
 export const registerLotPurchaseSchema = z.object({
+  supplier_credit_amount: supplierCreditAmount.optional(),
   group_id: z.string().uuid().nullable().optional(),
   supplier_id: z.string().uuid().optional(),
   new_supplier: z.object({ name: z.string().trim().min(1).max(200),
@@ -35,10 +37,13 @@ export const registerLotPurchaseSchema = z.object({
     issue('received_before_purchase', 'received_at');
   }
   if (d.payment_status === 'pending' && !d.due_date) issue('due_date_required', 'due_date');
-  if (d.payment_status === 'paid' && (!d.paid_at || !d.payment_method)) issue('payment_details_required', 'paid_at');
   if (d.due_date && d.due_date < businessDateSaoPaulo(d.purchased_at)) issue('due_date_before_purchase', 'due_date');
   try {
     const total = calculateLotPurchaseMoney(d.lot, d.freight_amount, d.discount_amount);
+    const credit = Math.round((d.supplier_credit_amount ?? 0) * 100);
+    if (credit && (!d.supplier_id || credit > total.totalCents)) issue('purchase_credit_invalid','supplier_credit_amount');
+    if (d.payment_status === 'paid' && (!credit || credit !== total.totalCents) && (!d.paid_at || !d.payment_method))
+      issue('payment_details_required', 'paid_at');
     if (total.totalCents <= 0) issue('lot_total_cost_invalid', 'lot');
   } catch (error) { issue(error instanceof Error ? error.message : 'lot_total_cost_invalid', 'lot'); }
 });

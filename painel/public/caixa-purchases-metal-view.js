@@ -72,7 +72,9 @@
     const payment = plate('Pagamento', 'mp-payment');
     if (data.status === 'cancelled') payment.appendChild(P.badge('Compra cancelada', 'gray'));
     else payment.appendChild(P.badge(data.payment_status === 'paid' ? 'Pago' : 'A prazo', data.payment_status === 'paid' ? 'green' : 'amber'));
-    (data.installments || []).forEach(item => payment.appendChild(row('Parcela ' + item.number + ' · ' + P.day(item.due_date), P.money(item.amount))));
+    if (Number(data.credit_applied)>0) payment.append(row('Crédito utilizado',P.money(data.credit_applied)),
+      row('Saldo a pagar',P.money(data.remaining_balance)));
+    (data.installments || []).forEach(item => payment.appendChild(row('Saldo da parcela ' + item.number + ' · ' + P.day(item.due_date), P.money(item.balance ?? item.amount))));
     if (!data.installments?.length && data.payment_status === 'pending' && data.due_date) payment.appendChild(row('Vencimento', P.day(data.due_date)));
     if (data.paid_at) payment.appendChild(row('Pago em', P.date(data.paid_at)));
     if (data.payment_method) payment.appendChild(row('Forma', paymentLabel(data.payment_method))); host.appendChild(payment);
