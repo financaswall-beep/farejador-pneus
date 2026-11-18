@@ -23,7 +23,9 @@
     },
     canOpenStock(){return H.app?.hasPanelModule('estoque');},
     canOpenSale(){return H.app?.adminUser?.role==='owner';},
-    openChatStock(){if(H.canOpenStock())H.app.currentPage='estoque';},
+    openChatStock(context){if(!H.canOpenStock())return;
+      if(context&&'measure' in context){H.app.stockBusca=context.measure;H.app.stockTab='visao';}
+      H.app.currentPage='estoque';},
     async openChatSale(row,data){
       if(!H.canOpenSale())return;
       const app=H.app,session=H.sessionFingerprint();

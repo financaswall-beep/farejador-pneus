@@ -50,7 +50,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-navigation.js', 'caixa-navigation.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-checkout-view.js', 'caixa-checkout-view.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-chat.css', 'caixa-chat.css', 'text/css; charset=utf-8');
-  for (const file of ['caixa-chat-metal', 'caixa-chat-metal-sheets', 'caixa-chat-metal-media']) {
+  for (const file of ['caixa-chat-metal', 'caixa-chat-metal-sheets', 'caixa-chat-metal-media', 'caixa-chat-milly','caixa-chat-milly-mobile']) {
     text(`/operacao/${file}.css`, `${file}.css`, 'text/css; charset=utf-8');
   }
   for (const file of ['caixa-chat-metal', 'caixa-chat-metal-filters', 'caixa-chat-metal-audio', 'caixa-chat-metal-media']) {
@@ -62,7 +62,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   }
   text('/operacao/caixa-chat-customer.css', 'caixa-chat-customer.css', 'text/css; charset=utf-8');
   text('/operacao/chat-channel-alerts.css', 'chat-channel-alerts.css', 'text/css; charset=utf-8');
-  for (const file of ['chat-channel-alerts','caixa-chat','caixa-chat-view','caixa-chat-media','caixa-chat-customer','caixa-chat-channels']) {
+  for (const file of ['chat-channel-alerts','caixa-chat','caixa-chat-view','caixa-chat-media','caixa-chat-customer','caixa-chat-channels','caixa-chat-milly','caixa-chat-milly-view']) {
     text(`/operacao/${file}.js`, `${file}.js`, 'text/javascript; charset=utf-8');
   }
   text('/operacao/business-time.js', 'business-time.js', 'text/javascript; charset=utf-8');

@@ -3,7 +3,7 @@
   const C=window.FarejadorBotChat||window.Caixa,ch=C.chat,s=ch.state;
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const paths={human:'M16 21H4v-2a6 6 0 0 1 12 0v2ZM14 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
-    bot:'M12 3v3m-2-3h4M6 7h12a2 2 0 0 1 2 2v10H4V9a2 2 0 0 1 2-2Zm2 5h1m6 0h1m-8 4h8M1 12v4m22-4v4',
+    bot:'M12 3v3m-2-3h4M6 7h12a2 2 0 0 1 2 2v10H4V9a2 2 0 0 1 2-2Zm2 5h1m6 0h1m-8 4h8M1 12v4m22-4v4', lock:'M6 10h12v10H6z M8.5 10V7a3.5 3.5 0 0 1 7 0v3',
     back:'m15 5-7 7 7 7',send:'m3 3 18 9-18 9 4-9-4-9Zm4 9h14',mic:'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5Zm-3 6v1a6 6 0 0 0 12 0v-1m-6 7v4m-3 0h6',
     camera:'M8 6l2-3h4l2 3h5v15H3V6h5Zm8 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
     paperclip:'m8 13 7-7a3 3 0 0 1 4 4L9 20a5 5 0 0 1-7-7L13 2m-7 13 8-8',
@@ -39,10 +39,14 @@
     <div id="chat-channel-alerts" class="channel-alerts" role="status" aria-live="polite" hidden></div>
     <div class="chat-search"><input id="chat-search" type="search" placeholder="Buscar cliente ou medida" aria-label="Buscar cliente ou medida" maxlength="100"><button id="chat-filters-button" class="chat-icon" aria-label="Filtrar conversas" aria-expanded="false">${ch.icon('filter')}</button></div>
     <div id="chat-filters" class="chat-filters hidden"><label>Canal<select id="chat-channel"><option value="">Todos os canais</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="web">Chatwoot</option></select></label><label><input id="chat-closed" type="checkbox"> Incluir encerradas</label></div>
-    <nav class="chat-tabs" aria-label="Filtrar fila"><button data-filter="needs" class="selected">Precisam de você <b id="chat-needs-count">0</b></button><button data-filter="all">Todas</button><button data-filter="bot">Com o bot</button></nav>
+    <nav class="chat-tabs" aria-label="Filtrar fila"><button data-filter="needs" class="selected">Precisam de você <b id="chat-needs-count">0</b></button><button data-filter="all">Todas</button><button data-filter="bot">Com o bot</button><button id="chat-milly-filter" type="button" data-filter="milly" hidden>Com Milly</button></nav>
+    <select id="chat-milly-list-filter" class="mh-list-filter" aria-label="Filtrar conversas"><option value="milly">Com Milly</option><option value="needs">Precisam de você</option><option value="all">Todas as conversas</option><option value="bot">Com o bot</option></select>
     <p class="chat-sort">↕ Maior espera primeiro</p><div id="chat-error" role="alert"></div><div id="chat-list"></div><button id="chat-more" class="chat-more hidden">Ver mais conversas</button></section>
     <section class="chat-thread" id="chat-thread"><div id="chat-no-selection">${ch.icon('chat')}<h3>Seu atendimento, em um só lugar</h3><p>Selecione uma conversa para começar.</p></div>
     <div id="chat-conversation" class="hidden"><header class="chat-contact" id="chat-contact"></header>
+    <header class="mh-analysis-contact"><button type="button" id="chat-milly-back" class="mh-back">← Conversas</button><time id="chat-milly-day" class="mh-thread-date" aria-label="Data do turno"></time><h3 id="chat-milly-title">Conversa</h3><small id="chat-milly-channel" class="mh-desktop-channel"></small><small id="chat-milly-context" class="mh-mobile-context"></small></header>
+    <div id="chat-milly-tabs" role="group" aria-label="Visualização da conversa" hidden><button type="button" id="chat-public-tab" aria-pressed="true">Conversa</button><button type="button" id="chat-milly-tab" aria-pressed="false" aria-controls="chat-milly-analysis">${ch.icon('lock')}Análise da Milly</button></div>
+    <section id="chat-milly-analysis" aria-label="Análise da Milly" hidden></section>
     <div id="chat-owner" class="chat-owner"></div><div id="chat-context" class="chat-context"></div>
     <div id="chat-channel-warning" class="channel-alerts" role="status" aria-live="polite" hidden></div>
     <div id="chat-thread-error" role="alert"></div><div id="chat-photo-notice" class="chat-photo-notice hidden" role="status"></div>
@@ -67,14 +71,16 @@
   }
   ch.renderConnection=()=>{ch.el('connection').textContent=s.connected?'Atualização ao vivo':'Atualização automática • reconectando';};
   ch.renderQueue=function(){
+    ch.milly?.sync();
     ch.channels?.render();
-    ch.el('error').textContent=s.error;ch.el('needs-count').textContent=s.needsTotal||0;
+    ch.el('error').textContent=s.error;ch.el('needs-count').textContent=s.needsTotal||0;ch.el('milly-list-filter').value=s.filter;
     ch.el('more').classList.toggle('hidden',!s.hasMore);
     panel.querySelectorAll('[data-filter]').forEach(el=>{el.classList.toggle('selected',el.dataset.filter===s.filter);el.setAttribute('aria-pressed',String(el.dataset.filter===s.filter));});
     ch.el('list').innerHTML=s.rows.map(row=>{
       const measures=(row.interests||[]).map(i=>i.measure).join(' · '),location=row.location?.label||'';
       const label=row.photo_request_id?(row.photo_status==='answered'?'Foto em envio':'Pediu foto'):row.send_failed?'Falha no envio':row.mode==='human'?'Atendimento humano':row.waiting?'Resposta pendente':'Aguardando cliente';
-      return `<article class="chat-row ${row.id===s.id?'selected':''}"><button class="chat-open-row" data-open="${esc(row.id)}">${avatar(row)}<span class="chat-row-text"><strong>${esc(row.name||'Cliente')}</strong><span>${esc(row.last_message||'Anexo recebido')}</span><small>${esc([measures,location].filter(Boolean).join(' · ')||channel(row))}</small><em class="${row.photo_request_id?'photo':''}">${row.photo_request_id?ch.icon('camera'):''}${esc(label)}</em></span></button><div class="chat-row-actions"><small>${row.last_customer_at?wait(row.last_customer_at):''}</small><div>${controls(row)}</div></div></article>`;
+      const number=row.chatwoot_conversation_id?'#'+row.chatwoot_conversation_id:'Conversa';
+      return `<article class="chat-row ${row.id===s.id?'selected':''}"><button class="chat-open-row" data-open="${esc(row.id)}"><span class="mh-queue-line"><strong>${esc(number)}</strong><span>${esc(measures||row.last_message||row.name||'Conversa')}</span></span>${avatar(row)}<span class="chat-row-text"><strong>${esc(row.name||'Cliente')}</strong><span>${esc(row.last_message||'Anexo recebido')}</span><small>${esc([measures,location].filter(Boolean).join(' · ')||channel(row))}</small><em class="${row.photo_request_id?'photo':''}">${row.photo_request_id?ch.icon('camera'):''}${esc(label)}</em></span></button><div class="chat-row-actions"><small>${row.last_customer_at?wait(row.last_customer_at):''}</small><div>${controls(row)}</div></div></article>`;
     }).join('')||`<div class="chat-empty">${s.error?'':'Nenhuma conversa neste filtro.'}</div>`;
     ch.updateAvatars();ch.loadQueueAvatars();
   };
@@ -95,10 +101,13 @@
     return `<div class="chat-bubble ${inbound?'incoming':bot?'bot':'outgoing'} ${system?'system':''}">${bot?'<small class="chat-sender">Bot</small>':''}${attachments}${m.mime&&!attachments?`<small>${m.mime.startsWith('audio/')?'Áudio':m.mime.startsWith('image/')?'Foto':'Anexo'} • ${esc(m.filename||'aguardando confirmação')}</small>`:''}<p>${esc(m.content)}</p><footer><time>${time(m.sent_at)}</time>${!inbound?`<span>${esc(status)}</span>`:''}</footer>${retry}</div>`;
   }
   ch.renderThread=function(){
+    ch.milly?.sync();
     ch.channels?.render();
     ch.el('no-selection').classList.toggle('hidden',!!s.id);ch.el('conversation').classList.toggle('hidden',!s.id);
     panel.classList.toggle('has-conversation',!!s.id);if(!s.id){ch.resetCustomer?.();return;}
     const row=s.detail||s.rows.find(r=>r.id===s.id)||{id:s.id,name:'Carregando…',mode:'auto'};
+    ch.el('milly-title').textContent=row.chatwoot_conversation_id?'Conversa #'+row.chatwoot_conversation_id:'Conversa';
+    ch.el('milly-channel').textContent=channel(row)+' · Matriz';
     ch.el('contact').innerHTML=`<button id="chat-back" class="chat-icon" aria-label="Voltar às conversas">${ch.icon('back')}</button>${avatar(row)}<div><h3>${esc(row.name||'Cliente')}</h3><small>${esc(channel(row))}${row.location?.label?' · '+esc(row.location.label):''}</small></div><div class="chat-top-controls">${controls(row)}</div>`;
     ch.updateAvatars(s.id);
     ch.el('owner').textContent=row.mode==='human'?'Atendimento humano · bot pausado':'Bot atendendo';
@@ -134,7 +143,7 @@
     if(target.dataset.retry)void ch.send(s.pending.get(target.dataset.retry));
     if(target.dataset.retryFailed)void ch.retryFailed(target.dataset.retryFailed);
     if(target.hasAttribute('data-dismiss-photo'))ch.el('photo-notice').classList.add('hidden');
-    if(target.id==='chat-back')ch.back();if(target.id==='chat-customer')void ch.openCustomer();
+    if(target.id==='chat-back'||target.id==='chat-milly-back')ch.back();if(target.id==='chat-customer')void ch.openCustomer();
     if(target.id==='chat-refresh'){ch.refreshAvatars();void ch.loadList();void ch.loadThread();void ch.channels?.refresh(true);}
     if(target.id==='chat-more')void ch.loadList(true);if(target.id==='chat-older')void ch.loadThread(true);
   });
@@ -142,6 +151,7 @@
   ch.el('filters-button').onclick=()=>{const hidden=ch.el('filters').classList.toggle('hidden');ch.el('filters-button').setAttribute('aria-expanded',String(!hidden));};
   ch.el('channel').onchange=event=>{s.channel=event.target.value;ch.changeFilter();};
   ch.el('closed').onchange=event=>{s.closed=event.target.checked;ch.changeFilter();};
+  ch.el('milly-list-filter').onchange=event=>{s.filter=event.target.value;ch.changeFilter();};
   ch.el('input').addEventListener('input',()=>{if(s.id){s.drafts.set(s.id,ch.el('input').value);if(ch.el('input').value.trim())void ch.setControl(s.id,'takeover');}});
   ch.el('compose').onsubmit=event=>{event.preventDefault();void ch.send();};
 }());

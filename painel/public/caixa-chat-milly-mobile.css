@@ -1,0 +1,166 @@
+/* App da Matriz: a consulta privada ocupa a janela entre o cabeçalho e a navegação. */
+.is-matrix-chat:has(#chat-panel.milly-open) {
+  --mc-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mc-header: calc(48px + env(safe-area-inset-top));
+  --mc-nav: calc(58px + env(safe-area-inset-bottom));
+  --mh-paper: #fcfaf3;
+  --mh-line: #c8cbc1;
+  --mh-green: #064b26;
+  --mh-purple: #4e1380;
+  --mh-ink: #101611;
+}
+.is-matrix-chat:has(#chat-panel.milly-open) .sales-header {
+  border: 0;
+  border-bottom: 1px solid #9ba79d;
+  border-radius: 0;
+  padding: calc(1px + env(safe-area-inset-top)) 10px 1px;
+  background: linear-gradient(110deg,#ffffffae,#efeff35c 45%,#ffffff96),var(--mc-metal) center/540px;
+  box-shadow: none;
+}
+.is-matrix-chat:has(#chat-panel.milly-open) .sales-logo { width: 38px; height: 38px; flex-basis: 38px; border-radius: 7px; }
+.is-matrix-chat:has(#chat-panel.milly-open) #operation-unit-label { border-left: 1px solid #8a958d; padding-left: 10px; font: 750 20px/1 var(--mc-font); }
+.is-matrix-chat:has(#chat-panel.milly-open) .operator-actions { gap: 4px; padding: 0; border: 0; }
+.is-matrix-chat:has(#chat-panel.milly-open) #operator-button { border: 0; box-shadow: none; background: transparent; }
+.is-matrix-chat:has(#chat-panel.milly-open) #operator-button::after { width: 11px; height: 11px; right: 3px; bottom: 5px; }
+.is-matrix-chat:has(#chat-panel.milly-open) #session-view > .bottom-nav {
+  gap: 0; border: 0; border-top: 1px solid #c6cec7; border-radius: 0;
+  padding: 3px 5px calc(3px + env(safe-area-inset-bottom)); background: #fff; box-shadow: none;
+}
+.is-matrix-chat:has(#chat-panel.milly-open) #session-view .bottom-nav > button:not(.hidden) {
+  flex: 0 0 25%; min-width: 25%; min-height: 44px; padding: 2px; gap: 2px;
+  border: 0; border-radius: 8px; color: #171c18; background: #fff; box-shadow: none;
+  font: 550 13px/1.15 var(--mc-font);
+}
+.is-matrix-chat:has(#chat-panel.milly-open) #session-view .bottom-nav > button.active { color: #fff; background: #07512a; font-weight: 700; }
+.is-matrix-chat:has(#chat-panel.milly-open) .bottom-nav svg { width: 23px; height: 23px; stroke-width: 2; }
+.is-matrix-chat #chat-panel.milly-open {
+  color: var(--mh-ink); background: linear-gradient(125deg,#e9eee6,#e4eae3 65%,#edf0e9);
+  font-family: var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open #chat-contact { display: none; }
+.is-matrix-chat #chat-panel.milly-open .mh-analysis-contact { display: block; flex: none; padding: 1px 12px 4px; }
+.is-matrix-chat #chat-panel.milly-open .mh-desktop-channel { display: none; }
+.is-matrix-chat #chat-panel.milly-open .mh-back {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 35px; margin: 0;
+  padding: 0 4px 0 0; border: 0; border-radius: 4px; background: none; color: var(--mh-green);
+  font: 700 15px/1.1 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-back svg { width: 16px; height: 16px; }
+.is-matrix-chat #chat-panel.milly-open .mh-analysis-contact h3 {
+  margin: 0 0 2px; color: #080d09; font: 780 clamp(24px,6.8vw,30px)/1.08 var(--mc-font); letter-spacing: -.035em;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-context {
+  display: block; margin: 1px 0 0; color: #172019; font: 500 16px/1.25 var(--mc-font); overflow-wrap: anywhere;
+}
+.is-matrix-chat #chat-panel.milly-open #chat-milly-tabs {
+  flex: none; margin: 0 8px 7px; padding: 0; gap: 0; border: 1px solid var(--mh-line); border-radius: 8px; background: var(--mh-paper);
+}
+.is-matrix-chat #chat-panel.milly-open #chat-milly-tabs button {
+  min-height: 40px; border: 0; border-radius: 6px; padding: 4px; color: #383a35; font: 710 16px/1.15 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open #chat-milly-tabs svg { display: none; }
+.is-matrix-chat #chat-panel.milly-open #chat-milly-tabs [aria-pressed=true] { color: white; background: linear-gradient(95deg,#005329,#07411e); }
+.is-matrix-chat #chat-panel.milly-open #chat-milly-analysis { background: transparent; color: var(--mh-ink); }
+.is-matrix-chat #chat-panel.milly-open .mh-layout { display: block; }
+.is-matrix-chat #chat-panel.milly-open .mh-central { padding: 0 8px 8px; background: transparent; }
+.is-matrix-chat #chat-panel.milly-open :is(.mh-heading,.mh-sidebar) { display: none; }
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-summary,.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts { display: block; }
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-summary .mh-verification {
+  margin: 0 0 7px; padding: 4px 12px 3px; border: 1px solid var(--mh-line); border-radius: 9px; background: var(--mh-paper);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-summary h4 {
+  display: block; margin: 0; padding: 4px 0; border: 0; color: var(--mh-green); background: none; font-size: 17px;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-order {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; min-height: 34px; margin: 0;
+  color: var(--mh-green); background: none; box-shadow: none; font: 750 18px/1.12 var(--mc-font); text-align: left;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-values { margin: 2px 0 5px; color: #171b16; font: 670 14px/1.25 var(--mc-font); }
+.is-matrix-chat #chat-panel.milly-open .mh-values span + span { border-left: 1px solid #b4b8ae; }
+.is-matrix-chat #chat-panel.milly-open .mh-values b { margin: 3px 0 0; color: var(--mh-green); font: 780 24px/1.06 var(--mc-font); }
+.is-matrix-chat #chat-panel.milly-open .mh-compare {
+  margin: 0; padding: 6px 0 2px; gap: 6px; border-top: 1px solid #c6c9bf; border-radius: 0; font: 710 14px/1.2 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-compare.match { color: var(--mh-green); background: transparent; }
+.is-matrix-chat #chat-panel.milly-open .mh-compare.match svg { width: 18px; height: 18px; padding: 2px; border-radius: 50%; color: #fff; background: #248634; stroke-width: 3; }
+.is-matrix-chat #chat-panel.milly-open .mh-turn {
+  margin: 0 0 5px; border: 1px solid var(--mh-line); border-radius: 8px; background: var(--mh-paper);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-turn > h4 button {
+  min-height: 38px; padding: 6px 10px; gap: 8px; color: #121914; background: #f7f5ed; font: 720 16px/1.2 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-turn > h4 small { gap: 5px; font: 650 14px/1.15 var(--mc-font); white-space: nowrap; }
+.is-matrix-chat #chat-panel.milly-open .mh-turn > h4 button>svg:first-child { transform: rotate(90deg); }
+.is-matrix-chat #chat-panel.milly-open .mh-turn.expanded > h4 button>svg:first-child { transform: rotate(-90deg); }
+.is-matrix-chat #chat-panel.milly-open .mh-turn.expanded > h4 button { color: #fff; background: linear-gradient(100deg,#006137,#054625); }
+.is-matrix-chat #chat-panel.milly-open .mh-date { margin: 2px 0 4px; font: 550 11px/1.2 var(--mc-font); }
+.is-matrix-chat #chat-panel.milly-open .mh-events { position: relative; display: grid; gap: 10px; padding: 8px 8px 9px; }
+.is-matrix-chat #chat-panel.milly-open .mh-event {
+  position: relative; display: grid; grid-template-columns: max-content minmax(0,1fr); gap: 3px 7px;
+  align-items: baseline; padding: 0 0 0 30px; font: 470 14px/1.3 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event::before {
+  content: ''; position: absolute; top: 5px; left: 9px; width: 10px; height: 10px; border: 3px solid #166737;
+  border-radius: 50%; background: #fff; box-sizing: border-box; z-index: 1;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event::after {
+  content: ''; position: absolute; left: 13px; top: 12px; bottom: -18px; width: 1px; background: #9fa89b;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event.outbound::after,.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event:last-of-type::after { display:none; }
+.is-matrix-chat #chat-panel.milly-open .mh-event time {
+  grid-column: 1; padding: 0; color: var(--mh-ink); font: 670 13px/1.2 var(--mc-font); font-variant-numeric: tabular-nums;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event>div { display: contents; }
+.is-matrix-chat #chat-panel.milly-open .mh-event>div::before { content: none; }
+.is-matrix-chat #chat-panel.milly-open .mh-event b {
+  display: inline; grid-column: 2; color: #111610; font: 710 13px/1.25 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event p {
+  grid-column: 1/-1; margin: 0; padding: 4px 7px; border: 1px solid #bfc3b8;
+  border-radius: 6px; background: #f7f5ed; color: #131813; font: inherit;
+}
+.is-matrix-chat #chat-panel.milly-open .mh-event.outbound p { background: #e1f4db; border-color: #9dc59b; color: #0f3c20; font-weight: 650; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log {
+  position: relative; padding: 6px 7px 7px; border: 1px solid #c7a5e5; border-radius: 8px;
+  color: #230c32; background: linear-gradient(125deg,#f5ebff,#efe2f8);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-private-log>h4 {
+  gap: 5px; margin: 0 0 7px; color: var(--mh-purple); font: 740 15px/1.2 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-private-log>h4 small { margin-left: 0; font: inherit; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log>h4 small::before { content: '· '; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event { padding-left: 29px; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event + .mh-event { margin-top: 7px; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event::before { left: 5px; top: 4px; border: 2px solid #fff; width: 12px; height: 12px; background: #7826ab; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event::after { left: 10px; }
+.is-matrix-chat #chat-panel.milly-open .mh-private-log .mh-event p { background: #ffffff3d; border-color: #c7add8; }
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts {
+  padding: 4px 10px; margin: 0 0 5px; border: 1px solid var(--mh-line); border-radius: 8px; background: var(--mh-paper);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts summary {
+  display: flex; gap: 8px; align-items: center; min-height: 42px; color: var(--mh-ink); font: 680 14px/1.2 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts summary>svg:first-child { color: #774298; width: 20px; height: 20px; }
+.is-matrix-chat #chat-panel.milly-open .mh-facts-copy { display: grid; gap: 2px; min-width: 0; }
+.is-matrix-chat #chat-panel.milly-open .mh-facts-copy small { font-size: 12px; font-weight: 450; }
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts[open] .mh-box { background: transparent; border: 0; padding: 5px 0; }
+.is-matrix-chat #chat-panel.milly-open .mh-mobile-facts[open] .mh-box h4 { margin: 0; padding: 0; }
+.is-matrix-chat #chat-panel.milly-open .mh-extra { margin: 5px 0 0; font: 500 12px/1.35 var(--mc-font); }
+.is-matrix-chat #chat-panel.milly-open .mh-timing { margin: 0; }
+.is-matrix-chat #chat-panel.milly-open .mh-timing span {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 3px;
+  padding: 3px 2px; font: 500 11px/1.25 var(--mc-font);
+}
+.is-matrix-chat #chat-panel.milly-open .mh-timing b { display: inline; font: 690 12px/1.25 var(--mc-font); }
+.is-matrix-chat #chat-panel.milly-open .mh-decision .mh-detail-timing { display: block; margin-top: 5px; }
+.is-matrix-chat #chat-panel.milly-open .mh-events:has(.mh-detail-timing) > .mh-timing { display: none; }
+@media (min-height: 620px) and (max-width: 600px) {
+  .is-matrix-chat #chat-panel.milly-open .mh-events { gap: 7px; padding-block: 7px; }
+  .is-matrix-chat #chat-panel.milly-open .mh-event { row-gap: 2px; }
+  .is-matrix-chat #chat-panel.milly-open .mh-event p { padding-block: 3px; }
+  .is-matrix-chat #chat-panel.milly-open .mh-private-log > h4 { margin-bottom: 5px; }
+}
+@media (max-height: 520px) {
+  .is-matrix-chat #chat-panel.milly-open #chat-conversation { overflow-y: auto; }
+  .is-matrix-chat #chat-panel.milly-open #chat-milly-analysis { overflow: visible; flex: 1 0 auto; }
+}

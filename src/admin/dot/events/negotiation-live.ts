@@ -16,6 +16,8 @@ import { matches } from './model.js';
 import { readSettings, ruleEnabled } from './settings.js';
 import { activeSubscriptionsSql, subscriptionParams, type Subscription } from './subscriptions.js';
 import { commercialFacts, permiteValor } from './negotiation-live-stock.js';
+import { registrarLeituraFichaMilly } from './negotiation-live-snapshot.js';
+import { containsCustomerText, liveRationale } from './negotiation-live-privacy.js';
 
 const conversationEvent = 'farejador.conversa.atualizada';
 const reason = 'aval_comercial_milly';
@@ -27,6 +29,7 @@ const decisionSchema = contextSchema.extend({turno:z.string().uuid(),loja:z.stri
   decisao:z.enum(['aceitar','contrapropor','manter','aguardar_dado']),
   total_centavos:z.number().int().positive().max(2_147_483_647).optional(),
   orientacao:z.enum(['oferecer_retirada','pedir_proposta','seguir_tabela']).optional(),
+  justificativa:liveRationale.optional(),
 }).strict().superRefine((v,ctx) => {
   if ((v.decisao==='aceitar'||v.decisao==='contrapropor') !== (v.total_centavos!==undefined))
     ctx.addIssue({code:'custom',message:'Informe total somente para aceitar ou contrapropor.'});
@@ -42,7 +45,7 @@ function tool(name:string,description:string,schema:z.ZodTypeAny,readOnlyHint:bo
 }
 export const liveNegotiationTools=[
   tool(contextTool,'Leia a ficha comercial atual da Matriz para uma consulta privada recebida por evento. Retorna produto, estoque, giro, reposição, custo e condições da transação. Na entrega, rotas abertas não comprovam desvio nem custo adicional.',contextSchema,true),
-  tool(decideTool,'Registre o aval delegado pelo controle do proprietário para esta consulta, turno e loja. Total em centavos inclui o frete de tabela. Aceitar usa o total oferecido pelo cliente; contrapropor usa total maior, até a tabela. Ao manter ou aguardar, a orientação opcional pode oferecer retirada para nova avaliação, pedir proposta ou seguir tabela. O pedido e o catálogo não são alterados pela ferramenta.',decisionSchema,false),
+  tool(decideTool,'Registre o aval delegado pelo controle do proprietário para esta consulta, turno e loja. Total em centavos inclui o frete de tabela. Aceitar usa o total oferecido pelo cliente; contrapropor usa total maior, até a tabela. Ao manter ou aguardar, a orientação opcional pode oferecer retirada para nova avaliação, pedir proposta ou seguir tabela. A justificativa opcional é uma frase comercial privada para o proprietário. O pedido e o catálogo não são alterados pela ferramenta.',decisionSchema,false),
 ];
 export const liveNegotiationInstructions=' Quando um evento de conversa trouxer reason=aval_comercial_milly, use consultar_negociacao_atendente com eventId e evidence.consulta. '
   +'Leia quantidade disponível desta variante, giro, custo, reposição e modalidade. Considere somente as condições retornadas. '
@@ -51,6 +54,7 @@ export const liveNegotiationInstructions=' Quando um evento de conversa trouxer 
   +'Para entrega, consulte as paradas abertas e o histórico com número de rotas por média. Combustível declarado e despesas aprovadas podem se sobrepor. A média histórica não é o custo de incluir o endereço. Quando faltar o custo incremental use aguardar_dado ou manter. '
   +'Nesse caso pode orientar oferecer_retirada para saber se o cliente aceita mudar de modalidade e avaliar uma nova proposta. Nunca peça ao cliente informações internas de custo e nunca prometa o desconto na retirada antecipadamente. '
   +'Se a ficha permitir, chame orientar_negociacao_atendente com o evento, consulta, turno e loja retornados. '
+  +'Na justificativa, resuma em uma frase curta a condição comercial observada que sustenta o aval. Omita identificação, falas do cliente e dados pessoais. '
   +'O controle ativado pelo proprietário delega apenas esse aval à atendente, dentro da ficha. As demais operações continuam com suas confirmações próprias.';
 
 const eligibleSubs=activeSubscriptionsSql+` AND ${monitorOwnerSql} AND s.event_name='${conversationEvent}' AND s.verified_at IS NOT NULL`;
@@ -161,18 +165,21 @@ export async function invokeLiveNegotiation(identity:DotIdentity,name:string,inp
           WHERE r.environment=$1 AND r.id=$2 AND r.conversation_id=$3 AND r.trigger_message_id=$4 AND r.unit_id=$5
             AND r.decided_by=$6 AND r.decision=$7 AND r.approved_total_cents IS NOT DISTINCT FROM $8::int
             AND r.orientation IS NOT DISTINCT FROM $9::text
+            AND ($10::text IS NULL OR to_jsonb(r)->>'decided_at' IS NULL OR to_jsonb(r)->>'decision_rationale'=$10)
             AND r.state IN ('declined','approved','sending','published','consumed')`,
           [env.FAREJADOR_ENV,args.consulta,conversation,decision.turno,decision.loja,identity.person_id,decision.decisao,
-            decision.total_centavos??null,decision.orientacao??null]);
+            decision.total_centavos??null,decision.orientacao??null,decision.justificativa??null]);
         if(saved.rowCount) return {consulta:args.consulta,registrada:true,decisao:decision.decisao};
       }
       if(!req || req.conversationId!==conversation || (decision && (decision.turno!==req.triggerMessageId || decision.loja!==req.unitId))) throw unavailable();
       if(!decision){
         const facts=await commercialFacts(db,env.FAREJADOR_ENV,req);
+        const readAt=await registrarLeituraFichaMilly(db,env.FAREJADOR_ENV,req.id,identity.person_id,facts);
+        if(!readAt) throw unavailable();
         return {consulta:req.id,turno:req.triggerMessageId,loja:req.unitId,produto:req.productId,
           quantidade:req.quantity,forma_pagamento:req.paymentMethod,modalidade:req.fulfillmentMode,
           oferta_cliente_total_centavos:req.offeredTotalCents,tabela_unitaria_centavos:req.catalogUnitCents,
-          frete_tabela_centavos:req.freightCents,lido_em:new Date().toISOString(),...facts};
+          frete_tabela_centavos:req.freightCents,lido_em:readAt.toISOString(),...facts};
       }
       if(decision.decisao==='aceitar'||decision.decisao==='contrapropor') {
         const facts=await commercialFacts(db,env.FAREJADOR_ENV,req,true);
@@ -181,9 +188,12 @@ export async function invokeLiveNegotiation(identity:DotIdentity,name:string,inp
       }
       if(decision.orientacao==='oferecer_retirada' && req.fulfillmentMode!=='delivery')
         throw new McpError(ErrorCode.InvalidParams,'A consulta já é para retirada.');
+      if(decision.justificativa && await containsCustomerText(db,env.FAREJADOR_ENV,conversation,req.triggerMessageId,decision.justificativa))
+        throw new McpError(ErrorCode.InvalidParams,'Use uma frase comercial sem identificação ou fala do cliente.');
       const ok=await registrarParecerMilly(db,env.FAREJADOR_ENV,req.id,{decisao:decision.decisao,
         ...(decision.total_centavos!==undefined?{totalCentavos:decision.total_centavos}:{}),
-        ...(decision.orientacao?{orientacao:decision.orientacao}:{}),personId:identity.person_id});
+        ...(decision.orientacao?{orientacao:decision.orientacao}:{}),...(decision.justificativa?{justificativa:decision.justificativa}:{}),
+        personId:identity.person_id});
       if(!ok) throw unavailable();
       return {consulta:req.id,registrada:true,decisao:decision.decisao};
     });

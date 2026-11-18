@@ -44,14 +44,22 @@ const baseSql = `SELECT c.id,c.contact_id,c.chatwoot_inbox_id,c.channel_type,c.c
   WHERE c.environment=$1 AND c.chatwoot_account_id=$2 AND c.deleted_at IS NULL`;
 
 export async function listOperationConversations(input: {
-  search: string; filter: 'all'|'needs'|'bot'; channel: string; offset: number; closed: boolean;
+  search: string; filter: 'all'|'needs'|'bot'|'milly'; channel: string; offset: number; closed: boolean;
 }, db: Pool = pool) {
+  const consultas = input.filter === 'milly' ? `AND EXISTS (
+    SELECT FROM ops.milly_consultas q
+    JOIN core.contacts ct ON ct.environment=q.environment AND ct.id=c.contact_id AND ct.deleted_at IS NULL
+    JOIN core.units u ON u.environment=q.environment AND u.id=q.unit_id AND u.slug='main'
+    JOIN core.messages m ON m.environment=q.environment AND m.conversation_id=q.conversation_id AND m.id=q.trigger_message_id
+      AND m.sender_type='contact' AND m.message_type=0 AND NOT m.is_private AND m.deleted_at IS NULL
+    WHERE q.environment=$1 AND q.conversation_id=c.id)` : '';
   const result = await db.query(`WITH conversations AS (${baseSql}), filtered AS (
     SELECT * FROM conversations c WHERE ($3 OR current_status<>'resolved')
+    ${consultas}
     AND ($4='' OR COALESCE(name,'') ILIKE '%'||$4||'%' OR COALESCE(last_message,'') ILIKE '%'||$4||'%'
       OR EXISTS(SELECT 1 FROM ops.bot_stock_searches s WHERE s.environment=$1 AND s.conversation_id=c.id
         AND s.measure ILIKE '%'||$4||'%')) AND ($5='' OR channel_type=$5)
-  ), selected AS (SELECT * FROM filtered WHERE ($6='all' OR ($6='bot' AND mode='auto') OR
+  ), selected AS (SELECT * FROM filtered WHERE ($6 IN ('all','milly') OR ($6='bot' AND mode='auto') OR
       ($6='needs' AND (waiting OR mode='human' OR photo_request_id IS NOT NULL OR send_failed)))
     ORDER BY (waiting OR photo_request_id IS NOT NULL) DESC,
       CASE WHEN waiting THEN last_customer_at END ASC,sent_at DESC NULLS LAST,id

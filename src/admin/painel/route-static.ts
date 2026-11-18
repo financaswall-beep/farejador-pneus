@@ -54,6 +54,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.marketing.publisher.helpers.js',
     'chat-channel-alerts.js', 'app.bot.channels.js',
     'app.bot.chat.js','caixa-chat.js','caixa-chat-view.js','caixa-chat-channels.js','caixa-chat-media.js','caixa-chat-customer.js',
+    'caixa-chat-milly.js','caixa-chat-milly-view.js',
     'app.resumo.js', 'app.resumo.chart.js',
     'app.estoque.lotes.js',
     'app.estoque.transferencias.js',
@@ -101,7 +102,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
         'text/javascript; charset=utf-8',
       ));
   }
-  for(const file of ['caixa-chat.css','caixa-chat-customer.css','bot-chat.css','fornecedor-financeiro.css']) {
+  for(const file of ['caixa-chat.css','caixa-chat-customer.css','bot-chat.css','caixa-chat-milly.css','caixa-chat-milly-desktop.css','fornecedor-financeiro.css']) {
     fastify.get(`/admin/painel/${file}`,async(_request,reply)=>sendStatic(reply,file,'text/css; charset=utf-8'));
   }
   fastify.get('/admin/painel/chat-channel-alerts.css', async (_request, reply) => sendStatic(reply, 'chat-channel-alerts.css', 'text/css; charset=utf-8'));
