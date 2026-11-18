@@ -157,6 +157,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         confidenceLevel: body.data.confidence_level,
         yearStart: body.data.year_start,
         yearEnd: body.data.year_end,
+        previousPeriod: body.data.previous_period,
         reason: body.data.reason,
         actorLabel: operatorLabel(request),
       }));
@@ -180,6 +181,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
         productId: params.data.product_id,
         vehicleModelId: params.data.vehicle_model_id,
         position: params.data.position,
+        previousPeriod: body.data.previous_period,
         reason: body.data.reason,
         actorLabel: operatorLabel(request),
       }));

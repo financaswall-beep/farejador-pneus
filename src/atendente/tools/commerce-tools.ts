@@ -299,10 +299,14 @@ export async function buscarCompatibilidade(
     const positionFilter = parsed.posicao_pneu && parsed.posicao_pneu !== 'both'
       ? parsed.posicao_pneu
       : null;
+    const candidates = 'FROM commerce.find_compatible_tires($1, $2, $3, $4)';
     const tires = await client.query<CompatibleTireRow>(
-      `SELECT *
-       FROM commerce.find_compatible_tires($1, $2, $3, $4)
-       LIMIT $5`,
+      parsed.moto_ano
+        ? `SELECT * FROM (SELECT DISTINCT ON (product_id,fitment_position) * ${candidates}
+             ORDER BY product_id,fitment_position,is_oem DESC,confidence_level DESC NULLS LAST,
+                      fitment_year_start,fitment_year_end) matched
+           ORDER BY is_oem DESC,confidence_level DESC NULLS LAST,product_name,product_id LIMIT $5`
+        : `SELECT * ${candidates} LIMIT $5`,
       [parsed.environment, vehicleId, positionFilter, parsed.moto_ano ?? null, parsed.limit],
     );
     out.push({

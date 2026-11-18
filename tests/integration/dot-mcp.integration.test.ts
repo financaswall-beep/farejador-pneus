@@ -326,6 +326,36 @@ async function ownerFinanceMcp() {
   return {token,permission,call};
 }
 
+it('Milly acrescenta e corrige somente a faixa autorizada pelo dono, visível na ficha', async () => {
+  const {token,call} = await ownerFinanceMcp();
+  const grant = (await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
+  expect((await app.inject({method:'PUT',url:'/admin/api/dot/connections/'+grant+'/operation-permissions',
+    headers:headers(),payload:{operation_confirmation:'conversa',catalog_operations_enabled:true}})).statusCode).toBe(200);
+  const { createCatalogProduct } = await import('../../src/admin/painel/queries-catalogo-create.js');
+  const {product_id} = await createCatalogProduct({measure:'140/70-17',brand:'MillyFixture',tireCondition:'novo',
+    vehicleType:'motorcycle',position:'rear',productCode:'FIT-MILLY',productName:'Pneu de teste',
+    actorLabel:'teste',environment:'test'},db.pool);
+  const vehicle_model_id=randomUUID();
+  await db.pool.query(`INSERT INTO commerce.vehicle_models(id,environment,vehicle_type,make,model)
+    VALUES ($1,'test','motorcycle','Honda','Modelo para testar períodos')`,[vehicle_model_id]);
+  const write = async (name:string, fields:object) => {
+    const args = {product_id,vehicle_model_id,position:'rear',reason:'Manual conferido',idempotency_key:randomUUID(),...fields};
+    const pending = await call(name,args);
+    expect(pending).toMatchObject({confirmacao:'conversa',executada:false});
+    await call('confirmar_operacao_milly',{proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true});
+    await call(name,args);
+  };
+  const original = {year_start:2016,year_end:2017}, newer = {year_start:2022,year_end:2022};
+  await write('salvar_compatibilidade_catalogo',original);
+  await write('salvar_compatibilidade_catalogo',newer);
+  await write('salvar_compatibilidade_catalogo',{previous_period:original,year_start:2017,year_end:2017});
+  const rows = async () => (await call('consultar_ficha_catalogo',{product_id})).compatibilidades.rows;
+  expect(await rows()).toMatchObject([{year_start:2017,year_end:2017},newer]);
+  await write('remover_compatibilidade_catalogo',{previous_period:newer});
+  expect(await rows()).toMatchObject([{year_start:2017,year_end:2017}]);
+});
+
 it('só o dono muda o canal; troca de canal e revogação invalidam propostas anteriores',async()=>{
   const {token,call}=await ownerFinanceMcp();
   const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',

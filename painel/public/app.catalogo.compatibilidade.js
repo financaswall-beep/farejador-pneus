@@ -15,7 +15,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         error: null,
         search: '', searchRows: [], searching: false, selectedVehicle: null,
         form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
-        saving: false, message: null,
+        editingPeriod: null, saving: false, message: null,
         discoveries: [], discoveriesLoading: false,
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
       };
@@ -87,7 +87,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         error: null,
         search: '', searchRows: [], searching: false, selectedVehicle: null,
         form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
-        saving: false, message: null,
+        editingPeriod: null, saving: false, message: null,
         discoveries: [], discoveriesLoading: false,
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
       };
@@ -95,6 +95,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
 
     async catalogoCompatibilitySearch() {
       const term = String(this.catalogoCompatibilidade.search || '').trim();
+      this.catalogoCompatibilidade.editingPeriod = null;
       this.catalogoCompatibilidade.selectedVehicle = null;
       this.catalogoCompatibilidade.searchRows = [];
       if (term.length < 2) return;
@@ -126,6 +127,19 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         .filter(Boolean).join(' ');
       this.catalogoCompatibilidade.form.year_start = vehicle.year_start || '';
       this.catalogoCompatibilidade.form.year_end = vehicle.year_end || '';
+    },
+
+    catalogoCompatibilityEdit(item) {
+      const state = this.catalogoCompatibilidade;
+      if (state.saving) return;
+      this.catalogoCompatibilitySelectVehicle(item);
+      state.editingPeriod = { year_start: item.year_start, year_end: item.year_end };
+      state.form.position = item.position;
+      state.form.source = item.source === 'manufacturer' ? 'manufacturer' : 'manual';
+      state.form.is_oem = item.is_oem;
+      state.form.reason = '';
+      state.message = null;
+      this.$nextTick(() => this.$refs.compatibilityStart?.focus());
     },
 
     catalogoCompatibilityYearValue(value) {
@@ -164,9 +178,11 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         await this.apiPost(`/admin/api/catalog/${encodeURIComponent(productId)}/compatibility`, {
           vehicle_model_id: state.selectedVehicle.vehicle_model_id,
           position: state.form.position,
+          ...(state.editingPeriod ? { previous_period: state.editingPeriod } : {}),
           is_oem: Boolean(state.form.is_oem),
-          source: state.form.source || 'manual',
-          confidence_level: 1,
+          ...(!state.editingPeriod || state.form.source !== (state.selectedVehicle.source === 'manufacturer' ? 'manufacturer' : 'manual')
+            ? { source: state.form.source || 'manual' } : {}),
+          ...(!state.editingPeriod ? { confidence_level: 1 } : {}),
           year_start: this.catalogoCompatibilityYearValue(state.form.year_start),
           year_end: this.catalogoCompatibilityYearValue(state.form.year_end),
           reason: String(state.form.reason).trim(),
@@ -174,12 +190,16 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         state.search = '';
         state.searchRows = [];
         state.selectedVehicle = null;
+        state.editingPeriod = null;
         state.form = { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' };
         state.message = { ok: true, text: 'Compatibilidade salva no escopo da categoria deste produto.' };
         await this.catalogoCompatibilityLoad(productId);
         await this.loadCatalogo();
-      } catch {
-        state.message = { ok: false, text: 'Não foi possível salvar a compatibilidade.' };
+      } catch (error) {
+        const text = error.message === 'catalog_fitment_period_already_exists' ? 'O período de destino já está cadastrado.'
+          : error.message === 'catalog_fitment_period_not_found' ? 'Este período mudou. Reabra a ficha e confira os anos.'
+          : 'Não foi possível salvar a compatibilidade.';
+        state.message = { ok: false, text };
       } finally {
         state.saving = false;
       }
@@ -191,13 +211,13 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       if (this.adminUser?.role !== 'owner' || !productId || state.saving) return;
       const reason = window.prompt('Motivo da remoção desta compatibilidade:');
       if (!reason || reason.trim().length < 2) return;
-      if (!window.confirm('Remover esta compatibilidade do produto e dos vínculos compartilhados da mesma categoria?')) return;
+      if (!window.confirm(`Remover apenas o período ${this.catalogoCompatibilityYearLabel(item)} deste vínculo e dos produtos no mesmo escopo?`)) return;
       state.saving = true;
       state.message = null;
       try {
         await this.apiDelete(
           `/admin/api/catalog/${encodeURIComponent(productId)}/compatibility/${encodeURIComponent(item.vehicle_model_id)}/${encodeURIComponent(item.position)}`,
-          { reason: reason.trim() },
+          { reason: reason.trim(), previous_period: { year_start: item.year_start, year_end: item.year_end } },
         );
         state.message = { ok: true, text: 'Compatibilidade removida da medida e registrada na auditoria.' };
         await this.catalogoCompatibilityLoad(productId);

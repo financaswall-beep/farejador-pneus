@@ -129,8 +129,10 @@ export async function createCatalogFitmentDiscovery(
          FROM commerce.fitment_discoveries d
         WHERE d.environment=$1 AND d.vehicle_model_id=$2 AND d.position=$3
           AND d.tire_spec_id=ANY($4::uuid[]) AND d.status IN ('pending','approved')
+          AND d.suggested_year_start IS NOT DISTINCT FROM $5::int
+          AND d.suggested_year_end IS NOT DISTINCT FROM $6::int
         LIMIT 1 FOR UPDATE`,
-      [environment, input.vehicleModelId, input.position, tireSpecIds],
+      [environment, input.vehicleModelId, input.position, tireSpecIds, input.yearStart ?? null, input.yearEnd ?? null],
     );
     if (duplicate.rows[0]) throw new Error('catalog_discovery_already_pending');
     const created = await client.query<{ id: string }>(

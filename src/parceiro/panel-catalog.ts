@@ -278,7 +278,7 @@ export async function getPartnerPanelCatalogCompatibility(
            ON vm.environment=vf.environment AND vm.id=vf.vehicle_model_id
         WHERE p.environment=$1 AND p.id=$2 AND p.deleted_at IS NULL
           AND vm.deleted_at IS NULL
-        ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position`,
+        ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position,vf.year_start NULLS FIRST,vf.year_end NULLS LAST`,
       [ctx.environment, productId],
     );
     return {

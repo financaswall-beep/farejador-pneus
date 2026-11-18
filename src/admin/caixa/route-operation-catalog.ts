@@ -90,13 +90,13 @@ export function registerCaixaOperationCatalogRoutes(
     return respond(reply, () => addCatalogCompatibility({ productId: p.data.product_id,
       vehicleModelId: b.data.vehicle_model_id, position: b.data.position, isOem: b.data.is_oem,
       source: b.data.source, confidenceLevel: b.data.confidence_level, yearStart: b.data.year_start,
-      yearEnd: b.data.year_end, reason: b.data.reason, actorLabel: actor(request) }), 201);
+      yearEnd: b.data.year_end, previousPeriod: b.data.previous_period, reason: b.data.reason, actorLabel: actor(request) }), 201);
   });
   fastify.delete(base + '/:product_id/compatibility/:vehicle_model_id/:position', write, async (request, reply) => {
     const p = compatibilityDeleteParams.safeParse(request.params), b = compatibilityDeleteBody.strict().safeParse(request.body);
     if (!p.success || !b.success) return reply.status(400).send({ error: 'invalid_catalog_compatibility' });
     return respond(reply, () => removeCatalogCompatibility({ productId: p.data.product_id,
-      vehicleModelId: p.data.vehicle_model_id, position: p.data.position,
+      vehicleModelId: p.data.vehicle_model_id, position: p.data.position, previousPeriod: b.data.previous_period,
       reason: b.data.reason, actorLabel: actor(request) }));
   });
 }
