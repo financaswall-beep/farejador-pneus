@@ -71,6 +71,30 @@ async function state(f:Fixture) {
   };
 }
 describe('remoção de um pneu reservado pelo bot',()=>{
+  it('preserva o pedido negociado na remoção parcial e permite o cancelamento integral',async()=>{
+    const f=await fixture();
+    // Pedido com aval sobre o pneu de moto e outra linha já presente. A ferramenta
+    // também precisa respeitar o aval em pedidos alterados fora deste canal.
+    await db.pool.query(`INSERT INTO ops.milly_consultas(environment,generation,conversation_id,trigger_message_id,
+      unit_id,product_id,quantity,payment_method,fulfillment_mode,offered_total_cents,catalog_unit_cents,
+      freight_cents,state,decision,approved_total_cents,valid_until,published_at,order_id)
+      VALUES('test',gen_random_uuid(),$1,gen_random_uuid(),$2,$3,1,'pix','pickup',8900,11000,
+        0,'consumed','aceitar',8900,now()+interval '30 minutes',now(),$4)`,[f.conversation,unit,moto,f.id]);
+    const before=await state(f);
+    expect((await remove(f,[car])).erro).toContain('condição negociada');
+    expect((await remove(f,[car,moto])).erro).toContain('cancelar_pedido');
+    expect(await state(f)).toEqual(before);
+    const client=await db.pool.connect();
+    try{
+      const result=JSON.parse(await execute(client,'test',f.conversation,'cancelar_pedido',{
+        order_number:f.order_number,motivo:'cliente_desistiu'}));
+      expect(result.ok).toBe(true);
+    }finally{client.release();}
+    const after=await state(f);
+    expect(after.order.status).toBe('cancelled');
+    expect(after.stock.every(row=>row.quantity_reserved===0)).toBe(true);
+    expect(after.ledger).toEqual([]);
+  });
   it('consulta IDs reais, remove carro, mantém moto e custo, repete sem liberar duas vezes',async()=>{
     const f=await fixture();
     const client=await db.pool.connect();

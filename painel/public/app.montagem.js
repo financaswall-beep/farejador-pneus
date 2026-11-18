@@ -99,6 +99,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.relatoriosPdf,
     window.PAINEL_MODULES.botEntrega,
     window.PAINEL_MODULES.botEntregaMapa,
+    window.PAINEL_MODULES.botMilly,
     window.PAINEL_MODULES.botMovimento, // recorte diário/semanal único dos movimentos do Bot
     window.PAINEL_MODULES.botMapa, // app.bot.mapa.js (2026-07-06): desenho do mapa IBGE pintado por camada
     window.PAINEL_MODULES.clientes, // CRM da matriz: clientes/leads/compradores/recompra/parceiros

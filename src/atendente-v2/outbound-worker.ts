@@ -13,22 +13,13 @@ import { deliverOutboundRow, markPhotoRequestSent } from './outbound-delivery.js
 import { hasAgentV2Wildcard } from './conversation-scope.js';
 import { lockBotConversation } from './conversation-control.js';
 import { prepareControlledOutbound } from './outbound-control.js';
-import { markOutboundAck, markResolutionDelivered } from './outbound-status.js';
+import { markOutboundAck, markResolutionDelivered, type OutboundRow } from './outbound-status.js';
+export type { OutboundRow } from './outbound-status.js';
+import { prepararSaidaOferta, confirmarSaidaOferta } from './milly-envio.js';
 const WORKER_ID = `bot-outbox-${randomUUID().slice(0, 8)}`;
 const POLL_MS = 2_000;
 const UNKNOWN_SENDING_MINUTES = 10;
 const DELIVERY_SUSPECT_MINUTES = 10;
-export interface OutboundRow {
-  id: string;
-  environment: Environment;
-  conversation_id: string;
-  turn_id: string | null;
-  chatwoot_conversation_id: string | number;
-  echo_id: string | null;
-  kind: string;
-  body: string;
-  attempts: number;
-}
 async function openOutboundDeadLetter(
   client: PoolClient, row: Pick<OutboundRow, 'id' | 'environment' | 'conversation_id'>,
   reason: string, code: string, kind: string, summary: string,
@@ -176,7 +167,7 @@ export async function pickOutboundMessage(
         SET status='sending',attempts=attempts+1,locked_at=now(),locked_by=$2,updated_at=now()
        FROM candidate c WHERE o.id=c.id
      RETURNING o.id,o.environment,o.conversation_id,o.turn_id,o.chatwoot_conversation_id,
-               o.echo_id,o.kind,o.body,o.attempts`,
+               o.echo_id,o.kind,o.body,o.attempts,o.trigger_message_id,to_jsonb(o)->>'milly_offer_id' AS milly_offer_id`,
     [environment, workerId, hasAgentV2Wildcard(allowedConversationIds),
       allowedConversationIds.filter((id) => id !== '*')],
   );
@@ -242,11 +233,13 @@ export async function pollBotOutbox(): Promise<void> {
     await markDeliverySuspects(client, env.FAREJADOR_ENV);
     await supersedeStaleAgentOutbound(client, env.FAREJADOR_ENV);
     row = await pickOutboundMessage(client, env.FAREJADOR_ENV);
+    if(row?.milly_offer_id && await prepararSaidaOferta(client,row)==='confirmada')row=null;
     await client.query('COMMIT');
     if (!row) return;
     await client.query('BEGIN');
     await lockBotConversation(client,row.environment,row.conversation_id);
     if (!await prepareControlledOutbound(client,row,env.ORGANIC_ATTRIBUTION_ENABLED)) { await client.query('COMMIT'); return; }
+    if(row.milly_offer_id && await prepararSaidaOferta(client,row)==='confirmada') { await client.query('COMMIT');return; }
     readyToSend = true;
     if (!['agent_text', 'survey_text', 'photo_text', 'photo_attachment', 'video_attachment', 'stock_text',
       'conversation_resolution','operator_text','operator_attachment'].includes(row.kind)) {
@@ -259,6 +252,7 @@ export async function pollBotOutbox(): Promise<void> {
     } else {
       await markPhotoRequestSent(client, row);
       await markOutboundAck(client, row, sent.chatwootMessageId);
+      if(row.milly_offer_id && sent.chatwootMessageId!=null) await confirmarSaidaOferta(client,row);
     }
     await client.query('COMMIT');
   } catch (error) {

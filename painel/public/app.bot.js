@@ -40,6 +40,7 @@ window.PAINEL_MODULES.bot = function () {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       window.FarejadorBotChannels?.refresh(this);
       if (silent && this.botLoading) return;
+      if (this.currentPage === 'bot') void this.carregarConsultaMilly?.();
       const requestId = ++latestVisaoRequestId;
       const period = this.botPeriodo;
       let changed = false;

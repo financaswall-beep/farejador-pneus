@@ -184,7 +184,8 @@
 <script src="/admin/painel/app.bot.waitlist.js?v=20261008-metal1"></script>
 <script src="/admin/painel/app.dot-alerts.js?v=20261025-1"></script>
 <link rel="stylesheet" href="/admin/painel/stock-waitlist.css?v=20261008-metal1">
-<script src="/admin/painel/app.bot.js?v=20260927-waitlist1"></script>
+<script src="/admin/painel/app.bot.js?v=20261118-consulta-milly"></script>
+<script src="/admin/painel/app.bot.milly.js?v=20261118-1"></script>
 <script src="/admin/painel/app.bot.faltas.js?v=20261008-legibilidade3"></script>
 <script src="/admin/painel/app.relatorios.demanda.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.relatorios.demanda.view.js?v=20260911-demanda3"></script>
@@ -315,7 +316,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261115-fornecedores"></script>
+<script src="/admin/painel/app.montagem.js?v=20261118-consulta-milly"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261019-chat-height2"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261019-chat1"></script>
@@ -7392,6 +7393,16 @@
         </div>
       </div>
 
+      <section x-cloak x-show="podeControlarMilly && ['visao', 'conversas'].includes(botTab)" aria-labelledby="consulta-milly-titulo" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+        <div>
+          <h2 id="consulta-milly-titulo" class="text-sm font-semibold text-gray-950">Milly nas negociações</h2>
+          <p role="status" class="mt-1 text-sm text-gray-600" x-text="consultaMillyStatus"></p>
+          <a x-show="consultaMillyAtiva && consultaMillyCanal === false" href="/admin/dot/connections" class="text-sm text-emerald-800 underline">Verificar conexão da Milly</a>
+        </div>
+        <button type="button" @click="alterarConsultaMilly()" :disabled="consultaMillySalvando || (consultaMillyAtiva === null && !consultaMillyErro)"
+          class="rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+          x-text="consultaMillySalvando ? 'Salvando…' : consultaMillyAtiva === null ? 'Atualizar estado' : consultaMillyAtiva ? 'Parar consultas à Milly' : 'Consultar a Milly'"></button>
+      </section>
       <section x-show="botTab === 'espera'" x-effect="syncBotWaitlist(currentPage === 'bot' && botTab === 'espera' && adminAuthenticated && adminUser?.role === 'owner')" x-cloak aria-label="Lista de espera"><div id="bot-waitlist" x-ignore></div></section>
       <section x-show="botTab === 'entrega'" class="bot-delivery" aria-labelledby="bot-delivery-heading">
 

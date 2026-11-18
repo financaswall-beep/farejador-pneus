@@ -15,6 +15,7 @@ import type { PainelRedePeriod } from './queries-pedidos.js';
 import { registerBotControlRoutes } from './route-bot-control.js';
 import { registerBotChatRoutes } from './route-bot-chat.js';
 import { registerBotDeliveryRoutes } from './route-bot-delivery.js';
+import { registerBotMillyRoutes } from './route-bot-milly.js';
 import { registerBotShortageRoutes } from './route-bot-faltas.js';
 import { registerDemandReportRoutes } from './route-demand-report.js';
 import { registerShortageReportRoutes } from './route-shortage-report.js';
@@ -38,6 +39,7 @@ export async function registerPainelBot(fastify: FastifyInstance): Promise<void>
     return getChatwootChannelHealth();
   });
   await registerBotControlRoutes(fastify);
+  registerBotMillyRoutes(fastify);
   registerBotChatRoutes(fastify);
   await registerBotDeliveryRoutes(fastify);
   await registerBotShortageRoutes(fastify);

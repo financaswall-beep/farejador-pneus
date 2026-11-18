@@ -32,6 +32,9 @@ import { withStockSearchTrace } from './stock-search-trace.js';
 import { recordBotModelUsage } from './model-usage.js';
 import {currentConfirmedStockPrompt,correctConfirmedStockHandoff} from './confirmed-stock-context.js';
 import {hasRepeatedEmptyGreetings,handoffEmptyGreetings} from './empty-greeting-limit.js';
+import { lerConsultaMilly } from './milly-negociacao.js';
+import { MILLY_TOOL, MILLY_RULES, MILLY_PROMPT_VERSION, consultarMillyParaVenda, gatilhoTextoMilly } from './milly-oferta.js';
+import { retomarTurnoMilly } from './milly-turno.js';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -62,7 +65,7 @@ async function nearestStoreKm(
   return min;
 }
 
-export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
+export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMillyId:string}> {
   const start = Date.now();
   const { conversationId, environment, jobId } = job;
   const logCtx = { job_id: jobId, conversation_id: conversationId, agent: 'v2', extractor_version: PROMPT_EXTRACTOR_VERSION };
@@ -71,6 +74,12 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const mayContinue = () => botMayProcessTrigger(client,environment as Environment,conversationId,job.triggerMessageId,env.ORGANIC_ATTRIBUTION_ENABLED);
   try {
     if (!await mayContinue()) return;
+    const scope=environment as Environment;
+    const closerLigada=env.BOT_OUTBOX && await lerConsultaMilly(client,scope);
+    const fluxo=closerLigada ? await retomarTurnoMilly(client,job):'tabela';
+    if(typeof fluxo==='object' && fluxo.consultaMillyId)return {consultaMillyId:fluxo.consultaMillyId};
+    if(fluxo==='respondido')return;
+    const podeConsultar=fluxo==='novo' && await gatilhoTextoMilly(client,scope,conversationId,job.triggerMessageId);
     await prepareConversationAudio(client,environment,conversationId,job);
     if(env.ORGANIC_ATTRIBUTION_ENABLED)await pollOrganicEvents(pool);
     await ensureOrganicContext(client,environment,conversationId,job.triggerMessageId);
@@ -124,6 +133,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // Foto sob demanda: bloco só com a flag on (off = prompt byte a byte o de hoje,
     // preserva o prompt caching; a tool pedir_foto também some — activeToolDefinitions).
     if (env.PHOTO_REQUESTS) basePrompt += PHOTO_PROMPT_BLOCK;
+    if (podeConsultar) basePrompt += MILLY_RULES;
+    if(typeof fluxo==='object' && fluxo.orientacao && await lerConsultaMilly(client,scope)) basePrompt+=fluxo.orientacao;
     // Nudge determinístico do PINO: só entra quando o cliente JÁ compartilhou a localização.
     // É uma ordem forte e contextual (alta autoridade, sem diluir) que vence as linhas do
     // prompt que mandam "pegue o bairro" — pra o bot CHAMAR a tool em vez de re-perguntar.
@@ -169,7 +180,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const messages=buildAgentMessages(env.OPENAI_MODEL,basePrompt,conversationContext,history);
 
     // 3. LLM loop with function calling
-    const modelTurn = createOpenAIResponsesTurn(messages, activeToolDefinitions(),
+    const tools=activeToolDefinitions();
+    const modelTurn = createOpenAIResponsesTurn(messages, podeConsultar?[...tools,MILLY_TOOL]:tools,
       event => recordBotModelUsage(client, job, event),{cacheStaticPrefix:true});
     let inputTokens = 0;
     let outputTokens = 0;
@@ -178,7 +190,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // Acumula tool calls + results pra persistir em agent.turns.actions
     const turnActions: ChatMessage[] = [];
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    let recotacaoPublica=false;
+    rodadas: for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!await mayContinue()) return;
       const response = await modelTurn.next();
       if (!await mayContinue()) return;
@@ -209,6 +222,20 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
           toolArgs = {};
         }
 
+        if(toolCall.function.name==='consultar_milly') {
+          let msg='Consulta indisponível. Use as condições atuais do catálogo.';
+          if(podeConsultar && await lerConsultaMilly(client,scope)) {
+            const result=await consultarMillyParaVenda(client,scope,conversationId,job.triggerMessageId,toolArgs)
+              .catch(()=>({mensagem:'Não foi possível verificar a condição especial. Siga o catálogo.',consulta:undefined}));
+            if(result.consulta) {
+              logger.info({...logCtx,extractor_version:MILLY_PROMPT_VERSION},'agent_v2: aguardando aval comercial');
+              return {consultaMillyId:result.consulta.id};
+            } else msg=JSON.stringify(result);
+          }
+          modelTurn.appendToolResult(toolCall.id,msg);
+          turnActions.push({role:'tool',tool_call_id:toolCall.id,content:msg});
+          continue;
+        }
         if (toolCall.function.name === 'escalar_humano') {
           const correction=await correctConfirmedStockHandoff(client,environment as Environment,conversationId,
             toolArgs,latestCustomerText,turnActions);
@@ -261,6 +288,14 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: result };
         modelTurn.appendToolResult(toolCall.id, result);
         turnActions.push(toolMsg);
+        if(isOrderWrite){
+          const bloqueio=JSON.parse(result);
+          if(bloqueio.erro==='oferta_expirada' && typeof bloqueio.texto_para_cliente==='string'){
+            assistantToolMsg.tool_calls=response.tool_calls.slice(0,toolIndex+1);
+            finalText=bloqueio.texto_para_cliente;recotacaoPublica=true;
+            break rodadas;
+          }
+        }
       }
     }
 
@@ -305,7 +340,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       conversationId,
     );
     // Cada mensagem nova durante a espera merece retorno; outbox mantém idempotência por gatilho.
-    if (lastAcceptedText === finalBody && !stockReply.pending) {
+    if (lastAcceptedText === finalBody && !stockReply.pending && !recotacaoPublica) {
       await publishStockRequest(client,environment as Environment,conversationId);
       logger.info(logCtx, 'agent_v2: resposta identica ao turno anterior, descartando (anti-eco)');
       return;

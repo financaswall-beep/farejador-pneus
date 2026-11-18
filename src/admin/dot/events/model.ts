@@ -46,6 +46,7 @@ export const eventDefinitions=eventNames.map(name=>({name,description:descriptio
     entity_id:{type:'string',format:'uuid'},kind:{type:'string'},reason:{type:'string'},status:{type:'string'},
     observed_at:{type:'string',format:'date-time'},source:{type:'string'},url:{type:'string'},
     last_message_id:{type:['string','null']},waiting_since:{type:['string','null']},
+    ...(name==='farejador.conversa.atualizada'?{sombra_negociacao:{type:'boolean'}}:{}),
     evidence:{type:'object',additionalProperties:true},
   },required:['entity_id','kind','reason','status','observed_at','source','url'],additionalProperties:false},
 }));

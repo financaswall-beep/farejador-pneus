@@ -8,6 +8,7 @@ import { seal } from './crypto.js';
 import { sendWebhook,type WebhookSender } from './https.js';
 import { dotEventsAvailable,dotEventsState,setDotEventsAvailability,type DotEventsFailure } from './availability.js';
 import { scanSignals } from './scan.js';
+import { setShadowPilotSchemaReady, shadowPilotEnabled } from './negotiation-shadow-pilot.js';
 let lastScan=0;
 
 /** Transaction-scoped lock works through Supabase transaction pooling as well as direct connections. */
@@ -24,6 +25,8 @@ export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook)
     await deliverEvents(db,send,undefined,async()=>{await lock.query('SELECT 1');});
     // Private technical history only. Preserve pending retries and live incident deduplication for seven days.
     // Revisões retêm a decisão e a chave: excluir ao expirar permitiria recriar uma proposta recusada.
+    await db.query(`UPDATE ops.dot_event_deliveries SET status='cancelled' WHERE environment=$1
+      AND fingerprint LIKE 'milly:%' AND status='pending' AND not_before<=clock_timestamp()`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_event_deliveries WHERE environment=$1 AND status<>'pending' AND created_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_monitor_targets WHERE environment=$1 AND due_at IS NULL AND changed_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM network.dot_event_subscriptions WHERE environment=$1
@@ -47,6 +50,7 @@ export async function assertDotEventsSchema(db:Pool=pool) {
 }
 /** Fail closed for the optional monitor, without taking the commercial application offline. */
 export async function initializeDotEvents(db:Pool=pool) {
+  setShadowPilotSchemaReady(false);
   if(!env.DOT_EVENTS_ENABLED)return dotEventsState();
   try {
     await assertDotEventsSchema(db);
@@ -61,6 +65,15 @@ export async function initializeDotEvents(db:Pool=pool) {
     setDotEventsAvailability(reason);
     logger.error({operational_alert:'dot_events_disabled',reason},
       'Acompanhamento do Dot indisponível. Corrija a configuração e reinicie. O restante do Farejador continua funcionando.');
+  }
+  if (dotEventsAvailable() && shadowPilotEnabled()) {
+    try {
+      await db.query('SELECT id,turn_id,conversation_id,decision,total_cents FROM ops.dot_negotiation_shadow LIMIT 0');
+      setShadowPilotSchemaReady(true);
+    } catch {
+      logger.warn({operational_alert:'dot_negotiation_shadow_unavailable'},
+        'Piloto de negociação em sombra indisponível. Confira o schema do piloto e reinicie.');
+    }
   }
   return dotEventsState();
 }

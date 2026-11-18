@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const dotEnvShape = {
   DOT_MCP_ENABLED: z.enum(['true','false']).default('false').transform(value => value === 'true'),
   DOT_EVENTS_ENABLED: z.enum(['true','false']).default('false').transform(value => value === 'true'),
+  DOT_NEGOTIATION_SHADOW_CONVERSATIONS: z.string().default(''),
   DOT_EVENTS_ENCRYPTION_KEY: z.string().default(''),
   DOT_EVENTS_WAIT_MINUTES: z.coerce.number().int().min(1).max(120).default(10),
   DOT_EVENTS_COOLDOWN_MINUTES: z.coerce.number().int().min(1).max(1440).default(10),

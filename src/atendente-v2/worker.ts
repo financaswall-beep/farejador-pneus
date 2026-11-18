@@ -33,6 +33,7 @@ import {
   reconcileMissingAtendenteJobsWithPool,
 } from '../atendente/reconcile-jobs.js';
 import { runAgentV2 } from './agent.js';
+import { notificarOuSeguir } from './milly-turno.js';
 import { hasAgentV2Wildcard, isAgentV2ConversationAllowed } from './conversation-scope.js';
 
 const WORKER_ID = `agent-v2-${randomUUID().slice(0, 8)}`;
@@ -136,14 +137,27 @@ export async function pollAndAttend(): Promise<void> {
     });
     await client.query('COMMIT');
 
+    client.release();
+    client=null;
     try {
-      await runAgentV2({
+      const andamento=await runAgentV2({
         jobId: job.id,
         conversationId: job.conversation_id,
         triggerMessageId: job.trigger_message_id,
         environment: job.environment,
       });
+      // runAgentV2 encerrou e devolveu sua conexão. O callback HTTPS opera
+      // fora de transações, com queries isoladas; nenhuma sessão Pg fica presa à resposta do Dot.
+      const aguardando=andamento ? await notificarOuSeguir(pool,job.environment,andamento.consultaMillyId,job.conversation_id) : false;
+      client=await pool.connect();
       await client.query('BEGIN');
+      if(andamento) {
+        await client.query(`UPDATE ops.atendente_jobs SET status='pending',not_before=now()+($4::int*interval '1 second'),
+          locked_at=NULL,locked_by=NULL,attempts=GREATEST(0,attempts-1),error_message=NULL
+          WHERE environment=$1 AND id=$2 AND status='processing' AND locked_by=$3`,[job.environment,job.id,WORKER_ID,aguardando?3:0]);
+        await client.query('COMMIT');
+        return;
+      }
       await markAtendenteJobProcessed(client, job.id);
       if (env.BOT_OUTBOX) await recordAtendenteJobEvent(client, {
         environment: job.environment, jobId: job.id, actor: WORKER_ID,
@@ -156,6 +170,8 @@ export async function pollAndAttend(): Promise<void> {
       );
     } catch (err) {
       try {
+        if(!client)client=await pool.connect();
+        else await client.query('ROLLBACK');
         await client.query('BEGIN');
         await markAtendenteJobFailed(client, job.id, err, env.BOT_OUTBOX);
         await client.query('COMMIT');

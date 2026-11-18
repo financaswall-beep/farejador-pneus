@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-16T04:11:09.697Z",
-  "total": 614,
+  "geradoEm": "2026-11-18T15:58:42.753Z",
+  "total": 617,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -12,6 +12,7 @@
     "GET /admin/api/bot/chat/conversations/:id/customer GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/chat/conversations/:id/messages GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/chat/stream GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/bot/consulta-milly GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/controle GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/conversations/:id/avatar GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/conversations/:id/controle GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -187,6 +188,7 @@
     "GET /admin/painel/app.bot.faltas.js PUBLICA",
     "GET /admin/painel/app.bot.js PUBLICA",
     "GET /admin/painel/app.bot.mapa.js PUBLICA",
+    "GET /admin/painel/app.bot.milly.js PUBLICA",
     "GET /admin/painel/app.bot.movimento.js PUBLICA",
     "GET /admin/painel/app.bot.waitlist.js PUBLICA",
     "GET /admin/painel/app.catalogo.atacado.js PUBLICA",
@@ -606,6 +608,7 @@
     "POST /admin/api/wholesale/suppliers GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/suppliers/archive GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /api/seja-parceiro PUBLICA",
+    "PUT /admin/api/bot/consulta-milly GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/bot/entrega GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/clientes/:source/:id/cadastro GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "PUT /admin/api/colaboradores/:collaboratorId/permissoes-operacao GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",

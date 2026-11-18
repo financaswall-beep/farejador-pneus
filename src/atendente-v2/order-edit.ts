@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
+import { pedidoComAvalMilly } from './milly-negociacao.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { loadCurrentCatalogPrices } from '../shared/catalog-pricing.js';
 import { buildMatrizStockIndex,matrizStockForMeasure } from '../shared/matriz-stock-source.js';
@@ -101,6 +102,9 @@ export async function editOpenOrder(client:PoolClient,environment:Environment,co
   try {
     const state=await loadEditableOrder(client,environment,conversationId,parsed.data.order_number);
     const {order,items}=state;
+    if(await pedidoComAvalMilly(client,environment,order.id)) {
+      throw Error('Este pedido tem um preço negociado para condições específicas. Encaminhe a alteração à loja; o pedido original foi preservado.');
+    }
     let input:EditInput;
     let quoted:Quote|undefined;
     let quoteId:string|undefined;
