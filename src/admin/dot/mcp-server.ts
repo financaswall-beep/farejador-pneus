@@ -15,6 +15,8 @@ import { monitorStatus,monitorTool } from './events/status.js';
 import { dotEventsAvailable } from './events/availability.js';
 import { hasPublisherTool, invokePublisherTool, publisherTools } from './publisher-tools.js';
 import { caseTools,invokeCaseTool } from './events/internal-cases.js';
+import { shadowPilotAvailable, shadowPilotInstructions } from './events/negotiation-shadow-pilot.js';
+import { negotiationShadowTools, invokeNegotiationShadow } from './events/negotiation-shadow.js';
 
 import {operationConfirmationTools,invokeOperationConfirmation} from './operation-confirmation-tools.js';
 import {inventoryTools,hasInventoryTool,invokeInventoryTool} from './inventory-tools.js';
@@ -50,7 +52,7 @@ export const dotTools:Tool[]=[...definitions.map(([name,description,properties])
   annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}]}}));
 
-export const dotServerVersion = '1.10.0';
+export const dotServerVersion = '1.11.0';
 
 export function dotInstructions() {
   return 'Para mudar um vencimento a pedido do dono, localize a parcela e prepare a proposta. O campo confirmacao informa o modo autorizado para a conexão. '
@@ -74,7 +76,8 @@ export function dotInstructions() {
       +'No publicador da 2W, importe os anexos ou consulte as mídias prontas, escreva uma legenda em português a partir dos fatos confirmados e prepare o rascunho. Para promoção de pneus, identifique medida, condição e, em um carrossel com produtos diferentes, as fotos de cada um. Convide o cliente a dizer qual foto quando houver mais de uma opção. Pergunte quando faltar a identificação. Em conteúdo institucional use pneus vazio. '
       +'“Prepara” termina no rascunho. “Publica” ou “agenda” dado pelo dono autoriza o envio na rede e horário pedidos. Para eventos automáticos, prepare o rascunho e aguarde o pedido do dono para publicar. Se horário, redes ou post forem ambíguos, esclareça. Apresente o estado devolvido por rede e só confirme a publicação quando constar publicada. '
       +'O conector não envia mensagens a clientes nem executa pagamentos. '
-      +(dotEventsAvailable()?monitorInstructions:'Acompanhamento automático indisponível ou desativado.');
+      +(dotEventsAvailable()?monitorInstructions:'Acompanhamento automático indisponível ou desativado.')
+      +(shadowPilotAvailable()?shadowPilotInstructions:'');
 }
 export function listedDotTools():Tool[] {
   const monitoring={...monitorTool,securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],
@@ -82,9 +85,12 @@ export function listedDotTools():Tool[] {
   const tools = env.DOT_EVENTS_ENABLED?[...dotTools,monitoring,...(dotEventsAvailable()?caseTools:[])]:dotTools;
   // O cliente pode guardar o catálogo obtido antes de o dono escolher como confirmar.
   // A chamada continua validando a permissão atual da conexão para cada operação.
-  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools,...publisherTools,...operationConfirmationTools,...inventoryTools];
+  const shadowTools = shadowPilotAvailable() ? negotiationShadowTools : [];
+  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools,...publisherTools,...operationConfirmationTools,...inventoryTools,...shadowTools];
 }
 export async function invokeDotTool(identity:DotIdentity,name:string,args:unknown) {
+    if (shadowPilotAvailable() && negotiationShadowTools.some(tool => tool.name === name))
+      return invokeNegotiationShadow(identity,name,args);
     if(operationConfirmationTools.some(tool=>tool.name===name)) return invokeOperationConfirmation(identity,name,args);
     if(hasInventoryTool(name)) return invokeInventoryTool(identity,name,args);
     if(hasPublisherTool(name)) return invokePublisherTool(identity,name,args);

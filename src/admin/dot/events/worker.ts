@@ -8,6 +8,7 @@ import { seal } from './crypto.js';
 import { sendWebhook,type WebhookSender } from './https.js';
 import { dotEventsAvailable,dotEventsState,setDotEventsAvailability,type DotEventsFailure } from './availability.js';
 import { scanSignals } from './scan.js';
+import { setShadowPilotSchemaReady, shadowPilotEnabled } from './negotiation-shadow-pilot.js';
 let lastScan=0;
 
 /** Transaction-scoped lock works through Supabase transaction pooling as well as direct connections. */
@@ -47,6 +48,7 @@ export async function assertDotEventsSchema(db:Pool=pool) {
 }
 /** Fail closed for the optional monitor, without taking the commercial application offline. */
 export async function initializeDotEvents(db:Pool=pool) {
+  setShadowPilotSchemaReady(false);
   if(!env.DOT_EVENTS_ENABLED)return dotEventsState();
   try {
     await assertDotEventsSchema(db);
@@ -61,6 +63,15 @@ export async function initializeDotEvents(db:Pool=pool) {
     setDotEventsAvailability(reason);
     logger.error({operational_alert:'dot_events_disabled',reason},
       'Acompanhamento do Dot indisponível. Corrija a configuração e reinicie. O restante do Farejador continua funcionando.');
+  }
+  if (dotEventsAvailable() && shadowPilotEnabled()) {
+    try {
+      await db.query('SELECT id,turn_id,conversation_id,decision,total_cents FROM ops.dot_negotiation_shadow LIMIT 0');
+      setShadowPilotSchemaReady(true);
+    } catch {
+      logger.warn({operational_alert:'dot_negotiation_shadow_unavailable'},
+        'Piloto de negociação em sombra indisponível. Confira o schema do piloto e reinicie.');
+    }
   }
   return dotEventsState();
 }

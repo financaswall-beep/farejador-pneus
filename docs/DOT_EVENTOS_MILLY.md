@@ -129,6 +129,24 @@ Instrução inicial sugerida para o piloto:
 Para excluir casos no próprio servidor, substituir a assinatura anterior por uma com `ignorar_ids`; alterações de filtros geram
 outra identidade de assinatura, então é necessário encerrar a anterior. O controle de notificação e memória da Milly continua no ChatGPT.
 
+## Piloto privado de negociação
+
+A atendente responde pelo fluxo habitual. Depois, a Milly pode avaliar uma objeção e guardar o que teria feito. O dono consegue comparar a proposta dela com a mensagem pública que a atendente enviou naquele turno. Só o conector privado do dono oferece as ferramentas do piloto.
+
+**Teste local do piloto**
+
+Com as dependências instaladas e Docker disponível, rode `npx vitest run --config vitest.integration.config.ts tests/integration/dot-negotiation-shadow.integration.test.ts`. Em máquinas com PostgreSQL portátil, a variável `FAREJADOR_TEST_POSTGRES_BIN` pode apontar para a pasta de binários da versão 17. O teste cria seu próprio banco temporário, simula o destinatário do evento e usa um parecer de teste para verificar o que o sistema permite registrar e comparar.
+
+**Para experimentar em homologação**
+
+1. Use um ambiente com banco, conta e conversas sintéticos. Aplique a migration `0295_dot_negotiation_shadow.sql` pelo processo usual. Configure a conta Chatwoot do ambiente, o acompanhamento por eventos e `DOT_NEGOTIATION_SHADOW_CONVERSATIONS` com até 50 UUIDs de `core.conversations`, separados por vírgula. Lista vazia, asterisco ou UUID inválido desativam o piloto inteiro.
+2. Reinicie o serviço e atualize o conector da Milly. Em **Avisos do assistente**, habilite o acompanhamento do atendimento. Confirme uma assinatura ativa de `farejador.conversa.atualizada` para as conversas escolhidas. A Milly reconhece um evento do piloto pelo campo `sombra_negociacao` igual a `true`.
+3. Em uma conversa de teste, faça uma oferta como “faz R$ 80 nesse pneu com entrega?”. Com o evento recebido, a ferramenta `consultar_contexto_negociacao_sombra` identifica o turno e recorta o histórico até a pergunta. A Milly considera os dados que consegue confirmar e pode manter o preço, aceitar, fazer contraproposta ou aguardar um dado. Ao oferecer um valor, registra o total e a modalidade de entrega ou retirada. O parecer fica associado à mensagem que motivou o turno, inclusive se a conversa prosseguir enquanto a Milly avalia.
+4. No privado, peça à Milly **“Me mostra a proposta do cliente, o que a atendente respondeu e o que você teria feito. Explica o motivo.”** Ela lista os pareceres com `consultar_negociacoes_sombra` e usa as referências de turno e mensagem para ler a conversa original. Se a resposta ainda estiver aguardando registro do Chatwoot, a comparação fica pendente. Cada turno guarda o primeiro parecer recebido.
+5. Para desativar apenas o piloto, esvazie `DOT_NEGOTIATION_SHADOW_CONVERSATIONS` e reinicie o serviço. Os pareceres acompanham o descarte dos eventos pelo monitor, normalmente após sete dias. A anonimização do contato também remove os pareceres relacionados.
+
+O monitor agrupa eventos. Alguns turnos podem não gerar parecer e o tempo até o registro inclui esperas da fila. A Milly é orientada a ler a resposta da atendente só depois de registrar sua alternativa. O acesso de proprietário também permite consultar o histórico integral, o que limita o uso deste piloto como avaliação às cegas. A comparação mostra diferenças nas propostas. Para medir se uma delas fecharia mais vendas ou se um desconto chega intacto à cobrança, é necessário um teste específico de fechamento.
+
 ## Segurança e protocolo
 
 - MCP `2026-07-28` tem despacho HTTP próprio limitado a descoberta, consultas e eventos; SDK existente serve clientes legados.

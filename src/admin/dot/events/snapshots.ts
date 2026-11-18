@@ -4,6 +4,7 @@ import { dotConfig } from '../config.js';
 import { withDotReadOnly } from '../read-only.js';
 import { hash,type Snapshot,type TargetKind } from './model.js';
 import { readSettings,ruleEnabled,type DotSettings } from './settings.js';
+import { shadowPilotAvailable } from './negotiation-shadow-pilot.js';
 
 interface Conversation {
   id:string;chatwoot_conversation_id:number;current_status:string;resolved_at:Date|null;waiting_since:Date|null;
@@ -35,11 +36,15 @@ async function conversation(db:Pool,id:string,now:Date,settings:DotSettings):Pro
   const overdue=!!deadline&&deadline<=now;
   const reason=closed?'conversa_encerrada':overdue?'aguardando_resposta':'conversa_atualizada';
   const occurredAt=overdue?deadline!:closed?row.resolved_at??row.last_activity_at:row.sent_at??row.last_activity_at;
+  const pilot = shadowPilotAvailable(row.id);
+  const fingerprint = [row.message_id,row.last_event_at,row.current_status,row.resolved_at,reason];
+  if (pilot) fingerprint.push('sombra_negociacao');
   return {name:'farejador.conversa.atualizada',kind:'conversation',id,urgent:false,
-    fingerprint:hash(JSON.stringify([row.message_id,row.last_event_at,row.current_status,row.resolved_at,reason])),
+    fingerprint:hash(JSON.stringify(fingerprint)),
     occurredAt,nextCheck:deadline&&!overdue?deadline:null,
     data:{entity_id:id,kind:'conversation',reason,status:row.current_status,observed_at:now.toISOString(),
       source:'core.conversations',last_message_id:row.message_id,waiting_since:waiting?.toISOString()??null,
+      ...(pilot ? {sombra_negociacao:true} : {}),
       url:env.CHATWOOT_API_BASE_URL
         ?`${env.CHATWOOT_API_BASE_URL.replace(/\/$/,'')}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${row.chatwoot_conversation_id}`
         :dotConfig()!.origin+'/admin/painel'}};
