@@ -14,6 +14,8 @@ export interface DotIdentity {
 export const monitorOwnerSql=`EXISTS(SELECT 1 FROM network.dot_monitor_owners owner_policy
   WHERE owner_policy.environment=g.environment AND owner_policy.person_id=g.person_id
     AND owner_policy.client_id=g.client_id AND owner_policy.resource=g.resource)`;
+export const conversationModeSql=`(COALESCE(to_jsonb(g)->>'operation_confirmation','legacy')='conversa' OR
+  (COALESCE(to_jsonb(g)->>'operation_confirmation','legacy')='legacy' AND g.installment_chat_confirmation AND NOT ${monitorOwnerSql}))`;
 const activeOwner = `JOIN network.matriz_collaborators mc ON mc.id=g.collaborator_id
   AND mc.environment=g.environment AND mc.person_id=g.person_id AND mc.panel_role='owner' AND mc.revoked_at IS NULL
   JOIN network.partner_people p ON p.id=g.person_id AND p.environment=g.environment AND p.revoked_at IS NULL`;
@@ -73,7 +75,7 @@ export async function validateDotAccess(config: DotConfig, token: string): Promi
   if (!/^da_[a-f0-9]{64}$/.test(token)) return null;
   const result = await pool.query<DotIdentity>(`SELECT g.id grant_id,g.person_id,g.collaborator_id,
     COALESCE((to_jsonb(g)->>'installment_reviews_enabled')::boolean,false) installment_reviews_enabled,
-    COALESCE((to_jsonb(g)->>'installment_chat_confirmation')::boolean,false) installment_chat_confirmation
+    ${conversationModeSql} installment_chat_confirmation
     FROM network.dot_oauth_grants g JOIN network.dot_oauth_tokens t ON t.grant_id=g.id AND t.environment=g.environment
     ${activeOwner} WHERE ${activeGrant} AND t.access_hash=$4 AND t.rotated_at IS NULL AND t.access_expires_at>now()`,
   [env.FAREJADOR_ENV,config.clientId,config.resource,dotHash(token)]);
@@ -91,7 +93,10 @@ export async function listDotConnections(personId: string) {
     (to_jsonb(g)->>'installment_reviews_enabled')::boolean installment_reviews_enabled,
     (to_jsonb(g)->>'publisher_enabled')::boolean publisher_enabled,
     (to_jsonb(g)->>'finance_operations_enabled')::boolean finance_operations_enabled,
-    ${monitorOwnerSql} AS monitor_owner_approval, (g.installment_chat_confirmation AND NOT ${monitorOwnerSql}) installment_chat_confirmation FROM network.dot_oauth_grants g
+    COALESCE(to_jsonb(g)->>'operation_confirmation','legacy') operation_confirmation,
+    COALESCE((to_jsonb(g)->>'stock_operations_enabled')::boolean,false) stock_operations_enabled,
+    COALESCE((to_jsonb(g)->>'catalog_operations_enabled')::boolean,false) catalog_operations_enabled,
+    ${monitorOwnerSql} AS monitor_owner_approval, ${conversationModeSql} installment_chat_confirmation FROM network.dot_oauth_grants g
     WHERE environment=$1 AND person_id=$2 AND code_used_at IS NOT NULL
     ORDER BY created_at DESC LIMIT 50`,[env.FAREJADOR_ENV,personId])).rows;
 }

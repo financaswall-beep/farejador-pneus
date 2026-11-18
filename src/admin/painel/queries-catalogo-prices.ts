@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -33,7 +34,7 @@ export async function getCatalogPriceHistory(
 
 export async function setCatalogPrice(
   input: CatalogPriceInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ changed: boolean; price_id: string | null; price_amount: number }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
@@ -43,9 +44,9 @@ export async function setCatalogPrice(
   }
   if (reason.length < 2) throw new Error('catalog_price_reason_required');
   const normalizedPrice = moneyCents(input.priceAmount) / 100;
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     await lockCatalogProduct(client, environment, input.productId);
     const current = await client.query<{ id: string; price_amount: string; price_type: string }>(
       `SELECT id,price_amount,'matriz'::text price_type FROM commerce.matriz_product_prices
@@ -56,7 +57,7 @@ export async function setCatalogPrice(
     );
     const official = current.rows[0] ? Number(current.rows[0].price_amount) : null;
     if (official !== null && moneyCents(official) === moneyCents(normalizedPrice)) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return { changed: false, price_id: current.rows[0]!.id, price_amount: official };
     }
     await client.query(
@@ -79,13 +80,13 @@ export async function setCatalogPrice(
       [environment, priceId, input.actorLabel, JSON.stringify({ active_prices: current.rows }),
        JSON.stringify({ product_id: input.productId, price_amount: normalizedPrice, reason })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { changed: true, price_id: priceId, price_amount: normalizedPrice };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 

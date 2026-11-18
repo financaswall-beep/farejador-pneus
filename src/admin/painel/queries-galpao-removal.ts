@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -25,7 +26,7 @@ export interface DeleteWholesaleStockInput {
 /** Remove uma variante inteira sem apagar a trilha física nem o efeito financeiro. */
 export async function deleteWholesaleStockComRotulo(
   input: DeleteWholesaleStockInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<void> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const measure = input.measure.trim();
@@ -40,12 +41,12 @@ export async function deleteWholesaleStockComRotulo(
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({ measure, brand, tire_condition: tireCondition, reason }),
   };
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const started = await beginIntegrityOperation<{ removed: true }>(client, operation);
     if (started.replayed) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return;
     }
     const current = await client.query<{
@@ -88,11 +89,11 @@ export async function deleteWholesaleStockComRotulo(
     await postMatrizInventoryAdjustmentsByMovementRef(
       client, environment, operation.idempotencyKey, input.actor_label,
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

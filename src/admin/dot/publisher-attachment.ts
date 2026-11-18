@@ -55,6 +55,7 @@ export async function assertPublisherPermission(db: PoolClient, identity: DotIde
   const grant = await lockGrant(db, identity.person_id, identity.grant_id);
   if (!grant.publisher_enabled) throw new McpError(ErrorCode.InvalidRequest,'Publicador em modo de consulta. O dono pode liberar posts em Permissões da Milly.');
   requirePublisher();
+  return grant;
 }
 
 let activeImports = 0;

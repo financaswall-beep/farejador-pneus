@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -90,7 +91,7 @@ export interface CreateFitmentDiscoveryInput {
 
 export async function createCatalogFitmentDiscovery(
   input: CreateFitmentDiscoveryInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ discovery_id: string; status: 'pending' }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   let sourceUrl: URL;
@@ -109,9 +110,9 @@ export async function createCatalogFitmentDiscovery(
   if (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
     || input.confidenceLevel > 1) throw new Error('catalog_compatibility_confidence_invalid');
   validateFitmentYears(input.yearStart, input.yearEnd);
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const { tireSize, tireSpecIds } = await loadCatalogMeasureSpecs(client, environment, input.productId);
     const vehicle = await client.query(
       `SELECT id FROM commerce.vehicle_models
@@ -158,13 +159,13 @@ export async function createCatalogFitmentDiscovery(
          source_url: sourceUrl.toString(), evidence_summary: summary,
          status: 'pending', automatic_promotion: false })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { discovery_id: discoveryId, status: 'pending' };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 

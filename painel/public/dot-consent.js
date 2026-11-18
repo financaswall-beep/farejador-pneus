@@ -44,10 +44,34 @@
           + new Date(row.created_at).toLocaleString('pt-BR');
         box.append(label);
         if (active) {
-          if (row.monitor_owner_approval) {
+          if (row.monitor_owner_approval && row.operation_confirmation !== 'conversa') {
             const note = document.createElement('p');
             note.textContent = 'Nesta conexão de acompanhamento, você aprova cada lançamento e alteração de vencimento na Matriz.';
             box.append(note);
+          }
+          if (typeof row.operation_confirmation === 'string') {
+            const note = document.createElement('p');
+            note.textContent = row.operation_confirmation === 'conversa'
+              ? 'Nas operações que exigem sua decisão, a Milly apresenta os dados e aguarda seu “autorizo” por voz ou texto. As permissões do aplicativo onde você conversa continuam valendo.'
+              : 'Escolha onde confirmar as operações da Milly. Consultas, rascunhos e tarefas internas continuam autônomos.';
+            box.append(note);
+            function operationPermission(label, changes) {
+              const control = document.createElement('button'); control.type = 'button'; control.textContent = label;
+              control.onclick = async () => {
+                control.disabled = true;
+                try {
+                  await api('/admin/api/dot/connections/' + encodeURIComponent(row.id) + '/operation-permissions', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes),
+                  });
+                  message.textContent = ''; await loadConnections();
+                } catch (error) { message.textContent = error.message; control.disabled = false; }
+              };
+              box.append(control);
+            }
+            if (row.operation_confirmation !== 'conversa') operationPermission('Confirmar operações por voz ou texto', { operation_confirmation: 'conversa' });
+            if (row.operation_confirmation !== 'painel') operationPermission('Confirmar operações na Matriz', { operation_confirmation: 'painel' });
+            operationPermission(row.stock_operations_enabled ? 'Desativar alterações de estoque' : 'Permitir todas as funções de estoque', { stock_operations_enabled: !row.stock_operations_enabled });
+            operationPermission(row.catalog_operations_enabled ? 'Desativar alterações do catálogo' : 'Permitir todas as funções do catálogo', { catalog_operations_enabled: !row.catalog_operations_enabled });
           }
           if (typeof row.installment_reviews_enabled === 'boolean') {
             const enabled = row.installment_reviews_enabled;
@@ -75,9 +99,10 @@
               });
               box.append(button);
             }
-            if (!row.monitor_owner_approval && !chat && typeof row.installment_chat_confirmation === 'boolean')
+            if (row.operation_confirmation === 'legacy' && !row.monitor_owner_approval && !chat && typeof row.installment_chat_confirmation === 'boolean')
               permissionButton('Permitir confirmação por voz ou texto', true, true);
-            if (!enabled || chat) permissionButton('Confirmar vencimentos só no painel', true, false);
+            if (!enabled) permissionButton('Permitir alteração de vencimentos', true, row.operation_confirmation === 'conversa');
+            else if (chat && row.operation_confirmation === 'legacy') permissionButton('Confirmar vencimentos só no painel', true, false);
             if (enabled) permissionButton('Desativar alteração de vencimento', false, false);
           }
           if (typeof row.publisher_enabled === 'boolean') {
@@ -218,6 +243,10 @@
       document.getElementById('operation-name').textContent = row.operacao.replaceAll('_',' ');
       fields(document.getElementById('operation-detail'),row.dados);
       display(row.status);
+      if (row.confirmacao === 'conversa') {
+        accept.hidden = deny.hidden = true;
+        if (row.status === 'pendente') state.textContent = 'Confirme ou recuse esta operação na conversa com a Milly.';
+      }
       async function decide(decisao) {
         accept.disabled = deny.disabled = true;
         try {

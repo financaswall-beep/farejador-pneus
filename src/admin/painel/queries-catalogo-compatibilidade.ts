@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -88,7 +89,7 @@ export async function loadCatalogMeasureSpecs(
 
 export async function addCatalogCompatibility(
   input: AddCompatibilityInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ changed: boolean; fitments_created: number; tire_size: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
@@ -96,9 +97,9 @@ export async function addCatalogCompatibility(
   if (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
     || input.confidenceLevel > 1) throw new Error('catalog_compatibility_confidence_invalid');
   validateFitmentYears(input.yearStart, input.yearEnd);
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const { tireSize, tireSpecIds } = await loadCatalogMeasureSpecs(client, environment, input.productId);
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `catalog-fitment:${environment}:${tireSize.replace(/\D/g, '')}:${input.vehicleModelId}:${input.position}`,
@@ -140,27 +141,27 @@ export async function addCatalogCompatibility(
          year_start: input.yearStart ?? null, year_end: input.yearEnd ?? null,
          affected_tire_specs: tireSpecIds.length, changed_rows: inserted.rowCount ?? 0 })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { changed: (inserted.rowCount ?? 0) > 0,
       fitments_created: inserted.rowCount ?? 0, tire_size: tireSize };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 
 export async function removeCatalogCompatibility(
   input: CompatibilityMutationInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ changed: boolean; fitments_removed: number; tire_size: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
   if (reason.length < 2 || reason.length > 500) throw new Error('catalog_compatibility_reason_required');
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const { tireSize, tireSpecIds } = await loadCatalogMeasureSpecs(client, environment, input.productId);
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `catalog-fitment:${environment}:${tireSize.replace(/\D/g, '')}:${input.vehicleModelId}:${input.position}`,
@@ -180,14 +181,14 @@ export async function removeCatalogCompatibility(
          position: input.position, affected_tire_specs: tireSpecIds.length,
          removed_rows: removed.rowCount ?? 0 }), JSON.stringify({ reason })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { changed: (removed.rowCount ?? 0) > 0,
       fitments_removed: removed.rowCount ?? 0, tire_size: tireSize };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 

@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -72,7 +73,7 @@ export async function correctWholesaleStockBrand(
     actor_label?: string | null;
     environment?: 'prod' | 'test';
   },
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<CorrectWholesaleStockBrandResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const measure = input.measure.trim();
@@ -96,14 +97,14 @@ export async function correctWholesaleStockBrand(
       tire_condition: tireCondition, reason,
     }),
   };
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const started = await beginIntegrityOperation<CorrectWholesaleStockBrandResult>(
       client, operation,
     );
     if (started.replayed) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return started.result;
     }
 
@@ -252,14 +253,14 @@ export async function correctWholesaleStockBrand(
     await completeIntegrityOperation(
       client, operation, 'commerce.wholesale_stock', target.id, result,
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined);
     const dbError = error as Error & { code?: string };
     if (dbError.code === '23505') throw new Error('brand_correction_target_exists');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import { createHash,randomUUID } from 'node:crypto';
 import type { Pool,PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
@@ -67,9 +68,9 @@ export async function saveCatalogPhoto(db:Pool,input:{environment:Environment;pr
  }finally{if(!connection)client.release();if(!saved&&!committing)await discard();}
 }
 export async function updatePhotoSettings(db:Pool,environment:Environment,productId:string,input:{
- version:number;enabled?:boolean;drive_folder_id?:string|null;drive_enabled?:boolean;primary_id?:string}){
- const client=await db.connect();try{
-  await client.query('BEGIN');await ensurePhotoProduct(client,environment,productId);
+ version:number;enabled?:boolean;drive_folder_id?:string|null;drive_enabled?:boolean;primary_id?:string}, transactionClient?: TransactionClient){
+ const client = transactionClient ?? await db.connect();try{
+  if (!transactionClient) await client.query('BEGIN');await ensurePhotoProduct(client,environment,productId);
   await client.query(`INSERT INTO commerce.matrix_photo_settings(environment,product_id) VALUES($1,$2) ON CONFLICT DO NOTHING`,[environment,productId]);
   const current=(await client.query('SELECT * FROM commerce.matrix_photo_settings WHERE environment=$1 AND product_id=$2 FOR UPDATE',[environment,productId])).rows[0];
   if(current.version!==input.version)throw new CatalogPhotoError('settings_changed',409);
@@ -85,8 +86,8 @@ export async function updatePhotoSettings(db:Pool,environment:Environment,produc
   await client.query(`UPDATE commerce.matrix_photo_settings SET enabled=$3,drive_folder_id=$4,drive_enabled=$5,
    version=version+1,drive_checked_at=NULL,drive_error=NULL,updated_at=now() WHERE environment=$1 AND product_id=$2`,
    [environment,productId,input.enabled??current.enabled,folder,driveEnabled]);
-  await client.query('COMMIT');
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+  if (!transactionClient) await client.query('COMMIT');
+ }catch(error){if (!transactionClient) await client.query('ROLLBACK');throw error;}finally{if (!transactionClient) client.release();}
 }
 export async function readCatalogPhoto(db:Pick<Pool,'query'>,environment:Environment,id:string){
  return (await db.query<CatalogPhoto>(`SELECT f.* FROM commerce.matrix_catalog_photos f

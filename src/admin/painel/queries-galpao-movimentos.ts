@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 // Trilha de movimentação do GALPÃO (0128) — o "filme" do estoque da matriz.
 // O trigger commerce.log_wholesale_stock_movement grava TODA mudança de qty/custo em
 // commerce.wholesale_stock_movements; este módulo é (a) o RÓTULO que a transação pendura
@@ -70,14 +71,14 @@ export async function setWholesaleStockComRotulo(
     reason?: string;
     actor_label?: string;
   },
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const movementRef = randomUUID();
   const reason = input.reason?.trim() ?? '';
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const catalogMeasure = await resolveMeasureInCatalog(client, environment, input.measure);
     if (!catalogMeasure) throw new Error('measure_not_in_catalog');
     const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
@@ -107,13 +108,13 @@ export async function setWholesaleStockComRotulo(
     await postMatrizInventoryAdjustmentsByMovementRef(
       client, environment, movementRef, input.actor_label ?? 'system:stock-adjustment',
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 
@@ -123,7 +124,7 @@ export async function addWholesaleStockEntryComRotulo(
     entry_nature?: 'inventory_found' | 'owner_contribution' | 'opening_balance' | 'other';
     reason?: string; actor_label?: string; idempotency_key?: string;
   },
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const nature = input.entry_nature;
@@ -137,12 +138,12 @@ export async function addWholesaleStockEntryComRotulo(
       tire_condition: input.tire_condition,
       entry_nature: nature, reason,
     }) };
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const started = await beginIntegrityOperation<WholesaleStockRow>(client, operation);
     if (started.replayed) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return started.result;
     }
     await setGalpaoMovContext(client, {
@@ -167,13 +168,13 @@ export async function addWholesaleStockEntryComRotulo(
     await postMatrizInventoryAdjustmentsByMovementRef(
       client, environment, operation.idempotencyKey, input.actor_label,
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 
@@ -187,7 +188,7 @@ export async function applyGalpaoBaixaManual(
     quantity: number; reason: string;
     nature?: 'breakage' | 'loss' | 'internal_use' | 'other';
     actor_label?: string; idempotency_key?: string; environment?: 'prod' | 'test' },
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const measure = input.measure.trim();
@@ -203,12 +204,12 @@ export async function applyGalpaoBaixaManual(
       measure, brand, tire_condition: tireCondition,
       quantity: input.quantity, nature: input.nature, reason,
     }) };
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const started = await beginIntegrityOperation<WholesaleStockRow>(client, operation);
     if (started.replayed) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return started.result;
     }
     await setGalpaoMovContext(client, { source: 'baixa_manual',
@@ -236,7 +237,7 @@ export async function applyGalpaoBaixaManual(
       await postMatrizInventoryAdjustmentsByMovementRef(
         client, environment, operation.idempotencyKey, input.actor_label,
       );
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return result;
     }
     // 0 linhas: medida não existe OU saldo insuficiente — dizer QUAL (erro honesto)
@@ -250,9 +251,9 @@ export async function applyGalpaoBaixaManual(
     if (!cur.rows[0]) throw new Error('measure_not_found');
     throw new Error('baixa_maior_que_estoque:' + cur.rows[0].quantity_available);
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

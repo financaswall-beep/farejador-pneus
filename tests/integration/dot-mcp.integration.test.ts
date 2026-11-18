@@ -170,16 +170,28 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(72);
+  expect(listing.result.tools).toHaveLength(106);
+  const newWrites=['confirmar_operacao_milly','recusar_operacao_milly',
+    'registrar_entrada_estoque','definir_estoque','remover_medida_estoque','registrar_perda_estoque',
+    'registrar_contagem_estoque','corrigir_marca_estoque','alterar_condicao_estoque','separar_lote_estoque',
+    'confirmar_transferencia_estoque','estornar_transferencia_estoque','cadastrar_produto_catalogo','editar_ficha_catalogo',
+    'alterar_preco_catalogo','alterar_preco_atacado_catalogo','salvar_compatibilidade_catalogo','remover_compatibilidade_catalogo',
+    'registrar_descoberta_catalogo','revisar_descoberta_catalogo','anexar_foto_catalogo','anexar_video_catalogo','configurar_midias_catalogo'];
   const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','excluir_publicacao_instagram','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
     'baixar_compra_com_credito','usar_adiantamento_fornecedor','desfazer_abatimento_fornecedor','registrar_devolucao_adiantamento','estornar_adiantamento_fornecedor'];
   for (const tool of listing.result.tools) {
-    expect(tool.annotations.readOnlyHint).toBe(!writes.includes(tool.name));
+    expect(tool.annotations.readOnlyHint).toBe(![...writes,...newWrites].includes(tool.name));
     expect(tool.securitySchemes).toEqual([{type:'oauth2',scopes:['farejador.read']}]);
   }
   expect(listing.result.tools.find((t:{name:string})=>t.name==='anexar_comprovante_despesa')._meta['openai/fileParams']).toEqual(['arquivo']);
+  for (const name of newWrites) {
+    expect(listing.result.tools.map((tool:{name:string})=>tool.name)).toContain(name);
+    const denied=(await rpc(access,'tools/call',{name,arguments:{}})).json();
+    expect(Boolean(denied.error || denied.result?.isError)).toBe(true);
+  }
+  (await import('../../src/shared/rate-limit.js')).__resetRateLimit();
   for (const name of writes) {
     expect(listing.result.tools.map((tool:{name:string})=>tool.name)).toContain(name);
     const denied=(await rpc(access,'tools/call',{name,arguments:{}})).json();
@@ -313,6 +325,29 @@ async function ownerFinanceMcp() {
   };
   return {token,permission,call};
 }
+
+it('só o dono muda o canal; troca de canal e revogação invalidam propostas anteriores',async()=>{
+  const {token,call}=await ownerFinanceMcp();
+  const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
+  const path='/admin/api/dot/connections/'+grant+'/operation-permissions';
+  const changes={operation_confirmation:'conversa',stock_operations_enabled:true,catalog_operations_enabled:true};
+  expect((await app.inject({method:'PUT',url:path,headers:{origin,authorization:'Bearer '+token},payload:changes})).statusCode).not.toBe(200);
+  expect((await app.inject({method:'PUT',url:path,headers:{...headers(),origin:'https://intruso.example'},payload:changes})).statusCode).toBe(403);
+  expect((await app.inject({method:'PUT',url:path,headers:headers(),payload:changes})).statusCode).toBe(200);
+  const data={name:'Proposta troca canal '+randomUUID(),idempotency_key:randomUUID()};
+  const pending=await call('cadastrar_fornecedor',data);
+  expect(pending).toMatchObject({confirmacao:'conversa',executada:false});
+  await call('confirmar_operacao_milly',{proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true});
+  expect((await app.inject({method:'PUT',url:path,headers:headers(),payload:{operation_confirmation:'painel'}})).statusCode).toBe(200);
+  expect(await call('cadastrar_fornecedor',data)).toMatchObject({status:'expirada',executada:false});
+  expect((await db.pool.query("SELECT 1 FROM commerce.wholesale_suppliers WHERE environment='test' AND name=$1",[data.name])).rowCount).toBe(0);
+  const panelData={...data,idempotency_key:randomUUID()};
+  const panel=await call('cadastrar_fornecedor',panelData);
+  const review='/admin/api/dot/operation-reviews/'+panel.proposta;
+  expect((await app.inject({method:'POST',url:review,headers:headers(),payload:{decisao:'autorizada'}})).json()).toMatchObject({status:'executada'});
+  expect((await db.pool.query("SELECT 1 FROM commerce.wholesale_suppliers WHERE environment='test' AND name=$1",[data.name])).rowCount).toBe(1);
+});
 
 it('executa com permissão financeira, repete sem duplicar e estorna apenas o pagamento selecionado',async()=>{
   const {token,permission,call}=await ownerFinanceMcp();
@@ -496,7 +531,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(72);
+    expect((await client.listTools()).tools).toHaveLength(106);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
@@ -585,6 +620,11 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await submit(expired)).statusCode).toBe(410);
   expect((await enable(true,true)).statusCode).toBe(200);
   expect((await confirmInChat(expired)).result.isError).toBe(true);
+  // O modo geral prevalece mesmo numa conexão com acompanhamento automático.
+  await db.pool.query(`INSERT INTO network.dot_monitor_owners(environment,person_id,client_id,resource)
+    VALUES('test',$1,'farejador-dot',$2) ON CONFLICT DO NOTHING`,[person,resource]);
+  expect((await app.inject({method:'PUT',url:'/admin/api/dot/connections/'+grant+'/operation-permissions',
+    headers:headers(),payload:{operation_confirmation:'conversa'}})).statusCode).toBe(200);
   const chatProposal=(await proposal()).result.structuredContent;
   expect(chatProposal).toMatchObject({confirmacao:'conversa',ferramenta_confirmacao:'confirmar_alteracao_vencimento'});
   expect(chatProposal.confirm_url).toBeUndefined();
@@ -627,6 +667,7 @@ it('Milly prepara, o dono confirma e pode restaurar ou desativar a permissão', 
   expect((await confirmInChat(partial.proposta)).result.isError).toBe(true);
   expect(await date()).toBe('2098-06-10');
   await enable(false);
+  await db.pool.query("DELETE FROM network.dot_monitor_owners WHERE environment='test' AND person_id=$1",[person]);
 });
 
 it('reconhece o mesmo Pix no painel e na Milly e permite retirar dinheiro do dono',async()=>{

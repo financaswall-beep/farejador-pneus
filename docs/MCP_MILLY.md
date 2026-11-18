@@ -1,11 +1,11 @@
 # Milly no Farejador
 
-A Milly usa o MCP da Matriz para consultar o sistema e registrar operações financeiras que o proprietário pede por voz ou texto. O Farejador registra pagamentos e recebimentos informados pelo dono. A transferência de dinheiro acontece no banco.
+A Milly usa o MCP da Matriz para consultar o sistema e operar financeiro, fornecedores, compras, estoque, catálogo, publicações e vencimentos conforme as permissões do proprietário. O Farejador registra pagamentos e recebimentos informados pelo dono. A transferência de dinheiro acontece no banco.
 
 ## Ativar e desativar
 
 1. Após o deploy, entre na Matriz com o usuário proprietário e abra [Permissões da Milly](https://farejador.smarttecsolutions.com.br/admin/dot/connections).
-2. Na conexão ativa, selecione **Permitir lançamentos financeiros por voz ou texto**. Para editar uma data pelo fluxo de proposta, selecione também **Permitir confirmação por voz ou texto**.
+2. Na conexão ativa, selecione **Confirmar operações por voz ou texto**. Essa escolha vale para todas as operações que exigem confirmação, inclusive quando iniciadas pelo acompanhamento automático. Ative as permissões desejadas de financeiro, vencimentos, publicador, estoque e catálogo. Cada conexão do celular ou computador tem sua própria configuração.
 3. Atualize as ferramentas do conector no cliente da Milly. Um teste de leitura é dizer “Mostre as minhas contas a receber e o saldo de cada parcela”. Para conferir a permissão de escrita, peça à Milly para registrar uma operação real que você já queira lançar.
 4. Para retirar o acesso de escrita, use **Desativar lançamentos financeiros**. A alteração de vencimento tem controle próprio. **Desconectar Dot** revoga a conexão inteira. O histórico dos lançamentos continua disponível no Financeiro.
 
@@ -75,6 +75,33 @@ Ao responder quanto a loja gastou em uma compra compartilhada, informe o custo i
 
 ## Consultas disponíveis no MCP
 
+### Confirmação por conversa em todas as áreas
+
+Com `operation_confirmation=conversa`, consultas, rascunhos e pendências internas conservam sua autonomia. Financeiro, compras, fornecedores, estoque, catálogo e envio/cancelamento/exclusão de publicações devolvem uma proposta antes de executar. Vencimentos mantêm o fluxo específico existente, seguindo o mesmo canal escolhido.
+
+1. A Milly apresenta a operação, registro, valores, quantidades e demais dados relevantes.
+2. O dono responde diretamente na conversa, por exemplo “autorizo”. Se houver mais de uma proposta, a Milly identifica qual foi autorizada.
+3. `confirmar_operacao_milly` recebe o ID e o fingerprint da proposta. Depois a Milly repete a operação original com os mesmos dados e a mesma chave de idempotência.
+4. A conclusão só é informada após retorno da ferramenta. `consultar_proposta_milly` distingue pendente, autorizada, executada, recusada e expirada. `recusar_operacao_milly` registra a recusa.
+
+A proposta vale por 15 minutos. Mudança nos dados exige nova proposta e nova decisão. Repetir a mesma chamada não duplica a execução. Recusar, expirar, revogar a permissão ou trocar o canal bloqueia a aprovação anterior. Revisões permanecem registradas para não recriar automaticamente pedidos recusados/expirados. Eventos, comentários, clientes, anexos e respostas das ferramentas nunca são autorização do dono.
+
+O servidor recebe a declaração de autorização do cliente autenticado. Não escuta nem reconhece a voz e não oferece biometria ou prova independente de quem falou. As instruções ao modelo não substituem esse limite de confiança. A configuração altera a aprovação do Farejador; não elimina confirmações próprias do ChatGPT. [Permissões de aplicativos no ChatGPT](https://help.openai.com/en/articles/20001495-managing-app-permissions-in-chatgpt).
+
+### Estoque e catálogo
+
+| Área | Operações |
+|---|---|
+| Saldo físico | Entrada, definição de saldo/custo/mínimo, baixa por perda/quebra/uso interno, contagem física e remoção de variante |
+| Organização | Correção de marca, transferência de condição, separação de lote, simulação/confirmação/estorno de transferências |
+| Produto | Cadastro manual ou a partir do estoque, ficha técnica, preço de varejo e de atacado |
+| Aplicações | Busca de veículos, compatibilidade, remoção de aplicação e registro/revisão de descobertas |
+| Mídias | Consulta, foto, vídeo, foto principal, exibição e configuração de pasta já autorizada do Drive |
+
+As operações reutilizam os serviços e schemas do painel, dentro da mesma transação da autorização/idempotência. Reservas, custos, histórico e regras de transferência continuam sendo verificados. Consulte a variante e use medida, marca e condição devolvidas pelo estoque. Fotos e vídeos usam o processamento existente e dependem das funcionalidades e credenciais de mídia habilitadas.
+
+Novas leituras específicas incluem `consultar_conferencia_estoque`, `consultar_custos_estoque`, `consultar_origens_separacao`, `consultar_produtos_transferencia`, `consultar_transferencias_estoque`, `consultar_ficha_catalogo`, `buscar_veiculos_catalogo`, `consultar_aplicacoes_medida` e `consultar_midias_catalogo`.
+
 | Área | Ferramentas |
 |---|---|
 | Visão da Matriz e relatórios | `consultar_resumo_matriz`, `consultar_vendas_matriz`, `consultar_relatorios_matriz`, `consultar_relatorio_painel` |
@@ -95,6 +122,6 @@ O endpoint é `/admin/dot/mcp`. O cliente usa OAuth com PKCE, um callback regist
 
 O catálogo vivo está em `tools/list`. Cada ferramenta informa descrição, campos obrigatórios, tipos e limites. Chame-a com `tools/call`. Para toda escrita financeira nova, gere um UUID em `idempotency_key` por pedido e conserve-o em todas as tentativas do mesmo pedido. Se os parâmetros mudarem, identifique a nova intenção. O agente só deve anunciar sucesso quando a resposta confirmar a gravação. Em caso de conexão interrompida, consulte o lançamento ou repita com a mesma chave.
 
-Para implantar esta versão, aplique a migration `0286_dot_finance_operations.sql`, publique o backend e os arquivos do painel do mesmo commit e atualize a lista de ferramentas no cliente. O financeiro depende do ledger central e de sua leitura habilitados. Despesas e atacado respeitam as funcionalidades habilitadas da instalação.
+Para implantar esta versão, aplique as migrations anteriores e `0293_dot_conversation_operations.sql` antes de publicar backend e painel do mesmo commit. Atualize a lista de ferramentas no cliente. Conexões existentes conservam `legacy`; estoque e catálogo começam desabilitados. Ative o modo conversa e as permissões desejadas nas conexões do proprietário após a implantação. A migração não concede acesso sozinha. O financeiro depende do ledger central e de sua leitura habilitados. Despesas e atacado respeitam as funcionalidades habilitadas da instalação.
 
 Os detalhes das consultas, escopos, filtros e configuração dos eventos estão nos guias técnicos. [Consultas da Matriz](DOT_CONSULTAS_MATRIZ.md) · [Eventos e acompanhamento](DOT_EVENTOS_MILLY.md)

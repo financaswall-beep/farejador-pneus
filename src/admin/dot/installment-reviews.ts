@@ -5,7 +5,8 @@ import { pool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { changeInstallmentInTransaction, readOpenInstallment } from '../painel/sale-installment-due-date.js';
 import { dotConfig, DOT_SCOPE } from './config.js';
-import { monitorOwnerSql,type DotIdentity } from './token-store.js';
+import type { OperationPermission } from './operation-policy.js';
+import { monitorOwnerSql,conversationModeSql,type DotIdentity } from './token-store.js';
 
 export const proposalSchema = z.object({
   order_id: z.string().uuid(), number: z.number().int().min(1).max(120),
@@ -27,9 +28,12 @@ export async function transact<T>(work: (db: PoolClient) => Promise<T>) {
 }
 
 const activeGrant = `SELECT g.installment_reviews_enabled,${monitorOwnerSql} AS monitor_owner_approval,
+     COALESCE(to_jsonb(g)->>'operation_confirmation','legacy') AS operation_confirmation,
+     COALESCE((to_jsonb(g)->>'stock_operations_enabled')::boolean,false) stock_operations_enabled,
+     COALESCE((to_jsonb(g)->>'catalog_operations_enabled')::boolean,false) catalog_operations_enabled,
      COALESCE((to_jsonb(g)->>'publisher_enabled')::boolean,false) publisher_enabled,
      COALESCE((to_jsonb(g)->>'finance_operations_enabled')::boolean,false) finance_operations_enabled,
-     (g.installment_chat_confirmation AND NOT ${monitorOwnerSql}) installment_chat_confirmation
+     ${conversationModeSql} installment_chat_confirmation
    FROM network.dot_oauth_grants g
    JOIN network.matriz_collaborators c ON c.id=g.collaborator_id AND c.environment=g.environment
      AND c.person_id=g.person_id AND c.panel_role='owner' AND c.revoked_at IS NULL
@@ -43,7 +47,7 @@ export async function lockGrant(db: PoolClient, person: string, grant: string) {
   if (!config) throw new Error('dot_grant_unavailable');
   // A assinatura toma a versão exclusiva desta trava ao ativar o acompanhamento pela primeira vez.
   await db.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',[`${env.FAREJADOR_ENV}:${person}:dot-events`]);
-  const row = (await db.query<{publisher_enabled:boolean;monitor_owner_approval:boolean;finance_operations_enabled:boolean;installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
+  const row = (await db.query<OperationPermission & {installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
     [env.FAREJADOR_ENV,person,grant,config.clientId,config.resource,DOT_SCOPE])).rows[0];
   if (!row) throw new Error('dot_grant_unavailable');
   return row;
@@ -53,7 +57,7 @@ export async function setInstallmentPermission(person: string, grant: string, en
   return transact(async db => {
     const permission=await lockGrant(db,person,grant);
     await db.query(`UPDATE network.dot_oauth_grants SET installment_reviews_enabled=$4, installment_chat_confirmation=$5
-      WHERE environment=$1 AND person_id=$2 AND id=$3`,[env.FAREJADOR_ENV,person,grant,enabled,enabled && chatConfirmation && !permission.monitor_owner_approval]);
+      WHERE environment=$1 AND person_id=$2 AND id=$3`,[env.FAREJADOR_ENV,person,grant,enabled,enabled && chatConfirmation && (!permission.monitor_owner_approval || permission.operation_confirmation==='conversa')]);
     if (!enabled) await db.query(`DELETE FROM network.dot_installment_reviews
       WHERE environment=$1 AND grant_id=$2 AND confirmed_at IS NULL`,[env.FAREJADOR_ENV,grant]);
     return { enabled };

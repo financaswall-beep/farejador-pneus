@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { z } from 'zod';
@@ -15,16 +16,16 @@ export const lotSeparationSchema = z.object({
   idempotency_key: z.string().min(8).max(200),
 }).strict();
 
-export async function separateTireLot(input: z.infer<typeof lotSeparationSchema>, actor: string, db: Pool = defaultPool) {
+export async function separateTireLot(input: z.infer<typeof lotSeparationSchema>, actor: string, db: Pool = defaultPool, transactionClient?: TransactionClient) {
   const data = lotSeparationSchema.parse(input);
   const environment = env.FAREJADOR_ENV;
   const operation = { environment, domain: 'tire-lot-separation', idempotencyKey: data.idempotency_key,
     fingerprint: operationFingerprint(data) };
-  const client = await db.connect();
+  const client = transactionClient ?? await db.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const replay = await beginIntegrityOperation<{ id: string; lot_code: string }>(client, operation);
-    if (replay.replayed) { await client.query('COMMIT'); return replay.result; }
+    if (replay.replayed) { if (!transactionClient) await client.query('COMMIT'); return replay.result; }
     await lockTireTransfers(client, environment);
     const source = await client.query(`SELECT id,measure,brand,tire_condition,quantity_on_hand,
       quantity_reserved,unit_cost,
@@ -59,8 +60,8 @@ export async function separateTireLot(input: z.infer<typeof lotSeparationSchema>
       entityId: id, eventType: 'separated', actorLabel: actor, idempotencyKey: operation.idempotencyKey,
       before: stock, after: { quantity: data.quantity, cost: stock.transfer_cost } });
     await completeIntegrityOperation(client, operation, 'commerce.tire_lots', id, result.rows[0]);
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return result.rows[0]!;
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
+  } catch (error) { if (!transactionClient) await client.query('ROLLBACK'); throw error; }
+  finally { if (!transactionClient) client.release(); }
 }

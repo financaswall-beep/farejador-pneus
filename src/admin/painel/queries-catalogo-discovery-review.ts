@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -13,14 +14,14 @@ export interface ReviewFitmentDiscoveryInput {
 }
 export async function reviewCatalogFitmentDiscovery(
   input: ReviewFitmentDiscoveryInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ status: 'promoted' | 'rejected'; fitments_promoted: number }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
   if (reason.length < 2 || reason.length > 500) throw new Error('catalog_discovery_review_reason_required');
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const { tireSize, tireSpecIds } = await loadCatalogMeasureSpecs(client, environment, input.productId);
     const discovery = await client.query<{
       id: string; vehicle_model_id: string; tire_spec_id: string;
@@ -65,7 +66,7 @@ export async function reviewCatalogFitmentDiscovery(
         [environment, input.discoveryId, actor, JSON.stringify({ status: candidate.status }),
          JSON.stringify({ status: 'rejected', reason })],
       );
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return { status: 'rejected', fitments_promoted: 0 };
     }
 
@@ -115,12 +116,12 @@ export async function reviewCatalogFitmentDiscovery(
          year_end: candidate.suggested_year_end,
          fitment_ids: fitmentIds, affected_tire_specs: tireSpecIds.length })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { status: 'promoted', fitments_promoted: fitmentIds.length };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
