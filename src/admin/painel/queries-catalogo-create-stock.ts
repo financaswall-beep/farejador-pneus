@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -34,7 +35,7 @@ function brandKey(value: string): string {
 
 export async function createCatalogProductFromStock(
   input: CreateCatalogProductInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<CreatedCatalogProduct> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const measure = input.measure.trim();
@@ -58,9 +59,9 @@ export async function createCatalogProductFromStock(
     throw new Error('catalog_product_name_invalid');
   }
 
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     await client.query(
       'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
       [`catalog-variant:${environment}:${measureKey}:${brandKey(brand)}:${tireCondition}`],
@@ -186,7 +187,7 @@ export async function createCatalogProductFromStock(
         }),
       ],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return {
       product_id: productId,
       product_code: productCode,
@@ -197,7 +198,7 @@ export async function createCatalogProductFromStock(
       vehicle_type: vehicleType,
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     const dbError = error as Error & { code?: string; constraint?: string };
     if (dbError.code === '23505'
       && dbError.constraint?.includes('product_code')) {
@@ -205,6 +206,6 @@ export async function createCatalogProductFromStock(
     }
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

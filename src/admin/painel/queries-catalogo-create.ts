@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -77,7 +78,7 @@ function validateInitialPrice(input: CreateCatalogProductInput): {
  */
 export async function createCatalogProduct(
   input: CreateCatalogProductInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<CreatedCatalogProduct> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const parsedMeasure = parseCatalogTireMeasure(input.measure);
@@ -100,9 +101,9 @@ export async function createCatalogProduct(
     throw new Error('catalog_product_name_invalid');
   }
 
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     await client.query(
       'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
       [`catalog-variant:${environment}:${parsedMeasure.key}:${brandKey(brand)}:${tireCondition}`],
@@ -226,7 +227,7 @@ export async function createCatalogProduct(
          effects: { stock: false, purchase: false, finance: false, orders: false },
        })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return {
       product_id: productId,
       product_code: productCode,
@@ -238,14 +239,14 @@ export async function createCatalogProduct(
       price_amount: initialPrice.amount,
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     const dbError = error as Error & { code?: string; constraint?: string };
     if (dbError.code === '23505' && dbError.constraint?.includes('product_code')) {
       throw new Error('catalog_product_code_duplicate');
     }
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 

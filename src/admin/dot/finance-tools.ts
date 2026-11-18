@@ -40,7 +40,7 @@ import {
   purchaseInput, lotPurchaseInput, registerSupplierPurchase,
 } from './supplier-operations.js';
 import { mapWriteError } from '../painel/route-helpers.js';
-import { requireOperationReview } from './operation-reviews.js';
+import { requireOperationReview,markOperationExecuted } from './operation-reviews.js';
 
 const tools=new Map<string,{descriptor:Tool;call:(identity:DotIdentity,args:unknown)=>Promise<object>}>();
 function describe(name:string,description:string,schema:z.ZodTypeAny,write:boolean):Tool & {securitySchemes:{type:string;scopes:string[]}[]} {
@@ -57,7 +57,7 @@ function parse<S extends z.ZodTypeAny>(schema:S,args:unknown):z.output<S> {
 }
 function write<S extends z.ZodTypeAny>(name:string,description:string,schema:S,
   execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<object>) {
-  tools.set(name,{descriptor:describe(name,description+' Atenda ao pedido do dono. Se receber aguardando_autorizacao, apresente confirm_url. Reutilize idempotency_key ao repetir.',schema,true),
+  tools.set(name,{descriptor:describe(name,description+' Atenda ao pedido do dono. Se receber aguardando_autorizacao, apresente a proposta. Em confirmacao=conversa aguarde o dono autorizar e use confirmar_operacao_milly; em painel apresente confirm_url. Reutilize idempotency_key ao repetir.',schema,true),
     call:(identity,args)=>transact(async db=>{
       const grant=await lockGrant(db,identity.person_id,identity.grant_id);
       if (!grant.finance_operations_enabled) throw new McpError(ErrorCode.InvalidRequest,'Conexão em modo de consulta financeira. O dono pode liberar lançamentos em Conexões.');
@@ -65,10 +65,8 @@ function write<S extends z.ZodTypeAny>(name:string,description:string,schema:S,
       const data=parse(schema,args);
       const actor='Milly · '+identity.person_id;
       const key=id.parse(data.idempotency_key);
-      if(grant.monitor_owner_approval) {
-        const review=await requireOperationReview(db,identity,name,key,data);
-        if(review) return review;
-      }
+      const review=await requireOperationReview(db,identity,name,key,data,grant);
+      if(review) return review;
       const operation={environment:env.FAREJADOR_ENV,domain:'dot.'+name,idempotencyKey:key,
         fingerprint:operationFingerprint({grant:identity.grant_id,
           data:data.arquivo?{...data,arquivo:{file_id:data.arquivo.file_id}}:data})};
@@ -77,11 +75,9 @@ function write<S extends z.ZodTypeAny>(name:string,description:string,schema:S,
       const result=await execute(db,data,actor,identity);
       await recordIntegrityEvent(db,{environment:env.FAREJADOR_ENV,domain:'dot_finance',entityTable:'network.dot_oauth_grants',
         entityId:identity.grant_id,actorLabel:actor,eventType:name,idempotencyKey:key,after:{operation:key,
-          ...(grant.monitor_owner_approval?{approval:'owner_panel',approved_by:identity.person_id}:{})}});
+          approval:grant.operation_confirmation==='conversa'?'owner_conversation':grant.monitor_owner_approval||grant.operation_confirmation==='painel'?'owner_panel':'owner_request'}});
       await completeIntegrityOperation(db,operation,'network.dot_oauth_grants',identity.grant_id,result);
-      if(grant.monitor_owner_approval) await db.query(`UPDATE network.dot_operation_reviews SET executed_at=now()
-        WHERE environment=$1 AND grant_id=$2 AND tool_name=$3 AND operation_key=$4 AND decision='autorizada'`,
-        [env.FAREJADOR_ENV,identity.grant_id,name,key]);
+      await markOperationExecuted(db,identity,name,key);
       return result;
     })});
 }

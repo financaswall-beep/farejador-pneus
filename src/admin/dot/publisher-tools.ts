@@ -15,6 +15,7 @@ import { attachmentInput, importAttachment, assertPublisherPermission } from './
 import { prepareInput, preparePost, sendInput, sendPost, rescheduleInput, movePost,
   cancelInput, cancelPost, readInput, readPublisher } from './publisher-posts.js';
 
+import { requireOperationReview,markOperationExecuted } from './operation-reviews.js';
 const catalog = new Map<string,{descriptor:Tool; run:(identity:DotIdentity,args:unknown)=>Promise<object>}>();
 function describe(name:string, description:string, schema:z.ZodTypeAny, readOnly:boolean, external=false):Tool & {securitySchemes:{type:string;scopes:string[]}[]} {
   const {$schema,...input}=zodToJsonSchema(schema,{$refStrategy:'none'});
@@ -27,14 +28,19 @@ function write<S extends z.ZodTypeAny>(name:string, description:string, schema:S
   execute:(db:PoolClient,data:z.output<S>,actor:string)=>Promise<object>,external=false) {
   catalog.set(name,{descriptor:describe(name,description+' Reutilize idempotency_key para repetir o mesmo pedido.',schema,false,external),
     run:(identity,args)=>transact(async db=>{
-      await assertPublisherPermission(db,identity);
+      const grant=await assertPublisherPermission(db,identity);
       const data=schema.parse(args);
+      if(name!=='preparar_publicacao') {
+        const review=await requireOperationReview(db,identity,name,data.idempotency_key,data,grant,'publisher');
+        if(review)return review;
+      }
       const operation={environment:env.FAREJADOR_ENV,domain:'dot.'+name,idempotencyKey:data.idempotency_key,
         fingerprint:operationFingerprint({grant:identity.grant_id,data})};
       const previous=await beginIntegrityOperation<object>(db,operation);
       if(previous.replayed) return previous.result;
       const result=await execute(db,data,'Milly · '+identity.person_id);
       await completeIntegrityOperation(db,operation,'network.dot_oauth_grants',identity.grant_id,result);
+      await markOperationExecuted(db,identity,name,data.idempotency_key);
       return result;
     })});
 }

@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -47,7 +48,7 @@ export async function getCatalogWholesaleHistory(
 export async function setCatalogWholesalePrice(input: {
   productId: string; priceAmount: number | null; reason: string; actorLabel: string;
   environment?: 'prod' | 'test';
-}, dbPool: Pool = defaultPool) {
+}, dbPool: Pool = defaultPool, transactionClient?: TransactionClient) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
   if (input.priceAmount !== null && (!Number.isFinite(input.priceAmount)
@@ -57,9 +58,9 @@ export async function setCatalogWholesalePrice(input: {
   }
   if (reason.length < 2 || reason.length > 500) throw new Error('catalog_wholesale_reason_required');
   const price = input.priceAmount === null ? null : moneyCents(input.priceAmount) / 100;
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const product = await client.query<{ product_type: string }>(
       `SELECT product_type FROM commerce.products WHERE environment=$1 AND id=$2
         AND deleted_at IS NULL AND NOT partner_generic FOR UPDATE`, [environment, input.productId],
@@ -73,7 +74,7 @@ export async function setCatalogWholesalePrice(input: {
     );
     const previous = current.rows[0];
     if ((previous ? Number(previous.price_amount) : null) === price) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return { changed: false, price_id: previous?.id ?? null, price_amount: price };
     }
     // Timestamp depois do lock: transações concorrentes não reabrem janelas no passado.
@@ -103,10 +104,10 @@ export async function setCatalogWholesalePrice(input: {
         JSON.stringify({ product_id: input.productId, price_amount: previous ? Number(previous.price_amount) : null }),
         JSON.stringify({ product_id: input.productId, price_id: priceId, price_amount: price, reason })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { changed: true, price_id: priceId, price_amount: price };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
-  } finally { client.release(); }
+  } finally { if (!transactionClient) client.release(); }
 }

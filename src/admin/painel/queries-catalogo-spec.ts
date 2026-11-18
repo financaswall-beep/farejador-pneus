@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -30,7 +31,7 @@ function optionalText(value: string | null | undefined): string | null {
 
 export async function updateCatalogTireSpec(
   input: UpdateCatalogTireSpecInput,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool = defaultPool, transactionClient?: TransactionClient
 ): Promise<{ changed: boolean; spec: TireSpecSnapshot }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
@@ -39,9 +40,9 @@ export async function updateCatalogTireSpec(
   }
   const vehicleType = requireTireVehicleType(input.vehicleType);
 
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const current = await client.query<TireSpecSnapshot>(
       `SELECT ts.id,ts.tread_pattern,ts.load_index,ts.speed_rating,ts.position,ts.vehicle_type
          FROM commerce.products p
@@ -69,7 +70,7 @@ export async function updateCatalogTireSpec(
       || before.position !== next.position
       || (before.vehicle_type ?? null) !== next.vehicle_type;
     if (!changed) {
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return { changed: false, spec: before };
     }
 
@@ -91,12 +92,12 @@ export async function updateCatalogTireSpec(
       [environment, before.id, input.actorLabel.trim().slice(0, 120) || 'admin',
        JSON.stringify(before), JSON.stringify({ ...spec, product_id: input.productId, reason })],
     );
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { changed: true, spec };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

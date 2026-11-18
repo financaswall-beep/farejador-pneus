@@ -1,3 +1,4 @@
+import type { PoolClient as TransactionClient } from 'pg';
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
@@ -84,14 +85,14 @@ async function applyPlan(client: PoolClient, plan: TransferPlan, actor: string, 
   return { id, lot_id: lot.id, lot_code: 'LT-' + String(lot.lot_number).padStart(6, '0'), cost: plan.cost, quantity: plan.quantity };
 }
 export async function confirmTireTransfer(input: TransferInput, fingerprint: string | undefined,
-  key: string, actor: string, db: Pool = defaultPool): Promise<Result> {
+  key: string, actor: string, db: Pool = defaultPool, transactionClient?: TransactionClient): Promise<Result> {
   const operation = { environment: env.FAREJADOR_ENV, domain: 'tire_transfer.create', idempotencyKey: key,
     fingerprint: operationFingerprint({ input, fingerprint: fingerprint ?? null }) };
-  const client = await db.connect();
+  const client = transactionClient ?? await db.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const replay = await beginIntegrityOperation<Result>(client, operation);
-    if (replay.replayed) { await client.query('COMMIT'); return replay.result; }
+    if (replay.replayed) { if (!transactionClient) await client.query('COMMIT'); return replay.result; }
     const plan = await buildTransferPlan(client, env.FAREJADOR_ENV, input);
     if (fingerprint && fingerprint !== plan.fingerprint) throw Error('transfer_preview_changed');
     const result = await applyPlan(client, plan, actor, randomUUID());
@@ -99,20 +100,20 @@ export async function confirmTireTransfer(input: TransferInput, fingerprint: str
       entityTable: 'commerce.tire_stock_transfers', entityId: result.id, eventType: input.kind,
       actorLabel: actor, idempotencyKey: key, after: result });
     await completeIntegrityOperation(client, operation, 'commerce.tire_stock_transfers', result.id, result);
-    await client.query('COMMIT'); return result;
-  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-  finally { client.release(); }
+    if (!transactionClient) await client.query('COMMIT'); return result;
+  } catch (error) { if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined); throw error; }
+  finally { if (!transactionClient) client.release(); }
 }
 
-export async function reverseTireTransfer(raw: z.infer<typeof reverseTransferSchema>, actor: string, db: Pool = defaultPool) {
+export async function reverseTireTransfer(raw: z.infer<typeof reverseTransferSchema>, actor: string, db: Pool = defaultPool, transactionClient?: TransactionClient) {
   const input = reverseTransferSchema.parse(raw), environment = env.FAREJADOR_ENV;
   const operation = { environment, domain: 'tire_transfer.reverse', idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({ id: input.id, reason: input.reason }) };
-  const client = await db.connect();
+  const client = transactionClient ?? await db.connect();
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
     const replay = await beginIntegrityOperation<Result>(client, operation);
-    if (replay.replayed) { await client.query('COMMIT'); return replay.result; }
+    if (replay.replayed) { if (!transactionClient) await client.query('COMMIT'); return replay.result; }
     await lockTireTransfers(client, environment);
     const r = await client.query(`SELECT * FROM commerce.tire_stock_transfers WHERE environment=$1 AND id=$2 FOR UPDATE`, [environment, input.id]);
     const t = r.rows[0];
@@ -148,7 +149,7 @@ export async function reverseTireTransfer(raw: z.infer<typeof reverseTransferSch
     await recordIntegrityEvent(client, { environment, domain: 'tire_transfer', entityTable: 'commerce.tire_stock_transfers',
       entityId: id, eventType: 'reversed', actorLabel: actor, idempotencyKey: input.idempotency_key, after: result });
     await completeIntegrityOperation(client, operation, 'commerce.tire_stock_transfers', id, result);
-    await client.query('COMMIT'); return result;
-  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-  finally { client.release(); }
+    if (!transactionClient) await client.query('COMMIT'); return result;
+  } catch (error) { if (!transactionClient) await client.query('ROLLBACK').catch(() => undefined); throw error; }
+  finally { if (!transactionClient) client.release(); }
 }
