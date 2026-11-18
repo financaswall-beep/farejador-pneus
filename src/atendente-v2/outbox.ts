@@ -17,6 +17,7 @@ export interface AgentTextOutboxInput {
   outputTokens: number;
   durationMs: number;
   humanHandoff?: boolean;
+  millyOfferId?: string;
 }
 
 export interface AgentTextOutboxResult {
@@ -145,7 +146,9 @@ export async function sendAgentTextWithOutbox(
          chatwoot_conversation_id,echo_id,kind,body,body_sha256,status
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,'agent_text',$8,$9,'pending')
        ON CONFLICT (environment,turn_id) DO UPDATE SET
-         job_id=EXCLUDED.job_id, body=EXCLUDED.body, body_sha256=EXCLUDED.body_sha256,
+         job_id=EXCLUDED.job_id,
+         body=CASE WHEN ops.outbound_messages.status IN ('pending','failed') THEN EXCLUDED.body ELSE ops.outbound_messages.body END,
+         body_sha256=CASE WHEN ops.outbound_messages.status IN ('pending','failed') THEN EXCLUDED.body_sha256 ELSE ops.outbound_messages.body_sha256 END,
          echo_id=EXCLUDED.echo_id,
          status=CASE WHEN ops.outbound_messages.status IN
            ('sending','sent_api_ack','delivered','dead_letter','superseded')
@@ -156,6 +159,18 @@ export async function sendAgentTextWithOutbox(
         turnId, input.chatwootConversationId, echoId, input.body, sha256(input.body)],
     );
     const row = outbound.rows[0]!;
+    if(row.status==='pending') {
+      // A reentrada do mesmo turno pode gerar o fallback de tabela após uma pausa.
+      // O vínculo nunca é reatribuído a um envio em andamento ou já confirmado.
+      if(input.millyOfferId) {
+        await client.query('UPDATE ops.outbound_messages SET milly_offer_id=$3 WHERE environment=$1 AND id=$2 AND status=\'pending\'',
+          [input.environment,row.id,input.millyOfferId]);
+      } else if(priorTurn) {
+        // Compatível com deploy de código antes da migration, quando o piloto segue desligado.
+        const old=await client.query('SELECT to_jsonb(o)->>\'milly_offer_id\' AS id FROM ops.outbound_messages o WHERE id=$1',[row.id]);
+        if(old.rows[0]?.id) await client.query('UPDATE ops.outbound_messages SET milly_offer_id=NULL WHERE id=$1 AND status=\'pending\'',[row.id]);
+      }
+    }
     if (input.humanHandoff && row.status === 'pending') {
       await pauseForHumanHandoff(client,input.environment,input.conversationId,row.id,input.jobId);
     }

@@ -1,5 +1,8 @@
 import { cancelOpenBotOrder } from './cancel-open-order.js';
 import { partnerUsedProducts, partnerUsedStock } from './partner-used-products.js';
+import { buscarOfertaCheckoutMilly, consumirOfertaMilly } from './milly-negociacao.js';
+import { reconfirmarAposVencimento } from './milly-recotacao.js';
+import { aplicarOfertaMilly, clienteRespondeuAOferta } from './milly-checkout.js';
 import { captureConfirmedUsedBrands } from './partner-used-order-brand.js';
 import type { PoolClient } from 'pg';
 import {
@@ -33,8 +36,8 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockQty, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
-import { reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
+import { getMatrizWholesaleStockQty, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { insertCommerceOrderMirror } from './order-mirror.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
@@ -46,7 +49,6 @@ import { botOrderRequestId, previousBotOrderAttempt, resolveBotOrderKey,
   recordBotOrderAttempt, botOrderReplay, type BotOrderExecution } from './order-attempt.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
-import { postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
 import {
   applyMatrizPricesToCompatibility,
   applyMatrizPricesToProducts,
@@ -1154,6 +1156,7 @@ async function executeToolInternal(
         return JSON.stringify({ erro: `Tool desconhecida: ${name}` });
     }
   } catch (err) {
+    if(err instanceof FalhaTransacaoOferta) throw err;
     if (err instanceof AmbiguousNeighborhoodError) return JSON.stringify(err.response());
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({ environment, conversation_id: conversationId, tool: name, err: message }, 'agent_v2: tool error');
@@ -1168,107 +1171,8 @@ interface PedidoItem {
   quantidade: number;
   preco_unitario: number;
 }
+class FalhaTransacaoOferta extends Error {}
 
-/**
- * Grava o ESPELHO em commerce.orders + order_items e devolve {id, order_number}.
- * Extraído do criar_pedido (Tijolo 3.2) pra os DOIS caminhos — matriz e parceiro —
- * usarem a MESMA peça, sem duplicar o INSERT. Comportamento idêntico ao de antes;
- * o caminho parceiro vai passar unit_id da loja (e, após a migration 0081, o link).
- */
-async function insertCommerceOrderMirror(
-  client: PoolClient,
-  environment: Environment,
-  input: {
-    contactId: string;
-    conversationId: string;
-    totalAmount: string;
-    fulfillmentMode: string;
-    paymentMethod: string | null;
-    deliveryAddress: string | null;
-    geoResolutionId: string | null;
-    customerName: string | null;
-    customerPhone: string;
-    unitId: string | null;
-    partnerOrderId?: string | null;
-    idempotencyKey?: string | null;
-    items: { product_id: string; quantity: number; unit_price: string }[];
-  },
-): Promise<{ id: string; order_number: string }> {
-  // idempotency_key dedup via índice parcial orders_idempotency_key_uniq — os DOIS
-  // caminhos (parceiro e matriz) passam chave estável; em colisão o ON CONFLICT DO
-  // NOTHING devolve o existente abaixo. Chave NULA (defensivo) nunca conflita → INSERT normal.
-  const ins = await client.query<{ id: string; order_number: string }>(
-    `INSERT INTO commerce.orders (
-       environment, contact_id, source_conversation_id, total_amount, status,
-       fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source, customer_name, unit_id,
-       partner_order_id, idempotency_key, customer_phone
-     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9, $10, $11, $12, $13)
-     ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-     RETURNING id, order_number`,
-    [
-      environment,
-      input.contactId,
-      input.conversationId,
-      input.totalAmount,
-      input.fulfillmentMode,
-      input.paymentMethod,
-      input.deliveryAddress,
-      input.geoResolutionId,
-      input.customerName,
-      input.unitId,
-      input.partnerOrderId ?? null,
-      input.idempotencyKey ?? null,
-      input.customerPhone,
-    ],
-  );
-
-  if (ins.rows[0]) {
-    const order = ins.rows[0];
-    for (const item of input.items) {
-      await client.query(
-        `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [environment, order.id, item.product_id, item.quantity, item.unit_price],
-      );
-    }
-    // Matriz vende no varejo (!partnerOrderId) → abate o GALPÃO na MESMA transação. Parceiro
-    // NUNCA entra aqui (tem partner_order_id + reserva o próprio partner_stock_levels). Só na
-    // inserção REAL — o caminho de colisão de idempotência (retry) abaixo NÃO baixa de novo.
-    if (!input.partnerOrderId) {
-      await reserveMatrizGalpaoStock(
-        client,
-        environment,
-        order.id,
-        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
-        env.WHOLESALE_MATRIZ_DECREMENT,
-      );
-      // Fatia 2 (0117): CONGELA o custo médio do galpão nos itens da venda da matriz —
-      // o lucro desta venda não muda quando o custo médio mudar depois. Mesma transação
-      // (rollback desfaz venda + retrato juntos). Item sem custo no galpão fica NULL.
-      await applyMatrizRetailCostSnapshot(
-        client,
-        environment,
-        order.id,
-        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
-        env.WHOLESALE_MATRIZ_RETAIL_COST,
-      );
-      await postMatrizRetailSaleFacts(client, environment, order.id);
-    }
-    return order;
-  }
-
-  // Sem linha = colisão de idempotência (retry/dupla-chamada do MESMO pedido): devolve o
-  // existente sem reinserir itens. Vale pros dois caminhos (parceiro e matriz têm chave).
-  if (input.idempotencyKey) {
-    const ex = await client.query<{ id: string; order_number: string }>(
-      `SELECT id, order_number FROM commerce.orders
-       WHERE environment = $1 AND idempotency_key = $2 LIMIT 1`,
-      [environment, input.idempotencyKey],
-    );
-    if (ex.rows[0]) return ex.rows[0];
-  }
-  throw new Error('Falha ao criar pedido');
-}
 
 async function criarPedido(
   client: PoolClient,
@@ -1503,7 +1407,11 @@ async function criarPedido(
   // horário e taxa de instalação, mas nunca o endereço exato nem o link.
   let retirada: { nome_loja: string; endereco: string | null; maps_url: string | null; horario: string | null } | null = null;
 
+  const oferta=await buscarOfertaCheckoutMilly(client,environment,conversationId,
+    [...new Set(quotedItems.map(item=>item.product_id))]);
   if (partner) {
+    if(oferta && quotedItems.some(it=>it.product_id===oferta.productId)) return JSON.stringify({
+      erro:'oferta_exclusiva_matriz',mensagem:'A condição apresentada vale somente na Matriz. Confirme as condições da loja parceira com o cliente.'});
     // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
     // Impressão digital estável (H2): o MESMO pedido em retry gera a MESMA chave →
     // não duplica o espelho nem o partner_order (register_partner_local_order dedup).
@@ -1517,6 +1425,10 @@ async function criarPedido(
 
     const priced = await validatePartnerRetailQuote(client, environment, partner, quotedItems, { conversationId, requestId });
     if (!priced.ok) return JSON.stringify(priced.response);
+    const recotacao=await reconfirmarAposVencimento(client,environment,conversationId,requestId,{
+      loja:partner.ctx.unitName,itens:partner.items.map(i=>({product_id:i.product_id,quantidade:i.quantity,preco_unitario:i.unit_price})),
+      frete:modalidade==='delivery'?FRETE_PADRAO_BRL:0,pagamento:formaPagamento,modalidade,endereco:deliveryAddress});
+    if(recotacao)return JSON.stringify(recotacao);
     const waiting=await requirePartnerStockConfirmation(client,environment,conversationId,partner,args,requestId);
     if(waiting)return waiting;
 
@@ -1600,16 +1512,29 @@ async function criarPedido(
     matrixSettings=(await readDeliverySettings(client,environment))?.settings??null;
     // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
     // Parceiros usam o sale_price da borracharia, sem alterar o preço da Matriz.
-    const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);
-    if (!repriced.ok) return JSON.stringify(repriced.response);
-    itens = repriced.items;
+    const unitId = await resolveMatrizUnitId(client, environment);
+    const especial=oferta && aplicarOfertaMilly(oferta,{unitId,paymentMethod:formaPagamento,fulfillmentMode:modalidade,
+      freightCents:Math.round(valorFrete*100),items:quotedItems,address:deliveryAddress});
+    if(especial && 'erro' in especial)return JSON.stringify({erro:'condicao_negociada_alterada',mensagem:especial.erro});
+    const aplicarAval=especial?.aplicavel===true;
+    if(aplicarAval && oferta) {
+      if(!await clienteRespondeuAOferta(client,environment,conversationId,requestId,oferta))return JSON.stringify({
+        erro:'confirmacao_da_oferta_pendente',mensagem:'Aguarde a resposta do cliente à oferta publicada antes de fechar.'});
+      itens=especial.items;
+    } else {
+      const recotacao=await reconfirmarAposVencimento(client,environment,conversationId,requestId,{
+        loja:'Matriz',itens:quotedItems,frete:valorFrete,pagamento:formaPagamento,modalidade,endereco:deliveryAddress},true);
+      if(recotacao)return JSON.stringify(recotacao);
+      const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);
+      if (!repriced.ok) return JSON.stringify(repriced.response);
+      itens = repriced.items;
+    }
     subtotal = itens.reduce((sum, item) => sum + item.quantidade * item.preco_unitario, 0);
     totalAmount = subtotal + valorFrete;
 
     // Dedup: chave estável (conversa+loja+itens+modalidade) como no parceiro — em
     // dupla-chamada do MESMO pedido o ON CONFLICT devolve o existente em vez de duplicar.
     // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)
-    const unitId = await resolveMatrizUnitId(client, environment);
     const resolved = await resolveBotOrderKey(client, environment, conversationId,
       unitId, itens, modalidade, requestId);
     if (resolved.existingId) {
@@ -1623,7 +1548,7 @@ async function criarPedido(
     // gravar nada (return ANTES do insert → o COMMIT do agent.ts fica vazio). O bot avisa o
     // cliente em vez de prometer o que não tem. Dormente atrás da flag + exige a baixa ligada
     // (só trava quando o estoque é real). Só o caminho MATRIZ (partner_order reserva o próprio).
-    if (env.WHOLESALE_MATRIZ_OVERSELL_GUARD && env.WHOLESALE_MATRIZ_DECREMENT) {
+    if ((aplicarAval && env.WHOLESALE_UNIFIED_STOCK) || env.WHOLESALE_MATRIZ_OVERSELL_GUARD && env.WHOLESALE_MATRIZ_DECREMENT) {
       const faltas = await checkMatrizGalpaoShortfall(
         client,
         environment,
@@ -1644,6 +1569,7 @@ async function criarPedido(
       }
     }
 
+    try {
     order = await insertCommerceOrderMirror(client, environment, {
       contactId,
       conversationId,
@@ -1664,6 +1590,11 @@ async function criarPedido(
         unit_price: i.preco_unitario.toFixed(2),
       })),
     });
+    if(aplicarAval && oferta) await consumirOfertaMilly(client,environment,oferta.id,order.id);
+    } catch(error) {
+      if(aplicarAval)throw new FalhaTransacaoOferta('Falha ao finalizar o pedido com o aval.',{cause:error});
+      throw error;
+    }
 
     fulfillmentNotBefore=await saveMatrizOrderWindow(client,environment,order.id,matrixSettings,modalidade as 'pickup'|'delivery',currentStoreOpeningTime());
     respSubtotal = subtotal;

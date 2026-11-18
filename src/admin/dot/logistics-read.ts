@@ -1,5 +1,71 @@
 import { readPage, rejectFilters, type DotReadContext } from './read-model.js';
 import { paymentMethodSql } from './safe-values.js';
+import type { PoolClient } from 'pg';
+import type { Environment } from '../../shared/types/chatwoot.js';
+
+// Publish only cities from the official catalogue. A same-turn route decision takes
+// precedence over a recent mention in the conversation; neither confirms a stop.
+async function negotiationMunicipality(db:Pick<PoolClient,'query'>,environment:Environment,requestId:string) {
+  const result=await db.query<{municipality_key:string;municipio:string;fonte:string}>(`WITH pedido AS (
+    SELECT q.conversation_id,q.created_at,m.sent_at FROM ops.milly_consultas q
+    JOIN core.messages m ON m.environment=q.environment AND m.id=q.trigger_message_id AND m.conversation_id=q.conversation_id
+    WHERE q.environment=$1 AND q.id=$2
+  ), roteada AS (
+    SELECT c.municipality_key,c.display_name municipio,'roteamento_entrega_deste_turno' fonte
+    FROM pedido p JOIN ops.partner_routing_decisions r ON r.environment=$1 AND r.conversation_id=p.conversation_id
+      AND r.modality='delivery' AND r.decision_kind='matrix' AND r.decided_at BETWEEN p.sent_at AND p.created_at
+    JOIN network.municipality_catalog c ON c.active AND lower(btrim(r.municipio)) IN (c.municipality_key,lower(c.display_name))
+  )
+  SELECT * FROM roteada UNION ALL
+  SELECT c.municipality_key,c.display_name,'referencia_recente_da_conversa'
+    FROM pedido p JOIN analytics.v_bot_demand_location l ON l.environment=$1 AND l.conversation_id=p.conversation_id
+      AND l.observed_at BETWEEN p.created_at-interval '24 hours' AND p.created_at
+    JOIN network.municipality_catalog c ON c.active AND lower(btrim(l.municipio)) IN (c.municipality_key,lower(c.display_name))
+    WHERE NOT EXISTS (SELECT FROM roteada) LIMIT 1`,[environment,requestId]);
+  return result.rows[0];
+}
+
+/** Aggregate route workload and observed expenses without stops' addresses or driver identifiers. */
+export async function readNegotiationRoutes(db:Pick<PoolClient,'query'>,environment:Environment,requestId:string) {
+  const city=await negotiationMunicipality(db,environment,requestId);
+  const row=await db.query(`WITH abertas AS (
+    SELECT count(DISTINCT t.id)::int rotas_abertas, count(o.id)::int entregas_pendentes,
+      count(o.id) FILTER (WHERE o.delivery_status='pending')::int aguardando_saida,
+      count(o.id) FILTER (WHERE o.delivery_status='dispatched')::int em_entrega,
+      count(o.id) FILTER (WHERE c.municipality_key IS NULL)::int entregas_sem_municipio_cadastrado,
+      CASE WHEN $2::text IS NOT NULL THEN count(o.id) FILTER (WHERE c.municipality_key=$2)::int END
+        entregas_com_municipio_cadastrado_igual,
+      CASE WHEN $2::text IS NOT NULL THEN count(DISTINCT t.id) FILTER (WHERE c.municipality_key=$2)::int END
+        rotas_com_municipio_cadastrado_igual
+    FROM commerce.matriz_delivery_trips t LEFT JOIN commerce.orders o
+      ON o.environment=t.environment AND o.trip_id=t.id AND o.status<>'cancelled'
+      AND o.delivery_status IN ('pending','dispatched') AND o.fulfillment_mode='delivery' AND o.partner_order_id IS NULL
+    LEFT JOIN commerce.geo_resolutions g ON g.environment=o.environment AND g.id=o.geo_resolution_id
+    LEFT JOIN network.municipality_catalog c ON c.active AND c.state_code=g.state_code
+      AND lower(btrim(g.city_name)) IN (c.municipality_key,lower(c.display_name))
+    WHERE t.environment=$1 AND t.status='open' AND t.deleted_at IS NULL
+  ), encerradas AS (
+    SELECT t.fuel_spent, (
+      SELECT sum(e.amount) FROM commerce.matriz_trip_approved_expenses(t.id,t.environment) e
+    ) despesas_aprovadas FROM commerce.matriz_delivery_trips t
+    WHERE t.environment=$1 AND t.deleted_at IS NULL AND t.status='closed'
+      AND t.ended_at>=(((now() AT TIME ZONE 'America/Sao_Paulo')::date-29)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+      AND t.ended_at<=now()
+  ), historico AS (
+    SELECT count(*) rotas_encerradas, count(despesas_aprovadas) rotas_com_despesa_aprovada,
+      round(sum(despesas_aprovadas)*100) total_despesas_aprovadas_centavos,
+      round(avg(despesas_aprovadas)*100) media_despesas_aprovadas_por_rota_com_registro_centavos,
+      count(*) FILTER (WHERE fuel_spent>0) rotas_com_combustivel_informado,
+      round((sum(fuel_spent) FILTER (WHERE fuel_spent>0))*100) total_combustivel_informado_centavos,
+      round((avg(fuel_spent) FILTER (WHERE fuel_spent>0))*100) media_combustivel_por_rota_com_registro_centavos
+    FROM encerradas
+  ) SELECT to_jsonb(abertas) || jsonb_build_object('historico_30_dias',to_jsonb(historico)) AS dados
+    FROM abertas CROSS JOIN historico`,[environment,city?.municipality_key??null]);
+  return {...row.rows[0]!.dados as Record<string,unknown>,
+    praca_referencia:city?{municipio:city.municipio,fonte:city.fonte}:null,
+    leitura_praca:'A praça é referência municipal. Os contadores comparam somente o município cadastrado em entregas pendentes de rotas abertas. Coincidência municipal não confirma endereço, encaixe na rota, horário ou custo adicional.',
+    leitura:'Médias por rota encerrada com registro nos últimos 30 dias. Combustível informado pode constar entre as despesas aprovadas. Valores são separados e não representam o custo de incluir uma parada.'};
+}
 
 export function readDotTrips(ctx:DotReadContext) {
   rejectFilters(ctx,'medida');

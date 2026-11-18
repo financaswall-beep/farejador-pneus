@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { releaseRemovedMatrizItems } from './matriz-stock-reservation.js';
+import { pedidoComAvalMilly } from './milly-negociacao.js';
 
 const removalInput = z.object({
   order_number: z.string().trim().min(1).max(40).transform(value => value.toUpperCase()),
@@ -95,6 +96,9 @@ export async function removeOpenOrderItems(
     }
     const remaining = items.filter(item => !requested.includes(item.product_id));
     if (!remaining.length) throw new Error('Para retirar todos os itens, use cancelar_pedido após confirmar o cancelamento.');
+    if (await pedidoComAvalMilly(client, environment, order.id)) {
+      throw new Error('Este pedido tem uma condição negociada para os itens e quantidades originais. Encaminhe a alteração à loja.');
+    }
     if (items.some(item => item.product_type !== 'tire')) throw new Error('Pedido com serviços: alteração precisa de atendente humano.');
     const oldTotal = cents(order.total_amount);
     const itemTotal = items.reduce((sum, item) => sum + cents(item.line_total), 0);

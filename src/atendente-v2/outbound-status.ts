@@ -1,7 +1,21 @@
 import type { PoolClient } from 'pg';
-import type { OutboundRow } from './outbound-worker.js';
+import type { Environment } from '../shared/types/chatwoot.js';
 import { recordOutboundEvent } from './outbound-events.js';
 import { reconcileAckAlreadyInCore } from './outbound-reconcile.js';
+
+export interface OutboundRow {
+  id: string;
+  environment: Environment;
+  conversation_id: string;
+  turn_id: string | null;
+  chatwoot_conversation_id: string | number;
+  echo_id: string | null;
+  kind: string;
+  body: string;
+  attempts: number;
+  milly_offer_id?:string|null;
+  trigger_message_id?:string|null;
+}
 
 export async function markOutboundAck(client: PoolClient, row: OutboundRow, providerId: number | null): Promise<void> {
   await client.query(

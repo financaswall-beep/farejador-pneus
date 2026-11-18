@@ -164,6 +164,20 @@ Rollback operacional: `DOT_EVENTS_ENABLED=false` e redeploy. Consultas permanece
 Para interromper captura também, encerrar as assinaturas/desconectar o Dot; os triggers só capturam enquanto houver assinatura não expirada.
 Não remover as tabelas antes dos triggers nem alterar dados de conversas para desfazer esta funcionalidade.
 
+## Consultar a Milly no atendimento de varejo da Matriz
+
+Em **Matriz → Bot → Visão geral** ou **Conversas**, o proprietário usa **Consultar a Milly** e **Parar consultas à Milly**. A configuração começa desligada, vale por ambiente e persiste entre reinicializações. O controle usa a sessão do proprietário. O painel também indica a disponibilidade da conexão com o Dot.
+
+Para receber consultas, a instalação precisa da migration `0296_milly_consulta_comercial.sql`, da atendente V2 com envio pela outbox e do MCP com eventos. A conexão do proprietário deve ter uma assinatura verificada de conversas que cubra a conversa em atendimento. Duas assinaturas elegíveis para a mesma consulta tornam o destino ambíguo. A atendente segue pelo catálogo nesse caso.
+
+Com o controle ligado, a atendente pode pedir uma decisão sobre um pneu da Matriz. O evento identifica a consulta. No MCP, a Milly lê a ficha por `consultar_negociacao_atendente` e responde por `orientar_negociacao_atendente`. A ficha traz a variante, o saldo, as reservas, o giro e o custo disponíveis naquele momento. Para entrega, o histórico de viagens ajuda na análise. Um desconto em entrega exige comprovação do custo de acrescentar a parada. Quando essa informação falta, a Milly pode orientar a atendente a oferecer a avaliação de retirada.
+
+A Milly vê quantas entregas em rotas abertas têm o mesmo município cadastrado e quantas estão sem município. A ficha identifica quando a cidade veio do roteamento ou de uma referência recente da conversa. As médias financeiras de viagens encerradas incluem o número de viagens com registro. Os custos informados permitem avaliar a contribuição direta antes das taxas de pagamento e despesas fixas.
+
+A consulta tem prazo de 50 segundos. A indisponibilidade do Dot e o fim desse prazo devolvem a negociação ao fluxo habitual. Uma oferta aprovada tem validade de 30 minutos e vale para a loja, produto, quantidade, pagamento e modalidade indicados. A publicação tem confirmação pela outbox do Chatwoot ou pelo eco da mensagem com o mesmo conteúdo autorizado. Se o cliente responder depois do vencimento, a atendente apresenta as condições atuais e pede novo aceite antes de fechar pelo preço de tabela.
+
+**Para interromper**, use **Parar consultas à Milly**. A pausa impede novas condições e invalida pareceres ainda pendentes. Uma oferta válida e já comunicada continua disponível para aceitar e fechar o pedido nas condições anunciadas. O preço de tabela continua servindo aos demais clientes. O controle afeta a negociação comercial da atendente e pode ser operado independentemente do monitor geral de eventos.
+
 ## Monitor externo de queda total
 
 Código preparado, **não hospedado automaticamente**. Rodar a cada minuto em host diferente do Farejador:

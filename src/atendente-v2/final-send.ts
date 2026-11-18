@@ -17,6 +17,7 @@ export interface SendFinalAgentTextInput {
   outputTokens: number;
   durationMs: number;
   humanHandoff?: boolean;
+  millyOfferId?: string;
 }
 
 export async function sendFinalAgentText(
@@ -36,6 +37,7 @@ export async function sendFinalAgentText(
       outputTokens: input.outputTokens,
       durationMs: input.durationMs,
       humanHandoff: input.humanHandoff,
+      millyOfferId: input.millyOfferId,
     });
     if (outboxResult.status === 'superseded') return 'superseded';
   } else {

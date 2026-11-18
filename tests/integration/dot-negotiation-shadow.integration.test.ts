@@ -13,7 +13,7 @@ const pilot = randomUUID(), livePilot = randomUUID(), erasurePilot = randomUUID(
 let db: IntegrationDb, app: FastifyInstance, owner: Awaited<ReturnType<typeof createOwner>>;
 let sequence = 91000;
 
-async function createOwner() {
+async function createOwner(filters: {ids?:string[]} = {}) {
   const person = (await db.pool.query(`INSERT INTO network.partner_people(environment,username,password_hash)
     VALUES('test',$1,'fixture') RETURNING id`, ['qa-'+randomUUID()])).rows[0].id as string;
   const collaborator = (await db.pool.query(`INSERT INTO network.matriz_collaborators
@@ -28,7 +28,7 @@ async function createOwner() {
     VALUES('test',$1,$2,$3)`, [grant,createHash('sha256').update(token).digest('hex'),randomBytes(32).toString('hex')]);
   const { subscribe } = await import('../../src/admin/dot/events/subscriptions.js');
   await subscribe({person_id:person,collaborator_id:collaborator,grant_id:grant}, {
-    name:eventName,arguments:{},cursor:null,delivery:{mode:'webhook',url:'https://receiver.example/events',
+    name:eventName,arguments:filters,cursor:null,delivery:{mode:'webhook',url:'https://receiver.example/events',
       secret:'whsec_'+randomBytes(32).toString('base64')},
   }, db.pool, async (_url,body)=>({status:200,body:JSON.stringify({challenge:JSON.parse(body).challenge})}));
   const sub = (await db.pool.query('SELECT id,activation_id FROM network.dot_event_subscriptions WHERE grant_id=$1',[grant])).rows[0];
@@ -113,6 +113,111 @@ async function commercialCounts() {
     (SELECT count(*)::int FROM ops.outbound_messages) AS envios,
     (SELECT count(*)::int FROM core.messages) AS mensagens`)).rows[0];
 }
+
+it('entrega consulta privada uma vez ao Dot do dono e valida o aval comercial por ficha, escopo, turno e geração',async()=>{
+  const {definirConsultaMilly,solicitarConsultaMilly,lerResultadoConsultaMilly}=await import('../../src/atendente-v2/milly-negociacao.js');
+  const {notificarConsultaMilly,canalConsultaMillyDisponivel}=await import('../../src/admin/dot/events/negotiation-live.js');
+  const conversation=outsidePilot;
+  const active=await createOwner({ids:[conversation]}), other=await createOwner({ids:[conversation]});
+  await definirConsultaMilly(db.pool,'test',true,active.person);
+  expect(await canalConsultaMillyDisponivel(db.pool,'test')).toBe(true);
+  const unit=(await db.pool.query(`INSERT INTO core.units(environment,slug,name) VALUES ('test','main','Matriz')
+    ON CONFLICT(environment,slug) DO UPDATE SET name=EXCLUDED.name RETURNING id`)).rows[0].id;
+  const product=(await db.pool.query(`INSERT INTO commerce.products(environment,product_code,product_name,product_type,brand,tire_condition)
+    VALUES('test','pneu-aval-ficticio','Pneu fictício','tire','LAB','novo') RETURNING id`)).rows[0].id;
+  await db.pool.query("INSERT INTO commerce.tire_specs(environment,product_id,tire_size) VALUES('test',$1,'110/70-13')",[product]);
+  await db.pool.query("INSERT INTO commerce.matriz_product_prices(environment,product_id,price_amount) VALUES('test',$1,110)",[product]);
+  await db.pool.query(`INSERT INTO commerce.wholesale_stock(environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+    VALUES('test','110/70-13','LAB','novo',100,50)`);
+  const send=vi.fn(async (_url:string, _body:string, _headers:Record<string,string>)=>({status:202,body:''}));
+  async function start(mode:'pickup'|'delivery',offer=8000,routedCity?:string) {
+    const trigger=await message(conversation,0,'Texto fictício que não pode sair do bot.');
+    if(routedCity) await db.pool.query(`INSERT INTO ops.partner_routing_decisions
+      (environment,conversation_id,decision_kind,modality,municipio)
+      VALUES ('test',$1,'matrix','delivery',$2)`,[conversation,routedCity]);
+    const q=await solicitarConsultaMilly(db.pool,{environment:'test',conversationId:conversation,triggerMessageId:trigger.id,
+      unitId:unit,productId:product,paymentMethod:'pix',quantity:1,fulfillmentMode:mode,offeredTotalCents:offer,
+      catalogUnitCents:11000,freightCents:mode==='pickup'?0:1000,destinationKey:mode==='pickup'?null:'c'.repeat(64)});
+    expect(q).toBeTruthy();
+    expect(await notificarConsultaMilly(db.pool,'test',q!.id,conversation,send)).toBe(true);
+    const body=JSON.parse(send.mock.calls.at(-1)![1]);
+    expect(body.data.evidence).toEqual({consulta:q!.id});
+    expect(body.data.reason).toBe('aval_comercial_milly');
+    expect(JSON.stringify(body)).not.toContain('Texto fictício');
+    expect(send.mock.calls.at(-1)![2]['webhook-signature']).toMatch(/^v1,/);
+    return {evento:body.eventId as string,consulta:q!.id,turno:trigger.id,loja:unit};
+  }
+  const pickup=await start('pickup');
+  expect(await notificarConsultaMilly(db.pool,'test',pickup.consulta,conversation,send)).toBe(true);
+  expect(send).toHaveBeenCalledTimes(1);
+  const ctx={evento:pickup.evento,consulta:pickup.consulta};
+  const ctxTool='consultar_negociacao_atendente', decisionTool='orientar_negociacao_atendente';
+  expect((await call(ctxTool,ctx,other.token)).error).toBeTruthy();
+  expect(content(await call(ctxTool,ctx,active.token))).toMatchObject({turno:pickup.turno,loja:unit,
+    disponivel:100,custo_unitario_centavos:5000,oferta_cliente_total_centavos:8000,rotas:null});
+  const acceptance={...pickup,decisao:'aceitar',total_centavos:8000};
+  expect((await call(decisionTool,{...acceptance,turno:randomUUID()},active.token)).error).toBeTruthy();
+  expect((await call(decisionTool,{...acceptance,loja:randomUUID()},active.token)).error).toBeTruthy();
+  expect((await call(decisionTool,{...acceptance,total_centavos:7900},active.token)).error).toBeTruthy();
+  expect(content(await call(decisionTool,acceptance,active.token)).registrada).toBe(true);
+  expect(content(await call(decisionTool,acceptance,active.token)).registrada).toBe(true);
+  expect((await call(decisionTool,{...acceptance,total_centavos:8100},active.token)).error).toBeTruthy();
+  expect(await lerResultadoConsultaMilly(db.pool,'test',pickup.consulta)).toMatchObject({status:'approved',approvedTotalCents:8000});
+  const noCity=await start('delivery');
+  expect(content(await call(ctxTool,{evento:noCity.evento,consulta:noCity.consulta},active.token)).rotas).toMatchObject({
+    praca_referencia:null,entregas_com_municipio_cadastrado_igual:null});
+  await db.pool.query(`INSERT INTO analytics.conversation_facts
+    (environment,conversation_id,fact_key,fact_value,observed_at,truth_type,source,extractor_version)
+    VALUES ('test',$1,'municipio_entrega',to_jsonb('Niterói'::text),now(),'observed','test','fixture')`,[conversation]);
+  const mentioned=await start('delivery');
+  expect(content(await call(ctxTool,{evento:mentioned.evento,consulta:mentioned.consulta},active.token)).rotas).toMatchObject({
+    praca_referencia:{municipio:'Niterói',fonte:'referencia_recente_da_conversa'}});
+  const delivery=await start('delivery',8000,'sao goncalo');
+  const routeContext={evento:delivery.evento,consulta:delivery.consulta};
+  expect(content(await call(ctxTool,routeContext,active.token))).toMatchObject({
+    rota_compativel_confirmada:null,custo_incremental_entrega_centavos:null,
+    rotas:{historico_30_dias:{rotas_encerradas:0,total_despesas_aprovadas_centavos:null,total_combustivel_informado_centavos:null}}});
+  const trip=(await db.pool.query(`INSERT INTO commerce.matriz_delivery_trips(environment,courier_name,status,fuel_spent,ended_at)
+    VALUES('test','Nome privado','closed',20,now()),('test','Nome privado','closed',30,now()) RETURNING id`)).rows[0].id;
+  const open=(await db.pool.query(`INSERT INTO commerce.matriz_delivery_trips(environment,courier_name,status)
+    VALUES('test','Nome privado','open') RETURNING id`)).rows[0].id;
+  const locations=await db.pool.query(`INSERT INTO commerce.geo_resolutions
+    (environment,neighborhood_name,neighborhood_canonical,city_name,state_code)
+    VALUES('test','Bairro privado','fixture','São Gonçalo','RJ'),('test','Bairro privado','fixture','Niterói','RJ') RETURNING id`);
+  await db.pool.query(`INSERT INTO commerce.orders
+    (environment,contact_id,unit_id,total_amount,fulfillment_mode,delivery_status,delivery_address,geo_resolution_id,trip_id)
+    SELECT 'test',c.contact_id,$2,110,'delivery','pending','Endereço privado',g.id,$3
+      FROM core.conversations c CROSS JOIN unnest($4::uuid[]) g(id) WHERE c.environment='test' AND c.id=$1`,
+    [conversation,unit,open,[...locations.rows.map(g=>g.id),null]]);
+  const receipt=(await db.pool.query(`INSERT INTO commerce.matriz_trip_receipts(environment,trip_id,mime,size_bytes,ai_status,workflow_status)
+    VALUES('test',$1,'image/jpeg',4,'skipped','review_required') RETURNING id`,[trip])).rows[0].id;
+  await db.pool.query("INSERT INTO commerce.matriz_trip_receipt_blobs(receipt_id,environment,bytes) VALUES ($1,'test',convert_to('fuel','UTF8'))",[receipt]);
+  const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date());
+  const {approveMatrizTripReceipt}=await import('../../src/admin/painel/queries-logistica-comprovantes-decision.js');
+  await approveMatrizTripReceipt({receipt_id:receipt,amount:20,category:'combustivel',document_date:day,competence_month:day.slice(0,7)+'-01',
+    payment_status:'paid',payment_date:day,idempotency_key:'teste-aval-milly-rota',actor_label:'Dono fictício',environment:'test'},db.pool);
+  const afterTrips=content(await call(ctxTool,routeContext,active.token));
+  expect(afterTrips).toMatchObject({rota_compativel_confirmada:null,custo_incremental_entrega_centavos:null,rotas:{
+    praca_referencia:{municipio:'São Gonçalo',fonte:'roteamento_entrega_deste_turno'},
+    entregas_pendentes:3,entregas_sem_municipio_cadastrado:1,
+    entregas_com_municipio_cadastrado_igual:1,rotas_com_municipio_cadastrado_igual:1}});
+  expect(afterTrips.rotas.historico_30_dias).toMatchObject({rotas_encerradas:2,rotas_com_despesa_aprovada:1,
+    total_despesas_aprovadas_centavos:2000,media_despesas_aprovadas_por_rota_com_registro_centavos:2000,
+    rotas_com_combustivel_informado:2,total_combustivel_informado_centavos:5000,media_combustivel_por_rota_com_registro_centavos:2500});
+  expect(JSON.stringify(afterTrips)).not.toContain('Nome privado');
+  expect(JSON.stringify(afterTrips)).not.toMatch(/Bairro privado|Endereço privado/);
+  expect((await call(decisionTool,{...delivery,decisao:'aceitar',total_centavos:8000},active.token)).error).toBeTruthy();
+  const retiradaAlternativa={...delivery,decisao:'aguardar_dado',orientacao:'oferecer_retirada'};
+  expect(content(await call(decisionTool,retiradaAlternativa,active.token)).registrada).toBe(true);
+  expect(content(await call(decisionTool,retiradaAlternativa,active.token)).registrada).toBe(true);
+  expect(await lerResultadoConsultaMilly(db.pool,'test',delivery.consulta)).toMatchObject({status:'declined',orientacao:'oferecer_retirada'});
+  const changed=await start('pickup');
+  await db.pool.query("UPDATE commerce.wholesale_stock SET quantity_reserved=100 WHERE environment='test' AND brand='LAB'");
+  expect((await call(decisionTool,{...changed,decisao:'aceitar',total_centavos:8000},active.token)).error).toBeTruthy();
+  await definirConsultaMilly(db.pool,'test',false,active.person);
+  await definirConsultaMilly(db.pool,'test',true,active.person);
+  expect((await call(ctxTool,{evento:changed.evento,consulta:changed.consulta},active.token)).error).toBeTruthy();
+});
 
 it('leva um evento autêntico do monitor ao MCP e oculta a resposta real até gravar o parecer', async () => {
   const {collectEvents}=await import('../../src/admin/dot/events/queue.js');

@@ -13,7 +13,7 @@ export async function enqueueSnapshot(db:Pool,s:Subscription,snapshot:Snapshot,c
     ||snapshot.data.reason==='entrega_agendada')return;
   const id='evt_'+hash(JSON.stringify([s.id,s.activation_id,snapshot.kind,snapshot.id,snapshot.fingerprint]));
   const latest=await db.query<{sent_at:Date}>(`SELECT sent_at FROM ops.dot_event_deliveries
-    WHERE environment=$1 AND subscription_id=$2 AND kind=$3 AND entity_id=$4 AND status='sent'
+    WHERE environment=$1 AND subscription_id=$2 AND kind=$3 AND entity_id=$4 AND status='sent' AND fingerprint NOT LIKE 'milly:%'
     ORDER BY sent_at DESC LIMIT 1`,[env.FAREJADOR_ENV,s.id,snapshot.kind,snapshot.id]);
   const last=latest.rows[0]?.sent_at?.getTime()??0;
   const quiet=snapshot.urgent&&settings.urgent_outside_hours?null:quietUntil(now,settings);
@@ -36,7 +36,7 @@ export async function collectEvents(db:Pool,now=new Date()) {
     const snapshot=await readSnapshot(target.kind,target.entity_id,db,now);
     // Changed or solved cases invalidate queued notices, including notices held by quiet hours/cooldown.
     await db.query(`UPDATE ops.dot_event_deliveries SET status='cancelled' WHERE environment=$1 AND kind=$2 AND entity_id=$3
-      AND status='pending' AND ($4::text IS NULL OR fingerprint<>$4)`,
+      AND status='pending' AND fingerprint NOT LIKE 'milly:%' AND ($4::text IS NULL OR fingerprint<>$4)`,
     [env.FAREJADOR_ENV,target.kind,target.entity_id,snapshot?.fingerprint??null]);
     // An unresolved delivery is a current incident even if its last business update predates the subscription.
     if(snapshot)for(const sub of subscriptions)await enqueueSnapshot(db,sub,snapshot,target.kind==='order'?now:target.changed_at,now);

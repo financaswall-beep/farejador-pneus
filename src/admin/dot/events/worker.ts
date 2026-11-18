@@ -25,6 +25,8 @@ export async function runEventCycle(db:Pool=pool,send:WebhookSender=sendWebhook)
     await deliverEvents(db,send,undefined,async()=>{await lock.query('SELECT 1');});
     // Private technical history only. Preserve pending retries and live incident deduplication for seven days.
     // Revisões retêm a decisão e a chave: excluir ao expirar permitiria recriar uma proposta recusada.
+    await db.query(`UPDATE ops.dot_event_deliveries SET status='cancelled' WHERE environment=$1
+      AND fingerprint LIKE 'milly:%' AND status='pending' AND not_before<=clock_timestamp()`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_event_deliveries WHERE environment=$1 AND status<>'pending' AND created_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM ops.dot_monitor_targets WHERE environment=$1 AND due_at IS NULL AND changed_at<now()-interval '7 days'`,[env.FAREJADOR_ENV]);
     await db.query(`DELETE FROM network.dot_event_subscriptions WHERE environment=$1

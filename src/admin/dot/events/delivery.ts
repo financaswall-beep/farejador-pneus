@@ -14,7 +14,7 @@ interface Delivery {id:string;subscription_id:string;activation_id:string;kind:T
   payload:{name:EventName;data:Record<string,unknown>};attempts:number;created_at:Date}
 export async function deliverEvents(db:Pool,send:WebhookSender=sendWebhook,now=new Date(),checkLock:()=>Promise<void>=async()=>{},onlySignalId:string|null=null) {
   const rows=await db.query<Delivery>(`SELECT * FROM ops.dot_event_deliveries
-    WHERE environment=$1 AND status='pending' AND not_before<=$2 AND ($3::uuid IS NULL OR (kind='signal' AND entity_id=$3))
+    WHERE environment=$1 AND status='pending' AND fingerprint NOT LIKE 'milly:%' AND not_before<=$2 AND ($3::uuid IS NULL OR (kind='signal' AND entity_id=$3))
     ORDER BY not_before,id LIMIT 10`,[env.FAREJADOR_ENV,now,onlySignalId]);
   for(const item of rows.rows) {
     if(!dotEventsAvailable())return;
@@ -35,10 +35,11 @@ export async function deliverEvents(db:Pool,send:WebhookSender=sendWebhook,now=n
     const quiet=current.urgent&&settings.urgent_outside_hours?null:quietUntil(now,settings);
     const recent=await db.query<{n:number}>(`SELECT count(*)::int n FROM ops.dot_event_deliveries d
       JOIN network.dot_event_subscriptions s ON s.environment=d.environment AND s.id=d.subscription_id
-      WHERE d.environment=$1 AND s.person_id=$2 AND d.status='sent' AND d.sent_at>$3::timestamptz-interval '1 hour'`,
+      WHERE d.environment=$1 AND s.person_id=$2 AND d.status='sent' AND d.fingerprint NOT LIKE 'milly:%'
+        AND d.sent_at>$3::timestamptz-interval '1 hour'`,
       [env.FAREJADOR_ENV,sub.person_id,now]);
     const last=(await db.query<{sent_at:Date}>(`SELECT sent_at FROM ops.dot_event_deliveries WHERE environment=$1
-      AND subscription_id=$2 AND kind=$3 AND entity_id=$4 AND status='sent' ORDER BY sent_at DESC LIMIT 1`,
+      AND subscription_id=$2 AND kind=$3 AND entity_id=$4 AND status='sent' AND fingerprint NOT LIKE 'milly:%' ORDER BY sent_at DESC LIMIT 1`,
       [env.FAREJADOR_ENV,sub.id,item.kind,item.entity_id])).rows[0]?.sent_at;
     const cooldown=(last?.getTime()??0)+settings.cooldown_minutes*60000;
     if(quiet||cooldown>now.getTime()||recent.rows[0]!.n>=settings.max_per_hour) {
