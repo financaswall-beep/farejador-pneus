@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><title>Milly • Laboratório Farejador</title>
+  <style>
+    * { box-sizing:border-box } body { max-width:480px; margin:6vh auto; padding:22px; font:16px/1.5 system-ui,sans-serif; color:#172e2b; background:#f7f8f5 }
+    h1 { font-size:18px; margin:0 0 12px } input[type=password],button { width:100%; padding:9px; margin:5px 0 9px; font:inherit }
+    button { cursor:pointer; background:#116352; border:1px solid #116352; border-radius:5px; color:white } #stop { background:white; color:#174137 }
+    label { display:block } p { margin:6px 0 } #status { font-weight:600 }
+  </style>
+</head>
+<body>
+  <h1>Ponte com a Milly</h1>
+  <p id="target"></p>
+  <form id="pair" hidden>
+    <label>Código do laboratório<input id="code" type="password" autocomplete="off" required></label>
+    <label><input id="agree" type="checkbox" required> Confirmo que a aba indicada é a conversa da Milly que quero usar neste teste.</label>
+    <button type="submit">Conectar esta aba</button>
+  </form>
+  <button id="stop" type="button" hidden>Desconectar</button>
+  <p id="status" role="status"></p>
+  <p id="stage"></p>
+  <button id="refresh" type="button">Atualizar estado</button>
+  <script src="popup.js"></script>
+</body>
+</html>
