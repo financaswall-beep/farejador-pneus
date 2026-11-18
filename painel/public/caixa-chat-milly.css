@@ -1,4 +1,12 @@
 /* Histórico privado dentro do chat existente da Matriz e da Operação. */
+.mh-workspace-head,.mh-all-modules,.mh-list-filter,.mh-analysis-contact,.mh-queue-line{display:none}
+.mh-detail-timing{display:none}
+.mh-product>img{width:clamp(48px,4.7vw,76px);height:clamp(64px,5.8vw,92px);object-fit:contain;flex:none}
+.mh-mobile-order{display:flex;align-items:center;gap:5px;background:none;border:0;padding:0;color:#07552d;text-align:left;font:inherit;font-weight:750}
+.mh-extra{font-size:12px;color:#59456a}.mh-extra summary{cursor:pointer;min-height:24px;align-content:center}
+.mh-extra[open]{margin-bottom:4px}.mh-extra summary:focus-visible{outline:2px solid #68418e;outline-offset:2px}
+.mh-analysis-contact{position:relative}.mh-thread-date{position:absolute;right:12px;top:10px;font-size:12px;color:#52665d;font-variant-numeric:tabular-nums}
+.mh-extra .mh-note{margin:4px 0}
 #chat-panel [hidden]{display:none!important}
 #chat-panel.milly-open :is(#chat-owner,#chat-context,#chat-channel-warning,#chat-thread-error,#chat-photo-notice,#chat-timeline,#chat-media-preview,#chat-compose,#cm-chat-controls,.chat-top-controls){display:none!important}
 #bot-chat-root #chat-panel.milly-open{grid-template-columns:minmax(230px,.76fr) minmax(0,2.3fr)}
@@ -120,4 +128,33 @@
   .mh-event,.mh-private-log .mh-event{grid-template-columns:minmax(0,1fr);gap:0}
   .mh-event time{padding-top:0}
   .mh-event>div::before{display:none}
+}
+@media(min-width:1100px){
+  #bot-chat-root #chat-panel.milly-open .mh-date{color:#52645b;font-size:12px}
+  #bot-chat-root #chat-panel.milly-open .mh-turn{margin:0 0 12px;border:1px solid #cdd6d8;border-radius:10px;overflow:hidden}
+  #bot-chat-root #chat-panel.milly-open .mh-turn>h4 button{min-height:46px;padding:9px 13px;gap:10px;background:#f6f8f9;color:#17222d;font-size:clamp(16px,1.13vw,19px)}
+  #bot-chat-root #chat-panel.milly-open .mh-turn.expanded>h4 button{background:#ddf2e9;color:#12241e}
+  #bot-chat-root #chat-panel.milly-open .mh-turn>h4 small{font-size:inherit;color:inherit}
+  #bot-chat-root #chat-panel.milly-open .mh-turn>h4 small svg{display:none}
+  #bot-chat-root #chat-panel.milly-open .mh-events{--mh-time:clamp(60px,5.65vw,89px);--mh-gap:28px;display:grid;gap:clamp(12px,1.9vh,20px);padding:clamp(14px,2vh,22px) 11px 17px;position:relative}
+  #bot-chat-root #chat-panel.milly-open .mh-events:before{content:"";position:absolute;top:35px;bottom:64px;left:calc(11px + var(--mh-time) + 8px);width:2px;background:#c4cdcb;pointer-events:none}
+  #bot-chat-root #chat-panel.milly-open .mh-event{display:grid;align-items:start;grid-template-columns:var(--mh-time) minmax(0,1fr);gap:var(--mh-gap);font-size:clamp(14px,1.1vw,18px);line-height:1.35}
+  #bot-chat-root #chat-panel.milly-open .mh-event time{padding:8px 0 0;font-size:clamp(13px,1vw,16px);color:#25332d;font-weight:550;text-align:right}
+  #bot-chat-root #chat-panel.milly-open .mh-event>div{padding:clamp(8px,1.05vh,12px) 11px;background:#f0f3f4;border-radius:7px}
+  #bot-chat-root #chat-panel.milly-open .mh-event>div:before{top:12px;left:-20px;width:11px;height:11px;border-radius:50%;background:#087e42;box-shadow:0 0 0 2px #fff}
+  #bot-chat-root #chat-panel.milly-open .mh-event b{display:inline;font:inherit;font-weight:700;color:#17212a}
+  #bot-chat-root #chat-panel.milly-open .mh-event b:after{content:" — ";font-weight:400}
+  #bot-chat-root #chat-panel.milly-open .mh-event p{display:inline;margin:0}
+  #bot-chat-root #chat-panel.milly-open .mh-event.outbound>div{background:#e1f5e7}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log{position:relative;isolation:isolate;padding:4px 0 6px;border:0;background:transparent}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log:before{content:"";position:absolute;z-index:-1;inset:0 0 0 calc(var(--mh-time) + var(--mh-gap));border:1px solid #d6b9ed;border-radius:9px;background:#f3ebfb}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log>h4{margin:3px 0 3px calc(var(--mh-time) + var(--mh-gap) + 9px);font-size:clamp(15px,1.2vw,19px);color:#7226a1}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log .mh-event>div{background:transparent}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log .mh-event>div:before{background:#9254bd}
+  #bot-chat-root #chat-panel.milly-open .mh-private-log>:is(.mh-extra,.mh-note){margin-left:calc(var(--mh-time) + var(--mh-gap) + 10px);padding-right:8px}
+  #bot-chat-root #chat-panel.milly-open .mh-extra[open] p{display:block}
+  #bot-chat-root #chat-panel.milly-open .mh-timing{grid-template-columns:1fr 2fr 1fr;gap:1px;margin:7px 0 0}
+  #bot-chat-root #chat-panel.milly-open .mh-timing span{padding:6px 2px;background:#bdeec9;font-size:13px;color:#153324}
+  #bot-chat-root #chat-panel.milly-open .mh-timing span:nth-child(2){background:#e3cfef;color:#392044}
+  #bot-chat-root #chat-panel.milly-open .mh-timing b{display:inline;margin-left:4px;font-size:inherit}
 }

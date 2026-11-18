@@ -21,7 +21,7 @@ describe('análise da Milly no chat da Matriz',()=>{
     expect(html).not.toMatch(/<cliente>|<resposta>|<privado>/);
     expect(html).toContain('ficha histórica de estoque e custos está indisponível');
     const sidebar=html.slice(html.indexOf('<aside'));
-    expect(sidebar.indexOf('Conferência do pedido')).toBeLessThan(sidebar.indexOf('Dados na consulta'));
+    expect(sidebar.indexOf('Dados na consulta')).toBeLessThan(sidebar.indexOf('Conferência do pedido'));
   });
   it('compara somente o pedido vinculado à consulta, com totais em centavos',()=>{
     expect(view({...turn,consulta:{...consultation,pedido:{...order,total_centavos:7999}}})).toContain('Divergência de valores');
@@ -61,8 +61,8 @@ it('descarta a resposta de outra conversa e elimina a ficha quando muda o acesso
   let finish!:(page:unknown)=>void;
   req.mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
   chat.milly.sync();click(el('milly-tab'));
+  req.mockResolvedValueOnce({turns:[{id:'histórico B'}],next:null});
   state.id='B';chat.milly.sync();
-  req.mockResolvedValueOnce({turns:[{id:'histórico B'}],next:null});click(el('milly-tab'));
   await vi.waitFor(()=>expect(el('milly-analysis').innerHTML).toContain('histórico B'));
   finish({turns:[{id:'histórico A'}],next:null});await new Promise(resolve=>setTimeout(resolve,0));
   expect(el('milly-analysis').innerHTML).not.toContain('histórico A');

@@ -320,12 +320,12 @@
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261118-milly1"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261118-milly1"></script>
-<script defer src="/admin/painel/caixa-chat-view.js?v=20261118-milly1"></script>
+<script defer src="/admin/painel/caixa-chat-view.js?v=20261118-milly2"></script>
 <script defer src="/admin/painel/caixa-chat-channels.js?v=20261019-chat1"></script>
 <script defer src="/admin/painel/caixa-chat-media.js?v=20261019-chat1"></script>
 <script defer src="/admin/painel/caixa-chat-customer.js?v=20261019-chat1"></script>
-<script defer src="/admin/painel/caixa-chat-milly-view.js?v=20261118-milly1"></script>
-<script defer src="/admin/painel/caixa-chat-milly.js?v=20261118-milly1"></script>
+<script defer src="/admin/painel/caixa-chat-milly-view.js?v=20261118-milly2"></script>
+<script defer src="/admin/painel/caixa-chat-milly.js?v=20261118-milly2"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260916-vehicle-ui1" />
 <link rel="stylesheet" href="/admin/painel/logistica-historico.css?v=20260917-historico1" />
@@ -357,7 +357,8 @@
 <link rel="stylesheet" href="/admin/painel/caixa-chat.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/caixa-chat-customer.css?v=20261019-chat1" />
 <link rel="stylesheet" href="/admin/painel/bot-chat.css?v=20261019-chat-height2" />
-<link rel="stylesheet" href="/admin/painel/caixa-chat-milly.css?v=20261118-milly1" />
+<link rel="stylesheet" href="/admin/painel/caixa-chat-milly.css?v=20261118-milly2" />
+<link rel="stylesheet" href="/admin/painel/caixa-chat-milly-desktop.css?v=20261118-milly2" />
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
@@ -401,7 +402,7 @@
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-3 px-3" id="farejador-sidebar-nav">
       <template x-for="item in liveMenu">
-        <a href="#"
+        <a href="#" :data-mh-nav="item.id"
            @click.prevent="currentPage = item.id"
            :class="currentPage === item.id
              ? 'bg-emerald-500/30 text-white font-semibold ring-1 ring-inset ring-emerald-300/10'
@@ -415,6 +416,7 @@
         </a>
       </template>
 
+      <button class="mh-all-modules" type="button" @click="window.FarejadorBotChat.chat.back(); $nextTick(() => document.querySelector('#farejador-sidebar-nav a')?.focus())">Todos os módulos</button>
       <div x-show="isMatrixPanel() && futureMenu.length" class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
         Fase 2 · próximos
       </div>
@@ -7613,6 +7615,10 @@
       <!-- CONVERSAS: mesmo chat da Operação, com sessão e ficha lateral da Matriz. -->
       <section x-show="botTab === 'conversas'" x-effect="window.FarejadorBotChat.sync($data, currentPage === 'bot' && botTab === 'conversas' && adminAuthenticated && isMatrixPanel() && hasPanelModule('bot'))" aria-label="Conversas do Bot">
         <div id="bot-chat-notice" role="status" aria-live="polite" hidden></div>
+        <header class="mh-workspace-head">
+          <div><nav aria-label="Caminho da análise">Matriz / <button type="button" @click="botTab='visao'">Bot</button> / <button type="button" @click="window.FarejadorBotChat.chat.back()">Conversas</button></nav>
+          <h1>Histórico de negociações</h1></div>
+        </header>
         <div id="bot-chat-root" class="is-chat" x-ignore></div>
         <details x-ref="sinoBotTechnical" class="bot-chat-technical" x-show="botDeadLetters.length || botResilience?.api_ack_unconfirmed">
           <summary>Envios que precisam de revisão <span x-text="botDeadLetters.length"></span></summary>

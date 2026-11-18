@@ -1,14 +1,15 @@
 (function () {
   'use strict';
   const C=window.FarejadorBotChat||window.Caixa, ch=C.chat, esc=ch.escape;
-  const moneyFmt=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+  const moneyWhole=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:0,maximumFractionDigits:0});
+  const moneyCents=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
   const numFmt=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1});
   const timeFmt=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Sao_Paulo'});
   const dayFmt=new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'America/Sao_Paulo'});
   const paths={lock:'M6 10h12v10H6z M8.5 10V7a3.5 3.5 0 0 1 7 0v3',clock:'M12 7v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 1 1 18 0',chevron:'m9 5 7 7-7 7',check:'m5 12 5 5 9-11',tire:'M17 3c4 1 5 6 3 11s-6 8-10 7l-4-1c-4-1-5-6-3-11S9 1 13 2z M17 3c-4-1-8 2-10 7s-1 10 3 11 M17 8c2 1 2 3 1 5s-2 4-4 4-2-3-1-5 2-4 4-4z',order:'M5 3h14v18l-3-2-4 2-4-2-3 2z M8 8h8 M8 12h6',arrow:'M6 18 18 6 M8 6h10v10'};
   const symbol=name=>'<svg class="mh-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="'+(paths[name]||'M4 4h16v13H9l-5 4z')+'"/></svg>';
   const number=v=>Number.isFinite(v);
-  const money=v=>number(v)?moneyFmt.format(v/100):null;
+  const money=v=>number(v)?(v%100===0?moneyWhole:moneyCents).format(v/100):null;
   const units=v=>number(v)?numFmt.format(v)+' un.':null;
   function ms(value){
     if(!number(value)||value<0)return null;
@@ -24,20 +25,23 @@
   const notice=(message,cls='')=>'<p class="mh-note '+cls+'">'+esc(message)+'</p>';
   function product(c){
     const f=c.ficha||{},name=f.medida||c.produto?.nome||'Produto sem identificação',sub=[f.marca,label(f.condicao),units(c.quantidade)].filter(Boolean);
-    return '<div class="mh-product">'+symbol('tire')+'<div><strong>'+esc(name)+'</strong><span>'+esc(sub.join(' · '))+'</span><span>'+esc([label(c.pagamento),label(c.modalidade)].filter(Boolean).join(' · '))+'</span></div></div>';
+    const image=C.chatMountId?'/admin/painel/assets/catalog-tire.webp':'/operacao/catalog-tire.webp';
+    return '<div class="mh-product"><img src="'+image+'" width="68" height="82" alt="" title="Imagem ilustrativa do catálogo"><div><strong>'+esc(name)+'</strong><span>'+esc(sub.join(' · '))+'</span><span>'+esc([label(c.pagamento),label(c.modalidade)].filter(Boolean).join(' · '))+'</span></div></div>';
   }
   function facts(c,stock){
     const f=c.ficha, routes=f?.rotas,routeCost=f?.custo_incremental_entrega_centavos;
     const contrib=[c.aval_centavos,f?.custo_produtos_para_quantidade_centavos,routeCost].every(number)?c.aval_centavos-f.custo_produtos_para_quantidade_centavos-routeCost:null;
-    let html='<section class="mh-box mh-private"><h4>'+symbol('lock')+' Dados na consulta</h4>';
+    let html='<section class="mh-box mh-private" data-history-id="'+esc(c.id||'')+'"><h4>'+symbol('lock')+' Dados na consulta</h4>';
     if(f){
-      html+=pairs([['Disponíveis',units(f.disponivel)],['Reservados',units(f.reservado)],['Vendas líquidas em 30 dias',units(f.vendas_liquidas_30_dias)],['Entradas previstas',units(f.entradas_previstas)],['Cobertura estimada',number(f.cobertura_estimada_dias)?numFmt.format(f.cobertura_estimada_dias)+' dias':null],['Custo por unidade',money(f.custo_unitario_centavos)],['Custo adicional da entrega',money(routeCost)],['Contribuição direta¹',money(contrib)]]);
-      if(number(contrib))html+=notice('¹ Total aprovado menos custo dos produtos e custo adicional da entrega.');
+      html+=pairs([['Disponíveis',units(f.disponivel)],['Vendas em 30 dias',units(f.vendas_liquidas_30_dias)],['Custo do pneu',money(f.custo_unitario_centavos)],['Contribuição direta',money(contrib)]]);
+      html+='<details class="mh-extra" data-milly-detail="estoque"><summary>Mais dados da consulta</summary>'+pairs([['Reservados',units(f.reservado)],['Entradas previstas',units(f.entradas_previstas)],['Cobertura estimada',number(f.cobertura_estimada_dias)?numFmt.format(f.cobertura_estimada_dias)+' dias':null],['Custo adicional da entrega',money(routeCost)]]);
+      if(number(contrib))html+=notice('Contribuição direta é o total aprovado menos o custo dos produtos e o custo adicional da entrega.');
       if(c.modalidade==='delivery'){
         if(routes)html+='<h5>Rotas no momento da leitura</h5>'+pairs([['Rotas abertas',routes.rotas_abertas],['Entregas pendentes',routes.entregas_pendentes],['Rotas com município igual',routes.rotas_com_municipio_cadastrado_igual],['Média de despesas por rota com registro · 30 dias',money(routes.historico_30_dias?.media_despesas_aprovadas_por_rota_com_registro_centavos)]]);
         if(!routes||f.rota_compativel_confirmada==null)html+=notice('Encaixe da entrega na rota sem confirmação.');
       }
       if(c.lida_em)html+=notice('Leitura de '+day(c.lida_em)+' às '+time(c.lida_em)+'.');
+      html+='</details>';
     } else html+=notice(c.estado==='pending'?'Aguardando o registro da leitura dos dados.':'A ficha histórica de estoque e custos está indisponível para esta consulta.');
     if(stock&&c.produto?.id)html+='<button type="button" class="mh-link" data-milly-stock>'+esc(f?.medida?'Ver estoque de '+f.medida:'Abrir estoque')+' '+symbol('arrow')+'</button>';
     return html+'</section>';
@@ -62,19 +66,19 @@
     const {c,o,approved,charged,status,kind}=compare(turn);
     if(!c&&!o)return '';
     const title=mobile&&o?'Pedido '+(o.numero||'vinculado'):'Conferência do pedido';
-    let html='<section class="mh-box mh-verification"><h4>'+symbol('order')+esc(title)+'</h4>';
+    let html='<section class="mh-box mh-verification">'+(mobile&&o?'<button type="button" class="mh-mobile-order" data-milly-order aria-expanded="'+expanded+'">'+esc(title)+' '+symbol('arrow')+'</button>':'<h4>'+esc(title)+'</h4>');
     html+=mobile?'<div class="mh-values"><span>Aval da Milly<b>'+esc(approved||'—')+'</b></span><span>Valor no pedido<b>'+esc(charged||'—')+'</b></span></div>':
-      pairs([['Tabela por unidade',money(c?.tabela_unitaria_centavos)],['Frete',money(c?.frete_centavos)],['Proposta do cliente',money(c?.proposta_centavos)],['Aval da Milly',approved||'—'],['Valor no pedido',charged||'—']]);
+      pairs([['Tabela por unidade',money(c?.tabela_unitaria_centavos)],['Frete',c?.modalidade==='delivery'?money(c.frete_centavos):null],['Proposta do cliente',money(c?.proposta_centavos)],['Aval da Milly',approved||'—'],['Valor no pedido',charged||'—']]);
     html+='<p class="mh-compare '+kind+'">'+symbol(kind==='match'?'check':'order')+esc(status)+'</p>';
-    if(o)html+=orderButton(o)+(expanded?orderDetails(o):'');
+    if(o)html+=(mobile?'':orderButton(o))+(expanded?orderDetails(o):'');
     return html+'</section>';
   }
   function eventRow(when,title,body,extra=''){
-    return '<div class="mh-event '+extra+'"><time>'+esc(time(when)||'—')+'</time><div><b>'+esc(title)+'</b>'+body+'</div></div>';
+    return '<div class="mh-event '+extra+'"><time title="'+esc(day(when))+'">'+esc(time(when)||'—')+'</time><div><b>'+esc(title)+'</b>'+body+'</div></div>';
   }
   function timing(t){
     const c=t.consulta;if(!c)return '';
-    const times=[['Antes da consulta',diff(t.cliente?.em,c.solicitada_em)],['Com a Milly',c.tempo_milly_ms],['Após o parecer',diff(c.decidida_em,t.atendente?.em)]];
+    const times=[['Antes',diff(t.cliente?.em,c.solicitada_em)],['Milly',c.tempo_milly_ms],['Depois',diff(c.decidida_em,t.atendente?.em)]];
     return '<div class="mh-timing" aria-label="Tempo das etapas">'+times.map(([name,value])=>'<span>'+esc(name)+'<b>'+esc(ms(value)||'—')+'</b></span>').join('')+'</div>';
   }
   function body(t){
@@ -82,14 +86,19 @@
     let html=eventRow(t.cliente?.em,'Cliente','<p>'+esc(t.cliente?.texto||'Mensagem sem texto registrado.')+'</p>','customer');
     if(c){
       const offer=money(c.proposta_centavos);
-      const req=[offer&&('Proposta de '+offer),units(c.quantidade),label(c.pagamento),label(c.modalidade)].filter(Boolean).join(' · ');
+      const payment={pix:'no Pix',cartao:'no cartão',dinheiro:'em dinheiro'}[c.pagamento];
+      const mode={pickup:'com retirada',delivery:'com entrega'}[c.modalidade];
+      const req=[offer&&('Aval para vender por '+offer),payment,mode].filter(Boolean).join(' ')+'.';
       html+='<div class="mh-private-log"><h4>'+symbol('lock')+'Consulta privada'+(ms(c.tempo_milly_ms)?'<small>'+ms(c.tempo_milly_ms)+'</small>':'')+'</h4>';
       html+=eventRow(c.solicitada_em,'Atendente → Milly','<p>'+esc(req||'Consulta registrada')+'</p>');
-      if(c.decidida_em||c.decisao){const answer=[label(c.decisao),money(c.aval_centavos),label(c.orientacao)].filter(Boolean).join(' · ');
-        html+=eventRow(c.decidida_em,'Milly → Atendente','<p>'+esc(answer||'Parecer registrado')+'</p>'+(c.justificativa?'<p>'+esc(c.justificativa)+'</p>':''));}
+      if(c.decidida_em||c.decisao){const value=money(c.aval_centavos);
+        const offerDecision={aceitar:'Fechamento autorizado por ',contrapropor:'Contraproposta autorizada de '}[c.decisao];
+        const answer=offerDecision&&value?offerDecision+[value,payment].filter(Boolean).join(' ')+'.':[label(c.decisao),label(c.orientacao)].filter(Boolean).join(' · ');
+        html+=eventRow(c.decidida_em,'Milly → Atendente','<p>'+esc(answer||'Parecer registrado')+'</p>');}
+      if(c.decisao)html+='<details class="mh-extra mh-decision" data-milly-detail="parecer"><summary>Detalhes do parecer</summary>'+notice('Decisão registrada: '+(label(c.decisao)||'indisponível'))+(c.justificativa?'<p>'+esc(c.justificativa)+'</p>':'');
       html+=notice(label(c.estado)||'Situação da consulta indisponível.','mh-consult-status');
       if(c.valida_ate&&number(c.aval_centavos))html+=notice('Oferta válida até '+day(c.valida_ate)+' às '+time(c.valida_ate)+'.');
-      html+='</div>';
+      html+=(c.decisao?'<div class="mh-detail-timing">'+timing(t)+'</div></details>':'')+'</div>';
     } else html+=notice('Sem consulta à Milly neste turno.');
     if(t.atendente)html+=eventRow(t.atendente.em,'Atendente → Cliente','<p>'+esc(t.atendente.texto||'Resposta sem texto registrado.')+'</p>','outbound');
     else html+=notice('Sem resposta pública vinculada a este turno.');
@@ -102,20 +111,25 @@
     const turn=turns.find(t=>t.id===selected),c=turn?.consulta;
     let timeline=data.pageCount>1?'<div class="mh-history-refresh">Você está vendo turnos anteriores. <button type="button" class="mh-link" data-milly-retry>Atualizar histórico</button></div>':'';
     if(next)timeline+='<button class="mh-older" type="button" data-milly-older '+(olderPending?'disabled':'')+'>'+ (olderPending?'Carregando…':'Carregar turnos anteriores')+'</button>';
+    const severalDays=new Set(turns.map(t=>day(t.cliente?.em)).filter(Boolean)).size>1;
     let lastDay='';
     turns.forEach((t,i)=>{
-      const date=day(t.cliente?.em);if(date!==lastDay){timeline+='<div class="mh-date">'+esc(date)+'</div>';lastDay=date;}
-      const title=t.consulta?'Negociação':t.pedido?'Pedido':'Atendimento',dur=ms(t.tempo_resposta_ms),open=t.id===opened;
+      const date=day(t.cliente?.em);if(severalDays&&date!==lastDay){timeline+='<div class="mh-date">'+esc(date)+'</div>';lastDay=date;}
+      const title=t.consulta?'Negociação':t.pedido?'Confirmação do pedido':'Atendimento',dur=ms(t.tempo_resposta_ms),open=t.id===opened;
       const count=t.numero||(next?null:i+1);
-      timeline+='<article class="mh-turn '+(open?'expanded':'')+'"><h4><button type="button" data-milly-turn="'+esc(t.id)+'" aria-expanded="'+open+'">'+symbol('chevron')+'<span>'+(count?'Turno '+esc(count)+' · ':'')+title+'</span><small>'+symbol('clock')+esc(dur||'Tempo indisponível')+'</small></button></h4>'+
+      timeline+='<article data-history-id="'+esc(t.id)+'" class="mh-turn '+(open?'expanded':'')+'"><h4><button type="button" data-milly-turn="'+esc(t.id)+'" aria-expanded="'+open+'">'+symbol('chevron')+'<span>'+(count?'Turno '+esc(count)+' · ':'')+title+'</span><small>'+symbol('clock')+esc(dur||'Tempo indisponível')+'</small></button></h4>'+
         (open?'<div class="mh-events">'+body(t)+'</div>':'')+'</article>';
-      if(t.id===selected&&c)timeline+='<details class="mh-mobile-facts" '+(data.factsOpen?'open':'')+'><summary>'+symbol('lock')+' Estoque e custo na consulta '+symbol('chevron')+'</summary>'+facts(c,stock)+'</details>';
+      if(t.id===selected&&c){
+        const brief=[units(c.ficha?.disponivel)&&units(c.ficha.disponivel)+' disponíveis',money(c.ficha?.custo_unitario_centavos)&&'custo '+money(c.ficha.custo_unitario_centavos)].filter(Boolean).join(' · ');
+        timeline+='<details class="mh-mobile-facts" '+(data.factsOpen?'open':'')+'><summary>'+symbol('lock')+'<span class="mh-facts-copy"><strong>Estoque e custo na consulta</strong><small>'+esc(brief)+'</small></span>'+symbol('chevron')+'</summary>'+facts(c,stock)+'</details>';
+      }
     });
     const privateBadge='<span class="mh-eyebrow">'+symbol('lock')+'Acesso do proprietário</span>';
     return '<div class="mh-layout"><section class="mh-central"><div class="mh-heading"><div><h3>Histórico de negociações</h3>'+privateBadge+'</div></div>'+
       (error?'<div role="alert" class="mh-retry">'+esc(error)+' <button data-milly-retry>Tentar novamente</button></div>':'')+
       '<div class="mh-mobile-summary">'+verification(turn,orderOpen,true)+'</div>'+timeline+'</section>'+
-      '<aside class="mh-sidebar" aria-label="Ficha da negociação"><h3>Ficha da negociação</h3>'+(c?product(c):notice('Turno sem consulta à Milly.'))+verification(turn,orderOpen,false)+(c?facts(c,stock):'')+'</aside></div>';
+      '<aside class="mh-sidebar" aria-label="Ficha da negociação"><h3>Ficha da negociação</h3>'+(c?product(c)+facts(c,stock):notice('Turno sem consulta à Milly.'))+verification(turn,orderOpen,false)+'</aside></div>';
   }
-  ch.millyView={html,symbol,orderFor};
+  function contextLine(t){const c=t?.consulta;return [c?.ficha?.medida||c?.produto?.nome,label(c?.pagamento||t?.pedido?.pagamento),label(c?.modalidade||t?.pedido?.modalidade)].filter(Boolean).join(' · ');}
+  ch.millyView={html,symbol,orderFor,contextLine,day};
 }());

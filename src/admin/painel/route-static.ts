@@ -102,7 +102,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
         'text/javascript; charset=utf-8',
       ));
   }
-  for(const file of ['caixa-chat.css','caixa-chat-customer.css','bot-chat.css','caixa-chat-milly.css','fornecedor-financeiro.css']) {
+  for(const file of ['caixa-chat.css','caixa-chat-customer.css','bot-chat.css','caixa-chat-milly.css','caixa-chat-milly-desktop.css','fornecedor-financeiro.css']) {
     fastify.get(`/admin/painel/${file}`,async(_request,reply)=>sendStatic(reply,file,'text/css; charset=utf-8'));
   }
   fastify.get('/admin/painel/chat-channel-alerts.css', async (_request, reply) => sendStatic(reply, 'chat-channel-alerts.css', 'text/css; charset=utf-8'));

@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-18T17:57:08.646Z",
-  "total": 621,
+  "geradoEm": "2026-11-18T18:14:28.508Z",
+  "total": 622,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -393,6 +393,7 @@
     "GET /admin/painel/caixa-chat-customer.css PUBLICA",
     "GET /admin/painel/caixa-chat-customer.js PUBLICA",
     "GET /admin/painel/caixa-chat-media.js PUBLICA",
+    "GET /admin/painel/caixa-chat-milly-desktop.css PUBLICA",
     "GET /admin/painel/caixa-chat-milly-view.js PUBLICA",
     "GET /admin/painel/caixa-chat-milly.css PUBLICA",
     "GET /admin/painel/caixa-chat-milly.js PUBLICA",
