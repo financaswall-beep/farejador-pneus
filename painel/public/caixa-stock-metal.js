@@ -145,5 +145,10 @@
     if (!valid() || priceModal.contains(event.target) || !priceModal.classList.contains('hidden') || event.key !== 'Escape' || m.view === 'list') return;
     if (['history', 'reservations'].includes(m.view)) { ++m.request; m.loading = false; m.error = false; m.view = 'detail'; render(true); } else list();
   });
-  C.matrixStock = { sync, reset, load };
+  function searchMeasure(measure) {
+    if (!valid()) return;
+    Object.assign(m, { view: 'list', query: measure, filter: 'all', condition: '', vehicle: '', brand: '', limit: 20 });
+    render(true);
+  }
+  C.matrixStock = { sync, reset, load, searchMeasure };
 }());

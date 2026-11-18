@@ -40,7 +40,7 @@
     void chat.loadList();if(s.id)void chat.loadThread();void chat.connect(s.generation);void chat.channels?.refresh(true);
     s.poll=setInterval(()=>{if(document.hidden)return;void chat.loadList();if(s.id)void chat.loadThread();void chat.channels?.refresh();},5000);
   };
-  chat.stop=function(){s.active=false;s.generation++;clearInterval(s.poll);clearTimeout(s.retry);chat.channels?.stop();
+  chat.stop=function(){s.active=false;s.generation++;clearInterval(s.poll);clearTimeout(s.retry);chat.channels?.stop();chat.milly?.reset();
     if(s.stream)s.stream.abort();s.stream=null;s.connected=false;s.listBusy=false;s.threadBusy=false;s.listSeq++;s.threadSeq++;};
   chat.syncTab=function(tab){
     const active=tab==='conversations';chat.el('panel').classList.toggle('hidden',!active);
@@ -71,7 +71,7 @@
       const photo=data.rows.find(row=>row.id!==s.id&&row.photo_request_id&&!previous.get(row.id)?.photo_request_id);
       if(photo&&s.id&&previous.size)chat.photoNotice(photo);
       chat.renderQueue();
-    }catch(error){if(generation===s.generation){s.error=chat.errorText(error);chat.renderQueue();}}
+    }catch(error){if(seq===s.listSeq&&generation===s.generation){s.error=chat.errorText(error);chat.renderQueue();}}
     finally{if(seq===s.listSeq)s.listBusy=false;}
   };
   chat.changeFilter=function(){s.rows=[];s.offset=0;s.listSeq++;s.listBusy=false;void chat.loadList();};

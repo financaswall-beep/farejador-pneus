@@ -10,6 +10,7 @@ import { monitorOwnerSql, type DotIdentity } from '../token-store.js';
 import { matches, type EventFilters } from './model.js';
 import { shadowPilotAvailable, shadowPilotIds } from './negotiation-shadow-pilot.js';
 import { readSettings, ruleEnabled } from './settings.js';
+import { maskContactDetails, privateRationale } from './negotiation-live-privacy.js';
 
 const eventName = 'farejador.conversa.atualizada';
 const registerName = 'registrar_negociacao_sombra';
@@ -23,9 +24,7 @@ const registerSchema = z.object({
   decisao: z.enum(['manter', 'contrapropor', 'aceitar', 'aguardar_dado']),
   total_centavos: z.number().int().positive().max(2_147_483_647).optional(),
   modalidade: z.enum(['retirada', 'entrega']).optional(),
-  justificativa: z.string().trim().min(1).max(300).refine(text =>
-    !/[\r\n]/.test(text) && maskContactDetails(text) === text,
-  'Descreva o motivo comercial sem dados pessoais, links ou transcrição.'),
+  justificativa: privateRationale,
 }).strict().superRefine((data, ctx) => {
   const hasTotal = data.total_centavos !== undefined;
   const hasMode = data.modalidade !== undefined;
@@ -152,17 +151,6 @@ async function list(identity: DotIdentity, page: number, pilots: string[], accou
     [env.FAREJADOR_ENV, identity.person_id, pilots, account, (page - 1) * 50]);
     return { pareceres: rows.rows.slice(0, 50), tem_mais: rows.rows.length > 50 };
   });
-}
-
-function maskContactDetails(text: string) {
-  return text.replace(/(?:https?:\/\/|www\.)\S+|\b(?:maps\.app\.goo\.gl|wa\.me)\/\S+/gi, '[link]')
-    .replace(/[\w.%+-]+@[\w.-]+\.[a-z]{2,}/gi, '[e-mail]')
-    .replace(/\b(?:[a-z\d-]+\.)+[a-z]{2,}\b(?:[/?#]\S*)?/gi, '[link]')
-    .replace(/[-+]?\d{1,3}[.,]\d{4,}\s*[,; ]\s*[-+]?\d{1,3}[.,]\d{4,}/g, '[localização]')
-    .replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, '[documento]')
-    .replace(/(?:\+?55[ .-]*)?(?:\(\d{2}\)|\b\d{2})[ .-]*9?\d{4}[ .-]?\d{4}\b|\b9?\d{4}[- ]\d{4}\b/g, '[telefone]')
-    .replace(/\b\d{5}-\d{3}\b/g, '[CEP]').replace(/\b\d{8,}\b/g, '[número pessoal]')
-    .replace(/@[\w.-]+/g, '[perfil]');
 }
 
 function commercialExcerpt(text: string) {

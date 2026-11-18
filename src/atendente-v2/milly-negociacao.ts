@@ -157,22 +157,27 @@ export interface ParecerMilly {
   decisao: 'aceitar'|'contrapropor'|'manter'|'aguardar_dado';
   totalCentavos?: number;
   orientacao?: OrientacaoMilly;
+  justificativa?: string;
   personId: string;
 }
 export async function registrarParecerMilly(db: Db, environment: Environment, id: string, parecer: ParecerMilly) {
   const aprovar = parecer.decisao==='aceitar' || parecer.decisao==='contrapropor';
   if (aprovar && !Number.isSafeInteger(parecer.totalCentavos)) return false;
+  // Uma instalação ainda na 0296 aceita as mesmas decisões, sem persistir justificativa.
+  const gravaMotivo = parecer.justificativa !== undefined && (await db.query(`SELECT FROM pg_catalog.pg_attribute
+    WHERE attrelid='ops.milly_consultas'::regclass AND attname='decision_rationale' AND NOT attisdropped`)).rowCount === 1;
   const res = await db.query(`WITH gate AS (SELECT generation FROM ops.milly_consulta_config
       WHERE environment=$1 AND enabled AND owner_person_id=$4 FOR SHARE)
     UPDATE ops.milly_consultas r SET state=CASE WHEN $5 THEN 'approved' ELSE 'declined' END,decision=$3,orientation=$7,
-      decided_by=$4,approved_total_cents=$6,
+      decided_by=$4,approved_total_cents=$6${gravaMotivo ? ',decision_rationale=$8' : ''},
       valid_until=CASE WHEN $5 THEN clock_timestamp()+interval '30 minutes' END
     FROM gate WHERE r.environment=$1 AND r.id=$2 AND r.generation=gate.generation AND r.state='pending'
       AND r.request_deadline>clock_timestamp() AND (NOT $5 OR
        ($6::int>r.freight_cents AND $6<=r.catalog_unit_cents::bigint*r.quantity+r.freight_cents
         AND ($6-r.freight_cents)%r.quantity=0 AND ($3<>'aceitar' OR $6=r.offered_total_cents)
         AND ($3<>'contrapropor' OR $6>=r.offered_total_cents))) RETURNING r.id`,
-    [environment,id,parecer.decisao,parecer.personId,aprovar,aprovar?parecer.totalCentavos:null,parecer.orientacao??null]);
+    [environment,id,parecer.decisao,parecer.personId,aprovar,aprovar?parecer.totalCentavos:null,parecer.orientacao??null,
+      ...(gravaMotivo ? [parecer.justificativa] : [])]);
   return res.rowCount===1;
 }
 

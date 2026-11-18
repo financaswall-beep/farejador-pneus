@@ -16,11 +16,12 @@ import { pollBotOutbox } from '../../atendente-v2/outbound-worker.js';
 import { getChatwootChannelHealth } from '../chatwoot-channel-health.js';
 import { getOperationCustomerInterests } from './chat-customer-interests.js';
 import { registerStockWaitlistRoutes } from '../route-stock-waitlist.js';
+import { getMillyChatHistory } from './chat-milly-history.js';
 
 type Guard=(request:FastifyRequest,reply:FastifyReply)=>Promise<void>;
 type Request=FastifyRequest & {caixa?:CaixaAuth};
 const params=z.object({id:z.string().uuid()});
-const listQuery=z.object({search:z.string().trim().max(100).default(''),filter:z.enum(['all','needs','bot']).default('needs'),
+const listQuery=z.object({search:z.string().trim().max(100).default(''),filter:z.enum(['all','needs','bot','milly']).default('needs'),
   channel:z.enum(['','whatsapp','instagram','facebook','web']).default(''),offset:z.coerce.number().int().min(0).max(10000).default(0),
   closed:z.enum(['true','false']).default('false').transform(v=>v==='true')});
 const sendBody=z.object({client_token:z.string().uuid(),content:z.string().trim().max(4000).default(''),
@@ -39,11 +40,14 @@ export function registerCaixaChatRoutes(app:FastifyInstance,flag:Guard,auth:Guar
     prefix:'/api/caixa/chat',guards:[flag,auth,access],
     actor:req=>`caixa:${(req as Request).caixa!.personId}`,
     principal:req=>(req as Request).caixa!.personId,
+    canReadMilly:req=>(req as Request).caixa?.panelRole==='owner',
   });
 }
 
 export function registerOperatorChatRoutes(app:FastifyInstance,options:{
   prefix:string;guards:Guard[];actor:(request:FastifyRequest)=>string;principal:(request:FastifyRequest)=>string;
+  canReadMilly:(request:FastifyRequest)=>boolean;
+  historyGuards?:Guard[];
 }) {
   const {prefix,actor,principal}=options;
   const ready:Guard=async(_req,reply)=>{
@@ -67,7 +71,15 @@ export function registerOperatorChatRoutes(app:FastifyInstance,options:{
   };
   app.get(prefix+'/conversations',{preHandler:guards},async(req,reply)=>{
     const query=listQuery.safeParse(req.query);if(!query.success)return reply.code(400).send({error:'invalid_query'});
+    if(query.data.filter==='milly'&&!options.canReadMilly(req))return reply.code(403).send({error:'forbidden'});
     return respond(reply,()=>listOperationConversations(query.data));
+  });
+  app.get(prefix+'/conversations/:id/milly',{preHandler:options.historyGuards?[...options.historyGuards,ready]:guards},async(req,reply)=>{
+    if(!options.canReadMilly(req))return reply.code(403).send({error:'forbidden'});
+    const p=params.safeParse(req.params);
+    const q=z.object({at:z.string().datetime({offset:true}).optional(),before:z.string().uuid().optional()}).strict().safeParse(req.query);
+    if(!p.success||!q.success||Boolean(q.data.at)!==Boolean(q.data.before))return reply.code(400).send({error:'invalid_query'});
+    return respond(reply,()=>getMillyChatHistory(p.data.id,q.data.at?{at:q.data.at,id:q.data.before!}:undefined));
   });
   app.get(prefix+'/conversations/:id',{preHandler:guards},async(req,reply)=>{
     const parsed=params.safeParse(req.params);if(!parsed.success)return reply.code(400).send({error:'invalid_id'});

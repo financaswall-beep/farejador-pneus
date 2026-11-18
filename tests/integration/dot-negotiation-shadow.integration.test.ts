@@ -148,21 +148,49 @@ it('entrega consulta privada uma vez ao Dot do dono e valida o aval comercial po
     return {evento:body.eventId as string,consulta:q!.id,turno:trigger.id,loja:unit};
   }
   const pickup=await start('pickup');
+  async function history(id:string) {
+    return (await db.pool.query(`SELECT context_read_at, context_snapshot, decided_at, decision_rationale
+      FROM ops.milly_consultas WHERE environment='test' AND id=$1`,[id])).rows[0];
+  }
   expect(await notificarConsultaMilly(db.pool,'test',pickup.consulta,conversation,send)).toBe(true);
   expect(send).toHaveBeenCalledTimes(1);
   const ctx={evento:pickup.evento,consulta:pickup.consulta};
   const ctxTool='consultar_negociacao_atendente', decisionTool='orientar_negociacao_atendente';
   expect((await call(ctxTool,ctx,other.token)).error).toBeTruthy();
-  expect(content(await call(ctxTool,ctx,active.token))).toMatchObject({turno:pickup.turno,loja:unit,
+  expect(await history(pickup.consulta)).toEqual({context_read_at:null,context_snapshot:null,decided_at:null,decision_rationale:null});
+  const pickupFacts=content(await call(ctxTool,ctx,active.token));
+  expect(pickupFacts).toMatchObject({turno:pickup.turno,loja:unit,
     disponivel:100,custo_unitario_centavos:5000,oferta_cliente_total_centavos:8000,rotas:null});
-  const acceptance={...pickup,decisao:'aceitar',total_centavos:8000};
+  const viewed=await history(pickup.consulta);
+  expect(viewed.context_read_at.toISOString()).toBe(pickupFacts.lido_em);
+  expect(viewed.context_snapshot.custo_unitario_centavos).toBe(5000);
+  expect(viewed.context_snapshot).not.toHaveProperty('turno');
+  // A decisão revalida os custos atuais sem sobrescrever o que o Dot pôde ler.
+  await db.pool.query("UPDATE commerce.wholesale_stock SET unit_cost=55 WHERE environment='test' AND brand='LAB'");
+  const motivo='Há estoque disponível e a retirada mantém contribuição direta.';
+  const acceptance={...pickup,decisao:'aceitar',total_centavos:8000,justificativa:motivo};
+  for (const justificativa of ['E-mail cliente@example.invalid','Pode retirar na Rua do Teste.',
+    'A pedido de Contato fictício.','Texto fictício que não pode sair do bot.','Copiei: “fechado por 80”.']) {
+    expect((await call(decisionTool,{...acceptance,justificativa},active.token)).error).toBeTruthy();
+  }
   expect((await call(decisionTool,{...acceptance,turno:randomUUID()},active.token)).error).toBeTruthy();
   expect((await call(decisionTool,{...acceptance,loja:randomUUID()},active.token)).error).toBeTruthy();
   expect((await call(decisionTool,{...acceptance,total_centavos:7900},active.token)).error).toBeTruthy();
+  expect((await history(pickup.consulta)).decided_at).toBeNull();
+  const registered=content(await call(decisionTool,acceptance,active.token));
+  expect(registered.registrada).toBe(true);
+  expect(JSON.stringify(registered)).not.toContain(motivo);
+  const approved=await history(pickup.consulta);
+  expect(approved.decided_at.getTime()).toBeGreaterThanOrEqual(viewed.context_read_at.getTime());
+  expect(approved.context_snapshot).toEqual(viewed.context_snapshot);
+  expect(approved.decision_rationale).toBe(motivo);
   expect(content(await call(decisionTool,acceptance,active.token)).registrada).toBe(true);
-  expect(content(await call(decisionTool,acceptance,active.token)).registrada).toBe(true);
+  expect(await history(pickup.consulta)).toEqual(approved);
+  expect((await call(decisionTool,{...acceptance,justificativa:'Outro motivo.'},active.token)).error).toBeTruthy();
   expect((await call(decisionTool,{...acceptance,total_centavos:8100},active.token)).error).toBeTruthy();
-  expect(await lerResultadoConsultaMilly(db.pool,'test',pickup.consulta)).toMatchObject({status:'approved',approvedTotalCents:8000});
+  const visibleToBot=await lerResultadoConsultaMilly(db.pool,'test',pickup.consulta);
+  expect(visibleToBot).toMatchObject({status:'approved',approvedTotalCents:8000});
+  expect(JSON.stringify(visibleToBot)).not.toContain(motivo);
   const noCity=await start('delivery');
   expect(content(await call(ctxTool,{evento:noCity.evento,consulta:noCity.consulta},active.token)).rotas).toMatchObject({
     praca_referencia:null,entregas_com_municipio_cadastrado_igual:null});
@@ -206,11 +234,17 @@ it('entrega consulta privada uma vez ao Dot do dono e valida o aval comercial po
     rotas_com_combustivel_informado:2,total_combustivel_informado_centavos:5000,media_combustivel_por_rota_com_registro_centavos:2500});
   expect(JSON.stringify(afterTrips)).not.toContain('Nome privado');
   expect(JSON.stringify(afterTrips)).not.toMatch(/Bairro privado|Endereço privado/);
+  const routeRead=await history(delivery.consulta);
+  expect(routeRead.context_read_at.toISOString()).toBe(afterTrips.lido_em);
+  expect(routeRead.context_snapshot.rotas).toMatchObject({entregas_pendentes:3,
+    praca_referencia:afterTrips.rotas.praca_referencia,historico_30_dias:afterTrips.rotas.historico_30_dias});
+  expect(JSON.stringify(routeRead.context_snapshot)).not.toMatch(/leitura_praca|Bairro privado|Endereço privado|Nome privado/);
   expect((await call(decisionTool,{...delivery,decisao:'aceitar',total_centavos:8000},active.token)).error).toBeTruthy();
   const retiradaAlternativa={...delivery,decisao:'aguardar_dado',orientacao:'oferecer_retirada'};
   expect(content(await call(decisionTool,retiradaAlternativa,active.token)).registrada).toBe(true);
   expect(content(await call(decisionTool,retiradaAlternativa,active.token)).registrada).toBe(true);
   expect(await lerResultadoConsultaMilly(db.pool,'test',delivery.consulta)).toMatchObject({status:'declined',orientacao:'oferecer_retirada'});
+  expect((await history(delivery.consulta)).decided_at).toBeInstanceOf(Date);
   const changed=await start('pickup');
   await db.pool.query("UPDATE commerce.wholesale_stock SET quantity_reserved=100 WHERE environment='test' AND brand='LAB'");
   expect((await call(decisionTool,{...changed,decisao:'aceitar',total_centavos:8000},active.token)).error).toBeTruthy();
