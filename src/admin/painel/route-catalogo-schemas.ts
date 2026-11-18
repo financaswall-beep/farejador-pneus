@@ -39,7 +39,10 @@ export const vehicleSearchQuery = z.object({ q: z.string().trim().min(2).max(120
 const fitmentYear = z.number().int().min(1900).max(2100).nullable().optional();
 function withValidFitmentRange<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
   return schema.superRefine((body, context) => {
-    const years = body as { year_start?: number | null; year_end?: number | null };
+    const years = body as { year_start?: number | null; year_end?: number | null; previous_period?: unknown };
+    if (years.previous_period && (years.year_start === undefined || years.year_end === undefined)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['year_start'], message: 'catalog_fitment_new_period_required' });
+    }
     if (years.year_start !== null && years.year_start !== undefined
       && years.year_end !== null && years.year_end !== undefined
       && years.year_end < years.year_start) {
@@ -51,12 +54,16 @@ function withValidFitmentRange<T extends z.ZodRawShape>(schema: z.ZodObject<T>) 
     }
   });
 }
+const selectedPeriod = withValidFitmentRange(z.object({
+  year_start: fitmentYear.unwrap(), year_end: fitmentYear.unwrap(),
+}));
 export const compatibilityBody = withValidFitmentRange(z.object({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),
-  is_oem: z.boolean().default(false),
-  source: z.enum(['manufacturer', 'manual']).default('manual'),
-  confidence_level: z.number().min(0).max(1).default(1),
+  is_oem: z.boolean().optional(),
+  source: z.enum(['manufacturer', 'manual']).optional(),
+  confidence_level: z.number().min(0).max(1).optional(),
+  previous_period: selectedPeriod.optional(),
   year_start: fitmentYear,
   year_end: fitmentYear,
   reason: z.string().trim().min(2).max(500),
@@ -65,7 +72,7 @@ export const compatibilityDeleteParams = productParams.extend({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),
 });
-export const compatibilityDeleteBody = z.object({ reason: z.string().trim().min(2).max(500) });
+export const compatibilityDeleteBody = z.object({ previous_period: selectedPeriod.optional(), reason: z.string().trim().min(2).max(500) });
 export const discoveryBody = withValidFitmentRange(z.object({
   vehicle_model_id: z.string().uuid(),
   position: z.enum(['front', 'rear', 'both']),

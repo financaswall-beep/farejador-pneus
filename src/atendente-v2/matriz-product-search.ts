@@ -186,8 +186,12 @@ export async function buscarCompatibilidadeMatriz(
   );
   if (vehicles.rows.length === 0) return [];
   const position = parsed.posicao_pneu && parsed.posicao_pneu !== 'both' ? parsed.posicao_pneu : null;
+  // Duas fontes podem comprovar faixas sobrepostas. Ao consultar um ano,
+  // apresente uma oferta por produto/posição, preservando a melhor evidência.
+  const oneOffer = parsed.moto_ano ? 'DISTINCT ON (vf.vehicle_model_id,p.id,vf.position)' : '';
+  const rank = parsed.moto_ano ? 'ORDER BY vf.vehicle_model_id,p.id,vf.position,vf.is_oem DESC,vf.confidence_level DESC NULLS LAST,vf.id' : '';
   const fitments = await client.query<FitmentRow>(
-    `SELECT vf.vehicle_model_id, p.id AS product_id, p.product_name, p.brand,
+    `SELECT ${oneOffer} vf.vehicle_model_id, p.id AS product_id, p.product_name, p.brand,
             p.tire_condition,
             ts.tire_size, vf.year_start, vf.year_end,
             vf.position, vf.is_oem, vf.source,
@@ -205,7 +209,7 @@ export async function buscarCompatibilidadeMatriz(
         AND ($5::int IS NULL OR (
           (vf.year_start IS NULL OR vf.year_start <= $5)
           AND (vf.year_end IS NULL OR vf.year_end >= $5)
-        ))`,
+        )) ${rank}`,
     [
       parsed.environment,
       vehicles.rows.map((row) => row.vehicle_model_id),

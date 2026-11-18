@@ -79,10 +79,9 @@ export async function reviewCatalogFitmentDiscovery(
           confidence_level,year_start,year_end)
        SELECT $1::env_t,$2,spec_id,$3,$4,'discovery_promoted',$5,$6,$7
          FROM unnest($8::uuid[]) AS spec_id
-       ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position)
+       ON CONFLICT ON CONSTRAINT vehicle_fitments_period_key
        DO UPDATE SET is_oem=EXCLUDED.is_oem,source=EXCLUDED.source,
                      confidence_level=EXCLUDED.confidence_level,
-                     year_start=EXCLUDED.year_start,year_end=EXCLUDED.year_end,
                      updated_at=now()
        RETURNING id`,
       [environment, candidate.vehicle_model_id, candidate.position,

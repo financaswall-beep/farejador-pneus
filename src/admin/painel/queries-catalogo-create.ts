@@ -161,7 +161,7 @@ export async function createCatalogProduct(
       `INSERT INTO commerce.vehicle_fitments
          (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,
           confidence_level,year_start,year_end)
-       SELECT DISTINCT ON (vf.vehicle_model_id,vf.position)
+       SELECT DISTINCT ON (vf.vehicle_model_id,vf.position,vf.year_start,vf.year_end)
               $1::env_t,vf.vehicle_model_id,$2,vf.position,vf.is_oem,vf.source,
               vf.confidence_level,vf.year_start,vf.year_end
          FROM commerce.vehicle_fitments vf
@@ -178,9 +178,9 @@ export async function createCatalogProduct(
           AND ($5::text IS NULL OR $5='both' OR vf.position=$5 OR vf.position='both')
           AND source_spec.id<>$2
           AND regexp_replace(source_spec.tire_size,'[^0-9]+','','g')=$3
-        ORDER BY vf.vehicle_model_id,vf.position,vf.is_oem DESC,
+        ORDER BY vf.vehicle_model_id,vf.position,vf.year_start,vf.year_end,vf.is_oem DESC,
                  vf.confidence_level DESC NULLS LAST,vf.created_at
-       ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position) DO NOTHING`,
+       ON CONFLICT ON CONSTRAINT vehicle_fitments_period_key DO NOTHING`,
       [environment, tireSpecId, parsedMeasure.canonical.replace(/\D/g, ''), vehicleType, position],
     );
 

@@ -672,6 +672,23 @@ describe('catalogo no painel', () => {
     });
   });
 
+  it('corrige somente o período selecionado e mantém a origem de uma pesquisa aprovada', async () => {
+    const module = loadCatalogModule();
+    const item = { vehicle_model_id:'twister', make:'Honda', model:'Twister', year_start:2016, year_end:2017,
+      source:'discovery_promoted', position:'rear', is_oem:false };
+    const context = { ...module, adminUser:{role:'owner'}, $nextTick:vi.fn(),
+      catalogoCompatibilidade:{ row:{product_id:'pneu'}, saving:false, form:{year_start:'',year_end:'',reason:''} },
+      apiPost:vi.fn(), catalogoCompatibilityLoad:vi.fn(), loadCatalogo:vi.fn() };
+    module.catalogoCompatibilityEdit.call(context,item);
+    context.catalogoCompatibilidade.form.year_start='2017';
+    context.catalogoCompatibilidade.form.reason='Ano corrigido';
+    await module.catalogoCompatibilitySave.call(context);
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/pneu/compatibility',{
+      vehicle_model_id:'twister',position:'rear',is_oem:false,year_start:2017,year_end:2017,
+      previous_period:{year_start:2016,year_end:2017},reason:'Ano corrigido',
+    });
+  });
+
   it('inicializa a fila de pesquisa antes de o Alpine avaliar o drawer oculto', () => {
     const stateSource = readFileSync('painel/public/app.js', 'utf8');
     expect(stateSource).toContain('discoveries: [], discoveriesLoading: false');

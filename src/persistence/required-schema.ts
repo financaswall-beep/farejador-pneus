@@ -203,6 +203,7 @@ export const REQUIRED_SCHEMA_SQL = `
        WHERE table_schema='commerce' AND table_name='vehicle_fitments'
          AND column_name='year_end'
     )
+    AND to_regclass('commerce.vehicle_fitments_period_key') IS NOT NULL
     AND to_regprocedure('commerce.find_compatible_tires(env_t,uuid,text,integer)') IS NOT NULL
     AND to_regclass('ops.application_schema_state') IS NOT NULL
     AND to_regclass('ops.applied_migrations') IS NOT NULL

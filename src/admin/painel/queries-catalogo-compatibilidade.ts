@@ -1,3 +1,4 @@
+import { saveFitmentPeriod, selectFitmentPeriod, type FitmentPeriod } from './catalog-fitment-period.js';
 import type { PoolClient as TransactionClient } from 'pg';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
@@ -21,7 +22,8 @@ export interface CatalogCompatibilityRow {
 }
 
 
-interface CompatibilityMutationInput {
+export interface CompatibilityMutationInput {
+  previousPeriod?: FitmentPeriod;
   productId: string;
   vehicleModelId: string;
   position: 'front' | 'rear' | 'both';
@@ -31,9 +33,9 @@ interface CompatibilityMutationInput {
 }
 
 export interface AddCompatibilityInput extends CompatibilityMutationInput {
-  isOem: boolean;
-  source: 'manufacturer' | 'manual';
-  confidenceLevel: number;
+  isOem?: boolean;
+  source?: 'manufacturer' | 'manual';
+  confidenceLevel?: number;
   yearStart?: number | null;
   yearEnd?: number | null;
 }
@@ -94,9 +96,12 @@ export async function addCatalogCompatibility(
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const reason = input.reason.trim();
   if (reason.length < 2 || reason.length > 500) throw new Error('catalog_compatibility_reason_required');
-  if (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
-    || input.confidenceLevel > 1) throw new Error('catalog_compatibility_confidence_invalid');
+  if (input.confidenceLevel !== undefined && (!Number.isFinite(input.confidenceLevel) || input.confidenceLevel < 0
+    || input.confidenceLevel > 1)) throw new Error('catalog_compatibility_confidence_invalid');
   validateFitmentYears(input.yearStart, input.yearEnd);
+  if (input.previousPeriod && (input.yearStart === undefined || input.yearEnd === undefined)) {
+    throw new Error('catalog_fitment_new_period_required');
+  }
   const client = transactionClient ?? await dbPool.connect();
   try {
     if (!transactionClient) await client.query('BEGIN');
@@ -111,25 +116,7 @@ export async function addCatalogCompatibility(
       [environment, input.vehicleModelId],
     );
     if (!vehicle.rows[0]) throw new Error('catalog_vehicle_model_not_found');
-    const inserted = await client.query(
-      `INSERT INTO commerce.vehicle_fitments
-         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level,
-          year_start,year_end)
-       SELECT $1::env_t,$2,spec_id,$3,$4,$5,$6,$7,$8
-         FROM unnest($9::uuid[]) AS spec_id
-       ON CONFLICT (environment,vehicle_model_id,tire_spec_id,position)
-       DO UPDATE SET is_oem=EXCLUDED.is_oem,source=EXCLUDED.source,
-                     confidence_level=EXCLUDED.confidence_level,
-                     year_start=EXCLUDED.year_start,year_end=EXCLUDED.year_end,
-                     updated_at=now()
-       WHERE commerce.vehicle_fitments.is_oem IS DISTINCT FROM EXCLUDED.is_oem
-          OR commerce.vehicle_fitments.source IS DISTINCT FROM EXCLUDED.source
-          OR commerce.vehicle_fitments.confidence_level IS DISTINCT FROM EXCLUDED.confidence_level
-          OR commerce.vehicle_fitments.year_start IS DISTINCT FROM EXCLUDED.year_start
-          OR commerce.vehicle_fitments.year_end IS DISTINCT FROM EXCLUDED.year_end`,
-      [environment, input.vehicleModelId, input.position, input.isOem, input.source,
-       input.confidenceLevel, input.yearStart ?? null, input.yearEnd ?? null, tireSpecIds],
-    );
+    const inserted = await saveFitmentPeriod(client, environment, tireSpecIds, input);
     await client.query(
       `INSERT INTO audit.events
          (environment,domain,entity_table,entity_id,event_type,actor_label,payload_after)
@@ -138,6 +125,7 @@ export async function addCatalogCompatibility(
        JSON.stringify({ tire_size: tireSize, vehicle_model_id: input.vehicleModelId,
          vehicle: vehicle.rows[0], position: input.position, is_oem: input.isOem,
          source: input.source, confidence_level: input.confidenceLevel, reason,
+         previous_period: input.previousPeriod,
          year_start: input.yearStart ?? null, year_end: input.yearEnd ?? null,
          affected_tire_specs: tireSpecIds.length, changed_rows: inserted.rowCount ?? 0 })],
     );
@@ -166,11 +154,13 @@ export async function removeCatalogCompatibility(
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       `catalog-fitment:${environment}:${tireSize.replace(/\D/g, '')}:${input.vehicleModelId}:${input.position}`,
     ]);
+    const period = await selectFitmentPeriod(client, environment, tireSpecIds, input);
     const removed = await client.query(
       `DELETE FROM commerce.vehicle_fitments
         WHERE environment=$1 AND vehicle_model_id=$2 AND position=$3
-          AND tire_spec_id=ANY($4::uuid[])`,
-      [environment, input.vehicleModelId, input.position, tireSpecIds],
+          AND tire_spec_id=ANY($4::uuid[])
+          AND year_start IS NOT DISTINCT FROM $5::int AND year_end IS NOT DISTINCT FROM $6::int`,
+      [environment, input.vehicleModelId, input.position, tireSpecIds, period.year_start, period.year_end],
     );
     await client.query(
       `INSERT INTO audit.events
@@ -178,7 +168,7 @@ export async function removeCatalogCompatibility(
        VALUES ($1,'catalog','commerce.products',$2,'catalog_measure_fitment_removed',$3,$4::jsonb,$5::jsonb)`,
       [environment, input.productId, input.actorLabel.trim().slice(0, 120) || 'admin',
        JSON.stringify({ tire_size: tireSize, vehicle_model_id: input.vehicleModelId,
-         position: input.position, affected_tire_specs: tireSpecIds.length,
+         position: input.position, ...period, affected_tire_specs: tireSpecIds.length,
          removed_rows: removed.rowCount ?? 0 }), JSON.stringify({ reason })],
     );
     if (!transactionClient) await client.query('COMMIT');
@@ -262,7 +252,7 @@ export async function getCatalogCompatibility(
          ON vm.id=vf.vehicle_model_id AND vm.environment=vf.environment
       WHERE p.environment=$1 AND p.id=$2
         AND p.deleted_at IS NULL AND vm.deleted_at IS NULL
-      ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position`,
+      ORDER BY vm.make,vm.model,vm.variant NULLS FIRST,vf.position,vf.year_start NULLS FIRST,vf.year_end NULLS LAST`,
     [environment, productId],
   );
   const measureApplications = await getCatalogMeasureApplications(selected.tire_size ?? '', environment, dbPool, selected.vehicle_type);

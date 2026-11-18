@@ -124,13 +124,17 @@
     try {
       const path = '/' + state.row.product_id + '/compatibility';
       const reason = el('reason').value.trim(), pos = el('position').value;
+      const previous_period = { year_start: state.vehicle.year_start ?? null, year_end: state.vehicle.year_end ?? null };
       if (state.action === 'remove') {
-        await C.matrixCatalog.api(path + '/' + state.vehicle.id + '/' + pos, { reason }, 'DELETE');
+        await C.matrixCatalog.api(path + '/' + state.vehicle.id + '/' + pos, { reason, previous_period }, 'DELETE');
       } else {
         await C.matrixCatalog.api(path, { vehicle_model_id: state.vehicle.id, position: pos, reason,
+          ...(state.action === 'edit' ? { previous_period } : {}),
           year_start: el('start').value ? Number(el('start').value) : null,
           year_end: el('end').value ? Number(el('end').value) : null,
-          source: el('source').value, is_oem: el('oem').checked, confidence_level: 1 });
+          ...(state.action !== 'edit' || el('source').value !== (state.vehicle.source === 'manufacturer' ? 'manufacturer' : 'manual')
+            ? { source: el('source').value } : {}),
+          is_oem: el('oem').checked, ...(state.action !== 'edit' ? { confidence_level: 1 } : {}) });
       }
       if (generation !== state.generation) return;
       reset(); await load(); await C.loadOperationCatalog(1);

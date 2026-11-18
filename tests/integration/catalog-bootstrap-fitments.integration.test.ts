@@ -130,6 +130,66 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
     }));
   });
 
+  it('mantém períodos separados na aprovação, edição, cópia e consulta por ano', async () => {
+    const vehicleModelId = randomUUID();
+    const vehicleName = 'Twister Períodos';
+    await db.pool.query(`INSERT INTO commerce.vehicle_models
+      (id,environment,vehicle_type,make,model,year_start,year_end)
+      VALUES ($1,'test','motorcycle','Honda',$2,2016,2022)`, [vehicleModelId, vehicleName]);
+    const product = (brand: string) => createCatalogProduct({
+      measure: '140/70-17', vehicleType: 'motorcycle', brand, tireCondition: 'novo',
+      productCode: 'PER-' + brand, productName: brand, position: 'rear', actorLabel: 'teste', environment: 'test',
+    }, db.pool);
+    const { product_id: productId } = await product('MarcaA');
+    const base = { productId, vehicleModelId, position: 'rear' as const, actorLabel: 'teste',
+      environment: 'test' as const, reason: 'Manual conferido' };
+    const manual = { ...base, isOem: false, source: 'manual' as const, confidenceLevel: 0.8 };
+    const research = { ...base, sourceUrl: 'https://example.org/manual', evidenceSummary: 'Medida traseira',
+      suggestedIsOem: false, confidenceLevel: 0.8 };
+    const older = await createCatalogFitmentDiscovery({ ...research, yearStart: 2016, yearEnd: 2017 }, db.pool);
+    const newer = await createCatalogFitmentDiscovery({ ...research, yearStart: 2022, yearEnd: 2022 }, db.pool);
+    for (const d of [older, newer]) {
+      await reviewCatalogFitmentDiscovery({ ...base, discoveryId: d.discovery_id, decision: 'approve' }, db.pool);
+    }
+    await addCatalogCompatibility({ ...manual, yearStart: 2022, yearEnd: 2022 }, db.pool);
+    const copied = await product('MarcaB');
+    const { getCatalogCompatibility } = await import('../../src/admin/painel/queries-catalogo-compatibilidade.js');
+    const periods = async (id: string) => (await getCatalogCompatibility(id, 'test', db.pool)).rows
+      .map(row => [row.year_start, row.year_end]);
+    for (const id of [productId, copied.product_id]) expect(await periods(id)).toEqual([[2016,2017],[2022,2022]]);
+    const { buscarCompatibilidadeMatriz } = await import('../../src/atendente-v2/matriz-product-search.js');
+    const client = await db.pool.connect();
+    try {
+      for (const [year, expected] of [[2016,2],[2017,2],[2018,0],[2022,2]] as const) {
+        const rows = await buscarCompatibilidadeMatriz(client, { environment: 'test', moto_modelo: vehicleName,
+          moto_ano: year, posicao_pneu: 'rear', limit: 10 });
+        expect(rows.find(row => row.vehicle_model_id === vehicleModelId)?.produtos.length ?? 0).toBe(expected);
+        const legacy = await client.query("SELECT * FROM commerce.find_compatible_tires('test',$1,'rear',$2)",[vehicleModelId,year]);
+        expect(legacy.rowCount).toBe(expected);
+      }
+    } finally { client.release(); }
+    await expect(removeCatalogCompatibility(base, db.pool)).rejects.toThrow('catalog_fitment_period_ambiguous');
+    const previousPeriod = { year_start: 2016, year_end: 2017 };
+    await expect(addCatalogCompatibility({ ...manual, previousPeriod, yearStart: 2022, yearEnd: 2022 }, db.pool))
+      .rejects.toThrow('catalog_fitment_period_already_exists');
+    await addCatalogCompatibility({ ...manual, previousPeriod, yearStart: 2017, yearEnd: 2017 }, db.pool);
+    await expect(removeCatalogCompatibility({ ...base, previousPeriod }, db.pool)).rejects.toThrow('catalog_fitment_period_not_found');
+    await removeCatalogCompatibility({ ...base, previousPeriod: { year_start: 2017, year_end: 2017 } }, db.pool);
+    for (const id of [productId, copied.product_id]) expect(await periods(id)).toEqual([[2022,2022]]);
+    // Repetir uma faixa aberta não duplica a linha. Duas evidências para 2022 não duplicam a oferta.
+    for (let i = 0; i < 2; i++) await addCatalogCompatibility({ ...manual, yearStart: 2021, yearEnd: null }, db.pool);
+    expect(await periods(productId)).toEqual([[2021,null],[2022,2022]]);
+    const { buscarCompatibilidade } = await import('../../src/atendente/tools/commerce-tools.js');
+    const lookup = await db.pool.connect();
+    try {
+      for (const search of [buscarCompatibilidade, buscarCompatibilidadeMatriz]) {
+        const rows = await search(lookup, { environment:'test', moto_modelo:vehicleName, moto_ano:2022,
+          posicao_pneu:'rear', limit:10 });
+        expect(rows.find(row => row.vehicle_model_id === vehicleModelId)?.produtos).toHaveLength(2);
+      }
+    } finally { lookup.release(); }
+  });
+
   it('propaga homologação e promoção pesquisada para toda a medida', async () => {
     const second = await createCatalogProduct({
       measure: '90/90-18', brand: 'Technic', tireCondition: 'meia_vida',
