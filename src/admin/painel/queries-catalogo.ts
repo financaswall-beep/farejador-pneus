@@ -59,6 +59,8 @@ export async function getCatalogOverview(
               COALESCE((
                 SELECT count(DISTINCT vf.vehicle_model_id)::int
                   FROM commerce.vehicle_fitments vf
+                  JOIN commerce.vehicle_models vm
+                    ON vm.environment=vf.environment AND vm.id=vf.vehicle_model_id AND vm.deleted_at IS NULL
                  WHERE vf.environment=p.environment
                    AND vf.tire_spec_id=ts.id
               ),0) AS compatibility_count

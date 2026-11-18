@@ -147,7 +147,17 @@ window.PAINEL_MODULES.catalogo = function () {
       const positions = row?.application_positions || [];
       if (positions.length > 1) return 'Dianteiro ou traseiro, conforme o veículo';
       if (positions.length === 1) return this.catalogoPositionLabel(positions[0]) + ' nas aplicações';
-      return 'Aplicações pendentes de conferência';
+      if (Number(row?.compatibility_count) > 0) return 'Consulte a posição nos vínculos do pneu';
+      return '';
+    },
+
+    catalogoCompatibilityLabel(row) {
+      if (row.product_type !== 'tire') return 'Não se aplica';
+      const models = Number(row.compatibility_count);
+      if (models > 0) return models === 1 ? '1 modelo vinculado' : models + ' modelos vinculados';
+      const references = Number(row.application_count);
+      if (references > 0) return references === 1 ? '1 referência da medida' : references + ' referências da medida';
+      return 'Ver veículos e anos';
     },
 
     async catalogoOpen(row) {

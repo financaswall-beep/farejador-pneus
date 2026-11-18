@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-18T04:30:23.917Z",
-  "total": 3226,
+  "geradoEm": "2026-11-18T05:16:04.456Z",
+  "total": 3227,
   "propriedades": {
     "abrirCadastroCliente": "function",
     "abrirClienteLead": "function",
@@ -295,6 +295,7 @@
     "catalogoCompatibilityCanSave": "function",
     "catalogoCompatibilityClose": "function",
     "catalogoCompatibilityEdit": "function",
+    "catalogoCompatibilityLabel": "function",
     "catalogoCompatibilityLoad": "function",
     "catalogoCompatibilityOpen": "function",
     "catalogoCompatibilityPositionLabel": "function",

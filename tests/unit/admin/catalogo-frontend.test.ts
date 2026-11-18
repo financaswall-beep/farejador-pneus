@@ -270,7 +270,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
-    expect(html.includes('app.catalogo.js?v=20261006-atacado1')).toBe(true);
+    expect(html).toContain('app.catalogo.js?v=20261118-vinculos1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -597,7 +597,28 @@ describe('catalogo no painel', () => {
     expect(html).toContain('<th class="px-4 py-3">Compatibilidade</th>');
     expect(html).toContain('data-testid="catalog-compatibility-drawer"');
     expect(html).toContain(":disabled=\"row.product_type !== 'tire' || !row.tire_size\"");
-    expect(html).toContain('Nenhuma moto associada');
+    expect(html).toContain('Nenhuma aplicação confirmada');
+  });
+
+  it('distingue os modelos do pneu das referências da medida na lista e na ficha', () => {
+    const catalog = loadCatalogModule();
+    const row = { product_type: 'tire', compatibility_count: 7, application_count: 0 };
+    expect(catalog.catalogoCompatibilityLabel(row)).toBe('7 modelos vinculados');
+    expect(catalog.catalogoApplicationPositionLabel(row)).toBe('Consulte a posição nos vínculos do pneu');
+    expect(catalog.catalogoCompatibilityLabel({ ...row, compatibility_count: 1, application_count: 2 })).toBe('1 modelo vinculado');
+    expect(catalog.catalogoCompatibilityLabel({ ...row, compatibility_count: 0, application_count: 2 })).toBe('2 referências da medida');
+    expect(catalog.catalogoCompatibilityLabel({ ...row, compatibility_count: 0 })).toBe('Ver veículos e anos');
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).not.toContain('Anos e posição permanecem pendentes');
+    const binding = html.match(/data-testid="catalog-compatibility-empty" x-show="([^"]+)"/)![1];
+    const empty = (rows: object[], applications: object[], loading = false, error: string | null = null) =>
+      vm.runInNewContext(binding, { catalogoCompatibilidade: { rows, applications, loading, error } });
+    expect(empty([{}], [])).toBe(false);
+    expect(empty([], [{}])).toBe(false);
+    expect(empty([{}], [{}])).toBe(false);
+    expect(empty([], [])).toBe(true);
+    expect(empty([], [], true)).toBe(false);
+    expect(empty([], [], false, 'Falha ao carregar')).toBe(false);
   });
 
   it('salva compatibilidade oficial e mantém pesquisa da internet pendente', async () => {

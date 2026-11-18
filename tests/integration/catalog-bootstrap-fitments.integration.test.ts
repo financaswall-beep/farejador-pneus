@@ -188,6 +188,12 @@ describe('migration 0202 — catálogo inicial e compatibilidade por medida', ()
         expect(rows.find(row => row.vehicle_model_id === vehicleModelId)?.produtos).toHaveLength(2);
       }
     } finally { lookup.release(); }
+    const catalogBefore = await getCatalogOverview('test', db.pool);
+    expect(catalogBefore.rows).toContainEqual(expect.objectContaining({ product_id: productId, compatibility_count: 1 }));
+    await db.pool.query("UPDATE commerce.vehicle_models SET deleted_at=now() WHERE environment='test' AND id=$1", [vehicleModelId]);
+    const catalogAfter = await getCatalogOverview('test', db.pool);
+    expect(catalogAfter.rows).toContainEqual(expect.objectContaining({ product_id: productId, compatibility_count: 0 }));
+    expect(await periods(productId)).toEqual([]);
   });
 
   it('propaga homologação e promoção pesquisada para toda a medida', async () => {

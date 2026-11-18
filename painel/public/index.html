@@ -301,7 +301,7 @@
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
-  <script src="/admin/painel/app.catalogo.js?v=20261006-atacado1"></script>
+  <script src="/admin/painel/app.catalogo.js?v=20261118-vinculos1"></script>
 <script src="/admin/painel/app.catalogo.atacado.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
@@ -10789,7 +10789,7 @@
                             :disabled="row.product_type !== 'tire' || !row.tire_size"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-dashed disabled:bg-gray-50 disabled:text-gray-400">
                       <i data-lucide="bike" class="h-3.5 w-3.5"></i>
-                      <span x-text="row.product_type !== 'tire' ? 'Não se aplica' : (Number(row.application_count || 0) > 0 ? Number(row.application_count) + ' aplicação(ões)' : 'Ver veículos e anos')"></span>
+                      <span x-text="catalogoCompatibilityLabel(row)"></span>
                     </button>
                   </td>
                   <td class="px-5 py-3.5 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="catalogoOpen(row)" :class="row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="row.measure_draft ? 'Completar cadastro' : (row.product_type === 'tire' && catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.product_type === 'tire' && !row.tire_position ? 'Completar ficha' : (Number(row.price_amount) > 0 ? 'Editar produto' : 'Definir preço'))))"></button><span x-show="adminUser?.role !== 'owner'" class="text-[11px] font-medium text-gray-400">Somente dono</span></td>
@@ -10954,15 +10954,15 @@
             <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Compatibilidade</p>
             <h2 class="mt-1 truncate text-xl font-bold text-gray-950" x-text="catalogoTitle(catalogoCompatibilidade.row)"></h2>
             <p class="mt-1 text-xs text-gray-500" x-text="catalogoTechnicalLabel(catalogoCompatibilidade.row)"></p>
-            <p class="mt-1 text-xs text-gray-500">Motos associadas ao produto pela medida cadastrada.</p>
           </div>
           <button type="button" @click="catalogoCompatibilityClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
 
         <div class="flex-1 overflow-y-auto px-6 py-5">
-          <section class="grid grid-cols-2 divide-x divide-emerald-100 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60 text-center">
+          <section class="grid divide-x divide-emerald-100 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60 text-center" :class="catalogoCompatibilidade.row?.product_id ? 'grid-cols-3' : 'grid-cols-2'">
             <div class="p-4"><p class="text-[10px] text-gray-500">Medida</p><p class="mt-1 font-bold text-emerald-900" x-text="catalogoMeasureLabel(catalogoCompatibilidade.row?.tire_size)"></p></div>
-            <div class="p-4"><p class="text-[10px] text-gray-500">Aplicações por medida</p><p class="mt-1 font-bold text-emerald-900" x-text="catalogoCompatibilidade.applications?.length || 0"></p></div>
+            <div class="p-4"><p class="text-[10px] text-gray-500">Referências da medida</p><p class="mt-1 font-bold text-emerald-900" x-text="catalogoCompatibilidade.loading || catalogoCompatibilidade.error ? '—' : (catalogoCompatibilidade.applications?.length ?? 0)"></p></div>
+            <div x-show="catalogoCompatibilidade.row?.product_id" class="p-4"><p class="text-[10px] text-gray-500">Modelos vinculados ao pneu</p><p class="mt-1 font-bold text-emerald-900" x-text="catalogoCompatibilidade.loading || catalogoCompatibilidade.error ? '—' : catalogoCompatibilidade.summary.models"></p></div>
           </section>
 
           <section x-show="adminUser?.role === 'owner' && catalogoCompatibilidade.row?.product_id" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -10993,9 +10993,8 @@
 
           <div x-show="catalogoCompatibilidade.message" :class="catalogoCompatibilidade.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="mt-4 rounded-lg border p-3 text-xs" x-text="catalogoCompatibilidade.message?.text"></div>
 
-          <p x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && !catalogoCompatibilidade.applications?.length" class="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Esta medida ainda não tem aplicação confirmada. Anos e posição permanecem pendentes de conferência.</p>
           <section x-show="catalogoCompatibilidade.applications?.length > 0" class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-            <h3 class="text-sm font-bold text-emerald-950">Motos, anos e posição confirmados</h3>
+            <h3 class="text-sm font-bold text-emerald-950">Veículos, anos e posição de referência</h3>
             <p class="mt-1 text-xs font-semibold text-emerald-800">Em uso pelo Bot — não precisa aprovar uma por uma.</p>
             <p class="mt-1 text-[11px] leading-4 text-gray-600">Relação moto, medida e posição. Respeite ano/versão, construção e índices. Não é homologação automática do produto em estoque.</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-2">
@@ -11014,7 +11013,7 @@
 
           <details x-show="catalogoCompatibilidade.applicationReviews?.length" class="mt-5 rounded-xl border border-amber-200 bg-amber-50/30 p-4">
             <summary class="cursor-pointer text-xs font-semibold text-amber-900" x-text="(catalogoCompatibilidade.applicationReviews || []).length + ' propostas da lista em revisão — fora das indicações do Bot'"></summary>
-            <p class="mt-2 text-[11px] text-gray-600">As faixas abaixo são propostas recebidas. Consulte as aplicações confirmadas acima para orientar o atendimento.</p>
+            <p class="mt-2 text-[11px] text-gray-600">As faixas abaixo são propostas recebidas. Para o atendimento, consulte as referências da medida ou os vínculos do pneu.</p>
             <div class="mt-3 space-y-2">
               <template x-for="item in (catalogoCompatibilidade.applicationReviews || [])" :key="item.application_id">
                 <article class="rounded-lg border border-amber-100 bg-white p-3">
@@ -11052,10 +11051,9 @@
             <button type="button" @click="catalogoCompatibilityLoad(catalogoCompatibilidade.row?.product_id)" class="mt-2 text-xs font-semibold underline">Tentar novamente</button>
           </div>
 
-          <div x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && catalogoCompatibilidade.rows.length === 0 && !catalogoCompatibilidade.applications?.length" class="mt-5 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-center">
+          <div data-testid="catalog-compatibility-empty" x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && catalogoCompatibilidade.rows.length === 0 && !catalogoCompatibilidade.applications?.length" class="mt-5 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-center">
             <i data-lucide="bike" class="mx-auto h-6 w-6 text-amber-600"></i>
-            <p class="mt-3 text-sm font-semibold text-amber-950">Nenhuma moto associada</p>
-            <p class="mt-1 text-xs leading-5 text-amber-800">Esta medida ainda não possui compatibilidade cadastrada. O bot não vai adivinhar uma moto.</p>
+            <p class="mt-3 text-sm font-semibold text-amber-950">Nenhuma aplicação confirmada</p>
           </div>
 
           <div x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && catalogoCompatibilidade.rows.length > 0" class="mt-5 space-y-3">
