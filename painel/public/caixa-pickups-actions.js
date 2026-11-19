@@ -180,7 +180,7 @@
   });
   elements.stageAction.addEventListener('click', function () {
     const row = P.selected();
-    if (row) void saveStage(P.pickupStage(row) === 'waiting' ? 'arrived' : 'installing');
+    if (row) void saveStage(['waiting', 'ready'].includes(P.pickupStage(row)) ? 'arrived' : 'installing');
   });
   elements.backStage.addEventListener('click', function () {
     const row = P.selected();

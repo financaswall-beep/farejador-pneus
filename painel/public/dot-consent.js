@@ -72,6 +72,7 @@
             if (row.operation_confirmation !== 'painel') operationPermission('Confirmar operações na Matriz', { operation_confirmation: 'painel' });
             operationPermission(row.stock_operations_enabled ? 'Desativar alterações de estoque' : 'Permitir todas as funções de estoque', { stock_operations_enabled: !row.stock_operations_enabled });
             operationPermission(row.catalog_operations_enabled ? 'Desativar alterações do catálogo' : 'Permitir todas as funções do catálogo', { catalog_operations_enabled: !row.catalog_operations_enabled });
+            operationPermission(row.pickup_operations_enabled ? 'Desativar cancelamentos de retiradas' : 'Permitir cancelamentos de retiradas com confirmação', { pickup_operations_enabled: !row.pickup_operations_enabled });
           }
           if (typeof row.installment_reviews_enabled === 'boolean') {
             const enabled = row.installment_reviews_enabled;
@@ -207,11 +208,15 @@
     const accept = document.getElementById('accept-operation');
     const deny = document.getElementById('deny-operation');
     const path = '/admin/api/dot/operation-reviews/' + encodeURIComponent(id);
+    let rowToolIsPickupCancellation = false;
     const labels = {amount:'Valor (R$)',quantity:'Quantidade',name:'Nome',supplier_id:'Fornecedor',paid_at:'Pago em',
       payment_method:'Forma de pagamento',cash_account:'Conta',note:'Observação',changes:'Alterações',document:'Documento',
+      retirada_id:'Identificador da retirada',ficha:'Pedido a cancelar',numero_pedido:'Número do pedido',motivo:'Motivo',
+      cliente:'Cliente',itens:'Itens',situacao:'Situação',condicao:'Condição',total:'Total (R$)',
       phone:'Telefone',notes:'Observações',due_date:'Vencimento',total_amount:'Valor total (R$)',unit_cost:'Custo unitário (R$)'};
     function fields(parent, value) {
       for (const [key,item] of Object.entries(value)) {
+        if (key === 'revisao' && rowToolIsPickupCancellation) continue;
         const row = document.createElement('div');
         const label = document.createElement('strong');
         label.textContent = (labels[key] || key.replaceAll('_',' ')) + ' ';
@@ -225,7 +230,8 @@
             list.append(li);
           }
           row.append(list);
-        } else row.append(document.createTextNode(item === null ? 'Limpar campo' : String(item)));
+        } else row.append(document.createTextNode(item === null
+          ? (rowToolIsPickupCancellation ? 'Não informado' : 'Limpar campo') : String(item)));
         parent.append(row);
       }
     }
@@ -240,7 +246,9 @@
     try {
       const row = await api(path);
       needsFile = !!(row.dados.arquivo || row.dados.imagem_base64);
-      document.getElementById('operation-name').textContent = row.operacao.replaceAll('_',' ');
+      rowToolIsPickupCancellation = row.operacao === 'cancelar_retirada_matriz';
+      document.getElementById('operation-name').textContent = rowToolIsPickupCancellation
+        ? 'Cancelar retirada da Matriz' : row.operacao.replaceAll('_',' ');
       fields(document.getElementById('operation-detail'),row.dados);
       display(row.status);
       if (row.confirmacao === 'conversa') {

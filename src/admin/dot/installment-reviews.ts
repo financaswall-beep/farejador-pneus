@@ -31,6 +31,7 @@ const activeGrant = `SELECT g.installment_reviews_enabled,${monitorOwnerSql} AS 
      COALESCE(to_jsonb(g)->>'operation_confirmation','legacy') AS operation_confirmation,
      COALESCE((to_jsonb(g)->>'stock_operations_enabled')::boolean,false) stock_operations_enabled,
      COALESCE((to_jsonb(g)->>'catalog_operations_enabled')::boolean,false) catalog_operations_enabled,
+     COALESCE((to_jsonb(g)->>'pickup_operations_enabled')::boolean,false) pickup_operations_enabled,
      COALESCE((to_jsonb(g)->>'publisher_enabled')::boolean,false) publisher_enabled,
      COALESCE((to_jsonb(g)->>'finance_operations_enabled')::boolean,false) finance_operations_enabled,
      ${conversationModeSql} installment_chat_confirmation

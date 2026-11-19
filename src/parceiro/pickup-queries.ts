@@ -2,8 +2,9 @@ import { partnerActor } from './actor.js';
 import { withPartnerContext } from './db.js';
 import type { PartnerContext } from './auth.js';
 import { moneyCents } from '../shared/catalog-pricing.js';
+import { env } from '../shared/config/env.js';
 import {
-  pickupServicesTotalCents, type PickupService,
+  pickupServicesTotalCents, type PickupService, type PickupStage,
 } from '../shared/pickup-services.js';
 import { materializePartnerPickupServices } from '../shared/pickup-service-persistence.js';
 import { normalizePartnerText } from './partner-finance-input.js';
@@ -13,8 +14,9 @@ export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[
     const result = await client.query(
       `SELECT po.id order_id,po.created_at,po.customer_name,po.customer_phone,
               po.source_tag,po.status,po.payment_method,po.total_amount,
-              po.awaiting_pickup,po.retrieved_at,po.pickup_arrived_at,
+              po.awaiting_pickup,po.retrieved_at,po.pickup_ready_at,po.pickup_arrived_at,
               po.pickup_installation_started_at,po.pickup_services,
+              po.created_at reservation_started_at,metadata.reservation_expires_at,metadata.order_number,
               customer.customer_avatar_url,
               COALESCE(items.rows,'[]'::jsonb) items,
               (SELECT request.id FROM commerce.photo_requests request
@@ -24,6 +26,7 @@ export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[
                WHERE request.environment=po.environment AND request_item.order_id=po.id
                ORDER BY request.created_at DESC LIMIT 1) photo_request_id
          FROM commerce.partner_orders po
+         LEFT JOIN LATERAL commerce.partner_pickup_metadata(po.environment,po.id,$3) metadata ON true
          LEFT JOIN LATERAL (
            SELECT pc.customer_avatar_url
              FROM commerce.partner_conversations pc
@@ -63,13 +66,13 @@ export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[
           AND (po.awaiting_pickup OR po.retrieved_at>=now()-interval '7 days')
         ORDER BY po.awaiting_pickup DESC,po.created_at ASC
         LIMIT 300`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, env.BOT_PICKUP_RESERVATION_HOURS],
     );
     return result.rows;
   });
 }
 
-export type PartnerPickupStage = 'waiting' | 'arrived' | 'installing';
+export type PartnerPickupStage = PickupStage;
 
 export async function updatePartnerPickupStage(
   ctx: PartnerContext,
@@ -77,32 +80,55 @@ export async function updatePartnerPickupStage(
   input: { stage: PartnerPickupStage; services: PickupService[] },
 ): Promise<{ order_id: string; stage: PartnerPickupStage }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const updated = await client.query<{ order_id: string }>(
-      `UPDATE commerce.partner_orders
-          SET pickup_arrived_at=CASE
-                WHEN $4='waiting' THEN NULL ELSE COALESCE(pickup_arrived_at,now()) END,
-              pickup_installation_started_at=CASE
-                WHEN $4='installing' THEN COALESCE(pickup_installation_started_at,now())
-                ELSE NULL END,
-              pickup_services=$5::jsonb,updated_at=now()
-        WHERE id=$1 AND environment=$2 AND unit_id=$3
-          AND fulfillment_mode='pickup' AND awaiting_pickup
-          AND status<>'cancelled' AND deleted_at IS NULL
-        RETURNING id order_id`,
-      [orderId, ctx.environment, ctx.unitId, input.stage, JSON.stringify(input.services)],
+    const updated = await client.query<{ order_id: string; changed: boolean; pickup_services: PickupService[] }>(
+      `WITH target AS (
+         SELECT live.id,live.pickup_ready_at,live.pickup_services
+           FROM commerce.partner_orders live
+          WHERE live.id=$1 AND live.environment=$2 AND live.unit_id=$3
+            AND live.fulfillment_mode='pickup' AND live.awaiting_pickup
+            AND live.status<>'cancelled' AND live.deleted_at IS NULL
+            AND ($4<>'ready' OR (
+              live.pickup_arrived_at IS NULL AND COALESCE((
+                SELECT metadata.reservation_expires_at>clock_timestamp()
+                  FROM commerce.partner_pickup_metadata(live.environment,live.id,$6) metadata
+              ),true)
+            ))
+          FOR UPDATE OF live
+       ), changed AS (
+         UPDATE commerce.partner_orders pickup
+            SET pickup_ready_at=CASE WHEN $4='ready' THEN now() ELSE pickup.pickup_ready_at END,
+                pickup_arrived_at=CASE WHEN $4='ready' THEN pickup.pickup_arrived_at
+                  WHEN $4='waiting' THEN NULL ELSE COALESCE(pickup.pickup_arrived_at,now()) END,
+                pickup_installation_started_at=CASE WHEN $4='ready' THEN pickup.pickup_installation_started_at
+                  WHEN $4='installing' THEN COALESCE(pickup.pickup_installation_started_at,now()) ELSE NULL END,
+                pickup_services=CASE WHEN $4='ready' THEN pickup.pickup_services ELSE $5::jsonb END,
+                updated_at=now()
+           FROM target
+          WHERE pickup.id=target.id AND pickup.environment=$2 AND pickup.unit_id=$3
+            AND ($4<>'ready' OR target.pickup_ready_at IS NULL)
+          RETURNING pickup.id,pickup.pickup_services
+       )
+       SELECT id order_id,true changed,pickup_services FROM changed
+       UNION ALL
+       SELECT id order_id,false changed,pickup_services FROM target
+        WHERE $4='ready' AND pickup_ready_at IS NOT NULL`,
+      [orderId, ctx.environment, ctx.unitId, input.stage, JSON.stringify(input.services), env.BOT_PICKUP_RESERVATION_HOURS],
     );
-    if (!updated.rows[0]) throw new Error('pickup_not_found');
-    await client.query(
-      `INSERT INTO audit.events (
-         environment,domain,entity_table,entity_id,event_type,actor_label,payload_after
-       ) VALUES ($1,'partner_orders','commerce.partner_orders',$2,
-                 'partner_pickup_stage_changed',$3,$4::jsonb)`,
-      [ctx.environment, orderId, partnerActor(ctx), JSON.stringify({
-        unit_id: ctx.unitId, stage: input.stage,
-        service_codes: input.services.map((service) => service.code),
-        service_total_cents: pickupServicesTotalCents(input.services),
-      })],
-    );
+    const row = updated.rows[0];
+    if (!row) throw new Error('pickup_not_found');
+    if (row.changed) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment,domain,entity_table,entity_id,event_type,actor_label,payload_after
+         ) VALUES ($1,'partner_orders','commerce.partner_orders',$2,
+                   'partner_pickup_stage_changed',$3,$4::jsonb)`,
+        [ctx.environment, orderId, partnerActor(ctx), JSON.stringify({
+          unit_id: ctx.unitId, stage: input.stage,
+          service_codes: row.pickup_services.map((service) => service.code),
+          service_total_cents: pickupServicesTotalCents(row.pickup_services),
+        })],
+      );
+    }
     return { order_id: orderId, stage: input.stage };
   });
 }

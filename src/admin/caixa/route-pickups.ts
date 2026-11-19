@@ -8,16 +8,12 @@ import {
   updateMatrizPickupStage,
 } from '../painel/queries.js';
 import { mapWriteError } from '../painel/route-helpers.js';
-import { pickupServicesPublicCatalog, pickupServicesSchema } from '../../shared/pickup-services.js';
+import { pickupServicesPublicCatalog, pickupServicesSchema, pickupStageUpdateSchema } from '../../shared/pickup-services.js';
 
 type PreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 type CaixaRequest = FastifyRequest & { caixa?: CaixaAuth };
 
 const paramsSchema = z.object({ orderId: z.string().uuid() });
-const stageSchema = z.object({
-  stage: z.enum(['waiting', 'arrived', 'installing']),
-  services: pickupServicesSchema.default([]),
-});
 const completionSchema = z.object({
   payment_method: z.string().trim().min(1).max(80),
   services: pickupServicesSchema.optional(),
@@ -56,7 +52,7 @@ export function registerCaixaPickupRoutes(
 
   fastify.put('/api/caixa/retiradas/:orderId/stage', { preHandler: guarded }, async (request, reply) => {
     const params = paramsSchema.safeParse(request.params);
-    const body = stageSchema.safeParse(request.body ?? {});
+    const body = pickupStageUpdateSchema.safeParse(request.body ?? {});
     if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
     try {
       return reply.status(200).send(await updateMatrizPickupStage({

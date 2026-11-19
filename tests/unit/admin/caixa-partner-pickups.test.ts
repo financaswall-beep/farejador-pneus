@@ -53,4 +53,24 @@ describe('retiradas simples: identidade e itens do pedido', () => {
     await button('CONFIRMAR RETIRADA').click(); await vi.waitFor(() => expect(root.textContent).toContain('Esse pedido já mudou'));
     expect(C.showToast).not.toHaveBeenCalled(); expect(C.partnerData.state.pickups).toHaveLength(1);
   });
+  it('registra separação pela API do parceiro e mostra prazo, histórico e aviso manual', async () => {
+    const { C, ready, root, button } = partnerScreen();
+    const now = new Date().toISOString();
+    const row = { ...order, order_number: 'PED-0060', customer_phone: '21987654321', created_at: now,
+      total_amount: 125, reservation_expires_at: new Date(Date.now() + 20 * 60_000).toISOString(), items: [] };
+    C.partnerData.state.pickups = [row];
+    C.partnerData.api = vi.fn(async () => {
+      C.partnerData.state.pickups = [{ ...row, pickup_ready_at: now }];
+      return { order_id: row.order_id, stage: 'ready' };
+    });
+    C.partnerData.load = vi.fn(async () => {});
+    ready(); C.partnerHome.open('partner-pickups'); await button('VER RETIRADA').click();
+    expect(root.textContent).not.toContain('Avisar no WhatsApp');
+    await button('Marcar como pronto').click();
+    await vi.waitFor(() => expect(root.textContent).toContain('Avisar no WhatsApp'));
+    expect(root.textContent).toContain('Reserva até');
+    expect(root.textContent).toContain('Marcado como pronto');
+    expect(C.partnerData.api).toHaveBeenCalledWith('retiradas/order-a/stage',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ stage: 'ready', services: [] }) }));
+  });
 });

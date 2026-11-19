@@ -170,8 +170,9 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(106);
-  const newWrites=['confirmar_operacao_milly','recusar_operacao_milly',
+  expect(listing.result.tools).toHaveLength(108);
+  expect(listing.result.tools).toContainEqual(expect.objectContaining({name:'consultar_retirada_para_cancelar'}));
+  const newWrites=['confirmar_operacao_milly','recusar_operacao_milly','cancelar_retirada_matriz',
     'registrar_entrada_estoque','definir_estoque','remover_medida_estoque','registrar_perda_estoque',
     'registrar_contagem_estoque','corrigir_marca_estoque','alterar_condicao_estoque','separar_lote_estoque',
     'confirmar_transferencia_estoque','estornar_transferencia_estoque','cadastrar_produto_catalogo','editar_ficha_catalogo',
@@ -561,7 +562,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(106);
+    expect((await client.listTools()).tools).toHaveLength(108);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
