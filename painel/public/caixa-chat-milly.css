@@ -1,5 +1,5 @@
 /* Histórico privado dentro do chat existente da Matriz e da Operação. */
-.mh-workspace-head,.mh-all-modules,.mh-list-filter,.mh-analysis-contact,.mh-queue-line{display:none}
+.mh-list-filter,.mh-analysis-contact,.mh-queue-line{display:none}
 .mh-detail-timing{display:none}
 .mh-product>img{width:clamp(48px,4.7vw,76px);height:clamp(64px,5.8vw,92px);object-fit:contain;flex:none}
 .mh-mobile-order{display:flex;align-items:center;gap:5px;background:none;border:0;padding:0;color:#07552d;text-align:left;font:inherit;font-weight:750}
@@ -129,7 +129,7 @@
   .mh-event time{padding-top:0}
   .mh-event>div::before{display:none}
 }
-@media(min-width:1100px){
+@container botchat (min-width:800px){
   #bot-chat-root #chat-panel.milly-open .mh-date{color:#52645b;font-size:12px}
   #bot-chat-root #chat-panel.milly-open .mh-turn{margin:0 0 12px;border:1px solid #cdd6d8;border-radius:10px;overflow:hidden}
   #bot-chat-root #chat-panel.milly-open .mh-turn>h4 button{min-height:46px;padding:9px 13px;gap:10px;background:#f6f8f9;color:#17222d;font-size:clamp(16px,1.13vw,19px)}
