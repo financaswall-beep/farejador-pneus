@@ -28,7 +28,7 @@ nesta revisão, e seus anos não foram ampliados.
 ## O que foi conferido novamente
 
 Foram examinados 43 PDFs do acervo oficial brasileiro da Yamaha. O arquivo
-`scripts/data/catalog-manual-review-20260911.json` guarda 98 observações de
+`src/shared/data/catalog-manual-review-20260911.json` guarda 98 observações de
 ano/posição, com URL, página e SHA-256 de cada PDF. Só anos-modelo consecutivos
 observados foram unidos em faixa. A ficha oficial já existente da NMAX 2026
 completa a consulta dessa família.

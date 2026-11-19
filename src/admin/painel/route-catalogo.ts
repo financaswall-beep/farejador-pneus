@@ -4,6 +4,7 @@ import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
 import { getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
 import { getMatrixCatalogWithWholesale } from './queries-catalogo-wholesale.js';
+import { registerReferenceClassification } from './catalog-reference-classification.js';
 import { registerCatalogWholesale } from './route-catalogo-wholesale.js';
 import { registerCatalogPhotoRoutes } from './route-catalogo-photos.js';
 import {
@@ -37,6 +38,7 @@ import {
 } from './route-catalogo-schemas.js';
 
 export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<void> {
+  registerReferenceClassification(fastify);
   await registerCatalogWholesale(fastify);
   await registerCatalogPhotoRoutes(fastify);
   fastify.get('/admin/api/catalog', { preHandler: requireAdminAuth }, async (request, reply) => {

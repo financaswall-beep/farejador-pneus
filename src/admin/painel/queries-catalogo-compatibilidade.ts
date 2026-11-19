@@ -6,6 +6,7 @@ import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
 import { applicationMeasureKey, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
 import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
+import { repairVehicleApplicationTypes, type MotorcycleReference } from '../../shared/vehicle-application-type-repair.js';
 import type { TireVehicleType } from '../../shared/tire-vehicle-type.js';
 
 export interface CatalogCompatibilityRow {
@@ -195,7 +196,9 @@ export async function getCatalogMeasureApplications(
       AND display_measure=$2 AND status<>'verified' AND ($3::text IS NULL OR vehicle_type=$3)
     ORDER BY make,model,application_id`,
   [environment, key, vehicleType ?? null]);
-  return { applications, application_reviews: reviews.rows };
+  const referencias_para_classificar = key && (vehicleType === 'motorcycle' || vehicleType === undefined)
+    ? (await repairVehicleApplicationTypes(dbPool, environment, key)).applications : [];
+  return { applications, application_reviews: reviews.rows, referencias_para_classificar };
 }
 
 export async function getCatalogCompatibility(
@@ -214,6 +217,7 @@ export async function getCatalogCompatibility(
   summary: { models: number; fitments: number };
   rows: CatalogCompatibilityRow[];
   applications: VehicleTireApplication[];
+  referencias_para_classificar: MotorcycleReference[];
   application_reviews: Array<{ application_id: string; make: string; model: string;
     position: string; year_start: number | null; year_end: number | null; status: string; review_note: string }>;
 }> {

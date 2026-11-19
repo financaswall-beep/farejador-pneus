@@ -126,3 +126,29 @@ it('opera ficha, atacado, contagem e separação/estorno de lote pelos serviços
   expect((await db.pool.query('SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE id=$1',[stock.id])).rows[0].quantity_on_hand).toBe(5);
   expect(await call('consultar_ficha_catalogo',{product_id:productId})).not.toHaveProperty('isError');
 });
+
+it('Milly encontra as referências antigas ao cadastrar e só classifica as escolhidas pelo dono', async () => {
+  const { importVehicleApplications } = await import('../../scripts/vehicle-application-import.js');
+  const client = await db.pool.connect();
+  try { await importVehicleApplications(client, 'test'); } finally { client.release(); }
+  await db.pool.query("UPDATE commerce.vehicle_measure_applications SET vehicle_type=NULL WHERE environment='test' AND display_measure='100/90-19'");
+  const created = await approve('cadastrar_produto_catalogo', {creation_mode:'manual',measure:'100/90-19',brand,
+    tire_condition:'meia_vida',product_code:'TEST-'+randomUUID(),product_name:'Pirelli de teste',vehicle_type:'motorcycle',idempotency_key:randomUUID()});
+  const refs = created.resultado.referencias_para_classificar;
+  expect(refs).toHaveLength(5);
+  const id = created.resultado.product_id;
+  const before = await call('consultar_ficha_catalogo',{product_id:id});
+  expect(before.compatibilidades).toMatchObject({applications:[],rows:[],referencias_para_classificar:refs});
+  const data = {measure:'100/90-19',application_ids:[refs[0].application_id],idempotency_key:randomUUID()};
+  const result = await approve('classificar_referencias_moto',data);
+  expect(result.resultado.changed).toBe(1);
+  expect(await call('classificar_referencias_moto',data)).toEqual(result);
+  const stale = await approve('classificar_referencias_moto',{...data,application_ids:[refs[1].application_id,refs[0].application_id],idempotency_key:randomUUID()});
+  expect(stale.isError).toBe(true);
+  const after = (await call('consultar_ficha_catalogo',{product_id:id})).compatibilidades;
+  expect(after.applications.map((r:any)=>r.application_id)).toEqual(data.application_ids);
+  expect(after.referencias_para_classificar).toHaveLength(4);
+  expect(after.rows).toEqual([]);
+  const audit = await db.pool.query("SELECT actor_label FROM audit.events WHERE event_type='catalog_application_vehicle_type_repaired'");
+  expect(audit.rows).toEqual([{actor_label:'Milly · '+identity.person_id}]);
+});

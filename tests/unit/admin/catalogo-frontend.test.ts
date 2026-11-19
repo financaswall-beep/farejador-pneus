@@ -621,6 +621,20 @@ describe('catalogo no painel', () => {
     expect(empty([], [], false, 'Falha ao carregar')).toBe(false);
   });
 
+  it('permite ao dono classificar apenas as referências selecionadas e recarrega a ficha', async () => {
+    const context = { ...loadCatalogModule(), adminUser: {role:'operator'}, apiPost:vi.fn().mockResolvedValue({changed:1}),
+      catalogoCompatibilidade: {row:{product_id:'pneu',tire_size:'100/90-19'}, selectedReferences:['M071:front:100/90-19']},
+      catalogoCompatibilityLoad:vi.fn(),loadCatalogo:vi.fn() };
+    await context.catalogoClassifyReferences();
+    expect(context.apiPost).not.toHaveBeenCalled();
+    context.adminUser.role = 'owner';
+    await context.catalogoClassifyReferences();
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/measure-applications/classify-motorcycle',
+      {measure:'100/90-19', application_ids:['M071:front:100/90-19']});
+    expect(context.catalogoCompatibilityLoad).toHaveBeenCalledWith('pneu');
+    expect(context.loadCatalogo).toHaveBeenCalledOnce();
+  });
+
   it('salva compatibilidade oficial e mantém pesquisa da internet pendente', async () => {
     const module = loadCatalogModule();
     const context = {
