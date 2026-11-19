@@ -37,7 +37,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
     'app.compras.viagens.js', 'app.compras.viagens.dialog.js',
-    'app.catalogo.photos.js',
+    'app.catalogo.photos.js', 'app.partner-retiradas.report.js',
     'app.atacado.requests.js',
     'app.catalogo.atacado.js',
     'stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',

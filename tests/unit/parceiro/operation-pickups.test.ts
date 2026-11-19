@@ -5,6 +5,7 @@ import { getPartnerPickupPhoto } from '../../../src/parceiro/operation-pickup-ph
 
 const mocks = vi.hoisted(() => ({ query: vi.fn(), read: vi.fn(), services: vi.fn() }));
 vi.mock('../../../src/parceiro/db.js', () => ({ withPartnerContext: (_id: string, work: any) => work({ query: mocks.query }) }));
+vi.mock('../../../src/shared/config/env.js', () => ({ env: { BOT_PICKUP_RESERVATION_HOURS: 24 } }));
 vi.mock('../../../src/photos/storage.js', () => ({ readStoredTirePhoto: mocks.read }));
 vi.mock('../../../src/shared/pickup-service-persistence.js', () => ({ materializePartnerPickupServices: mocks.services }));
 const ctx = { partnerUnitId: 'network-unit', unitId: 'unit-a', environment: 'test', tokenId: 'token-a', slug: 'loja' } as PartnerContext;
@@ -29,8 +30,9 @@ describe('motor de retirada simplificado', () => {
   it('busca avatar e metadados somente na unidade e ambiente da retirada', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [] }); await getPartnerRetiradas(ctx);
     const [sql, params] = mocks.query.mock.calls[0];
-    expect(params).toEqual(['test', 'unit-a']);
+    expect(params).toEqual(['test', 'unit-a', 24]);
     expect(sql).toContain('pc.environment=po.environment AND pc.unit_id=po.unit_id');
+    expect(sql).toContain('commerce.partner_pickup_metadata(po.environment,po.id,$3)');
     expect(sql).toContain('pr.order_item_id=item.id'); expect(sql).toContain('blob.deleted_at IS NULL');
   });
   it('imagem ausente ou de outra retirada não é lida do Storage', async () => {

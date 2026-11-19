@@ -37,7 +37,7 @@ export const expandedTools={
   consultar_despesas_matriz:tool('Despesas operacionais, categorias e metadados de comprovantes. Sem fotos, descrições pessoais ou pagamentos individuais da equipe.',
     views(['despesas','comprovantes','categorias']),(ctx,input)=>readDotExpenses(ctx,input.visao)),
   consultar_rotas_matriz:simple('Rotas da Matriz: situação, paradas, quilômetros, combustível informado e despesas aprovadas. Entregador por código.',readDotTrips),
-  consultar_retiradas_matriz:simple('Reservas abertas e retiradas do período: aguardando, cliente chegou, instalação ou retirada concluída.',readDotPickups),
+  consultar_retiradas_matriz:simple('Reservas abertas e retiradas concluídas do período. Mostra situação, prazo da reserva automática quando aplicável, número e referência da retirada da Matriz.',readDotPickups),
   consultar_rede_matriz:tool('Relacionamento comercial da Matriz com a Rede: lojas, termos, comissões, mensalidades e pedidos originados pela Rede. Sem financeiro privado das lojas.',
     views(['lojas','comissoes','mensalidades','funil']),(ctx,input)=>readDotNetwork(ctx,input.visao)),
   consultar_candidaturas_matriz:simple('Solicitações de novas lojas por código, situação e datas da análise, sem contatos ou documentos pessoais.',readDotApplications),

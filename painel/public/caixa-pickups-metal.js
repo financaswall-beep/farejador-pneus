@@ -31,7 +31,7 @@
     if (!valid() || P.state.saving || m.phase !== 'ready') return;
     P.state.selectedId = id; const row = P.selected(); if (!row) return;
     m.received = false; m.reason = ''; m.receipt = null;
-    navigate(({ waiting: 'arrival', arrived: 'services', installing: 'services', completed: 'completed' })[P.pickupStage(row)]);
+    navigate(({ waiting: 'arrival', ready: 'arrival', arrived: 'services', installing: 'services', completed: 'completed' })[P.pickupStage(row)]);
   }
   function close() {
     if (C.isPartner()) return legacy.close();
@@ -74,12 +74,17 @@
       let result;
       if (kind === 'complete') result = await P.actions.completePickup();
       else if (kind === 'cancel-confirm') result = await P.actions.cancelPickup(m.reason.trim());
-      else result = await P.actions.saveStage(({ arrived: 'arrived', install: 'installing', 'previous-stage': P.pickupStage(row) === 'installing' ? 'arrived' : 'waiting' })[kind]);
+      else {
+        const stage = { ready: 'ready', arrived: 'arrived', install: 'installing',
+          'previous-stage': P.pickupStage(row) === 'installing' ? 'arrived' : 'waiting' }[kind];
+        if (!stage) return;
+        result = await P.actions.saveStage(stage);
+      }
       if (!valid() || own !== m.session || epoch !== m.epoch) return;
       if (result) {
         if (kind === 'complete') { m.receipt = { ...receipt, ...result }; m.view = 'completed'; m.received = false; }
         else if (kind === 'cancel-confirm') m.view = 'queue';
-        else m.view = P.pickupStage(P.selected()) === 'waiting' ? 'arrival' : 'services';
+        else m.view = ['waiting', 'ready'].includes(P.pickupStage(P.selected())) ? 'arrival' : 'services';
       }
     } finally { if (own === m.session && epoch === m.epoch) { m.busy = false; render(); } }
   }

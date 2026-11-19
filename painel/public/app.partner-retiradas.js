@@ -14,13 +14,13 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     app.partnerRetiradasError = 'Atendimento disponível a partir de ' + app.formatDateTime(row.fulfillment_not_before) + '.';
     return true;
   };
-  return {
+  return Object.defineProperties({
     partnerRetiradasRows: [], partnerRetiradasLoading: false,
     partnerRetiradasError: '', partnerRetiradasNotice: '',
     partnerRetiradasSavingId: '', partnerRetiradasPayments: {},
     partnerRetiradasServices: {}, partnerRetiradasServiceCatalog: [],
     partnerRetiradasSelectedId: '', partnerRetiradasSearch: '',
-    partnerRetiradasFilter: 'all', partnerRetiradasCancelId: null,
+    partnerRetiradasFilter: 'all', partnerRetiradasPeriod: 'all', partnerRetiradasCancelId: null,
     partnerRetiradasCancelReason: '',
     partnerRetiradasPhotoUrls: {}, partnerRetiradasPhotoOpen: false,
     partnerRetiradasPhotoUrl: '',
@@ -59,9 +59,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
             if (row.photo_request_id) void this.partnerRetiradasLoadPhoto(row.photo_request_id);
           }
         }
-        if (!this.partnerRetiradasSelectedId && this.partnerRetiradasActiveRows[0]) {
-          this.partnerRetiradasSelectedId = this.partnerRetiradasActiveRows[0].order_id;
-        }
+        if (this.partnerRetiradasSelectedId && !this.partnerRetiradasSelected) this.partnerRetiradasClose();
         if (this.isPartnerPanel()) void this.partnerPanelTelemetry({
           page: 'retiradas', event_type: 'read', operation: 'load_pickups', outcome: 'success',
           duration_ms: Math.round(performance.now() - startedAt),
@@ -81,32 +79,6 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     partnerRetiradasNumber(value) {
       const parsed = Number(value ?? 0); return Number.isFinite(parsed) ? parsed : 0;
     },
-    partnerRetiradasStage(row) {
-      if (row?.retrieved_at || (row?.status === 'paid' && row?.awaiting_pickup === false)) return 'completed';
-      if (row?.pickup_installation_started_at) return 'installing';
-      if (row?.pickup_arrived_at) return 'arrived';
-      return 'waiting';
-    },
-    partnerRetiradasStageLabel(row) {
-      return ({ waiting: 'Aguardando cliente', arrived: 'Na loja', installing: 'Em instalação',
-        completed: 'Concluído' })[this.partnerRetiradasStage(row)];
-    },
-    partnerRetiradasStageIcon(row) {
-      return ({ waiting: 'clock-3', arrived: 'store', installing: 'wrench',
-        completed: 'circle-check' })[this.partnerRetiradasStage(row)];
-    },
-    partnerRetiradasStepReached(row, step) {
-      const reached = ({ waiting: 0, arrived: 1, installing: 3, completed: 4 })[
-        this.partnerRetiradasStage(row)
-      ] ?? 0;
-      const target = ({ arrived: 1, payment: 2, installing: 3, completed: 4 })[step] ?? 99;
-      return reached >= target;
-    },
-    partnerRetiradasIsToday(value) {
-      if (!value) return false;
-      return new Date(value).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
-        === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    },
     get partnerRetiradasActiveRows() {
       return this.partnerRetiradasRows.filter((row) => this.partnerRetiradasStage(row) !== 'completed');
     },
@@ -116,31 +88,21 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
         (sum, row) => sum + this.partnerRetiradasNumber(row.total_amount), 0,
       );
     },
-    get partnerRetiradasSummary() {
-      const rows = this.partnerRetiradasRows;
-      return {
-        waiting: rows.filter((row) => this.partnerRetiradasStage(row) === 'waiting').length,
-        // "Chegaram hoje" continua contando quem ja avancou para instalacao ou conclusao.
-        arrived: rows.filter((row) => this.partnerRetiradasIsToday(row.pickup_arrived_at)).length,
-        installing: rows.filter((row) => this.partnerRetiradasStage(row) === 'installing').length,
-        completed: rows.filter((row) => this.partnerRetiradasStage(row) === 'completed'
-          && this.partnerRetiradasIsToday(row.retrieved_at)).length,
-      };
-    },
-    get partnerRetiradasFilteredRows() {
-      const query = String(this.partnerRetiradasSearch || '').trim().toLowerCase();
-      return this.partnerRetiradasRows.filter((row) => {
-        const stage = this.partnerRetiradasStage(row);
-        const matchesStage = this.partnerRetiradasFilter === 'all'
-          || this.partnerRetiradasFilter === stage;
-        const haystack = `${row.customer_name || ''} ${row.order_id || ''} ${this.partnerRetiradasItemsLabel(row)}`.toLowerCase();
-        return matchesStage && (!query || haystack.includes(query));
-      });
-    },
     get partnerRetiradasSelected() {
       return this.partnerRetiradasRows.find((row) => row.order_id === this.partnerRetiradasSelectedId) || null;
     },
-    partnerRetiradasSelect(row) { this.partnerRetiradasSelectedId = row.order_id; },
+    partnerRetiradasSelect(row) {
+      this.partnerRetiradasCloseCancel(); this.partnerRetiradasSelectedId = row.order_id;
+      this.$nextTick(() => {
+        document.getElementById('pickup-detail-title')?.focus();
+        lucide.createIcons();
+      });
+    },
+    partnerRetiradasClose(returnFocus = false) {
+      const selectedId = this.partnerRetiradasSelectedId;
+      this.partnerRetiradasSelectedId = ''; this.partnerRetiradasCloseCancel();
+      if (returnFocus) this.$nextTick(() => document.getElementById(`pickup-open-${selectedId}`)?.focus());
+    },
     partnerRetiradasItemsLabel(row) {
       const items = productItems(row);
       return items.length ? items.map((item) => `${itemLabel(item)}${
@@ -149,10 +111,6 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     partnerRetiradasPhone(row) { return String(row?.customer_phone || '').replace(/\D/g, ''); },
     partnerRetiradasIsTwoW(row) {
       return String(row?.source_tag || row?.source || '').trim().toLowerCase() === '2w';
-    },
-    partnerRetiradasWaLink(row) {
-      let digits = this.partnerRetiradasPhone(row); if ([10, 11].includes(digits.length)) digits = `55${digits}`;
-      return digits ? `https://wa.me/${digits}?text=${encodeURIComponent('Olá! Seu pedido está reservado e pronto para retirada na loja.')}` : '#';
     },
     partnerRetiradasPaymentFor(row) { return this.partnerRetiradasPayments[row.order_id] || 'Pix'; },
     partnerRetiradasSetPayment(orderId, payment) {
@@ -199,7 +157,9 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     },
     async partnerRetiradasStageSave(row, stage) {
       if (!row?.order_id || this.partnerRetiradasSavingId) return;
-      if (windowBlocked(this, row)) return;
+      if (stage === 'ready') {
+        if (this.partnerRetiradasStage(row) !== 'waiting' || this.partnerRetiradasExpiry(row) === 'expired') return;
+      } else if (windowBlocked(this, row)) return;
       this.partnerRetiradasSavingId = row.order_id; this.partnerRetiradasError = '';
       const body = { stage, services: this.partnerRetiradasDraft(row) };
       try {
@@ -240,6 +200,7 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     },
     partnerRetiradasErrorMessage(error) {
       if ((error?.code || error?.message) === 'pickup_already_retrieved') return 'Esta retirada já foi finalizada.';
+      if ((error?.code || error?.message) === 'pickup_not_found') return 'Esta retirada já mudou. Atualize a fila.';
       if ((error?.code || error?.message) === 'reserva_insuficiente') return 'A reserva de estoque não está íntegra. Nada foi baixado.';
       if (error?.status === 403) return 'Seu usuário não tem permissão para operar Retiradas.';
       return error?.message || 'Não foi possível concluir a operação.';
@@ -261,5 +222,5 @@ window.PAINEL_MODULES.partnerRetiradas = function () {
     partnerRetiradasClosePhoto() {
       this.partnerRetiradasPhotoOpen = false; this.partnerRetiradasPhotoUrl = '';
     },
-  };
+  }, Object.getOwnPropertyDescriptors(window.PAINEL_MODULES.partnerRetiradasReport()));
 };

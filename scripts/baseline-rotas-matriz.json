@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-19T02:31:04.411Z",
-  "total": 623,
+  "geradoEm": "2026-11-19T03:12:09.748Z",
+  "total": 624,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -309,6 +309,7 @@
     "GET /admin/painel/app.partner-logistica.js PUBLICA",
     "GET /admin/painel/app.partner-resumo.js PUBLICA",
     "GET /admin/painel/app.partner-retiradas.js PUBLICA",
+    "GET /admin/painel/app.partner-retiradas.report.js PUBLICA",
     "GET /admin/painel/app.partner-vendas.dashboard.js PUBLICA",
     "GET /admin/painel/app.partner-vendas.js PUBLICA",
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",

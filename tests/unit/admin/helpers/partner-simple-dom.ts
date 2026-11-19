@@ -105,7 +105,7 @@ export function partnerScreen(partner = true, permissions: Record<string, boolea
     sessionStorage: { getItem: () => '' }, AbortController, Promise, Date,
     URL: { createObjectURL: vi.fn(() => 'blob:photo'), revokeObjectURL: vi.fn() },
   };
-  for (const file of ['modules', 'brand-catalog', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-hours', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-buy-ui', 'partner-buy-orders', 'partner-buy', 'partner-replenishment', 'partner-home']) {
+  for (const file of ['modules', 'brand-catalog', 'pickups-core', 'partner-ui', 'partner-data', 'partner-orders', 'partner-waiting', 'partner-photo', 'partner-pickups', 'partner-deliveries', 'partner-stock-fields', 'partner-stock-form', 'partner-stock', 'partner-store', 'partner-hours', 'partner-store-form', 'partner-team', 'partner-extras', 'partner-buy-ui', 'partner-buy-orders', 'partner-buy', 'partner-replenishment', 'partner-home']) {
     if (file === 'partner-photo') {
       runInNewContext(readFileSync('painel/public/caixa-partner-photo-ui.js', 'utf8'), context);
       runInNewContext(readFileSync('painel/public/caixa-partner-photo-upload.js', 'utf8'), context);

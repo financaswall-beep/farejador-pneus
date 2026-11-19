@@ -1,8 +1,38 @@
 (function () {
   'use strict';
   const Caixa = window.Caixa;
+  if (!Caixa) return;
+  const zone = { timeZone: 'America/Sao_Paulo' };
+  const day = new Intl.DateTimeFormat('en-CA', zone);
+  const time = new Intl.DateTimeFormat('pt-BR', { ...zone, hour: '2-digit', minute: '2-digit' });
+  const date = new Intl.DateTimeFormat('pt-BR', { ...zone, day: '2-digit', month: '2-digit' });
+  const timestamp = value => value ? new Date(value).getTime() : NaN;
+  function expiry(row) {
+    const at = timestamp(row?.reservation_expires_at);
+    if (!Number.isFinite(at)) return null;
+    const now = Date.now();
+    const dateLabel = day.format(at) === day.format(now) ? 'hoje'
+      : day.format(at) === day.format(now + 86_400_000) ? 'amanhã' : date.format(at);
+    const beforeArrival = ['waiting', 'ready'].includes(pickupStage(row));
+    const level = beforeArrival && at <= now ? 'expired' : beforeArrival && at - now <= 60 * 60_000 ? 'soon' : '';
+    return { level, label: (level === 'expired' ? 'Reserva vencida · ' : 'Reserva até ')
+      + dateLabel + ', ' + time.format(at) };
+  }
+  function history(row) {
+    return [
+      [row.reservation_started_at ? 'Reserva criada' : 'Pedido criado', row.reservation_started_at || row.created_at],
+      ['Marcado como pronto', row.pickup_ready_at],
+      ['Cliente chegou', row.pickup_arrived_at],
+      ['Instalação iniciada', row.pickup_installation_started_at],
+      ['Retirada concluída', row.retrieved_at],
+    ].filter(([, when]) => Number.isFinite(timestamp(when)))
+      .sort((a, b) => timestamp(a[1]) - timestamp(b[1]))
+      .map(([label, when]) => ({ label, when, text: date.format(timestamp(when)) + ', ' + time.format(timestamp(when)) }));
+  }
+  const normalizeSearch = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+  Caixa.pickupReport = { expiry, history, normalizeSearch, orderLabel, stage: pickupStage, stageLabel, whatsappLink, checkWhatsapp };
   const panel = document.getElementById('pickups-panel');
-  if (!Caixa || !panel) return;
+  if (!panel) return;
   const byId = function (id) { return document.getElementById(id); };
   const elements = {
     panel: panel,
@@ -38,19 +68,22 @@
     return Caixa.currency.format(Number.isFinite(number) ? number : 0);
   }
   function orderLabel(row) {
+    if (row?.order_public_code || row?.public_code) return row.order_public_code || row.public_code;
+    if (row?.order_number != null) return String(row.order_number);
     const raw = String(row && row.order_id || '');
-    return 'Pedido #' + (raw.includes('-') ? raw.slice(0, 8).toUpperCase() : raw);
+    return '#' + raw.slice(0, 8).toUpperCase();
   }
   function pickupStage(row) {
     if (!row) return 'waiting';
     if (row.retrieved_at || (row.status === 'paid' && row.awaiting_pickup === false)) return 'completed';
     if (row.pickup_installation_started_at) return 'installing';
     if (row.pickup_arrived_at) return 'arrived';
+    if (row.pickup_ready_at) return 'ready';
     return 'waiting';
   }
   function stageLabel(stage) {
-    return ({ waiting: 'Aguardando cliente', arrived: 'Na loja', installing: 'Em instalação', completed: 'Concluída' })[stage]
-      || 'Aguardando cliente';
+    return ({ waiting: 'A separar', ready: 'Pronto para retirar', arrived: 'Na loja',
+      installing: 'Em instalação', completed: 'Concluída' })[stage] || 'A separar';
   }
   function isToday(value) {
     if (!value) return false;
@@ -72,11 +105,20 @@
     }).join(' · ');
   }
   function whatsappLink(row) {
+    if (pickupStage(row) !== 'ready' || expiry(row)?.level === 'expired') return '';
     let digits = String(row && row.customer_phone || '').replace(/\D/g, '');
     if (digits.length === 10 || digits.length === 11) digits = '55' + digits;
-    if (!digits) return '';
-    const message = encodeURIComponent('Olá! Seu pedido está reservado e pronto para retirada na loja.');
+    if (!/^\d{12,15}$/.test(digits)) return '';
+    const startsAt = timestamp(row.fulfillment_not_before);
+    const schedule = startsAt > Date.now() ? ' A retirada começa em ' + date.format(startsAt) + ', às ' + time.format(startsAt) + '.' : '';
+    const message = encodeURIComponent('Olá! Seu pedido está pronto para retirada na loja.' + schedule);
     return 'https://wa.me/' + digits + '?text=' + message;
+  }
+  function checkWhatsapp(event, row) {
+    const href = whatsappLink(row);
+    if (href) { event.currentTarget.href = href; return; }
+    event.preventDefault();
+    Caixa.showToast('Este pedido já mudou. Atualize a fila antes de avisar o cliente.');
   }
   function selected() {
     return state.rows.find(function (row) { return row.order_id === state.selectedId; }) || null;
@@ -98,6 +140,8 @@
     return Number(row && row.total_amount || 0) + pending;
   }
   function reservationLabel(row) {
+    const deadline = expiry(row);
+    if (deadline) return deadline.label;
     if (!row || !row.created_at) return 'Reserva ativa';
     const instant = new Date(row.created_at);
     if (Number.isNaN(instant.getTime())) return 'Reserva ativa';
@@ -113,7 +157,7 @@
     const summary = { waiting: 0, arrived: 0, installing: 0, completed: 0 };
     state.rows.forEach(function (row) {
       const stage = pickupStage(row);
-      if (stage === 'waiting') summary.waiting += 1;
+      if (stage === 'waiting' || stage === 'ready') summary.waiting += 1;
       if (isToday(row.pickup_arrived_at)) summary.arrived += 1;
       if (stage === 'installing') summary.installing += 1;
       if (stage === 'completed' && isToday(row.retrieved_at)) summary.completed += 1;
@@ -127,7 +171,7 @@
     const query = state.search.trim().toLowerCase();
     return state.rows.filter(function (row) {
       const stage = pickupStage(row);
-      if (state.filter !== 'all' && state.filter !== stage) return false;
+      if (state.filter !== 'all' && state.filter !== stage && !(state.filter === 'waiting' && stage === 'ready')) return false;
       if (!query) return true;
       return [row.customer_name, row.customer_phone, row.order_id, itemsLabel(row)]
         .join(' ').toLowerCase().includes(query);
@@ -183,12 +227,13 @@
     const wa = whatsappLink(row);
     if (wa) {
       const link = node('a', 'pickup-card-whatsapp', 'WhatsApp');
-      link.href = wa; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.appendChild(link);
-    } else {
+      link.href = wa; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      link.addEventListener('click', event => checkWhatsapp(event, row)); actions.appendChild(link);
+    } else if (pickupStage(row) === 'ready') {
       const unavailable = node('button', 'pickup-card-whatsapp pickup-card-whatsapp--disabled', 'Sem WhatsApp');
       unavailable.type = 'button'; unavailable.disabled = true; actions.appendChild(unavailable);
     }
-    const open = node('button', 'pickup-card-open', pickupStage(row) === 'waiting' ? 'Cliente chegou' : 'Abrir atendimento');
+    const open = node('button', 'pickup-card-open', 'Abrir atendimento');
     open.type = 'button'; open.dataset.openPickup = row.order_id; actions.appendChild(open);
     footer.appendChild(actions); card.appendChild(footer);
     return card;

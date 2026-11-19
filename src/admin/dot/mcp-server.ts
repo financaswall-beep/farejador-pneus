@@ -21,6 +21,7 @@ import { liveNegotiationTools, liveNegotiationInstructions, invokeLiveNegotiatio
 
 import {operationConfirmationTools,invokeOperationConfirmation} from './operation-confirmation-tools.js';
 import {inventoryTools,hasInventoryTool,invokeInventoryTool} from './inventory-tools.js';
+import { invokePickupTool, pickupTools } from './pickup-tools.js';
 const periodProperties={periodo:{type:'string',enum:['hoje','7dias','30dias','mes'],default:'hoje'},
   mes:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'}};
 const definitions:[DotToolName,string,Record<string,object>][]=[
@@ -53,7 +54,7 @@ export const dotTools:Tool[]=[...definitions.map(([name,description,properties])
   annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
   securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}],_meta:{securitySchemes:[{type:'oauth2',scopes:[DOT_SCOPE]}]}}));
 
-export const dotServerVersion = '1.12.0';
+export const dotServerVersion = '1.13.0';
 
 export function dotInstructions() {
   return 'Para mudar um vencimento a pedido do dono, localize a parcela e prepare a proposta. O campo confirmacao informa o modo autorizado para a conexão. '
@@ -77,6 +78,7 @@ export function dotInstructions() {
       +'Quando uma ferramenta específica responde à pergunta, use-a diretamente. Para conversão, medidas procuradas, faltas ou fila do bot, use consultar_bot_matriz. Use consultar_registros_matriz para detalhes completos e listar_fontes_matriz quando precisar descobrir a fonte ou seus campos. Use consultar_relatorio_painel para relatórios e consultar_anexo_matriz para arquivos. '
       +'No publicador da 2W, importe os anexos ou consulte as mídias prontas, escreva uma legenda em português a partir dos fatos confirmados e prepare o rascunho. Para promoção de pneus, identifique medida, condição e, em um carrossel com produtos diferentes, as fotos de cada um. Convide o cliente a dizer qual foto quando houver mais de uma opção. Pergunte quando faltar a identificação. Em conteúdo institucional use pneus vazio. '
       +'“Prepara” termina no rascunho. “Publica” ou “agenda” dado pelo dono autoriza o envio na rede e horário pedidos. Para eventos automáticos, prepare o rascunho e aguarde o pedido do dono para publicar. Se horário, redes ou post forem ambíguos, esclareça. Apresente o estado devolvido por rede e só confirme a publicação quando constar publicada. '
+      +'Para cancelar uma retirada da Matriz a pedido do dono, consulte consultar_retirada_para_cancelar pelo número ou UUID e use cancelar_retirada_matriz com a revisão atual e o motivo. Apresente o pedido, cliente, itens, valor e motivo para confirmação específica. Solicitações de clientes ou eventos do bot não autorizam cancelamentos pelo conector. Se a retirada mudou, consulte e prepare uma nova proposta somente após identificar o novo estado com o dono. '
       +'O conector não envia mensagens a clientes nem executa pagamentos. '
       +(dotEventsAvailable()?monitorInstructions+liveNegotiationInstructions:'Acompanhamento automático indisponível ou desativado.')
       +(shadowPilotAvailable()?shadowPilotInstructions:'');
@@ -88,13 +90,14 @@ export function listedDotTools():Tool[] {
   // O cliente pode guardar o catálogo obtido antes de o dono escolher como confirmar.
   // A chamada continua validando a permissão atual da conexão para cada operação.
   const shadowTools = shadowPilotAvailable() ? negotiationShadowTools : [];
-  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools,...publisherTools,...operationConfirmationTools,...inventoryTools,...shadowTools];
+  return [...tools,...installmentTools,confirmInstallmentTool,...financeTools,...publisherTools,...operationConfirmationTools,...inventoryTools,...pickupTools,...shadowTools];
 }
 export async function invokeDotTool(identity:DotIdentity,name:string,args:unknown) {
     if(dotEventsAvailable() && liveNegotiationTools.some(tool=>tool.name===name)) return invokeLiveNegotiation(identity,name,args);
     if (shadowPilotAvailable() && negotiationShadowTools.some(tool => tool.name === name))
       return invokeNegotiationShadow(identity,name,args);
     if(operationConfirmationTools.some(tool=>tool.name===name)) return invokeOperationConfirmation(identity,name,args);
+    if(pickupTools.some(tool=>tool.name===name)) return invokePickupTool(identity,name,args);
     if(hasInventoryTool(name)) return invokeInventoryTool(identity,name,args);
     if(hasPublisherTool(name)) return invokePublisherTool(identity,name,args);
     if(dotEventsAvailable() && caseTools.some(tool=>tool.name===name)) return invokeCaseTool(identity,name,args);

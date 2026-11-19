@@ -109,6 +109,77 @@ it('publicador usa a mesma confirmação para cancelar, agendar, reagendar e exc
   }
 });
 
+async function createPickup() {
+  const unit=(await db.pool.query(`INSERT INTO core.units(environment,slug,name,is_active) VALUES('test','main','Matriz',true)
+    ON CONFLICT (environment,slug) DO UPDATE SET name=EXCLUDED.name RETURNING id`)).rows[0].id;
+  const contact=(await db.pool.query(`INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
+    VALUES('test',$1,'Cliente de retirada') RETURNING id`,[randomBytes(5).readUIntBE(0,5)])).rows[0].id;
+  const size=(await db.pool.query(`SELECT tire_size FROM commerce.tire_specs WHERE environment='test' AND product_id=$1`,[productId])).rows[0].tire_size;
+  const stock=(await db.pool.query(`INSERT INTO commerce.wholesale_stock(environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+    VALUES('test',$1,$2,'novo',3,40) ON CONFLICT (environment,measure,brand,tire_condition)
+    DO UPDATE SET quantity_on_hand=3,quantity_reserved=0,unit_cost=40 RETURNING id`,[size,brand])).rows[0].id;
+  const {id,order_number}=(await db.pool.query(`INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
+    payment_method,unit_id,source,idempotency_key) VALUES('test',$1,80,'open','pickup','A receber',$2,'chatwoot_com_bot',$3)
+    RETURNING id,order_number`,[contact,unit,'bot:order:'+randomUUID()])).rows[0];
+  await db.pool.query(`INSERT INTO commerce.order_items(environment,order_id,product_id,quantity,unit_price,
+    discount_amount,reference_unit_price,matriz_unit_cost) VALUES('test',$1,$2,1,80,0,80,40)`,[id,productId]);
+  const {reserveMatrizGalpaoStock}=await import('../../src/atendente-v2/matriz-stock-reservation.js');
+  const {transact}=await import('../../src/admin/dot/installment-reviews.js');
+  await transact(client=>reserveMatrizGalpaoStock(client,'test',id,[{productId,quantity:1}],true));
+  return {id,order_number,size,stock};
+}
+
+it('Milly identifica a retirada e libera a reserva só uma vez após confirmação em voz ou texto',async()=>{
+  const order=await createPickup();
+  const {updateMatrizPickupStage}=await import('../../src/admin/painel/queries-pickups.js');
+  await updateMatrizPickupStage({order_id:order.id,stage:'ready',services:[],actor_label:'Operador',environment:'test'},db.pool);
+  const queue=await call('consultar_retiradas_matriz',{referencia:order.id});
+  expect(queue.rows).toEqual([expect.objectContaining({id:order.id,stage:'pronto_para_retirar',reservation_expires_at:expect.any(String)})]);
+  const candidate=await call('consultar_retirada_para_cancelar',{numero_pedido:order.order_number.replace(/^PED-0*/, '')});
+  expect(candidate.ficha).toMatchObject({retirada_id:order.id,numero_pedido:order.order_number,
+    cliente:'Cliente de retirada',total:'80.00',itens:[{medida:order.size,marca:brand,quantidade:1}]});
+  const cancel={retirada_id:order.id,revisao:candidate.revisao,motivo:'Cliente desistiu',idempotency_key:randomUUID()};
+  const blocked=await call('cancelar_retirada_matriz',cancel);
+  expect(blocked.isError).toBe(true);
+  await db.pool.query(`UPDATE network.dot_oauth_grants SET pickup_operations_enabled=true WHERE id=$1`,[identity.grant_id]);
+  const pending=await call('cancelar_retirada_matriz',cancel);
+  expect(pending).toMatchObject({status:'aguardando_autorizacao',confirmacao:'conversa',executada:false,
+    dados:{ficha:candidate.ficha,motivo:cancel.motivo}});
+  const state=async()=> (await db.pool.query(`SELECT o.status,s.quantity_on_hand,s.quantity_reserved
+    FROM commerce.orders o JOIN commerce.wholesale_stock s ON s.id=$2 WHERE o.id=$1`,[order.id,order.stock])).rows[0];
+  expect(await state()).toEqual({status:'open',quantity_on_hand:3,quantity_reserved:1});
+  const confirm={proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true};
+  const other=await grant(identity.person_id,identity.collaborator_id);
+  expect((await call('confirmar_operacao_milly',confirm,other)).isError).toBe(true);
+  expect(await call('confirmar_operacao_milly',confirm)).toMatchObject({status:'autorizada',executada:false});
+  expect(await state()).toMatchObject({status:'open',quantity_reserved:1});
+  const results=await Promise.all([call('cancelar_retirada_matriz',cancel),call('cancelar_retirada_matriz',cancel)]);
+  expect(results[0]).toEqual(results[1]);
+  expect(results[0]).toMatchObject({status:'executada',resultado:{cancelled:true,retirada_id:order.id}});
+  expect(await state()).toEqual({status:'cancelled',quantity_on_hand:3,quantity_reserved:0});
+  expect(await call('consultar_proposta_milly',{proposta:pending.proposta})).toMatchObject({status:'executada'});
+});
+
+it('Milly recusa cancelamento com ficha alterada depois do aval e restringe proposta ao canal permitido',async()=>{
+  const order=await createPickup();
+  await db.pool.query(`UPDATE network.dot_oauth_grants SET pickup_operations_enabled=true WHERE id=$1`,[identity.grant_id]);
+  const candidate=await call('consultar_retirada_para_cancelar',{retirada_id:order.id});
+  const cancel={retirada_id:order.id,revisao:candidate.revisao,motivo:'Cliente desistiu',idempotency_key:randomUUID()};
+  const pending=await call('cancelar_retirada_matriz',cancel);
+  await call('confirmar_operacao_milly',{proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true});
+  const {updateMatrizPickupStage}=await import('../../src/admin/painel/queries-pickups.js');
+  await updateMatrizPickupStage({order_id:order.id,stage:'arrived',services:[],actor_label:'Operador',environment:'test'},db.pool);
+  const stale=await call('cancelar_retirada_matriz',cancel);
+  expect(stale).toMatchObject({isError:true,text:[{text:'retirada_alterada_consulte_novamente'}]});
+  expect((await db.pool.query('SELECT status FROM commerce.orders WHERE id=$1',[order.id])).rows[0].status).toBe('open');
+  await db.pool.query(`UPDATE network.dot_oauth_grants SET operation_confirmation='legacy' WHERE id=$1`,[identity.grant_id]);
+  const updated=await call('consultar_retirada_para_cancelar',{retirada_id:order.id});
+  const panel=await call('cancelar_retirada_matriz',{...cancel,revisao:updated.revisao,idempotency_key:randomUUID()});
+  expect(panel).toMatchObject({status:'aguardando_autorizacao',confirmacao:'painel',executada:false});
+  expect(panel.confirm_url).toContain('/admin/dot/connections?operacao=');
+  expect((await call('confirmar_operacao_milly',{proposta:panel.proposta,fingerprint:panel.fingerprint,autorizado_pelo_dono:true})).isError).toBe(true);
+});
+
 it('opera ficha, atacado, contagem e separação/estorno de lote pelos serviços do painel',async()=>{
   expect(await approve('editar_ficha_catalogo',{product_id:productId,tread_pattern:'Touring',load_index:'91',speed_rating:'V',reason:'Ficha conferida',idempotency_key:randomUUID()})).toMatchObject({executada:true});
   const wholesale={product_id:productId,price_amount:180,reason:'Preço do dono',idempotency_key:randomUUID()};

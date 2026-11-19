@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const C = window.Caixa, P = C.Pickups;
+  const C = window.Caixa, P = C.Pickups, R = C.pickupReport;
   const paths = {
     back: 'm14 5-7 7 7 7', next: 'm9 5 7 7-7 7', refresh: 'M20 5v6h-6M4 19v-6h6M5 8a8 8 0 0 1 13-3l2 3M4 16l2 3a8 8 0 0 0 13-3',
     clock: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
@@ -23,7 +23,7 @@
   function plate(className) { return el('section', null, 'mp-plate ' + (className || '')); }
   const tires = row => (row.items || []).filter(item => !item.pickup_service_code);
   const quantity = row => tires(row).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-  const order = row => row.order_number ? 'Pedido ' + row.order_number : P.orderLabel(row);
+  const order = row => R.orderLabel(row);
   const condition = value => ({ novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' })[value] || '';
   function heading(title, back) {
     const n = el('header', null, 'mp-heading');
@@ -32,7 +32,7 @@
   }
   function status(row) {
     const stage = P.pickupStage(row), badge = el('span', null, 'mp-status mp-status-' + stage);
-    badge.append(icon(({ waiting: 'clock', arrived: 'person', installing: 'tool', completed: 'check' })[stage]), el('span', P.stageLabel(stage))); return badge;
+    badge.append(icon(({ waiting: 'clock', ready: 'check', arrived: 'person', installing: 'tool', completed: 'check' })[stage]), el('span', P.stageLabel(stage))); return badge;
   }
   function identity(row, showStatus = true) {
     const n = plate('mp-identity'), avatar = el('span', (row.customer_name || 'Cliente').split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]).join(''), 'mp-avatar');
@@ -63,19 +63,34 @@
     if (!Number.isFinite(services) || !Number.isFinite(total)) n.querySelectorAll('strong').forEach(value => { value.textContent = '—'; });
     return n;
   }
+  function history(row) {
+    const entries = R.history(row);
+    if (!entries.length) return null;
+    const card = plate('mp-history'), list = el('ol');
+    entries.forEach(entry => {
+      const item = el('li'), instant = el('time', entry.text);
+      instant.dateTime = entry.when; item.append(instant, el('span', entry.label)); list.appendChild(item);
+    });
+    card.append(el('h3', 'Histórico do pedido'), list); return card;
+  }
   function queue(m) {
     const page = el('div', null, 'mp-page mp-queue'), top = heading('Retiradas');
     const refresh = button('', 'refresh', 'icon', 'refresh'); refresh.setAttribute('aria-label', 'Atualizar retiradas'); top.appendChild(refresh); page.appendChild(top);
     const summary = el('div', null, 'mp-kpis');
-    [['waiting', 'Aguardando', 'clock'], ['arrived', 'Na loja', 'person'], ['installing', 'Instalação', 'tool']].forEach(([stage, label, symbol]) => {
-      const box = plate(), copy = el('div'); copy.append(el('small', label), el('strong', m.phase === 'ready' ? String(P.state.rows.filter(row => P.pickupStage(row) === stage).length) : '—'));
+    const metrics = [
+      ['Em aberto', 'person', row => P.pickupStage(row) !== 'completed'],
+      ['Prontas', 'check', row => P.pickupStage(row) === 'ready' && R.expiry(row)?.level !== 'expired'],
+      ['Vencem em breve', 'clock', row => R.expiry(row)?.level === 'soon'],
+    ];
+    metrics.forEach(([label, symbol, matches]) => {
+      const box = plate(), copy = el('div'); copy.append(el('small', label), el('strong', m.phase === 'ready' ? String(P.state.rows.filter(matches).length) : '—'));
       box.append(icon(symbol), copy); summary.appendChild(box);
     }); page.appendChild(summary);
     const search = el('label', null, 'mp-search'); search.appendChild(icon('search'));
     const input = el('input'); input.id = 'mp-search'; input.type = 'search'; input.placeholder = 'Cliente ou pedido'; input.maxLength = 100; input.value = P.state.search; input.setAttribute('aria-label', 'Buscar cliente ou pedido');
     search.appendChild(input); page.appendChild(search);
     const filters = el('nav', null, 'mp-filters'); filters.setAttribute('aria-label', 'Filtrar retiradas');
-    [['all', 'Todos'], ['waiting', 'Aguardando'], ['arrived', 'Na loja'], ['installing', 'Instalação'], ['completed', 'Concluídas']].forEach(([value, label]) => {
+    [['all', 'Todas'], ['waiting', 'A separar'], ['ready', 'Prontas'], ['arrived', 'Na loja'], ['completed', 'Concluídas']].forEach(([value, label]) => {
       const b = button(label, 'filter'); b.id = 'mp-filter-' + value; b.dataset.filter = value; b.classList.toggle('active', value === P.state.filter); b.setAttribute('aria-pressed', String(value === P.state.filter)); filters.appendChild(b);
     }); page.appendChild(filters);
     const list = el('div', null, 'mp-list'); list.id = 'mp-list'; list.setAttribute('aria-live', 'polite'); page.appendChild(list); return page;
@@ -86,26 +101,51 @@
       host.appendChild(el('p', m.phase === 'error' ? 'Não foi possível carregar as retiradas.' : 'Carregando retiradas…', 'mp-notice'));
       if (m.phase === 'error') host.appendChild(button('Tentar novamente', 'refresh', 'primary')); return;
     }
-    const query = P.state.search.trim().toLocaleLowerCase('pt-BR');
-    const rows = P.state.rows.filter(row => (P.state.filter === 'all' || P.pickupStage(row) === P.state.filter)
-      && [row.customer_name, row.customer_phone, order(row), P.itemsLabel(row)].join(' ').toLocaleLowerCase('pt-BR').includes(query));
+    const query = R.normalizeSearch(P.state.search);
+    const rows = P.state.rows.filter(row => {
+      const stage = P.pickupStage(row), filter = P.state.filter;
+      return (filter === 'all' || stage === filter || (filter === 'arrived' && stage === 'installing'))
+        && R.normalizeSearch([row.customer_name, row.customer_phone, row.order_number, order(row), P.itemsLabel(row)].join(' ')).includes(query);
+    });
     rows.forEach(row => {
       const card = plate('mp-order'), copy = el('div', null, 'mp-order-copy'), head = el('header');
       head.append(el('h3', row.customer_name || 'Cliente não identificado'), el('small', order(row)));
       copy.append(head, el('p', P.itemsLabel(row)), status(row));
-      const footer = el('footer'), open = button(P.pickupStage(row) === 'waiting' ? 'Atender' : 'Abrir', 'open', P.pickupStage(row) === 'waiting' ? 'primary' : 'secondary', 'next'); open.dataset.order = row.order_id;
+      const deadline = R.expiry(row);
+      if (deadline) copy.appendChild(el('p', deadline.label, 'mp-deadline mp-deadline-' + deadline.level));
+      const footer = el('footer'), open = button('Abrir', 'open', 'secondary', 'next'); open.dataset.order = row.order_id;
       footer.append(el('strong', P.money(P.fullTotal(row))), open); copy.appendChild(footer); card.append(picture(), copy); host.appendChild(card);
     });
     if (!rows.length) { const n = el('div', null, 'mp-notice'); n.append(el('strong', 'Nenhuma retirada encontrada'), el('p', query || P.state.filter !== 'all' ? 'Experimente outra busca ou filtro.' : 'Os pedidos reservados para retirada aparecerão aqui.')); host.appendChild(n); }
   }
   function arrival(row) {
-    const page = el('div', null, 'mp-page'); page.append(heading('Atender retirada', 'queue'), identity(row), product(row));
-    if (row.has_stock_reservation) { const n = plate('mp-reservation'); n.append(icon('check'), el('div', 'Reserva de estoque ativa')); page.appendChild(n); }
-    if (row.fulfillment_not_before) page.appendChild(el('p', 'Retirada a partir de ' + C.dateTime.format(new Date(row.fulfillment_not_before)), 'mp-hint'));
-    const total = plate('mp-totals'); total.appendChild(totalLine('Total dos pneus', P.money(row.total_amount), true)); page.appendChild(total);
-    let phone = String(row.customer_phone || '').replace(/\D/g, ''); if (phone.length === 10 || phone.length === 11) phone = '55' + phone;
-    if (phone) { const link = el('a', null, 'mp-button mp-secondary'); link.append(icon('whatsapp'), el('span', 'Falar com cliente')); link.href = 'https://wa.me/' + phone; link.target = '_blank'; link.rel = 'noopener noreferrer'; page.appendChild(link); }
-    page.append(button('Cliente chegou', 'arrived', 'primary', 'person'), button('Cancelar pedido', 'cancel', 'link-danger', 'trash')); return page;
+    const page = el('div', null, 'mp-page mp-arrival'), head = plate('mp-detail-identity');
+    head.append(el('h3', order(row)), el('p', row.customer_name || 'Cliente não identificado'), status(row));
+    page.append(heading('Retiradas', 'queue'), head);
+    const items = product(row, true), deadline = R.expiry(row);
+    items.appendChild(totalLine('Total', P.money(P.fullTotal(row)), true));
+    if (deadline) {
+      const hint = el('p', null, 'mp-deadline mp-deadline-' + deadline.level);
+      hint.append(icon('clock'), el('span', deadline.label)); items.appendChild(hint);
+    }
+    page.appendChild(items);
+    const startsAt = row.fulfillment_not_before ? new Date(row.fulfillment_not_before) : null;
+    const future = startsAt && startsAt.getTime() > Date.now();
+    if (future) page.appendChild(el('p', 'Retirada a partir de ' + C.dateTime.format(startsAt), 'mp-hint'));
+    const actions = plate('mp-detail-actions'), href = R.whatsappLink(row);
+    if (href) {
+      const link = el('a', null, 'mp-button mp-primary');
+      link.append(icon('whatsapp'), el('span', 'Avisar no WhatsApp'));
+      link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      link.addEventListener('click', event => R.checkWhatsapp(event, P.selected())); actions.appendChild(link);
+    }
+    if (P.pickupStage(row) === 'waiting' && deadline?.level !== 'expired') {
+      actions.appendChild(button('Marcar como pronto', 'ready', 'primary', 'check'));
+    }
+    const arrive = button('Cliente chegou', 'arrived', 'secondary', 'person');
+    arrive.disabled = Boolean(future); actions.appendChild(arrive); page.appendChild(actions);
+    const timeline = history(row); if (timeline) page.appendChild(timeline);
+    page.appendChild(button('Cancelar pedido', 'cancel', 'link-danger', 'trash')); return page;
   }
   function completed(row) {
     const page = el('div', null, 'mp-page mp-completed'); page.appendChild(heading('Retirada concluída', 'queue'));

@@ -21,9 +21,9 @@ describe('Retiradas dentro da Operação da Loja', () => {
   it('acrescenta a aba no casco existente sem criar outro aplicativo', () => {
     expect(html).toContain('id="pickups-panel"');
     expect(html).toContain('id="nav-pickups"');
-    expect(html).toContain('/operacao/caixa-pickups-core.js?v=20260823-pickups-layout2');
-    expect(html).toContain('/operacao/caixa-pickups-sheet.js?v=20260823-pickups-layout2');
-    expect(html).toContain('/operacao/caixa-pickups-actions.js?v=20261026-pickups1');
+    for (const asset of ['core', 'sheet', 'actions', 'metal-view', 'metal']) {
+      expect(html).toMatch(new RegExp('/operacao/caixa-pickups-' + asset + '\\.js\\?v=[A-Za-z0-9-]+'));
+    }
     expect(modules).toContain("pickups: 'retiradas'");
     expect(modules).toContain("setNavigationVisibility('nav-pickups', canModule('retiradas'))");
     expect(navigation).toContain("showTab('pickups')");

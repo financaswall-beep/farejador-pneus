@@ -18,7 +18,7 @@ import { partnerSaleSchema } from './sale-schema.js';
 export { partnerSaleSchema } from './sale-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
-import { pickupServicesSchema, pickupServicesPublicCatalog } from '../shared/pickup-services.js';
+import { pickupServicesSchema, pickupServicesPublicCatalog, pickupStageUpdateSchema } from '../shared/pickup-services.js';
 import { PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
@@ -175,10 +175,6 @@ const retrieveSchema = z.object({
   services: pickupServicesSchema.optional(),
 });
 
-const pickupStageSchema = z.object({
-  stage: z.enum(['waiting', 'arrived', 'installing']),
-  services: pickupServicesSchema.default([]),
-});
 
 // Cancelar pedido: motivo (free-text) — vira audit + insumo do antifraude da matriz.
 const cancelSchema = z.object({
@@ -854,6 +850,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // requireScreen('retiradas') — o balconista vê só esta fila, sem precisar de
   // 'vendas'. Server-side filtra pra só pickup aguardando (getPartnerRetiradas).
   fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
     return reply.status(200).send({
       rows: await getPartnerRetiradas(getPartnerContext(request)),
       service_catalog: pickupServicesPublicCatalog(),
@@ -862,7 +859,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.put('/parceiro/:slug/api/retiradas/:orderId/stage', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = saleParamsSchema.safeParse(request.params);
-    const body = pickupStageSchema.safeParse(request.body ?? {});
+    const body = pickupStageUpdateSchema.safeParse(request.body ?? {});
     if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
     try {
       return reply.status(200).send(await updatePartnerPickupStage(

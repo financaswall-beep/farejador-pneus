@@ -1,5 +1,6 @@
 import { readPage, rejectFilters, type DotReadContext } from './read-model.js';
 import { paymentMethodSql } from './safe-values.js';
+import { env } from '../../shared/config/env.js';
 import type { PoolClient } from 'pg';
 import type { Environment } from '../../shared/types/chatwoot.js';
 
@@ -92,9 +93,11 @@ export function readDotTrips(ctx:DotReadContext) {
 export function readDotPickups(ctx:DotReadContext) {
   rejectFilters(ctx,'medida');
   return readPage(ctx,`SELECT o.id,o.order_number,o.created_at,o.status,o.total_amount,${paymentMethodSql('o.payment_method')} payment_method,
-    o.pickup_arrived_at,o.pickup_installation_started_at,o.retrieved_at,
+    o.pickup_ready_at,o.pickup_arrived_at,o.pickup_installation_started_at,o.retrieved_at,
+    commerce.pickup_reservation_deadline(o,NULL::commerce.partner_orders,$8::int) reservation_expires_at,
     CASE WHEN o.retrieved_at IS NOT NULL THEN 'retirado' WHEN o.pickup_installation_started_at IS NOT NULL THEN 'instalando'
-      WHEN o.pickup_arrived_at IS NOT NULL THEN 'cliente_chegou' ELSE 'aguardando' END stage,
+      WHEN o.pickup_arrived_at IS NOT NULL THEN 'cliente_chegou'
+      WHEN o.pickup_ready_at IS NOT NULL THEN 'pronto_para_retirar' ELSE 'aguardando' END stage,
     EXISTS(SELECT 1 FROM audit.events a WHERE a.environment=o.environment AND a.entity_id=o.id
       AND a.event_type='matriz_galpao_reserved') reserved
     FROM commerce.orders o JOIN core.units u ON u.environment=o.environment AND u.id=o.unit_id AND u.slug='main'
@@ -102,7 +105,8 @@ export function readDotPickups(ctx:DotReadContext) {
       AND (o.status='open' OR (o.retrieved_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date)
       AND (o.status<>'open' OR EXISTS(SELECT 1 FROM audit.events a WHERE a.environment=o.environment AND a.entity_id=o.id
         AND a.event_type='matriz_galpao_reserved')) AND ($4::uuid IS NULL OR o.id=$4) AND $5=''`,
-  'created_at DESC,id DESC','Inclui todas as reservas abertas atuais e retiradas concluídas no período.');
+  'created_at DESC,id DESC','Inclui todas as reservas abertas atuais e retiradas concluídas no período.',
+  [env.BOT_PICKUP_RESERVATION_HOURS]);
 }
 
 export function readDotExpenses(ctx:DotReadContext,view:'despesas'|'comprovantes'|'categorias') {

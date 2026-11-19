@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const C = window.Caixa;
-  const U = C.partnerUI;
+  const U = C.partnerUI, R = C.pickupReport;
   let selected = '', error = '';
   let cancel = false, busy = false, generation = 0;
   const photos = new Map();
@@ -17,7 +17,7 @@
   function identity(row, compact) {
     const el = U.node('div', null, 'pu-identity');
     const copy = U.node('div', null, 'pu-person');
-    copy.append(U.node('strong', row.customer_name || 'Cliente'), U.node('p', U.orderLabel(row)));
+    copy.append(U.node('strong', row.customer_name || 'Cliente'), U.node('p', R.orderLabel(row)));
     el.append(avatar(row), copy);
     if (compact) el.appendChild(U.node('span', quantity(tires(row).reduce((sum, item) => sum + Number(item.quantity || 0), 0)), 'pu-quantity-badge'));
     return el;
@@ -48,6 +48,9 @@
       const items = U.node('div', null, 'pu-order-items');
       tires(row).forEach(item => items.appendChild(U.node('p', size(item) + ' • ' + quantity(item.quantity))));
       card.appendChild(items);
+      card.appendChild(U.node('p', R.stageLabel(R.stage(row)), 'pu-status pu-status-' + R.stage(row)));
+      const deadline = R.expiry(row);
+      if (deadline) card.appendChild(U.node('p', deadline.label, 'pu-deadline pu-deadline-' + deadline.level));
       const button = U.button('VER RETIRADA', () => {
         leave(); selected = row.order_id; cancel = false; error = ''; C.partnerHome.open('partner-pickup');
       });
@@ -91,6 +94,36 @@
       ...(row.items || []).map(item => item.pickup_service_code).filter(Boolean)])];
     return codes.length ? codes.map(code => labels[code] || 'Serviço combinado').join(' • ') : 'Só retirada';
   }
+  async function saveStage(row, stage) {
+    if (busy || (stage === 'ready' && (R.stage(row) !== 'waiting' || R.expiry(row)?.level === 'expired'))) return;
+    busy = true; error = ''; render();
+    const session = C.sessionFingerprint();
+    try {
+      const result = await C.partnerData.api('retiradas/' + encodeURIComponent(row.order_id) + '/stage', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage, services: row.pickup_services || [] }),
+      });
+      if (session !== C.sessionFingerprint()) return;
+      if (result.order_id !== row.order_id || result.stage !== stage) throw new Error('pickup_not_found');
+      await C.partnerData.load();
+    } catch (failure) {
+      if (session === C.sessionFingerprint()) {
+        error = U.errorMessage(failure);
+      }
+    } finally {
+      if (session === C.sessionFingerprint()) { busy = false; C.partnerHome.render(); }
+    }
+  }
+  function history(row) {
+    const entries = R.history(row);
+    if (!entries.length) return null;
+    const card = plate('pu-history'), list = U.node('ol');
+    entries.forEach(entry => {
+      const item = U.node('li'), instant = U.node('time', entry.text);
+      instant.dateTime = entry.when; item.append(instant, U.node('span', entry.label)); list.appendChild(item);
+    });
+    card.append(U.node('h4', 'Histórico do pedido'), list); return card;
+  }
   async function save(row, cancelling) {
     if (busy) return;
     busy = true; error = ''; render();
@@ -117,12 +150,15 @@
   function render() {
     const row = C.partnerData.pendingPickups().find(item => item.order_id === selected);
     if (!row) return list();
-    const page = section(cancel ? 'Cliente não veio?' : 'Retirada', () => {
+    const page = section(cancel ? 'Cliente não veio?' : 'Retiradas', () => {
       if (busy) return;
       if (cancel) { cancel = false; render(); } else C.partnerHome.open('partner-pickups');
     }, 'detail');
-    page.appendChild(U.node('h4', 'Quem veio buscar', 'pu-label'));
-    const customer = plate('pu-customer'); customer.appendChild(identity(row, false)); page.appendChild(customer);
+    const stage = R.stage(row);
+    const customer = plate('pu-customer');
+    customer.append(U.node('h4', R.orderLabel(row)), U.node('p', row.customer_name || 'Cliente'),
+      U.node('span', R.stageLabel(stage), 'pu-status pu-status-' + stage));
+    page.appendChild(customer);
     if (cancel) {
       page.appendChild(U.node('p', 'Cancelar este pedido e liberar os pneus?', 'ps-copy'));
       page.appendChild(U.button(busy ? 'CANCELANDO…' : 'SIM, CANCELAR', () => void save(row, true), 'danger', 'close'));
@@ -139,13 +175,33 @@
         const service = U.node('div', null, 'pu-service'); service.append(U.icon('pickup-solid'), U.node('span', serviceLabel(row)));
         card.appendChild(service); page.appendChild(card);
       });
-      page.appendChild(U.node('p', items.length > 1 ? 'Confira os pneus antes de entregar.' : 'Confira o pneu antes de entregar.', 'pu-helper'));
-      page.appendChild(U.button(busy ? 'CONFIRMANDO…' : 'CONFIRMAR RETIRADA', () => void save(row, false), 'primary', 'check'));
+      const deadline = R.expiry(row);
+      const totals = plate('pu-totals');
+      totals.append(U.node('strong', 'Total'), U.node('strong', C.currency.format(Number(row.total_amount) || 0)));
+      if (deadline) totals.appendChild(U.node('p', deadline.label, 'pu-deadline pu-deadline-' + deadline.level));
+      page.appendChild(totals);
+      const actions = plate('pu-actions'), href = R.whatsappLink(row);
+      if (href) {
+        const link = U.node('a', 'Avisar no WhatsApp', 'ps-button ps-button--primary');
+        link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.addEventListener('click', event => R.checkWhatsapp(event, C.partnerData.pendingPickups().find(item => item.order_id === selected)));
+        actions.appendChild(link);
+      }
+      if (stage === 'waiting' && deadline?.level !== 'expired') {
+        actions.appendChild(U.button('Marcar como pronto', () => void saveStage(row, 'ready'), 'primary', 'check'));
+      }
+      if (stage === 'waiting' || stage === 'ready') {
+        actions.appendChild(U.button('Cliente chegou', () => void saveStage(row, 'arrived'), 'secondary', 'pickup'));
+      }
+      actions.appendChild(U.button(busy ? 'CONFIRMANDO…' : 'CONFIRMAR RETIRADA', () => void save(row, false),
+        stage === 'arrived' || stage === 'installing' ? 'primary' : 'secondary', 'check'));
+      page.appendChild(actions);
+      const timeline = history(row); if (timeline) page.appendChild(timeline);
       const absent = U.button('Cliente não veio', () => { cancel = true; error = ''; render(); }, 'secondary');
       absent.prepend(C.createSvg([{ d: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6h5' }])); page.appendChild(absent);
     }
     if (error) { const el = U.node('p', error, 'ps-error'); el.setAttribute('role', 'alert'); page.appendChild(el); }
-    page.querySelectorAll('button').forEach(el => { el.disabled = busy; });
+    page.querySelectorAll('button').forEach(el => { el.disabled = busy || el.disabled; });
     mount(page, 'pickup');
   }
   function leave() {

@@ -44,6 +44,13 @@ export const pickupServicesSchema = z.array(pickupServiceSchema)
 
 export type PickupService = z.infer<typeof pickupServiceSchema>;
 
+export const pickupStageUpdateSchema = z.object({
+  stage: z.enum(['waiting', 'ready', 'arrived', 'installing']),
+  services: pickupServicesSchema.default([]),
+});
+
+export type PickupStage = z.infer<typeof pickupStageUpdateSchema>['stage'];
+
 export function pickupServiceDefinition(code: PickupServiceCode) {
   return PICKUP_SERVICE_CATALOG.find((item) => item.code === code)!;
 }

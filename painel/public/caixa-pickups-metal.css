@@ -50,3 +50,70 @@
 .is-matrix-pickups .mp-notice strong { font-size: 25px; }
 .is-matrix-pickups .mp-error { padding: 10px; border: 1px solid #bd7a82; border-radius: 7px; color: #891d2b; background: #fff0f1; font: 600 19px/1.2 var(--mc-font); }
 @media(max-width:350px){.is-matrix-pickups #pickups-panel{padding-inline:10px}.is-matrix-pickups .mp-kpis .mp-plate{gap:4px;padding-inline:6px}.is-matrix-pickups .mp-kpis svg{width:20px}.is-matrix-pickups .mp-kpis small{font-size:14px}.is-matrix-pickups .mp-order{grid-template-columns:50px minmax(0,1fr);gap:7px}.is-matrix-pickups .mp-heading h2{font-size:31px}.is-matrix-pickups .mp-order footer>strong{font-size:26px}}
+
+/* O relatório de retiradas usa as mesmas superfícies claras e a tipografia do painel. */
+.is-matrix-pickups .sales-header { background: #064e3b; color: white; border-color: #047857; border-radius: 0; box-shadow: none; }
+.is-matrix-pickups .sales-heading p { color: white; font: 700 19px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; }
+.is-matrix-pickups .notifications-button { color: white; }
+.is-matrix-pickups #session-view > .bottom-nav { background: white; border-color: #dce5e0; border-radius: 0; box-shadow: none; }
+.is-matrix-pickups #session-view .bottom-nav > button:not(.hidden) {
+  color: #374151; font: 600 12px/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
+  border: 0; border-radius: 10px; box-shadow: none;
+}
+.is-matrix-pickups #session-view .bottom-nav > button.active { background: #d5f6e6; color: #065f46; }
+.is-matrix-pickups #pickups-panel { background: #f5f7f6; padding: 14px; }
+.is-matrix-pickups #matrix-pickups-metal {
+  --mc-font: Inter, ui-sans-serif, system-ui, sans-serif;
+  --mc-panel: #fff;
+  --mc-shadow: none;
+  --mc-action: #047857;
+  --mc-ink: #111827;
+  max-width: 760px; margin-inline: auto;
+}
+.is-matrix-pickups .mp-heading h2,
+.is-matrix-pickups .mp-queue .mp-heading h2 { font-size: 24px; font-weight: 700; }
+.is-matrix-pickups .mp-plate { border-color: #dce5e0; border-radius: 12px; padding: 14px; }
+.is-matrix-pickups .mp-plate::after { content: none; }
+.is-matrix-pickups .mp-button { font-size: 15px; border-color: #dce5e0; border-radius: 10px; }
+.is-matrix-pickups .mp-primary, .is-matrix-pickups .mp-button.active {
+  border-color: #047857; box-shadow: none;
+}
+.is-matrix-pickups .mp-secondary { color: #065f46; border-color: #047857; }
+.is-matrix-pickups .mp-link-danger { border-color: transparent; font-size: 14px; }
+.is-matrix-pickups .mp-status {
+  background: #edf1ef; color: #374151; border: 0; padding: 5px 7px; font-size: 12px;
+}
+.is-matrix-pickups .mp-status-ready, .is-matrix-pickups .mp-status-arrived,
+.is-matrix-pickups .mp-status-installing { background: #d5f6e6; color: #065f46; }
+.is-matrix-pickups .mp-status svg { width: 14px; height: 14px; }
+.is-matrix-pickups .mp-detail-identity { display: grid; gap: 6px; justify-items: start; }
+.is-matrix-pickups .mp-detail-identity h3 { font-size: 24px; overflow-wrap: anywhere; }
+.is-matrix-pickups .mp-detail-identity p { font-size: 15px; }
+.is-matrix-pickups .mp-detail-actions { display: grid; gap: 8px; }
+.is-matrix-pickups .mp-arrival .mp-total-line,
+.is-matrix-pickups .mp-arrival .mp-total-large strong { font-size: 16px; }
+.is-matrix-pickups .mp-arrival .mp-products-compact .mp-product strong { font-size: 17px; }
+.is-matrix-pickups .mp-arrival .mp-products-compact .mp-product :is(p,small) { font-size: 13px; }
+.is-matrix-pickups .mp-deadline {
+  display: inline-flex; gap: 8px; align-items: center; width: fit-content;
+  border-radius: 8px; padding: 7px 9px; color: #43544b; background: #f2f5f3;
+  font: 600 13px/1.3 var(--mc-font);
+}
+.is-matrix-pickups .mp-arrival .mp-deadline { width: auto; }
+.is-matrix-pickups .mp-deadline svg { width: 17px; height: 17px; }
+.is-matrix-pickups .mp-deadline-soon { color: #854d0e; background: #fef3c7; }
+.is-matrix-pickups .mp-deadline-expired { color: #9f1239; background: #fff1f2; }
+.is-matrix-pickups .mp-history h3 { font-size: 16px; }
+.is-matrix-pickups .mp-history ol { list-style: none; padding: 0; margin: 9px 0 0; }
+.is-matrix-pickups .mp-history li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-top: 6px; }
+.is-matrix-pickups .mp-history li::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #047857; flex: none; }
+.is-matrix-pickups .mp-history time { font-variant-numeric: tabular-nums; flex: none; }
+.is-matrix-pickups .mp-kpis small { font-size: 12px; }
+.is-matrix-pickups .mp-kpis strong { font-size: 23px; }
+.is-matrix-pickups .mp-kpis svg { width: 20px; color: #047857; }
+.is-matrix-pickups .mp-kpis > :last-child svg { color: #a16207; }
+.is-matrix-pickups .mp-search input { font-size: 15px; }
+.is-matrix-pickups .mp-order h3 { font-size: 16px; }
+.is-matrix-pickups .mp-order-copy > p:not(.mp-deadline), .is-matrix-pickups .mp-order small { font-size: 13px; }
+.is-matrix-pickups .mp-order footer > strong { font-size: 18px; }
+.is-matrix-pickups .mp-order footer .mp-button { font-size: 14px; }
