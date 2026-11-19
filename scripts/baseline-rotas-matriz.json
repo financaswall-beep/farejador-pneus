@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-18T18:14:28.508Z",
-  "total": 623,
+  "geradoEm": "2026-11-19T03:12:09.748Z",
+  "total": 624,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -480,6 +480,7 @@
     "POST /admin/api/catalog/:product_id/price GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/catalog/:product_id/spec GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/catalog/:product_id/wholesale-price GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/catalog/measure-applications/classify-motorcycle GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/catalog/products GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/clientes-v2/:id/split GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/clientes-v2/backfill GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",

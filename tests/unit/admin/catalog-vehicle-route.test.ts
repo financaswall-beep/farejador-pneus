@@ -5,6 +5,7 @@ vi.mock('../../../src/admin/auth.js', () => ({
   requireAdminAuth: async (r: any, p: any) => { if (!r.headers.authorization) return p.code(401).send({ error: 'auth' }); },
   requireAdminOwner: async (r: any, p: any) => { if (r.headers.authorization !== 'owner') return p.code(403).send({ error: 'owner' }); },
 }));
+vi.mock('../../../src/persistence/db.js', () => ({pool:{connect:vi.fn()}}));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test' } }));
 vi.mock('../../../src/shared/logger.js', () => ({ logger: { error: vi.fn() } }));
 vi.mock('../../../src/admin/painel/route-helpers.js', () => ({ operatorLabel: () => 'owner:test' }));
@@ -58,6 +59,15 @@ describe('categoria no contrato do catálogo', () => {
     expect((await app.inject({ url: '/admin/api/catalog/vehicle-inventory', headers: { authorization: 'staff' } })).statusCode).toBe(403);
     svc.inventory.mockResolvedValue({ rows: [] });
     expect((await app.inject({ url: '/admin/api/catalog/vehicle-inventory', headers: { authorization: 'owner' } })).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('reserva ao dono a classificação e exige uma seleção válida', async () => {
+    const app = Fastify(); await registerPainelCatalogo(app);
+    const url = '/admin/api/catalog/measure-applications/classify-motorcycle';
+    const payload = {measure:'100/90-19', application_ids:['M071:front:100/90-19']};
+    expect((await app.inject({method:'POST',url,headers:{authorization:'staff'},payload})).statusCode).toBe(403);
+    expect((await app.inject({method:'POST',url,headers:{authorization:'owner'},payload:{...payload,application_ids:[]}})).statusCode).toBe(400);
     await app.close();
   });
 

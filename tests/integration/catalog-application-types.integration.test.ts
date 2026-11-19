@@ -5,9 +5,9 @@ import { repairVehicleApplicationTypes } from '../../scripts/vehicle-application
 let db: IntegrationDb;
 beforeAll(async()=>{
   db=await startPostgres();
-  Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:db.connectionString,CHATWOOT_HMAC_SECRET:'test',ADMIN_AUTH_TOKEN:'test'});
+  Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:db.connectionString,CHATWOOT_HMAC_SECRET:'test',DATABASE_SSL:'false',ADMIN_BEARER_FALLBACK_ENABLED:'true',ADMIN_AUTH_TOKEN:'test'});
 },180000);
-afterAll(async()=>{if(db)await stopPostgres(db);});
+afterAll(async()=>{if(db){await (await import('../../src/persistence/db.js')).pool.end();await stopPostgres(db);}});
 describe('aplicações automáticas ao cadastrar 90/90-18 como Moto',()=>{
   it('restaura as referências antigas na ficha e na listagem sem alterar estoque ou homologar SKU',async()=>{
     const c=await db.pool.connect();
@@ -47,4 +47,34 @@ describe('aplicações automáticas ao cadastrar 90/90-18 como Moto',()=>{
       await c.query('ROLLBACK');
     }finally{c.release();}
   });
+});
+
+it('painel classifica apenas as referências marcadas pelo dono pelo endpoint real', async () => {
+  const { default: Fastify } = await import('fastify');
+  const { registerPainelCatalogo } = await import('../../src/admin/painel/route-catalogo.js');
+  const app = Fastify();
+  await registerPainelCatalogo(app);
+  const measure = '100/90-19';
+  const url = '/admin/api/catalog/measure-applications';
+  const headers = {authorization:'Bearer test','x-operator-label':'Dono da Matriz'};
+  const c = await db.pool.connect();
+  try { await importVehicleApplications(c,'test'); } finally { c.release(); }
+  await db.pool.query("UPDATE commerce.vehicle_measure_applications SET vehicle_type=NULL WHERE environment='test' AND display_measure=$1",[measure]);
+  try {
+    const lookup = () => app.inject({method:'GET',url,query:{measure,vehicle_type:'motorcycle'},headers});
+    const before = (await lookup()).json();
+    expect(before.referencias_para_classificar).toHaveLength(5);
+    const payload = { measure, application_ids:[before.referencias_para_classificar[0].application_id] };
+    const post = {method:'POST' as const,url:url+'/classify-motorcycle',payload};
+    expect((await app.inject(post)).statusCode).toBe(401);
+    expect((await app.inject({...post,headers})).json()).toEqual({changed:1});
+    expect((await app.inject({...post,headers})).statusCode).toBe(409);
+    const after = (await lookup()).json();
+    expect(after.applications.map((r:any)=>r.application_id)).toEqual(payload.application_ids);
+    expect(after.referencias_para_classificar).toHaveLength(4);
+    const car = (await app.inject({method:'GET',url,query:{measure,vehicle_type:'car'},headers})).json();
+    expect(car.referencias_para_classificar).toEqual([]);
+    const history = await db.pool.query("SELECT count(*)::int n FROM audit.events WHERE event_type='catalog_application_vehicle_type_repaired' AND actor_label=$1",['Dono da Matriz']);
+    expect(history.rows[0].n).toBe(1);
+  } finally { await app.close(); }
 });

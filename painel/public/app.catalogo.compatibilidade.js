@@ -9,7 +9,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         open: true,
         row,
         rows: [],
-        applications: [], applicationReviews: [],
+        applications: [], applicationReviews: [], referencesToClassify: [], selectedReferences: [],
         summary: { models: 0, fitments: 0 },
         loading: true,
         error: null,
@@ -40,6 +40,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
           const data = await this.apiGet(`/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}${state.row.vehicle_type ? '&vehicle_type='+encodeURIComponent(state.row.vehicle_type) : ''}`);
           if (this.catalogoCompatibilidade !== state) return;
           state.applications = Array.isArray(data.applications) ? data.applications : [];
+          state.referencesToClassify = data.referencias_para_classificar || [];
+          state.selectedReferences = [];
           state.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
         } catch {
           state.error = 'Não foi possível carregar as aplicações desta medida.';
@@ -59,6 +61,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         if (this.catalogoCompatibilidade.row?.product_id !== productId) return;
         this.catalogoCompatibilidade.rows = Array.isArray(data.rows) ? data.rows : [];
         this.catalogoCompatibilidade.applications = Array.isArray(data.applications) ? data.applications : [];
+        this.catalogoCompatibilidade.referencesToClassify = data.referencias_para_classificar || [];
+        this.catalogoCompatibilidade.selectedReferences = [];
         this.catalogoCompatibilidade.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
         this.catalogoCompatibilidade.summary = data.summary || { models: 0, fitments: 0 };
       } catch {
@@ -76,12 +80,36 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       }
     },
 
+    async catalogoClassifyReferences() {
+      const state = this.catalogoCompatibilidade;
+      if (this.adminUser?.role !== 'owner' || state.loading || state.error || state.saving || !state.selectedReferences?.length) return;
+      state.saving = true;
+      state.message = null;
+      try {
+        const result = await this.apiPost('/admin/api/catalog/measure-applications/classify-motorcycle', {
+          measure: state.row.tire_size, application_ids: [...state.selectedReferences],
+        });
+        state.message = { ok: true, text: 'Referências classificadas como Moto: ' + result.changed + '.' };
+        if (this.catalogoCompatibilidade === state) await this.catalogoCompatibilityLoad(state.row.product_id);
+        await this.loadCatalogo();
+      } catch (error) {
+        if (error.message === 'catalog_reference_selection_changed') {
+          if (this.catalogoCompatibilidade === state) await this.catalogoCompatibilityLoad(state.row.product_id);
+          state.message = { ok: false, text: 'As referências mudaram. Confira a lista atualizada.' };
+        } else {
+          state.message = { ok: false, text: 'Não foi possível confirmar a classificação. Reabra a ficha para conferir.' };
+        }
+      } finally {
+        state.saving = false;
+      }
+    },
+
     catalogoCompatibilityClose() {
       this.catalogoCompatibilidade = {
         open: false,
         row: null,
         rows: [],
-        applications: [], applicationReviews: [],
+        applications: [], applicationReviews: [], referencesToClassify: [], selectedReferences: [],
         summary: { models: 0, fitments: 0 },
         loading: false,
         error: null,

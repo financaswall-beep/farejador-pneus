@@ -170,14 +170,14 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(108);
+  expect(listing.result.tools).toHaveLength(109);
   expect(listing.result.tools).toContainEqual(expect.objectContaining({name:'consultar_retirada_para_cancelar'}));
   const newWrites=['confirmar_operacao_milly','recusar_operacao_milly','cancelar_retirada_matriz',
     'registrar_entrada_estoque','definir_estoque','remover_medida_estoque','registrar_perda_estoque',
     'registrar_contagem_estoque','corrigir_marca_estoque','alterar_condicao_estoque','separar_lote_estoque',
     'confirmar_transferencia_estoque','estornar_transferencia_estoque','cadastrar_produto_catalogo','editar_ficha_catalogo',
     'alterar_preco_catalogo','alterar_preco_atacado_catalogo','salvar_compatibilidade_catalogo','remover_compatibilidade_catalogo',
-    'registrar_descoberta_catalogo','revisar_descoberta_catalogo','anexar_foto_catalogo','anexar_video_catalogo','configurar_midias_catalogo'];
+    'registrar_descoberta_catalogo','revisar_descoberta_catalogo','classificar_referencias_moto','anexar_foto_catalogo','anexar_video_catalogo','configurar_midias_catalogo'];
   const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','excluir_publicacao_instagram','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
@@ -562,7 +562,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(108);
+    expect((await client.listTools()).tools).toHaveLength(109);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}
