@@ -9,6 +9,7 @@ function pickupModule() {
   const sandbox: Record<string, any> = {
     window: {}, lucide: { createIcons() {} }, performance: { now: () => Date.now() },
   };
+  runInNewContext(source('painel/public/app.partner-retiradas.report.js'), sandbox);
   runInNewContext(source('painel/public/app.partner-retiradas.js'), sandbox);
   return sandbox.window.PAINEL_MODULES.partnerRetiradas();
 }
@@ -38,9 +39,10 @@ describe('retiradas no painel único', () => {
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
     expect(html).toContain('data-pickup-workspace');
     expect(html).toContain('data-pickup-detail-panel');
-    expect(html).toContain('[data-pickup-detail-panel]{position:static!important');
+    expect(html).toContain('Voltar à fila');
     expect(html).toMatch(/app\.partner-retiradas\.js\?v=[A-Za-z0-9._-]+/);
     expect(staticRoute).toContain("'app.partner-retiradas.js'");
+    expect(staticRoute).toContain("'app.partner-retiradas.report.js'");
     expect(partnerRoute).toContain("fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
     expect(partnerRoute).toContain("fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
     expect(partnerRoute).toContain("fastify.put('/parceiro/:slug/api/retiradas/:orderId/stage', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }");
@@ -184,7 +186,7 @@ describe('retiradas no painel único', () => {
     expect(app.partnerRetiradasStepReached(installing, 'completed')).toBe(false);
   });
 
-  it('apresenta etapas numeradas com ícones, logos das marcas e WhatsApp nos cards web', async () => {
+  it('apresenta fila em tabela e preserva etapas, marcas e ações no detalhe', async () => {
     const html = source('painel/public/index.html');
     const row = { items: [
       { quantity: 1, tire_size: '90/90-18', brand: 'Pirelli' },
@@ -205,15 +207,38 @@ describe('retiradas no painel único', () => {
       expect.objectContaining({ pickup_label: '2× 80/100-14', pickup_brand_logo: null }),
     ]);
     expect(app.partnerRetiradasItemsLabel(row)).toBe('1× 90/90-18 Pirelli · 2× 80/100-14 Marca futura');
-    expect(html).toContain('data-pickup-card-actions');
+    for (const column of ['Pedido', 'Cliente', 'Itens', 'Reserva até', 'Situação', 'Total']) {
+      expect(html).toMatch(new RegExp('<th scope="col"[^>]*>' + column + '</th>'));
+    }
     expect(html).toContain('data-pickup-brand-logo');
     expect(html).toContain('data-pickup-step-number>1</b>Chegou');
     expect(html).toContain('data-lucide="wallet-cards"');
     expect(html).not.toContain('absolute -right-1 -top-1');
     expect(html).toContain('item.pickup_brand_logo');
-    expect(html).toContain('partnerRetiradasWaLink(row)');
-    expect(html).toContain('Sem WhatsApp');
+    expect(html).toContain('partnerRetiradasWaLink(partnerRetiradasSelected)');
+    expect(html).toContain('Avisar no WhatsApp');
+    expect(html).toContain('Histórico do pedido');
     expect(html).toContain('Abrir atendimento');
+  });
+
+  it('procura pelo código exibido, distingue o prazo e só oferece WhatsApp após a separação', () => {
+    const app = pickupModule();
+    const active = { order_id: 'order-1', order_number: 'PED-0060', customer_name: 'João',
+      customer_phone: '21987654321', pickup_ready_at: new Date().toISOString(),
+      reservation_expires_at: new Date(Date.now() + 20 * 60_000).toISOString() };
+    const expired = { ...active, order_id: 'order-2', order_number: 'PED-0061',
+      reservation_expires_at: new Date(Date.now() - 60_000).toISOString() };
+    app.partnerRetiradasRows = [active, expired];
+    expect(app.partnerRetiradasCode(active)).toBe('PED-0060');
+    app.partnerRetiradasSearch = 'ped-0060';
+    expect(app.partnerRetiradasFilteredRows).toEqual([active]);
+    app.partnerRetiradasSearch = 'joao';
+    expect(app.partnerRetiradasFilteredRows).toHaveLength(2);
+    expect(app.partnerRetiradasSummary).toMatchObject({ open: 2, ready: 1, soon: 1 });
+    expect(app.partnerRetiradasWaLink(active)).toMatch(/^https:\/\/wa\.me\/5521987654321\?text=/);
+    expect(app.partnerRetiradasWaLink(expired)).toBe('');
+    expect(app.partnerRetiradasWaLink({ ...active, pickup_ready_at: null })).toBe('');
+    expect(app.partnerRetiradasWaLink({ ...active, pickup_arrived_at: new Date().toISOString() })).toBe('');
   });
 
   it('Vendas apenas encaminha a retirada para o fluxo único', () => {

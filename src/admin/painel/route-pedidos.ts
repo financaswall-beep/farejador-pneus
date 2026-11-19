@@ -13,17 +13,13 @@ import {
 } from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { cancelBodySchema, cancelParamsSchema, registerManualOrderSchema, registerWalkinOrderSchema } from './route-schemas.js';
-import { pickupServicesPublicCatalog, pickupServicesSchema } from '../../shared/pickup-services.js';
+import { pickupServicesPublicCatalog, pickupServicesSchema, pickupStageUpdateSchema } from '../../shared/pickup-services.js';
 
 const pickupCompletionSchema = z.object({
   payment_method: z.string().trim().min(1).max(80),
   services: pickupServicesSchema.optional(),
 });
 
-const pickupStageSchema = z.object({
-  stage: z.enum(['waiting', 'arrived', 'installing']),
-  services: pickupServicesSchema.default([]),
-});
 
 export async function registerPainelPedidos(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/orders/customer-search', { preHandler: requireAdminOwner }, async (request, reply) => {
@@ -33,6 +29,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     return searchSaleCustomers(env.FAREJADOR_ENV, parsed.data.q);
   });
   fastify.get('/admin/api/retiradas', { preHandler: requireAdminOwner }, async (_request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
     return reply.status(200).send({
       rows: await getMatrizRetiradas(),
       service_catalog: pickupServicesPublicCatalog(),
@@ -41,7 +38,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
 
   fastify.put('/admin/api/retiradas/:order_id/stage', { preHandler: requireAdminOwner }, async (request, reply) => {
     const params = cancelParamsSchema.safeParse(request.params);
-    const body = pickupStageSchema.safeParse(request.body ?? {});
+    const body = pickupStageUpdateSchema.safeParse(request.body ?? {});
     if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
     try {
       return reply.status(200).send(await updateMatrizPickupStage({

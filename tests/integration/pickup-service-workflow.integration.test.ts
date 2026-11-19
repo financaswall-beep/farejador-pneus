@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { PoolClient } from 'pg';
-import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
+import { Pool, type PoolClient } from 'pg';
+import { buildRestrictedConnectionString, startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
 import { createPartnerFixture } from './helpers/partner-fixtures.js';
 
 let db: IntegrationDb;
@@ -14,6 +14,7 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'test';
   process.env.CHATWOOT_HMAC_SECRET = 'pickup-workflow-test';
   process.env.ADMIN_AUTH_TOKEN = 'pickup-workflow-admin-token-123';
+  process.env.BOT_PICKUP_RESERVATION_HOURS = '24';
 }, 180_000);
 
 afterAll(async () => {
@@ -47,13 +48,61 @@ describe('retirada com serviços na mesma verdade comercial', () => {
       }]), `pickup-service-${randomUUID()}`],
     );
     const orderId = created.rows[0]!.order_id;
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
+       VALUES ('test',$1,'Cliente Serviço') RETURNING id`,
+      [Math.floor(Math.random() * 1_000_000_000)],
+    );
+    const mirrorCreatedAt = new Date(Date.now() - 2 * 3_600_000);
+    const mirror = await db.pool.query<{ order_number: string }>(
+      `INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
+         unit_id,source,idempotency_key,partner_order_id,created_at)
+       VALUES ('test',$1,80,'open','pickup',$2,'chatwoot_com_bot',$3,$4,$5) RETURNING order_number`,
+      [contact.rows[0]!.id, fixture.unitId, `bot:order:${randomUUID()}`, orderId, mirrorCreatedAt],
+    );
+    const deadline = new Date(mirrorCreatedAt.getTime() + 24 * 3_600_000);
+    expect(await queries.getPartnerRetiradas(fixture.ctx)).toContainEqual(expect.objectContaining({
+      order_id: orderId, order_number: mirror.rows[0]!.order_number,
+      pickup_ready_at: null, reservation_expires_at: deadline,
+    }));
+    const { withPartnerContext } = await import('../../src/parceiro/db.js');
+    const restricted = new Pool({ connectionString: buildRestrictedConnectionString(db.connectionString) });
+    const outside = await createPartnerFixture(db.pool);
+    try {
+      const metadata = (client: PoolClient) => client.query(
+        `SELECT * FROM commerce.partner_pickup_metadata('test',$1,24)`, [orderId],
+      );
+      expect((await withPartnerContext(fixture.partnerUnitId, metadata, restricted)).rows[0]).toMatchObject({
+        order_number: mirror.rows[0]!.order_number, reservation_expires_at: deadline,
+      });
+      expect((await withPartnerContext(outside.partnerUnitId, metadata, restricted)).rows).toEqual([]);
+    } finally {
+      await restricted.end();
+    }
     const services = [
       { code: 'mounting' as const, charge_mode: 'charged' as const, amount_cents: 2000 },
       { code: 'valve_change' as const, charge_mode: 'courtesy' as const, amount_cents: 0 },
     ];
+    // Ready is idempotent and keeps the commercial amounts and service draft intact.
+    await Promise.all([
+      queries.updatePartnerPickupStage(fixture.ctx, orderId, { stage: 'ready', services }),
+      queries.updatePartnerPickupStage(fixture.ctx, orderId, { stage: 'ready', services }),
+    ]);
+    expect(await queries.getPartnerRetiradas(fixture.ctx)).toContainEqual(expect.objectContaining({
+      order_id: orderId, pickup_ready_at: expect.any(Date),
+      pickup_services: [], pickup_arrived_at: null, reservation_expires_at: deadline,
+    }));
+    const partnerReadyEvents = await db.pool.query(
+      `SELECT id FROM audit.events WHERE environment='test' AND entity_id=$1
+        AND event_type='partner_pickup_stage_changed' AND payload_after->>'stage'='ready'`, [orderId],
+    );
+    expect(partnerReadyEvents.rowCount).toBe(1);
     await queries.updatePartnerPickupStage(fixture.ctx, orderId, {
       stage: 'installing', services,
     });
+    expect(await queries.getPartnerRetiradas(fixture.ctx)).toContainEqual(expect.objectContaining({
+      order_id: orderId, pickup_ready_at: expect.any(Date), reservation_expires_at: null,
+    }));
     const pending = await db.pool.query(
       `SELECT order_row.total_amount,stock.quantity_on_hand,stock.quantity_reserved,
               (SELECT count(*)::int FROM commerce.partner_order_items item
@@ -134,7 +183,7 @@ describe('retirada com serviços na mesma verdade comercial', () => {
       `INSERT INTO commerce.orders(environment,contact_id,total_amount,status,fulfillment_mode,
          payment_method,unit_id,source,idempotency_key)
        VALUES ('test',$1,80,'open','pickup','A receber',$2,'chatwoot_com_bot',$3) RETURNING id`,
-      [contact.rows[0]!.id, unit.rows[0]!.id, `matrix-pickup-${randomUUID()}`],
+      [contact.rows[0]!.id, unit.rows[0]!.id, `bot:order:${randomUUID()}`],
     );
     await db.pool.query(
       `INSERT INTO commerce.order_items(environment,order_id,product_id,quantity,unit_price,
@@ -148,10 +197,38 @@ describe('retirada com serviços na mesma verdade comercial', () => {
     ));
     const services = [{ code: 'mounting' as const,
       charge_mode: 'charged' as const, amount_cents: 1500 }];
+    const ready = () => pickups.updateMatrizPickupStage({
+      order_id: order.rows[0]!.id, stage: 'ready', services,
+      actor_label: 'integration', environment: 'test',
+    }, db.pool);
+    const opening = new Date(Date.now() + 2 * 3_600_000);
+    await db.pool.query('UPDATE commerce.orders SET fulfillment_not_before=$2 WHERE id=$1',
+      [order.rows[0]!.id, opening]);
+    expect(await pickups.getMatrizRetiradas(db.pool)).toContainEqual(expect.objectContaining({
+      order_id: order.rows[0]!.id, reservation_started_at: expect.any(Date),
+      reservation_expires_at: new Date(opening.getTime() + 24 * 3_600_000),
+    }));
+    await db.pool.query(
+      `UPDATE commerce.orders SET fulfillment_not_before=NULL,created_at=now()-interval '25 hours' WHERE id=$1`,
+      [order.rows[0]!.id],
+    );
+    await expect(ready()).rejects.toThrow('pickup_not_found');
+    await db.pool.query('UPDATE commerce.orders SET created_at=now() WHERE id=$1', [order.rows[0]!.id]);
+    await Promise.all([ready(), ready()]);
+    expect(await pickups.getMatrizRetiradas(db.pool)).toContainEqual(expect.objectContaining({
+      order_id: order.rows[0]!.id, pickup_ready_at: expect.any(Date), pickup_arrived_at: null,
+      pickup_services: [], reservation_expires_at: expect.any(Date),
+    }));
+    const matrizReadyEvents = await db.pool.query(
+      `SELECT id FROM audit.events WHERE environment='test' AND entity_id=$1
+        AND event_type='matriz_pickup_stage_changed' AND payload_after->>'stage'='ready'`, [order.rows[0]!.id],
+    );
+    expect(matrizReadyEvents.rowCount).toBe(1);
     await pickups.updateMatrizPickupStage({
       order_id: order.rows[0]!.id, stage: 'arrived', services,
       actor_label: 'integration', environment: 'test',
     }, db.pool);
+    await expect(ready()).rejects.toThrow('pickup_not_found');
     await actions.completeMatrizPickup({
       order_id: order.rows[0]!.id, actor_label: 'integration',
       environment: 'test', payment_method: 'Dinheiro', services,

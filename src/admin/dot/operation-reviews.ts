@@ -21,7 +21,8 @@ export function reviewFingerprint(data: Record<string, unknown>) {
 
 /** Executado sob a trava da conexão, na mesma transação da operação. */
 export async function requireOperationReview(db: PoolClient, identity: DotIdentity, name: string, key: string,
-  data: Record<string, unknown>, permission?: OperationPermission, domain: OperationDomain = 'finance') {
+  input: Record<string, unknown> | (() => Promise<Record<string, unknown>>),
+  permission?: OperationPermission, domain: OperationDomain = 'finance') {
   const grant = permission ?? await lockGrant(db, identity.person_id, identity.grant_id);
   if (!operationAllowed(grant, domain)) throw Error('dot_operation_disabled');
   const mode = operationReviewMode(grant, domain);
@@ -32,6 +33,7 @@ export async function requireOperationReview(db: PoolClient, identity: DotIdenti
   [env.FAREJADOR_ENV, 'dot.' + name, key]);
   // O validador de idempotência ainda compara conexão e dados antes de retornar o resultado.
   if (completed.rowCount) return null;
+  const data = typeof input === 'function' ? await input() : input;
   const fingerprint = reviewFingerprint(data);
   let row = (await db.query(`SELECT id,fingerprint,decision,decision_channel,expires_at,
     expires_at<=clock_timestamp() AS expired FROM network.dot_operation_reviews

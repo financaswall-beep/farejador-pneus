@@ -116,12 +116,13 @@
     elements.servicesTotal.textContent = P.money(P.servicesCents(row) / 100);
     elements.grandTotal.textContent = P.money(P.fullTotal(row));
     renderSteps(stage); renderPayment(row, locked); renderServices(row);
-    elements.backStage.classList.toggle('hidden', locked || stage === 'waiting');
+    const beforeArrival = stage === 'waiting' || stage === 'ready';
+    elements.backStage.classList.toggle('hidden', locked || beforeArrival);
     elements.stageAction.classList.toggle('hidden', locked || stage === 'installing'
       || (stage === 'arrived' && P.draftServices(row).length === 0));
-    elements.completeAction.classList.toggle('hidden', locked || stage === 'waiting');
+    elements.completeAction.classList.toggle('hidden', locked || beforeArrival);
     elements.cancelOpen.classList.toggle('hidden', locked);
-    elements.stageAction.textContent = stage === 'waiting' ? 'Cliente chegou' : 'Iniciar instalação';
+    elements.stageAction.textContent = beforeArrival ? 'Cliente chegou' : 'Iniciar instalação';
     elements.completeAction.textContent = stage === 'installing'
       ? 'Concluir instalação e pagamento' : 'Confirmar retirada e pagamento';
     elements.backStage.disabled = state.saving;

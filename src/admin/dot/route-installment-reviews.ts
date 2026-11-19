@@ -8,6 +8,7 @@ import { logger } from '../../shared/logger.js';
 import { ownerReview } from './operation-reviews.js';
 import { invokeDotTool } from './mcp-server.js';
 import { registerOperationPermissions } from './route-operation-permissions.js';
+import { cancelPickupTool } from './pickup-tools.js';
 
 const params=z.object({id:z.string().uuid()});
 function fail(reply:FastifyReply,error:unknown) {
@@ -38,7 +39,10 @@ export function registerInstallmentReviews(app:FastifyInstance,origin:string) {
     try {
       const review=await ownerReview(getAdminContext(req).personId!,id.data.id,body.data.decisao);
       if(review.status!=='autorizada' || review.dados.arquivo || review.dados.imagem_base64) return {status:review.status};
-      const result=await invokeDotTool(review.identity,review.operacao,{...review.dados,idempotency_key:review.key});
+      const args={...review.dados,idempotency_key:review.key};
+      // A ficha da retirada foi gerada pelo sistema para a revisão. A execução confere a ficha atual.
+      if(review.operacao===cancelPickupTool && 'ficha' in args) delete args.ficha;
+      const result=await invokeDotTool(review.identity,review.operacao,args);
       if('isError' in result && result.isError) return reply.code(409).send({error:'operacao_nao_concluida'});
       // Desativação ou expiração concorrente pode exigir uma nova proposta.
       if(result.structuredContent && 'executada' in result.structuredContent && result.structuredContent.executada===false)

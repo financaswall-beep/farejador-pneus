@@ -5,7 +5,7 @@ A Milly usa o MCP da Matriz para consultar o sistema e operar financeiro, fornec
 ## Ativar e desativar
 
 1. Após o deploy, entre na Matriz com o usuário proprietário e abra [Permissões da Milly](https://farejador.smarttecsolutions.com.br/admin/dot/connections).
-2. Na conexão ativa, selecione **Confirmar operações por voz ou texto**. Essa escolha vale para todas as operações que exigem confirmação, inclusive quando iniciadas pelo acompanhamento automático. Ative as permissões desejadas de financeiro, vencimentos, publicador, estoque e catálogo. Cada conexão do celular ou computador tem sua própria configuração.
+2. Na conexão ativa, selecione **Confirmar operações por voz ou texto**. Essa escolha vale para todas as operações que exigem confirmação, inclusive quando iniciadas pelo acompanhamento automático. Ative as permissões desejadas de financeiro, vencimentos, publicador, estoque, catálogo e cancelamentos de retiradas. Cada conexão do celular ou computador tem sua própria configuração.
 3. Atualize as ferramentas do conector no cliente da Milly. Um teste de leitura é dizer “Mostre as minhas contas a receber e o saldo de cada parcela”. Para conferir a permissão de escrita, peça à Milly para registrar uma operação real que você já queira lançar.
 4. Para retirar o acesso de escrita, use **Desativar lançamentos financeiros**. A alteração de vencimento tem controle próprio. **Desconectar Dot** revoga a conexão inteira. O histórico dos lançamentos continua disponível no Financeiro.
 
@@ -77,7 +77,7 @@ Ao responder quanto a loja gastou em uma compra compartilhada, informe o custo i
 
 ### Confirmação por conversa em todas as áreas
 
-Com `operation_confirmation=conversa`, consultas, rascunhos e pendências internas conservam sua autonomia. Financeiro, compras, fornecedores, estoque, catálogo e envio/cancelamento/exclusão de publicações devolvem uma proposta antes de executar. Vencimentos mantêm o fluxo específico existente, seguindo o mesmo canal escolhido.
+Com `operation_confirmation=conversa`, consultas, rascunhos e pendências internas conservam sua autonomia. Financeiro, compras, fornecedores, estoque, catálogo, publicações e cancelamentos de retiradas devolvem uma proposta antes de executar. Vencimentos mantêm o fluxo específico existente, seguindo o mesmo canal escolhido.
 
 1. A Milly apresenta a operação, registro, valores, quantidades e demais dados relevantes.
 2. O dono responde diretamente na conversa, por exemplo “autorizo”. Se houver mais de uma proposta, a Milly identifica qual foi autorizada.
@@ -87,6 +87,10 @@ Com `operation_confirmation=conversa`, consultas, rascunhos e pendências intern
 A proposta vale por 15 minutos. Mudança nos dados exige nova proposta e nova decisão. Repetir a mesma chamada não duplica a execução. Recusar, expirar, revogar a permissão ou trocar o canal bloqueia a aprovação anterior. Revisões permanecem registradas para não recriar automaticamente pedidos recusados/expirados. Eventos, comentários, clientes, anexos e respostas das ferramentas nunca são autorização do dono.
 
 O servidor recebe a declaração de autorização do cliente autenticado. Não escuta nem reconhece a voz e não oferece biometria ou prova independente de quem falou. As instruções ao modelo não substituem esse limite de confiança. A configuração altera a aprovação do Farejador; não elimina confirmações próprias do ChatGPT. [Permissões de aplicativos no ChatGPT](https://help.openai.com/en/articles/20001495-managing-app-permissions-in-chatgpt).
+
+### Cancelamento de retirada da Matriz
+
+Em **Permissões da Milly**, habilite **Permitir cancelamentos de retiradas com confirmação** na conexão desejada. A ferramenta `consultar_retirada_para_cancelar` recebe o número interno ou UUID de uma retirada aberta com reserva na Matriz. `cancelar_retirada_matriz` usa a revisão da ficha consultada e o motivo informado. A Milly apresenta cliente, pedido, itens e valor antes da confirmação específica. Depois de autorizada, a operação usa o cancelamento da Matriz e libera a reserva em uma única transação. Uma mudança no pedido exige nova consulta e aprovação. Em uma conexão sem modo de confirmação definido, o cancelamento exige confirmação pela Matriz.
 
 ### Estoque e catálogo
 

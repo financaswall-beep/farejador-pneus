@@ -1,4 +1,4 @@
-export type OperationDomain = 'finance' | 'publisher' | 'stock' | 'catalog';
+export type OperationDomain = 'finance' | 'publisher' | 'stock' | 'catalog' | 'pickup';
 export type ConfirmationMode = 'legacy' | 'conversa' | 'painel';
 export interface OperationPermission {
   operation_confirmation?: ConfirmationMode;
@@ -7,6 +7,7 @@ export interface OperationPermission {
   publisher_enabled: boolean;
   stock_operations_enabled?: boolean;
   catalog_operations_enabled?: boolean;
+  pickup_operations_enabled?: boolean;
 }
 export function operationAllowed(permission: OperationPermission, domain: OperationDomain): boolean {
   if (domain === 'publisher') return permission.publisher_enabled;
@@ -16,5 +17,5 @@ export function operationAllowed(permission: OperationPermission, domain: Operat
 export function operationReviewMode(permission: OperationPermission, domain: OperationDomain): 'conversa' | 'painel' | null {
   if (permission.operation_confirmation === 'conversa' || permission.operation_confirmation === 'painel')
     return permission.operation_confirmation;
-  return permission.monitor_owner_approval || domain === 'stock' || domain === 'catalog' ? 'painel' : null;
+  return permission.monitor_owner_approval || domain === 'stock' || domain === 'catalog' || domain === 'pickup' ? 'painel' : null;
 }

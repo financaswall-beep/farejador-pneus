@@ -86,3 +86,64 @@
   .is-partner-home .pu-customer .pu-identity { gap: 19px; }.is-partner-home .pu-customer .pu-person p { font-size: 22px; }
   .is-partner-home .pu-tire-main { gap: 12px; }.is-partner-home .pu-tire-quantity { font-size: 28px; }.is-partner-home .pu-tire-brand { font-size: 17px; }
 }
+
+/* A navegação do app continua visível enquanto o atendimento ocupa a tela. */
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-header { background: #064e3b; padding-bottom: 0; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-header-bar { background: #064e3b; color: white; border-radius: 0; box-shadow: none; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-header-bar::after { content: none; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-store { font: 700 19px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; }
+.is-partner-home .partner-home-panel:has(.pu-screen) #partner-home-notifications { color: white; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-nav { background: white; border-color: #dce5e0; border-radius: 0; box-shadow: none; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-nav-metal { display: none; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-nav button {
+  justify-content: center; font: 600 12px/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: normal; gap: 4px;
+}
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-nav button[aria-current='page'] { background: #d5f6e6; color: #065f46; }
+.is-partner-home .partner-home-panel:has(.pu-screen) .ph-nav button[aria-current='page'] .ph-nav-icon::after { content: none; }
+.is-partner-home #partner-home-screen:has(.pu-screen) { background: #f5f7f6; padding-top: 12px; }
+.is-partner-home .pu-screen { color: #111827; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.is-partner-home .pu-screen .ps-screen-heading h3 { font: 700 24px/1.1 Inter, ui-sans-serif, system-ui, sans-serif; }
+.is-partner-home .pu-screen .pu-plate {
+  border: 1px solid #dce5e0; border-radius: 12px; background: white; box-shadow: none;
+}
+.is-partner-home .pu-screen .pu-screw { display: none; }
+.is-partner-home .pu-screen .pu-customer { padding: 14px; }
+.is-partner-home .pu-customer h4 { margin: 0; font-size: 24px; overflow-wrap: anywhere; }
+.is-partner-home .pu-customer p { margin: 4px 0 8px; font-size: 15px; }
+.is-partner-home .pu-status { width: fit-content; padding: 4px 7px; border-radius: 7px; background: #edf1ef; color: #374151; font-size: 12px; font-weight: 600; }
+.is-partner-home .pu-status-ready, .is-partner-home .pu-status-arrived, .is-partner-home .pu-status-installing {
+  background: #d5f6e6; color: #065f46;
+}
+.is-partner-home .pu-deadline { font-size: 13px; font-weight: 600; color: #43544b; border-radius: 8px; padding: 8px; background: #f2f5f3; }
+.is-partner-home .pu-deadline-soon { color: #854d0e; background: #fef3c7; }
+.is-partner-home .pu-deadline-expired { color: #9f1239; background: #fff1f2; }
+.is-partner-home .pu-screen .pu-label { font: 600 15px/1.15 Inter, ui-sans-serif, system-ui, sans-serif; }
+.is-partner-home .pu-screen .pu-tire-main { grid-template-columns: 72px minmax(0,1fr); }
+.is-partner-home .pu-screen .pu-tire-photo { min-height: 68px; background: #eff4f1; color: #065f46; border-color: #dce5e0; box-shadow: none; }
+.is-partner-home .pu-screen .pu-tire-photo::after { box-shadow: none; }
+.is-partner-home .pu-screen .pu-tire-photo svg { width: 22px; height: 22px; }
+.is-partner-home .pu-screen .pu-tire-photo span { padding: 0; font-size: 10px; }
+.is-partner-home .pu-screen .pu-size { font-size: 21px; box-shadow: none; border-color: #dce5e0; }
+.is-partner-home .pu-screen .pu-tire-quantity { font-size: 16px; }
+.is-partner-home .pu-screen .pu-tire-brand, .is-partner-home .pu-screen .pu-service { font-size: 13px; }
+.is-partner-home .pu-screen .ps-button {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+  border: 1px solid #047857; outline: none; border-radius: 10px; background: #047857;
+  color: white; font: 600 15px/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
+  box-shadow: none; text-shadow: none; text-decoration: none;
+}
+.is-partner-home .pu-screen .ps-button::before { content: none; }
+.is-partner-home .pu-screen .ps-button--secondary, .is-partner-home .pu-screen .ps-button--back { background: #fff; color: #065f46; }
+.is-partner-home .pu-screen .ps-button--danger { background: #9f1239; border-color: #9f1239; }
+.is-partner-home .pu-screen .ps-button > svg { width: 20px; height: 20px; stroke-width: 1.8; }
+.is-partner-home .pu-screen .ps-button:focus-visible { outline: 3px solid #047857; outline-offset: 2px; }
+.is-partner-home .pu-totals, .is-partner-home .pu-history, .is-partner-home .pu-actions { padding: 13px; margin-bottom: 12px; }
+.is-partner-home .pu-totals { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+.is-partner-home .pu-totals .pu-deadline { grid-column: 1 / -1; margin: 0; }
+.is-partner-home .pu-actions { display: grid; gap: 8px; }
+.is-partner-home .pu-actions .ps-button { width: 100%; margin: 0; }
+.is-partner-home .pu-history h4 { margin: 0; }
+.is-partner-home .pu-history ol { list-style: none; padding: 0; margin: 9px 0 0; }
+.is-partner-home .pu-history li { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 13px; }
+.is-partner-home .pu-history li::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #047857; flex: none; }
+.is-partner-home .pu-history time { font-variant-numeric: tabular-nums; flex: none; }
