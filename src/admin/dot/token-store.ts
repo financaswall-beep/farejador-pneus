@@ -97,6 +97,8 @@ export async function listDotConnections(personId: string) {
     COALESCE((to_jsonb(g)->>'stock_operations_enabled')::boolean,false) stock_operations_enabled,
     COALESCE((to_jsonb(g)->>'catalog_operations_enabled')::boolean,false) catalog_operations_enabled,
     COALESCE((to_jsonb(g)->>'pickup_operations_enabled')::boolean,false) pickup_operations_enabled,
+    COALESCE((to_jsonb(g)->>'retail_operations_enabled')::boolean,false) retail_operations_enabled,
+    COALESCE((to_jsonb(g)->>'route_operations_enabled')::boolean,false) route_operations_enabled,
     ${monitorOwnerSql} AS monitor_owner_approval, ${conversationModeSql} installment_chat_confirmation FROM network.dot_oauth_grants g
     WHERE environment=$1 AND person_id=$2 AND code_used_at IS NOT NULL
     ORDER BY created_at DESC LIMIT 50`,[env.FAREJADOR_ENV,personId])).rows;

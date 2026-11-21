@@ -19,10 +19,14 @@ function descriptor(name:string,description:string,schema:z.ZodTypeAny,write:boo
     annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:file}};
 }
 export function registerInventoryRead<S extends z.ZodTypeAny>(name:string,description:string,schema:S,run:(data:z.output<S>)=>Promise<unknown>){
-  inventoryRegistry.set(name,{descriptor:descriptor(name,description,schema,false),run:async(_identity,args)=>run(schema.parse(args??{}))});
+  registerConnectionRead(name,description,schema,data=>run(data));
 }
-export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'catalog',name:string,description:string,schema:S,
-  execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<unknown>,file=false){
+export function registerConnectionRead<S extends z.ZodTypeAny>(name:string,description:string,schema:S,run:(data:z.output<S>,identity:DotIdentity)=>Promise<unknown>){
+  inventoryRegistry.set(name,{descriptor:descriptor(name,description,schema,false),run:async(identity,args)=>run(schema.parse(args??{}),identity)});
+}
+export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'catalog'|'retail'|'route',name:string,description:string,schema:S,
+  execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<unknown>,file=false,
+  preview?:(db:PoolClient,data:z.output<S>)=>Promise<object>, additionalDomain?:'retail'|'route'){
   let base:z.ZodTypeAny=schema;
   while(base instanceof z.ZodEffects)base=base.innerType();
   if(!(base instanceof z.ZodObject))throw Error('inventory_schema_requires_object');
@@ -35,8 +39,10 @@ export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'c
     run:(identity,args)=>transact(async db=>{
       const grant=await lockGrant(db,identity.person_id,identity.grant_id);
       if(!operationAllowed(grant,domain))throw Error('dot_'+domain+'_disabled');
+      if(additionalDomain && !operationAllowed(grant,additionalDomain))throw Error('dot_'+additionalDomain+'_disabled');
       const data=input.parse(args),key=z.string().uuid().parse(data.idempotency_key);
-      const pending=await requireOperationReview(db,identity,name,key,data,grant,domain);
+      const details=preview ? async()=>({...data,efeitos:await preview(db,data as z.output<S>)}) : data;
+      const pending=await requireOperationReview(db,identity,name,key,details,grant,domain);
       if(pending)return pending;
       const operation={environment:env.FAREJADOR_ENV,domain:'dot.'+name,idempotencyKey:key,
         fingerprint:operationFingerprint({grant:identity.grant_id,data:reviewFingerprint(data)})};

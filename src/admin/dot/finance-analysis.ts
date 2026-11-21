@@ -1,3 +1,4 @@
+import {effectiveCashAccountSql} from '../painel/retail-cash-account.js';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
 import { businessDateSaoPaulo } from '../../shared/business-time.js';
@@ -48,10 +49,10 @@ export const compareStatement=(data:z.infer<typeof bankInput>)=>withDotReadOnly(
   if (data.de>data.ate || Date.parse(data.ate)-Date.parse(data.de)>31*86400000 ||
       data.movimentos.some(m=>m.dia<data.de || m.dia>data.ate)) throw Error('intervalo_de_extrato_invalido');
   const rows=(await db.query<{id:string;dia:string;direcao:string;valor:string;conta:string|null}>(`SELECT t.id,t.cash_on::text dia,
-    CASE e.side WHEN 'debit' THEN 'entrada' ELSE 'saida' END direcao,e.amount::text valor,t.metadata->>'cash_account' conta
+    CASE e.side WHEN 'debit' THEN 'entrada' ELSE 'saida' END direcao,e.amount::text valor,${effectiveCashAccountSql} conta
     FROM finance.matriz_ledger_transactions t JOIN finance.matriz_reporting_entries e ON e.transaction_id=t.id AND e.environment=t.environment
     WHERE t.environment=$1 AND t.cash_on BETWEEN $2 AND $3 AND e.account_code='cash' AND `+EFFECTIVE_CASH_TRANSACTION_SQL+`
-      AND (t.metadata->>'cash_account' IS NULL OR lower(t.metadata->>'cash_account')=lower($4)) ORDER BY t.cash_on,t.id LIMIT 501`,
+      AND (${effectiveCashAccountSql} IS NULL OR lower(${effectiveCashAccountSql})=lower($4)) ORDER BY t.cash_on,t.id LIMIT 501`,
     [env.FAREJADOR_ENV,data.de,data.ate,data.conta])).rows;
   if (rows.length>500) throw Error('reduza_o_periodo_do_extrato');
   const key=(r:{dia:string;direcao:string;valor:string|number})=>[r.dia,r.direcao,Math.round(Number(r.valor)*100)].join('/');

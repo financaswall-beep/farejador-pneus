@@ -72,6 +72,8 @@
             if (row.operation_confirmation !== 'painel') operationPermission('Confirmar operações na Matriz', { operation_confirmation: 'painel' });
             operationPermission(row.stock_operations_enabled ? 'Desativar alterações de estoque' : 'Permitir todas as funções de estoque', { stock_operations_enabled: !row.stock_operations_enabled });
             operationPermission(row.catalog_operations_enabled ? 'Desativar alterações do catálogo' : 'Permitir todas as funções do catálogo', { catalog_operations_enabled: !row.catalog_operations_enabled });
+            operationPermission(row.retail_operations_enabled ? 'Desativar vendas de balcão' : 'Permitir vendas de balcão com confirmação', { retail_operations_enabled: !row.retail_operations_enabled });
+            operationPermission(row.route_operations_enabled ? 'Desativar rotas realizadas' : 'Permitir rotas realizadas com confirmação', { route_operations_enabled: !row.route_operations_enabled });
             operationPermission(row.pickup_operations_enabled ? 'Desativar cancelamentos de retiradas' : 'Permitir cancelamentos de retiradas com confirmação', { pickup_operations_enabled: !row.pickup_operations_enabled });
           }
           if (typeof row.installment_reviews_enabled === 'boolean') {

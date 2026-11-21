@@ -101,6 +101,7 @@ export const tripSelect = `
               FROM (SELECT DISTINCT ON (e2.id)
                            e2.id, e2.category, e2.description, e2.amount, e2.occurred_at,
                            CASE WHEN a2.id IS NOT NULL THEN 'sem_comprovante'
+                             WHEN e2.delivery_trip_id=t.id AND r3.id IS NULL THEN 'registro_historico'
                              WHEN r3.id IS NULL THEN 'fechamento' ELSE 'comprovante' END AS source,
                            r3.id AS receipt_id, r3.ai_summary AS receipt_summary,
                            a2.reason AS approval_reason,a2.actor_label AS approved_by,a2.created_at AS approved_at

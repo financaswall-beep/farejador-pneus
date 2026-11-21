@@ -1,6 +1,6 @@
 import { formatSaleAddress } from './sale-address.js';
 import { resolveSaleCustomer, cleanCustomerText } from './sale-customers.js';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
@@ -10,7 +10,9 @@ import { applyMatrizWalkinStockSale, prepareMatrizWalkinStock } from './matriz-w
 import { postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
 import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 import { operationFingerprint } from './stage5-integrity.js';
-import { assertRetailSaleMoney } from './sales-money.js';
+import { assertRetailSaleMoney, MAX_RETAIL_SALE_CENTS, hasCentPrecision } from './sales-money.js';
+
+import type { RetailTender } from './retail-tenders.js';
 
 interface ExistingOrder {
   id: string;
@@ -38,6 +40,8 @@ function calculateTotal(input: RegisterWalkinOrderInput): number {
 export async function registerWalkinOrder(
   input: RegisterWalkinOrderInput,
   dbPool: Pool = defaultPool,
+  transactionClient?: PoolClient,
+  fact?: { soldAt: string; deliveredAt?: string; freight: number; payments: RetailTender[] },
 ): Promise<{ order_id: string }> {
   if (input.delivery_address_fields && input.fulfillment_mode === 'delivery') {
     input = { ...input, delivery_address: formatSaleAddress(input.delivery_address_fields) };
@@ -48,7 +52,11 @@ export async function registerWalkinOrder(
   }
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
-  const total = calculateTotal(input);
+  const subtotal = calculateTotal(input);
+  if (fact && (!hasCentPrecision(fact.freight) || fact.freight < 0)) throw Error('frete_invalido');
+  const cents = Math.round(subtotal * 100) + Math.round((fact?.freight ?? 0) * 100);
+  if (cents > MAX_RETAIL_SALE_CENTS) throw Error('sale_total_too_large');
+  const total = cents / 100;
   const requestFingerprint = operationFingerprint({
     customer_name: input.customer_mode ? cleanCustomerText(input.customer_name) : input.customer_name?.trim() || null,
     ...(input.customer_mode || input.customer_ref ? { customer_ref: input.customer_ref ?? null, customer_mode: input.customer_mode ?? null } : {}),
@@ -65,11 +73,12 @@ export async function registerWalkinOrder(
     fulfillment_mode: input.fulfillment_mode,
     delivery_address: input.delivery_address?.trim() || null,
     source_tag: input.source_tag,
+    ...(fact ? { fact } : {}),
   });
-  const client = await dbPool.connect();
+  const client = transactionClient ?? await dbPool.connect();
 
   try {
-    await client.query('BEGIN');
+    if (!transactionClient) await client.query('BEGIN');
 
     // Serializa retries/duplo clique antes de consultar ou criar o pedido.
     await client.query(
@@ -98,7 +107,7 @@ export async function registerWalkinOrder(
       if (row.request_fingerprint && row.request_fingerprint !== requestFingerprint) {
         throw new Error('walkin_idempotency_conflict');
       }
-      await client.query('COMMIT');
+      if (!transactionClient) await client.query('COMMIT');
       return { order_id: row.id };
     }
 
@@ -148,18 +157,18 @@ export async function registerWalkinOrder(
          environment, contact_id, customer_id, source_conversation_id,
          total_amount, status, fulfillment_mode, payment_method,
          delivery_address, payment_due_on, closed_by, closed_at,
-         idempotency_key, source, unit_id
+         idempotency_key, source, unit_id, created_at
        ) VALUES (
          $1, $11, $2, NULL,
          $3, 'open', $4, $5,
          $6, $10::date, NULL, NULL,
-         $7, $8, $9
+         $7, $8, $9, COALESCE($12::timestamptz,now())
        )
        RETURNING id`,
       [
         environment, customerId, total, input.fulfillment_mode, input.payment_method,
         input.delivery_address ?? null, input.idempotency_key, input.source_tag, unitId,
-        input.payment_due_on ?? null, customer.contactId,
+        input.payment_due_on ?? null, customer.contactId, fact?.soldAt ?? null,
       ],
     );
     const orderId = order.rows[0]?.id;
@@ -204,6 +213,7 @@ export async function registerWalkinOrder(
        )`,
       [environment, orderId, input.actor_label, input.idempotency_key, JSON.stringify({
         total,
+        ...(fact ? { subtotal, freight_amount: fact.freight, sold_at: fact.soldAt, delivered_at: fact.deliveredAt, payments: fact.payments } : {}),
         items: input.items,
         unit_id: unitId,
         customer_id: customerId,
@@ -221,20 +231,22 @@ export async function registerWalkinOrder(
 
     const confirmed = await client.query(
       `UPDATE commerce.orders
-          SET status = 'confirmed', closed_by = $3, closed_at = now(), updated_at = now()
+          SET status = CASE WHEN $5::timestamptz IS NULL THEN 'confirmed' ELSE 'delivered' END,
+              delivery_status = CASE WHEN $5::timestamptz IS NULL THEN delivery_status ELSE 'delivered' END,
+              delivered_at = $5::timestamptz, closed_by = $3, closed_at = COALESCE($4::timestamptz,now()), updated_at = now()
         WHERE id = $1 AND environment = $2 AND status = 'open'
         RETURNING id`,
-      [orderId, environment, input.actor_label],
+      [orderId, environment, input.actor_label, fact?.soldAt ?? null, fact?.deliveredAt ?? null],
     );
     if (confirmed.rowCount !== 1) throw new Error('walkin_order_not_confirmed');
-    await postMatrizRetailSaleFacts(client, environment, orderId);
+    await postMatrizRetailSaleFacts(client, environment, orderId, fact?.payments, fact?.soldAt);
 
-    await client.query('COMMIT');
+    if (!transactionClient) await client.query('COMMIT');
     return { order_id: orderId };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!transactionClient) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }

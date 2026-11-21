@@ -50,6 +50,8 @@ export async function readLogisticsSnapshot(db:Pool,environment:string,filter:Lo
         WHERE t.environment=$1 AND t.id=ANY($2::uuid[]) AND t.fuel_expense_id IS NOT NULL
       UNION SELECT r.trip_id,r.ai_expense_id FROM commerce.matriz_trip_receipts r
         WHERE r.environment=$1 AND r.trip_id=ANY($2::uuid[]) AND r.workflow_status IN ('linked','legacy_linked')
+      UNION SELECT delivery_trip_id,id FROM commerce.matriz_expenses WHERE environment=$1 AND delivery_trip_id=ANY($2::uuid[])
+      UNION SELECT trip_id,expense_id FROM commerce.matriz_trip_lost_receipts WHERE environment=$1 AND trip_id=ANY($2::uuid[])
     ) SELECT e.id,l.trip_id,e.category,e.amount::float8,e.occurred_at::text,
       ARRAY(SELECT r.id::text FROM commerce.matriz_trip_receipts r WHERE r.environment=e.environment
         AND r.trip_id=l.trip_id AND r.ai_expense_id=e.id AND r.workflow_status IN ('linked','legacy_linked') ORDER BY r.created_at) AS receipt_ids,

@@ -299,7 +299,7 @@ it('MCP 2.0 descobre eventos e ferramentas com autenticação, cabeçalhos e cac
   expect((await rpc('server/discover')).json()).toMatchObject({result:{resultType:'complete',supportedVersions:['2026-07-28'],capabilities:{events:{}},cacheScope:'private'}});
   expect((await rpc('events/list')).json().result.events).toHaveLength(10);
   const listed=(await rpc('tools/list')).json().result.tools;
-  expect(listed).toHaveLength(115);
+  expect(listed).toHaveLength(129);
   expect(listed.find((tool:{name:string})=>tool.name==='classificar_referencias_moto')).toMatchObject({annotations:{readOnlyHint:false}});
   expect(listed.map((t:{name:string})=>t.name)).toContain('registrar_pendencia_interna');
   for(const {name,readOnlyHint} of [...negotiationTools,...pickupTools]) {
@@ -520,7 +520,7 @@ it('flag desligada mantém consultas e não anuncia eventos',async()=>{
     config.DOT_EVENTS_ENABLED=false;
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
     const listed=(await rpc('tools/list')).json().result.tools;
-    expect(listed).toHaveLength(109);
+    expect(listed).toHaveLength(123);
     for(const {name} of negotiationTools) expect(listed).not.toContainEqual(expect.objectContaining({name}));
     for(const {name} of pickupTools) expect(listed).toContainEqual(expect.objectContaining({name}));
     expect((await rpc('events/list')).statusCode).toBe(404);
@@ -541,7 +541,7 @@ it('chave inválida preserva HTTP e consultas, mas bloqueia descoberta, assinatu
     expect((await fresh.inject({method:'GET',url:'/livez'})).statusCode).toBe(200);
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
     const listed=(await rpc('tools/list')).json().result.tools;
-    expect(listed).toHaveLength(110);
+    expect(listed).toHaveLength(124);
     for(const {name} of negotiationTools) expect(listed).not.toContainEqual(expect.objectContaining({name}));
     for(const {name} of pickupTools) expect(listed).toContainEqual(expect.objectContaining({name}));
     expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);

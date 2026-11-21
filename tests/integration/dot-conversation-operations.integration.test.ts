@@ -1,3 +1,4 @@
+import {retailTripCase} from './helpers/milly-retail-trip-case.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {beforeAll,beforeEach,afterAll,it,expect,vi} from 'vitest';
 import {startPostgres,stopPostgres,type IntegrationDb} from './helpers/postgres.js';
@@ -10,7 +11,7 @@ beforeAll(async()=>{
   Object.assign(process.env,{NODE_ENV:'test',FAREJADOR_ENV:'test',DATABASE_URL:'postgres://test',DATABASE_SSL:'false',
     CHATWOOT_HMAC_SECRET:'test-secret',ADMIN_AUTH_TOKEN:'test-emergency',DOT_MCP_ENABLED:'true',
     DOT_MCP_PUBLIC_ORIGIN:'https://farejador.example',DOT_MCP_REDIRECT_URIS:'https://chatgpt.com/connector_platform_oauth_redirect',
-    MATRIZ_CENTRAL_LEDGER:'true',MATRIZ_CENTRAL_LEDGER_READ:'true',MATRIZ_EXPENSES:'true',WHOLESALE_FINANCE:'true',
+    MATRIZ_LOGISTICS:'true',MATRIZ_CENTRAL_LEDGER:'true',MATRIZ_CENTRAL_LEDGER_READ:'true',MATRIZ_EXPENSES:'true',WHOLESALE_FINANCE:'true',
     WHOLESALE_STOCK_DECREMENT:'true',MARKETING_PUBLISHER_ENABLED:'true'});
   db=await startPostgres();process.env.DATABASE_URL=db.connectionString;vi.resetModules();
   invoke=(await import('../../src/admin/dot/mcp-server.js')).invokeDotTool;
@@ -222,4 +223,8 @@ it('Milly encontra as referências antigas ao cadastrar e só classifica as esco
   expect(after.rows).toEqual([]);
   const audit = await db.pool.query("SELECT actor_label FROM audit.events WHERE event_type='catalog_application_vehicle_type_repaired'");
   expect(audit.rows).toEqual([{actor_label:'Milly · '+identity.person_id}]);
+});
+
+it('registra balcão e rota histórica com uma baixa, um Pix e despesas conciliadas',async()=>{
+  await retailTripCase(db.pool,identity.grant_id,call,approve);
 });

@@ -1,3 +1,4 @@
+import {effectiveCashAccountSql} from './retail-cash-account.js';
 import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
 
 // Only account entries determine values. Transaction headers can contain several accounting legs.
@@ -8,7 +9,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
   COALESCE(wc.name,rc.name,ct.name,ws.name,np.trade_name,np.legal_name) AS party,
   t.competence_on::text,t.cash_on::text,
   COALESCE(t.metadata->>'category',b.metadata->>'category',o.metadata->>'category') AS category,
-  t.metadata->>'payment_method' AS payment_method,t.metadata->>'cash_account' AS cash_account,
+  t.metadata->>'payment_method' AS payment_method,${effectiveCashAccountSql} AS cash_account,
   t.reversal_of_transaction_id AS reversal_of,
   (t.cash_on IS NOT NULL AND NOT (${EFFECTIVE_CASH_TRANSACTION_SQL})) AS cash_entry_error,
   EXISTS(SELECT 1 FROM finance.matriz_ledger_transactions r WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id) AS reversed,

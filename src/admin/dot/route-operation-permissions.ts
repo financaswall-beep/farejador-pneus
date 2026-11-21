@@ -7,7 +7,7 @@ import {lockGrant,transact} from './installment-reviews.js';
 
 const input=z.object({operation_confirmation:z.enum(['legacy','conversa','painel']).optional(),
   stock_operations_enabled:z.boolean().optional(),catalog_operations_enabled:z.boolean().optional(),
-  pickup_operations_enabled:z.boolean().optional(),
+  pickup_operations_enabled:z.boolean().optional(), retail_operations_enabled:z.boolean().optional(), route_operations_enabled:z.boolean().optional(),
 }).strict().refine(value=>Object.keys(value).length>0);
 export function registerOperationPermissions(app:FastifyInstance,origin:string){
   app.put('/admin/api/dot/connections/:id/operation-permissions',{preHandler:dotHumanOwner},async(req,reply)=>{
@@ -17,10 +17,11 @@ export function registerOperationPermissions(app:FastifyInstance,origin:string){
     try{return await transact(async db=>{
       const person=getAdminContext(req).personId!,grant=await lockGrant(db,person,params.data.id);
       const next={operation_confirmation:grant.operation_confirmation??'legacy',stock_operations_enabled:!!grant.stock_operations_enabled,
-        catalog_operations_enabled:!!grant.catalog_operations_enabled,pickup_operations_enabled:!!grant.pickup_operations_enabled,...body.data};
+        catalog_operations_enabled:!!grant.catalog_operations_enabled,pickup_operations_enabled:!!grant.pickup_operations_enabled,retail_operations_enabled:!!grant.retail_operations_enabled,
+        route_operations_enabled:!!grant.route_operations_enabled,...body.data};
       await db.query(`UPDATE network.dot_oauth_grants SET operation_confirmation=$3,stock_operations_enabled=$4,catalog_operations_enabled=$5,
-        pickup_operations_enabled=$6 WHERE environment=$1 AND id=$2`,[env.FAREJADOR_ENV,params.data.id,next.operation_confirmation,
-        next.stock_operations_enabled,next.catalog_operations_enabled,next.pickup_operations_enabled]);
+        pickup_operations_enabled=$6,retail_operations_enabled=$7,route_operations_enabled=$8 WHERE environment=$1 AND id=$2`,[env.FAREJADOR_ENV,params.data.id,next.operation_confirmation,
+        next.stock_operations_enabled,next.catalog_operations_enabled,next.pickup_operations_enabled,next.retail_operations_enabled,next.route_operations_enabled]);
       // Trocar o canal ou revogar uma permissão invalida aprovações ainda não executadas.
       if(next.operation_confirmation!==grant.operation_confirmation || (grant.stock_operations_enabled&&!next.stock_operations_enabled)
         || (grant.catalog_operations_enabled&&!next.catalog_operations_enabled))
@@ -29,6 +30,11 @@ export function registerOperationPermissions(app:FastifyInstance,origin:string){
       else if (grant.pickup_operations_enabled && !next.pickup_operations_enabled)
         await db.query(`UPDATE network.dot_operation_reviews SET expires_at=LEAST(expires_at,clock_timestamp())
           WHERE environment=$1 AND grant_id=$2 AND permission_domain='pickup' AND executed_at IS NULL`,[env.FAREJADOR_ENV,params.data.id]);
+      for (const domain of ['retail','route'] as const) {
+        const field = (domain + '_operations_enabled') as 'retail_operations_enabled' | 'route_operations_enabled';
+        if (grant[field] && !next[field]) await db.query(`UPDATE network.dot_operation_reviews SET expires_at=LEAST(expires_at,clock_timestamp())
+          WHERE environment=$1 AND grant_id=$2 AND (permission_domain=$3 OR tool_name='registrar_venda_e_rota_matriz') AND executed_at IS NULL`,[env.FAREJADOR_ENV,params.data.id,domain]);
+      }
       await db.query(`INSERT INTO audit.events(environment,domain,entity_table,entity_id,event_type,actor_label,payload_after)
         VALUES($1,'dot_permissions','network.dot_oauth_grants',$2,'permissions_changed',$3,$4)`,
       [env.FAREJADOR_ENV,params.data.id,'Dono · '+person,next]);

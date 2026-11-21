@@ -1,6 +1,11 @@
 import './inventory-stock-tools.js';
 import './inventory-catalog-tools.js';
 import './inventory-media-tools.js';
+import './retail-delivery-tools.js';
+import './retail-trip-bundle.js';
+import './retail-existing-delivery.js';
+import './retail-follow-up.js';
+import './retail-account-correction.js';
 import {inventoryRegistry} from './inventory-registry.js';
 export {invokeInventoryTool} from './inventory-registry.js';
 export const inventoryTools=[...inventoryRegistry.values()].map(tool=>tool.descriptor);

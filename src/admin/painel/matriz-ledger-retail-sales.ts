@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { cancelMatrizSaleRevenue } from './matriz-ledger-sale-cancel.js';
+import { settleSplitRetailTenders, type RetailTender } from './retail-tenders.js';
 import { env } from '../../shared/config/env.js';
 import {
   matrizLedgerActor, matrizLedgerAmount, postMatrizLedgerTransaction,
@@ -98,6 +99,7 @@ async function existing(
 async function ensureRetailRevenue(
   client: PoolClient,
   sale: RetailSaleLedgerState,
+  tender?: RetailTender,
 ): Promise<string | null> {
   const amount = matrizLedgerAmount(sale.totalAmount, 'retail_ledger_amount_invalid');
   if (amount === 0) return null;
@@ -119,6 +121,7 @@ async function ensureRetailRevenue(
     ],
     metadata: {
       order_id: sale.orderId, customer_id: sale.customerId,
+      ...(tender ? { cash_account: tender.cash_account } : {}),
       payment_method: sale.paymentMethod, fulfillment_mode: sale.fulfillmentMode,
     },
   });
@@ -151,6 +154,8 @@ export async function postMatrizRetailSaleFacts(
   client: PoolClient,
   environment: 'prod' | 'test',
   orderId: string,
+  payments?: RetailTender[],
+  paidAt?: string,
 ): Promise<void> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return;
   const sale = await getRetailSaleState(client, environment, orderId);
@@ -159,7 +164,10 @@ export async function postMatrizRetailSaleFacts(
   if (!sale || !['confirmed', 'paid', 'delivered'].includes(sale.status)) return;
   if (sale.fulfillmentMode === 'delivery' && sale.deliveryStatus !== 'delivered') return;
   if (!sale.occurredAt) throw new Error('retail_delivery_fact_date_missing');
-  await ensureRetailRevenue(client, sale);
+  if (paidAt) sale.cashAt = paidAt;
+  const split = payments && payments.length > 1;
+  const revenueId = await ensureRetailRevenue(client, split ? {...sale,cashRealized:false} : sale, payments?.[0]);
+  if (split && revenueId) await settleSplitRetailTenders(client, environment, orderId, revenueId, sale.cashAt, sale.createdBy, payments);
   await ensureRetailCogs(client, sale);
 }
 
