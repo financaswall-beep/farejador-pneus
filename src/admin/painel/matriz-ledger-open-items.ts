@@ -1,3 +1,4 @@
+import { expenseReportCategoryJoinSql } from './expense-report-category.js';
 import { salePlanSnapshotSql } from './sale-payment-plan.js';
 import { purchaseInstallmentBalancesSql } from './purchase-installment-balances.js';
 import type { Pool } from 'pg';
@@ -117,13 +118,14 @@ export async function getMatrizLedgerOpenItems(
             t.due_on::text due_date,
             (t.due_on IS NOT NULL
               AND t.due_on<(now() AT TIME ZONE 'America/Sao_Paulo')::date) overdue,
-            t.description,t.metadata->>'category' category,
+            t.description,COALESCE(category_expense.category,t.metadata->>'category') category,
             t.metadata->>'partner_id' partner_id,
             COALESCE(np.trade_name,np.legal_name) partner_name,np.whatsapp_phone partner_phone,
             wc.name customer_name,wc.phone customer_phone,ws.name supplier_name,
             credits.available supplier_credit_available
        FROM finance.matriz_ledger_transactions t
        JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+       ${expenseReportCategoryJoinSql('t')}
        LEFT JOIN paid ON paid.obligation_transaction_id=t.id
        LEFT JOIN network.partners np ON np.environment=t.environment
         AND np.id::text=t.metadata->>'partner_id'

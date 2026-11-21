@@ -109,7 +109,8 @@ export function readDotPickups(ctx:DotReadContext) {
   [env.BOT_PICKUP_RESERVATION_HOURS]);
 }
 
-export function readDotExpenses(ctx:DotReadContext,view:'despesas'|'comprovantes'|'categorias') {
+export function readDotExpenses(ctx:DotReadContext,view:'despesas'|'comprovantes'|'categorias',search?:string) {
+  if (search && view!=='despesas') throw Error('unsupported_filter_for_view');
   rejectFilters(ctx,'medida');
   if(view==='categorias')rejectFilters(ctx,'referencia');
   if(view==='comprovantes')return readPage(ctx,`SELECT r.id,r.trip_id,r.created_at,r.ai_status,r.workflow_status,
@@ -129,11 +130,14 @@ export function readDotExpenses(ctx:DotReadContext,view:'despesas'|'comprovantes
       AND (occurred_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date
       AND $4::uuid IS NULL AND $5='' GROUP BY category`,'amount_brl::numeric DESC,id');
   return readPage(ctx,`SELECT e.id,e.category,e.amount,e.occurred_at,e.payment_status,e.due_date,e.paid_at,
+    CASE WHEN $8<>'' THEN e.description END AS searched_description,
+    ops.matriz_expense_competence_month(e.competence_month,e.occurred_at) AS competence_month,
     EXISTS(SELECT 1 FROM commerce.matriz_expense_receipts r WHERE r.environment=e.environment AND r.expense_id=e.id)
       OR EXISTS(SELECT 1 FROM commerce.matriz_trip_receipts r WHERE r.environment=e.environment AND r.ai_expense_id=e.id
-        AND r.workflow_status='approved') has_receipt
+        AND r.workflow_status IN ('linked','legacy_linked')) has_receipt
     FROM commerce.matriz_expenses e WHERE e.environment=$1 AND e.deleted_at IS NULL AND e.category<>'funcionario'
       AND (e.occurred_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date
-      AND ($4::uuid IS NULL OR e.id=$4) AND $5=''`,'occurred_at DESC,id DESC',
-  'Despesas operacionais registradas; descrições, beneficiários e pagamentos individuais da equipe omitidos. Para totais consolidados use o financeiro.');
+      AND ($4::uuid IS NULL OR e.id=$4) AND $5=''
+      AND ($8::text='' OR strpos(lower(COALESCE(e.description,'')),lower($8))>0)`,'occurred_at DESC,id DESC',
+  'Busque por descrição ou UUID e confira valor e data antes de escolher uma despesa. Para totais consolidados use o financeiro.',[search??'']);
 }

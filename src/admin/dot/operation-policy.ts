@@ -15,9 +15,14 @@ export function operationAllowed(permission: OperationPermission, domain: Operat
   if (domain === 'publisher') return permission.publisher_enabled;
   return permission[`${domain}_operations_enabled`] === true;
 }
-// Rascunhos, anexos preparatórios e tarefas internas mantêm sua autonomia.
-export function operationReviewMode(permission: OperationPermission, domain: OperationDomain): 'conversa' | 'painel' | null {
+const financeCategoryWrites = new Set(['criar_categoria_despesa_matriz', 'reclassificar_despesa_matriz']);
+export function operationReviewMode(permission: OperationPermission, domain: OperationDomain, tool?: string): 'conversa' | 'painel' | null {
   if (permission.operation_confirmation === 'conversa' || permission.operation_confirmation === 'painel')
     return permission.operation_confirmation;
-  return permission.monitor_owner_approval || domain === 'stock' || domain === 'catalog' || domain === 'pickup' || domain === 'retail' || domain === 'route' ? 'painel' : null;
+  const mustReviewCategory = domain === 'finance' && tool !== undefined && financeCategoryWrites.has(tool);
+  if (mustReviewCategory || permission.monitor_owner_approval
+      || domain === 'stock' || domain === 'catalog' || domain === 'pickup' || domain === 'retail' || domain === 'route') {
+    return 'painel';
+  }
+  return null;
 }

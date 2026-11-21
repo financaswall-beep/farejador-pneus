@@ -1,3 +1,4 @@
+import { expenseReportCategoryJoinSql, expenseReportAccountSql } from './expense-report-category.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -171,14 +172,15 @@ export async function getMatrizLedgerStatement(
               bool_or(e.account_code IN ('inventory','inventory_in_transit',
                 'inventory_gain','inventory_loss','inventory_internal_use')) has_inventory,
               jsonb_agg(jsonb_build_object(
-                'account_code',e.account_code,'account_class',e.account_class,
+                'account_code',${expenseReportAccountSql},'account_class',e.account_class,
                 'side',e.side,'amount',e.amount::text
               ) ORDER BY e.line_no) entries,
               count(*) OVER()::int total_count
          FROM selected s
          JOIN finance.matriz_reporting_entries e
            ON e.environment=s.environment AND e.transaction_id=s.id
-        GROUP BY s.id,s.source_type,s.source_id,s.transaction_kind,s.amount,
+         ${expenseReportCategoryJoinSql('s')}
+        GROUP BY s.id,category_expense.category,s.source_type,s.source_id,s.transaction_kind,s.amount,
                  s.competence_on,s.due_on,s.cash_on,s.description,s.created_by,
                  s.created_at,s.metadata,s.reversal_of_transaction_id,s.reversed,
                  s.paid_amount,s.obligation_amount,s.cash_entry_error

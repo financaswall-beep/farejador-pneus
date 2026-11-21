@@ -42,6 +42,12 @@ import {
 import { mapWriteError } from '../painel/route-helpers.js';
 import { requireOperationReview,markOperationExecuted } from './operation-reviews.js';
 
+import {
+  activeExpenseCategories, ExpenseCategoryNotice, newExpenseCategorySchema, previewNewExpenseCategory,
+  previewExpenseReclassification, reclassifyExpenseSchema, requireActiveExpenseCategory,
+  saveExpenseCategory, saveExpenseReclassification,
+} from './expense-category-tools.js';
+
 const tools=new Map<string,{descriptor:Tool;call:(identity:DotIdentity,args:unknown)=>Promise<object>}>();
 function describe(name:string,description:string,schema:z.ZodTypeAny,write:boolean):Tool & {securitySchemes:{type:string;scopes:string[]}[]} {
   const { $schema,...json }=zodToJsonSchema(schema,{$refStrategy:'none',effectStrategy:'input'});
@@ -56,7 +62,8 @@ function parse<S extends z.ZodTypeAny>(schema:S,args:unknown):z.output<S> {
   return parsed.data;
 }
 function write<S extends z.ZodTypeAny>(name:string,description:string,schema:S,
-  execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<object>) {
+  execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<object>,
+  preview?:(db:PoolClient,data:z.output<S>)=>Promise<object>) {
   tools.set(name,{descriptor:describe(name,description+' Atenda ao pedido do dono. Se receber aguardando_autorizacao, apresente a proposta. Em confirmacao=conversa aguarde o dono autorizar e use confirmar_operacao_milly; em painel apresente confirm_url. Reutilize idempotency_key ao repetir.',schema,true),
     call:(identity,args)=>transact(async db=>{
       const grant=await lockGrant(db,identity.person_id,identity.grant_id);
@@ -65,7 +72,8 @@ function write<S extends z.ZodTypeAny>(name:string,description:string,schema:S,
       const data=parse(schema,args);
       const actor='Milly · '+identity.person_id;
       const key=id.parse(data.idempotency_key);
-      const review=await requireOperationReview(db,identity,name,key,data,grant);
+      const details=preview?async()=>({...data,efeitos:await preview(db,data)}):data;
+      const review=await requireOperationReview(db,identity,name,key,details,grant);
       if(review) return review;
       const operation={environment:env.FAREJADOR_ENV,domain:'dot.'+name,idempotencyKey:key,
         fingerprint:operationFingerprint({grant:identity.grant_id,
@@ -88,12 +96,21 @@ const expense=createMatrizExpenseSchema.innerType().extend({amount:money,payment
   payment_method:z.string().trim().min(2).max(40).optional(),cash_account:z.string().trim().min(2).max(80).optional(),idempotency_key:id}).strict();
 write('lancar_despesa_matriz','Registra uma despesa paga ou a pagar, com categoria ativa e viagem opcional. Pergunte pelo comprovante e aceite “não tenho”.',expense,
   async(db,data,actor)=>{
-    if (!env.MATRIZ_EXPENSES) throw Error('expenses_disabled');
+    await requireActiveExpenseCategory(db,data.category);
     createMatrizExpenseSchema.parse(data);
     if(data.payment_status==='pending' && (data.paid_at || data.cash_account || data.payment_method)) throw Error('despesa_pendente_sem_pagamento');
     if (data.payment_status==='paid' && data.due_date) throw Error('despesa_paga_nao_aceita_vencimento');
     return createMatrizExpenseOnClient(db,{...data,created_by:actor});
-  });
+  },async(db,data)=>({categoria:await requireActiveExpenseCategory(db,data.category)}));
+
+read('listar_categorias_despesas_matriz',
+  'Lista o nome e o ID aceito de todas as categorias ativas de despesas da Matriz.',z.object({}).strict(),activeExpenseCategories);
+write('criar_categoria_despesa_matriz',
+  'Prepara uma categoria de despesa. Apresenta o nome e o identificador e verifica equivalentes ativos. Se houver equivalente arquivado, propõe reativar. Aguarde autorização do dono.',
+  newExpenseCategorySchema,saveExpenseCategory,previewNewExpenseCategory);
+write('reclassificar_despesa_matriz',
+  'Muda apenas a categoria de uma despesa ativa da Matriz. Localize primeiro pelo nome, valor e data em consultar_despesas_matriz. Mostre as categorias atual e nova, valor, pagamento, competência e comprovante. Aguarde autorização do dono.',
+  reclassifyExpenseSchema,saveExpenseReclassification,previewExpenseReclassification);
 const attachment=z.object({expense_id:id,valor_esperado:money,data_esperada:z.string().date().optional(),receipt_id:id.optional(),
   arquivo:z.object({download_url:z.string().url().max(8192),file_id:z.string().min(1).max(200),mime_type:z.string().max(100).optional(),
     file_name:z.string().max(300).optional()}).strict().optional(),
@@ -185,7 +202,8 @@ write('estornar_baixa_financeira','Corrige uma baixa central específica pelo ID
   });
 write('renegociar_parcelas_venda','Troca o calendário e a divisão do saldo restante de uma venda parcelada, preservando o que já foi recebido.',agreementInput,renegotiate);
 write('criar_cobranca_servico','Registra um serviço prestado a receber de um cliente com valor e vencimento.',serviceInput,createService);
-write('agendar_despesas_mensais','Cria de 1 a 36 contas mensais a pagar, com competência no mês do vencimento. Em meses mais curtos usa o último dia.',recurrenceInput,scheduleExpenses);
+write('agendar_despesas_mensais','Cria de 1 a 36 contas mensais a pagar, com competência no mês do vencimento. Em meses mais curtos usa o último dia.',recurrenceInput,scheduleExpenses,
+  async(db,data)=>({categoria:await requireActiveExpenseCategory(db,data.categoria)}));
 write('registrar_entrada_avulsa','Registra receita avulsa recebida ou aporte do proprietário em uma conta.',manualEntrySchema,(db,data,actor)=>createManualEntryOnClient(db,data,actor));
 const manualReverse=reverseManualEntrySchema.extend({entrada_id:id});
 write('estornar_entrada_avulsa','Estorna um aporte ou receita avulsa pelo UUID e motivo.',manualReverse,
@@ -236,6 +254,9 @@ export async function invokeFinanceTool(identity:DotIdentity,name:string,args:un
     const data=await tools.get(name)!.call(identity,args);
     return {content:[{type:'text' as const,text:JSON.stringify(data)}],structuredContent:{...data}};
   } catch(error) {
+    if(error instanceof ExpenseCategoryNotice) {
+      return {content:[{type:'text' as const,text:JSON.stringify(error.details)}],structuredContent:error.details};
+    }
     if(error instanceof McpError) throw error;
     if (mapWriteError(error).error === 'supplier_duplicate') {
       throw new McpError(ErrorCode.InvalidParams,'Já existe fornecedor ativo com esse nome, telefone ou documento. Consulte o cadastro antes de continuar.');

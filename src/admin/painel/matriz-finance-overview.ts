@@ -1,3 +1,4 @@
+import { expenseReportCategoryJoinSql, expenseReportAccountSql } from './expense-report-category.js';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
@@ -18,10 +19,11 @@ export async function getMatrizFinanceOverview(
            (now() AT TIME ZONE 'America/Sao_Paulo')::date) ends
      ), ledger AS (
        SELECT CASE WHEN e.account_code='cash' AND ${EFFECTIVE_CASH_TRANSACTION_SQL} THEN t.cash_on END cash_on,
-         t.competence_on,e.account_code,e.account_class,e.side,e.amount
+         t.competence_on,${expenseReportAccountSql} AS account_code,e.account_class,e.side,e.amount
        FROM finance.matriz_ledger_transactions t
        JOIN finance.matriz_reporting_entries e
          ON e.environment=t.environment AND e.transaction_id=t.id
+       ${expenseReportCategoryJoinSql('t')}
        WHERE t.environment=$1
      ), daily AS (
        SELECT cash_on,

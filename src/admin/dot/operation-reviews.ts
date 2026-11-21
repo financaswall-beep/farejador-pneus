@@ -25,7 +25,7 @@ export async function requireOperationReview(db: PoolClient, identity: DotIdenti
   permission?: OperationPermission, domain: OperationDomain = 'finance') {
   const grant = permission ?? await lockGrant(db, identity.person_id, identity.grant_id);
   if (!operationAllowed(grant, domain)) throw Error('dot_operation_disabled');
-  const mode = operationReviewMode(grant, domain);
+  const mode = operationReviewMode(grant, domain, name);
   if (!mode) return null;
   const scope = [env.FAREJADOR_ENV, identity.grant_id, name, key];
   const completed = await db.query(`SELECT 1 FROM audit.operation_idempotency
@@ -75,7 +75,7 @@ export async function ownerReview(person: string, id: string, decision?: 'autori
       WHERE r.environment=$1 AND r.id=$2 AND r.grant_id=$3 FOR UPDATE OF r`, [...scope, grantId])).rows[0];
     if (!row) throw Error('dot_review_missing');
     if (!operationAllowed(permission, row.permission_domain)) throw Error('dot_operation_disabled');
-    const mode = operationReviewMode(permission, row.permission_domain);
+    const mode = operationReviewMode(permission, row.permission_domain, row.tool_name);
     if (decision && (conversation ? mode !== 'conversa' : mode !== 'painel')) throw Error('dot_confirmation_channel_disabled');
     if (conversation?.fingerprint && conversation.fingerprint !== row.fingerprint) throw Error('dot_review_changed');
     if (decision && row.decision && row.decision !== decision) throw Error('dot_review_decided');

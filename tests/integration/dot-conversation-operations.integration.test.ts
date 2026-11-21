@@ -1,3 +1,4 @@
+import { checkMillyExpenseCategories } from './helpers/milly-expense-category-case.js';
 import {retailTripCase} from './helpers/milly-retail-trip-case.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {beforeAll,beforeEach,afterAll,it,expect,vi} from 'vitest';
@@ -227,4 +228,15 @@ it('Milly encontra as referências antigas ao cadastrar e só classifica as esco
 
 it('registra balcão e rota histórica com uma baixa, um Pix e despesas conciliadas',async()=>{
   await retailTripCase(db.pool,identity.grant_id,call,approve);
+});
+
+it('Milly lista, cria e reclassifica despesa preservando comprovante, caixa e resultado', async () => {
+  await checkMillyExpenseCategories(db.pool, call, approve);
+});
+
+it('operações de categoria sempre exigem autorização, inclusive em conexão legada', async () => {
+  await db.pool.query("UPDATE network.dot_oauth_grants SET operation_confirmation='legacy' WHERE id=$1", [identity.grant_id]);
+  const proposed = await call('criar_categoria_despesa_matriz', { label:'Categoria de teste legada', idempotency_key:randomUUID() });
+  expect(proposed).toMatchObject({status:'aguardando_autorizacao',confirmacao:'painel',executada:false});
+  expect((await db.pool.query("SELECT 1 FROM commerce.matriz_expense_categories WHERE environment='test' AND slug='categoria_de_teste_legada'")).rowCount).toBe(0);
 });

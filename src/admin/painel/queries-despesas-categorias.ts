@@ -33,7 +33,7 @@ export function normalizeCategorySlug(label: string): string {
  *  no fim). A lista inteira serve o RÓTULO de despesa antiga; o form filtra archived. */
 export async function listMatrizExpenseCategories(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<MatrizExpenseCategoryRow[]> {
   const r = await dbPool.query<MatrizExpenseCategoryRow>(
     `SELECT slug AS id, label, is_system, (archived_at IS NOT NULL) AS archived
@@ -48,7 +48,7 @@ export async function listMatrizExpenseCategories(
 /** Só os slugs ATIVOS — é o vocabulário válido da IA de comprovante e do guard de lançamento. */
 export async function listActiveExpenseCategorySlugs(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<Array<{ id: string; label: string }>> {
   const r = await dbPool.query<{ id: string; label: string }>(
     `SELECT slug AS id, label FROM commerce.matriz_expense_categories
@@ -62,13 +62,13 @@ export async function listActiveExpenseCategorySlugs(
 /** Cadastra uma modalidade nova. Mesmo nome já ATIVO → 'category_exists'.
  *  Mesmo nome ARQUIVADO → REATIVA (o "criei de novo" do dono desfaz o arquivar). */
 export async function createMatrizExpenseCategory(
-  input: { label: string; created_by?: string | null; environment?: 'prod' | 'test' },
-  dbPool: Pool = defaultPool,
+  input: { label: string; slug?: string; created_by?: string | null; environment?: 'prod' | 'test' },
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<MatrizExpenseCategoryRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const label = input.label.trim();
-  const slug = normalizeCategorySlug(label);
-  if (!slug || label.length < 2 || label.length > 40) throw new Error('category_label_invalid');
+  const slug = input.slug ?? normalizeCategorySlug(label);
+  if (!/^[a-z0-9_]{2,40}$/.test(slug) || label.length < 2 || label.length > 40) throw new Error('category_label_invalid');
   const r = await dbPool.query<MatrizExpenseCategoryRow>(
     `INSERT INTO commerce.matriz_expense_categories (environment, slug, label, created_by)
      VALUES ($1, $2, $3, $4)
@@ -88,7 +88,7 @@ export async function createMatrizExpenseCategory(
 export async function archiveMatrizExpenseCategory(
   slug: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
+  dbPool: Pick<Pool, 'query'> = defaultPool,
 ): Promise<{ id: string }> {
   const r = await dbPool.query<{ id: string }>(
     `UPDATE commerce.matriz_expense_categories

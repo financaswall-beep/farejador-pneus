@@ -1,3 +1,4 @@
+import { expenseReportCategoryJoinSql } from './expense-report-category.js';
 import {effectiveCashAccountSql} from './retail-cash-account.js';
 import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
 
@@ -8,7 +9,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
     CASE WHEN wp.id IS NOT NULL THEN 'CMP-'||upper(right(replace(wp.id::text,'-',''),8)) END) AS reference,
   COALESCE(wc.name,rc.name,ct.name,ws.name,np.trade_name,np.legal_name) AS party,
   t.competence_on::text,t.cash_on::text,
-  COALESCE(t.metadata->>'category',b.metadata->>'category',o.metadata->>'category') AS category,
+  COALESCE(category_expense.category,t.metadata->>'category',b.metadata->>'category',o.metadata->>'category') AS category,
   t.metadata->>'payment_method' AS payment_method,${effectiveCashAccountSql} AS cash_account,
   t.reversal_of_transaction_id AS reversal_of,
   (t.cash_on IS NOT NULL AND NOT (${EFFECTIVE_CASH_TRANSACTION_SQL})) AS cash_entry_error,
@@ -22,10 +23,11 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
   COALESCE(sum(e.amount) FILTER(WHERE e.account_code='cash' AND e.side='credit'),0)::float8 AS cash_out
   FROM finance.matriz_ledger_transactions t
   JOIN finance.matriz_reporting_entries e ON e.transaction_id=t.id AND e.environment=t.environment
-  LEFT JOIN LATERAL(SELECT base.source_id,base.metadata FROM finance.matriz_ledger_payments p
+  LEFT JOIN LATERAL(SELECT base.source_id,base.source_type,base.metadata FROM finance.matriz_ledger_payments p
     JOIN finance.matriz_ledger_transactions base ON base.id=p.obligation_transaction_id AND base.environment=p.environment
     WHERE p.environment=t.environment AND p.payment_transaction_id=t.id ORDER BY p.id LIMIT 1) b ON true
   LEFT JOIN finance.matriz_ledger_transactions o ON o.id=t.reversal_of_transaction_id AND o.environment=t.environment
+  ${expenseReportCategoryJoinSql('t','b','o')}
   LEFT JOIN commerce.wholesale_orders wo ON wo.environment=t.environment AND t.source_type LIKE 'commerce.wholesale_order.%'
     AND wo.id::text=COALESCE(b.source_id,o.source_id,t.metadata->>'order_id',t.metadata->>'source_id',t.source_id)
   LEFT JOIN commerce.wholesale_customers wc ON wc.environment=wo.environment AND wc.id=wo.buyer_id
@@ -38,7 +40,7 @@ export const financialMovementsSql=`SELECT t.id,t.source_type,
   LEFT JOIN commerce.wholesale_suppliers ws ON ws.environment=wp.environment AND ws.id=wp.supplier_id
   LEFT JOIN network.partners np ON np.environment=t.environment AND np.id::text=COALESCE(t.metadata->>'partner_id',b.metadata->>'partner_id',o.metadata->>'partner_id')
   WHERE t.environment=$1 AND (t.competence_on BETWEEN $2::date AND $3::date OR t.cash_on BETWEEN $2::date AND $3::date)
-  GROUP BY t.id,b.source_id,b.metadata,o.source_id,o.metadata,wo.id,ro.order_number,wp.id,wc.name,rc.name,ct.name,ws.name,np.trade_name,np.legal_name
+  GROUP BY t.id,category_expense.category,b.source_id,b.metadata,o.source_id,o.metadata,wo.id,ro.order_number,wp.id,wc.name,rc.name,ct.name,ws.name,np.trade_name,np.legal_name
   ORDER BY t.competence_on DESC,t.id DESC LIMIT 20001`;
 
 export const financialOpeningSql=`SELECT t.source_type,
