@@ -4,7 +4,7 @@ import { env } from '../../shared/config/env.js';
 import { operationFingerprint } from '../painel/stage5-integrity.js';
 import { lockGrant, transact } from './installment-reviews.js';
 import type { DotIdentity } from './token-store.js';
-import { operationAllowed, operationReviewMode, type OperationDomain, type OperationPermission } from './operation-policy.js';
+import { operationAllowed, operationReviewMode, requiresVoiceAuthorization, type OperationDomain, type OperationPermission } from './operation-policy.js';
 
 export function reviewDetails(data: Record<string, unknown>) {
   const { idempotency_key, arquivo, imagem_base64, ...fields } = data;
@@ -50,6 +50,7 @@ export async function requireOperationReview(db: PoolClient, identity: DotIdenti
   [...scope, fingerprint, reviewDetails(data), domain])).rows[0];
   return { status: 'aguardando_autorizacao', executada: false, proposta: row.id, fingerprint,
     operacao: name, dados: reviewDetails(data), expires_at: row.expires_at, confirmacao: mode,
+    ...(requiresVoiceAuthorization(domain) ? { autorizacao_exigida: 'voz' } : {}),
     ...(mode === 'conversa' ? { ferramenta_confirmacao: 'confirmar_operacao_milly' }
       : { confirm_url: env.DOT_MCP_PUBLIC_ORIGIN + '/admin/dot/connections?operacao=' + row.id }) };
 }
@@ -61,7 +62,7 @@ export async function markOperationExecuted(db: PoolClient, identity: DotIdentit
 }
 
 export async function ownerReview(person: string, id: string, decision?: 'autorizada' | 'recusada',
-  conversation?: { grantId: string; fingerprint?: string }) {
+  conversation?: { grantId: string; fingerprint?: string; authorizationChannel?: 'voz' }) {
   return transact(async db => {
     const scope = [env.FAREJADOR_ENV, id];
     const grantId = conversation?.grantId ?? (await db.query(`SELECT grant_id FROM network.dot_operation_reviews
@@ -77,6 +78,10 @@ export async function ownerReview(person: string, id: string, decision?: 'autori
     if (!operationAllowed(permission, row.permission_domain)) throw Error('dot_operation_disabled');
     const mode = operationReviewMode(permission, row.permission_domain, row.tool_name);
     if (decision && (conversation ? mode !== 'conversa' : mode !== 'painel')) throw Error('dot_confirmation_channel_disabled');
+    const voiceRequired = requiresVoiceAuthorization(row.permission_domain);
+    if (voiceRequired && decision === 'autorizada' && conversation?.authorizationChannel !== 'voz') {
+      throw Error('dot_voice_authorization_required');
+    }
     if (conversation?.fingerprint && conversation.fingerprint !== row.fingerprint) throw Error('dot_review_changed');
     if (decision && row.decision && row.decision !== decision) throw Error('dot_review_decided');
     if (decision && row.expired && !row.executed_at) throw Error('dot_review_expired');
@@ -85,6 +90,7 @@ export async function ownerReview(person: string, id: string, decision?: 'autori
       SET decision=$3,decision_channel=$4,decided_at=clock_timestamp() WHERE environment=$1 AND id=$2`, [...scope, decision, channel]);
     return { operacao: row.tool_name as string, dados: row.details as Record<string, unknown>,
       proposta: id, fingerprint: row.fingerprint as string, expires_at: row.expires_at, confirmacao: mode,
+      ...(voiceRequired ? { autorizacao_exigida: 'voz' } : {}),
       status: (row.executed_at ? 'executada' : row.decision === 'recusada' ? 'recusada'
         : row.expired ? 'expirada' : row.decision ?? decision ?? 'pendente') as string,
       key: row.operation_key as string,

@@ -75,6 +75,12 @@
             operationPermission(row.retail_operations_enabled ? 'Desativar vendas de balcão' : 'Permitir vendas de balcão com confirmação', { retail_operations_enabled: !row.retail_operations_enabled });
             operationPermission(row.route_operations_enabled ? 'Desativar rotas realizadas' : 'Permitir rotas realizadas com confirmação', { route_operations_enabled: !row.route_operations_enabled });
             operationPermission(row.pickup_operations_enabled ? 'Desativar cancelamentos de retiradas' : 'Permitir cancelamentos de retiradas com confirmação', { pickup_operations_enabled: !row.pickup_operations_enabled });
+            if (row.operation_confirmation === 'conversa' || row.pickup_completion_enabled) {
+              operationPermission(row.pickup_completion_enabled ? 'Desativar conclusão de retiradas' : 'Habilitar conclusão de retiradas por voz', { pickup_completion_enabled: !row.pickup_completion_enabled });
+            }
+            if (row.operation_confirmation === 'conversa' || row.purchase_receipt_enabled) {
+              operationPermission(row.purchase_receipt_enabled ? 'Desativar recebimento de compras' : 'Habilitar recebimento de compras por voz', { purchase_receipt_enabled: !row.purchase_receipt_enabled });
+            }
           }
           if (typeof row.installment_reviews_enabled === 'boolean') {
             const enabled = row.installment_reviews_enabled;

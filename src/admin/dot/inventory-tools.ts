@@ -6,6 +6,7 @@ import './retail-trip-bundle.js';
 import './retail-existing-delivery.js';
 import './retail-follow-up.js';
 import './retail-account-correction.js';
+import './purchase-receipt-tools.js';
 import {inventoryRegistry} from './inventory-registry.js';
 export {invokeInventoryTool} from './inventory-registry.js';
 export const inventoryTools=[...inventoryRegistry.values()].map(tool=>tool.descriptor);

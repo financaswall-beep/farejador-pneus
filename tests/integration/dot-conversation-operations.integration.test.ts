@@ -182,6 +182,77 @@ it('Milly recusa cancelamento com ficha alterada depois do aval e restringe prop
   expect((await call('confirmar_operacao_milly',{proposta:panel.proposta,fingerprint:panel.fingerprint,autorizado_pelo_dono:true})).isError).toBe(true);
 });
 
+it('Milly conclui uma retirada já feita e registra a baixa e o pagamento uma só vez após o aval por voz', async () => {
+  const order = await createPickup();
+  const { updateMatrizPickupStage } = await import('../../src/admin/painel/queries-pickups.js');
+  await updateMatrizPickupStage({ order_id: order.id, stage: 'arrived',
+    services: [{ code: 'balancing', charge_mode: 'charged', amount_cents: 1000 }],
+    actor_label: 'Operador', environment: 'test' }, db.pool);
+  const candidate = await call('consultar_retirada_para_concluir', { numero_pedido: order.order_number });
+  expect(candidate.ficha).toMatchObject({ retirada_id: order.id, baixa_unidades: 1, valor_total_com_servicos: 90,
+    estoque_a_baixar: [{ medida: order.size, marca: brand, quantidade: 1 }],
+    servicos: [{ code: 'balancing', amount_cents: 1000 }] });
+  const request = { retirada_id: order.id, revisao: candidate.revisao,
+    forma_pagamento: 'pix', valor_recebido: 90, idempotency_key: randomUUID() };
+  expect(await call('concluir_retirada_matriz', request)).toMatchObject({ isError: true, text: [{ text: 'dot_operation_disabled' }] });
+  await db.pool.query('UPDATE network.dot_oauth_grants SET pickup_completion_enabled=true WHERE id=$1', [identity.grant_id]);
+  expect(await call('concluir_retirada_matriz', { ...request, valor_recebido: 80 })).toMatchObject({ isError: true,
+    text: [{ text: 'valor_recebido_difere_do_total_da_retirada' }] });
+
+  const pending = await call('concluir_retirada_matriz', request);
+  expect(pending).toMatchObject({ status: 'aguardando_autorizacao', confirmacao: 'conversa', autorizacao_exigida: 'voz',
+    dados: { forma_pagamento: 'pix', valor_recebido: 90, ficha: candidate.ficha } });
+  expect(pending).not.toHaveProperty('confirm_url');
+  const { ownerReview } = await import('../../src/admin/dot/operation-reviews.js');
+  await expect(ownerReview(identity.person_id, pending.proposta, 'autorizada')).rejects.toThrow('dot_confirmation_channel_disabled');
+  const confirmation = { proposta: pending.proposta, fingerprint: pending.fingerprint, autorizado_pelo_dono: true };
+  expect(await call('confirmar_operacao_milly', confirmation)).toMatchObject({ isError: true,
+    text: [{ text: 'dot_voice_authorization_required' }] });
+  const readState = async () => (await db.pool.query(`SELECT o.status,o.payment_method,o.total_amount::text,
+    s.quantity_on_hand,s.quantity_reserved FROM commerce.orders o,commerce.wholesale_stock s
+    WHERE o.id=$1 AND s.id=$2`, [order.id, order.stock])).rows[0];
+  expect(await readState()).toMatchObject({ status: 'open', quantity_on_hand: 3, quantity_reserved: 1 });
+  expect(await call('confirmar_operacao_milly', { ...confirmation, canal_autorizacao: 'voz' }))
+    .toMatchObject({ status: 'autorizada', executada: false });
+
+  await db.pool.query('UPDATE commerce.wholesale_stock SET quantity_reserved=0 WHERE id=$1', [order.stock]);
+  expect(await call('concluir_retirada_matriz', request)).toMatchObject({ isError: true,
+    text: [{ text: 'stock_reservation_insufficient' }] });
+  expect(await readState()).toMatchObject({ status: 'open', total_amount: '80.00', quantity_on_hand: 3, quantity_reserved: 0 });
+  expect((await db.pool.query('SELECT 1 FROM audit.operation_idempotency WHERE environment=$1 AND idempotency_key=$2',
+    ['test', request.idempotency_key])).rowCount).toBe(0);
+  await db.pool.query('UPDATE commerce.wholesale_stock SET quantity_reserved=1 WHERE id=$1', [order.stock]);
+
+  const results = await Promise.all([call('concluir_retirada_matriz', request), call('concluir_retirada_matriz', request)]);
+  expect(results[0]).toEqual(results[1]);
+  expect(results[0]).toMatchObject({ status: 'executada', executada: true,
+    resultado: { retirada_id: order.id, status: 'paid', valor_recebido: 90, forma_pagamento: 'pix' } });
+  expect(await readState()).toEqual({ status: 'paid', payment_method: 'pix', total_amount: '90.00', quantity_on_hand: 2, quantity_reserved: 0 });
+  expect((await db.pool.query(`SELECT source_type,transaction_kind,amount::text FROM finance.matriz_ledger_transactions
+    WHERE environment='test' AND source_id=$1 ORDER BY source_type`, [order.id])).rows).toEqual([
+    { source_type: 'commerce.order.cogs', transaction_kind: 'cost_of_goods_sold', amount: '40.00' },
+    { source_type: 'commerce.order.revenue', transaction_kind: 'sale_cash', amount: '90.00' },
+  ]);
+});
+
+it('Milly exige a ficha atual e bloqueia conclusão de retirada no modo painel', async () => {
+  const order = await createPickup();
+  const candidate = await call('consultar_retirada_para_concluir', { retirada_id: order.id });
+  const request = { retirada_id: order.id, revisao: candidate.revisao,
+    forma_pagamento: 'dinheiro', valor_recebido: 80, idempotency_key: randomUUID() };
+  await db.pool.query("UPDATE network.dot_oauth_grants SET pickup_completion_enabled=true,operation_confirmation='painel' WHERE id=$1", [identity.grant_id]);
+  expect(await call('concluir_retirada_matriz', request)).toMatchObject({ isError: true, text: [{ text: 'dot_operation_disabled' }] });
+  await db.pool.query("UPDATE network.dot_oauth_grants SET operation_confirmation='conversa' WHERE id=$1", [identity.grant_id]);
+  const pending = await call('concluir_retirada_matriz', request);
+  await call('confirmar_operacao_milly', { proposta: pending.proposta, fingerprint: pending.fingerprint,
+    autorizado_pelo_dono: true, canal_autorizacao: 'voz' });
+  const { updateMatrizPickupStage } = await import('../../src/admin/painel/queries-pickups.js');
+  await updateMatrizPickupStage({ order_id: order.id, stage: 'arrived', services: [], actor_label: 'Operador', environment: 'test' }, db.pool);
+  expect(await call('concluir_retirada_matriz', request)).toMatchObject({ isError: true,
+    text: [{ text: 'retirada_alterada_consulte_novamente' }] });
+  expect((await db.pool.query('SELECT status FROM commerce.orders WHERE id=$1', [order.id])).rows[0]).toEqual({ status: 'open' });
+});
+
 it('opera ficha, atacado, contagem e separação/estorno de lote pelos serviços do painel',async()=>{
   expect(await approve('editar_ficha_catalogo',{product_id:productId,tread_pattern:'Touring',load_index:'91',speed_rating:'V',reason:'Ficha conferida',idempotency_key:randomUUID()})).toMatchObject({executada:true});
   const wholesale={product_id:productId,price_amount:180,reason:'Preço do dono',idempotency_key:randomUUID()};
