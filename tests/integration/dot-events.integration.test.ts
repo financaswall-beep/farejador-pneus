@@ -15,9 +15,14 @@ const negotiationTools=[
   {name:'consultar_negociacao_atendente',readOnlyHint:true},
   {name:'orientar_negociacao_atendente',readOnlyHint:false},
 ];
-const pickupTools=[
+const operationTools=[
+  {name:'consultar_permissoes_milly',readOnlyHint:true},
   {name:'consultar_retirada_para_cancelar',readOnlyHint:true},
   {name:'cancelar_retirada_matriz',readOnlyHint:false},
+  {name:'consultar_retirada_para_concluir',readOnlyHint:true},
+  {name:'concluir_retirada_matriz',readOnlyHint:false},
+  {name:'consultar_compra_para_receber',readOnlyHint:true},
+  {name:'confirmar_recebimento_compra',readOnlyHint:false},
 ];
 const echo:WebhookSender=async(_url,body)=>({status:200,body:JSON.stringify({challenge:JSON.parse(body).challenge})});
 let count=90000;
@@ -299,10 +304,10 @@ it('MCP 2.0 descobre eventos e ferramentas com autenticação, cabeçalhos e cac
   expect((await rpc('server/discover')).json()).toMatchObject({result:{resultType:'complete',supportedVersions:['2026-07-28'],capabilities:{events:{}},cacheScope:'private'}});
   expect((await rpc('events/list')).json().result.events).toHaveLength(10);
   const listed=(await rpc('tools/list')).json().result.tools;
-  expect(listed).toHaveLength(132);
+  expect(listed).toHaveLength(137);
   expect(listed.find((tool:{name:string})=>tool.name==='classificar_referencias_moto')).toMatchObject({annotations:{readOnlyHint:false}});
   expect(listed.map((t:{name:string})=>t.name)).toContain('registrar_pendencia_interna');
-  for(const {name,readOnlyHint} of [...negotiationTools,...pickupTools]) {
+  for(const {name,readOnlyHint} of [...negotiationTools,...operationTools]) {
     expect(listed.find((tool:{name:string})=>tool.name===name)).toMatchObject({
       name,annotations:{readOnlyHint},_meta:{securitySchemes:[{type:'oauth2',scopes:['farejador.read']}]},
     });
@@ -520,9 +525,9 @@ it('flag desligada mantém consultas e não anuncia eventos',async()=>{
     config.DOT_EVENTS_ENABLED=false;
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
     const listed=(await rpc('tools/list')).json().result.tools;
-    expect(listed).toHaveLength(126);
+    expect(listed).toHaveLength(131);
     for(const {name} of negotiationTools) expect(listed).not.toContainEqual(expect.objectContaining({name}));
-    for(const {name} of pickupTools) expect(listed).toContainEqual(expect.objectContaining({name}));
+    for(const {name} of operationTools) expect(listed).toContainEqual(expect.objectContaining({name}));
     expect((await rpc('events/list')).statusCode).toBe(404);
   }finally{config.DOT_EVENTS_ENABLED=previous;}
 });
@@ -541,9 +546,9 @@ it('chave inválida preserva HTTP e consultas, mas bloqueia descoberta, assinatu
     expect((await fresh.inject({method:'GET',url:'/livez'})).statusCode).toBe(200);
     expect((await rpc('server/discover')).json().result.capabilities.events).toBeUndefined();
     const listed=(await rpc('tools/list')).json().result.tools;
-    expect(listed).toHaveLength(127);
+    expect(listed).toHaveLength(132);
     for(const {name} of negotiationTools) expect(listed).not.toContainEqual(expect.objectContaining({name}));
-    for(const {name} of pickupTools) expect(listed).toContainEqual(expect.objectContaining({name}));
+    for(const {name} of operationTools) expect(listed).toContainEqual(expect.objectContaining({name}));
     expect((await rpc('tools/call',{name:'listar_fontes_matriz',arguments:{}})).json().result.isError).not.toBe(true);
     const status=(await rpc('tools/call',{name:'consultar_acompanhamento_matriz',arguments:{}})).json().result.structuredContent;
     expect(status).toMatchObject({enabled:false,reason:'invalid_encryption_key',subscriptions:null,last_24h:null});

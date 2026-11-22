@@ -218,49 +218,45 @@ export async function cancelManualOrder(
   return { cancelled: true };
 }
 
-/** Conclui retirada aberta do bot: reserva vira baixa fisica e o pagamento realiza. */
-export async function completeMatrizPickup(
-  input: {
-    order_id: string;
-    actor_label: string;
-    environment?: 'prod' | 'test';
-    payment_method?: string | null;
-    services?: PickupService[];
-  },
-  dbPool: Pool = defaultPool,
-): Promise<{ order_id: string; status: 'paid'; retrieved_at: string }> {
+type CompleteMatrizPickupInput = {
+  order_id: string;
+  actor_label: string;
+  environment?: 'prod' | 'test';
+  payment_method?: string | null;
+  services?: PickupService[];
+};
+
+/** Conclui retirada aberta do bot: reserva vira baixa física e realiza o pagamento. */
+export async function completeMatrizPickupInTransaction(client: PoolClient, input: CompleteMatrizPickupInput) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    const locked = await client.query<{ pickup_services: PickupService[] }>(
-      `SELECT pickup_services FROM commerce.orders
+  const locked = await client.query<{ pickup_services: PickupService[] }>(
+    `SELECT pickup_services FROM commerce.orders
         WHERE environment=$1 AND id=$2 AND partner_order_id IS NULL
           AND fulfillment_mode='pickup' AND status='open' FOR UPDATE`,
-      [environment, input.order_id],
-    );
-    if (!locked.rows[0]) throw new Error('pickup_not_found');
-    const services = input.services ?? locked.rows[0].pickup_services ?? [];
-    await client.query(
-      `UPDATE commerce.orders
+    [environment, input.order_id],
+  );
+  if (!locked.rows[0]) throw new Error('pickup_not_found');
+  const services = input.services ?? locked.rows[0].pickup_services ?? [];
+  await client.query(
+    `UPDATE commerce.orders
           SET pickup_arrived_at=COALESCE(pickup_arrived_at,now()),
               pickup_services=$3::jsonb,
               payment_method=COALESCE(NULLIF($4,''),payment_method),updated_at=now()
         WHERE environment=$1 AND id=$2`,
-      [environment, input.order_id, JSON.stringify(services), input.payment_method ?? null],
-    );
-    const insertedServiceCents = await materializeMatrizPickupServices(
-      client, environment, input.order_id, services,
-    );
-    if (insertedServiceCents > 0) {
-      await client.query(
-        `UPDATE commerce.orders SET total_amount=total_amount+$3::numeric,updated_at=now()
+    [environment, input.order_id, JSON.stringify(services), input.payment_method ?? null],
+  );
+  const insertedServiceCents = await materializeMatrizPickupServices(
+    client, environment, input.order_id, services,
+  );
+  if (insertedServiceCents > 0) {
+    await client.query(
+      `UPDATE commerce.orders SET total_amount=total_amount+$3::numeric,updated_at=now()
           WHERE environment=$1 AND id=$2`,
-        [environment, input.order_id, (insertedServiceCents / 100).toFixed(2)],
-      );
-    }
-    const updated = await client.query<{ order_id: string; status: 'paid'; retrieved_at: string }>(
-      `UPDATE commerce.orders o
+      [environment, input.order_id, (insertedServiceCents / 100).toFixed(2)],
+    );
+  }
+  const updated = await client.query<{ order_id: string; status: 'paid'; retrieved_at: string }>(
+    `UPDATE commerce.orders o
           SET status='paid',retrieved_at=now(),closed_at=COALESCE(closed_at,now()),
               closed_by=COALESCE(closed_by,$3),updated_at=now()
         WHERE o.environment=$1 AND o.id=$2 AND o.partner_order_id IS NULL
@@ -271,16 +267,22 @@ export async function completeMatrizPickup(
                        WHERE a.environment=o.environment AND a.entity_id=o.id
                          AND a.event_type='matriz_galpao_reserved')
         RETURNING o.id order_id,o.status,o.retrieved_at`,
-      [environment, input.order_id, input.actor_label],
-    );
-    if (!updated.rows[0]) throw new Error('pickup_not_found');
-    await consumeMatrizGalpaoReservation(client, environment, input.order_id);
-    await postMatrizRetailSaleFacts(client, environment, input.order_id);
-    await postMatrizRetailPaymentIfRealized(
-      client, environment, input.order_id, input.actor_label,
-    );
+    [environment, input.order_id, input.actor_label],
+  );
+  if (!updated.rows[0]) throw new Error('pickup_not_found');
+  await consumeMatrizGalpaoReservation(client, environment, input.order_id);
+  await postMatrizRetailSaleFacts(client, environment, input.order_id);
+  await postMatrizRetailPaymentIfRealized(client, environment, input.order_id, input.actor_label);
+  return updated.rows[0];
+}
+
+export async function completeMatrizPickup(input: CompleteMatrizPickupInput, dbPool: Pool = defaultPool) {
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await completeMatrizPickupInTransaction(client, input);
     await client.query('COMMIT');
-    return updated.rows[0];
+    return result;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

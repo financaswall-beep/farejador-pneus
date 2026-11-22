@@ -34,6 +34,8 @@ const activeGrant = `SELECT g.installment_reviews_enabled,${monitorOwnerSql} AS 
      COALESCE((to_jsonb(g)->>'pickup_operations_enabled')::boolean,false) pickup_operations_enabled,
      COALESCE((to_jsonb(g)->>'retail_operations_enabled')::boolean,false) retail_operations_enabled,
      COALESCE((to_jsonb(g)->>'route_operations_enabled')::boolean,false) route_operations_enabled,
+     COALESCE((to_jsonb(g)->>'pickup_completion_enabled')::boolean,false) pickup_completion_enabled,
+     COALESCE((to_jsonb(g)->>'purchase_receipt_enabled')::boolean,false) purchase_receipt_enabled,
      COALESCE((to_jsonb(g)->>'publisher_enabled')::boolean,false) publisher_enabled,
      COALESCE((to_jsonb(g)->>'finance_operations_enabled')::boolean,false) finance_operations_enabled,
      ${conversationModeSql} installment_chat_confirmation
@@ -43,17 +45,28 @@ const activeGrant = `SELECT g.installment_reviews_enabled,${monitorOwnerSql} AS 
    JOIN network.partner_people p ON p.id=g.person_id AND p.environment=g.environment AND p.revoked_at IS NULL
    WHERE g.environment=$1 AND g.person_id=$2 AND g.id=$3 AND g.revoked_at IS NULL
      AND g.expires_at>clock_timestamp() AND g.code_used_at IS NOT NULL
-     AND g.client_id=$4 AND g.resource=$5 AND g.scope=$6 FOR UPDATE OF g`;
+     AND g.client_id=$4 AND g.resource=$5 AND g.scope=$6`;
 
-export async function lockGrant(db: PoolClient, person: string, grant: string) {
+async function getGrantPermission(db: Pick<PoolClient, 'query'>, person: string, grant: string, lock: boolean) {
   const config=dotConfig();
   if (!config) throw new Error('dot_grant_unavailable');
-  // A assinatura toma a versão exclusiva desta trava ao ativar o acompanhamento pela primeira vez.
-  await db.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',[`${env.FAREJADOR_ENV}:${person}:dot-events`]);
-  const row = (await db.query<OperationPermission & {installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(activeGrant,
+  if (lock) {
+    // A assinatura toma a versão exclusiva desta trava ao ativar o acompanhamento pela primeira vez.
+    await db.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',[`${env.FAREJADOR_ENV}:${person}:dot-events`]);
+  }
+  const row = (await db.query<OperationPermission & {installment_reviews_enabled:boolean;installment_chat_confirmation:boolean}>(
+    lock ? activeGrant + ' FOR UPDATE OF g' : activeGrant,
     [env.FAREJADOR_ENV,person,grant,config.clientId,config.resource,DOT_SCOPE])).rows[0];
   if (!row) throw new Error('dot_grant_unavailable');
   return row;
+}
+
+export function readGrantPermission(db: Pick<PoolClient, 'query'>, person: string, grant: string) {
+  return getGrantPermission(db, person, grant, false);
+}
+
+export function lockGrant(db: PoolClient, person: string, grant: string) {
+  return getGrantPermission(db, person, grant, true);
 }
 
 export async function setInstallmentPermission(person: string, grant: string, enabled: boolean, chatConfirmation = false) {

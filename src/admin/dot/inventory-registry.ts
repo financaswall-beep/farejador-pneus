@@ -6,7 +6,7 @@ import { env } from '../../shared/config/env.js';
 import { beginIntegrityOperation,completeIntegrityOperation,operationFingerprint,recordIntegrityEvent } from '../painel/stage5-integrity.js';
 import { DOT_SCOPE } from './config.js';
 import { lockGrant,transact } from './installment-reviews.js';
-import { operationAllowed } from './operation-policy.js';
+import { operationAllowed, requiresVoiceAuthorization } from './operation-policy.js';
 import { requireOperationReview,markOperationExecuted,reviewFingerprint } from './operation-reviews.js';
 import type { DotIdentity } from './token-store.js';
 
@@ -24,7 +24,7 @@ export function registerInventoryRead<S extends z.ZodTypeAny>(name:string,descri
 export function registerConnectionRead<S extends z.ZodTypeAny>(name:string,description:string,schema:S,run:(data:z.output<S>,identity:DotIdentity)=>Promise<unknown>){
   inventoryRegistry.set(name,{descriptor:descriptor(name,description,schema,false),run:async(identity,args)=>run(schema.parse(args??{}),identity)});
 }
-export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'catalog'|'retail'|'route',name:string,description:string,schema:S,
+export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'catalog'|'retail'|'route'|'purchase_receipt',name:string,description:string,schema:S,
   execute:(db:PoolClient,data:z.output<S>,actor:string,identity:DotIdentity)=>Promise<unknown>,file=false,
   preview?:(db:PoolClient,data:z.output<S>)=>Promise<object>, additionalDomain?:'retail'|'route'){
   let base:z.ZodTypeAny=schema;
@@ -35,7 +35,10 @@ export function registerInventoryWrite<S extends z.ZodTypeAny>(domain:'stock'|'c
     const checked=schema.safeParse(Object.fromEntries(keys.filter(key=>key in data).map(key=>[key,data[key]])));
     if(!checked.success)for(const issue of checked.error.issues)ctx.addIssue(issue);
   });
-  inventoryRegistry.set(name,{descriptor:descriptor(name,description+' Apresente a proposta e aguarde a autorização do dono. Em confirmacao=conversa use confirmar_operacao_milly após a resposta direta dele. Reutilize idempotency_key nas tentativas do mesmo pedido.',input,true,file),
+  const authorization = requiresVoiceAuthorization(domain)
+    ? ' Apresente a proposta e aguarde o dono autorizar diretamente por voz na conversa. Use confirmar_operacao_milly com canal_autorizacao=voz.'
+    : ' Apresente a proposta e aguarde a autorização do dono. Em confirmacao=conversa use confirmar_operacao_milly após a resposta direta dele.';
+  inventoryRegistry.set(name,{descriptor:descriptor(name,description+authorization+' Reutilize idempotency_key nas tentativas do mesmo pedido.',input,true,file),
     run:(identity,args)=>transact(async db=>{
       const grant=await lockGrant(db,identity.person_id,identity.grant_id);
       if(!operationAllowed(grant,domain))throw Error('dot_'+domain+'_disabled');

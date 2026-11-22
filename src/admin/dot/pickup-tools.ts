@@ -12,9 +12,14 @@ import {
 import { DOT_SCOPE } from './config.js';
 import { lockGrant, transact } from './installment-reviews.js';
 import { markOperationExecuted, requireOperationReview } from './operation-reviews.js';
+import {
+  completePickupTool, pickupCompletionSchema, readPickupCompletionCandidate, requestPickupCompletion,
+} from './pickup-completion.js';
+import { withDotReadOnly } from './read-only.js';
 import type { DotIdentity } from './token-store.js';
 
 const lookupTool = 'consultar_retirada_para_cancelar';
+const lookupCompletionTool = 'consultar_retirada_para_concluir';
 export const cancelPickupTool = 'cancelar_retirada_matriz';
 
 const lookupSchema = z.object({
@@ -45,6 +50,12 @@ export const pickupTools = [
   describeTool(cancelPickupTool,
     'Prepara e executa o cancelamento de uma retirada reservada da Matriz, liberando o estoque conforme as regras da loja. Consulte a retirada primeiro e informe o motivo. Apresente o número, cliente, itens e valor do pedido e peça confirmação específica ao dono. Em conversa use confirmar_operacao_milly após resposta direta por voz ou texto e repita os mesmos argumentos; em painel apresente confirm_url. Só anuncie cancelamento quando executada=true.',
     cancelSchema, false),
+  describeTool(lookupCompletionTool,
+    'Identifica uma retirada aberta da Matriz com reserva ativa pelo número interno do pedido ou UUID. Mostra cliente, itens, serviços, valor total, baixa de estoque e revisão para preparar a conclusão.',
+    lookupSchema, true),
+  describeTool(completePickupTool,
+    'Prepara e conclui uma retirada já entregue ao cliente e paga integralmente. Consulte consultar_retirada_para_concluir primeiro e obtenha do dono o valor recebido e a forma de pagamento. Apresente número, cliente, itens, serviços, baixa de estoque, valor_total_com_servicos e forma de pagamento. Só após o dono autorizar a proposta diretamente por voz nesta conversa, use confirmar_operacao_milly com canal_autorizacao=voz e repita a proposta com os mesmos dados e a mesma chave. Só anuncie a conclusão quando executada=true.',
+    pickupCompletionSchema, false),
 ];
 
 async function requestCancellation(identity: DotIdentity, raw: unknown) {
@@ -77,19 +88,26 @@ async function requestCancellation(identity: DotIdentity, raw: unknown) {
 export async function invokePickupTool(identity: DotIdentity, name: string, args: unknown) {
   try {
     let result;
-    if (name === lookupTool) {
+    if (name === lookupTool || name === lookupCompletionTool) {
       const input = lookupSchema.parse(args);
       const lookup = input.retirada_id ? { order_id: input.retirada_id }
         : { order_number: 'PED-' + input.numero_pedido!.replace(/^PED-/i, '').padStart(4, '0') };
-      result = await readMatrizPickupCancellationCandidate(pool, env.FAREJADOR_ENV, lookup);
+      result = name === lookupCompletionTool ? await withDotReadOnly(db => readPickupCompletionCandidate(db, lookup))
+        : await readMatrizPickupCancellationCandidate(pool, env.FAREJADOR_ENV, lookup);
+    } else if (name === completePickupTool) {
+      result = await requestPickupCompletion(identity, args);
     } else {
       result = await requestCancellation(identity, args);
     }
     return { structuredContent: result, content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
   } catch (error) {
-    if (error instanceof z.ZodError) throw new McpError(ErrorCode.InvalidParams, 'Confira a identificação, a revisão e o motivo da retirada.');
-    const code = error instanceof Error && /^[a-z][a-z0-9_]{2,100}$/.test(error.message)
-      ? error.message : 'retirada_indisponivel';
+    if (error instanceof z.ZodError) throw new McpError(ErrorCode.InvalidParams, name === completePickupTool
+      ? 'Confira a identificação, a revisão, o valor recebido e a forma de pagamento da retirada.'
+      : 'Confira a identificação, a revisão e o motivo da retirada.');
+    const message = error instanceof Error ? error.message : '';
+    const code = name === completePickupTool && message.startsWith('stock_reservation_insufficient:')
+      ? 'stock_reservation_insufficient'
+      : /^[a-z][a-z0-9_]{2,100}$/.test(message) ? message : 'retirada_indisponivel';
     return { isError: true as const, content: [{ type: 'text' as const, text: code }] };
   }
 }

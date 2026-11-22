@@ -92,6 +92,15 @@ O servidor recebe a declaração de autorização do cliente autenticado. Não e
 
 Em **Permissões da Milly**, habilite **Permitir cancelamentos de retiradas com confirmação** na conexão desejada. A ferramenta `consultar_retirada_para_cancelar` recebe o número interno ou UUID de uma retirada aberta com reserva na Matriz. `cancelar_retirada_matriz` usa a revisão da ficha consultada e o motivo informado. A Milly apresenta cliente, pedido, itens e valor antes da confirmação específica. Depois de autorizada, a operação usa o cancelamento da Matriz e libera a reserva em uma única transação. Uma mudança no pedido exige nova consulta e aprovação. Em uma conexão sem modo de confirmação definido, o cancelamento exige confirmação pela Matriz.
 
+### Retiradas concluídas e compras recebidas por voz
+
+`consultar_permissoes_milly` informa as permissões efetivas e o modo de confirmação da conexão atual. Para as duas operações abaixo, o dono habilita a permissão específica em uma conexão configurada para confirmação pela conversa.
+
+- `consultar_retirada_para_concluir` localiza a retirada da Matriz. `concluir_retirada_matriz` conclui a retirada e baixa o estoque reservado de acordo com as regras do painel.
+- `consultar_compra_para_receber` localiza a compra já registrada. `confirmar_recebimento_compra` registra a chegada dos itens na compra original e atualiza o estoque.
+
+A Milly lê a ficha, apresenta a proposta e espera o dono autorizá-la por voz na mesma conversa. `confirmar_operacao_milly` recebe `canal_autorizacao=voz` para essas propostas. O Farejador usa a declaração do cliente autenticado. A revisão dos dados e a chave de idempotência protegem a execução. As duas permissões começam desligadas na migration `0301_milly_pickup_purchase_voice.sql`.
+
 ### Estoque e catálogo
 
 | Área | Operações |
