@@ -36,14 +36,14 @@ describe('Catálogo na Operação da Loja', () => {
     expect(navigation).toContain("showTab('catalog')");
   });
 
-  it('usa exatamente os mesmos 15 arquivos de logo já usados pela Matriz', () => {
+  it('usa exatamente os mesmos 21 arquivos de logo da Matriz', () => {
     const assets = readdirSync(resolve('painel/public/assets/catalog-brands'))
       .filter((file) => file.endsWith('.webp')).sort();
     expect(assets).toEqual([
-      'bridgestone.webp', 'ceat.webp', 'dunlop.webp', 'ira.webp', 'irc.webp',
+      'bridgestone.webp', 'ceat.webp', 'dunlop.webp', 'giti.webp', 'hankook.webp', 'ira.webp', 'irc.webp',
       'kenda.webp', 'levorin.webp',
-      'maggion.webp', 'metzeler.webp', 'michelin.webp', 'mitas.webp',
-      'pirelli.webp', 'rinaldi.webp', 'technic.webp', 'vipal.webp',
+      'maggion.webp', 'maxxis.webp', 'metzeler.webp', 'michelin.webp', 'mitas.webp',
+      'pirelli.webp', 'rinaldi.webp', 'technic.webp', 'toyo.webp', 'vipal.webp', 'xbri.webp', 'yokohama.webp',
     ]);
     expect(brandCatalog).toContain('Caixa.catalogLogoBrands');
     expect(view).toContain('Caixa.catalogBrandLogo(brand)');

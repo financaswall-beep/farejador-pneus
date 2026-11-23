@@ -16,6 +16,13 @@ const KNOWN_BRANDS = new Map<string, string>([
   ['irc', 'IRC'],
   ['ceat', 'CEAT'],
   ['ciat', 'CEAT'],
+  ['maxxis', 'Maxxis'],
+  ['hankook', 'Hankook'],
+  ['toyo', 'Toyo'],
+  ['toyotires', 'Toyo'],
+  ['xbri', 'XBRI'],
+  ['yokohama', 'Yokohama'],
+  ['giti', 'Giti'],
 ]);
 
 function brandKey(value: string): string {

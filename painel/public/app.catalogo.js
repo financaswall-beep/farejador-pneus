@@ -2,6 +2,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 const CATALOGO_KNOWN_BRANDS = Object.freeze([
   'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'CEAT', 'Dunlop', 'IRA', 'IRC',
   'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+  'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
 ]);
 const catalogoMoneyValue = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 // Apenas apresentação. Nunca usar este texto como identidade, medida de gravação
@@ -124,6 +125,8 @@ window.PAINEL_MODULES.catalogo = function () {
         ciat: 'ceat',
         ira: 'ira',
         irc: 'irc',
+        maxxis: 'maxxis', hankook: 'hankook', toyo: 'toyo', toyotires: 'toyo',
+        xbri: 'xbri', yokohama: 'yokohama', giti: 'giti',
       };
       const asset = aliases[key];
       return asset

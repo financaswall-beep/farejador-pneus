@@ -40,6 +40,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     for (const brand of [
       'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
       'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda', 'CEAT', 'IRA', 'IRC',
+      'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
     ]) {
       const url = brandLogo(brand);
       expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260824-catalog-brand3$/);
@@ -52,6 +53,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(brandLogo('Michellin')).toBe(brandLogo('Michelin'));
     expect(brandLogo('Ira')).toBe(brandLogo('IRA'));
     expect(brandLogo('Ciat')).toBe(brandLogo('CEAT'));
+    expect(brandLogo('Toyo Tires')).toBe(brandLogo('Toyo'));
     const canonical = sandbox.window.Caixa.canonicalCatalogBrand as (brand: string) => string;
     const options = sandbox.window.Caixa.catalogBrandOptions as string[];
     expect(canonical('Levorim')).toBe('Levorin');
@@ -62,7 +64,7 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(options).toContain('IRA');
     expect(options).toContain('CEAT');
     expect(options).toContain('IRC');
-    expect(new Set(options).size).toBe(15);
+    expect(new Set(options).size).toBe(21);
     expect(brandLogo('Marca futura')).toBeNull();
     expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });
