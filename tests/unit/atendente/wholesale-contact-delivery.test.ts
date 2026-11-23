@@ -11,14 +11,15 @@ const sends = vi.hoisted(() => ({ text: vi.fn() }));
 vi.mock('../../../src/atendente-v2/sender.js', () => ({
   sendMessageOnce: sends.text, sendAttachmentOnce: vi.fn(), resolveConversationOnce: vi.fn(),
 }));
-import { tryDeliverWholesaleContact, WHOLESALE_CONTACT } from '../../../src/atendente-v2/wholesale-contact-delivery.js';
+import { tryDeliverWholesaleContact } from '../../../src/atendente-v2/wholesale-contact-delivery.js';
+import { WHOLESALE_CONTACT } from '../../../src/atendente-v2/wholesale-contact.js';
 import { deliverOutboundRow } from '../../../src/atendente-v2/outbound-delivery.js';
 import { ChatwootApiError } from '../../../src/admin/chatwoot-api.client.js';
 
 const row: OutboundRow = {
   id: 'outbound-1', environment: 'test', conversation_id: 'conversation-1', turn_id: 'turn-1',
   chatwoot_conversation_id: 555, kind: 'agent_text', attempts: 1, echo_id: 'turn:turn-1',
-  body: 'Pra comprar no atacado, fala com a gente nesse WhatsApp, amigo: (21) 97667-4264.\nhttps://wa.me/5521976674264',
+  body: '2W Pneus — Atacado\n(21) 97667-4264\nhttps://wa.me/5521976674264',
 };
 const local = { chatwoot_account_id: 2, chatwoot_inbox_id: 39, channel_type: 'whatsapp' };
 const conversation = {
@@ -45,6 +46,29 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('contato nativo do atacado na outbox', () => {
+  it('entrega a apresentação inteira com o link em uma única mensagem', async () => {
+    const body = `Opa! Vou te passar o WhatsApp de quem cuida do atacado aqui na 2W.\n${WHOLESALE_CONTACT.url}`;
+    await deliverOutboundRow(database() as never, { ...row, body });
+    expect(sends.text).toHaveBeenCalledExactlyOnceWith(555, body, row.echo_id);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([WHOLESALE_CONTACT.url, WHOLESALE_CONTACT.displayPhone, `WhatsApp: <${WHOLESALE_CONTACT.url}>`,
+    `${WHOLESALE_CONTACT.displayPhone}\n${WHOLESALE_CONTACT.url}`])('apresenta o responsável mesmo se só vier o contato: %s', async body => {
+    await deliverOutboundRow(database() as never, { ...row, body });
+    expect(sends.text).toHaveBeenCalledExactlyOnceWith(555,
+      expect.stringMatching(/quem cuida do atacado.*\nhttps:\/\/wa\.me\/5521976674264$/s), row.echo_id);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('preserva mensagens de varejo e o texto digitado pelo operador', async () => {
+    const retail = 'Vou consultar essa medida para você.';
+    await deliverOutboundRow(database() as never, { ...row, body: retail });
+    await deliverOutboundRow(database() as never, { ...row, kind: 'operator_text', body: WHOLESALE_CONTACT.url });
+    expect(sends.text.mock.calls).toEqual([[555, retail, row.echo_id], [555, WHOLESALE_CONTACT.url, row.echo_id]]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   const productionShape = { id: 555, account_id: 2, inbox_id: 39, can_reply: true,
     meta: { sender: { id: 17, account_id: 2, phone_number: '+5521888880002' } } };
   const associations = { payload: [

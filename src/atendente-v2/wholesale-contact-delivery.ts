@@ -4,15 +4,7 @@ import { logger } from '../shared/logger.js';
 import { ChatwootApiError } from '../admin/chatwoot-api.client.js';
 import type { OutboundRow } from './outbound-worker.js';
 import type { SendMessageResult } from './sender.js';
-
-export const WHOLESALE_CONTACT = {
-  name: '2W Pneus — Atacado',
-  phone: '5521976674264',
-  displayPhone: '(21) 97667-4264',
-  url: 'https://wa.me/5521976674264',
-} as const;
-
-const CONTACT_LINK = /(?:^|\s)https:\/\/wa\.me\/5521976674264(?=$|\s|[.!;:)](?:\s|$))/;
+import { WHOLESALE_CARD_TEXT, WHOLESALE_CONTACT } from './wholesale-contact.js';
 const TIMEOUT_MS = 10_000;
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown): JsonObject => value && typeof value === 'object' && !Array.isArray(value)
@@ -41,7 +33,8 @@ async function chatwootGet(url: string): Promise<JsonObject | null> {
 export async function tryDeliverWholesaleContact(
   client: PoolClient, row: OutboundRow,
 ): Promise<SendMessageResult | null> {
-  if (row.kind !== 'agent_text' || !CONTACT_LINK.test(row.body)) return null;
+  // O cartão nativo não exibe legenda. Uma resposta com conversa vai como texto com link.
+  if (row.kind !== 'agent_text' || row.body.trim().replace(/\r\n/g, '\n') !== WHOLESALE_CARD_TEXT) return null;
   if (!env.BOT_OUTBOX) throw new ChatwootApiError('Bot outbox delivery is disabled');
   const result = await client.query<{
     chatwoot_account_id: number; chatwoot_inbox_id: number; channel_type: string | null;
