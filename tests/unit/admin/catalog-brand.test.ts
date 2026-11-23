@@ -8,6 +8,10 @@ describe('marca conciliada entre compra, estoque e catalogo', () => {
     expect(canonicalCatalogBrand('Ira')).toBe('IRA');
     expect(canonicalCatalogBrand('irc')).toBe('IRC');
     expect(canonicalCatalogBrand('Ciat')).toBe('CEAT');
+    for (const brand of ['Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti']) {
+      expect(canonicalCatalogBrand(brand.toLowerCase())).toBe(brand);
+    }
+    expect(canonicalCatalogBrand('Toyo Tires')).toBe('Toyo');
     expect(canonicalCatalogBrand('Marca   Nova')).toBe('Marca Nova');
     expect(canonicalCatalogBrand('  ')).toBeNull();
   });
