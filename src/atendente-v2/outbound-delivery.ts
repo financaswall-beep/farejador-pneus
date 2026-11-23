@@ -5,6 +5,7 @@ import { readStoredTirePhoto, type StoredTirePhoto } from '../photos/storage.js'
 import { tirePhotoForWhatsApp } from '../photos/codec.js';
 import { catalogPhotoPayload } from '../catalog-photos/model.js';
 import { tryDeliverWholesaleContact } from './wholesale-contact-delivery.js';
+import { introduceBareWholesaleContact } from './wholesale-contact.js';
 
 export async function deliverOutboundRow(
   client: PoolClient,
@@ -34,7 +35,8 @@ export async function deliverOutboundRow(
   if (row.kind !== 'photo_attachment') {
     const contact = await tryDeliverWholesaleContact(client, row);
     if (contact) return contact;
-    return sendMessageOnce(Number(row.chatwoot_conversation_id), row.body, row.echo_id ?? undefined);
+    const body = row.kind === 'agent_text' ? introduceBareWholesaleContact(row.body) : row.body;
+    return sendMessageOnce(Number(row.chatwoot_conversation_id), body, row.echo_id ?? undefined);
   }
   if(catalogPhotoPayload(row.body)){
     const {readOutboundCatalogPhoto}=await import('../catalog-photos/bot.js');

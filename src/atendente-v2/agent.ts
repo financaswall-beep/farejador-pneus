@@ -12,6 +12,7 @@ import { activeToolDefinitions, executeTool } from './tools.js';
 import { guardStockConfirmationReply,stockConfirmationAtTurnStart,publishStockRequest } from './stock-confirmation.js';
 import { sendFinalAgentText } from './final-send.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
+import { introduceBareWholesaleContact } from './wholesale-contact.js';
 import { photoRequestNudge } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
 import { buildProductSearchNudge } from './product-search-nudge.js';
@@ -304,7 +305,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
     }
 
     // 4. Send to Chatwoot (strip quick-reply markers from sent text, keep them for reference)
-    const textToSend = finalText.replace(/^OPCOES:.*$/gm, '').trim();
+    const textToSend = introduceBareWholesaleContact(finalText.replace(/^OPCOES:.*$/gm, '').trim());
 
     // Salvaguarda: se LLM gerou SO uma linha OPCOES (sem texto principal),
     // o regex deixa o body vazio e o Chatwoot recusa com 'text.body is required'.
