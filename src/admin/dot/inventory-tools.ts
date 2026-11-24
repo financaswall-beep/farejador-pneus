@@ -1,4 +1,5 @@
 import './inventory-stock-tools.js';
+import './warehouse-tools.js';
 import './inventory-catalog-tools.js';
 import './inventory-media-tools.js';
 import './retail-delivery-tools.js';

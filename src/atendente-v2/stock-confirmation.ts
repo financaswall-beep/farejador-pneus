@@ -32,6 +32,7 @@ const waitingResult=(id:string)=>JSON.stringify({encontrado:true,disponibilidade
 export async function gatePartnerSearch(client:PoolClient,environment:Environment,conversationId:string,
   name:string,args:Record<string,unknown>,raw:string,history:ChatMessage[]=[]):Promise<string> {
   if(!env.PARTNER_STOCK_CONFIRMATION||!['buscar_produto','buscar_compatibilidade','verificar_estoque','localizacao_loja'].includes(name))return raw;
+  if(name==='localizacao_loja'&&args.conjunto_id!==undefined)return raw;
   const result=JSON.parse(raw) as Record<string,unknown>;
   if(result.erro||result.precisa_localizacao||result.aguardando_parceiro||result.encontrado===false||result.disponivel===false)return raw;
   const requestedQuantity=Number.isInteger(args.quantidade)&&Number(args.quantidade)>0&&Number(args.quantidade)<=20?Number(args.quantidade):1;

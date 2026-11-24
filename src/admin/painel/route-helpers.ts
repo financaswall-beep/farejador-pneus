@@ -165,6 +165,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     'catalog_price_changed',
     'pickup_not_found',
     'stock_reservation_already_released',
+    'stock_group_protected',
+    'stock_group_not_editable',
   ].includes(err.message)) {
     return { status: 409, error: err.message };
   }

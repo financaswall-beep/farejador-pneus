@@ -1,12 +1,13 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { addStockPickingPositions, type StockPickingItem } from './stock-group-picking.js';
 import {
   pickupServicesTotalCents, type PickupService, type PickupStage,
 } from '../../shared/pickup-services.js';
 
 export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<unknown[]> {
-  const result = await dbPool.query(
+  const result = await dbPool.query<{ order_id: string; status: string; items: StockPickingItem[] }>(
     `SELECT pr.order_id,pr.created_at,pr.contact_name AS customer_name,
             pr.contact_phone AS customer_phone,pr.source AS source_tag,live.status,
             live.order_number,live.payment_method,live.total_amount,live.retrieved_at,live.fulfillment_not_before,
@@ -28,7 +29,7 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
        ) reservation ON true
        LEFT JOIN LATERAL (
          SELECT jsonb_agg(jsonb_build_object(
-           'product_name',product.product_name,'tire_size',spec.tire_size,
+           'order_item_id',item.id,'product_name',product.product_name,'tire_size',spec.tire_size,
            'brand',product.brand,'tire_condition',product.tire_condition,
            'quantity',item.quantity,'unit_price',item.unit_price,
            'pickup_service_code',item.pickup_service_code
@@ -48,6 +49,7 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
       LIMIT 300`,
     [env.FAREJADOR_ENV, env.BOT_PICKUP_RESERVATION_HOURS],
   );
+  await addStockPickingPositions(dbPool, env.FAREJADOR_ENV, result.rows.filter(row => row.status === 'open'));
   return result.rows;
 }
 

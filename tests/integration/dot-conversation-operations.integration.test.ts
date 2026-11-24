@@ -33,11 +33,11 @@ async function call(name:string,args:object,who=identity):Promise<any>{
   if('isError' in response&&response.isError)return {isError:true,text:response.content};
   return 'structuredContent' in response?response.structuredContent:response;
 }
-async function approve(name:string,data:object){
+async function approve(name:string,data:object,channel?:'voz'){
   const pending=await call(name,data);
   expect(pending).toMatchObject({status:'aguardando_autorizacao',executada:false,confirmacao:'conversa'});
   expect(pending.confirm_url).toBeUndefined();
-  const confirmed=await call('confirmar_operacao_milly',{proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true});
+  const confirmed=await call('confirmar_operacao_milly',{proposta:pending.proposta,fingerprint:pending.fingerprint,autorizado_pelo_dono:true,canal_autorizacao:channel});
   expect(confirmed).toMatchObject({status:'autorizada',executada:false});
   return call(name,data);
 }
@@ -269,6 +269,36 @@ it('opera ficha, atacado, contagem e separação/estorno de lote pelos serviços
   expect(await approve('registrar_contagem_estoque',{rows:[{measure:actualMeasure,brand,tire_condition:'novo',counted_quantity:5}],reason:'Contagem realizada pelo dono',idempotency_key:randomUUID()})).toMatchObject({executada:true});
   expect((await db.pool.query('SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE id=$1',[stock.id])).rows[0].quantity_on_hand).toBe(5);
   expect(await call('consultar_ficha_catalogo',{product_id:productId})).not.toHaveProperty('isError');
+});
+
+it('Milly localiza o pneu, registra o par, move uma unidade e consulta a pesquisa de preço com as permissões da conexão',async()=>{
+  await db.pool.query("UPDATE commerce.tire_specs SET tread_pattern='Modelo de teste' WHERE environment='test' AND product_id=$1",[productId]);
+  const stock=(await db.pool.query(`INSERT INTO commerce.wholesale_stock
+    (environment,measure,brand,tire_condition,vehicle_type,quantity_on_hand,unit_cost)
+    VALUES ('test',$1,$2,'novo','car',3,40) RETURNING id`,[measure,brand])).rows[0].id;
+  const options=await call('consultar_pilhas_galpao',{marca:brand,medida:measure});
+  expect(options.variantes).toEqual([expect.objectContaining({stock_id:stock,product_id:productId})]);
+  const input={stock_id:stock,product_id:productId,model:'Modelo de teste',inspection_status:'approved',
+    matched_set:true,positions:[{location_code:'A1',quantity:2}],reason:'Par conferido pela equipe',idempotency_key:randomUUID()};
+  const checked=await approve('conferir_grupo_galpao',input,'voz');
+  expect(checked).toMatchObject({executada:true,resultado:{matched_set:true,quantity_available:2}});
+  expect(await call('conferir_grupo_galpao',input)).toEqual(checked);
+  const group=checked.resultado;
+  const moved=await approve('mover_pneus_entre_pilhas',{group_id:group.group_id,revision:group.revision,
+    from_location:'A1',to_location:'A2',quantity:1,reason:'Reposicionamento solicitado',idempotency_key:randomUUID()});
+  expect(moved).toMatchObject({executada:true,resultado:{quantity_available:2,positions:[
+    {location_code:'A1',quantity_on_hand:1},{location_code:'A2',quantity_on_hand:1}]}});
+  expect((await call('consultar_pilhas_galpao',{stock_id:stock})).grupos).toHaveLength(1);
+  expect((await db.pool.query('SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE id=$1',[stock])).rows[0].quantity_on_hand).toBe(3);
+  const dates=(await db.pool.query("SELECT d::text observed_on,(d+7)::text valid_until FROM (SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date d) x")).rows[0];
+  const reference={product_id:productId,model:'Modelo de teste',sources:['https://loja.example/pneu'],
+    amount:123.45,bot_enabled:true,...dates,idempotency_key:randomUUID()};
+  expect(await approve('salvar_referencia_online',reference)).toMatchObject({executada:true,resultado:{amount:123.45}});
+  expect(await call('consultar_referencia_online',{product_id:productId})).toMatchObject({referencia:{amount:123.45,bot_enabled:true}});
+  await db.pool.query('UPDATE network.dot_oauth_grants SET stock_operations_enabled=false,catalog_operations_enabled=false WHERE id=$1',[identity.grant_id]);
+  expect((await call('conferir_grupo_galpao',{...input,idempotency_key:randomUUID()})).isError).toBe(true);
+  expect((await call('salvar_referencia_online',{...reference,amount:999,idempotency_key:randomUUID()})).isError).toBe(true);
+  expect(await call('consultar_referencia_online',{product_id:productId})).toMatchObject({referencia:{amount:123.45}});
 });
 
 it('Milly encontra as referências antigas ao cadastrar e só classifica as escolhidas pelo dono', async () => {

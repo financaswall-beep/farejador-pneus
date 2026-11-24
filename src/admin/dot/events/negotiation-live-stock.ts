@@ -18,7 +18,8 @@ export async function commercialFacts(db: PoolClient, environment: Environment, 
   if (!catalog) throw Error('produto_matriz_indisponivel');
   const [spec] = await loadMatrizProductStockSpecs(db, environment, [terms.productId]);
   if (!spec) throw Error('produto_matriz_indisponivel');
-  const variants=await db.query<MatrizOfficialStockRow>(`SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost
+  const variants=await db.query<MatrizOfficialStockRow>(`SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost,
+    commerce.matriz_stock_inspection_unavailable(environment,id) AS quantity_inspection_unavailable
     FROM commerce.wholesale_stock WHERE environment=$1 AND commerce.wholesale_measure_key(measure)=commerce.wholesale_measure_key($2)
     ORDER BY measure,brand,tire_condition ${lockStock?'FOR SHARE':''}`,[environment,spec.tire_size]);
   const stock = matrizStockForMeasure(buildMatrizStockIndex(variants.rows),

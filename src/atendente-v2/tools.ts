@@ -81,6 +81,10 @@ import { validatePartnerRetailQuote } from './partner-retail-pricing.js';
 import { withStoreOpeningScope, matrixStoreAcceptsOrders,currentStoreOpeningTime } from './routing-store-hours.js';
 import {saveMatrizOrderWindow} from './matriz-order-window.js';
 import { partnerOrderPresentation } from './partner-order-state.js';
+import { checkedBotGroupOffer, findCarStockGroup, GROUP_ROUTE_CHANGED, matrizStockGroupsEnabled,
+  requestedCarQuantity, verifiedSingleCarTireConservation, withoutCarGroupToolArgs } from './stock-group-offer.js';
+import { lookupMarketObjection } from './market-objection.js';
+import { quoteGroupFreight, quoteGroupPickup } from './stock-group-fulfillment.js';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 /**
@@ -96,6 +100,7 @@ export function activeToolDefinitions(): ToolDefinition[] {
   if (env.DELIVERY_FREIGHT_FROM_PIN) {
     defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
   }
+  if (!matrizStockGroupsEnabled()) defs = defs.map(withoutCarGroupToolArgs);
   return [...defs,STOCK_INTEREST_TOOL,STORE_HOURS_TOOL,...(env.PARTNER_STOCK_CONFIRMATION?[CANCEL_STOCK_CONFIRMATION_TOOL]:[])];
 }
 
@@ -154,6 +159,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           medida_pneu: { type: 'string', description: 'Medida do pneu. Ex: "90/90-18"' },
           quantidade: { type: 'integer', minimum: 1, maximum: 20, description: 'Quantidade dessa medida pedida pelo cliente; omita se não informou.' },
+          tipo_veiculo: { type: 'string', enum: ['car', 'motorcycle'], description: 'Informe o tipo quando estiver claro na conversa. Se o cliente enviou só a medida, omita. Jamais deduza pelo aro, medida, quantidade ou palavra par.' },
+          pneus_avulsos: { type: 'boolean', description: 'Use true somente quando o cliente pediu pneus avulsos ou recusou o conjunto.' },
+          quer_conjunto: { type: 'boolean', description: 'Use true somente quando o cliente pediu par/jogo ou pneus iguais para carro. Passe a quantidade pedida, por exemplo 2 para um par.' },
           modalidade: { type: 'string', enum: ['pickup','delivery'], description: 'Retirada ou entrega escolhida pelo cliente. Passe quando já informado; omita se ainda não escolheu.' },
           marca: { type: 'string', description: 'Marca. Ex: "Pirelli", "Levorin"' },
           condicao_pneu: {
@@ -182,6 +190,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           bairro: { type: 'string', description: 'Nome do bairro. Ex: "Centro", "Vila Mariana"' },
           municipio: { type: 'string', description: 'Cidade (opcional)' },
           endereco_entrega: { type: 'string', description: 'Endereço completo já informado (rua e número); não invente nem peça de novo se já está na conversa.' },
+          conjunto_id: { type: 'string', description: 'ID da opção de conjunto de carro aceita pelo cliente, se houver. Preserva a quantidade e a loja na cotação.' },
           produtos: {
             type: 'array',
             description: 'Os pneus já escolhidos pelo cliente (dos resultados de busca). Inclua o product_id de cada um — necessário para cotar o frete da loja certa.',
@@ -267,6 +276,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           bairro: { type: 'string', description: 'Bairro do cliente, se informado (ajuda a achar a loja que atende).' },
           municipio: { type: 'string', description: 'Cidade do cliente, se informada.' },
           product_ids: { type: 'array', items: { type: 'string' }, description: 'product_id dos pneus que o cliente quer (de buscar_produto/buscar_compatibilidade). Passe SEMPRE que houver pneu escolhido — a loja indicada passa a ser a que TEM o item em estoque.' },
+          conjunto_id: { type: 'string', description: 'ID da opção de conjunto de carro aceita pelo cliente, se houver. Consulta retirada para todos os pneus dessa opção.' },
         },
         required: [],
         additionalProperties: false,
@@ -322,6 +332,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             },
           },
           nome_cliente: { type: 'string' },
+          conjunto_id: { type: 'string', description: 'UUID do conjunto de carro apresentado nesta conversa e aceito pelo cliente. Copie o ID retornado por buscar_produto. Use um único item com o SKU e quantidade exatos do conjunto.' },
           modalidade: { type: 'string', enum: ['delivery', 'pickup'] },
           endereco_entrega: { type: 'string', description: 'Obrigatório se modalidade=delivery' },
           usar_endereco_anterior: { type: 'boolean', description: 'Use true SOMENTE depois de perguntar se a entrega será no mesmo endereço da última entrega e o cliente confirmar. O sistema recupera o endereço sem expô-lo no prompt. Se o cliente informou endereço novo, passe endereco_entrega e omita este campo.' },
@@ -476,7 +487,7 @@ async function executeToolInternal(
               const resultado = JSON.parse(await executeTool(client, environment, conversationId,
                 'buscar_produto', { ...query,
                   // A busca aceita posição não cadastrada, mas exclui a oposta explícita.
-                  posicao_pneu: positions.length === 1 ? positions[0] : 'both',
+                  posicao_pneu: positions.length === 1 ? positions[0] : 'both', tipo_veiculo: 'motorcycle',
                   bairro: args.bairro, municipio: args.municipio })) as Record<string, unknown>;
               searches.push({ medida_pneu: query.medida_pneu, resultado });
             }
@@ -699,22 +710,37 @@ async function executeToolInternal(
         if (env.WHOLESALE_UNIFIED_STOCK && productInput.apenas_com_estoque) {
           result = result.filter((product) => product.total_stock_available > 0);
         }
-        result = result.sort((a, b) => b.total_stock_available - a.total_stock_available)
-          .slice(0, productInput.limit);
+        result = result.sort((a, b) => b.total_stock_available - a.total_stock_available);
         if (result.length === 0) {
           return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto com estoque encontrado.' });
         }
         // sem_estoque_loja_perto: ver buscar_compatibilidade — sei a localização, mas nenhuma
         // loja perto tem o item; o estoque exibido é o da REDE/matriz, não de loja perto.
+        const carQuantity = await requestedCarQuantity(client, environment, args);
+        const eligibleQuantity = carQuantity !== undefined && carQuantity > 1;
+        const availableInFull = !eligibleQuantity || result.some(p =>
+          p.total_stock_available >= carQuantity && Number(p.price_amount) > 0 && p.currency === 'BRL');
+        const group = lojaResolvida
+          ? await findCarStockGroup(client, environment, conversationId, args, result) : null;
+        const singleConservation = lojaResolvida && !group
+          ? await verifiedSingleCarTireConservation(client, environment, conversationId, args, result) : null;
+        if (group) result.sort((a, b) => Number(b.product_id === group.product_id) - Number(a.product_id === group.product_id));
         return JSON.stringify({
           encontrado: true,
-          produtos: result,
+          produtos: result.slice(0, productInput.limit),
           ...(lojaResolvida ? {} : { precisa_localizacao: true }),
-          ...(lojaResolvida && !estoqueLojaPerto ? { sem_estoque_loja_perto: true } : {}),
+          ...(lojaResolvida && !estoqueLojaPerto && !group ? { sem_estoque_loja_perto: true } : {}),
+          ...(eligibleQuantity ? {
+            quantidade_integral_disponivel: availableInFull,
+            ...(availableInFull ? {} : { orientacao_quantidade: 'A quantidade pedida não está verificada para um produto em uma só loja. Informe a disponibilidade parcial real e pergunte se ajuda. Não some saldo de lojas ou produtos.' }),
+          } : {}),
+          ...(group ? { conjunto_carro: group, loja_da_oferta: 'matriz' } : {}),
+          ...(singleConservation ? { conservacao_avulso_verificada: singleConservation } : {}),
         });
       }
 
       case 'calcular_frete': {
+        if (args.conjunto_id !== undefined) return quoteGroupFreight(client, environment, conversationId, execution?.triggerMessageId ?? null, args);
         const configured=(await readDeliverySettings(client,environment))?.settings??null;
         // Memória do produto (furo raiz): se o LLM não passou os produtos, usa o que o
         // bot já buscou na conversa — pra a cotação rotear pelo MESMO produto do pedido.
@@ -855,6 +881,7 @@ async function executeToolInternal(
       }
 
       case 'localizacao_loja': {
+        if (args.conjunto_id !== undefined) return quoteGroupPickup(client, environment, conversationId, execution?.triggerMessageId ?? null, args);
         const pickupSettings=(await readDeliverySettings(client,environment))?.settings??null;
         const bairro = args.bairro as string | undefined;
         let municipio = (args.municipio as string | undefined) ?? null;
@@ -1132,6 +1159,10 @@ async function executeToolInternal(
         return await criarPedido(client, environment, conversationId, args, execution);
       }
 
+      case 'consultar_referencia_preco': {
+        return JSON.stringify(await lookupMarketObjection(client, environment, conversationId, execution?.triggerMessageId, args));
+      }
+
       case 'consultar_pedido': {
         return await consultarPedido(client, environment, conversationId, args);
       }
@@ -1156,8 +1187,9 @@ async function executeToolInternal(
         return JSON.stringify({ erro: `Tool desconhecida: ${name}` });
     }
   } catch (err) {
-    if(err instanceof FalhaTransacaoOferta) throw err;
+    if(err instanceof FalhaTransacaoOferta || err instanceof StockGroupOrderRollback) throw err;
     if (err instanceof AmbiguousNeighborhoodError) return JSON.stringify(err.response());
+    if (name === 'criar_pedido' && args.conjunto_id !== undefined) throw new StockGroupOrderRollback('stock_group_order_failed', err);
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({ environment, conversation_id: conversationId, tool: name, err: message }, 'agent_v2: tool error');
     return JSON.stringify({ erro: message });
@@ -1172,6 +1204,11 @@ interface PedidoItem {
   preco_unitario: number;
 }
 class FalhaTransacaoOferta extends Error {}
+export class StockGroupOrderRollback extends Error {
+  constructor(readonly code: string, cause: unknown) {
+    super(code, { cause });
+  }
+}
 
 
 async function criarPedido(
@@ -1186,6 +1223,13 @@ async function criarPedido(
   if (replay) return replay;
   const quotedItems = Array.isArray(args.itens) ? args.itens as PedidoItem[] : [];
   if (quotedItems.length === 0) return JSON.stringify({ erro: 'itens_obrigatorios' });
+  const bundle = await checkedBotGroupOffer(client, environment, conversationId, requestId, args.conjunto_id, quotedItems);
+  if (bundle.error) return JSON.stringify({
+    erro: bundle.error,
+    mensagem: bundle.error === 'conjunto_exige_id'
+      ? 'Se o cliente aceitou o conjunto, preserve o ID da opção apresentada. Se ele preferiu avulsos, confirme essa escolha na busca.'
+      : 'A opção do conjunto não corresponde à oferta confirmada nesta conversa. Atualize a busca e confirme a opção com o cliente antes de fechar.',
+  });
   let itens = quotedItems;
   let subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
@@ -1410,6 +1454,10 @@ async function criarPedido(
   const oferta=await buscarOfertaCheckoutMilly(client,environment,conversationId,
     [...new Set(quotedItems.map(item=>item.product_id))]);
   if (partner) {
+    if (bundle.offer) return JSON.stringify({
+      erro: 'stock_group_route_changed',
+      mensagem: 'O conjunto apresentado é exclusivo da Matriz e a loja responsável mudou. Consulte de novo antes de confirmar qualquer opção.',
+    });
     if(oferta && quotedItems.some(it=>it.product_id===oferta.productId)) return JSON.stringify({
       erro:'oferta_exclusiva_matriz',mensagem:'A condição apresentada vale somente na Matriz. Confirme as condições da loja parceira com o cliente.'});
     // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
@@ -1513,10 +1561,23 @@ async function criarPedido(
     // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
     // Parceiros usam o sale_price da borracharia, sem alterar o preço da Matriz.
     const unitId = await resolveMatrizUnitId(client, environment);
+    if (bundle.offer && !unitId) return JSON.stringify(GROUP_ROUTE_CHANGED);
     const especial=oferta && aplicarOfertaMilly(oferta,{unitId,paymentMethod:formaPagamento,fulfillmentMode:modalidade,
       freightCents:Math.round(valorFrete*100),items:quotedItems,address:deliveryAddress});
     if(especial && 'erro' in especial)return JSON.stringify({erro:'condicao_negociada_alterada',mensagem:especial.erro});
     const aplicarAval=especial?.aplicavel===true;
+    if (bundle.offer && !aplicarAval) {
+      if (!bundle.accepted) return JSON.stringify({
+        erro: 'conjunto_aceite_pendente',
+        mensagem: 'Aguarde o cliente confirmar que quer o conjunto exato antes de fechar. Uma resposta à foto ou localização não é aceite.',
+      });
+      if (Math.round(quotedItems[0]!.preco_unitario * 100) !== Math.round(bundle.quotedUnitPrice! * 100)) {
+        return JSON.stringify({
+          erro: 'conjunto_preco_ofertado_alterado',
+          mensagem: 'O valor diverge da oferta do conjunto. Consulte novamente e confirme o preço com o cliente antes de fechar.',
+        });
+      }
+    }
     if(aplicarAval && oferta) {
       if(!await clienteRespondeuAOferta(client,environment,conversationId,requestId,oferta))return JSON.stringify({
         erro:'confirmacao_da_oferta_pendente',mensagem:'Aguarde a resposta do cliente à oferta publicada antes de fechar.'});
@@ -1536,7 +1597,7 @@ async function criarPedido(
     // dupla-chamada do MESMO pedido o ON CONFLICT devolve o existente em vez de duplicar.
     // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)
     const resolved = await resolveBotOrderKey(client, environment, conversationId,
-      unitId, itens, modalidade, requestId);
+      unitId, itens, modalidade, requestId, bundle.offer?.groupId);
     if (resolved.existingId) {
       await recordBotOrderAttempt(client, environment, conversationId, requestId, resolved.existingId);
       return botOrderReplay(client, environment, resolved.existingId);
@@ -1584,6 +1645,7 @@ async function criarPedido(
       unitId,
       partnerOrderId: null,
       idempotencyKey,
+      stockGroupOffer: bundle.offer,
       items: itens.map((i) => ({
         product_id: i.product_id,
         quantity: i.quantidade,
@@ -1592,6 +1654,11 @@ async function criarPedido(
     });
     if(aplicarAval && oferta) await consumirOfertaMilly(client,environment,oferta.id,order.id);
     } catch(error) {
+      if (bundle.offer) {
+        const code = error instanceof Error && ['stock_group_unavailable', 'stock_group_offer_changed'].includes(error.message)
+          ? error.message : 'stock_group_order_failed';
+        throw new StockGroupOrderRollback(code, error);
+      }
       if(aplicarAval)throw new FalhaTransacaoOferta('Falha ao finalizar o pedido com o aval.',{cause:error});
       throw error;
     }

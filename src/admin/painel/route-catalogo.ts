@@ -7,6 +7,7 @@ import { getMatrixCatalogWithWholesale } from './queries-catalogo-wholesale.js';
 import { registerReferenceClassification } from './catalog-reference-classification.js';
 import { registerCatalogWholesale } from './route-catalogo-wholesale.js';
 import { registerCatalogPhotoRoutes } from './route-catalogo-photos.js';
+import { registerMarketReferenceRoutes } from './route-market-reference.js';
 import {
   addCatalogCompatibility,
   createCatalogFitmentDiscovery,
@@ -41,6 +42,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
   registerReferenceClassification(fastify);
   await registerCatalogWholesale(fastify);
   await registerCatalogPhotoRoutes(fastify);
+  registerMarketReferenceRoutes(fastify);
   fastify.get('/admin/api/catalog', { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = z.object({ vehicle_type: tireVehicleFilterSchema.default('all') }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_vehicle_type' });

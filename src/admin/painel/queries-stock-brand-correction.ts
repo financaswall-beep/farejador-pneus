@@ -211,6 +211,8 @@ export async function correctWholesaleStockBrand(
       ],
     );
     const target = inserted.rows[0]!;
+    await client.query(`UPDATE commerce.matriz_stock_groups SET revision=revision+1,updated_at=clock_timestamp()
+      WHERE environment=$1 AND stock_id=$2`,[environment,target.id]);
     const result = integrityResult<CorrectWholesaleStockBrandResult>({
       stock_id: target.id,
       measure: target.measure,

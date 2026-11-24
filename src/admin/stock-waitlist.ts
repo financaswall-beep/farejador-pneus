@@ -28,6 +28,7 @@ export async function waitlistRows(db:Pool=pool,environment=env.FAREJADOR_ENV,ac
       l.municipio AS city,COALESCE(s.vehicle_type,commerce.catalog_vehicle_type(s.environment,s.tire_size,NULL,s.tire_condition)) AS resolved_type
       ${base} ORDER BY s.consent_at,s.id LIMIT 10001`,[environment,account]),
     db.query(`SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost,
+      commerce.matriz_stock_inspection_unavailable(environment,id) AS quantity_inspection_unavailable,
       commerce.stock_vehicle_type(environment,measure,brand,tire_condition) AS vehicle_type
       FROM commerce.wholesale_stock WHERE environment=$1`,[environment]),
     db.query(`SELECT name FROM core.units WHERE environment=$1 AND slug='main' LIMIT 1`,[environment]),

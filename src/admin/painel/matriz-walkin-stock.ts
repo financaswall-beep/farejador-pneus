@@ -93,7 +93,8 @@ export async function prepareMatrizWalkinStock(
     [...requestedByKey.values()].map((variant) => variant.key),
   )];
   const stock = await client.query<StockRow>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost,
+            commerce.matriz_stock_inspection_unavailable(environment,id) AS quantity_inspection_unavailable
       FROM commerce.wholesale_stock
       WHERE environment = $1
         AND commerce.wholesale_measure_key(measure) = ANY($2::text[])

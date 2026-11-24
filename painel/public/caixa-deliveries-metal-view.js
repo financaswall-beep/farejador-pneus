@@ -28,6 +28,9 @@
         const description = [item.brand, condition, category].filter(Boolean).join(' · ');
         copy.append(node('strong', size || item.label || 'Pneu'), node('small', description || item.label || 'Cadastro a conferir'),
           node('p', item.quantity + (Number(item.quantity) === 1 ? ' pneu' : ' pneus')));
+        for (const position of item.stock_positions || []) {
+          copy.appendChild(node('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
+        }
         // Uma foto de pedido não representa os demais modelos de uma compra com vários itens.
         line.append(photo(row.items.length === 1 ? row : { ...row, photo_request_id: null }, item), copy); list.appendChild(line);
       }

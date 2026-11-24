@@ -282,6 +282,7 @@
 <script src="/admin/painel/expense-receipt-viewer.js?v=20260923-receipt2"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20261101-viagens1"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.galpao.grupos.js?v=20261124"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260916-vehicle-ui1"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
@@ -289,9 +290,10 @@
 <link rel="stylesheet" href="/admin/painel/catalog-photos.css?v=20261025-video1">
 <script src="/admin/painel/app.catalogo.photos.js?v=20261025-video1"></script>
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
+<script src="/admin/painel/app.catalogo.referencia.js?v=20261124"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
-  <script src="/admin/painel/app.catalogo.js?v=20261123-logos1"></script>
+  <script src="/admin/painel/app.catalogo.js?v=20261124-referencia"></script>
 <script src="/admin/painel/app.catalogo.atacado.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
@@ -305,7 +307,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261118-consulta-milly"></script>
+<script src="/admin/painel/app.montagem.js?v=20261124-grupos"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261118-milly1"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261118-milly1"></script>
@@ -4329,6 +4331,8 @@
                   :class="stockTab === 'custos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
             <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
+            <button type="button" @click="sgOpen()" :aria-pressed="stockTab === 'pilhas'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    :class="stockTab === 'pilhas' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Pilhas e conjuntos</button>
           </nav>
           <div x-show="adminUser?.role === 'owner'" class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
             <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
@@ -4687,6 +4691,10 @@
                   <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure, selectedRow.brand, selectedRow.tire_condition)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     <i data-lucide="history" class="h-4 w-4"></i> Ver histórico
+                  </button>
+                  <button type="button" x-show="selectedRow.vehicle_type !== 'motorcycle'" @click="sgOpen(selectedRow)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
+                    <i data-lucide="map-pin" class="h-4 w-4"></i> Pilhas e conjuntos
                   </button>
                   <button x-show="adminUser?.role === 'owner'" @click="stockRemove(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 sm:col-span-2 2xl:col-span-1">
@@ -5250,6 +5258,108 @@
     </div>
 
     <!-- ═══ TELA: LOGÍSTICA da matriz — cockpit operacional ═══ -->
+    <section x-show="currentPage === 'estoque' && isMatrixPanel() && stockTab === 'pilhas'" x-cloak
+             class="space-y-4 px-4 pb-4 lg:px-5 lg:pb-5" aria-labelledby="galpao-grupos-heading">
+      <div class="rounded-xl border border-gray-200 bg-white p-4 lg:p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3"><div>
+          <h3 id="galpao-grupos-heading" class="text-base font-semibold text-gray-950">Pilhas e conjuntos do galpão</h3>
+          <p class="mt-1 text-sm text-gray-600">Confira a conservação e informe onde estão os pneus de carro já cadastrados no catálogo.</p>
+        </div><button type="button" @click="sgLoad()" :disabled="stockGroups.loading || stockGroups.saving" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium disabled:opacity-50">Atualizar</button></div>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <label class="block text-sm font-medium">Buscar no estoque<input type="search" x-model="stockGroups.query" placeholder="Medida ou marca" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+          <label class="block text-sm font-medium">Variante do galpão
+            <select id="galpao-pilha-variante" x-model="stockGroups.stockId" @change="sgChoose()" :disabled="stockGroups.loading || stockGroups.saving" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <option value="">Selecione uma medida, marca e condição</option>
+              <template x-for="row in sgVariants()" :key="row.stock_id">
+                <option :value="row.stock_id" :selected="stockGroups.stockId === row.stock_id" x-text="[row.measure, row.brand, sgCondition(row.tire_condition)].join(' · ')"></option>
+              </template>
+            </select>
+          </label>
+        </div>
+        <p x-show="stockGroups.loading" role="status" class="mt-3 text-sm text-gray-600">Consultando as pilhas…</p>
+        <p x-show="!stockGroups.loading && !stockGroups.error && !sgVariants().length" class="mt-3 text-sm text-gray-600">Nenhuma variante de carro encontrada.</p>
+        <p x-show="stockGroups.error" role="alert" class="mt-3 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900" x-text="stockGroups.error"></p>
+        <p x-show="stockGroups.message" role="status" class="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800" x-text="stockGroups.message"></p>
+        <template x-if="sgStock()">
+          <dl class="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-sm sm:grid-cols-5">
+            <div><dt class="text-gray-600">Saldo físico oficial</dt><dd class="font-semibold" x-text="sgStock().quantity_on_hand"></dd></div>
+            <div><dt class="text-gray-600">Reservado</dt><dd class="font-semibold" x-text="sgStock().quantity_reserved"></dd></div>
+            <div><dt class="text-gray-600">Fora da venda</dt><dd class="font-semibold" x-text="sgStock().quantity_inspection_unavailable ?? 0"></dd></div>
+            <div><dt class="text-gray-600">Disponível após conferência</dt><dd class="font-semibold" x-text="Math.max(0, sgStock().quantity_on_hand - sgStock().quantity_reserved - (sgStock().quantity_inspection_unavailable ?? 0))"></dd></div>
+            <div><dt class="text-gray-600">Sem grupo físico</dt><dd class="font-semibold" x-text="sgUngrouped()"></dd></div>
+          </dl>
+        </template>
+      </div>
+      <div x-show="stockGroups.stockId" class="grid gap-4 xl:grid-cols-2">
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2"><h4 class="font-semibold text-gray-950">Grupos da variante</h4>
+            <button type="button" x-show="adminUser?.role === 'owner' && sgProducts().length" @click="sgNew()" :disabled="stockGroups.loading || stockGroups.saving" class="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Novo grupo</button>
+          </div>
+          <p x-show="!stockGroups.loading && !sgRows().length" class="mt-3 text-sm text-gray-600">Nenhum grupo para esta variante.</p>
+          <ul class="mt-3 space-y-2">
+            <template x-for="group in sgRows()" :key="group.group_id">
+              <li class="rounded-lg border border-gray-200 p-3">
+                <div class="flex flex-wrap items-start justify-between gap-2"><div>
+                  <span class="font-semibold" x-text="group.model || 'Pneus avulsos' "></span>
+                  <div class="mt-1 text-xs text-gray-600" x-text="[sgStatus(group.inspection_status), group.matched_set ? 'Conjunto conferido' : '', sgConservation(group.conservation_grade), group.quantity_on_hand + ' no grupo', group.quantity_reserved + ' reservados'].filter(Boolean).join(' · ')"></div>
+                  <div x-show="group.conferred_at" class="mt-1 text-xs text-gray-600" x-text="'Conferência em ' + sgDate(group.conferred_at)"></div>
+                </div><button type="button" x-show="adminUser?.role === 'owner'" @click="sgEdit(group)" :disabled="stockGroups.saving" :aria-pressed="stockGroups.groupId === group.group_id" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Editar</button></div>
+                <ul class="mt-2 flex flex-wrap gap-2 text-sm text-gray-700">
+                  <template x-for="position in group.positions" :key="position.location_code">
+                    <li class="rounded bg-gray-100 px-2 py-1"><span x-text="`${position.location_code} · ${position.quantity_on_hand} un.${position.quantity_reserved ? ' (' + position.quantity_reserved + ' reserv.)' : ''}`"></span><small x-show="position.confirmed_at" class="block text-gray-600" x-text="'Posição conferida em ' + sgDate(position.confirmed_at)"></small></li>
+                  </template>
+                </ul>
+                <p x-show="group.conservation_note" class="mt-2 break-words text-sm text-gray-600" x-text="group.conservation_note"></p>
+              </li>
+            </template>
+          </ul>
+        </div>
+        <template x-if="stockGroups.form && adminUser?.role === 'owner'">
+          <div class="space-y-4">
+            <form @submit.prevent="sgSave()" class="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+              <h4 class="font-semibold text-gray-950" x-text="stockGroups.groupId ? 'Conferir grupo' : 'Novo grupo'"></h4>
+              <label class="block text-sm font-medium">Produto do catálogo
+                <select x-model="stockGroups.form.product_id" :disabled="!!stockGroups.groupId || stockGroups.saving" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">Selecione o produto</option>
+                  <template x-for="row in sgProducts()" :key="row.product_id"><option :value="row.product_id" :selected="stockGroups.form.product_id === row.product_id" x-text="[row.product_code, row.tread_pattern].filter(Boolean).join(' · ')"></option></template>
+                </select>
+              </label>
+              <label class="block text-sm font-medium">Modelo / versão<input x-model="stockGroups.form.model" maxlength="120" :required="stockGroups.form.matched_set" placeholder="Obrigatório para conjunto" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+              <label class="block text-sm font-medium">Conferência<select x-model="stockGroups.form.inspection_status" @change="sgInspectionChanged()" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"><option value="located">Somente localização</option><option value="pending">Aguardando inspeção</option><option value="approved">Conferido</option><option value="blocked">Bloqueado</option></select></label>
+              <p x-show="['pending','blocked'].includes(stockGroups.form.inspection_status)" class="text-sm font-medium text-gray-700">Os pneus deste grupo ficam fora da disponibilidade para venda.</p>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" x-model="stockGroups.form.matched_set" :disabled="stockGroups.form.inspection_status !== 'approved'" class="mt-1"><span>Confirmar que o grupo forma um conjunto do mesmo modelo e conservação</span></label>
+              <label class="block text-sm font-medium">Classificação comercial<select x-model="stockGroups.form.conservation_grade" :disabled="stockGroups.form.inspection_status !== 'approved'" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"><option value="">Sem classificação</option><option value="selecionado">Selecionado</option><option value="economico">Econômico</option></select></label>
+              <label class="block text-sm font-medium">Observação interna da conservação<textarea x-model="stockGroups.form.conservation_note" maxlength="500" rows="2" placeholder="Ex.: sulcos medidos, desgaste e avarias" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></textarea></label>
+              <fieldset x-show="!stockGroups.groupId" class="space-y-2 rounded-lg border border-gray-200 p-3">
+                <legend class="px-1 text-sm font-medium">Posições e quantidades contadas</legend>
+                <template x-for="(position, index) in (stockGroups.form.positions || [])" :key="index">
+                  <div class="grid grid-cols-2 gap-2"><label class="text-sm">Pilha<input x-model="position.location_code" maxlength="60" placeholder="Ex.: B1" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label><label class="text-sm">Unidades<input type="number" x-model="position.quantity" min="1" step="1" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label></div>
+                </template>
+                <button type="button" @click="stockGroups.form.positions.push({location_code:'',quantity:''})" :disabled="(stockGroups.form.positions || []).length >= 100" class="mt-1 text-sm font-semibold text-emerald-800 disabled:opacity-50">Adicionar posição</button>
+              </fieldset>
+              <label class="block text-sm font-medium">Motivo<input x-model="stockGroups.form.reason" maxlength="300" required placeholder="Ex.: conferência do inventário" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+              <p x-show="sgActive()?.quantity_reserved > 0" class="text-sm font-medium text-gray-700">A conferência só pode ser alterada após concluir ou liberar as reservas.</p>
+              <button type="submit" :disabled="stockGroups.saving || stockGroups.loading || sgActive()?.quantity_reserved > 0" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Salvar grupo</button>
+            </form>
+            <template x-if="stockGroups.move && sgActive()">
+              <form @submit.prevent="sgMove()" class="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+                <h4 class="font-semibold text-gray-950">Movimentar pneus do grupo</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="text-sm font-medium">Origem<select x-model="stockGroups.move.from_location" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <option value="" :disabled="sgActive().inspection_status === 'approved'" x-text="sgActive().inspection_status === 'approved' ? 'Selecione uma pilha' : 'Saldo sem grupo'"></option>
+                    <template x-for="position in sgActive().positions" :key="position.location_code"><option :value="position.location_code" x-text="`${position.location_code} · ${position.quantity_on_hand - position.quantity_reserved} livres`"></option></template>
+                  </select></label>
+                  <label class="text-sm font-medium">Pilha de destino<input x-model="stockGroups.move.to_location" maxlength="60" placeholder="Vazio devolve ao saldo sem grupo" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+                </div>
+                <label class="block text-sm font-medium">Unidades<input type="number" x-model="stockGroups.move.quantity" min="1" step="1" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+                <label class="block text-sm font-medium">Motivo<input x-model="stockGroups.move.reason" maxlength="300" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+                <button type="submit" :disabled="stockGroups.saving || stockGroups.loading" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Registrar movimentação</button>
+              </form>
+            </template>
+          </div>
+        </template>
+      </div>
+    </section>
     <div x-show="currentPage === 'estoque' && isMatrixPanel() && stockTab === 'conciliacao'" class="px-4 pb-4 lg:px-5 lg:pb-5" x-cloak>
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div class="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -11235,6 +11345,29 @@
             </div>
           </section>
 
+          <section x-show="catalogoSelecionado?.product_type === 'tire'" data-testid="catalog-market-reference" class="rounded-xl border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-950">Referência online do pneu novo</h3>
+            <p class="mt-1 text-xs leading-5 text-gray-600">Registre a cotação unitária em reais ou o valor médio das fontes consultadas. O preço de venda é definido no varejo.</p>
+            <p x-show="catalogoMarket.loading" role="status" class="mt-3 text-sm text-gray-600">Consultando a referência…</p>
+            <p x-show="catalogoMarket.message" role="status" class="mt-3 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800" x-text="catalogoMarket.message"></p>
+            <p x-show="catalogoMarket.error" role="alert" class="mt-3 rounded-lg bg-rose-50 p-2 text-sm text-rose-700" x-text="catalogoMarket.error"></p>
+            <button type="button" x-show="!catalogoMarket.loading && !catalogoMarket.loaded" @click="catalogoMarketLoad(catalogoSelecionado)" class="mt-3 text-sm font-semibold text-emerald-800">Consultar de novo</button>
+            <form x-show="catalogoMarket.loaded" @submit.prevent="catalogoMarketSave()" class="mt-3 space-y-3">
+              <label class="block text-xs font-medium text-gray-700">Modelo / versão cotados<input x-model="catalogoMarket.form.model" required maxlength="120" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+              <label class="block text-xs font-medium text-gray-700">Valor unitário (R$)<input type="number" x-model="catalogoMarket.form.amount" required min="0.01" step="0.01" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+              <label class="block text-xs font-medium text-gray-700">Links das fontes, um por linha<textarea x-model="catalogoMarket.form.sources" required rows="3" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></textarea></label>
+              <p class="text-xs text-gray-600" x-show="catalogoMarketSources().length" x-text="catalogoMarketSources().length === 1 ? 'Cotação única' : 'Média informada de ' + catalogoMarketSources().length + ' fontes'"></p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="block text-xs font-medium text-gray-700">Data da consulta<input type="date" x-model="catalogoMarket.form.observed_on" required class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+                <label class="block text-xs font-medium text-gray-700">Válida até<input type="date" x-model="catalogoMarket.form.valid_until" :required="catalogoMarket.form.bot_enabled" class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"></label>
+              </div>
+              <label class="flex items-start gap-2 text-sm font-medium"><input type="checkbox" x-model="catalogoMarket.form.bot_enabled" :disabled="!catalogoMarketCar() && !catalogoMarket.form.bot_enabled" class="mt-1"><span>Autorizar referência no atendimento</span></label>
+              <p class="text-xs text-gray-600" x-show="!catalogoMarketCar()">A referência pode ser salva para consulta interna. A liberação no atendimento exige uma ficha de carro.</p>
+              <p class="text-xs text-gray-600" x-show="catalogoMarketCar() && !catalogoMarketMatches()">Para liberar ao bot, o modelo cotado precisa coincidir com o campo Modelo / desenho já salvo na ficha técnica.</p>
+              <p class="text-xs text-gray-600" x-show="catalogoMarketCar() && catalogoMarket.form.bot_enabled && catalogoMarketMatches()">O atendimento usa esta referência dentro da validade e com a ficha técnica conferida.</p>
+              <button type="submit" :disabled="catalogoMarket.saving" class="rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:opacity-50" x-text="catalogoMarket.saving ? 'Salvando…' : 'Salvar referência online'"></button>
+            </form>
+          </section>
           <section x-show="catalogoSelecionado?.product_type === 'tire'" data-testid="catalog-wholesale-editor" class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
             <h3 class="text-sm font-semibold text-emerald-900">Preço de atacado</h3>
             <p class="mt-1 text-xs leading-5 text-gray-600">É o valor que o parceiro paga para comprar da 2W.</p>

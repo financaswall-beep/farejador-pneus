@@ -46,6 +46,9 @@
       const entry = el('div', null, 'mp-product'), copy = el('div');
       copy.append(el('strong', item.tire_size || item.product_name || 'Pneu'), el('p', [item.brand, condition(item.tire_condition)].filter(Boolean).join(' · ')),
         el('small', Number(item.quantity || 0) + (Number(item.quantity) === 1 ? ' pneu' : ' pneus') + ' × ' + P.money(item.unit_price)));
+      for (const position of item.stock_positions || []) {
+        copy.appendChild(el('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
+      }
       entry.append(picture(), copy); list.appendChild(entry);
     });
     if (!tires(row).length) list.appendChild(el('p', 'Itens do pedido não informados.'));

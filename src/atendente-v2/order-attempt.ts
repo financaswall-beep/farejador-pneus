@@ -54,8 +54,8 @@ export async function botOrderReplay(client: PoolClient, environment: Environmen
 
 export async function resolveBotOrderKey(client: PoolClient, environment: Environment,
   conversationId: string, unitId: string | null, items: OrderFingerprintItem[], modality: string,
-  requestId: string | null): Promise<{ key: string; existingId: string | null }> {
-  const base = buildOrderIdempotencyKey(conversationId, unitId, items, modality);
+  requestId: string | null, stockGroupId?: string): Promise<{ key: string; existingId: string | null }> {
+  const base = buildOrderIdempotencyKey(conversationId, unitId, items, modality, stockGroupId);
   const prior = await client.query<{ id: string; idempotency_key: string }>(
     `SELECT o.id,o.idempotency_key FROM commerce.orders o
      LEFT JOIN commerce.partner_orders po ON po.environment=o.environment AND po.id=o.partner_order_id

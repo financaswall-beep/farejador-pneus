@@ -52,7 +52,7 @@ export async function getMatrizOperationStock(
     vehicle_type: 'car' | 'motorcycle' | null;
   }>(
     `SELECT id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,
-            GREATEST(quantity_on_hand-quantity_reserved,0)::int quantity_available,
+            GREATEST(quantity_on_hand-quantity_reserved-commerce.matriz_stock_inspection_unavailable(environment,id),0)::int quantity_available,
             min_quantity,updated_at,tire_width_mm,tire_aspect_ratio,tire_rim_diameter,vehicle_type
        FROM commerce.wholesale_stock
       WHERE environment=$1

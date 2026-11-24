@@ -3,16 +3,16 @@ import { tireSizeKey } from '../shared/tire-size.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../shared/matriz-stock-source.js';
 import type { TireCondition } from '../shared/tire-condition.js';
 import {
+  finalizeMatrizStockGroupPositions, guardMatrizGroupOrderEdit, loadGroupOrderItems, reallocateMatrizGroupOrderIfNeeded,
+  reserveMatrizStockGroupPositions,
+  type MatrizStockGroupOffer,
+} from '../admin/painel/stock-group-reservation.js';
+import {
   loadMatrizOfficialStock, loadMatrizProductStockSpecs, stockBrandKey,
 } from './matriz-stock-variants.js';
+import { hasMatrizReservationEvent as hasEvent, reservationMovements, type ReservationMovement } from './matriz-reservation-events.js';
 
 interface RequestedItem { productId: string; quantity: number }
-interface ReservationMovement {
-  measure: string;
-  brand: string;
-  tire_condition: TireCondition;
-  qty: number;
-}
 
 async function buildReservationPlan(
   client: PoolClient,
@@ -78,6 +78,9 @@ export async function planMatrizReservationEdit(
   client: PoolClient, environment: 'prod' | 'test', orderId: string,
   current: RequestedItem[], desired: RequestedItem[],
 ) {
+  const normalizeItems = (items: RequestedItem[]) => JSON.stringify([...items].sort((a,b)=>a.productId.localeCompare(b.productId)));
+  const itemsChanged=normalizeItems(current)!==normalizeItems(desired);
+  if (itemsChanged) await guardMatrizGroupOrderEdit(client,environment,orderId);
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_decrement')
     || await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) {
     throw new Error('stock_reservation_not_editable');
@@ -89,13 +92,15 @@ export async function planMatrizReservationEdit(
   const expected = await buildReservationPlan(client, environment, current, previous);
   if (normalize(previous) !== normalize(expected)) throw new Error('stock_reservation_items_mismatch');
   const movements = await buildReservationPlan(client, environment, desired, previous);
-  return { previous, movements };
+  return { previous, movements, desired, itemsChanged };
 }
 
 export async function applyMatrizReservationEdit(
   client: PoolClient, environment: 'prod' | 'test', orderId: string,
   plan: Awaited<ReturnType<typeof planMatrizReservationEdit>>,
 ): Promise<void> {
+  const reallocated=plan.itemsChanged
+    && await reallocateMatrizGroupOrderIfNeeded(client,environment,orderId,plan.previous,plan.movements,plan.desired);
   const changes = new Map<string, ReservationMovement>();
   for (const [rows, sign] of [[plan.previous,-1],[plan.movements,1]] as const) {
     for (const row of rows) {
@@ -106,7 +111,7 @@ export async function applyMatrizReservationEdit(
     }
   }
   for (const row of [...changes.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))) {
-    if (!row.qty) continue;
+    if (reallocated || !row.qty) continue;
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock SET quantity_reserved=quantity_reserved+$5
         WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
@@ -122,35 +127,12 @@ export async function applyMatrizReservationEdit(
   );
 }
 
-async function hasEvent(
-  client: PoolClient, environment: 'prod' | 'test', orderId: string, eventType: string,
-): Promise<boolean> {
-  const result = await client.query(
-    `SELECT 1 FROM audit.events
-      WHERE environment=$1 AND entity_id=$2 AND event_type=$3 LIMIT 1`,
-    [environment, orderId, eventType],
-  );
-  return result.rows.length > 0;
-}
-
-async function reservationMovements(
-  client: PoolClient, environment: 'prod' | 'test', orderId: string,
-): Promise<ReservationMovement[]> {
-  const result = await client.query<{ payload_after: { movements?: ReservationMovement[] } }>(
-    `SELECT payload_after FROM audit.events
-      WHERE environment=$1 AND entity_id=$2
-        AND event_type IN ('matriz_galpao_reserved','matriz_galpao_reservation_adjusted')
-      ORDER BY created_at DESC,id DESC LIMIT 1`,
-    [environment, orderId],
-  );
-  return result.rows[0]?.payload_after?.movements ?? [];
-}
-
 /** Remove somente as reservas dos itens excluídos. O chamador trava o pedido e
  * engloba itens, total e este ajuste na mesma transação. Mantém a trilha anterior. */
 export async function releaseRemovedMatrizItems(
   client: PoolClient, environment: 'prod' | 'test', orderId: string, items: RequestedItem[],
 ): Promise<void> {
+  await guardMatrizGroupOrderEdit(client,environment,orderId);
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_decrement')
     || await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) {
     throw new Error('stock_reservation_not_editable');
@@ -170,7 +152,15 @@ export async function releaseRemovedMatrizItems(
     movements[index]!.qty -= item.quantity;
     released.set(index, (released.get(index) ?? 0) + item.quantity);
   }
-  for (const [index, quantity] of released) {
+  const desired=await loadGroupOrderItems(client,environment,orderId);
+  for (const item of items) {
+    const remaining=desired.find(row=>row.productId===item.productId);
+    if (!remaining || remaining.quantity<item.quantity) throw new Error('stock_reservation_items_mismatch');
+    remaining.quantity-=item.quantity;
+  }
+  const reallocated=await reallocateMatrizGroupOrderIfNeeded(client,environment,orderId,previous,
+    movements.filter(row=>row.qty>0),desired);
+  for (const [index, quantity] of reallocated?[]:released) {
     const row = previous[index]!;
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock SET quantity_reserved=quantity_reserved-$5
@@ -197,7 +187,10 @@ export async function reserveMatrizGalpaoStock(
   orderId: string,
   items: RequestedItem[],
   enabled: boolean,
+  groupOffer?: MatrizStockGroupOffer,
 ): Promise<void> {
+  if (groupOffer && (!enabled || !items.length || items.some(item=>item.productId!==groupOffer.productId)
+    || items.reduce((sum,item)=>sum+item.quantity,0)!==groupOffer.quantity)) throw new Error('stock_group_unavailable');
   if (!enabled || items.length === 0) return;
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_reserved')) return;
   const movements = await buildReservationPlan(client, environment, items);
@@ -205,6 +198,7 @@ export async function reserveMatrizGalpaoStock(
   // chamadas simultaneas do mesmo pedido nao reservem duas vezes.
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_reserved')) return;
   for (const movement of movements) {
+    await reserveMatrizStockGroupPositions(client,environment,orderId,movement,groupOffer);
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
           SET quantity_reserved=quantity_reserved+$5
@@ -243,6 +237,7 @@ export async function consumeMatrizGalpaoReservation(
             set_config('app.galpao_ref',$1,true)`,
     [orderId],
   );
+  await finalizeMatrizStockGroupPositions(client,environment,orderId,true);
   for (const movement of movements) {
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
@@ -274,6 +269,7 @@ export async function releaseMatrizGalpaoReservation(
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) return;
   const movements = await reservationMovements(client, environment, orderId);
   if (movements.length === 0) return;
+  await finalizeMatrizStockGroupPositions(client,environment,orderId,false);
   for (const movement of movements) {
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock

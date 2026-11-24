@@ -8,10 +8,13 @@ import { logger } from '../shared/logger.js';
 import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
-import { activeToolDefinitions, executeTool } from './tools.js';
+import { activeToolDefinitions, executeTool, StockGroupOrderRollback } from './tools.js';
+import { isPriceObjection, MARKET_OBJECTION_TOOL } from './market-objection.js';
 import { guardStockConfirmationReply,stockConfirmationAtTurnStart,publishStockRequest } from './stock-confirmation.js';
 import { sendFinalAgentText } from './final-send.js';
-import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION } from './prompt.js';
+import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK, PROMPT_EXTRACTOR_VERSION,
+  CAR_GROUP_OFFER_PROMPT, MARKET_OBJECTION_PROMPT } from './prompt.js';
+import { matrizStockGroupsEnabled } from './stock-group-offer.js';
 import { introduceBareWholesaleContact } from './wholesale-contact.js';
 import { photoRequestNudge } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
@@ -152,6 +155,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
     // Foto só pode ser prometida após chamada da ferramenta; flag off preserva o prompt.
     const reversedHistory = [...history].reverse();
     const latestCustomerText = reversedHistory.find((m) => m.role === 'user')?.content ?? null;
+    const marketObjection = env.MATRIZ_MARKET_REFERENCE_OBJECTIONS && isPriceObjection(latestCustomerText);
+    if (matrizStockGroupsEnabled()) basePrompt += CAR_GROUP_OFFER_PROMPT;
+    if (marketObjection) basePrompt += MARKET_OBJECTION_PROMPT;
     const lastAssistantText =
       reversedHistory.find((m) => m.role === 'assistant' && m.content)?.content ?? null;
     const photoNudge =
@@ -182,6 +188,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
 
     // 3. LLM loop with function calling
     const tools=activeToolDefinitions();
+    if (marketObjection) tools.push(MARKET_OBJECTION_TOOL);
     const modelTurn = createOpenAIResponsesTurn(messages, podeConsultar?[...tools,MILLY_TOOL]:tools,
       event => recordBotModelUsage(client, job, event),{cacheStaticPrefix:true});
     let inputTokens = 0;
@@ -274,9 +281,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
             await client.query('COMMIT');
           } catch (err) {
             await client.query('ROLLBACK');
-            throw err;
+            if (!(err instanceof StockGroupOrderRollback)) throw err;
+            result = JSON.stringify({
+              erro: err.code,
+              mensagem: 'O conjunto apresentado precisa ser reconferido. Consulte novamente e confirme a opção com o cliente antes de fechar.',
+            });
           }
-          if(isOrderWrite)await notifyClientesKanban(client, environment, conversationId, 'order');
+          if(isOrderWrite && JSON.parse(result).ok === true)await notifyClientesKanban(client, environment, conversationId, 'order');
         } else {
           result = await withStockSearchTrace(client, environment as Environment, conversationId,
             { key: `${jobId}:${round}:${toolIndex}`, tool: toolCall.function.name, args: toolArgs, messageId: job.triggerMessageId },
@@ -286,7 +297,9 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
             await notifyClientesKanban(client, environment, conversationId, 'order');
           }
         }
-        const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: result };
+        const stored = toolCall.function.name === 'consultar_referencia_preco'
+          ? JSON.stringify({ consulta_restrita_ao_turno_da_objecao: true }) : result;
+        const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: stored };
         modelTurn.appendToolResult(toolCall.id, result);
         turnActions.push(toolMsg);
         if(isOrderWrite){

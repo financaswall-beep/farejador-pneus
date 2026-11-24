@@ -266,7 +266,8 @@ function catalogSql(filters: string[]): string {
 
 async function loadOfficialStock(client: PoolClient, environment: 'prod' | 'test'): Promise<OfficialStockRow[]> {
   const result = await client.query<OfficialStockRow>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost,
+            commerce.matriz_stock_inspection_unavailable(environment,id) AS quantity_inspection_unavailable
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [environment],

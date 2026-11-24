@@ -1,0 +1,124 @@
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ groups: vi.fn(), saveGroup: vi.fn(), move: vi.fn(), allocations: vi.fn(),
+  reference: vi.fn(), saveReference: vi.fn() }));
+
+vi.mock('../../../src/admin/auth.js', () => ({
+  requireAdminAuth: async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.headers.authorization) reply.code(401).send({ error: 'unauthorized' });
+  },
+  requireAdminOwner: async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.headers.authorization) reply.code(401).send({ error: 'unauthorized' });
+    else if (request.headers.authorization !== 'owner') reply.code(403).send({ error: 'owner_required' });
+  },
+  getAdminContext: () => ({ authType: 'session', displayName: 'Maria', username: 'maria' }),
+}));
+vi.mock('../../../src/admin/painel/stock-groups.js', () => ({
+  listMatrizStockGroups: mocks.groups, moveMatrizStockGroup: mocks.move, saveMatrizStockGroup: mocks.saveGroup,
+  listMatrizOrderGroupPositionsForOrders: mocks.allocations,
+}));
+vi.mock('../../../src/shared/catalog-market-reference.js', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/shared/catalog-market-reference.js')>(),
+  getMarketReference: mocks.reference, setMarketReference: mocks.saveReference,
+}));
+vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: async () => ({ rows: [] }) } }));
+
+const stock = '11111111-1111-4111-8111-111111111111';
+const product = '22222222-2222-4222-8222-222222222222';
+const group = '33333333-3333-4333-8333-333333333333';
+const groupPath = '/admin/api/wholesale/stock/groups';
+const marketPath = `/admin/api/catalog/${product}/market-reference`;
+const owner = { authorization: 'owner' }, staff = { authorization: 'staff' };
+const newGroup = { stock_id: stock, product_id: product, inspection_status: 'located',
+  positions: [{ location_code: 'A1', quantity: 2 }], reason: 'Conferência', idempotency_key: 'operation-101' };
+const reference = { model: 'Dueler', amount: 875, sources: ['https://example.com/dueler'],
+  observed_on: '2026-11-21', valid_until: '2026-12-01', bot_enabled: false };
+
+let app: FastifyInstance;
+let registerStock: typeof import('../../../src/admin/painel/route-stock-groups.js').registerStockGroupRoutes;
+let registerMarket: typeof import('../../../src/admin/painel/route-market-reference.js').registerMarketReferenceRoutes;
+
+beforeAll(async () => {
+  Object.assign(process.env, { NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
+    CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-token' });
+  ({ registerStockGroupRoutes: registerStock } = await import('../../../src/admin/painel/route-stock-groups.js'));
+  ({ registerMarketReferenceRoutes: registerMarket } = await import('../../../src/admin/painel/route-market-reference.js'));
+});
+beforeEach(async () => {
+  vi.resetAllMocks();
+  app = Fastify();
+  registerStock(app);
+  registerMarket(app);
+  await app.ready();
+});
+afterEach(async () => app.close());
+
+describe('rotas de pilhas e referências da Matriz', () => {
+  it('exige operador de estoque para ler grupos e proprietário para editar ou consultar referências', async () => {
+    expect((await app.inject({ url: groupPath })).statusCode).toBe(401);
+    expect((await app.inject({ url: marketPath, headers: staff })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: groupPath, headers: staff, payload: newGroup })).statusCode).toBe(403);
+    expect(mocks.saveGroup).not.toHaveBeenCalled();
+    mocks.groups.mockResolvedValue([]);
+    const result = await app.inject({ url: `${groupPath}?stock_id=${stock}`, headers: staff });
+    expect(result.statusCode).toBe(200);
+    expect(result.headers['cache-control']).toBe('no-store');
+    expect(mocks.groups).toHaveBeenCalledWith(expect.anything(), 'test', stock);
+  });
+
+  it('salva localização sem modelo e exige que o conjunto seja inspecionado e identificado', async () => {
+    mocks.saveGroup.mockResolvedValue({ group_id: group });
+    const save = (payload: typeof newGroup & Record<string, unknown>) => app.inject({
+      method: 'POST', url: groupPath, headers: owner, payload,
+    });
+    expect((await save({ ...newGroup, model: null })).statusCode).toBe(200);
+    expect(mocks.saveGroup).toHaveBeenCalledWith(expect.anything(), 'test', { ...newGroup, model: null }, 'Maria (maria)');
+    for (const falseGroup of [{ matched_set: true }, { conservation_grade: 'economico' }, { environment: 'prod' }]) {
+      expect((await save({ ...newGroup, ...falseGroup })).statusCode).toBe(400);
+    }
+    expect(mocks.saveGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejeita pilha igual mesmo com letra diferente e informa conflito de revisão', async () => {
+    const attempt = (to_location: string) => app.inject({ method: 'POST', url: `${groupPath}/${group}/move`,
+      headers: owner, payload: { revision: '1', from_location: 'A1', to_location, quantity: 1,
+        reason: 'Reorganizar', idempotency_key: 'operation-102' } });
+    expect((await attempt('a1')).statusCode).toBe(400);
+    expect(mocks.move).not.toHaveBeenCalled();
+    mocks.move.mockRejectedValue(new Error('stock_group_offer_changed'));
+    expect((await attempt('B1')).json()).toEqual({ error: 'stock_group_offer_changed' });
+    expect(mocks.move).toHaveBeenCalledWith(expect.anything(), 'test', expect.objectContaining({ group_id: group }), 'Maria (maria)');
+  });
+
+  it('salva referência isolada do preço de venda e valida escopo, fontes e autorização', async () => {
+    mocks.saveReference.mockResolvedValue(reference);
+    const write = (payload: Record<string, unknown>) => app.inject({ method: 'PUT', url: marketPath, headers: owner, payload });
+    expect((await write(reference)).json()).toEqual({ reference });
+    expect(mocks.saveReference).toHaveBeenCalledWith({ ...reference, product_id: product }, 'Maria (maria)');
+    for (const invalid of [{ unit_cost: 500 }, { price_amount: 900 }, { product_id: stock }, { environment: 'prod' },
+      { sources: ['javascript:alert(1)'] }, { bot_enabled: true, valid_until: null }]) {
+      expect((await write({ ...reference, ...invalid })).statusCode).toBe(400);
+    }
+    expect(mocks.saveReference).toHaveBeenCalledTimes(1);
+    mocks.saveReference.mockRejectedValue(new Error('market_reference_model_mismatch'));
+    expect((await write({ ...reference, bot_enabled: true })).statusCode).toBe(409);
+  });
+});
+
+describe('posições exibidas para separação', () => {
+  it('associa ao item do mesmo pedido somente as posições efetivamente reservadas', async () => {
+    const { addStockPickingPositions } = await import('../../../src/admin/painel/stock-group-picking.js');
+    const { pool } = await import('../../../src/persistence/db.js');
+    mocks.allocations.mockResolvedValue([
+      { order_id: 'first', order_item_id: 'item', status: 'reserved', location_code: 'B2', quantity: 2, model: 'Scorpion' },
+      { order_id: 'first', order_item_id: 'item', status: 'released', location_code: 'B3', quantity: 1, model: null },
+      { order_id: 'other', order_item_id: 'item', status: 'reserved', location_code: 'A1', quantity: 1, model: null },
+    ]);
+    const orders = [{ order_id: 'first', items: [{ order_item_id: 'item' }, { order_item_id: 'other-item' }] }];
+    await addStockPickingPositions(pool, 'test', orders);
+    expect(mocks.allocations).toHaveBeenCalledWith(pool, 'test', ['first']);
+    expect(orders[0]!.items).toEqual([{ order_item_id: 'item',
+      stock_positions: [{ location_code: 'B2', quantity: 2, model: 'Scorpion' }] }, { order_item_id: 'other-item' }]);
+  });
+});

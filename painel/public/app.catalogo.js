@@ -164,7 +164,7 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoOpen(row) {
-      if (this.adminUser?.role !== 'owner' || this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving) return;
+      if (this.adminUser?.role !== 'owner' || this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving || this.catalogoMarket?.saving) return;
       if (row?.measure_draft) {
         this.catalogoCreateNew();
         this.catalogoCadastro.row = row;
@@ -199,12 +199,12 @@ window.PAINEL_MODULES.catalogo = function () {
       this.catalogoHistory = [];
       this.catalogoMessage = null;
       this.catalogoSpecMessage = null;
-      await this.catalogoLoadHistory(row.product_id);
+      await Promise.all([this.catalogoLoadHistory(row.product_id), this.catalogoMarketLoad?.(row)]);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
 
     catalogoClose() {
-      if (this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving) return;
+      if (this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving || this.catalogoMarket?.saving) return;
       this.catalogoSelecionado = null;
       this.catalogoHistory = [];
       this.catalogoMessage = null;

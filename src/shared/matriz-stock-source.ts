@@ -16,6 +16,7 @@ export interface MatrizStockRow {
   tire_condition?: TireCondition | string | null;
   quantity_on_hand: number | string;
   quantity_reserved?: number | string | null;
+  quantity_inspection_unavailable?: number | string | null;
   unit_cost?: number | string | null;
 }
 
@@ -88,18 +89,20 @@ export function matrizStockForMeasure(
   const reserved = Number(row.quantity_reserved ?? 0);
   const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
   const safeReserved = Number.isFinite(reserved) ? reserved : 0;
-  const available = Math.max(safeQuantity - safeReserved, 0);
+  const unavailable = Number(row.quantity_inspection_unavailable ?? 0);
+  const inspectionUnavailable = Number.isFinite(unavailable) ? Math.max(unavailable,0) : 0;
+  const available = Math.max(safeQuantity - safeReserved - inspectionUnavailable, 0);
   if (!Number.isFinite(quantity) || !Number.isFinite(reserved) || available <= 0) {
     return blocked(key, row.measure, row.brand ?? null, wantedCondition,
       safeQuantity, safeReserved, parseCost(row.unit_cost), 1,
-      'walkin_stock_insufficient');
+      'walkin_stock_insufficient', inspectionUnavailable);
   }
 
   const unitCost = parseCost(row.unit_cost);
   if (unitCost === null || unitCost <= 0) {
     return blocked(key, row.measure, row.brand ?? null, wantedCondition,
       safeQuantity, safeReserved, unitCost, 1,
-      'walkin_cost_missing');
+      'walkin_cost_missing', inspectionUnavailable);
   }
 
   return {
@@ -133,6 +136,7 @@ function blocked(
   unitCost: number | null,
   rowsCount: number,
   reason: MatrizStockBlockReason,
+  inspectionUnavailable = 0,
 ): MatrizStockState {
   return {
     key,
@@ -141,7 +145,7 @@ function blocked(
     tire_condition: tireCondition,
     quantity_on_hand: quantity,
     quantity_reserved: reserved,
-    quantity_available: Math.max(quantity - reserved, 0),
+    quantity_available: Math.max(quantity - reserved - inspectionUnavailable, 0),
     unit_cost: unitCost,
     rows_count: rowsCount,
     sellable: false,

@@ -19,9 +19,10 @@ export function buildOrderIdempotencyKey(
   unitId: string | null,
   itens: OrderFingerprintItem[],
   modalidade: string,
+  stockGroupId?: string,
 ): string {
   return `bot:order:${conversationId}:${createHash('sha1')
-    .update(JSON.stringify({ u: unitId, itens, modalidade }))
+    .update(JSON.stringify({ u: unitId, itens, modalidade, ...(stockGroupId ? { stockGroupId } : {}) }))
     .digest('hex')
     .slice(0, 16)}`;
 }

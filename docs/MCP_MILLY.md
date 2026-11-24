@@ -138,3 +138,11 @@ O catálogo vivo está em `tools/list`. Cada ferramenta informa descrição, cam
 Para implantar esta versão, aplique as migrations anteriores e `0293_dot_conversation_operations.sql` antes de publicar backend e painel do mesmo commit. Atualize a lista de ferramentas no cliente. Conexões existentes conservam `legacy`; estoque e catálogo começam desabilitados. Ative o modo conversa e as permissões desejadas nas conexões do proprietário após a implantação. A migração não concede acesso sozinha. O financeiro depende do ledger central e de sua leitura habilitados. Despesas e atacado respeitam as funcionalidades habilitadas da instalação.
 
 Os detalhes das consultas, escopos, filtros e configuração dos eventos estão nos guias técnicos. [Consultas da Matriz](DOT_CONSULTAS_MATRIZ.md) · [Eventos e acompanhamento](DOT_EVENTOS_MILLY.md)
+
+### Pilhas, conjuntos e pesquisa de preço
+
+Para conferir ou mudar pneus de pilha por voz ou texto, a Milly consulta `consultar_pilhas_galpao` por medida e marca e recupera os grupos pelo `stock_id`. A conferência usa `conferir_grupo_galpao`. Cada grupo reúne as unidades identificadas pelo operador. Marcar `matched_set` indica que essas unidades foram conferidas juntas. A ação `mover_pneus_entre_pilhas` usa o grupo, a revisão atual, a origem, o destino e a quantidade livre. As duas operações seguem a permissão e o modo de confirmação de Estoque da conexão.
+
+As ferramentas `consultar_referencia_online` e `salvar_referencia_online` trabalham com a pesquisa unitária de um pneu novo. A gravação usa a permissão de Catálogo. O operador registra o valor, modelo comparado, data e fontes e decide se o atendimento pode citar a comparação até a data informada.
+
+Na implantação, aplique as migrations `0302_matriz_stock_groups.sql` e `0303_catalog_market_references.sql`, nessa ordem, antes de iniciar a nova versão. Cadastro e separação já usam essas tabelas. Para habilitar a oferta de conjuntos de carro, o atendimento precisa de `MATRIZ_CAR_GROUP_OFFERS`, `WHOLESALE_UNIFIED_STOCK` e `WHOLESALE_MATRIZ_DECREMENT`. O uso da pesquisa online em objeções de preço é controlado por `MATRIZ_MARKET_REFERENCE_OBJECTIONS`. As duas novas opções do atendimento começam desligadas.

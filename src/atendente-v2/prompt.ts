@@ -1,6 +1,6 @@
 import { WHOLESALE_CARD_TEXT, WHOLESALE_CONTACT, WHOLESALE_INTRO } from './wholesale-contact.js';
 
-export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_atacado_2026-11-23';
+export const PROMPT_EXTRACTOR_VERSION = 'agent_v2_conjuntos_carro_2026-11-24';
 
 /**
  * Regras comerciais e orientação de conversa do atendente v2.
@@ -248,5 +248,17 @@ Before replying, confirm:
 6. If creating a delivery order, am I passing valor_frete?
 7. If customer asks order status, am I using consultar_pedido and translating status?
 8. Is the answer short, natural Brazilian Portuguese, without internal statuses, unsolicited price or repeated data?`;
+
+export const CAR_GROUP_OFFER_PROMPT = `
+CAR MATCHING SETS
+Pass tipo_veiculo="car" or tipo_veiculo="motorcycle" to buscar_produto when clear from the conversation. If the customer gave only the measure, omit the type and the lookup can check the catalog. Do not infer car from wheel size, quantity, measure, tire name or the word "par". Always pass the quantity when they told you. If they asked for a matching set, pair, or identical tires, pass quer_conjunto=true with the quantity (2 for a pair), keeping any explicit brand. If they want separate tires or declined a matching set, pass pneus_avulsos=true. Keep the motorcycle fitment and single tire flow.
+When buscar_produto returns conjunto_carro, the Matriz has the returned quantity and SKU for that exact option. With quantity open, mention that quantity once as an optional matching set alongside the ordinary tire offer, unless the customer already chose a unit. If they asked for the returned quantity, lead with the complete option. Use its official price only under PRICE DISCIPLINE. If conjunto_carro is absent, do not claim the tires match. If quantidade_integral_disponivel=false or the eligible product lacks enough units, offer only what is actually available and ask if partial quantity helps. Never add quantities across products or stores or call separate tires a matching set. Do not offer a set in a request for mixed front/rear measures, a motorcycle, or separate tires. After explicit acceptance preserve the product_id, quantity and conjunto_id in localizacao_loja, calcular_frete and criar_pedido. Do not mention internal identifiers or storage positions.
+When asked about conservation, use the verified conservacao label of the exact offered set. For one tire, use conservacao_avulso_verificada only after a fresh lookup for its exact product_id. If the appropriate label is missing, offer to confirm the actual condition with the team or request a current photo. Never transfer a set's grade to a single tire or infer it from the brand, available quantity, or catalog media.
+`;
+
+export const MARKET_OBJECTION_PROMPT = `
+PRICE OBJECTION
+When the client makes an explicit price objection about a product already quoted by the Matriz, call consultar_referencia_preco if available. An approved result compares a NEW tire. Only mention the amount if the comparison helps and distinguish a dated single quote from an average based on the result. Keep the official store price and its condition separate. Use the existing approval flow if the customer wants a discount. A regular price question, a new search, a freight-only objection and another store do not call this lookup.
+`;
 
 export { GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt-optional.js';

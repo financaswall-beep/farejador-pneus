@@ -4,6 +4,7 @@ import { env } from '../shared/config/env.js';
 import { applyMatrizRetailCostSnapshot } from './wholesale-stock-read.js';
 import { reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
 import { postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
+import type { BotGroupReservation } from './stock-group-offer.js';
 
 /**
  * Grava o ESPELHO em commerce.orders + order_items e devolve {id, order_number}.
@@ -27,6 +28,7 @@ export async function insertCommerceOrderMirror(
     unitId: string | null;
     partnerOrderId?: string | null;
     idempotencyKey?: string | null;
+    stockGroupOffer?: BotGroupReservation;
     items: { product_id: string; quantity: number; unit_price: string }[];
   },
 ): Promise<{ id: string; order_number: string }> {
@@ -71,13 +73,15 @@ export async function insertCommerceOrderMirror(
     // NUNCA entra aqui (tem partner_order_id + reserva o próprio partner_stock_levels). Só na
     // inserção REAL — o caminho de colisão de idempotência (retry) abaixo NÃO baixa de novo.
     if (!input.partnerOrderId) {
-      await reserveMatrizGalpaoStock(
+      const reserve = [
         client,
         environment,
         order.id,
         input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
         env.WHOLESALE_MATRIZ_DECREMENT,
-      );
+      ] as const;
+      if (input.stockGroupOffer) await reserveMatrizGalpaoStock(...reserve, input.stockGroupOffer);
+      else await reserveMatrizGalpaoStock(...reserve);
       // Fatia 2 (0117): CONGELA o custo médio do galpão nos itens da venda da matriz —
       // o lucro desta venda não muda quando o custo médio mudar depois. Mesma transação
       // (rollback desfaz venda + retrato juntos). Item sem custo no galpão fica NULL.

@@ -4,24 +4,27 @@ import { env } from '../../shared/config/env.js';
 import { MAIN_DELIVERY_GUARD } from '../painel/queries-logistica-read.js';
 import { getCustomerLeadAvatar } from '../painel/customer-lead-avatar.js';
 import type { CaixaAuth } from './queries.js';
+import { addStockPickingPositions, type StockPickingItem } from '../painel/stock-group-picking.js';
 
 export interface DeliveryPresentation {
   order_id: string;
   conversation_id: string | null;
   delivery_failure_reason: string | null;
-  items: Array<{ quantity: number; label: string; tire_condition: string | null;
+  delivery_status: string;
+  items: Array<StockPickingItem & { quantity: number; label: string; tire_condition: string | null;
     vehicle_type: 'car' | 'motorcycle' | null; tire_size: string | null; brand: string | null }>;
 }
 
 /** Somente fila da Matriz ou rota aberta do colaborador autenticado. Sem custo. */
 export async function getDeliveryPresentation(
   auth: CaixaAuth, orderIds: string[], environment = env.FAREJADOR_ENV, db: Pool = defaultPool,
+  includeStockPositions = true,
 ): Promise<Map<string, DeliveryPresentation>> {
   if (!orderIds.length) return new Map();
   const result = await db.query<DeliveryPresentation>(
-    `SELECT o.id AS order_id, cv.id AS conversation_id, o.delivery_failure_reason,
+    `SELECT o.id AS order_id, cv.id AS conversation_id, o.delivery_failure_reason, o.delivery_status,
             COALESCE((SELECT jsonb_agg(jsonb_build_object(
-              'quantity', oi.quantity, 'label', COALESCE(p.product_name,'Pneu'),
+              'order_item_id', oi.id, 'quantity', oi.quantity, 'label', COALESCE(p.product_name,'Pneu'),
               'tire_condition', p.tire_condition, 'vehicle_type', ts.vehicle_type,
               'tire_size', ts.tire_size, 'brand', p.brand) ORDER BY oi.created_at)
               FROM commerce.order_items oi
@@ -40,11 +43,14 @@ export async function getDeliveryPresentation(
              AND o.delivery_status IN ('pending','dispatched','delivered','failed')))`,
     [environment, orderIds, auth.collaboratorId],
   );
+  if (includeStockPositions) {
+    await addStockPickingPositions(db, environment, result.rows.filter(row => row.delivery_status === 'pending'));
+  }
   return new Map(result.rows.map(row => [row.order_id, row]));
 }
 
 export async function getDeliveryCustomerAvatar(auth: CaixaAuth, orderId: string): Promise<string | null> {
-  const row = (await getDeliveryPresentation(auth, [orderId])).get(orderId);
+  const row = (await getDeliveryPresentation(auth, [orderId], env.FAREJADOR_ENV, defaultPool, false)).get(orderId);
   if (!row) throw new Error('delivery_not_found');
   if (!row.conversation_id) return null;
   try { return await getCustomerLeadAvatar(row.conversation_id, env.FAREJADOR_ENV); }

@@ -162,7 +162,8 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
     quantity_reserved: number | string;
     unit_cost: number | string | null;
   }>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost,
+            commerce.matriz_stock_inspection_unavailable(environment,id) AS quantity_inspection_unavailable
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [env.FAREJADOR_ENV],

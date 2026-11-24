@@ -146,6 +146,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.financeiroIndicadores, // app.financeiro.indicadores.js (fatia 07-14): fluxo de caixa + análise + inadimplência
     window.PAINEL_MODULES.financeiroDespesas, // app.financeiro.despesas.js (fatia 07-14): despesas (0120/0130) — form, modalidades, extrato
     window.PAINEL_MODULES.galpaoContagem, // contagem física auditável do estoque oficial
+    window.PAINEL_MODULES.galpaoGrupos,
     window.PAINEL_MODULES.galpaoAjuste, // motivo e prévia financeira do ajuste manual
     window.PAINEL_MODULES.galpaoMultibrand, // identidade medida+marca+condição, custos e reposição
     window.PAINEL_MODULES.estoqueLotes,
@@ -157,6 +158,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.catalogoAtacado,
     window.PAINEL_MODULES.catalogoBootstrap,
     window.PAINEL_MODULES.catalogoFicha,
+    window.PAINEL_MODULES.catalogoReferencia,
     window.PAINEL_MODULES.catalogoDescobertas,
     window.PAINEL_MODULES.catalogoCompatibilidade,
     window.PAINEL_MODULES.catalogoMarca,
