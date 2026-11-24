@@ -6,6 +6,7 @@
     'Bridgestone', 'CEAT', 'Dunlop', 'IRA', 'IRC', 'Kenda', 'Levorin', 'Maggion',
     'Metzeler', 'Michelin', 'Mitas', 'Pirelli', 'Rinaldi', 'Technic', 'Vipal',
     'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
+    'Goodyear', 'Compasal', 'Itaro', 'Speed Max', 'Westlake', 'Kumho', 'Royal Black', 'Continental', 'Goform',
   ]);
   const NAMES = Object.freeze({
     bridgestone: 'Bridgestone', ceat: 'CEAT', ciat: 'CEAT', dunlop: 'Dunlop',
@@ -15,6 +16,9 @@
     pirelli: 'Pirelli', rinaldi: 'Rinaldi', technic: 'Technic', vipal: 'Vipal',
     maxxis: 'Maxxis', hankook: 'Hankook', toyo: 'Toyo', toyotires: 'Toyo',
     xbri: 'XBRI', yokohama: 'Yokohama', giti: 'Giti',
+    goodyear: 'Goodyear', compasal: 'Compasal', itaro: 'Itaro', speedmax: 'Speed Max',
+    westlake: 'Westlake', westlaketyres: 'Westlake', westlaketires: 'Westlake',
+    kumho: 'Kumho', royalblack: 'Royal Black', continental: 'Continental', goform: 'Goform',
   });
   const ASSETS = Object.freeze({
     pirelli: 'pirelli', metzeler: 'metzeler', michelin: 'michelin', michellin: 'michelin',
@@ -24,6 +28,9 @@
     ira: 'ira', irc: 'irc',
     maxxis: 'maxxis', hankook: 'hankook', toyo: 'toyo', toyotires: 'toyo',
     xbri: 'xbri', yokohama: 'yokohama', giti: 'giti',
+    goodyear: 'goodyear', compasal: 'compasal', itaro: 'itaro', speedmax: 'speedmax',
+    westlake: 'westlake', westlaketyres: 'westlake', westlaketires: 'westlake',
+    kumho: 'kumho', royalblack: 'royalblack', continental: 'continental', goform: 'goform',
   });
 
   function key(brand) {

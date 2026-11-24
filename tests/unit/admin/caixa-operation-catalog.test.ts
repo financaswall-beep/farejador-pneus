@@ -23,6 +23,7 @@ describe('Catálogo na Operação da Loja', () => {
   it('vive no mesmo casco do /operacao e segue a permissão de Estoque', () => {
     expect(html).toContain('id="operation-catalog-panel"');
     expect(html).toContain('id="nav-catalog"');
+    expect(html).toContain('/operacao/caixa-brand-catalog.js?v=20261124-logos1');
     expect(html).toContain('/operacao/caixa-catalog.js?v=20261027-stock1');
     expect(html).toContain('/operacao/caixa-catalog-view.js?v=20261026-catalog1');
     expect(html.indexOf('/operacao/caixa-catalog.js')).toBeLessThan(
@@ -36,14 +37,16 @@ describe('Catálogo na Operação da Loja', () => {
     expect(navigation).toContain("showTab('catalog')");
   });
 
-  it('usa exatamente os mesmos 21 arquivos de logo da Matriz', () => {
+  it('usa exatamente os mesmos 30 arquivos de logo da Matriz', () => {
     const assets = readdirSync(resolve('painel/public/assets/catalog-brands'))
       .filter((file) => file.endsWith('.webp')).sort();
     expect(assets).toEqual([
-      'bridgestone.webp', 'ceat.webp', 'dunlop.webp', 'giti.webp', 'hankook.webp', 'ira.webp', 'irc.webp',
-      'kenda.webp', 'levorin.webp',
+      'bridgestone.webp', 'ceat.webp', 'compasal.webp', 'continental.webp', 'dunlop.webp',
+      'giti.webp', 'goform.webp', 'goodyear.webp', 'hankook.webp', 'ira.webp', 'irc.webp',
+      'itaro.webp', 'kenda.webp', 'kumho.webp', 'levorin.webp',
       'maggion.webp', 'maxxis.webp', 'metzeler.webp', 'michelin.webp', 'mitas.webp',
-      'pirelli.webp', 'rinaldi.webp', 'technic.webp', 'toyo.webp', 'vipal.webp', 'xbri.webp', 'yokohama.webp',
+      'pirelli.webp', 'rinaldi.webp', 'royalblack.webp', 'speedmax.webp', 'technic.webp',
+      'toyo.webp', 'vipal.webp', 'westlake.webp', 'xbri.webp', 'yokohama.webp',
     ]);
     expect(brandCatalog).toContain('Caixa.catalogLogoBrands');
     expect(view).toContain('Caixa.catalogBrandLogo(brand)');

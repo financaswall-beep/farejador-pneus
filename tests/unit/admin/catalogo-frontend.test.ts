@@ -270,7 +270,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
-    expect(html).toContain('app.catalogo.js?v=20261123-logos1');
+    expect(html).toContain('app.catalogo.js?v=20261124-logos1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -290,6 +290,8 @@ describe('catalogo no painel', () => {
       'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
       'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda', 'CEAT', 'IRA', 'IRC',
       'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
+      'Goodyear', 'Compasal', 'Itaro', 'Speed Max', 'Westlake', 'Kumho', 'Royal Black',
+      'Continental', 'Goform',
     ];
 
     for (const brand of brands) {
@@ -298,10 +300,16 @@ describe('catalogo no painel', () => {
       );
       const file = module.catalogoBrandLogo(brand).match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
       if (!file) throw new Error(`Logo não mapeado: ${brand}`);
+      expect(file).toBe(`${brand.toLowerCase().replaceAll(' ', '')}.webp`);
       expect(statSync(`painel/public/assets/catalog-brands/${file}`).size).toBeGreaterThan(500);
     }
     expect(module.catalogoBrandLogo('Magion')).toBe(module.catalogoBrandLogo('Maggion'));
     expect(module.catalogoBrandLogo('Toyo Tires')).toBe(module.catalogoBrandLogo('Toyo'));
+    expect(module.catalogoBrandLogo('SpeedMax')).toBe(module.catalogoBrandLogo('Speed Max'));
+    expect(module.catalogoBrandLogo('West Lake')).toBe(module.catalogoBrandLogo('Westlake'));
+    expect(module.catalogoBrandLogo('Westlake Tyres')).toBe(module.catalogoBrandLogo('Westlake'));
+    expect(module.catalogoBrandLogo('Westlake Tires')).toBe(module.catalogoBrandLogo('Westlake'));
+    expect(module.catalogoBrandLogo('Royalblack')).toBe(module.catalogoBrandLogo('Royal Black'));
     expect(module.catalogoBrandLogo('Marca futura')).toBeNull();
   });
 
@@ -312,7 +320,11 @@ describe('catalogo no painel', () => {
     expect(html).toContain('x-model="stockForm.brand"');
     expect(html).toContain('x-model="it.brand" @change="purchaseVehicleResolve(it)" list="catalog-brand-options"');
     expect(html).toContain(':disabled="!catalogoRows.some((row) => row.brand === brand)"');
-    for (const brand of ['Pirelli', 'Michelin', 'Maggion', 'Kenda', 'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti']) {
+    for (const brand of [
+      'Pirelli', 'Michelin', 'Maggion', 'Kenda', 'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama',
+      'Giti', 'Goodyear', 'Compasal', 'Itaro', 'Speed Max', 'Westlake', 'Kumho', 'Royal Black',
+      'Continental', 'Goform',
+    ]) {
       expect(html).toContain(`<option value="${brand}"></option>`);
     }
   });

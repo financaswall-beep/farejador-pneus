@@ -193,6 +193,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'rinaldi.webp', 'maggion.webp', 'technic.webp', 'vipal.webp', 'mitas.webp', 'kenda.webp',
     'ceat.webp', 'ira.webp', 'irc.webp',
     'maxxis.webp', 'hankook.webp', 'toyo.webp', 'xbri.webp', 'yokohama.webp', 'giti.webp',
+    'goodyear.webp', 'compasal.webp', 'itaro.webp', 'speedmax.webp', 'westlake.webp',
+    'kumho.webp', 'royalblack.webp', 'continental.webp', 'goform.webp',
   ]);
   fastify.get('/admin/painel/assets/catalog-brands/:asset', async (request, reply) => {
     const { asset } = request.params as { asset: string };

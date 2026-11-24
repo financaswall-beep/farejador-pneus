@@ -37,15 +37,19 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     runInNewContext(brandCatalog, sandbox);
     runInNewContext(catalog, sandbox);
     const brandLogo = sandbox.window.Caixa.catalogBrandLogo as (brand: string) => string | null;
-    for (const brand of [
+    const brands = [
       'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
       'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda', 'CEAT', 'IRA', 'IRC',
       'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
-    ]) {
+      'Goodyear', 'Compasal', 'Itaro', 'Speed Max', 'Westlake', 'Kumho', 'Royal Black',
+      'Continental', 'Goform',
+    ];
+    for (const brand of brands) {
       const url = brandLogo(brand);
       expect(url).toMatch(/^\/operacao\/catalog-brands\/[a-z]+\.webp\?v=20260824-catalog-brand3$/);
       const asset = url?.match(/catalog-brands\/([a-z]+\.webp)/)?.[1];
       if (!asset) throw new Error(`Logo não mapeado: ${brand}`);
+      expect(asset).toBe(`${brand.toLowerCase().replaceAll(' ', '')}.webp`);
       expect(statSync(resolve('painel/public/assets/catalog-brands', asset)).size).toBeGreaterThan(500);
     }
     expect(brandLogo('Magion')).toBe(brandLogo('Maggion'));
@@ -61,10 +65,18 @@ describe('Etapa 2 - Caixa na Operação da Loja', () => {
     expect(canonical('ira')).toBe('IRA');
     expect(canonical('ciat')).toBe('CEAT');
     expect(canonical('irc')).toBe('IRC');
+    for (const [alias, name] of [
+      ['SpeedMax', 'Speed Max'], ['West Lake', 'Westlake'], ['Westlake Tyres', 'Westlake'],
+      ['Westlake Tires', 'Westlake'], ['Royalblack', 'Royal Black'],
+    ]) {
+      expect(brandLogo(alias)).toBe(brandLogo(name));
+      expect(canonical(alias)).toBe(name);
+    }
     expect(options).toContain('IRA');
     expect(options).toContain('CEAT');
     expect(options).toContain('IRC');
-    expect(new Set(options).size).toBe(21);
+    expect(options).toHaveLength(brands.length);
+    expect(new Set(options)).toEqual(new Set(brands));
     expect(brandLogo('Marca futura')).toBeNull();
     expect(catalog).toContain("fallback.textContent = String(product.brand || 'Sem marca').toUpperCase()");
   });
