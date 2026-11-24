@@ -15,3 +15,19 @@
 .origin-dialog {margin:auto;min-width:min(24rem,92vw);max-width:92vw;max-height:85vh;overflow:auto;border:0;border-radius:.75rem;padding:1rem;background:white;color:#1d3328;}
 .origin-dialog::backdrop {background:#0007;}
 .origin-dialog>button {padding:.4rem .7rem;border:1px solid #879d90;border-radius:.45rem;}
+
+.galpao-positions {width:100%;border-collapse:collapse;font-size:.875rem;text-align:left;}
+.galpao-positions th,.galpao-positions td {padding:.75rem 1rem;border-top:1px solid #e5e7eb;vertical-align:top;overflow-wrap:anywhere;}
+.galpao-positions thead {background:#f9fafb;color:#4b5563;font-size:.75rem;}
+.galpao-positions thead th {font-weight:500;}
+.galpao-positions td small {display:block;margin-top:.125rem;color:#4b5563;}
+.galpao-positions td:last-child {text-align:right;}
+.galpao-pile-code {display:inline-block;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;border-radius:.45rem;padding:.2rem .55rem;font-weight:650;}
+@media (max-width:1000px) {
+  .galpao-positions,.galpao-positions tbody {display:block;}
+  .galpao-positions thead {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+  .galpao-positions tr {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem 1rem;padding:.8rem 1rem;border-top:1px solid #e5e7eb;}
+  .galpao-positions tbody th,.galpao-positions td {padding:0;border:0;text-align:left;}
+  .galpao-positions [data-label]::before {display:block;content:attr(data-label);margin-bottom:.125rem;color:#4b5563;font-size:.72rem;font-weight:400;}
+  .galpao-positions td:last-child {align-self:end;text-align:left;}
+}

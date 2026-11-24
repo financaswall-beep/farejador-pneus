@@ -12,7 +12,7 @@ window.PAINEL_MODULES.catalogoReferencia = function () {
   const errors = {
     market_reference_invalid: 'Confira o valor, as datas e os links. Use até 12 fontes diferentes.',
     market_reference_dates_invalid: 'Confira a data da consulta e a validade para o atendimento.',
-    market_reference_model_mismatch: 'Confirme que a ficha é de carro e que o modelo cotado coincide com o modelo cadastrado.',
+    market_reference_model_mismatch: 'Para usar a referência no atendimento, selecione um pneu de carro e informe o mesmo Modelo / desenho da ficha técnica.',
     catalog_product_not_found: 'O produto não está disponível no catálogo da Matriz.',
   };
   return {

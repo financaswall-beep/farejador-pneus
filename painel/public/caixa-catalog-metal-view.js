@@ -59,7 +59,7 @@
     const price = plate('mcg-price-summary'), value = el('div'); value.append(el('small', 'Preço de venda'), el('strong', U.priceLabel(row))); price.append(value, el('span', U.available(row) + ' disponíveis')); page.appendChild(price);
     const owner = C.matrixCatalog.allowed();
     if (owner) { if (tire) page.appendChild(button('Ficha técnica', 'spec', 'secondary', 'file')); page.appendChild(button('Alterar preço', 'price', 'secondary', 'tag')); }
-    else { const spec = plate(); [['Tipo de veículo', ({ motorcycle: 'Moto', car: 'Carro' })[row.vehicle_type]], ['Posição', U.positionLabel(row.tire_position)], ['Desenho / modelo', row.tread_pattern], ['Índice de carga', row.load_index], ['Velocidade', row.speed_rating]].forEach(([label, value]) => { const p = el('p'); p.append(el('strong', label + ': '), document.createTextNode(value || 'Não informado')); spec.appendChild(p); }); page.appendChild(spec); }
+    else { const spec = plate(); [['Tipo de veículo', ({ motorcycle: 'Moto', car: 'Carro' })[row.vehicle_type]], ['Posição no veículo', U.positionLabel(row.tire_position)], ['Modelo / desenho', row.tread_pattern], ['Índice de carga', row.load_index], ['Velocidade', row.speed_rating]].forEach(([label, value]) => { const p = el('p'); p.append(el('strong', label + ': '), document.createTextNode(value || 'Não informado')); spec.appendChild(p); }); page.appendChild(spec); }
     if (tire) page.appendChild(button('Compatibilidade', 'fitments', 'secondary', 'car'));
     if (owner && tire) page.appendChild(button('Fotos e vídeos para o bot', 'media', 'secondary', 'photo'));
     page.appendChild(el('p', row.catalogued ? 'Cadastro completo' : 'Cadastro pendente', 'mcg-badge' + (row.catalogued ? '' : ' mcg-amber'))); return page;

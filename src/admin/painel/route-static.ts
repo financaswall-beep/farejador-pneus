@@ -40,7 +40,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.catalogo.photos.js', 'app.partner-retiradas.report.js',
     'app.atacado.requests.js',
     'app.catalogo.atacado.js',
-    'stock-origin-view.js','stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',
+    'stock-origin-view.js','stock-group-labels.js','stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',
     'app.marketing.comments.js', 'app.marketing.paid.js', 'app.marketing.google.js', 'app.marketing.google.overview.js', 'app.marketing.google.ads.js', 'app.marketing.google.campaign.js',
     'app.marketing.google.detail.js',
     'app.marketing.google.compare.js',

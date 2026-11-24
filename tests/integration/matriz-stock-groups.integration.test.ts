@@ -78,6 +78,10 @@ describe('grupos físicos conferidos do galpão da Matriz', () => {
       positions:[{location_code:' a1 ',quantity:3}],reason:'Conferência de pilha',idempotency_key:randomUUID()};
     const saved=await saveMatrizStockGroup(db.pool,'test',input,'teste');
     expect(saved).toMatchObject({model:null,quantity_available:3,positions:[{location_code:'A1',quantity_on_hand:3}]});
+    const { listWholesaleStock }=await import('../../src/admin/painel/queries-galpao-list.js');
+    const visibleStock=(await listWholesaleStock('test',db.pool)).find(row=>row.brand===f.brand);
+    expect(visibleStock?.stock_id).toBe(f.stockId);
+    expect(await listMatrizStockGroups(db.pool,'test',visibleStock!.stock_id)).toMatchObject([{group_id:saved.group_id}]);
     expect(await saveMatrizStockGroup(db.pool,'test',input,'teste')).toEqual(saved);
     expect(await listAvailableMatrizStockGroups(db.pool,'test',{measure:f.measure,brand:f.brand,quantity:2})).toEqual([]);
     const moved=await moveMatrizStockGroup(db.pool,'test',{group_id:saved.group_id,revision:saved.revision,

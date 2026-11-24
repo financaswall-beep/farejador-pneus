@@ -23,12 +23,14 @@ export interface WholesaleStockRow {
   tire_rim_diameter: number | null;
 }
 
+type ListedWholesaleStockRow = WholesaleStockRow & { stock_id: string };
+
 /** Lista o estoque e informa, sem alterar saldos, o que já está em trânsito. */
 export async function listWholesaleStock(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
-): Promise<WholesaleStockRow[]> {
-  const result = await dbPool.query<WholesaleStockRow>(
+): Promise<ListedWholesaleStockRow[]> {
+  const result = await dbPool.query<ListedWholesaleStockRow>(
     `WITH sales_30d AS (
        SELECT environment,measure,brand,tire_condition,
               GREATEST(0,-COALESCE(sum(qty_delta),0))::int AS units
@@ -52,7 +54,7 @@ export async function listWholesaleStock(
         WHERE p.status='pending'
         GROUP BY i.environment,i.measure,COALESCE(i.brand,'Sem marca'),i.tire_condition
      )
-     SELECT ws.measure,ws.brand,ws.tire_condition,ws.quantity_on_hand,
+     SELECT ws.id AS stock_id,ws.measure,ws.brand,ws.tire_condition,ws.quantity_on_hand,
             commerce.stock_vehicle_type(ws.environment,ws.measure,ws.brand,ws.tire_condition) vehicle_type,
             ws.quantity_reserved,
             (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,

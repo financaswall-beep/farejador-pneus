@@ -16,7 +16,7 @@ import {createCatalogFitmentDiscovery,getCatalogFitmentDiscoveries} from '../pai
 import {reviewCatalogFitmentDiscovery} from '../painel/queries-catalogo-discovery-review.js';
 import {searchCatalogVehicleModels} from '../painel/catalog-vehicle-models.js';
 const product=z.object({product_id:z.string().uuid()}).strict();
-write('catalog','cadastrar_produto_catalogo','Cadastra pneu a partir do estoque ou cadastro manual, com marca, medida, condição e dados técnicos. Se o retorno trouxer referencias_para_classificar, mostre os modelos ao dono e proponha classificar_referencias_moto.',createProductBody,
+write('catalog','cadastrar_produto_catalogo','Cadastra pneu a partir do estoque ou cadastro manual, com marca, medida, condição e dados técnicos. Modelo / desenho do pneu vai em tread_pattern. Se o retorno trouxer referencias_para_classificar, mostre os modelos de moto ao dono e proponha classificar_referencias_moto.',createProductBody,
   async (db,data,actor)=>{
     const input={measure:data.measure,brand:data.brand,tireCondition:data.tire_condition,productCode:data.product_code,
       productName:data.product_name,vehicleType:data.vehicle_type,treadPattern:data.tread_pattern,loadIndex:data.load_index,
@@ -27,7 +27,7 @@ write('catalog','cadastrar_produto_catalogo','Cadastra pneu a partir do estoque 
       ? (await repairVehicleApplicationTypes(db, env.FAREJADOR_ENV, created.tire_size)).applications : [];
     return { ...created, referencias_para_classificar: refs };
   });
-write('catalog','editar_ficha_catalogo','Após classificar um pneu como Moto, consulte a ficha para conferir referencias_para_classificar. Altera somente os dados técnicos enviados. Campo omitido é preservado; null limpa o campo. Informe o motivo.',tireSpecBody.extend(product.shape),
+write('catalog','editar_ficha_catalogo','Use tread_pattern para o Modelo / desenho do pneu e position para a posição no veículo. Após classificar um pneu como Moto, consulte a ficha para conferir referencias_para_classificar. Altera somente os dados técnicos enviados. Omita para preservar e use null para limpar. Informe o motivo.',tireSpecBody.extend(product.shape),
   (db,data,actor)=>updateCatalogTireSpec({productId:data.product_id,vehicleType:data.vehicle_type,treadPattern:data.tread_pattern,
     loadIndex:data.load_index,speedRating:data.speed_rating,position:data.position,reason:data.reason,actorLabel:actor},undefined,db));
 write('catalog','alterar_preco_catalogo','Altera o preço de varejo do pneu identificado. Valor em reais, com motivo e histórico.',priceBody.extend(product.shape),

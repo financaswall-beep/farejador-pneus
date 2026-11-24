@@ -1,29 +1,33 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpaoGrupos = function () {
   const endpoint = '/admin/api/wholesale/stock/groups';
+  let overviewRequest = 0;
+  let opening = 0;
+  let groupLoad = null;
   const origins = '/admin/api/wholesale/stock/origins';
   const labels = { located: 'Somente localização', pending: 'Aguardando inspeção', approved: 'Conferido', blocked: 'Bloqueado' };
   const conditions = { novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' };
   const conservation = { selecionado: 'Selecionado', economico: 'Econômico' };
   const messages = {
     stock_group_invalid: 'Confira os campos e as quantidades.',
-    stock_group_product_mismatch: 'Confira se o produto pertence à variante do estoque.',
-    stock_group_offer_changed: 'Os dados do grupo mudaram. Atualize e confira antes de tentar de novo.',
-    stock_group_not_found: 'Este grupo já não está disponível. Atualize a lista.',
+    stock_group_product_mismatch: 'Confira a medida, a marca, a condição e o modelo / desenho do produto no catálogo.',
+    stock_group_offer_changed: 'O registro dos pneus mudou. Atualize e confira antes de tentar de novo.',
+    stock_group_not_found: 'Este registro de pneus já não está disponível. Atualize a lista.',
     stock_group_unavailable: 'A quantidade excede o saldo livre para esta operação.',
-    stock_group_not_editable: 'O grupo não pode ser alterado no estado atual.',
+    stock_group_not_editable: 'A situação atual dos pneus impede esta alteração.',
     stock_group_invalid_positions: 'Confira os códigos de pilha e use apenas uma linha por posição.',
     stock_group_invalid_inspection: 'Confira as unidades antes de confirmar um conjunto.',
-    stock_group_model_required: 'Informe o modelo exato do conjunto.',
+    stock_group_model_required: 'Informe o modelo / desenho dos pneus conferidos.',
     reason_required: 'Informe o motivo desta operação.',
-    stock_group_protected: 'O grupo tem unidades protegidas por reserva. Confira o saldo livre.',
-    stock_origin_changed: 'Há uma origem de venda a conferir. Atualize as pendências antes de mover ou editar este grupo.',
+    stock_group_protected: 'Há pneus reservados neste registro. Confira o saldo livre.',
+    stock_origin_changed: 'Há uma origem de venda a conferir. Atualize as pendências antes de mover ou editar estes pneus.',
     idempotency_conflict: 'A operação já foi registrada com outros dados. Atualize a lista.',
   };
   return {
     stockGroups: {
       groups: [], stock: [], stockId: '', query: '', groupId: null, form: null, move: null,
       loading: false, saving: false, error: '', message: '',
+      overview: { stockId: '', status: 'idle', groups: [], ungrouped: 0 },
     },
     sgCondition(value) { return conditions[value] || ''; },
     sgStatus(value) { return labels[value] || ''; },
@@ -50,9 +54,29 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
       const grouped = this.sgRows().reduce((sum, group) => sum + group.quantity_on_hand, 0);
       return row ? Math.max(0, row.quantity_on_hand - grouped) : 0;
     },
+    async sgReadMeasureLocations(stockId) {
+      const request = ++overviewRequest;
+      const snapshot = { stockId, status: stockId ? 'loading' : 'idle', groups: [], ungrouped: 0 };
+      this.stockGroups.overview = snapshot;
+      if (!stockId) return;
+      try {
+        const data = await this.apiGet(endpoint + '?stock_id=' + encodeURIComponent(stockId));
+        if (request !== overviewRequest) return;
+        if (!Array.isArray(data.groups) || !Array.isArray(data.stock)) throw new Error('stock_groups_invalid_response');
+        const groups = data.groups.filter(group => group.stock_id === stockId && (group.positions.length || group.origin_pending));
+        const variant = data.stock.find(row => row.stock_id === stockId);
+        const grouped = groups.reduce((sum, group) => sum + group.quantity_on_hand, 0);
+        this.stockGroups.overview = { stockId, status: 'ready', groups,
+          ungrouped: variant ? Math.max(0, variant.quantity_on_hand - grouped) : 0 };
+      } catch (_) {
+        if (request === overviewRequest) this.stockGroups.overview = { ...snapshot, status: 'error' };
+      }
+    },
     async sgOpen(row) {
       const state = this.stockGroups;
       if (row?.vehicle_type === 'motorcycle' || state.saving) return;
+      if (!row && this.stockTab === 'pilhas' && groupLoad) return groupLoad;
+      const intent = ++opening;
       if (row) {
         this.sgChoose();
         state.stockId = '';
@@ -60,27 +84,36 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
       }
       this.stockTab = 'pilhas';
       await this.sgLoad();
-      if (row && this.stockTab === 'pilhas' && !state.error) {
-        const matched = state.stock.find(candidate => candidate.stock_id === row.stock_id
-          || this.stockVariantKey(candidate) === this.stockVariantKey(row));
-        state.stockId = matched?.stock_id || '';
-        this.$nextTick(() => document.getElementById('galpao-pilha-variante')?.focus());
+      if (row && intent === opening && this.stockTab === 'pilhas' && this.currentPage === 'estoque' && !state.error) {
+        // Só fichas antigas sem ID usam a chave composta. Códigos de produto distintos podem pertencer à mesma variante.
+        const ids = new Set(state.stock.filter(candidate => row.stock_id ? candidate.stock_id === row.stock_id
+          : this.stockVariantKey(candidate) === this.stockVariantKey(row)).map(candidate => candidate.stock_id));
+        state.stockId = ids.size === 1 ? [...ids][0] : '';
+        this.$nextTick(() => {
+          if (intent === opening && this.stockTab === 'pilhas' && this.currentPage === 'estoque') document.getElementById('galpao-pilha-variante')?.focus();
+        });
       }
     },
-    async sgLoad() {
+    async sgLoad(afterWrite = false) {
       const state = this.stockGroups;
-      if (state.loading) return;
+      if (groupLoad) {
+        if (!afterWrite) return groupLoad;
+        await groupLoad;
+        return this.sgLoad();
+      }
       state.loading = true;
       state.error = '';
-      try {
-        const data = await this.apiGet(endpoint);
-        state.groups = Array.isArray(data.groups) ? data.groups : [];
-        state.stock = Array.isArray(data.stock) ? data.stock : [];
-        if (!this.sgStock()) { state.stockId = ''; this.sgChoose(); }
-        if (state.groupId) this.sgEdit(this.sgActive());
-        await this.sgOrigins();
-      } catch (_) { state.error = 'Não foi possível consultar as pilhas do galpão.'; }
-      finally { state.loading = false; }
+      groupLoad = (async () => {
+        try {
+          const data = await this.apiGet(endpoint);
+          state.groups = Array.isArray(data.groups) ? data.groups : [];
+          state.stock = Array.isArray(data.stock) ? data.stock : [];
+          if (!this.sgStock()) { state.stockId = ''; this.sgChoose(); }
+          if (state.groupId) this.sgEdit(this.sgActive());
+          await this.sgOrigins();
+        } catch (_) { state.error = 'Não foi possível consultar as pilhas do galpão.'; }
+      })();
+      try { await groupLoad; } finally { groupLoad = null; state.loading = false; }
     },
     async sgOrigins() {
       const host = document.getElementById('galpao-origens-pendentes');
@@ -89,7 +122,7 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
         const { rows } = await this.apiGet(origins);
         window.StockOrigin.render(host,rows,{showOrder:true,
           save:this.adminUser?.role === 'owner' ? (p,body) => this.apiPost(origins + '/' + p.id,body) : null,
-          onSaved:async() => { await this.sgLoad(); this.stockGroups.message='Origem confirmada. O saldo total já estava contabilizado.'; },
+          onSaved:async() => { await this.sgLoad(true); this.stockGroups.message='Origem confirmada. O saldo total já estava contabilizado.'; },
           refresh:() => this.sgOrigins()});
       } catch (_) { host.textContent = 'Não foi possível consultar as origens pendentes. Use Atualizar para conferir.'; }
     },
@@ -117,10 +150,27 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
       this.sgChoose();
       this.stockGroups.form = {
         product_id: products.length === 1 ? products[0].product_id : '',
-        model: '',
+        model: '', modelEdited: false,
         inspection_status: 'located', matched_set: false, conservation_grade: '', conservation_note: '',
         reason: '', positions: [{ location_code: '', quantity: '' }],
       };
+      this.sgUseCatalogModel(this.stockGroups.form.product_id);
+    },
+    sgUseCatalogModel(productId) {
+      const { form, groupId } = this.stockGroups;
+      if (!form || groupId || form.modelEdited) return;
+      const pattern = this.sgProducts().find(product => product.product_id === productId)?.tread_pattern?.trim() || '';
+      form.model = pattern.length <= 120 ? pattern : '';
+    },
+    sgPositionRows() {
+      const rows = this.sgRows().flatMap(group => {
+        const positions = group.positions.length ? group.positions : [null];
+        return positions.map(position => ({ group, position, key: group.group_id + '/' + (position?.location_code || '') }));
+      });
+      return rows.sort((left, right) => {
+        if (!left.position || !right.position) return Number(!!right.position) - Number(!!left.position);
+        return left.position.location_code.localeCompare(right.position.location_code, 'pt-BR', { numeric: true });
+      });
     },
     sgEdit(group) {
       const state = this.stockGroups;
@@ -152,8 +202,8 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
         const result = await this.apiPost(path, { ...body, idempotency_key: operation.key });
         window.PAINEL_INTEGRITY.complete(action, target);
         state.groupId = result.group_id;
-        await this.sgLoad();
-        state.message = action === 'stock-group-move' ? 'Movimentação registrada.' : 'Grupo registrado.';
+        await this.sgLoad(true);
+        state.message = action === 'stock-group-move' ? 'Movimentação registrada.' : (body.group_id ? 'Conferência atualizada.' : 'Posição registrada.');
       } catch (error) { state.error = messages[error.message] || 'Não foi possível confirmar. Tente novamente.'; }
       finally { state.saving = false; }
     },
