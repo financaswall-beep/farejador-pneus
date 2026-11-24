@@ -1,8 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
-import { canonicalCatalogBrand } from './catalog-brand.js';
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult, operationFingerprint, type MatrizEnvironment } from './stage5-integrity.js';
-import { tireSizeKey } from '../../shared/tire-size.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
+export { listAvailableMatrizStockGroups } from './stock-group-offer-query.js';
 
 type Database = Pool | PoolClient;
 type InspectionStatus = 'located' | 'pending' | 'approved' | 'blocked';
@@ -18,6 +17,7 @@ export interface MatrizStockGroup {
   model: string | null;
   inspection_status: InspectionStatus;
   matched_set: boolean;
+  origin_pending: boolean;
   conservation_note: string | null;
   conservation_grade: ConservationGrade | null;
   conferred_at: string;
@@ -54,6 +54,7 @@ export interface MoveMatrizStockGroupInput {
 }
 
 const groupColumns = `g.id group_id,g.stock_id,g.product_id,s.measure,s.brand,s.tire_condition,
+    commerce.matriz_stock_origin_candidate_pending(g.environment,g.id) origin_pending,
     g.model,g.inspection_status,g.matched_set,g.conservation_note,g.conservation_grade,g.conferred_at,g.revision::text,
     COALESCE(pos.physical,0)::int quantity_on_hand,COALESCE(pos.reserved,0)::int quantity_reserved,
     COALESCE(pos.physical-pos.reserved,0)::int quantity_available,COALESCE(pos.positions,'[]') positions`;
@@ -73,32 +74,6 @@ export async function listMatrizStockGroups(db: Database, environment: MatrizEnv
   return (await db.query<MatrizStockGroup>(`SELECT ${groupColumns} ${groupTables}
     WHERE g.environment=$1 AND ($2::uuid IS NULL OR g.stock_id=$2)
     ORDER BY s.measure,s.brand,s.tire_condition,g.model,g.id`,[environment,stockId??null])).rows;
-}
-
-export async function listAvailableMatrizStockGroups(db: Database, environment: MatrizEnvironment, input: {
-  measure: string; quantity: number; brand?: string; tireCondition?: TireCondition;
-  productIds?: string[]; groupId?: string;
-}) {
-  const measureKey = tireSizeKey(input.measure).replace(/-/g,'');
-  if (!measureKey || !validQuantity(input.quantity)) return [];
-  type Offer = Pick<MatrizStockGroup,'group_id'|'product_id'|'measure'|'brand'|'tire_condition'|'model'|'conservation_grade'|'revision'|'quantity_available'>;
-  return (await db.query<Offer>(`SELECT g.id group_id,g.product_id,s.measure,s.brand,s.tire_condition,
-    g.model,g.conservation_grade,g.revision::text,(pos.physical-pos.reserved)::int quantity_available ${groupTables}
-    JOIN commerce.products p ON p.environment=g.environment AND p.id=g.product_id
-    JOIN commerce.tire_specs ts ON ts.environment=g.environment AND ts.product_id=g.product_id
-    WHERE g.environment=$1 AND regexp_replace(s.measure,'[^0-9]','','g')=$2
-      AND g.inspection_status='approved' AND ($3=1 OR g.matched_set)
-      AND pos.physical-pos.reserved >= $3 AND s.unit_cost>0 AND s.vehicle_type IS DISTINCT FROM 'motorcycle'
-      AND ($4::text IS NULL OR commerce.catalog_brand_identity(s.brand)=commerce.catalog_brand_identity($4))
-      AND ($5::text IS NULL OR s.tire_condition=$5)
-      AND ($6::uuid[] IS NULL OR g.product_id=ANY($6)) AND ($7::uuid IS NULL OR g.id=$7)
-      AND p.product_type='tire' AND NOT p.partner_generic AND p.deleted_at IS NULL AND ts.vehicle_type='car'
-      AND regexp_replace(ts.tire_size,'[^0-9]','','g')=$2 AND p.tire_condition=s.tire_condition
-      AND commerce.catalog_brand_identity(p.brand)=commerce.catalog_brand_identity(s.brand)
-      AND commerce.matriz_stock_group_model_matches(g.model,ts.tread_pattern)
-    ORDER BY pos.physical-pos.reserved DESC,g.id`,[
-    environment,measureKey,input.quantity,canonicalCatalogBrand(input.brand),input.tireCondition??null,input.productIds??null,input.groupId??null,
-  ])).rows;
 }
 
 function validQuantity(quantity: number) {
@@ -131,10 +106,12 @@ async function lockGroup(db: PoolClient, environment: MatrizEnvironment, groupId
   const stock = await db.query(`SELECT s.id FROM commerce.wholesale_stock s JOIN commerce.matriz_stock_groups g
      ON g.environment=s.environment AND g.stock_id=s.id WHERE g.environment=$1 AND g.id=$2 FOR UPDATE OF s`,[environment,groupId]);
   if (!stock.rows[0]) throw new Error('stock_group_not_found');
-  const { rows }=await db.query<LockedGroup>(`SELECT id group_id,stock_id,product_id,model,inspection_status,matched_set,revision::text
+  const { rows }=await db.query<LockedGroup & {origin_pending:boolean}>(`SELECT id group_id,stock_id,product_id,model,inspection_status,matched_set,revision::text,
+    commerce.matriz_stock_origin_candidate_pending(environment,id) origin_pending
     FROM commerce.matriz_stock_groups WHERE environment=$1 AND id=$2 FOR UPDATE`,[environment,groupId]);
   const group=rows[0];
   if (!group) throw new Error('stock_group_not_found');
+  if (group.origin_pending) throw new Error('stock_origin_changed');
   if (group.revision!==revision) throw new Error('stock_group_offer_changed');
   return group;
 }
@@ -279,7 +256,7 @@ export async function moveMatrizStockGroup(db: Database, environment: MatrizEnvi
   });
 }
 
-export async function listMatrizOrderGroupPositionsForOrders(db: Database, environment: MatrizEnvironment, orderIds: string[]) {
+export async function listMatrizOrderGroupPositionsForOrders(db: Database, environment: MatrizEnvironment, orderIds: string[], confirmedOnly = false) {
   if (orderIds.length===0) return [];
   return (await db.query<{
     order_id: string; order_item_id: string | null; matching_items: number; product_id: string; product_name: string;
@@ -290,8 +267,12 @@ export async function listMatrizOrderGroupPositionsForOrders(db: Database, envir
     JOIN commerce.products p ON p.environment=a.environment AND p.id=a.product_id
     CROSS JOIN LATERAL (SELECT count(*)::int matching_items,CASE WHEN count(*)=1 THEN (array_agg(i.id))[1] END order_item_id
       FROM commerce.order_items i WHERE i.environment=a.environment AND i.order_id=a.order_id AND i.product_id=a.product_id) oi
-    WHERE a.environment=$1 AND a.order_id=ANY($2::uuid[]) ORDER BY a.order_id,a.product_id,a.location_code,a.group_id`,
-  [environment,orderIds])).rows;
+    WHERE a.environment=$1 AND a.order_id=ANY($2::uuid[])
+      AND (NOT $3::boolean OR NOT EXISTS (SELECT 1 FROM commerce.matriz_stock_origins o
+        WHERE o.environment=a.environment AND o.source='varejo' AND o.reference_id=a.order_id AND o.status='pending'
+          AND (o.product_id=a.product_id OR o.product_id IS NULL)))
+    ORDER BY a.order_id,a.product_id,a.location_code,a.group_id`,
+  [environment,orderIds,confirmedOnly])).rows;
 }
 
 export function listMatrizOrderGroupPositions(db: Database, environment: MatrizEnvironment, orderId: string) {

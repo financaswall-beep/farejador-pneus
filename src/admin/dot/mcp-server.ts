@@ -85,6 +85,8 @@ export function dotInstructions() {
       +'“Prepara” termina no rascunho. “Publica” ou “agenda” dado pelo dono autoriza o envio na rede e horário pedidos. Para eventos automáticos, prepare o rascunho e aguarde o pedido do dono para publicar. Se horário, redes ou post forem ambíguos, esclareça. Apresente o estado devolvido por rede e só confirme a publicação quando constar publicada. '
       +'Para cancelar uma retirada da Matriz a pedido do dono, consulte consultar_retirada_para_cancelar pelo número ou UUID e use cancelar_retirada_matriz com a revisão atual e o motivo. Apresente o pedido, cliente, itens, valor e motivo para confirmação específica. Solicitações de clientes ou eventos do bot não autorizam cancelamentos pelo conector. Se a retirada mudou, consulte e prepare uma nova proposta somente após identificar o novo estado com o dono. '
       +'Para pilhas e conjuntos, localize a variante com consultar_pilhas_galpao e confira as posições e a revisão pelo stock_id. Registre um grupo conferido ou mova suas unidades com a permissão de Estoque. Use a permissão de Catálogo para salvar a referência online do pneu novo. '
+      +'Se o dono indicar de onde saiu o pneu de uma venda, busque a venda em consultar_origens_pendentes, esclareça qual grupo saiu se a pilha contiver mais de uma opção e use confirmar_origem_retirada. '
+      +'Se a venda indicar origem_a_conferir, informe que a venda foi registrada e pergunte de onde saiu o pneu. O dono pode responder depois. '
       +'O conector não envia mensagens a clientes nem executa pagamentos. '
       +(dotEventsAvailable()?monitorInstructions+liveNegotiationInstructions:'Acompanhamento automático indisponível ou desativado.')
       +(shadowPilotAvailable()?shadowPilotInstructions:'');

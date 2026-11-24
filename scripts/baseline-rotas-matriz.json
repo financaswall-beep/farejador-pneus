@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-24T04:59:24.070Z",
-  "total": 631,
+  "geradoEm": "2026-11-24T05:44:03.502Z",
+  "total": 635,
   "rotas": [
     "DELETE /admin/api/catalog/:product_id/compatibility/:vehicle_model_id/:position GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/bot/campainha GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -167,6 +167,7 @@
     "GET /admin/api/wholesale/stock/costs GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/wholesale/stock/groups GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/wholesale/stock/movimentos GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
+    "GET /admin/api/wholesale/stock/origins GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/wholesale/stock/reconciliation GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/wholesale/suppliers GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
     "GET /admin/api/wholesale/suppliers/breakdown GUARD(requireAdminAuth) SESSION(ms_) ROLE(owner|admin) POOL(admin) SCOPE(matriz)",
@@ -449,6 +450,8 @@
     "GET /admin/painel/relatorios.css PUBLICA",
     "GET /admin/painel/resumo.css PUBLICA",
     "GET /admin/painel/sale-payment-plan.js PUBLICA",
+    "GET /admin/painel/stock-origin-view.js PUBLICA",
+    "GET /admin/painel/stock-origin.css PUBLICA",
     "GET /admin/painel/stock-waitlist-view.js PUBLICA",
     "GET /admin/painel/stock-waitlist.css PUBLICA",
     "GET /admin/painel/stock-waitlist.js PUBLICA",
@@ -616,6 +619,7 @@
     "POST /admin/api/wholesale/stock/entry GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/stock/groups GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/stock/groups/:groupId/move GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
+    "POST /admin/api/wholesale/stock/origins/:pendingId GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/stock/physical-count GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/stock/remove GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",
     "POST /admin/api/wholesale/suppliers GUARD(requireAdminOwner) SESSION(ms_) ROLE(owner) POOL(admin) SCOPE(matriz)",

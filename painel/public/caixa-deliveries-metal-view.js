@@ -44,6 +44,10 @@
         list.appendChild(summary);
       }
       if (!list.children.length) list.appendChild(node('p', 'Itens a conferir', 'mdf-hint'));
+      if (row.delivery_status === 'pending' && row.stock_origin_pendings?.length) {
+        const host = node('div', null, 'origin-host'); list.appendChild(host);
+        window.StockOrigin.operation(host,row,'entregas',() => C.loadDeliveries());
+      }
       return list;
     }
     function charge(row, compact) {

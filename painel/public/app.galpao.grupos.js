@@ -1,6 +1,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpaoGrupos = function () {
   const endpoint = '/admin/api/wholesale/stock/groups';
+  const origins = '/admin/api/wholesale/stock/origins';
   const labels = { located: 'Somente localização', pending: 'Aguardando inspeção', approved: 'Conferido', blocked: 'Bloqueado' };
   const conditions = { novo: 'Novo', meia_vida: 'Meia-vida', remold: 'Remold' };
   const conservation = { selecionado: 'Selecionado', economico: 'Econômico' };
@@ -16,6 +17,7 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
     stock_group_model_required: 'Informe o modelo exato do conjunto.',
     reason_required: 'Informe o motivo desta operação.',
     stock_group_protected: 'O grupo tem unidades protegidas por reserva. Confira o saldo livre.',
+    stock_origin_changed: 'Há uma origem de venda a conferir. Atualize as pendências antes de mover ou editar este grupo.',
     idempotency_conflict: 'A operação já foi registrada com outros dados. Atualize a lista.',
   };
   return {
@@ -76,8 +78,35 @@ window.PAINEL_MODULES.galpaoGrupos = function () {
         state.stock = Array.isArray(data.stock) ? data.stock : [];
         if (!this.sgStock()) { state.stockId = ''; this.sgChoose(); }
         if (state.groupId) this.sgEdit(this.sgActive());
+        await this.sgOrigins();
       } catch (_) { state.error = 'Não foi possível consultar as pilhas do galpão.'; }
       finally { state.loading = false; }
+    },
+    async sgOrigins() {
+      const host = document.getElementById('galpao-origens-pendentes');
+      if (!host) return;
+      try {
+        const { rows } = await this.apiGet(origins);
+        window.StockOrigin.render(host,rows,{showOrder:true,
+          save:this.adminUser?.role === 'owner' ? (p,body) => this.apiPost(origins + '/' + p.id,body) : null,
+          onSaved:async() => { await this.sgLoad(); this.stockGroups.message='Origem confirmada. O saldo total já estava contabilizado.'; },
+          refresh:() => this.sgOrigins()});
+      } catch (_) { host.textContent = 'Não foi possível consultar as origens pendentes. Use Atualizar para conferir.'; }
+    },
+    async sgAfterSale(orderId, wholesale = false) {
+      if (!orderId || this.adminUser?.role !== 'owner') return;
+      const load = () => this.apiGet(origins + (wholesale ? '?order_number=' : '?order_id=') + encodeURIComponent(orderId));
+      let data;
+      try { data = await load(); } catch (_) { return; }
+      if (!data.rows?.length || !this.adminAuthenticated) return;
+      const dialog = document.createElement('dialog'), host = document.createElement('div'), close = document.createElement('button');
+      dialog.className = 'origin-dialog'; dialog.setAttribute('aria-label','Origem dos pneus da venda');
+      close.type = 'button'; close.textContent = 'Fechar'; close.addEventListener('click', () => dialog.close());
+      dialog.addEventListener('close', () => dialog.remove(), {once:true});
+      const draw = rows => window.StockOrigin.render(host,rows,{showOrder:true,onDefer:() => dialog.close(),
+        save:(p,body) => this.apiPost(origins + '/' + p.id, body),
+        refresh:async() => { try { draw((await load()).rows); } catch (_) { host.textContent='Consulte a pendência em Estoque → Pilhas e conjuntos.'; } }});
+      draw(data.rows); dialog.append(host,close); document.body.appendChild(dialog); dialog.showModal();
     },
     sgChoose() {
       Object.assign(this.stockGroups, { groupId: null, form: null, move: null, error: '', message: '' });

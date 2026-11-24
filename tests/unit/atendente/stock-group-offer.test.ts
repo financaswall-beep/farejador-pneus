@@ -235,6 +235,15 @@ describe('referência online em objeção de preço', () => {
     expect(mocked.market).not.toHaveBeenCalled();
   });
 
+  it('suspende o argumento comercial de um par cotado cuja origem ainda está em conferência',async()=>{
+    vi.mocked(client.query).mockResolvedValueOnce({ rows: [{ content:'Achei caro' }] } as never)
+      .mockResolvedValueOnce({ rows: [{...savedSearch(),say_text:'O jogo Bridgestone sai por R$ 1.560,00.'}] } as never);
+    mocked.group.mockResolvedValueOnce([]);
+    await expect(lookupMarketObjection(client,'test','conversation','message',{product_id:productId}))
+      .resolves.toEqual({referencia_disponivel:false});
+    expect(mocked.market).not.toHaveBeenCalled();
+  });
+
   it('com a flag desligada a ferramenta não acessa o banco', async () => {
     mocked.env.MATRIZ_MARKET_REFERENCE_OBJECTIONS = false;
     await expect(lookupMarketObjection(client, 'test', 'conversation', 'message', { product_id: productId }))

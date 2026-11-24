@@ -7,6 +7,7 @@ import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { operatorLabel, mapWriteError } from './route-helpers.js';
 import { listMatrizStockGroups, moveMatrizStockGroup, saveMatrizStockGroup } from './stock-groups.js';
 import { listMatrizStockGroupOptions, stockGroupId, stockGroupMoveBody, stockGroupSchema } from './stock-group-inputs.js';
+import { registerStockOriginRoutes } from './route-stock-origins.js';
 
 function failure(reply: FastifyReply, error: unknown) {
   const code = error instanceof Error ? error.message : '';
@@ -16,7 +17,7 @@ function failure(reply: FastifyReply, error: unknown) {
     'stock_group_move_required', 'reason_required'].includes(code)) {
     return reply.status(400).send({ error: code });
   }
-  if (['stock_group_offer_changed', 'stock_group_unavailable', 'stock_group_not_editable', 'stock_group_protected'].includes(code)) {
+  if (['stock_group_offer_changed', 'stock_group_unavailable', 'stock_group_not_editable', 'stock_group_protected', 'stock_origin_changed'].includes(code)) {
     return reply.status(409).send({ error: code });
   }
   const mapped = mapWriteError(error);
@@ -25,6 +26,7 @@ function failure(reply: FastifyReply, error: unknown) {
 }
 
 export function registerStockGroupRoutes(fastify: FastifyInstance): void {
+  registerStockOriginRoutes(fastify);
   const base = '/admin/api/wholesale/stock/groups';
   fastify.get(base, { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = z.object({ stock_id: stockGroupId.optional() }).strict().safeParse(request.query);

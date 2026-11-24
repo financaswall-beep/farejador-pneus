@@ -301,6 +301,48 @@ it('Milly localiza o pneu, registra o par, move uma unidade e consulta a pesquis
   expect(await call('consultar_referencia_online',{product_id:productId})).toMatchObject({referencia:{amount:123.45}});
 });
 
+it('Milly identifica a venda pelo número falado e confirma de qual grupo saiu o pneu sem baixá-lo de novo', async () => {
+  const {registerWalkinOrder} = await import('../../src/admin/painel/walkin-order.js');
+  await db.pool.query("INSERT INTO core.units(environment,slug,name) VALUES ('test','main','Matriz de teste') ON CONFLICT DO NOTHING");
+  const unit=(await db.pool.query("SELECT id FROM core.units WHERE environment='test' AND slug='main'")).rows[0].id;
+  const stock=(await db.pool.query(`INSERT INTO commerce.wholesale_stock
+    (environment,measure,brand,tire_condition,vehicle_type,quantity_on_hand,unit_cost)
+    VALUES ('test',$1,$2,'novo','car',3,45) RETURNING id`,[measure,brand])).rows[0].id;
+  await approve('alterar_preco_catalogo',{product_id:productId,price_amount:110,reason:'Preço de teste',idempotency_key:randomUUID()});
+  const inspect=(quantity:number,matched_set:boolean)=>approve('conferir_grupo_galpao',{
+    stock_id:stock,product_id:productId,model:'Modelo fictício',inspection_status:'approved',matched_set,
+    positions:[{location_code:'B2',quantity}],reason:'Conferência de teste',idempotency_key:randomUUID(),
+  });
+  const pair=(await inspect(2,true)).resultado;
+  const single=(await inspect(1,false)).resultado;
+  const sale=await registerWalkinOrder({environment:'test',customer_name:'Exemplo',customer_phone:null,unit_id:unit,
+    items:[{product_id:productId,quantity:1,unit_price:110,discount_amount:0}],payment_method:'pix',fulfillment_mode:'pickup',
+    actor_label:'Teste',idempotency_key:randomUUID(),source_tag:'walkin_balcao'},db.pool);
+  const order=(await db.pool.query("SELECT order_number FROM commerce.orders WHERE environment='test' AND id=$1",[sale.order_id])).rows[0];
+  const lookup={numero_venda:String(order.order_number).replace(/^PED-0*/, '')};
+  const [pending]=(await call('consultar_origens_pendentes',lookup)).pendencias;
+  expect(pending).toMatchObject({order_id:sale.order_id,quantity:1});
+  expect(pending.candidates).toEqual(expect.arrayContaining([
+    expect.objectContaining({group_id:single.group_id,location_code:'B2',matched_set:false,suggested_quantity:1}),
+    expect.objectContaining({group_id:pair.group_id,location_code:'B2',matched_set:true,suggested_quantity:0}),
+  ]));
+  const candidate=pending.candidates.find((c:{group_id:string})=>c.group_id===pair.group_id);
+  const input={pending_id:pending.id,selections:[{candidate_id:candidate.candidate_id,quantity:1}],idempotency_key:randomUUID()};
+  const saldo=async()=>(await db.pool.query('SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE id=$1',[stock])).rows[0].quantity_on_hand;
+  expect(await saldo()).toBe(2);
+  await db.pool.query('UPDATE network.dot_oauth_grants SET stock_operations_enabled=false WHERE id=$1',[identity.grant_id]);
+  expect((await call('confirmar_origem_retirada',input)).isError).toBe(true);
+  await db.pool.query('UPDATE network.dot_oauth_grants SET stock_operations_enabled=true WHERE id=$1',[identity.grant_id]);
+  const confirmed=await approve('confirmar_origem_retirada',input,'voz');
+  expect(confirmed).toMatchObject({executada:true,resultado:{id:pending.id,status:'confirmed'}});
+  expect(await call('confirmar_origem_retirada',input)).toEqual(confirmed);
+  expect((await call('consultar_origens_pendentes',lookup)).pendencias).toHaveLength(0);
+  const groups=(await call('consultar_pilhas_galpao',{stock_id:stock})).grupos;
+  expect(groups).toEqual(expect.arrayContaining([pair,single].map(group=>
+    expect.objectContaining({group_id:group.group_id,quantity_on_hand:1}))));
+  expect(await saldo()).toBe(2);
+});
+
 it('Milly encontra as referências antigas ao cadastrar e só classifica as escolhidas pelo dono', async () => {
   const { importVehicleApplications } = await import('../../scripts/vehicle-application-import.js');
   const client = await db.pool.connect();

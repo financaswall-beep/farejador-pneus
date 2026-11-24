@@ -6,7 +6,7 @@ import {
   pickupServicesTotalCents, type PickupService, type PickupStage,
 } from '../../shared/pickup-services.js';
 
-export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<unknown[]> {
+export async function getMatrizRetiradas(dbPool: Pool = defaultPool, orderId?: string, includePositions = true) {
   const result = await dbPool.query<{ order_id: string; status: string; items: StockPickingItem[] }>(
     `SELECT pr.order_id,pr.created_at,pr.contact_name AS customer_name,
             pr.contact_phone AS customer_phone,pr.source AS source_tag,live.status,
@@ -41,15 +41,15 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
              ON spec.environment=item.environment AND spec.product_id=item.product_id
           WHERE item.environment=live.environment AND item.order_id=live.id
        ) items ON true
-      WHERE live.environment=$1 AND live.partner_order_id IS NULL
+      WHERE live.environment=$1 AND live.partner_order_id IS NULL AND ($3::uuid IS NULL OR live.id=$3)
         AND live.fulfillment_mode='pickup' AND live.status<>'cancelled'
         AND (live.status='open' OR live.retrieved_at>=now()-interval '7 days')
         AND (live.status<>'open' OR reservation.started_at IS NOT NULL)
       ORDER BY (live.status='open') DESC,live.created_at ASC
       LIMIT 300`,
-    [env.FAREJADOR_ENV, env.BOT_PICKUP_RESERVATION_HOURS],
+    [env.FAREJADOR_ENV, env.BOT_PICKUP_RESERVATION_HOURS, orderId ?? null],
   );
-  await addStockPickingPositions(dbPool, env.FAREJADOR_ENV, result.rows.filter(row => row.status === 'open'), 'open_pickup');
+  if (includePositions) await addStockPickingPositions(dbPool, env.FAREJADOR_ENV, result.rows.filter(row => row.status === 'open'), 'open_pickup');
   return result.rows;
 }
 

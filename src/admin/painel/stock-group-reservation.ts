@@ -32,14 +32,36 @@ export async function loadGroupOrderItems(client: PoolClient, environment: Matri
     FROM commerce.order_items WHERE environment=$1 AND order_id=$2 GROUP BY product_id`,[environment,orderId])).rows;
 }
 
-/** A reserva agregada já travou as variantes. Esta é a decomposição em pilhas. */
+/** A variante já está travada pelo plano oficial. Captura as opções antes da reserva provisória das pilhas. */
 export async function reserveMatrizStockGroupPositions(client: PoolClient, environment: MatrizEnvironment, orderId: string,
-  variant: Variant, offer?: MatrizStockGroupOffer, plannedItems?: GroupOrderItem[]) {
+  variant: Variant, offer: MatrizStockGroupOffer | undefined, items: GroupOrderItem[]) {
+  const quantities=new Map<string,number>();
+  for (const item of items) quantities.set(item.productId,(quantities.get(item.productId)??0)+item.quantity);
+  const demand=JSON.stringify([...quantities].map(([product_id,quantity])=>({product_id,quantity})));
+  let stockId: string | undefined;
+  if (!offer) {
+    const captured=await client.query<{id:string}>(`SELECT s.id,
+        commerce.capture_matriz_stock_origin(s.environment,s.id,$5,'reservation',$6,$7::jsonb)
+      FROM commerce.wholesale_stock s WHERE s.environment=$1 AND s.measure=$2 AND s.brand=$3 AND s.tire_condition=$4
+        AND s.vehicle_type IS DISTINCT FROM 'motorcycle' AND EXISTS (
+          SELECT 1 FROM commerce.matriz_stock_groups g WHERE g.environment=s.environment AND g.stock_id=s.id
+            AND g.inspection_status='approved' AND g.matched_set)`,
+    [environment,variant.measure,variant.brand,variant.tire_condition,orderId,variant.qty,demand]);
+    stockId=captured.rows[0]?.id;
+  }
+  await allocatePositions(client,environment,orderId,variant,offer,demand);
+  if (stockId) {
+    await client.query("SELECT commerce.snapshot_matriz_stock_origin($1,$2,$3,'reservation')",[environment,stockId,orderId]);
+  }
+}
+
+async function allocatePositions(client: PoolClient, environment: MatrizEnvironment, orderId: string,
+  variant: Variant, offer: MatrizStockGroupOffer | undefined, demand: string) {
   const key=[environment,variant.measure,variant.brand,variant.tire_condition];
   let needed=variant.qty;
   if (offer) {
     const { rows }=await client.query<{ product_id: string; revision: string; eligible: boolean }>(`SELECT g.product_id,g.revision::text,
-      (g.inspection_status='approved' AND (g.matched_set OR $6=1)
+      (g.inspection_status='approved' AND (g.matched_set OR $6=1) AND NOT commerce.matriz_stock_origin_uncertain(g.environment,g.id)
         AND p.deleted_at IS NULL AND p.product_type='tire' AND NOT p.partner_generic AND ts.vehicle_type='car'
         AND s.vehicle_type IS DISTINCT FROM 'motorcycle'
         AND p.tire_condition=s.tire_condition AND commerce.catalog_brand_identity(p.brand)=commerce.catalog_brand_identity(s.brand)
@@ -67,10 +89,6 @@ export async function reserveMatrizStockGroupPositions(client: PoolClient, envir
     needed-=rows[0]?.free??variant.qty;
   }
   if (needed<=0) return;
-  const items=plannedItems??await loadGroupOrderItems(client,environment,orderId);
-  const quantities=new Map<string,number>();
-  for (const item of items) quantities.set(item.productId,(quantities.get(item.productId)??0)+item.quantity);
-  const demand=[...quantities].map(([product_id,quantity])=>({product_id,quantity}));
   const { rows }=await client.query<PositionAllocation>(`SELECT g.id group_id,g.model,g.product_id,p.location_code,
     (p.quantity_on_hand-p.quantity_reserved)::int available,d.quantity ordered
     FROM commerce.matriz_stock_groups g JOIN commerce.wholesale_stock s ON s.environment=g.environment AND s.id=g.stock_id
@@ -81,7 +99,8 @@ export async function reserveMatrizStockGroupPositions(client: PoolClient, envir
       AND NOT EXISTS(SELECT 1 FROM commerce.tire_specs ts WHERE ts.environment=g.environment AND ts.product_id=g.product_id
         AND NOT commerce.matriz_stock_group_model_matches(g.model,ts.tread_pattern))
       AND ($5::uuid IS NULL OR g.id=$5)
-    ORDER BY g.matched_set,g.id,p.location_code FOR UPDATE OF p`,[...key,offer?.groupId??null,JSON.stringify(demand)]);
+    ORDER BY commerce.matriz_stock_active_set(g.environment,g.id),g.id,p.location_code FOR UPDATE OF p`,
+  [...key,offer?.groupId??null,demand]);
   if (rows.reduce((total,row)=>total+row.available,0)<needed) throw new Error(offer?'stock_group_unavailable':'stock_group_protected');
   const assigned = new Map<string,number>();
   for (const row of rows) {
@@ -111,13 +130,16 @@ export async function reserveMatrizStockGroupPositions(client: PoolClient, envir
 }
 
 /** O pedido já está travado pela realização/cancelamento. Trava saldo em ordem igual à criação. */
+async function lockVariants(client: PoolClient, environment: MatrizEnvironment, variants: Variant[]) {
+  return client.query<{id:string}>(`SELECT s.id FROM commerce.wholesale_stock s
+    WHERE s.environment=$1 AND (s.measure,s.brand,s.tire_condition) IN (
+      SELECT v.measure,v.brand,v.tire_condition FROM jsonb_to_recordset($2::jsonb) AS v(measure text,brand text,tire_condition text)
+    ) ORDER BY s.measure,s.brand,s.tire_condition FOR UPDATE`,[environment,JSON.stringify(variants)]);
+}
+
 export async function finalizeMatrizStockGroupPositions(client: PoolClient, environment: MatrizEnvironment, orderId: string,
-  consume: boolean, actor = consume?'matriz-realizacao':'matriz-cancel') {
-  await client.query(`SELECT s.id FROM commerce.wholesale_stock s
-    WHERE s.environment=$1 AND EXISTS(SELECT 1 FROM commerce.matriz_stock_group_allocations a
-      JOIN commerce.matriz_stock_groups g ON g.environment=a.environment AND g.id=a.group_id
-      WHERE a.environment=s.environment AND a.order_id=$2 AND a.status='reserved' AND g.stock_id=s.id)
-    ORDER BY s.measure,s.brand,s.tire_condition FOR UPDATE`,[environment,orderId]);
+  variants: Variant[], consume: boolean, actor = consume?'matriz-realizacao':'matriz-cancel') {
+  await lockVariants(client,environment,variants);
   const { rows }=await client.query<{ group_id: string; location_code: string; quantity: number }>(`UPDATE commerce.matriz_stock_group_allocations
     SET status=$3,finalized_at=clock_timestamp() WHERE environment=$1 AND order_id=$2 AND status='reserved'
     RETURNING group_id,location_code,quantity`,[environment,orderId,consume?'consumed':'released']);
@@ -135,6 +157,7 @@ export async function finalizeMatrizStockGroupPositions(client: PoolClient, envi
       actor,
     ]);
   }
+  await client.query('SELECT commerce.finish_matriz_stock_origin_reservation($1,$2,$3)',[environment,orderId,consume]);
 }
 
 /** Alterar um conjunto reservado exige nova conferência da oferta e novo aceite. */
@@ -146,15 +169,12 @@ export async function guardMatrizGroupOrderEdit(client: PoolClient, environment:
 
 export async function reallocateMatrizGroupOrderIfNeeded(client: PoolClient, environment: MatrizEnvironment, orderId: string,
   previous: Variant[], next: Variant[], desired: GroupOrderItem[]) {
-  const locks=await client.query<{id:string}>(`SELECT s.id FROM commerce.wholesale_stock s
-    WHERE s.environment=$1 AND (s.measure,s.brand,s.tire_condition) IN (
-      SELECT v.measure,v.brand,v.tire_condition FROM jsonb_to_recordset($2::jsonb) AS v(measure text,brand text,tire_condition text)
-    ) ORDER BY s.measure,s.brand,s.tire_condition FOR UPDATE`,[environment,JSON.stringify([...previous,...next])]);
+  const locks=await lockVariants(client,environment,[...previous,...next]);
   const affected=await client.query(`SELECT 1 FROM commerce.matriz_stock_groups
     WHERE environment=$1 AND stock_id=ANY($2::uuid[]) LIMIT 1`,[environment,locks.rows.map(row=>row.id)]);
   if (!affected.rows.length) return false;
   await guardMatrizGroupOrderEdit(client,environment,orderId);
-  await finalizeMatrizStockGroupPositions(client,environment,orderId,false,'matriz-edicao');
+  await finalizeMatrizStockGroupPositions(client,environment,orderId,previous,false,'matriz-edicao');
   for (const row of previous) await adjustGroupOrderAggregate(client,environment,row,-row.qty);
   for (const row of next) {
     await reserveMatrizStockGroupPositions(client,environment,orderId,row,undefined,desired);

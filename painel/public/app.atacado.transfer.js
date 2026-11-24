@@ -247,6 +247,7 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
           ? ' A entrada já apareceu para o parceiro confirmar o recebimento.' : '';
         this.atacadoMsg = { ok: true, text: `${additionText} pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${receiptText}` };
         window.PAINEL_INTEGRITY.complete('wholesale-sale-create', integrityScope);
+        void this.sgAfterSale?.(result.order_id, true);
         this.atacadoForm = {
           buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
           payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',

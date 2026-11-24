@@ -1,0 +1,17 @@
+.origin-card {margin:.65rem 0;padding:.8rem;border:1px solid #adc8bb;border-radius:.65rem;background:#fff;color:#1d3328;font:inherit;}
+.origin-card summary {cursor:pointer;font-weight:650;}
+.origin-card p {margin:.4rem 0;}
+.origin-card p:empty,.origin-actions:empty,.origin-other:empty {display:none;}
+.origin-actions,.origin-other {display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;}
+.origin-card button {padding:.45rem .65rem;border:1px solid #557565;border-radius:.45rem;cursor:pointer;line-height:1.35;}
+.origin-secondary {background:#fff;color:#234032;}
+.origin-primary {background:#175737;color:#fff;}
+.origin-card button:disabled {cursor:default;opacity:.55;}
+.origin-other {margin-top:.5rem;align-items:flex-start;}
+.origin-other details {border:1px solid #c8d8ce;border-radius:.45rem;padding:.4rem;}
+.origin-other label {display:flex;gap:.4rem;align-items:center;}
+.origin-other input {width:4.2rem;border:1px solid #879d90;padding:.2rem;}
+@media print { .origin-card,.origin-host {display:none !important;} }
+.origin-dialog {margin:auto;min-width:min(24rem,92vw);max-width:92vw;max-height:85vh;overflow:auto;border:0;border-radius:.75rem;padding:1rem;background:white;color:#1d3328;}
+.origin-dialog::backdrop {background:#0007;}
+.origin-dialog>button {padding:.4rem .7rem;border:1px solid #879d90;border-radius:.45rem;}

@@ -198,7 +198,7 @@ export async function reserveMatrizGalpaoStock(
   // chamadas simultaneas do mesmo pedido nao reservem duas vezes.
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_reserved')) return;
   for (const movement of movements) {
-    await reserveMatrizStockGroupPositions(client,environment,orderId,movement,groupOffer);
+    await reserveMatrizStockGroupPositions(client,environment,orderId,movement,groupOffer,items);
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
           SET quantity_reserved=quantity_reserved+$5
@@ -237,7 +237,7 @@ export async function consumeMatrizGalpaoReservation(
             set_config('app.galpao_ref',$1,true)`,
     [orderId],
   );
-  await finalizeMatrizStockGroupPositions(client,environment,orderId,true);
+  await finalizeMatrizStockGroupPositions(client,environment,orderId,movements,true);
   for (const movement of movements) {
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
@@ -269,7 +269,7 @@ export async function releaseMatrizGalpaoReservation(
   if (await hasEvent(client, environment, orderId, 'matriz_galpao_reservation_released')) return;
   const movements = await reservationMovements(client, environment, orderId);
   if (movements.length === 0) return;
-  await finalizeMatrizStockGroupPositions(client,environment,orderId,false);
+  await finalizeMatrizStockGroupPositions(client,environment,orderId,movements,false);
   for (const movement of movements) {
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock

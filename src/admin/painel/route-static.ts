@@ -40,7 +40,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.catalogo.photos.js', 'app.partner-retiradas.report.js',
     'app.atacado.requests.js',
     'app.catalogo.atacado.js',
-    'stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',
+    'stock-origin-view.js','stock-waitlist-view.js','stock-waitlist.js','app.bot.waitlist.js','app.dot-alerts.js',
     'app.marketing.comments.js', 'app.marketing.paid.js', 'app.marketing.google.js', 'app.marketing.google.overview.js', 'app.marketing.google.ads.js', 'app.marketing.google.campaign.js',
     'app.marketing.google.detail.js',
     'app.marketing.google.compare.js',
@@ -135,6 +135,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   }
   fastify.get('/admin/painel/bot-demanda.css', async (_request, reply) => sendStatic(reply, 'bot-demanda.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/stock-waitlist.css', async (_request, reply) => sendStatic(reply, 'stock-waitlist.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/painel/stock-origin.css', async (_request, reply) => sendStatic(reply, 'stock-origin.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/bot-faltas.css', async (_request, reply) => sendStatic(reply, 'bot-faltas.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios.css', async (_request, reply) => sendStatic(reply, 'relatorios.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/relatorios-compras.css', async (_request, reply) => sendStatic(reply, 'relatorios-compras.css', 'text/css; charset=utf-8'));

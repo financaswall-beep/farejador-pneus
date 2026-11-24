@@ -71,6 +71,12 @@
     };
     overview.append(status, meta, items, commission.originCard(receipt, labels), summary);
     content.append(overview, calculation);
+    const onlyMotorcycles = receipt.items?.length > 0 && receipt.items.every(item => item.vehicle_type === 'motorcycle');
+    if (!cancelled && !C.isPartner() && !onlyMotorcycles && receipt.order_id) {
+      const host = node('div', null, 'origin-host');
+      overview.appendChild(host);
+      window.StockOrigin.operation(host, receipt, 'vendas');
+    }
     const back = node('button', '', 'mc-commission-back'); back.type = 'button';
     back.append(commission.icon('back'), node('span', 'Voltar à venda')); back.addEventListener('click', returnToSale);
     footer.append(printer, footer.querySelector('.receipt-done'), back);

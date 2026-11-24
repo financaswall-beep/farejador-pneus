@@ -189,6 +189,59 @@ describe('grupos físicos conferidos do galpão da Matriz', () => {
     expect(await listAvailableMatrizStockGroups(db.pool,'test',{measure:f.measure,brand:f.brand,quantity:1})).toEqual([]);
   });
 
+  it('suspende apenas as ofertas da reserva ambígua e invalida o fechamento antigo sob a trava do estoque', async () => {
+    // Há uma unidade sem pilha e duas no par. A reserva avulsa não aloca posição, mas deixa o par incerto.
+    const f=await fixture('OrigemReservaTeste',3);
+    const createPair = (item: typeof f) => saveMatrizStockGroup(db.pool,'test',{
+      stock_id:item.stockId,product_id:item.productId,model:'Modelo teste',matched_set:true,
+      inspection_status:'approved',conservation_grade:'selecionado',positions:[{location_code:'B2',quantity:2}],
+      reason:'Par conferido',idempotency_key:randomUUID(),
+    },'teste');
+    const group=await createPair(f);
+    const unaffected=await fixture('OrigemReservaOutraMarca',2);
+    const otherPair=await createPair(unaffected);
+    const offered=(item: typeof f,quantity=2)=>listAvailableMatrizStockGroups(db.pool,'test',{
+      measure:item.measure,productIds:[item.productId],quantity,
+    });
+    const oldOffer={groupId:group.group_id,productId:f.productId,quantity:2,revision:group.revision};
+    const single={productId:f.productId,quantity:1};
+    const reserveSingle=()=>tx(async client=>{
+      const id=await order(client,f.productId,1);
+      await reserveMatrizGalpaoStock(client,'test',id,[single],true);
+      return id;
+    });
+    expect(await offered(f)).toMatchObject([{group_id:group.group_id}]);
+    const first=await reserveSingle();
+    expect(await listMatrizOrderGroupPositions(db.pool,'test',first)).toEqual([]);
+    expect(await offered(f)).toEqual([]);
+    expect(await offered(f,1)).toEqual([]);
+    expect(await offered(unaffected)).toMatchObject([{group_id:otherPair.group_id}]);
+    await expect(tx(async client=>{
+      const id=await order(client,f.productId,2);
+      await reserveMatrizGalpaoStock(client,'test',id,[{...single,quantity:2}],true,oldOffer);
+    })).rejects.toThrow('stock_group_unavailable');
+    await expect(moveMatrizStockGroup(db.pool,'test',{
+      group_id:group.group_id,revision:group.revision,from_location:'B2',to_location:'B3',quantity:1,
+      reason:'Remanejamento',idempotency_key:randomUUID(),
+    },'teste')).rejects.toThrow('stock_origin_changed');
+
+    // A edição remove a reserva anterior (que não tinha allocation) e sua pendência.
+    await tx(client=>releaseRemovedMatrizItems(client,'test',first,[single]));
+    expect(await stock(f.stockId)).toMatchObject({quantity_on_hand:3,quantity_reserved:0});
+    expect(await offered(f)).toMatchObject([{group_id:group.group_id}]);
+    const second=await reserveSingle();
+    await tx(client=>consumeMatrizGalpaoReservation(client,'test',second));
+    await tx(client=>consumeMatrizGalpaoReservation(client,'test',second));
+    expect(await stock(f.stockId)).toMatchObject({quantity_on_hand:2,quantity_reserved:0});
+    expect(await offered(f)).toEqual([]);
+    await tx(async client=>{
+      await client.query("SELECT set_config('app.galpao_source','cancelamento_varejo',true),set_config('app.galpao_ref',$1,true)",[second]);
+      await client.query("UPDATE commerce.wholesale_stock SET quantity_on_hand=quantity_on_hand+1 WHERE environment='test' AND id=$1",[f.stockId]);
+    });
+    expect(await offered(f)).toMatchObject([{group_id:group.group_id}]);
+    expect(await stock(f.stockId)).toMatchObject({quantity_on_hand:3,quantity_reserved:0});
+  });
+
   it('mantém pilhas e invalida a oferta antiga quando a Matriz corrige a marca', async () => {
     const f=await fixture('MarcaErradaTeste',3);
     const group=await saveMatrizStockGroup(db.pool,'test',{stock_id:f.stockId,product_id:f.productId,model:'S',
@@ -202,6 +255,35 @@ describe('grupos físicos conferidos do galpão da Matriz', () => {
     expect(updated).toMatchObject({group_id:group.group_id,product_id:f.productId,brand:'MarcaCorrigidaTeste',
       positions:[{location_code:'D2',quantity_on_hand:2}]});
     expect(updated?.revision).not.toBe(group.revision);
+  });
+
+  it('usa o remanescente avulso de um grupo antes de abrir outro par na reserva e no balcão', async () => {
+    const f=await fixture('OrigemRemanescenteTeste',2);
+    const createPair=(location_code:string)=>saveMatrizStockGroup(db.pool,'test',{
+      stock_id:f.stockId,product_id:f.productId,model:'Modelo teste',matched_set:true,
+      inspection_status:'approved',positions:[{location_code,quantity:2}],
+      reason:'Conferência de pares',idempotency_key:randomUUID(),
+    },'teste');
+    const sell=()=>tx(async client=>{
+      const id=await order(client,f.productId,1);
+      await client.query("SELECT set_config('app.galpao_source','varejo',true),set_config('app.galpao_ref',$1,true)",[id]);
+      await client.query("UPDATE commerce.wholesale_stock SET quantity_on_hand=quantity_on_hand-1 WHERE environment='test' AND id=$1",[f.stockId]);
+      return id;
+    });
+    const remainder=await createPair('B2');
+    await sell(); // Única origem: a peça que restou na B2 agora é avulsa.
+    expect(await listAvailableMatrizStockGroups(db.pool,'test',{measure:f.measure,groupId:remainder.group_id,quantity:2})).toEqual([]);
+    await db.pool.query("UPDATE commerce.wholesale_stock SET quantity_on_hand=quantity_on_hand+2 WHERE environment='test' AND id=$1",[f.stockId]);
+    await createPair('C2');
+    const id=await tx(async client=>{
+      const reserved=await order(client,f.productId,1);
+      await reserveMatrizGalpaoStock(client,'test',reserved,[{productId:f.productId,quantity:1}],true);
+      return reserved;
+    });
+    expect(await listMatrizOrderGroupPositions(db.pool,'test',id)).toMatchObject([{group_id:remainder.group_id,quantity:1}]);
+    await tx(client=>releaseMatrizGalpaoReservation(client,'test',id));
+    const walkin=await sell();
+    expect(await listMatrizOrderGroupPositions(db.pool,'test',walkin)).toMatchObject([{group_id:remainder.group_id,quantity:1}]);
   });
 
   it('valida modelo do SKU e exige reconferência de um conjunto suspenso', async () => {

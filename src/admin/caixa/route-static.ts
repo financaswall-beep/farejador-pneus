@@ -57,6 +57,8 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
     text(`/operacao/${file}.js`, `${file}.js`, 'text/javascript; charset=utf-8');
   }
   text('/operacao/stock-waitlist.css', 'stock-waitlist.css', 'text/css; charset=utf-8');
+  text('/operacao/stock-origin.css', 'stock-origin.css', 'text/css; charset=utf-8');
+  text('/operacao/stock-origin-view.js', 'stock-origin-view.js', 'text/javascript; charset=utf-8');
   for(const file of ['stock-waitlist-view','stock-waitlist','caixa-waitlist']) {
     text(`/operacao/${file}.js`,`${file}.js`,'text/javascript; charset=utf-8');
   }

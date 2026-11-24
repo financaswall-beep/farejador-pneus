@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-11-24T05:01:16.096Z",
-  "total": 3272,
+  "geradoEm": "2026-11-24T05:43:52.085Z",
+  "total": 3274,
   "propriedades": {
     "abrirCadastroCliente": "function",
     "abrirClienteLead": "function",
@@ -2988,6 +2988,7 @@
     "sfUseExisting": "function",
     "sfWritable": "value:boolean",
     "sgActive": "function",
+    "sgAfterSale": "function",
     "sgChoose": "function",
     "sgCondition": "function",
     "sgConservation": "function",
@@ -2998,6 +2999,7 @@
     "sgMove": "function",
     "sgNew": "function",
     "sgOpen": "function",
+    "sgOrigins": "function",
     "sgProducts": "function",
     "sgRows": "function",
     "sgSave": "function",

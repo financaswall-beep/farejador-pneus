@@ -24,6 +24,7 @@ export interface CaixaDeliveryRow {
   delivery_failure_reason?: string | null;
   items: DeliveryPresentation['items'] | Array<{ quantity: number; label: string; tire_condition: null }>;
   shared_stock_positions?: DeliveryPresentation['shared_stock_positions'];
+  stock_origin_pendings?: DeliveryPresentation['stock_origin_pendings'];
 }
 
 function courierAuth(auth: CaixaAuth): EntregadorAuth {
@@ -71,7 +72,7 @@ export async function getCaixaDeliveries(auth: CaixaAuth) {
   const presentation = await getDeliveryPresentation(auth, rows.map(row => row.order_id));
   for (const row of rows) {
     const extra = presentation.get(row.order_id);
-    if (extra) Object.assign(row, { items: extra.items, shared_stock_positions: extra.shared_stock_positions, delivery_failure_reason: extra.delivery_failure_reason,
+    if (extra) Object.assign(row, { items: extra.items, shared_stock_positions: extra.shared_stock_positions, stock_origin_pendings: extra.stock_origin_pendings, delivery_failure_reason: extra.delivery_failure_reason,
       has_customer_avatar: Boolean(extra.conversation_id) });
   }
   const unresolved = routeRows.filter(

@@ -62,6 +62,10 @@
       list.appendChild(summary);
     }
     if (!tires(row).length) list.appendChild(el('p', 'Itens do pedido não informados.'));
+    if (row.status === 'open' && row.stock_origin_pendings?.length) {
+      const host = el('div', null, 'origin-host'); list.appendChild(host);
+      window.StockOrigin.operation(host,row,'retiradas',() => C.loadPickups());
+    }
     return list;
   }
   function totalLine(label, amount, large) {

@@ -5,6 +5,7 @@ import { getMarketReference, marketReferenceSchema, setMarketReference } from '.
 import { listMatrizStockGroups, moveMatrizStockGroup, saveMatrizStockGroup } from '../painel/stock-groups.js';
 import { listMatrizStockGroupOptions, stockGroupId, stockGroupSchema, stockGroupMoveSchema } from '../painel/stock-group-inputs.js';
 import { registerInventoryRead as read, registerInventoryWrite as write } from './inventory-registry.js';
+import './stock-origin-tools.js';
 
 read('consultar_pilhas_galpao','Localize o stock_id e o product_id da variante informando medida e marca. Use o stock_id para ver grupos, pilhas, quantidades livres/reservadas, notas de conservação e revisão antes de movimentar.',
   z.object({stock_id:stockGroupId.optional(),medida:z.string().trim().min(1).max(60).optional(),

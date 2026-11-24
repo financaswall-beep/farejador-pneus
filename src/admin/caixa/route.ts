@@ -30,6 +30,7 @@ import { registerCaixaTeamRoutes } from './route-team.js';
 import { registerCaixaNotificationRoutes } from './route-notifications.js';
 import { registerCaixaOperationStockRoutes } from './route-operation-stock.js';
 import { registerCaixaPickupRoutes } from './route-pickups.js';
+import { registerCaixaStockOriginRoutes } from './route-stock-origins.js';
 import { createCaixaSaleSchema } from './sale-schema.js';
 import { registerCaixaPurchaseRoutes } from './route-purchases.js';
 import { registerCaixaFinanceStatementRoutes } from './route-finance-statement.js';
@@ -128,6 +129,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   };
   const requireVendas = requireCaixaModule('vendas');
   registerCaixaSaleRecovery(fastify, [flagGate, requireCaixaAuth, requireVendas]);
+  registerCaixaStockOriginRoutes(fastify, [flagGate, requireCaixaAuth]);
   const requireEstoque = requireCaixaModule('estoque');
   const requireEntregas = requireCaixaModule('entregas');
   const requireRetiradas = requireCaixaModule('retiradas');

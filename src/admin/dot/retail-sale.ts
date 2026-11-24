@@ -66,6 +66,9 @@ export async function retailOrder(db:Pick<PoolClient,'query'>,id:string,lock=fal
     o.delivered_at,o.created_at,o.fulfillment_mode,o.trip_id,o.total_amount::float8 AS total,
     items.produtos,items.custo,items.itens_sem_custo,items.quantidade,
     COALESCE(receipts.total,0)::float8 AS recebido,COALESCE(receipts.total=o.total_amount,false) AS pago,
+    EXISTS(SELECT 1 FROM commerce.matriz_stock_origins pending
+      WHERE pending.environment=o.environment AND pending.reference_id=o.id AND pending.source='varejo'
+        AND pending.status='pending') AS origem_a_conferir,
     EXISTS(SELECT 1 FROM audit.events a WHERE a.environment=o.environment AND a.entity_id=o.id
       AND a.event_type='matriz_galpao_decrement') AS baixa_registrada
     FROM commerce.orders o JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'

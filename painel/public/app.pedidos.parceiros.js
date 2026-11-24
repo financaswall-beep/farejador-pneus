@@ -68,8 +68,9 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       this.orderError = null;
 
       try {
+        let sale;
         if (this.modalConv) {
-          await this.apiPost('/admin/api/orders/register-manual', {
+          sale = await this.apiPost('/admin/api/orders/register-manual', {
             conversation_id: this.modalConv.id,
             draft_id: this.modalConv.draft_id || null,
             items,
@@ -81,7 +82,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
             source_tag: this.saleForm.source_tag || null,
           });
         } else {
-          await this.apiPost('/admin/api/orders/register-walkin', {
+          sale = await this.apiPost('/admin/api/orders/register-walkin', {
             delivery_address_fields: this.saleAddress.structured && this.saleForm.fulfillment_mode==='delivery' ? {...this.saleAddress.fields} : null,
             customer_mode: this.saleCustomer.mode,
             customer_ref: this.saleCustomer.selected ? { source:this.saleCustomer.selected.source,id:this.saleCustomer.selected.id } : null,
@@ -98,6 +99,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         }
 
         this.saleModalOpen = false;
+        if (sale?.order_id) void this.sgAfterSale?.(sale.order_id);
         await Promise.allSettled([
           this.loadRealData(),
           this.loadFinanceiro(),

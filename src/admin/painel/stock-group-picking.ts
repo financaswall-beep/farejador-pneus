@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { listMatrizOrderGroupPositionsForOrders } from './stock-groups.js';
+import { listStockOriginPendings } from './stock-origin.js';
 
 type StockPosition = { location_code: string; quantity: number; model: string | null };
 export interface StockPickingItem {
@@ -10,6 +11,7 @@ export interface StockPickingOrder {
   order_id: string;
   items: StockPickingItem[];
   shared_stock_positions?: Array<{ product_id: string; product_name: string; positions: StockPosition[] }>;
+  stock_origin_pendings?: Awaited<ReturnType<typeof listStockOriginPendings>>;
 }
 
 /** Recebe apenas pedidos já filtrados por acesso à retirada/entrega da Matriz. */
@@ -18,17 +20,27 @@ export async function addStockPickingPositions(
   stage: 'pending_delivery' | 'open_pickup',
 ): Promise<void> {
   if (!orders.length) return;
-  const positions = await listMatrizOrderGroupPositionsForOrders(db, environment, orders.map(order => order.order_id));
+  const orderIds = orders.map(order => order.order_id);
+  const [positions, pendings] = await Promise.all([
+    listMatrizOrderGroupPositionsForOrders(db, environment, orderIds, true),
+    listStockOriginPendings(db, environment, { orderIds }),
+  ]);
   const byOrder = new Map(orders.map(order => [order.order_id, order]));
   for (const order of orders) {
     delete order.shared_stock_positions;
+    delete order.stock_origin_pendings;
     for (const item of order.items) delete item.stock_positions;
+  }
+  for (const issue of pendings) {
+    const order = issue.order_id && byOrder.get(issue.order_id);
+    if (order) (order.stock_origin_pendings ??= []).push(issue);
   }
   for (const position of positions) {
     // Uma venda avulsa para entrega já baixou as unidades quando entra na fila de separação.
     if (position.status !== 'reserved' && !(stage === 'pending_delivery' && position.status === 'consumed')) continue;
     const order = byOrder.get(position.order_id);
     if (!order) continue;
+    if (order.stock_origin_pendings?.some(issue => !issue.product_id || issue.product_id === position.product_id)) continue;
     const { location_code, quantity, model } = position;
     if (position.order_item_id) {
       const item = order.items.find(row => row.order_item_id === position.order_item_id);

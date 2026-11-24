@@ -47,6 +47,13 @@ const groupSchema = z.object({
 
 type GroupQuote = z.infer<typeof groupSchema>;
 
+async function groupStillAvailable(client: PoolClient, environment: Environment, quote: GroupQuote) {
+  const groups=await listAvailableMatrizStockGroups(client,environment,{
+    measure:quote.medida,quantity:quote.quantidade,productIds:[quote.product_id],groupId:quote.conjunto_id,
+  });
+  return groups.some(group=>group.group_id===quote.conjunto_id && group.product_id===quote.product_id && group.revision===quote.revisao);
+}
+
 export interface BotGroupReservation {
   groupId: string;
   productId: string;
@@ -258,6 +265,7 @@ export async function verifiedObjectionProduct(
     ? group.data.quantidade : tireSearchQuantity(previous.args) ?? 1;
   if (!product || !(product.total_stock_available >= quantity) || product.price_type === 'partner_retail'
     || !matchesSentMarketQuote(previous.say_text, productId, candidates, group.data)) return false;
+  if (group.success && group.data.product_id===productId && !await groupStillAvailable(client,environment,group.data)) return false;
   const location = await confirmationLocation(client, environment, conversationId, previous.args);
   if (previous.args.modalidade === 'pickup' || previous.args.modalidade === 'delivery') {
     location.modalidade = previous.args.modalidade;
@@ -274,11 +282,7 @@ export async function verifyGroupFulfillment(
   const parsed = groupSchema.safeParse(previous?.result.conjunto_carro);
   if (!parsed.success || parsed.data.conjunto_id !== args.conjunto_id) return null;
   const quote = parsed.data;
-  const groups = await listAvailableMatrizStockGroups(client, environment, {
-    measure: quote.medida, quantity: quote.quantidade, productIds: [quote.product_id], groupId: quote.conjunto_id,
-  });
-  if (!groups.some(group => group.group_id === quote.conjunto_id && group.revision === quote.revisao
-    && group.product_id === quote.product_id)) return null;
+  if (!await groupStillAvailable(client,environment,quote)) return null;
   const location = await confirmationLocation(client, environment, conversationId, args);
   location.modalidade = modality;
   return await matrixCanOfferGroup(client, environment, conversationId, location, quote.product_id, quote.quantidade)

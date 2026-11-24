@@ -2,7 +2,10 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ groups: vi.fn(), saveGroup: vi.fn(), move: vi.fn(), allocations: vi.fn(),
-  reference: vi.fn(), saveReference: vi.fn() }));
+  reference: vi.fn(), saveReference: vi.fn(), origins:vi.fn(), confirmOrigin:vi.fn() }));
+vi.mock('../../../src/admin/painel/stock-origin.js', () => ({
+  listStockOriginPendings:mocks.origins, confirmStockOrigin:mocks.confirmOrigin,
+}));
 
 vi.mock('../../../src/admin/auth.js', () => ({
   requireAdminAuth: async (request: FastifyRequest, reply: FastifyReply) => {
@@ -47,6 +50,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   vi.resetAllMocks();
+  mocks.origins.mockResolvedValue([]);
   app = Fastify();
   registerStock(app);
   registerMarket(app);
@@ -55,6 +59,21 @@ beforeEach(async () => {
 afterEach(async () => app.close());
 
 describe('rotas de pilhas e referências da Matriz', () => {
+  it('confirma origem no Estoque com permissão, chave de repetição e quantidades positivas por candidato', async () => {
+    const url = '/admin/api/wholesale/stock/origins';
+    const payload = { selections:[{candidate_id:product,quantity:1}], idempotency_key:stock };
+    expect((await app.inject({url})).statusCode).toBe(401);
+    expect((await app.inject({url:url+'?order_id='+group,headers:staff})).statusCode).toBe(200);
+    expect(mocks.origins).toHaveBeenCalledWith(expect.anything(),'test',expect.objectContaining({orderIds:[group]}));
+    const post=(headers:Record<string,string>,body=payload)=>app.inject({method:'POST',url:url+'/'+group,headers,payload:body});
+    expect((await post(staff)).statusCode).toBe(403);
+    expect((await post(owner,{...payload,selections:[...payload.selections,...payload.selections]})).statusCode).toBe(400);
+    expect(mocks.confirmOrigin).not.toHaveBeenCalled();
+    mocks.confirmOrigin.mockResolvedValue({id:group,status:'confirmed'});
+    expect((await post(owner)).json()).toEqual({id:group,status:'confirmed'});
+    mocks.confirmOrigin.mockRejectedValueOnce(Error('stock_origin_changed'));
+    expect((await post(owner)).statusCode).toBe(409);
+  });
   it('exige operador de estoque para ler grupos e proprietário para editar ou consultar referências', async () => {
     expect((await app.inject({ url: groupPath })).statusCode).toBe(401);
     expect((await app.inject({ url: marketPath, headers: staff })).statusCode).toBe(403);
@@ -107,6 +126,18 @@ describe('rotas de pilhas e referências da Matriz', () => {
 });
 
 describe('posições exibidas para separação', () => {
+  it('apresenta a sugestão pendente sem exibir a baixa provisória como origem confirmada', async () => {
+    const { addStockPickingPositions } = await import('../../../src/admin/painel/stock-group-picking.js');
+    const { pool } = await import('../../../src/persistence/db.js');
+    const issue = {id:group,order_id:'o',product_id:'p',quantity:1,candidates:[{candidate_id:stock,location_code:'C2',suggested_quantity:1}]};
+    mocks.origins.mockResolvedValue([issue]);
+    mocks.allocations.mockResolvedValue([{order_id:'o',order_item_id:'i',product_id:'p',status:'consumed',location_code:'C2',quantity:1},
+      {order_id:'o',order_item_id:'j',product_id:'q',status:'reserved',location_code:'F2',quantity:1,model:null}]);
+    const o={order_id:'o',items:[{order_item_id:'i'},{order_item_id:'j'}]};
+    await addStockPickingPositions(pool,'test',[o],'pending_delivery');
+    expect(o).toEqual({order_id:'o',stock_origin_pendings:[issue],items:[{order_item_id:'i'},
+      {order_item_id:'j',stock_positions:[{location_code:'F2',quantity:1,model:null}]}]});
+  });
   it.each(['pending_delivery','open_pickup'] as const)('associa somente posições utilizáveis da fila %s ao item do mesmo pedido', async stage => {
     const { addStockPickingPositions } = await import('../../../src/admin/painel/stock-group-picking.js');
     const { pool } = await import('../../../src/persistence/db.js');
@@ -119,7 +150,7 @@ describe('posições exibidas para separação', () => {
     ]);
     const orders = [{ order_id: 'first', items: [{ order_item_id: 'item' }, { order_item_id: 'other-item' }] }];
     await addStockPickingPositions(pool, 'test', orders, stage);
-    expect(mocks.allocations).toHaveBeenCalledWith(pool, 'test', ['first']);
+    expect(mocks.allocations).toHaveBeenCalledWith(pool, 'test', ['first'], true);
     const expectedPositions = [{ location_code: 'B2', quantity: 2, model: 'Scorpion' },
       ...(stage === 'pending_delivery' ? [{ location_code: 'B1', quantity: 1, model: null }] : [])];
     expect(orders[0]!.items).toEqual([{ order_item_id: 'item', stock_positions: expectedPositions }, { order_item_id: 'other-item' }]);
