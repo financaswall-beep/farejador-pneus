@@ -3,6 +3,14 @@ const CATALOGO_KNOWN_BRANDS = Object.freeze([
   'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'CEAT', 'Dunlop', 'IRA', 'IRC',
   'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
   'Maxxis', 'Hankook', 'Toyo', 'XBRI', 'Yokohama', 'Giti',
+  'Goodyear', 'Compasal', 'Itaro', 'Speed Max', 'Westlake', 'Kumho', 'Royal Black', 'Continental', 'Goform',
+]);
+const catalogoBrandKey = (brand) => String(brand || '').normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const CATALOGO_LOGO_KEYS = new Set(CATALOGO_KNOWN_BRANDS.map(catalogoBrandKey));
+const CATALOGO_LOGO_ALIASES = new Map([
+  ['magion', 'maggion'], ['ciat', 'ceat'], ['toyotires', 'toyo'],
+  ['westlaketyres', 'westlake'], ['westlaketires', 'westlake'],
 ]);
 const catalogoMoneyValue = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 // Apenas apresentação. Nunca usar este texto como identidade, medida de gravação
@@ -102,34 +110,9 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     catalogoBrandLogo(brand) {
-      const key = String(brand || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '');
-      const aliases = {
-        pirelli: 'pirelli',
-        metzeler: 'metzeler',
-        michelin: 'michelin',
-        bridgestone: 'bridgestone',
-        dunlop: 'dunlop',
-        levorin: 'levorin',
-        rinaldi: 'rinaldi',
-        maggion: 'maggion',
-        magion: 'maggion',
-        technic: 'technic',
-        vipal: 'vipal',
-        mitas: 'mitas',
-        kenda: 'kenda',
-        ceat: 'ceat',
-        ciat: 'ceat',
-        ira: 'ira',
-        irc: 'irc',
-        maxxis: 'maxxis', hankook: 'hankook', toyo: 'toyo', toyotires: 'toyo',
-        xbri: 'xbri', yokohama: 'yokohama', giti: 'giti',
-      };
-      const asset = aliases[key];
-      return asset
+      const key = catalogoBrandKey(brand);
+      const asset = CATALOGO_LOGO_ALIASES.get(key) ?? key;
+      return CATALOGO_LOGO_KEYS.has(asset)
         ? `/admin/painel/assets/catalog-brands/${asset}.webp?v=20260824-catalog-brand3`
         : null;
     },
