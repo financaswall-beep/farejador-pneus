@@ -261,6 +261,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
     'pirelli', 'metzeler', 'michelin', 'bridgestone', 'dunlop', 'levorin',
     'rinaldi', 'maggion', 'technic', 'vipal', 'mitas', 'kenda', 'ceat', 'ira', 'irc',
     'maxxis', 'hankook', 'toyo', 'xbri', 'yokohama', 'giti',
+    'goodyear', 'compasal', 'itaro', 'speedmax', 'westlake', 'kumho', 'royalblack', 'continental', 'goform',
   ]) {
     text(
       `/operacao/catalog-brands/${asset}.webp`,

@@ -23,6 +23,17 @@ const KNOWN_BRANDS = new Map<string, string>([
   ['xbri', 'XBRI'],
   ['yokohama', 'Yokohama'],
   ['giti', 'Giti'],
+  ['goodyear', 'Goodyear'],
+  ['compasal', 'Compasal'],
+  ['itaro', 'Itaro'],
+  ['speedmax', 'Speed Max'],
+  ['westlake', 'Westlake'],
+  ['westlaketyres', 'Westlake'],
+  ['westlaketires', 'Westlake'],
+  ['kumho', 'Kumho'],
+  ['royalblack', 'Royal Black'],
+  ['continental', 'Continental'],
+  ['goform', 'Goform'],
 ]);
 
 function brandKey(value: string): string {
