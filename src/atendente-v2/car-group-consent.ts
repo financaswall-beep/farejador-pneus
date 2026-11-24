@@ -10,9 +10,12 @@ function cleanReply(text: string): string {
 export function acceptedCarGroup(sayText: string, quantity: number, replies: OfferReply[]): boolean {
   const names = ['zero', 'um', 'dois', 'tres', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez'];
   const count = new RegExp(`\\b(?:${quantity}${names[quantity] ? '|' + names[quantity] : ''}${quantity === 2 ? '|duas' : ''})\\s+(?:pneus?|unidades?)\\b`);
-  const set = /\b(?:conjunto|jogo|par)\b/;
-  const action = /\b(?:(?:quer|vai|posso|vamos|pode)\s+(?:levar|ficar|fechar|reservar|confirmar|aproveitar|comprar)|quer\s+(?:o|um)\s+(?:conjunto|jogo|par))\b/;
+  const pair = /\b(?:par|parzinho)\b/;
+  const set = /\b(?:conjunto|jogo|par|parzinho)\b/;
+  const action = /\b(?:(?:quer|vai|posso|vamos|pode)\s+(?:levar|ficar|fechar|reservar|confirmar|aproveitar|comprar)|quer\s+(?:o|um)\s+(?:conjunto|jogo|par|parzinho))\b/;
   const explicit = /\b(?:quero|vou (?:levar|querer)|leva|fico|manda|fecha|reserva|aceito|confirmo|pode ser|pode fechar|pode reservar|pode mandar)\b/;
+  // O objeto da decisão deve ser o pneu. "Quero ver a foto do par" não autoriza uma reserva.
+  const purchase = new RegExp(`${explicit.source}\\s+(?:(?:levar|fechar|reservar|comprar|ficar)\\s+)?(?:com\\s+)?(?:(?:o|os|um|esse|esses|este|estes|aquele|aqueles)\\s+)?(?:${set.source}|${count.source})`);
   const isSet = (text: string) => set.test(text) || count.test(text);
   const invites = (text: string) => {
     const lastQuestion = text.match(/[^.!?]+\?\s*$/)?.[0] ?? '';
@@ -30,10 +33,16 @@ export function acceptedCarGroup(sayText: string, quantity: number, replies: Off
     }
     const quantities = Array.from(text.matchAll(/\b(\d+|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\s+(?:pneus?|unidades?)\b/g));
     const changedQuantity = explicit.test(text) && (quantities.some(match => !count.test(match[0]))
-      || (quantity !== 2 && /\bpar\b/.test(text)));
-    if (changedQuantity || /\b(?:desisti|cancela\w*|nao quero|so (?:um|uma|[1-9]|dois|tres|quatro)|avuls[oa]s?|troca\w*|outro(?:s)? pneu)\b/.test(text)) {
+      || (quantity !== 2 && pair.test(text)));
+    const negated = /\b(?:nao|nem|nunca|jamais|negativo)\b/.test(text);
+    const refused = negated && (explicit.test(text) || isSet(text)
+      || /^(?:nao|negativo|prefiro nao|agora nao|melhor nao|nem pensar)(?:[,\s]+(?:obrigad[oa]|valeu))?[.!\s]*$/.test(text));
+    const undecided = /\b(?:talvez|vou pensar|acho que|ainda (?:estou pensando|nao decidi)|deixa (?:eu pensar|pra depois|pra la)|na duvida|dependendo|mudei de ideia)\b/.test(text);
+    const conditional = /\b(?:se|caso|ou|mas|porem|desconto|caro)\b|r\$/.test(text);
+    if (changedQuantity || refused || undecided || (conditional && purchase.test(text))
+      || /\b(?:desisti|cancela\w*|so (?:um|uma|[1-9]|dois|tres|quatro)|avuls[oa]s?|troca\w*|outro(?:s)? pneu)\b/.test(text)) {
       accepted = false;
-    } else if (!text.includes('?') && !/\b(?:se|mas|porem|desconto|caro)\b|r\$/.test(text) && (explicit.test(text) && isSet(text)
+    } else if (!negated && !text.includes('?') && !conditional && (purchase.test(text)
       || allowed && /^(?:sim|aceito|confirmo|fechado|fechou|pode ser|pode fechar|pode reservar)[.!\s👍✅]*$/u.test(text))) {
       accepted = true;
     }

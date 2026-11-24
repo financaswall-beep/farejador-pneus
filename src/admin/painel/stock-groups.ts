@@ -77,10 +77,13 @@ export async function listMatrizStockGroups(db: Database, environment: MatrizEnv
 
 export async function listAvailableMatrizStockGroups(db: Database, environment: MatrizEnvironment, input: {
   measure: string; quantity: number; brand?: string; tireCondition?: TireCondition;
+  productIds?: string[]; groupId?: string;
 }) {
   const measureKey = tireSizeKey(input.measure).replace(/-/g,'');
   if (!measureKey || !validQuantity(input.quantity)) return [];
-  return (await db.query<MatrizStockGroup>(`SELECT ${groupColumns} ${groupTables}
+  type Offer = Pick<MatrizStockGroup,'group_id'|'product_id'|'measure'|'brand'|'tire_condition'|'model'|'conservation_grade'|'revision'|'quantity_available'>;
+  return (await db.query<Offer>(`SELECT g.id group_id,g.product_id,s.measure,s.brand,s.tire_condition,
+    g.model,g.conservation_grade,g.revision::text,(pos.physical-pos.reserved)::int quantity_available ${groupTables}
     JOIN commerce.products p ON p.environment=g.environment AND p.id=g.product_id
     JOIN commerce.tire_specs ts ON ts.environment=g.environment AND ts.product_id=g.product_id
     WHERE g.environment=$1 AND regexp_replace(s.measure,'[^0-9]','','g')=$2
@@ -88,12 +91,13 @@ export async function listAvailableMatrizStockGroups(db: Database, environment: 
       AND pos.physical-pos.reserved >= $3 AND s.unit_cost>0 AND s.vehicle_type IS DISTINCT FROM 'motorcycle'
       AND ($4::text IS NULL OR commerce.catalog_brand_identity(s.brand)=commerce.catalog_brand_identity($4))
       AND ($5::text IS NULL OR s.tire_condition=$5)
+      AND ($6::uuid[] IS NULL OR g.product_id=ANY($6)) AND ($7::uuid IS NULL OR g.id=$7)
       AND p.product_type='tire' AND NOT p.partner_generic AND p.deleted_at IS NULL AND ts.vehicle_type='car'
       AND regexp_replace(ts.tire_size,'[^0-9]','','g')=$2 AND p.tire_condition=s.tire_condition
       AND commerce.catalog_brand_identity(p.brand)=commerce.catalog_brand_identity(s.brand)
       AND commerce.matriz_stock_group_model_matches(g.model,ts.tread_pattern)
-    ORDER BY pos.physical-pos.reserved DESC,g.id LIMIT 100`,[
-    environment,measureKey,input.quantity,canonicalCatalogBrand(input.brand),input.tireCondition??null,
+    ORDER BY pos.physical-pos.reserved DESC,g.id`,[
+    environment,measureKey,input.quantity,canonicalCatalogBrand(input.brand),input.tireCondition??null,input.productIds??null,input.groupId??null,
   ])).rows;
 }
 
@@ -278,13 +282,14 @@ export async function moveMatrizStockGroup(db: Database, environment: MatrizEnvi
 export async function listMatrizOrderGroupPositionsForOrders(db: Database, environment: MatrizEnvironment, orderIds: string[]) {
   if (orderIds.length===0) return [];
   return (await db.query<{
-    order_id: string; order_item_id: string | null; product_id: string; group_id: string; model: string | null;
+    order_id: string; order_item_id: string | null; matching_items: number; product_id: string; product_name: string;
+    group_id: string; model: string | null;
     location_code: string; quantity: number; status: 'reserved'|'released'|'consumed';
-  }>(`SELECT a.order_id,oi.order_item_id,a.product_id,a.group_id,a.model,a.location_code,a.quantity,a.status
+  }>(`SELECT a.order_id,oi.order_item_id,oi.matching_items,a.product_id,p.product_name,a.group_id,a.model,a.location_code,a.quantity,a.status
     FROM commerce.matriz_stock_group_allocations a
-    LEFT JOIN LATERAL (SELECT (array_agg(i.id))[1] order_item_id FROM commerce.order_items i
-      WHERE i.environment=a.environment AND i.order_id=a.order_id AND i.product_id=a.product_id
-      HAVING count(*)=1) oi ON TRUE
+    JOIN commerce.products p ON p.environment=a.environment AND p.id=a.product_id
+    CROSS JOIN LATERAL (SELECT count(*)::int matching_items,CASE WHEN count(*)=1 THEN (array_agg(i.id))[1] END order_item_id
+      FROM commerce.order_items i WHERE i.environment=a.environment AND i.order_id=a.order_id AND i.product_id=a.product_id) oi
     WHERE a.environment=$1 AND a.order_id=ANY($2::uuid[]) ORDER BY a.order_id,a.product_id,a.location_code,a.group_id`,
   [environment,orderIds])).rows;
 }

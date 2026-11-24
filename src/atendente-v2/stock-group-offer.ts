@@ -92,10 +92,8 @@ export async function findCarStockGroup(
   if (args.modalidade === 'pickup' || args.modalidade === 'delivery') location.modalidade = args.modalidade;
   if (!location.municipio && !location.customerLocation) return null;
 
-  const only = choices.length === 1 ? choices[0] : undefined;
   const groups = await listAvailableMatrizStockGroups(client, environment, {
-    measure: args.medida_pneu, quantity: minimum, brand: only?.brand ?? undefined,
-    tireCondition: only?.tire_condition ?? undefined,
+    measure: args.medida_pneu, quantity: minimum, productIds: choices.map(product => product.product_id),
   });
   for (const product of choices) {
     const group = groups.find(item => item.product_id === product.product_id);
@@ -125,8 +123,7 @@ export async function verifiedSingleCarTireConservation(
   if (!winner || winner.total_stock_available !== 1 || winner.price_type === 'partner_retail'
     || !await isCarTireSearch(client, environment, args)) return null;
   const groups = await listAvailableMatrizStockGroups(client, environment, {
-    measure: args.medida_pneu, quantity: 1, brand: winner.brand ?? undefined,
-    tireCondition: winner.tire_condition ?? undefined,
+    measure: args.medida_pneu, quantity: 1, productIds: [winner.product_id],
   });
   const matches = groups.filter(group => group.product_id === winner.product_id && group.quantity_available > 0);
   const sole = matches[0];
@@ -158,7 +155,7 @@ interface ProductSearchTurn {
 
 interface SearchHistoryRow {
   actions: ChatMessage[];
-  say_text: string;
+  say_text: string | null;
   provider_message_id: string | null;
 }
 
@@ -173,7 +170,7 @@ function latestProductSearch(turns: SearchHistoryRow[]): ProductSearchTurn | nul
     try {
       return { result: JSON.parse(result.content) as ProductSearch,
         args: JSON.parse(calls.get(result.tool_call_id!) ?? '{}') as Record<string, unknown>,
-        say_text: turn.say_text, provider_message_id: turn.provider_message_id };
+        say_text: turn.say_text ?? '', provider_message_id: turn.provider_message_id };
     }
     catch { return null; }
   }
@@ -186,7 +183,7 @@ async function sentProductSearch(
 ): Promise<ProductSearchTurn | null> {
   if (!requestId) return null;
   const result = await client.query<SearchHistoryRow>(`
-    SELECT t.actions,${confirmedQuote ? 'outbound.body' : 't.say_text'} AS say_text,
+    SELECT t.actions,outbound.body AS say_text,
            outbound.provider_message_id::text AS provider_message_id
       FROM agent.turns t
       JOIN core.messages quoted ON quoted.id=t.trigger_message_id AND quoted.environment=t.environment
@@ -278,7 +275,7 @@ export async function verifyGroupFulfillment(
   if (!parsed.success || parsed.data.conjunto_id !== args.conjunto_id) return null;
   const quote = parsed.data;
   const groups = await listAvailableMatrizStockGroups(client, environment, {
-    measure: quote.medida, quantity: quote.quantidade,
+    measure: quote.medida, quantity: quote.quantidade, productIds: [quote.product_id], groupId: quote.conjunto_id,
   });
   if (!groups.some(group => group.group_id === quote.conjunto_id && group.revision === quote.revisao
     && group.product_id === quote.product_id)) return null;

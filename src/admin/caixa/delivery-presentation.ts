@@ -4,9 +4,9 @@ import { env } from '../../shared/config/env.js';
 import { MAIN_DELIVERY_GUARD } from '../painel/queries-logistica-read.js';
 import { getCustomerLeadAvatar } from '../painel/customer-lead-avatar.js';
 import type { CaixaAuth } from './queries.js';
-import { addStockPickingPositions, type StockPickingItem } from '../painel/stock-group-picking.js';
+import { addStockPickingPositions, type StockPickingOrder, type StockPickingItem } from '../painel/stock-group-picking.js';
 
-export interface DeliveryPresentation {
+export interface DeliveryPresentation extends StockPickingOrder {
   order_id: string;
   conversation_id: string | null;
   delivery_failure_reason: string | null;
@@ -44,7 +44,7 @@ export async function getDeliveryPresentation(
     [environment, orderIds, auth.collaboratorId],
   );
   if (includeStockPositions) {
-    await addStockPickingPositions(db, environment, result.rows.filter(row => row.delivery_status === 'pending'));
+    await addStockPickingPositions(db, environment, result.rows.filter(row => row.delivery_status === 'pending'), 'pending_delivery');
   }
   return new Map(result.rows.map(row => [row.order_id, row]));
 }

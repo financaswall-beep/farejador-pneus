@@ -49,7 +49,7 @@ export async function getMatrizRetiradas(dbPool: Pool = defaultPool): Promise<un
       LIMIT 300`,
     [env.FAREJADOR_ENV, env.BOT_PICKUP_RESERVATION_HOURS],
   );
-  await addStockPickingPositions(dbPool, env.FAREJADOR_ENV, result.rows.filter(row => row.status === 'open'));
+  await addStockPickingPositions(dbPool, env.FAREJADOR_ENV, result.rows.filter(row => row.status === 'open'), 'open_pickup');
   return result.rows;
 }
 

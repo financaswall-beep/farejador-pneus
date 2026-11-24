@@ -20,6 +20,11 @@
     }
     function products(row, compact) {
       const list = node('div', null, compact ? 'mdf-products mdf-products--compact' : 'mdf-products');
+      function appendPositions(parent, positions) {
+        for (const position of positions || []) {
+          parent.appendChild(node('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
+        }
+      }
       for (const item of row.items || []) {
         const line = node('div', null, 'mdf-product'), copy = node('div', null, 'mdf-product-copy');
         const size = item.tire_size || String(item.label || 'Pneu').match(/\b\d{2,3}\/\d{2,3}[-R ]\d{2}\b/i)?.[0];
@@ -28,11 +33,15 @@
         const description = [item.brand, condition, category].filter(Boolean).join(' · ');
         copy.append(node('strong', size || item.label || 'Pneu'), node('small', description || item.label || 'Cadastro a conferir'),
           node('p', item.quantity + (Number(item.quantity) === 1 ? ' pneu' : ' pneus')));
-        for (const position of item.stock_positions || []) {
-          copy.appendChild(node('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
-        }
+        appendPositions(copy, item.stock_positions);
         // Uma foto de pedido não representa os demais modelos de uma compra com vários itens.
         line.append(photo(row.items.length === 1 ? row : { ...row, photo_request_id: null }, item), copy); list.appendChild(line);
+      }
+      for (const group of row.shared_stock_positions || []) {
+        const summary = node('div', null, 'mdf-product-copy');
+        summary.appendChild(node('small', 'Pilhas para ' + group.product_name));
+        appendPositions(summary, group.positions);
+        list.appendChild(summary);
       }
       if (!list.children.length) list.appendChild(node('p', 'Itens a conferir', 'mdf-hint'));
       return list;

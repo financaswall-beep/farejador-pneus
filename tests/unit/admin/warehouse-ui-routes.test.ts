@@ -107,18 +107,35 @@ describe('rotas de pilhas e referências da Matriz', () => {
 });
 
 describe('posições exibidas para separação', () => {
-  it('associa ao item do mesmo pedido somente as posições efetivamente reservadas', async () => {
+  it.each(['pending_delivery','open_pickup'] as const)('associa somente posições utilizáveis da fila %s ao item do mesmo pedido', async stage => {
     const { addStockPickingPositions } = await import('../../../src/admin/painel/stock-group-picking.js');
     const { pool } = await import('../../../src/persistence/db.js');
     mocks.allocations.mockResolvedValue([
       { order_id: 'first', order_item_id: 'item', status: 'reserved', location_code: 'B2', quantity: 2, model: 'Scorpion' },
+      { order_id: 'first', order_item_id: 'item', status: 'consumed', location_code: 'B1', quantity: 1, model: null },
       { order_id: 'first', order_item_id: 'item', status: 'released', location_code: 'B3', quantity: 1, model: null },
+      { order_id: 'first', order_item_id: null, status: 'consumed', location_code: 'D4', quantity: 1, model: null },
       { order_id: 'other', order_item_id: 'item', status: 'reserved', location_code: 'A1', quantity: 1, model: null },
     ]);
     const orders = [{ order_id: 'first', items: [{ order_item_id: 'item' }, { order_item_id: 'other-item' }] }];
-    await addStockPickingPositions(pool, 'test', orders);
+    await addStockPickingPositions(pool, 'test', orders, stage);
     expect(mocks.allocations).toHaveBeenCalledWith(pool, 'test', ['first']);
-    expect(orders[0]!.items).toEqual([{ order_item_id: 'item',
-      stock_positions: [{ location_code: 'B2', quantity: 2, model: 'Scorpion' }] }, { order_item_id: 'other-item' }]);
+    const expectedPositions = [{ location_code: 'B2', quantity: 2, model: 'Scorpion' },
+      ...(stage === 'pending_delivery' ? [{ location_code: 'B1', quantity: 1, model: null }] : [])];
+    expect(orders[0]!.items).toEqual([{ order_item_id: 'item', stock_positions: expectedPositions }, { order_item_id: 'other-item' }]);
+  });
+  it('consolida as linhas repetidas por SKU sem duplicar quantidades ou exibir posições liberadas e órfãs', async () => {
+    const { addStockPickingPositions } = await import('../../../src/admin/painel/stock-group-picking.js');
+    const { pool } = await import('../../../src/persistence/db.js');
+    const shared = { order_id: 'o', product_id: 'p', product_name: 'Modelo A', order_item_id: null,
+      matching_items: 2, status: 'reserved', location_code: 'B2', quantity: 1, model: null };
+    mocks.allocations.mockResolvedValue([shared, { ...shared, quantity: 2 },
+      { ...shared, location_code: 'B5', status: 'released' }, { ...shared, matching_items: 0, location_code: 'C2' },
+      { ...shared, order_id: 'outro' }]);
+    const order = { order_id: 'o', items: [{ order_item_id: 'um' }, { order_item_id: 'dois' }] };
+    await addStockPickingPositions(pool, 'test', [order], 'open_pickup');
+    await addStockPickingPositions(pool, 'test', [order], 'open_pickup');
+    expect(order).toEqual({ order_id: 'o', items: [{ order_item_id: 'um' }, { order_item_id: 'dois' }],
+      shared_stock_positions: [{ product_id: 'p', product_name: 'Modelo A', positions: [{ location_code: 'B2', quantity: 3, model: null }] }] });
   });
 });

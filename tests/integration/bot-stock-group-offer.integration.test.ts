@@ -139,12 +139,18 @@ it('oferece um par confirmado após o décimo SKU, rejeita revisão antiga e res
   });
   expect(JSON.stringify(offer)).not.toContain(location);
   expect(JSON.stringify(offer)).not.toContain('observação exclusiva');
-  await acknowledgeQuote(conversationId, triggerId, pairArgs, offer);
-
-  const accepted = await customerMessage(conversationId, 'Pode ser o par.');
   const pickupArgs = { ...searchArgs, conjunto_id: group.group_id, product_ids: [confirmed.productId] };
   const checkoutArgs = { ...searchArgs, conjunto_id: group.group_id, forma_pagamento: 'pix',
     nome_cliente: customerName, itens: [{ product_id: confirmed.productId, quantidade: 2, preco_unitario: 110 }] };
+  // O cliente pode responder apenas ao texto que foi enviado, inclusive quando o rascunho era diferente.
+  await acknowledgeQuote(conversationId, triggerId, pairArgs, offer, 'Quer ver a foto do par?', confirmedOfferText);
+  const wantsPhoto = await customerMessage(conversationId, 'Sim');
+  expect(await call(conversationId, wantsPhoto, 'criar_pedido', checkoutArgs)).toMatchObject({ erro: 'conjunto_aceite_pendente' });
+  await acknowledgeQuote(conversationId, wantsPhoto, pairArgs, offer, confirmedOfferText, 'Quer ver a foto do par?');
+  const declined = await customerMessage(conversationId, 'Não vou levar o par.');
+  expect(await call(conversationId, declined, 'criar_pedido', checkoutArgs)).toMatchObject({ erro: 'conjunto_aceite_pendente' });
+  await acknowledgeQuote(conversationId, declined, pairArgs, offer, 'Quer levar o parzinho?', 'Quer ver a foto?');
+  const accepted = await customerMessage(conversationId, 'Sim');
   expect(await call(conversationId, accepted, 'localizacao_loja', pickupArgs))
     .toMatchObject({ encontrado: true, conjunto_id: group.group_id });
   await stockGroups.moveMatrizStockGroup(db.pool, 'test', {
@@ -230,4 +236,36 @@ it('usa referência só após a última cotação confirmada na outbox e uma obj
   const later = await customerMessage(conversationId, 'Você tem fotos?');
   await acknowledgeQuote(conversationId, later, search, undefined, 'Vou pedir a foto para a loja.');
   expect(await lookup('Achei caro.')).toEqual({ referencia_disponivel: false });
+});
+
+it('oferece e reconfirma o par da opção prioritária com mais de cem outros grupos na medida', async () => {
+  const size = '275/40-18';
+  const first = await product('Marca QA maior saldo', 304, size);
+  const secondary = await product('Marca QA muitos grupos', 303, size);
+  const pair = await stockGroups.saveMatrizStockGroup(db.pool, 'test', {
+    stock_id: first.stockId, product_id: first.productId, model, matched_set: true,
+    inspection_status: 'approved', positions: [{ location_code: location, quantity: 2 }],
+    reason: 'Par conferido', idempotency_key: randomUUID(),
+  }, 'fixture');
+  await db.pool.query(`INSERT INTO commerce.matriz_stock_groups
+    (environment,stock_id,product_id,model,inspection_status,matched_set)
+    SELECT 'test',$1,$2,$3,'approved',true FROM generate_series(1,101)`,
+  [secondary.stockId, secondary.productId, model]);
+  await db.pool.query(`INSERT INTO commerce.matriz_stock_group_positions
+    (environment,group_id,location_code,quantity_on_hand)
+    SELECT environment,id,'OUTRA-PILHA',3 FROM commerce.matriz_stock_groups
+    WHERE environment='test' AND product_id=$1`, [secondary.productId]);
+
+  const conversationId = await conversation();
+  const request = await customerMessage(conversationId, 'Quero um par nessa medida para retirar.');
+  const args = { ...searchArgs, medida_pneu: size, tipo_veiculo: 'car', quantidade: 2, quer_conjunto: true };
+  const offer = await call(conversationId, request, 'buscar_produto', args);
+  expect(offer.conjunto_carro).toMatchObject({ conjunto_id: pair.group_id, product_id: first.productId, quantidade: 2 });
+  expect(JSON.stringify(offer)).not.toContain(location);
+  await acknowledgeQuote(conversationId, request, args, offer);
+  const accepted = await customerMessage(conversationId, 'Quero levar o par.');
+  const pickup = await call(conversationId, accepted, 'localizacao_loja', {
+    ...searchArgs, medida_pneu: size, conjunto_id: pair.group_id, product_ids: [first.productId],
+  });
+  expect(pickup).toMatchObject({ encontrado: true, conjunto_id: pair.group_id });
 });

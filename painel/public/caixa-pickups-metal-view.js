@@ -42,15 +42,25 @@
   function picture() { const img = el('img'); img.src = '/operacao/catalog-tire.webp'; img.alt = ''; img.className = 'mp-tire'; return img; }
   function product(row, compact) {
     const list = plate('mp-products' + (compact ? ' mp-products-compact' : ''));
+    function appendPositions(parent, positions) {
+      for (const position of positions || []) {
+        parent.appendChild(el('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
+      }
+    }
     tires(row).forEach(item => {
       const entry = el('div', null, 'mp-product'), copy = el('div');
       copy.append(el('strong', item.tire_size || item.product_name || 'Pneu'), el('p', [item.brand, condition(item.tire_condition)].filter(Boolean).join(' · ')),
         el('small', Number(item.quantity || 0) + (Number(item.quantity) === 1 ? ' pneu' : ' pneus') + ' × ' + P.money(item.unit_price)));
-      for (const position of item.stock_positions || []) {
-        copy.appendChild(el('strong', ['Pilha ' + position.location_code, position.quantity + ' un.', position.model].filter(Boolean).join(' · ')));
-      }
+      appendPositions(copy, item.stock_positions);
       entry.append(picture(), copy); list.appendChild(entry);
     });
+    for (const group of row.shared_stock_positions || []) {
+      const summary = el('div', null, 'mp-product'), copy = el('div');
+      copy.appendChild(el('p', 'Pilhas para ' + group.product_name));
+      appendPositions(copy, group.positions);
+      summary.appendChild(copy);
+      list.appendChild(summary);
+    }
     if (!tires(row).length) list.appendChild(el('p', 'Itens do pedido não informados.'));
     return list;
   }

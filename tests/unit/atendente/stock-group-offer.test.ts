@@ -75,7 +75,7 @@ describe('oferta de conjunto de carro da Matriz', () => {
     expect(offer).toMatchObject({ ...quote, quantidade: 8 });
     expect(offer).toMatchObject({ total: 3120, modelo: 'Dueler', conservacao: 'selecionado' });
     expect(JSON.stringify(offer)).not.toMatch(/B3|Nota da equipe/);
-    expect(mocked.group.mock.calls[0]?.[2]).toMatchObject({ quantity: 2, brand: product.brand });
+    expect(mocked.group.mock.calls[0]?.[2]).toMatchObject({ quantity: 2, productIds: [productId] });
   });
 
   it('oferece um conjunto de três quando conferido e respeita quantidade explícita acima de quatro', async () => {
@@ -173,6 +173,7 @@ describe('oferta de conjunto de carro da Matriz', () => {
     vi.mocked(client.query).mockResolvedValue({ rows: [savedSearch()] } as never);
     const verify = () => verifyGroupFulfillment(client, 'test', 'conversation', 'message', { conjunto_id: groupId }, 'delivery');
     await expect(verify()).resolves.toMatchObject({ quote, location: { modalidade: 'delivery' } });
+    expect(mocked.group.mock.calls[0]?.[2]).toMatchObject({ quantity: 4, groupId, productIds: [productId] });
     mocked.group.mockResolvedValueOnce([{ ...group, revision: '3' }]);
     await expect(verify()).resolves.toBeNull();
   });
