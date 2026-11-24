@@ -75,6 +75,7 @@ services:
       ROUTING_GEO: ${ROUTING_GEO:-false}
       ROUTING_MATRIZ_AS_STORE: ${ROUTING_MATRIZ_AS_STORE:-false}
       WHOLESALE_UNIFIED_STOCK: ${WHOLESALE_UNIFIED_STOCK:-false}
+      WHOLESALE_MATRIZ_DECREMENT: ${WHOLESALE_MATRIZ_DECREMENT:-false}
       MATRIZ_CAR_GROUP_OFFERS: ${MATRIZ_CAR_GROUP_OFFERS:-false}
       MATRIZ_MARKET_REFERENCE_OBJECTIONS: ${MATRIZ_MARKET_REFERENCE_OBJECTIONS:-false}
       # Chaves distintas: servidor para geocodificacao/distancia e navegador para o mapa do painel.
