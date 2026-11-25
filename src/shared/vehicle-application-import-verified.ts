@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import manuals from './data/catalog-manual-review-20260911.json' with { type: 'json' };
-import { manufacturerApplicationSeed, applicationMeasureKey } from './vehicle-tire-applications.js';
+import { manufacturerApplicationSeed, applicationMeasureKey, type VehicleTireApplication } from './vehicle-tire-applications.js';
 import { matchCatalogApplications, type CatalogApplication } from './vehicle-application-catalog.js';
 
 export const APPLICATION_BATCH = 'catalog-measure-applications-20260911-v1';
 export interface ApplicationImportRow {
-  application: CatalogApplication;
+  application: CatalogApplication & VehicleTireApplication;
   status: 'verified' | 'pending' | 'rejected';
   kind: 'original' | 'alternative' | 'unknown';
   reviewNote: string;
@@ -36,7 +36,7 @@ export function verifiedMotorcycleImport(): ApplicationImportRow[] {
         : /FZ25/.test(first.model) ? ['Fazer 250 FZ25', 'Fazer FZ25 250']
           : /YS150/.test(first.model) ? ['Fazer 150 YS 150']
             : /FLUO/.test(first.model) ? ['Fluo 125 ABS'] : ['NMAX 160'];
-      const application: CatalogApplication = {
+      const application: ApplicationImportRow['application'] = {
         vehicle_type: 'motorcycle',
         application_id: idFor(`${key}:${first.year}:${last.year}`), make: first.make, model: first.model,
         aliases, position: first.position as 'front' | 'rear', tire_size: first.tire_size,
@@ -56,7 +56,7 @@ export function verifiedMotorcycleImport(): ApplicationImportRow[] {
   // Mantém a pesquisa anterior sem ampliar seus anos. Suprime só referências
   // cujo modelo/posição/período já está inteiramente coberto pelos manuais novos.
   for (const application of manufacturerApplicationSeed()) {
-    const seedApplication: CatalogApplication = { ...application, vehicle_type: 'motorcycle',
+    const seedApplication: ApplicationImportRow['application'] = { ...application, vehicle_type: 'motorcycle',
       aliases: manuals.seed_aliases[application.application_id.split(':')[0] as keyof typeof manuals.seed_aliases] ?? [],
       year_optional: manuals.year_optional_seed_ids.includes(application.application_id.split(':')[0]!),
     };

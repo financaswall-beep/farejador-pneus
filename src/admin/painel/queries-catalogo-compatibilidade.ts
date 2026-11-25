@@ -4,8 +4,8 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
-import { applicationMeasureKey, type VehicleTireApplication } from '../../shared/vehicle-tire-applications.js';
-import { loadVehicleApplicationCatalog } from '../../shared/vehicle-application-catalog.js';
+import { applicationMeasureKey } from '../../shared/vehicle-tire-applications.js';
+import { loadVehicleApplicationCatalog, type CatalogApplication } from '../../shared/vehicle-application-catalog.js';
 import { repairVehicleApplicationTypes, type MotorcycleReference } from '../../shared/vehicle-application-type-repair.js';
 import type { TireVehicleType } from '../../shared/tire-vehicle-type.js';
 
@@ -221,7 +221,7 @@ export async function getCatalogCompatibility(
   };
   summary: { models: number; fitments: number };
   rows: CatalogCompatibilityRow[];
-  applications: VehicleTireApplication[];
+  applications: CatalogApplication[];
   referencias_para_classificar: MotorcycleReference[];
   application_reviews: Array<{ application_id: string; make: string; model: string;
     position: string; year_start: number | null; year_end: number | null; status: string; review_note: string }>;

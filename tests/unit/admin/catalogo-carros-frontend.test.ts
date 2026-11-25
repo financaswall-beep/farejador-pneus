@@ -48,13 +48,28 @@ describe('compatibilidade de veículos na ficha da Matriz', () => {
     expect(state.selectedVehicle).toBeNull();
   });
 
-  it('exige fonte HTTPS, posição e período coberto pelo modelo antes de enviar a referência', async () => {
+  it.each(['', '   '])('registra a referência quando o campo de link está em branco (%j)', async sourceUrl => {
+    const view = panel();
+    view.catalogoCompatibilidade.loading = false;
+    view.catalogoCompatibilitySelectVehicle(car);
+    Object.assign(view.catalogoCompatibilidade.carReference, reference, { source_url: sourceUrl });
+    view.apiPost.mockResolvedValue({ created: 1 });
+    view.apiGet.mockResolvedValue({ applications: [] });
+    expect(view.catalogoCarCanSaveReference()).toBe(true);
+    await view.catalogoCarSaveReference();
+    expect(view.apiPost).toHaveBeenCalledExactlyOnceWith('/admin/api/catalog/pneu/measure-applications', {
+      ...reference, source_url: null, year_start: 2022, year_end: 2023, vehicle_model_id: car.vehicle_model_id,
+    });
+  });
+
+  it('valida o link preenchido, a posição e o período coberto pelo modelo antes de enviar', async () => {
     const view = panel();
     const state = view.catalogoCompatibilidade;
     state.loading = false;
     view.catalogoCompatibilitySelectVehicle(car);
     for (const invalid of [{ year_end: 2020 }, { year_start: 2018 }, { year_end: 2027 },
-      { year_start: '' }, { source_url: '' }, { source_url: 'http://manual.example' }, { position: '' }]) {
+      { year_start: '' }, { source_url: 'inválido' }, { source_url: 'http://manual.example' },
+      { source_url: 'https://usuario:senha@manual.example' }, { position: '' }]) {
       Object.assign(state.carReference, reference, invalid);
       expect(view.catalogoCarCanSaveReference()).toBe(false);
       await view.catalogoCarSaveReference();

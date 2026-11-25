@@ -149,7 +149,7 @@ describe('catalogo no painel', () => {
     await module.catalogoCompatibilityLoad.call(context, 'p1');
     expect(context.catalogoCompatibilidade.applications).toEqual([app]);
     const html = readFileSync('painel/public/index.html', 'utf8');
-    expect(html).toContain('Aplicações consultadas no fabricante');
+    expect(html).toContain('Referências de aplicação');
     expect(html).toContain('catalogoCompatibilidade.applications');
     expect(html).toContain('partnerCatalogo.applications');
     expect(html).toContain('A referência informa a medida por modelo, ano, versão e posição.');

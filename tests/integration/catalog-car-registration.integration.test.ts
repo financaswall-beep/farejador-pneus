@@ -108,7 +108,8 @@ it('cadastra fonte por versão, anos e eixo, com repetição concorrente e rollb
   expect(fichas[0].rows).toEqual([]);
   expect(fichas[0].applications.filter((a: {year_start: number}) => a.year_start===2022)).toHaveLength(2);
   expect(fichas[0].applications[0]).toMatchObject({vehicle_type:'car', reference_model:'Modelo A Versão X', vehicle_variant:'Versão X',
-    source_url:ref.source_url, display_measure:size, tire_size:'265/60R18', product_fitment_confirmed:false, vehicle_model_id:vehicle.vehicle_model_id});
+    source_url:ref.source_url, range_source_urls:[ref.source_url], validation_scope:'manufacturer_measure',
+    display_measure:size, tire_size:'265/60R18', product_fitment_confirmed:false, vehicle_model_id:vehicle.vehicle_model_id});
   const history = await db.pool.query(`SELECT event_type FROM audit.events WHERE environment='test' AND entity_id=$1 AND actor_label=$2`,
     [vehicle.vehicle_model_id,headers['x-operator-label']]);
   expect(history.rows.map(r => r.event_type).sort()).toEqual([
@@ -129,4 +130,21 @@ it('cadastra fonte por versão, anos e eixo, com repetição concorrente e rollb
     expect(detail.applications).toHaveLength(count);
     if (id!==car) expect(detail.applications[0]?.application_id).toBe('fixture-legado');
   }
+});
+
+it('salva sem link e reconhece repetições omitidas, nulas, vazias ou em branco', async () => {
+  const car = await tire('car');
+  const {vehicle} = (await postModel({...model, variant:'Sem link'})).json();
+  const ref = {vehicle_model_id:vehicle.vehicle_model_id, tire_size:'265/60R18', position:'rear',
+    year_start:2021, year_end:2024};
+  const results = await Promise.all([{}, {source_url:null}, {source_url:''}, {source_url:'  '}]
+    .map(source => postRef(car, {...ref,...source})));
+  expect(results.map(r => r.statusCode).sort()).toEqual([200,200,200,201]);
+  expect(results.map(r => r.json().created).sort()).toEqual([0,0,0,1]);
+  const ficha = (await app.inject({url:productUrl(car),headers})).json();
+  const saved = ficha.applications.filter((a: {vehicle_model_id: string}) => a.vehicle_model_id === ref.vehicle_model_id);
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).toMatchObject({source_url:null, range_source_urls:[], source_checked_at:null,
+    source_type:'Cadastro manual da Matriz', validation_scope:'catalog_measure', product_fitment_confirmed:false,
+    position:'rear', year_start:2021, year_end:2024, tire_size:'265/60R18'});
 });

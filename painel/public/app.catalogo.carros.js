@@ -15,13 +15,13 @@ window.PAINEL_MODULES.catalogoCarros = function () {
 
   const errors = {
     invalid_car_model: 'Confira a marca, o modelo e os anos do carro.',
-    invalid_car_reference: 'Confira a medida, os anos, a posição e o endereço da fonte.',
+    invalid_car_reference: 'Confira a medida, os anos, a posição e o link, se informado.',
     catalog_vehicle_model_conflict: 'Já existe um modelo com dados conflitantes. Confira a versão e o período.',
     catalog_vehicle_model_not_found: 'O modelo mudou. Pesquise o carro novamente.',
     catalog_product_not_found: 'O produto mudou. Reabra a ficha no catálogo.',
     catalog_car_required: 'Confira a categoria do pneu e do modelo na ficha.',
-    catalog_application_measure_mismatch: 'A medida informada no manual precisa corresponder à medida deste pneu.',
-    catalog_application_years_mismatch: 'Informe os anos cobertos pelo manual dentro do período do modelo.',
+    catalog_application_measure_mismatch: 'A medida de referência precisa corresponder à medida deste pneu.',
+    catalog_application_years_mismatch: 'Informe os anos da referência dentro do período do modelo.',
     catalog_application_conflict: 'Já existe uma referência conflitante para esse modelo, período e posição.',
   };
 
@@ -76,8 +76,10 @@ window.PAINEL_MODULES.catalogoCarros = function () {
         || !form.tire_size.trim() || !validPeriod(form) || !['front', 'rear', 'both'].includes(form.position)) return false;
       if ((state.selectedVehicle.year_start && Number(form.year_start) < state.selectedVehicle.year_start)
         || (state.selectedVehicle.year_end && Number(form.year_end) > state.selectedVehicle.year_end)) return false;
+      const sourceUrl = form.source_url.trim();
+      if (!sourceUrl) return true;
       try {
-        const url = new URL(form.source_url.trim());
+        const url = new URL(sourceUrl);
         return url.protocol === 'https:' && !url.username && !url.password;
       } catch {
         return false;
@@ -95,7 +97,7 @@ window.PAINEL_MODULES.catalogoCarros = function () {
         const result = await this.apiPost(`/admin/api/catalog/${encodeURIComponent(productId)}/measure-applications`, {
           vehicle_model_id: state.selectedVehicle.vehicle_model_id, tire_size: form.tire_size.trim(),
           year_start: Number(form.year_start), year_end: Number(form.year_end), position: form.position,
-          source_url: form.source_url.trim(), index_spec: form.index_spec.trim() || null,
+          source_url: form.source_url.trim() || null, index_spec: form.index_spec.trim() || null,
         });
         if (state === this.catalogoCompatibilidade) {
           this.catalogoCompatibilityResetSearch();

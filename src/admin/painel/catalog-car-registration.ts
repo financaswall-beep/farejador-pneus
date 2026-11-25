@@ -73,10 +73,11 @@ export async function createCarMeasureApplications(client: PoolClient, environme
       vehicle_model_id: vehicle.vehicle_model_id, vehicle_variant: vehicle.variant, reference_model: model,
       reference_year_start: input.year_start, reference_year_end: input.year_end,
       year_reference: input.year_start === input.year_end ? String(input.year_start) : `${input.year_start}–${input.year_end}`,
-      range_source_urls: [input.source_url], source_url: input.source_url,
-      source_type: 'Fonte do fabricante conferida pela Matriz', source_checked_at: new Date().toISOString().slice(0, 10),
+      range_source_urls: input.source_url ? [input.source_url] : [], source_url: input.source_url,
+      source_type: input.source_url ? 'Fonte do fabricante conferida pela Matriz' : 'Cadastro manual da Matriz',
+      source_checked_at: input.source_url ? new Date().toISOString().slice(0, 10) : null,
       index_spec: input.index_spec || null, mounting: 'ND', notes: '',
-      validation_scope: 'manufacturer_measure', product_fitment_confirmed: false,
+      validation_scope: input.source_url ? 'manufacturer_measure' : 'catalog_measure', product_fitment_confirmed: false,
     };
     const saved = await client.query(`INSERT INTO commerce.vehicle_measure_applications
       (environment, application_id, vehicle_type, make, model, position, tire_size, display_measure,
@@ -92,7 +93,8 @@ export async function createCarMeasureApplications(client: PoolClient, environme
     } else {
       const same = await client.query(`SELECT 1 FROM commerce.vehicle_measure_applications
         WHERE environment=$1 AND application_id=$2 AND vehicle_type='car' AND status='verified' AND application_kind='original'
-        AND tire_size=$3 AND reference->>'source_url'=$4 AND (reference->>'index_spec') IS NOT DISTINCT FROM $5
+        AND tire_size=$3 AND (reference->>'source_url') IS NOT DISTINCT FROM $4
+        AND (reference->>'index_spec') IS NOT DISTINCT FROM $5
         FOR SHARE`, [environment, applicationId, input.tire_size, input.source_url, reference.index_spec]);
       if (!same.rowCount) throw new Error('catalog_application_conflict');
     }

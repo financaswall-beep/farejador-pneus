@@ -60,4 +60,22 @@ describe('catálogo de aplicações independente de SKU', () => {
     query.mockRejectedValue(new Error('offline'));
     await expect(loadVehicleApplicationCatalog({query},'prod')).rejects.toThrow('offline');
   });
+
+  it('consulta a medida manual sem link e atribui a referência à Matriz', async () => {
+    const reference = { ...catalog[0]!, reference_model: 'Modelo A', source_url: null,
+      source_type: 'Cadastro manual da Matriz', source_checked_at: null, range_source_urls: [],
+      validation_scope: 'catalog_measure' };
+    const row = { application_id: 'car-test', vehicle_type: 'car', make: 'Marca A', model: 'Modelo A',
+      position: 'rear', tire_size: '265/60R18', display_measure: '265/60-18', year_start: 2023, year_end: 2025,
+      aliases: [], reference };
+    const query = vi.fn().mockResolvedValue({ rows: [row] });
+    const applications = await loadVehicleApplicationCatalog({query}, 'test', undefined, 'car');
+    const answer = vehicleApplicationAnswer(compatibilityInput('test', {
+      tipo_veiculo: 'car', modelo: 'Modelo A', ano: 2024, posicao_pneu: 'rear',
+    }), applications);
+    expect(answer).toMatchObject({ tipo_resultado: 'aplicacao_de_medida_do_catalogo',
+      aplicacoes: [{ source_url: null, validation_scope: 'catalog_measure', source_checked_at: null }],
+      produto_confirmado: false, consultas_de_produto: [{ tipo_veiculo: 'car', medida_pneu: '265/60-18' }] });
+    expect(answer?.mensagem).toContain('Matriz');
+  });
 });

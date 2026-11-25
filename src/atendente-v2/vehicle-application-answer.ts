@@ -76,9 +76,10 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, cata
   const yearOptional = rows.every(r => 'year_optional' in r && r.year_optional === true);
   const needsYear = !parsed.moto_ano && (!yearOptional || unknownYears || (vehicleType === 'motorcycle' && ambiguous));
   const confirmedContext = !ambiguous && !unknownYears && !missingPosition && !partialPair && !needsYear;
+  const hasCatalogReference = rows.some(row => row.validation_scope === 'catalog_measure');
   return {
     encontrado: true,
-    tipo_resultado: 'aplicacao_de_medida_do_fabricante',
+    tipo_resultado: hasCatalogReference ? 'aplicacao_de_medida_do_catalogo' : 'aplicacao_de_medida_do_fabricante',
     ano_informado: parsed.moto_ano ?? null,
     versao_catalogo: VEHICLE_APPLICATION_VERSION,
     referencia_em_uso: true,
@@ -104,7 +105,9 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, cata
         ? 'A medida está documentada nos anos retornados, mas a pesquisa ainda não cobre toda a história deste modelo. Pergunte somente o ano que falta para verificar a faixa correta.'
         : unknownYears
           ? 'A referência não delimita os anos de aplicação. Não peça novamente o ano já informado; confirme a medida para esse veículo antes de consultar produtos.'
-      : 'Aplicação encontrada na fonte do fabricante. A faixa inclui o primeiro e o último ano. As referências retornadas usam a mesma medida na posição solicitada: não peça ano ou foto apenas para repetir essa confirmação. Preserve as faixas informadas; ano não delimitado não significa todos os anos. Índices e montagem podem variar entre as referências e devem ser conferidos no produto.',
+      : hasCatalogReference
+        ? 'A Matriz cadastrou a medida para o modelo, os anos e a posição indicados. Confira índices e montagem no pneu específico.'
+        : 'Aplicação encontrada na fonte do fabricante. A faixa inclui o primeiro e o último ano. As referências retornadas usam a mesma medida na posição solicitada: não peça ano ou foto apenas para repetir essa confirmação. Preserve as faixas informadas; ano não delimitado não significa todos os anos. Índices e montagem podem variar entre as referências e devem ser conferidos no produto.',
     proximo_passo: 'Esta referência já está em uso; não peça aprovação ao dono nem ao cliente para consultá-la. Depois de identificar ano/versão e posição, use consultas_de_produto em buscar_produto e mantenha bairro/município conhecidos para consultar preço/estoque. A busca nominal do catálogo agrupado não deve filtrar por posição não cadastrada; a posição da aplicação continua sendo a indicada acima. estoque_consultado=false NÃO significa falta de estoque. Não prometa disponibilidade antes da busca. A equipe confere o pneu específico antes da venda/montagem: não diga que um SKU serve sem conferir construção, índices e montagem. Não troque radial por diagonal nem converta polegadas automaticamente.',
   };
 }

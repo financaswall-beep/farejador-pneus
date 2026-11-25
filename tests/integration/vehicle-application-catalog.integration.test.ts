@@ -69,6 +69,22 @@ describe('importação real do catálogo técnico',()=>{
     await expect(db.pool.query(sql,[2026,2016,{source_url:'https://example.com'}])).rejects.toThrow();
     await expect(db.pool.query(sql,[2016,2026,{}])).rejects.toThrow();
   });
+  it('limita o cadastro sem link às medidas originais de carro informadas pela Matriz', async () => {
+    const sql = `INSERT INTO commerce.vehicle_measure_applications (environment, application_id, vehicle_type,
+      make, model, position, tire_size, display_measure, status, application_kind, reference, import_batch)
+      VALUES ('test','manual-sem-url',$1,'Marca','Modelo','front','265/60R18','265/60-18','verified',$2,$3,$4)`;
+    const manual = { validation_scope: 'catalog_measure', source_url: null };
+    for (const params of [
+      ['motorcycle', 'original', manual, 'matriz-car-manual'],
+      [null, 'original', manual, 'matriz-car-manual'],
+      ['car', 'alternative', manual, 'matriz-car-manual'],
+      ['car', 'original', manual, 'importacao'],
+      ['car', 'original', {}, 'matriz-car-manual'],
+    ]) {
+      await expect(db.pool.query(sql, params)).rejects.toMatchObject({ code: '23514',
+        constraint: 'vehicle_measure_applications_verified_source' });
+    }
+  });
   it('parceiro só lê referências verificadas do seu ambiente e não pode alterá-las',async()=>{
     const partner=await createPartnerFixture(db.pool);
     const client=await db.pool.connect();

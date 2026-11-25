@@ -2,7 +2,10 @@ import type { Pool, PoolClient } from 'pg';
 import { applicationMeasureKey, type VehicleTireApplication } from './vehicle-tire-applications.js';
 import type { TireVehicleType } from './tire-vehicle-type.js';
 
-export interface CatalogApplication extends VehicleTireApplication {
+export interface CatalogApplication extends Omit<VehicleTireApplication, 'source_url' | 'source_checked_at' | 'validation_scope'> {
+  source_url: string | null;
+  source_checked_at: string | null;
+  validation_scope: 'manufacturer_measure' | 'catalog_measure';
   vehicle_type?: TireVehicleType | null;
   vehicle_variant?: string | null;
   aliases?: string[];
@@ -11,7 +14,7 @@ export interface CatalogApplication extends VehicleTireApplication {
 }
 type CatalogRow = Pick<CatalogApplication, 'application_id' | 'make' | 'model' | 'aliases' |
   'position' | 'tire_size' | 'display_measure' | 'year_start' | 'year_end' | 'vehicle_type'> & {
-  reference: VehicleTireApplication;
+  reference: CatalogApplication;
 };
 
 export async function loadVehicleApplicationCatalog(
@@ -28,7 +31,7 @@ export async function loadVehicleApplicationCatalog(
       AND ($3::text IS NULL OR vehicle_type=$3)
     ORDER BY make,model,year_start NULLS LAST,position,application_id`, [environment, key, vehicleType ?? null]);
   return result.rows.map(({ reference, ...row }) => ({ ...reference, ...row,
-    validation_scope: 'manufacturer_measure', product_fitment_confirmed: false,
+    validation_scope: reference.validation_scope ?? 'manufacturer_measure', product_fitment_confirmed: false,
   }));
 }
 

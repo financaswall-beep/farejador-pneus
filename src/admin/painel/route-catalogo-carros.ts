@@ -22,11 +22,12 @@ export const carReferenceBody = z.object({
     .refine(value => Boolean(applicationMeasureKey(value))),
   year_start: year, year_end: year, position: z.enum(['front','rear','both']),
   index_spec: z.string().trim().max(30).nullish(),
-  source_url: z.string().trim().max(2048).url().refine(value => {
-    if (!URL.canParse(value)) return false;
-    const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password;
-  }),
+  source_url: z.preprocess(value => typeof value === 'string' && !value.trim() ? null : value,
+    z.string().trim().max(2048).url().refine(value => {
+      if (!URL.canParse(value)) return false;
+      const url = new URL(value);
+      return url.protocol === 'https:' && !url.username && !url.password;
+    }).nullable().default(null)),
 }).strict().refine(validPeriod);
 
 const errorStatus = new Map([
