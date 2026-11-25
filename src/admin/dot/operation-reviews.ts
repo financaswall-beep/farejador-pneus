@@ -22,7 +22,7 @@ export function reviewFingerprint(data: Record<string, unknown>) {
 /** Executado sob a trava da conexão, na mesma transação da operação. */
 export async function requireOperationReview(db: PoolClient, identity: DotIdentity, name: string, key: string,
   input: Record<string, unknown> | (() => Promise<Record<string, unknown>>),
-  permission?: OperationPermission, domain: OperationDomain = 'finance') {
+  permission?: OperationPermission, domain: OperationDomain = 'finance', preparedFingerprint?: string) {
   const grant = permission ?? await lockGrant(db, identity.person_id, identity.grant_id);
   if (!operationAllowed(grant, domain)) throw Error('dot_operation_disabled');
   const mode = operationReviewMode(grant, domain, name);
@@ -34,8 +34,9 @@ export async function requireOperationReview(db: PoolClient, identity: DotIdenti
   // O validador de idempotência ainda compara conexão e dados antes de retornar o resultado.
   if (completed.rowCount) return null;
   const data = typeof input === 'function' ? await input() : input;
-  const fingerprint = reviewFingerprint(data);
-  let row = (await db.query(`SELECT id,fingerprint,decision,decision_channel,expires_at,
+  const details = reviewDetails(data);
+  const fingerprint = preparedFingerprint ?? reviewFingerprint(data);
+  let row = (await db.query(`SELECT id,fingerprint,details,decision,decision_channel,expires_at,
     expires_at<=clock_timestamp() AS expired FROM network.dot_operation_reviews
     WHERE environment=$1 AND grant_id=$2 AND tool_name=$3 AND operation_key=$4 FOR UPDATE`, scope)).rows[0];
   if (row && row.fingerprint !== fingerprint) throw Error('dados_da_proposta_mudaram_use_nova_chave');
@@ -46,10 +47,10 @@ export async function requireOperationReview(db: PoolClient, identity: DotIdenti
   if (row?.decision === 'autorizada') throw Error('modo_de_confirmacao_mudou_prepare_nova_proposta');
   if (!row) row = (await db.query(`INSERT INTO network.dot_operation_reviews
     (environment,grant_id,tool_name,operation_key,fingerprint,details,permission_domain)
-    VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,expires_at`,
-  [...scope, fingerprint, reviewDetails(data), domain])).rows[0];
+    VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,expires_at,details`,
+  [...scope, fingerprint, details, domain])).rows[0];
   return { status: 'aguardando_autorizacao', executada: false, proposta: row.id, fingerprint,
-    operacao: name, dados: reviewDetails(data), expires_at: row.expires_at, confirmacao: mode,
+    operacao: name, dados: preparedFingerprint ? row.details : details, expires_at: row.expires_at, confirmacao: mode,
     ...(requiresVoiceAuthorization(domain) ? { autorizacao_exigida: 'voz' } : {}),
     ...(mode === 'conversa' ? { ferramenta_confirmacao: 'confirmar_operacao_milly' }
       : { confirm_url: env.DOT_MCP_PUBLIC_ORIGIN + '/admin/dot/connections?operacao=' + row.id }) };
