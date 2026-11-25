@@ -4948,18 +4948,21 @@
              movPageEnd() {
                return Math.min(this.movCurrentPage() * this.movPageSize, this.movRows().length);
              },
+             movDayLabel(dayKey) {
+               const date = new Date(dayKey + 'T00:00:00Z');
+               return date.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: 'short' }).replace('.', '');
+             },
              movGroups() {
+               const time = window.FarejadorTime;
+               const today = time.dateKey(new Date());
+               const yesterday = time.addDays(today, -1);
                const groups = [];
                const byDay = new Map();
                for (const row of this.movPagedRows()) {
-                 const date = new Date(row.created_at);
-                 const key = Number.isNaN(date.getTime()) ? 'sem-data' : date.toISOString().slice(0, 10);
+                 const key = time.dateKey(row.created_at || '') || 'sem-data';
                  if (!byDay.has(key)) {
-                   const today = new Date();
-                   const yesterday = new Date(Date.now() - 86400000);
-                   const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-                   const prefix = !Number.isNaN(date.getTime()) && same(date, today) ? 'Hoje' : (!Number.isNaN(date.getTime()) && same(date, yesterday) ? 'Ontem' : '');
-                   const label = Number.isNaN(date.getTime()) ? 'Sem data' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+                   const prefix = key === today ? 'Hoje' : (key === yesterday ? 'Ontem' : '');
+                   const label = key === 'sem-data' ? 'Sem data' : this.movDayLabel(key);
                    const group = { key, label: prefix ? prefix + ', ' + label : label, rows: [] };
                    byDay.set(key, group);
                    groups.push(group);
@@ -4984,8 +4987,7 @@
                return row.source === 'sem_rotulo' ? 'Origem não identificada' : 'Registro automático';
              },
              movHora(row) {
-               const date = new Date(row.created_at);
-               return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+               return window.FarejadorTime.formatTime(row.created_at) || '—';
              },
              movKind(row) {
                const delta = Number(row.qty_delta || 0);
@@ -5000,19 +5002,16 @@
                return Math.max(1, ...this.movRanking().map((row) => row.total));
              },
              movTrend() {
+               const time = window.FarejadorTime;
+               const today = time.dateKey(new Date());
                const days = Array.from({ length: 7 }, (_, index) => {
-                 const date = new Date();
-                 date.setHours(0, 0, 0, 0);
-                 date.setDate(date.getDate() - (6 - index));
-                 return { key: date.toISOString().slice(0, 10), label: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''), total: 0 };
+                 const key = time.addDays(today, index - 6);
+                 return { key, label: this.movDayLabel(key), total: 0 };
                });
                const index = new Map(days.map((day) => [day.key, day]));
                for (const row of this.movRows()) {
-                 const date = new Date(row.created_at);
-                 if (!Number.isNaN(date.getTime())) {
-                   const day = index.get(date.toISOString().slice(0, 10));
-                   if (day) day.total += Math.abs(Number(row.qty_delta || 0));
-                 }
+                 const day = index.get(time.dateKey(row.created_at || ''));
+                 if (day) day.total += Math.abs(Number(row.qty_delta || 0));
                }
                return days;
              },
