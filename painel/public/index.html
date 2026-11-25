@@ -301,7 +301,7 @@
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20261125-carros"></script>
-<script src="/admin/painel/app.catalogo.carros.js?v=20261125-carros2"></script>
+<script src="/admin/painel/app.catalogo.carros.js?v=20261125-carros3"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260917-bot-cost1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20261124-origem"></script>
@@ -11204,7 +11204,7 @@
                   <label class="block text-xs font-medium text-gray-700">Versão (opcional)<input x-model="catalogoCompatibilidade.carModel.variant" type="text" maxlength="100" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
                   <div class="grid grid-cols-2 gap-2">
                     <label class="block text-xs font-medium text-gray-700">Ano inicial<input x-model="catalogoCompatibilidade.carModel.year_start" type="number" min="1900" max="2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
-                    <label class="block text-xs font-medium text-gray-700">Ano final<input x-model="catalogoCompatibilidade.carModel.year_end" type="number" min="1900" max="2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                    <label class="block text-xs font-medium text-gray-700">Ano final (se diferente)<input x-model="catalogoCompatibilidade.carModel.year_end" type="number" :min="catalogoCompatibilidade.carModel.year_start || 1900" max="2100" :placeholder="catalogoCompatibilidade.carModel.year_start || ''" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
                   </div>
                   <div class="flex items-center justify-end gap-3">
                     <button type="button" @click="catalogoCompatibilidade.carModel = null" class="rounded px-2 py-2 text-xs text-gray-700">Cancelar</button>
@@ -11226,7 +11226,7 @@
               <form @submit.prevent="catalogoCarSaveReference()" class="mt-3">
                 <fieldset :disabled="catalogoCompatibilidade.saving" class="space-y-3">
                   <legend class="text-sm font-semibold text-gray-900">Referência da medida</legend>
-                  <p class="text-xs leading-4 text-gray-600">Informe a medida, os anos e a posição que você conferiu para esta versão. O bot poderá consultar essa referência por modelo.</p>
+                  <p class="text-xs leading-4 text-gray-600">Escolha a posição no veículo. Você pode ajustar a medida e os anos para esta versão.</p>
                   <label class="block text-xs font-medium text-gray-700">Medida do pneu<input x-model="catalogoCompatibilidade.carReference.tire_size" type="text" maxlength="60" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
                   <label class="block text-xs font-medium text-gray-700">Índice de carga e velocidade (opcional)<input x-model="catalogoCompatibilidade.carReference.index_spec" type="text" maxlength="30" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
                   <label class="block text-xs font-medium text-gray-700">Posição no veículo<select x-model="catalogoCompatibilidade.carReference.position" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700">

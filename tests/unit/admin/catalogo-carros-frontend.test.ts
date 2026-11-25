@@ -33,7 +33,7 @@ describe('compatibilidade de veículos na ficha da Matriz', () => {
       vehicle_type: 'car', make: 'Toyota', model: 'Hilux', variant: 'SRX', year_start: 2021, year_end: 2025,
     });
     expect(state.selectedVehicle).toEqual(car);
-    expect(state.carReference).toMatchObject({ tire_size: '', position: '', source_url: '', year_start: '', year_end: '' });
+    expect(state.carReference).toMatchObject({ tire_size: '265/60-18', position: '', source_url: '', year_start: 2021, year_end: 2025 });
     state.form.reason = 'Manual';
     expect(view.catalogoCompatibilityCanSave()).toBe(false);
     Object.assign(state.carReference, reference);
@@ -46,6 +46,46 @@ describe('compatibilidade de veículos na ficha da Matriz', () => {
     expect(view.catalogoCompatibilityLoad).toHaveBeenCalledWith('pneu');
     expect(view.loadCatalogo).toHaveBeenCalledOnce();
     expect(state.selectedVehicle).toBeNull();
+  });
+
+  it('cadastra um único ano e salva a referência só escolhendo o eixo', async () => {
+    const view = panel();
+    const state = view.catalogoCompatibilidade;
+    state.loading = false;
+    state.row.tire_size = '265/60R18';
+    view.catalogoCarStartModel();
+    Object.assign(state.carModel, { make: car.make, model: car.model, year_start: '2024' });
+    view.apiPost.mockResolvedValueOnce({ created: true, vehicle: { ...car, year_start: 2024, year_end: 2024 } });
+    expect(view.catalogoCarCanCreate()).toBe(true);
+    await view.catalogoCarCreate();
+    expect(view.apiPost).toHaveBeenCalledWith('/admin/api/catalog/vehicle-models', expect.objectContaining({
+      year_start: 2024, year_end: 2024,
+    }));
+    state.carReference.position = 'both';
+    view.apiPost.mockResolvedValueOnce({ created: 2 });
+    view.apiGet.mockResolvedValue({ applications: [] });
+    await view.catalogoCarSaveReference();
+    expect(view.apiPost).toHaveBeenLastCalledWith('/admin/api/catalog/pneu/measure-applications', {
+      vehicle_model_id: car.vehicle_model_id, tire_size: '265/60R18', year_start: 2024, year_end: 2024,
+      position: 'both', source_url: null, index_spec: null,
+    });
+  });
+
+  it.each([
+    { year_start: null, year_end: 2025, missing: 'year_start', known: 'year_end' },
+    { year_start: 2021, year_end: null, missing: 'year_end', known: 'year_start' },
+  ] as const)('pede só o limite ausente no cadastro antigo ($missing)', ({ year_start, year_end, missing, known }) => {
+    const view = panel();
+    view.catalogoCompatibilidade.loading = false;
+    view.catalogoCompatibilitySelectVehicle({ ...car, year_start, year_end });
+    const form = view.catalogoCompatibilidade.carReference;
+    expect(form.tire_size).toBe('265/60-18');
+    expect(form[known]).toBe(car[known]);
+    expect(form[missing]).toBe('');
+    form.position = 'front';
+    expect(view.catalogoCarCanSaveReference()).toBe(false);
+    form[missing] = 2024;
+    expect(view.catalogoCarCanSaveReference()).toBe(true);
   });
 
   it.each(['', '   '])('registra a referência quando o campo de link está em branco (%j)', async sourceUrl => {
@@ -130,8 +170,8 @@ describe('compatibilidade de veículos na ficha da Matriz', () => {
     expect(state.searchRows).toEqual([car]);
     view.catalogoCompatibilitySelectVehicle(car);
     Object.assign(state.carReference, reference);
-    view.catalogoCompatibilitySelectVehicle({ ...car, variant: 'SR' });
+    view.catalogoCompatibilitySelectVehicle({ ...car, variant: 'SR', year_start: 2016, year_end: 2020 });
     expect(state.carReference.source_url).toBe('');
-    expect(state.carReference.tire_size).toBe('');
+    expect(state.carReference).toMatchObject({ tire_size: '265/60-18', position: '', year_start: 2016, year_end: 2020 });
   });
 });

@@ -1,8 +1,12 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.catalogoCarros = function () {
-  function validPeriod(form) {
+  function modelEndYear(form) {
+    return form.year_end === '' || form.year_end == null ? form.year_start : form.year_end;
+  }
+
+  function validPeriod(form, endYear = form.year_end) {
     const start = Number(form.year_start);
-    const end = Number(form.year_end);
+    const end = Number(endYear);
     return Number.isInteger(start) && Number.isInteger(end)
       && start >= 1900 && end <= 2100 && start <= end;
   }
@@ -37,7 +41,7 @@ window.PAINEL_MODULES.catalogoCarros = function () {
 
     catalogoCarCanCreate() {
       const form = this.catalogoCompatibilidade.carModel;
-      return Boolean(form && canWrite(this) && form.make.trim() && form.model.trim() && validPeriod(form));
+      return Boolean(form && canWrite(this) && form.make.trim() && form.model.trim() && validPeriod(form, modelEndYear(form)));
     },
 
     async catalogoCarCreate() {
@@ -49,7 +53,7 @@ window.PAINEL_MODULES.catalogoCarros = function () {
       try {
         const result = await this.apiPost('/admin/api/catalog/vehicle-models', {
           vehicle_type: 'car', make: form.make.trim(), model: form.model.trim(), variant: form.variant.trim() || null,
-          year_start: Number(form.year_start), year_end: Number(form.year_end),
+          year_start: Number(form.year_start), year_end: Number(modelEndYear(form)),
         });
         if (state !== this.catalogoCompatibilidade) return;
         this.catalogoCompatibilitySelectVehicle(result.vehicle);
@@ -62,10 +66,11 @@ window.PAINEL_MODULES.catalogoCarros = function () {
     },
 
     catalogoCarStartReference() {
-      this.catalogoCompatibilidade.carAction = 'reference';
-      this.catalogoCompatibilidade.carReference = {
-        tire_size: '', index_spec: '', source_url: '', position: '',
-        year_start: '', year_end: '',
+      const state = this.catalogoCompatibilidade;
+      state.carAction = 'reference';
+      state.carReference = {
+        tire_size: state.row.tire_size ?? '', index_spec: '', source_url: '', position: '',
+        year_start: state.selectedVehicle.year_start ?? '', year_end: state.selectedVehicle.year_end ?? '',
       };
     },
 
