@@ -74,6 +74,8 @@ async function lockIntegrityOperation(
 export async function beginIntegrityOperation<T>(
   client: PoolClient,
   operation: IntegrityOperation,
+  // O domínio pode verificar um resultado legado na entidade gravada.
+  matchesCompleted?: (result: T) => Promise<boolean>,
 ): Promise<{ replayed: false } | { replayed: true; result: T }> {
   const key = await lockIntegrityOperation(client, operation);
   const existing = await client.query<{
@@ -87,13 +89,15 @@ export async function beginIntegrityOperation<T>(
     [operation.environment, operation.domain, key],
   );
   if (existing.rows[0]) {
-    if (existing.rows[0].request_fingerprint !== operation.fingerprint) {
+    const row = existing.rows[0];
+    if (row.request_fingerprint !== operation.fingerprint &&
+      !(matchesCompleted && row.completed_at && row.result !== null && await matchesCompleted(row.result))) {
       throw new Error('idempotency_conflict');
     }
-    if (!existing.rows[0].completed_at || existing.rows[0].result === null) {
+    if (!row.completed_at || row.result === null) {
       throw new Error('idempotency_incomplete');
     }
-    return { replayed: true, result: existing.rows[0].result };
+    return { replayed: true, result: row.result };
   }
 
   await client.query(
