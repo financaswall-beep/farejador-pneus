@@ -1,4 +1,5 @@
 import { EFFECTIVE_CASH_TRANSACTION_SQL } from './matriz-effective-cash.js';
+import { INVENTORY_ADJUSTMENT_COUNTERPART_SQL } from './matriz-ledger-inventory-reconciliation.sql.js';
 
 /** Shared monthly financial reconciliation, including Meta and Google origins. */
 export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
@@ -212,9 +213,5 @@ export const MATRIZ_LEDGER_FINANCIAL_SQL = `WITH bounds AS (
          FROM finance.matriz_inventory_adjustments,bounds b
          WHERE environment=$1 AND occurred_at>=b.month_ts
            AND occurred_at<b.month_end_ts),0) source_inventory,
-       COALESCE((SELECT sum(CASE
-         WHEN account_code='inventory_gain'
-           THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
-         WHEN account_code IN ('inventory_loss','inventory_internal_use')
-           THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
-         ELSE 0 END) FROM month_ledger),0) ledger_inventory`;
+       COALESCE((SELECT sum(${INVENTORY_ADJUSTMENT_COUNTERPART_SQL})
+         FROM month_ledger WHERE source_type='finance.inventory_adjustment'),0) ledger_inventory`;

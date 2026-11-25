@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { INVENTORY_ADJUSTMENT_COUNTERPART_SQL } from './matriz-ledger-inventory-reconciliation.sql.js';
 
 type Environment = 'prod' | 'test';
 type Origin = 'atacado' | 'varejo' | 'comissao' | 'mensalidades'
@@ -165,11 +166,7 @@ export async function getMatrizLedgerCompetenceGate(
            THEN CASE side WHEN 'debit' THEN amount ELSE -amount END
          WHEN origin='compras' AND account_code IN ('inventory','inventory_in_transit')
            THEN CASE side WHEN 'debit' THEN amount ELSE -amount END
-         WHEN origin='estoque' AND account_code='inventory_gain'
-           THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
-         WHEN origin='estoque'
-           AND account_code IN ('inventory_loss','inventory_internal_use')
-           THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
+         WHEN origin='estoque' THEN ${INVENTORY_ADJUSTMENT_COUNTERPART_SQL}
          ELSE 0 END) value
        FROM ledger_lines WHERE origin IS NOT NULL GROUP BY competence,origin
      )
