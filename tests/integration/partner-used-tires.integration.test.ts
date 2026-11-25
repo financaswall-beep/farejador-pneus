@@ -82,6 +82,9 @@ describe('usado sem marca exclusivo do parceiro — banco real descartável',()=
       expect(await matrix.verificarEstoqueMatriz(client,{environment:'test',product_id:genericId})).toBeNull();
       const candidates=await used.partnerUsedProducts(client,{environment:'test',medida_pneu:'90/90-18',marca:'Pirelli',limit:20,apenas_com_estoque:false});
       expect(candidates).toEqual([expect.objectContaining({product_id:genericId,brand:null,requested_brand:'Pirelli',marca_exige_confirmacao:true,total_stock_available:0,price_amount:null})]);
+      const query={environment:'test' as const,medida_pneu:'90/90-18',limit:20,apenas_com_estoque:false};
+      expect(await used.partnerUsedProducts(client,{...query,tipo_veiculo:'car'})).toEqual([]);
+      expect((await used.partnerUsedProducts(client,{...query,tipo_veiculo:'motorcycle'})).map(p=>p.product_id)).toEqual([genericId]);
     }finally{client.release();}
     for(const table of ['matriz_product_prices','wholesale_product_prices','product_prices'])
       await expect(db.pool.query('INSERT INTO commerce.'+table+"(environment,product_id,price_amount) VALUES('test',$1,10)",[genericId]))

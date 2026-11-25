@@ -5,6 +5,7 @@ import { logger } from '../../shared/logger.js';
 import { getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
 import { getMatrixCatalogWithWholesale } from './queries-catalogo-wholesale.js';
 import { registerReferenceClassification } from './catalog-reference-classification.js';
+import { registerCatalogCarRoutes } from './route-catalogo-carros.js';
 import { registerCatalogWholesale } from './route-catalogo-wholesale.js';
 import { registerCatalogPhotoRoutes } from './route-catalogo-photos.js';
 import { registerMarketReferenceRoutes } from './route-market-reference.js';
@@ -21,7 +22,7 @@ import {
 import { createCatalogProduct, createCatalogProductFromStock } from './queries-catalogo-create.js';
 import { updateCatalogTireSpec } from './queries-catalogo-spec.js';
 import { operatorLabel } from './route-helpers.js';
-import { tireVehicleTypeSchema, tireVehicleFilterSchema } from '../../shared/tire-vehicle-type.js';
+import { tireVehicleFilterSchema } from '../../shared/tire-vehicle-type.js';
 import { getCatalogVehicleInventory } from './catalog-vehicle-inventory.js';
 
 import {
@@ -40,6 +41,7 @@ import {
 
 export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<void> {
   registerReferenceClassification(fastify);
+  registerCatalogCarRoutes(fastify);
   await registerCatalogWholesale(fastify);
   await registerCatalogPhotoRoutes(fastify);
   registerMarketReferenceRoutes(fastify);
@@ -88,9 +90,10 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
 
   fastify.get('/admin/api/catalog/measure-applications', { preHandler: requireAdminAuth }, async (request, reply) => {
     const query = z.object({ measure: z.string().trim().min(1).max(60),
-      vehicle_type: tireVehicleTypeSchema.optional() }).safeParse(request.query);
+      vehicle_type: tireVehicleFilterSchema.exclude(['all']).optional() }).safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: 'invalid_measure' });
-    return reply.send(await getCatalogMeasureApplications(query.data.measure, undefined, undefined, query.data.vehicle_type));
+    const vehicleType = query.data.vehicle_type === 'unknown' ? null : query.data.vehicle_type;
+    return reply.send(await getCatalogMeasureApplications(query.data.measure, undefined, undefined, vehicleType));
   });
 
   fastify.post('/admin/api/catalog/:product_id/spec', { preHandler: requireAdminOwner }, async (request, reply) => {

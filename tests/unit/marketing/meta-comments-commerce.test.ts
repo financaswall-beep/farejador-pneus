@@ -19,7 +19,8 @@ const settings = {delivery_enabled:true,pickup_enabled:true,radius_km:12,address
 function database(data: {products?:unknown[];stock?:unknown[];applications?:unknown[];vehicles?:unknown[];fitments?:unknown[];settings?:unknown;policies?:unknown[]} = {}) {
   const query = vi.fn(async (sql: string, values?: unknown[]) => {
     if (['BEGIN READ ONLY',"SET LOCAL statement_timeout = '5s'",'COMMIT','ROLLBACK'].includes(sql)) return {rows:[]};
-    if (!sql.trim().startsWith('SELECT')) throw new Error('Escrita inesperada');
+    if (!/^(SELECT|WITH resolve_vehicle_model AS)/.test(sql.trim()) || /\b(INSERT|UPDATE|DELETE)\b/i.test(sql))
+      throw new Error('Escrita inesperada');
     expect(values?.[0]).toBe('test');
     if (sql.includes('FROM commerce.products')) return {rows:data.products ?? []};
     if (sql.includes('FROM commerce.wholesale_stock')) return {rows:data.stock ?? []};
@@ -45,7 +46,7 @@ describe('consultas públicas comerciais sem efeitos em atendimento/estoque', ()
     expect(db.query.mock.calls[0]![0]).toBe('BEGIN READ ONLY');
     expect(db.query.mock.calls.at(-1)![0]).toBe('COMMIT');
     expect(db.release).toHaveBeenCalledWith(false);
-    expect(db.query.mock.calls.some(([sql])=>sql.includes('vehicle'))).toBe(false);
+    expect(db.query.mock.calls.some(([sql])=>/commerce\.vehicle_(models|fitments|measure_applications)/.test(sql))).toBe(false);
   });
 
   it('saldo reservado não aparece disponível e condição nova não usa saldo meia-vida', async () => {
@@ -131,6 +132,7 @@ describe('compatibilidade pública usa referências aprovadas e anos', () => {
     expect(result.consultas_estoque[0]).toMatchObject({medida_consultada:'130/70-13',produtos:[{disponivel:true}]});
     const [sql,values] = db.query.mock.calls.find(([s])=>s.includes('FROM commerce.products'))!;
     expect(sql).toContain('ts.position');
+    expect(sql).toContain("ts.vehicle_type IS DISTINCT FROM 'car'");
     expect(values).toContain('rear');
   });
 
@@ -160,6 +162,7 @@ describe('compatibilidade pública usa referências aprovadas e anos', () => {
     expect(result).toMatchObject({encontrado:true,estoque_consultado:true});
     expect(db.query.mock.calls.find(([sql])=>sql.includes('vehicle_measure_applications'))?.[1]).toEqual(['test',null,'car']);
     expect(db.query.mock.calls.some(([sql])=>sql.includes('resolve_vehicle_model'))).toBe(false);
+    expect(db.query.mock.calls.find(([sql])=>sql.includes('FROM commerce.products'))?.[0]).toContain("ts.vehicle_type = 'car'");
     expect(vehicleApplicationAnswer({environment:'test',moto_modelo:'NMAX',posicao_pneu:'rear'},undefined,'car')).toBeNull();
     expect(vehicleApplicationAnswer({environment:'test',moto_modelo:'NMAX',posicao_pneu:'rear'},catalog,'car')).toBeNull();
   });

@@ -43,6 +43,49 @@ async function untouchedState() {
 }
 
 describe('importação de pesquisa de compatibilidades, sem homologação automática', () => {
+  it('resolve carro e motos homônimos antes do limite e entrega apenas o vínculo da categoria nas duas fontes', async () => {
+    const { buscarCompatibilidade } = await import('../../src/atendente/tools/commerce-tools.js');
+    const { buscarCompatibilidadeMatriz } = await import('../../src/atendente-v2/matriz-product-search.js');
+    const client = await db.pool.connect();
+    const model = 'Homônimo de teste';
+    try {
+      await client.query('BEGIN');
+      const motos = await client.query(`INSERT INTO commerce.vehicle_models
+        (environment, vehicle_type, make, model, variant, year_start, year_end)
+        SELECT 'test','motorcycle','Fabricante',$1,'Linha ' || n,2020,2024 FROM generate_series(1,6) n
+        RETURNING id`, [model]);
+      const car = (await client.query(`INSERT INTO commerce.vehicle_models
+        (environment,vehicle_type,make,model,year_start,year_end)
+        VALUES ('test','car','Fabricante',$1,2020,2024) RETURNING id`, [model])).rows[0].id;
+      const product = (await client.query(`INSERT INTO commerce.products
+        (environment,product_code,product_name,product_type,tire_condition,brand)
+        VALUES ('test','COMPAT-CAR','Carro de teste','tire','novo','Teste') RETURNING id`)).rows[0].id;
+      const spec = (await client.query(`INSERT INTO commerce.tire_specs
+        (environment,product_id,tire_size,vehicle_type) VALUES ('test',$1,'265/60R18','car') RETURNING id`, [product])).rows[0].id;
+      const bikeSpec = (await client.query(`SELECT id FROM commerce.tire_specs
+        WHERE environment='test' AND vehicle_type='motorcycle' ORDER BY id LIMIT 1`)).rows[0].id;
+      for (const [vehicle, tire] of [[car, spec], ...motos.rows.map(row => [row.id, bikeSpec])]) {
+        await client.query(`INSERT INTO commerce.vehicle_fitments
+          (environment,vehicle_model_id,tire_spec_id,position,is_oem,source)
+          VALUES ('test',$1,$2,'both',true,'manual')`, [vehicle, tire]);
+      }
+      const oldRanking = await client.query('SELECT vehicle_model_id FROM commerce.resolve_vehicle_model($1,$2,$3)',
+        ['test',model,2024]);
+      expect(oldRanking.rows).toHaveLength(5);
+      expect(oldRanking.rows.map(row => row.vehicle_model_id)).not.toContain(car);
+      for (const search of [buscarCompatibilidade, buscarCompatibilidadeMatriz]) {
+        const args = {environment: 'test', moto_modelo: model, moto_ano: 2024, limit: 10} as const;
+        const carRows = await search(client, { ...args, tipo_veiculo: 'car' });
+        expect(carRows).toHaveLength(1);
+        expect(carRows[0]).toMatchObject({ vehicle_model_id: car, produtos: [{product_id: product, position: 'both'}] });
+        const bikeRows = await search(client, args);
+        expect(bikeRows).toHaveLength(5);
+        expect(bikeRows.every(row => motos.rows.some(b => b.id === row.vehicle_model_id)
+          && row.produtos.length === 1 && row.produtos[0]?.product_id !== product)).toBe(true);
+      }
+    } finally { await client.query('ROLLBACK'); client.release(); }
+  });
+
   it('dry-run desfaz veículos, candidatas e auditoria', async () => {
     const client = await db.pool.connect();
     try {

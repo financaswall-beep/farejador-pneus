@@ -43,8 +43,8 @@ describe('orientação de localização antes da busca de pneu', () => {
   it('medida com espaços segue a busca direta mesmo com nome de moto na mensagem', () => {
     const nudge = buildProductSearchNudge('quero 130 70 13 pra NMAX', true);
     expect(nudge).toContain('use buscar_produto com essa medida');
-    expect(nudge).toContain('não pergunte modelo da moto, ano, dianteiro/traseiro nem peça foto');
-    expect(nudge).not.toContain('quando houver somente o modelo da moto');
+    expect(nudge).toContain('não pergunte modelo do veículo, ano, dianteiro/traseiro nem peça foto');
+    expect(nudge).not.toContain('quando houver somente o modelo do carro ou da moto');
     expect(nudge).not.toContain('peça somente a localização fixa');
   });
 });

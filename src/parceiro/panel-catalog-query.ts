@@ -1,3 +1,5 @@
+import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
+
 function brandIdentity(expression: string): string {
   return `regexp_replace(regexp_replace(translate(lower(btrim(COALESCE(${expression},''))),
     'áàâãäéèêëíìîïóòôõöúùûüç','aaaaaeeeeiiiiooooouuuuc'),
@@ -49,3 +51,7 @@ export const CATALOG_WHERE = `p.environment=$1 AND p.deleted_at IS NULL
          AND ${catalogStockMatch('priced_stock')} AND priced_stock.deleted_at IS NULL
          AND priced_stock.sale_price>0
     )))`;
+
+export function partnerApplicationMatchesCategory(reference: TireVehicleType | null | undefined, product: TireVehicleType | null) {
+  return (reference ?? null) === product || (product === 'motorcycle' && reference == null);
+}

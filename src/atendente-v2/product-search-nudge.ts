@@ -7,8 +7,8 @@ const TIRE_REQUEST_RE = /\bpneu(?:s|zinho|zinhos)?\b|\b(?:dianteiro|traseiro)\b/
 export function buildProductSearchNudge(latestCustomerText: string | null | undefined, hasPin: boolean): string {
   if (!latestCustomerText || (!TIRE_SIZE_RE.test(latestCustomerText) && !TIRE_REQUEST_RE.test(latestCustomerText))) return '';
   const search = TIRE_SIZE_RE.test(latestCustomerText)
-    ? 'O cliente informou uma medida: use buscar_produto com essa medida. Escrita com espaços, como 130 70 13, significa 130/70-13. Preserve R/ZR/B quando informados. Para buscar e cotar, não pergunte modelo da moto, ano, dianteiro/traseiro nem peça foto ou confirmação da medida já completa. Não use buscar_compatibilidade apenas para repetir essa identificação. Só investigue aplicação se o cliente perguntar se serve na moto ou houver um conflito concreto.'
-    : 'Use buscar_produto se houver medida ou marca; use buscar_compatibilidade quando houver somente o modelo da moto.';
+    ? 'O cliente informou uma medida: use buscar_produto com essa medida. Escrita com espaços, como 130 70 13, significa 130/70-13. Preserve R/ZR/B quando informados. Para buscar e cotar, não pergunte modelo do veículo, ano, dianteiro/traseiro nem peça foto ou confirmação da medida já completa. Não use buscar_compatibilidade apenas para repetir essa identificação. Só investigue aplicação se o cliente perguntar se serve no veículo ou houver um conflito concreto.'
+    : 'Use buscar_produto se houver medida ou marca; use buscar_compatibilidade quando houver somente o modelo do carro ou da moto.';
   return `\n\n[LOCALIZAÇÃO ANTES DA DISPONIBILIDADE DO PNEU]
 Este lembrete vale para busca/cotação de pneu. Se o assunto for pedido existente, cancelamento, entrega em andamento ou política da loja, siga o fluxo correspondente; mencionar pneu não exige uma nova busca.
 Para interesse em compra no atacado/revenda, siga WHOLESALE CONTACT antes deste lembrete: compartilhe o contato sem pedir localização nem buscar estoque de varejo. Se a intenção comercial estiver ambígua, esclareça uso próprio ou revenda; quantidade sozinha não define atacado.

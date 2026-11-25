@@ -165,7 +165,7 @@ describe('commerce tools deterministicas da Atendente', () => {
     const client = clientWithRows([
       [
         {
-          id: 'v1',
+          vehicle_model_id: 'v1',
           make: 'Honda',
           model: 'Bros',
           variant: null,
@@ -204,7 +204,7 @@ describe('commerce tools deterministicas da Atendente', () => {
     });
     expect(client.calls[1]!.text).toContain('commerce.find_compatible_tires');
     expect(client.calls[1]!.text).toContain('($1, $2, $3, $4)');
-    expect(client.calls[1]!.values).toEqual(['test', 'v1', 'rear', 2020, 10]);
+    expect(client.calls[1]!.values).toEqual(['test', 'v1', 'rear', 2020, 10, null]);
   });
 
   it('calcularFrete retorna bairro nao encontrado sem consultar zona', async () => {

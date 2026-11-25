@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { tireVehicleTypeSchema } from '../../shared/tire-vehicle-type.js';
 
 const tirePositionSchema = z.enum(['front', 'rear', 'both']);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
 
 export const buscarProdutoInputSchema = z.object({
   environment: z.enum(['prod', 'test']),
+  tipo_veiculo: tireVehicleTypeSchema.optional(),
   medida_pneu: z.string().trim().min(1).optional(),
   marca: z.string().trim().min(1).optional(),
   condicao_pneu: tireConditionSchema.optional(),
@@ -28,6 +30,7 @@ export const verificarEstoqueInputSchema = z.object({
 
 export const buscarCompatibilidadeInputSchema = z.object({
   environment: z.enum(['prod', 'test']),
+  tipo_veiculo: tireVehicleTypeSchema.optional(),
   moto_modelo: z.string().trim().min(1),
   moto_ano: z.number().int().min(1900).max(2100).optional(),
   posicao_pneu: tirePositionSchema.optional(),

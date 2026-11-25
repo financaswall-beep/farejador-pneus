@@ -159,7 +159,7 @@ describe('aplicações do fabricante — moto, versão, medida e posição', () 
     const answer = vehicleApplicationAnswer(compatibilityInput('prod', {
       moto_modelo: 'Fazer 250', moto_ano: 2025, posicao_pneu: 'rear', condicao_pneu: 'meia_vida',
     }));
-    expect(answer?.consultas_de_produto).toEqual([{ medida_pneu: '140/70-17', condicao_pneu: 'meia_vida' }]);
+    expect(answer?.consultas_de_produto).toEqual([{ medida_pneu: '140/70-17', tipo_veiculo: 'motorcycle', condicao_pneu: 'meia_vida' }]);
     expect(answer?.aplicacoes[0]?.position).toBe('rear');
     expect(answer?.produto_confirmado).toBe(false);
     for (const args of [{ moto_modelo: 'Fan' }, { moto_modelo: 'Fazer 250', moto_ano: 2025 },

@@ -198,7 +198,12 @@ export async function getCatalogMeasureApplications(
   [environment, key, vehicleType ?? null]);
   const referencias_para_classificar = key && (vehicleType === 'motorcycle' || vehicleType === undefined)
     ? (await repairVehicleApplicationTypes(dbPool, environment, key)).applications : [];
-  return { applications, application_reviews: reviews.rows, referencias_para_classificar };
+  // Na consulta geral a categoria é omitida. A ficha pode trazê-la explicitamente nula.
+  return {
+    applications: vehicleType === null ? applications.filter(row => row.vehicle_type == null) : applications,
+    application_reviews: vehicleType === null ? reviews.rows.filter(row => row.vehicle_type == null) : reviews.rows,
+    referencias_para_classificar,
+  };
 }
 
 export async function getCatalogCompatibility(

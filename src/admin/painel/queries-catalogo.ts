@@ -185,7 +185,7 @@ export async function getCatalogOverview(
         currency: null,
         price_type: null,
         compatibility_count: null,
-        ...catalogApplicationSummary(applications, row.measure),
+        ...catalogApplicationSummary(applications, row.measure, row.vehicle_type),
         row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
         catalogued: false,
         official_quantity_on_hand: Number(row.quantity_on_hand),

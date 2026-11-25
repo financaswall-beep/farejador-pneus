@@ -1,8 +1,10 @@
 import type { PoolClient } from 'pg';
+import { resolveVehicleModel } from './resolve-vehicle-model.js';
 import { logger } from '../../shared/logger.js';
 import type { Environment } from '../../shared/types/chatwoot.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
 import { isKnownPolicyKey, parsePolicyValue } from '../policies/policy-schemas.js';
+import { productVehicleFilter } from './product-vehicle-filter.js';
 
 import { buscarProdutoInputSchema, verificarEstoqueInputSchema, buscarCompatibilidadeInputSchema,
   calcularFreteInputSchema, buscarPoliticaComercialInputSchema } from './commerce-tool-inputs.js';
@@ -118,19 +120,6 @@ interface StockRow {
   quantity_reserved: number;
 }
 
-interface VehicleRow {
-  id?: string;
-  vehicle_model_id?: string;
-  make: string;
-  model: string;
-  variant: string | null;
-  year_start: number | null;
-  year_end: number | null;
-  displacement_cc: number | null;
-  match_type?: string;
-  match_similarity?: string;
-}
-
 interface CompatibleTireRow {
   product_id: string;
   product_name: string;
@@ -179,7 +168,8 @@ export async function buscarProduto(
   const parsed = buscarProdutoInputSchema.parse(input);
   const values: unknown[] = [parsed.environment];
   const filters = ['environment = $1'];
-
+  if (parsed.tipo_veiculo) filters.push(`EXISTS (SELECT 1 FROM commerce.tire_specs ts
+    WHERE ts.environment=product_full.environment AND ts.product_id=product_full.product_id AND ${productVehicleFilter(parsed.tipo_veiculo)})`);
   if (parsed.medida_pneu) {
     values.push(normalizeTireSize(parsed.medida_pneu));
     filters.push(`replace(replace(lower(COALESCE(tire_size, '')), ' ', ''), 'r', '-') = $${values.length}`);
@@ -281,17 +271,11 @@ export async function buscarCompatibilidade(
   input: BuscarCompatibilidadeInput,
 ): Promise<CompatibilidadeResultado[]> {
   const parsed = buscarCompatibilidadeInputSchema.parse(input);
-  const vehicleResult = await client.query<VehicleRow>(
-    `SELECT *
-     FROM commerce.resolve_vehicle_model($1, $2, $3)
-     LIMIT 5`,
-    [parsed.environment, parsed.moto_modelo, parsed.moto_ano ?? null],
-  );
+  const vehicleResult = await resolveVehicleModel(client, parsed);
 
   const out: CompatibilidadeResultado[] = [];
   for (const vehicle of vehicleResult.rows) {
-    const vehicleId = vehicle.vehicle_model_id ?? vehicle.id;
-    if (!vehicleId) throw new Error('resolve_vehicle_model returned no vehicle id');
+    const vehicleId = vehicle.vehicle_model_id;
     // Fix (2026-05-23): a funcao SQL find_compatible_tires aceita apenas
     // 'front', 'rear' ou NULL. O schema da tool aceita 'both' (alias semantico
     // de "todos os pneus"), entao traduzimos 'both' -> NULL antes da query.
@@ -299,15 +283,21 @@ export async function buscarCompatibilidade(
     const positionFilter = parsed.posicao_pneu && parsed.posicao_pneu !== 'both'
       ? parsed.posicao_pneu
       : null;
-    const candidates = 'FROM commerce.find_compatible_tires($1, $2, $3, $4)';
+    const candidates = `FROM commerce.find_compatible_tires($1, $2, $3, $4) fit
+      JOIN commerce.products p ON p.environment=$1 AND p.id=fit.product_id
+      WHERE ($6::text IS NULL OR p.tire_condition=$6)
+        AND EXISTS (SELECT 1 FROM commerce.tire_specs ts WHERE ts.environment=$1
+          AND ts.product_id=fit.product_id AND ${productVehicleFilter(parsed.tipo_veiculo ?? 'motorcycle')})`;
     const tires = await client.query<CompatibleTireRow>(
       parsed.moto_ano
-        ? `SELECT * FROM (SELECT DISTINCT ON (product_id,fitment_position) * ${candidates}
-             ORDER BY product_id,fitment_position,is_oem DESC,confidence_level DESC NULLS LAST,
+        ? `SELECT * FROM (SELECT DISTINCT ON (fit.product_id,fitment_position) fit.*,p.tire_condition ${candidates}
+             ORDER BY fit.product_id,fitment_position,is_oem DESC,confidence_level DESC NULLS LAST,
                       fitment_year_start,fitment_year_end) matched
            ORDER BY is_oem DESC,confidence_level DESC NULLS LAST,product_name,product_id LIMIT $5`
-        : `SELECT * ${candidates} LIMIT $5`,
-      [parsed.environment, vehicleId, positionFilter, parsed.moto_ano ?? null, parsed.limit],
+        : `SELECT fit.*,p.tire_condition ${candidates}
+           ORDER BY is_oem DESC,confidence_level DESC NULLS LAST,fit.product_name,fit.product_id LIMIT $5`,
+      [parsed.environment, vehicleId, positionFilter, parsed.moto_ano ?? null, parsed.limit,
+        parsed.condicao_pneu ?? null],
     );
     out.push({
       vehicle_model_id: vehicleId,

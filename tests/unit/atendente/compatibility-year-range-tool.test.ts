@@ -33,11 +33,12 @@ const fitment = {
 };
 const args = { moto_modelo: 'Twister', moto_ano: 2021, posicao_pneu: 'rear', municipio: 'Niterói' };
 
-function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitment], stock: unknown[] = []) {
+function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitment], stock: unknown[] = [],
+  references: unknown[] = manufacturerApplicationSeed().map(a => ({ ...a, reference: a }))) {
   const query = vi.fn(async (sql: string, _values?: unknown[]) => {
     if (sql.includes('resolve_vehicle_model')) return { rows: vehicles };
     if (sql.includes('vehicle_fitments') || sql.includes('find_compatible_tires')) return { rows: products };
-    if (sql.includes('vehicle_measure_applications')) return { rows: manufacturerApplicationSeed().map(a => ({ ...a, reference:a })) };
+    if (sql.includes('vehicle_measure_applications')) return { rows: references };
     if (sql.includes('FROM commerce.products') || sql.includes('search_products') || sql.includes('commerce.product_full')) return { rows: [] };
     if (sql.includes('wholesale_stock')) return { rows: stock };
     // O cenário não tem parceiro atendendo o município; a busca atual também consulta a rede.
@@ -49,6 +50,65 @@ function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitmen
 
 describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', unified => {
   beforeEach(() => { config.WHOLESALE_UNIFIED_STOCK = unified; });
+
+  it('carro com os dois eixos iguais consulta estoque de carro uma vez e não confirma o SKU pela medida', async () => {
+    const base = { ...manufacturerApplicationSeed()[0]!, make: 'Fabricante A', model: 'Modelo A SR',
+      reference_model: 'Modelo A SR', vehicle_variant: 'SR', vehicle_type: 'car', aliases: ['Modelo A'],
+      year_start: 2020, year_end: 2024, tire_size: '265/60R18', display_measure: '265/60-18' };
+    const rows = ['front','rear'].map(position => ({ ...base, position, reference: base }));
+    const { client, query } = database([],[],[],rows);
+    const run = async (modelo: string) => JSON.parse(await executeTool(client, 'test', 'conv',
+      'buscar_compatibilidade', { modelo, tipo_veiculo: 'car', ano: 2024 }));
+    const result = await run('Modelo A SR');
+    expect(result).toMatchObject({ precisa_confirmar_ano: false, precisa_confirmar_posicao: false,
+      precisa_confirmar_modelo_versao: false, produto_confirmado: false, estoque_consultado: true,
+      consultas_de_produto: [{ medida_pneu: '265/60-18', tipo_veiculo: 'car' }] });
+    expect(query.mock.calls[0]?.[1]).toEqual(['test','Modelo A SR',2024,'car']);
+    expect(query.mock.calls.some(([sql, values]) => sql.includes('vehicle_measure_applications') && values?.[2]==='car')).toBe(true);
+    expect(query.mock.calls.some(([sql]) => sql.includes("ts.vehicle_type = 'car'") && !sql.includes('resolve_vehicle_model'))).toBe(true);
+    expect(await run('Modelo A')).toMatchObject({ precisa_confirmar_modelo_versao: true, consultas_de_produto: [] });
+    for (const incomplete of ['Fabricante A','SR']) {
+      expect(await run(incomplete)).toMatchObject({ encontrado: false, precisa_confirmar_medida: true, estoque_consultado: false });
+    }
+  });
+
+  it('modelo de carro sem fonte própria pede a medida mesmo existindo referência de moto homônima', async () => {
+    const { client, query } = database([],[]);
+    const answer = JSON.parse(await executeTool(client,'test','conv','buscar_compatibilidade',
+      { modelo: 'NMAX', tipo_veiculo: 'car', ano: 2018 }));
+    expect(answer).toMatchObject({ encontrado: false, precisa_confirmar_medida: true, estoque_consultado: false });
+    expect(query.mock.calls.some(([sql]) => sql.includes('wholesale_stock'))).toBe(false);
+  });
+
+  it('carro com vínculo do SKU para ambos os eixos dispensa posição; um eixo sozinho exige confirmação', async () => {
+    const args = { tipo_veiculo: 'car', modelo: 'Modelo B', ano: 2021 };
+    const run = async (position: string) => {
+      const { client } = database([{ ...vehicle, make: 'Fabricante A', model: 'Modelo B' }],
+        [{ ...fitment, position, fitment_position: position }]);
+      return JSON.parse(await executeTool(client,'test','conv','buscar_compatibilidade',args));
+    };
+    expect(await run('both')).toMatchObject({ tipo_resultado: 'compatibilidade_cadastrada', precisa_confirmar_posicao: false });
+    expect(await run('rear')).toMatchObject({ precisa_confirmar_posicao: true, precisa_confirmar_ano: false });
+  });
+
+  it('pedido dos dois eixos de carro com cobertura apenas dianteira pede a medida do outro eixo', async () => {
+    const base = { ...manufacturerApplicationSeed()[0]!, make: 'Marca', model: 'Amostra',
+      reference_model: 'Amostra', vehicle_type: 'car', position: 'front',
+      year_start: 2020, year_end: 2023, tire_size: '265/60R18', display_measure: '265/60-18' };
+    const { client } = database([{ ...vehicle, model: 'Amostra' }],[{ ...fitment, position: 'front', fitment_position: 'front' }],
+      [],[{ ...base, reference: base }]);
+    const result = JSON.parse(await executeTool(client,'test','conv','buscar_compatibilidade',
+      { modelo: 'Amostra', tipo_veiculo: 'car', ano: 2021, posicao_pneu: 'both' }));
+    expect(result).toMatchObject({ precisa_confirmar_posicao: false, precisa_confirmar_medida: true,
+      produto_confirmado: false, estoque_consultado: false, consultas_de_produto: [] });
+  });
+
+  it('modelo sem categoria identificada não cai automaticamente no catálogo de moto', async () => {
+    const { client, query } = database();
+    expect(JSON.parse(await executeTool(client,'test','conv','buscar_compatibilidade',
+      { modelo: 'Modelo genérico' }))).toMatchObject({ precisa_confirmar_tipo_veiculo: true });
+    expect(query).not.toHaveBeenCalled();
+  });
 
   it('ordena as opções pelo disponível após reservas, sem transformar a busca em estoque local confirmado', async () => {
     const { client } = database([vehicle], [
@@ -68,7 +128,7 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
   it('retorna o vínculo vigente do banco antes da referência do fabricante, inclusive com estoque zerado', async () => {
     const { client, query } = database();
     const answer = JSON.parse(await executeTool(client, 'test', 'conv', 'buscar_compatibilidade', args));
-    expect(query.mock.calls[0]?.[1]).toEqual(['test', 'Twister', 2021]);
+    expect(query.mock.calls[0]?.[1]).toEqual(['test', 'Twister', 2021, 'motorcycle']);
     expect(answer).toMatchObject({
       tipo_resultado: 'compatibilidade_cadastrada', ano_informado: 2021,
       precisa_confirmar_ano: false, precisa_confirmar_modelo_versao: false, precisa_localizacao: true,
@@ -78,7 +138,7 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
     expect(answer).not.toHaveProperty('aplicacoes');
     expect(query.mock.calls[1]?.[1]).toEqual(unified
       ? ['test', ['v1'], 'rear', null, 2021]
-      : ['test', 'v1', 'rear', 2021, 10]);
+      : ['test', 'v1', 'rear', 2021, 10, null]);
   });
 
   it('uma lacuna na referência estática não invalida vigência aprovada no banco para outra moto', async () => {

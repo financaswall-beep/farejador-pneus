@@ -7,6 +7,7 @@ import { readDeliverySettings, applyMatrizDeliveryPolicies } from '../atendente-
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { tireSizeKey } from '../shared/tire-size.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
 
 const condition = z.enum(['novo', 'meia_vida', 'remold']).nullable().default(null);
 const productArgs = z.object({
@@ -98,11 +99,12 @@ function publicProduct(product: ProdutoOferta & { stock_block_reason?: string | 
   };
 }
 
-async function products(client: PoolClient, environment: Environment, args: z.infer<typeof productArgs>, position?: 'front' | 'rear' | 'both') {
+async function products(client: PoolClient, environment: Environment, args: z.infer<typeof productArgs>,
+  position?: 'front' | 'rear' | 'both', vehicleType?: TireVehicleType) {
   // Reutiliza catálogo/preço vigente e estoque oficial com reservas descontadas.
   // Não usa executeTool: ele também grava localização/demanda da conversa privada.
   const rows = await buscarProdutoMatriz(client, {
-    environment, medida_pneu: args.medida, marca: args.marca ?? undefined,
+    environment, medida_pneu: args.medida, marca: args.marca ?? undefined, tipo_veiculo: vehicleType,
     condicao_pneu: args.condicao ?? undefined, posicao_pneu: position, apenas_com_estoque: false, limit: 20,
   });
   return {
@@ -140,7 +142,7 @@ async function vehicle(client: PoolClient, environment: Environment, args: z.inf
   for (const query of application.consultas_de_produto.slice(0, 4)) {
     const positions = [...new Set(application.aplicacoes.filter(a => a.display_measure === query.medida_pneu).map(a => a.position))];
     stock.push(await products(client, environment, { medida: query.medida_pneu, condicao: args.condicao, marca: null },
-      positions.length === 1 ? positions[0] : 'both'));
+      positions.length === 1 ? positions[0] : 'both', args.tipo_veiculo));
   }
   return {
     encontrado: application.encontrado, precisa_confirmar_ano: application.precisa_confirmar_ano,

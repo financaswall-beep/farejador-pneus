@@ -20,7 +20,6 @@ export function matrizStockGroupsEnabled(): boolean {
 export function withoutCarGroupToolArgs(tool: ToolDefinition): ToolDefinition {
   if (!['buscar_produto', 'calcular_frete', 'localizacao_loja', 'criar_pedido'].includes(tool.function.name)) return tool;
   const properties = { ...tool.function.parameters.properties as Record<string, unknown> };
-  delete properties.tipo_veiculo;
   delete properties.pneus_avulsos;
   delete properties.quer_conjunto;
   delete properties.conjunto_id;

@@ -294,13 +294,14 @@
 <script src="/admin/painel/app.catalogo.photos.js?v=20261025-video1"></script>
 <script src="/admin/painel/app.catalogo.ficha.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/app.catalogo.referencia.js?v=20261124-modelo"></script>
-  <script src="/admin/painel/app.catalogo.descobertas.js?v=20260916-vehicle1"></script>
+  <script src="/admin/painel/app.catalogo.descobertas.js?v=20261125-carros"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
   <script src="/admin/painel/app.catalogo.js?v=20261124-logos-referencia"></script>
 <script src="/admin/painel/app.catalogo.atacado.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
-<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20261118-referencias"></script>
+<script src="/admin/painel/app.catalogo.compatibilidade.js?v=20261125-carros"></script>
+<script src="/admin/painel/app.catalogo.carros.js?v=20261125-carros"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260821-catalogo-auditoria1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260917-bot-cost1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20261124-origem"></script>
@@ -310,7 +311,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261124-grupos"></script>
+<script src="/admin/painel/app.montagem.js?v=20261125-carros"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261118-milly1"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261118-milly1"></script>
@@ -11154,7 +11155,7 @@
              @keydown.escape.window="catalogoCompatibilityClose()">
         <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
           <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Compatibilidade</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700" x-text="'Compatibilidade · ' + vehicleTypeLabel(catalogoCompatibilidade.row?.vehicle_type)"></p>
             <h2 class="mt-1 truncate text-xl font-bold text-gray-950" x-text="catalogoTitle(catalogoCompatibilidade.row)"></h2>
             <p class="mt-1 text-xs text-gray-500" x-text="catalogoTechnicalLabel(catalogoCompatibilidade.row)"></p>
           </div>
@@ -11180,22 +11181,74 @@
             <button type="button" x-show="adminUser?.role === 'owner'" @click="catalogoClassifyReferences()" :disabled="catalogoCompatibilidade.saving || !catalogoCompatibilidade.selectedReferences?.length" class="mt-3 rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Classificar selecionadas como Moto</button>
           </section>
 
-          <section x-show="adminUser?.role === 'owner' && catalogoCompatibilidade.row?.product_id" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div class="flex items-start gap-2"><i data-lucide="badge-plus" class="mt-0.5 h-4 w-4 text-emerald-700"></i><div><p class="text-sm font-semibold text-gray-950">Associar uma moto à medida</p><p class="mt-0.5 text-[11px] leading-4 text-gray-500">Pesquise na base normalizada. A associação será aplicada a todas as marcas e condições desta mesma medida.</p></div></div>
+          <p x-show="adminUser?.role === 'owner' && catalogoCompatibilidade.row?.product_id && !['car','motorcycle'].includes(catalogoCompatibilidade.row?.vehicle_type)" class="mt-5 rounded-lg border border-gray-200 p-3 text-xs text-gray-700">Defina o tipo de veículo na ficha técnica do pneu para associar um modelo.</p>
+
+          <section x-show="adminUser?.role === 'owner' && catalogoCompatibilidade.row?.product_id && ['car','motorcycle'].includes(catalogoCompatibilidade.row?.vehicle_type)" class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div class="flex items-start gap-2"><i data-lucide="badge-plus" class="mt-0.5 h-4 w-4 text-emerald-700"></i><div><p class="text-sm font-semibold text-gray-950" x-text="catalogoCompatibilidade.row?.vehicle_type === 'car' ? 'Selecionar um carro' : 'Associar uma moto à medida'"></p><p class="mt-0.5 text-[11px] leading-4 text-gray-500" x-text="catalogoCompatibilidade.row?.vehicle_type === 'car' ? 'Pesquise por marca, modelo ou versão para registrar a medida do fabricante ou vincular este pneu.' : 'A associação vale para os pneus de moto cadastrados com esta medida, em todas as marcas e condições.'"></p></div></div>
             <div class="relative mt-4">
-              <div class="flex gap-2"><input x-model="catalogoCompatibilidade.search" @input.debounce.350ms="catalogoCompatibilitySearch()" type="search" placeholder="Ex.: Honda CG 160 2024" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><span x-show="catalogoCompatibilidade.searching" class="flex items-center px-2 text-gray-400"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i></span></div>
+              <div class="flex gap-2"><input x-model="catalogoCompatibilidade.search" @input="catalogoCompatibilityResetSearch()" @input.debounce.350ms="catalogoCompatibilitySearch()" :disabled="catalogoCompatibilidade.saving" type="search" aria-label="Pesquisar marca, modelo ou versão" :placeholder="catalogoCompatibilidade.row?.vehicle_type === 'car' ? 'Ex.: Toyota Hilux' : 'Ex.: Honda CG 160'" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-700"><span x-show="catalogoCompatibilidade.searching" class="flex items-center px-2 text-gray-400"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i></span></div>
               <div x-show="catalogoCompatibilidade.searchRows.length > 0" class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
                 <template x-for="vehicle in catalogoCompatibilidade.searchRows" :key="vehicle.vehicle_model_id"><button type="button" @click="catalogoCompatibilitySelectVehicle(vehicle)" class="block w-full rounded-md px-3 py-2 text-left hover:bg-emerald-50"><span class="block text-xs font-semibold text-gray-900" x-text="[vehicle.make,vehicle.model,vehicle.variant].filter(Boolean).join(' ')"></span><span class="text-[10px] text-gray-500" x-text="catalogoCompatibilityYearLabel(vehicle)"></span></button></template>
               </div>
             </div>
-            <div x-show="catalogoCompatibilidade.selectedVehicle" class="mt-3 space-y-3">
-              <p class="border-t border-gray-200 pt-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-700" x-text="catalogoCompatibilidade.editingPeriod ? 'Corrigindo ' + catalogoCompatibilityYearLabel(catalogoCompatibilidade.editingPeriod) : 'Homologação direta'"></p>
+            <p x-show="catalogoCompatibilidade.searchDone && !catalogoCompatibilidade.searchRows.length" role="status" class="mt-2 text-xs text-gray-600">Nenhum modelo encontrado.</p>
+            <button x-show="catalogoCompatibilidade.row?.vehicle_type === 'car' && !catalogoCompatibilidade.carModel && !catalogoCompatibilidade.selectedVehicle" @click="catalogoCarStartModel()" :disabled="catalogoCompatibilidade.loading || catalogoCompatibilidade.error || catalogoCompatibilidade.saving" type="button" class="mt-2 rounded py-1 text-xs font-semibold text-emerald-800 underline disabled:opacity-40">Cadastrar modelo de carro</button>
+            <template x-if="catalogoCompatibilidade.carModel">
+              <form @submit.prevent="catalogoCarCreate()" class="mt-3">
+                <fieldset :disabled="catalogoCompatibilidade.saving" class="space-y-3">
+                  <legend class="text-sm font-semibold text-gray-900">Novo modelo de carro</legend>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block text-xs font-medium text-gray-700">Montadora<input x-model="catalogoCompatibilidade.carModel.make" x-ref="carMake" type="text" maxlength="100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                    <label class="block text-xs font-medium text-gray-700">Modelo<input x-model="catalogoCompatibilidade.carModel.model" type="text" maxlength="100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  </div>
+                  <label class="block text-xs font-medium text-gray-700">Versão (opcional)<input x-model="catalogoCompatibilidade.carModel.variant" type="text" maxlength="100" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block text-xs font-medium text-gray-700">Ano inicial<input x-model="catalogoCompatibilidade.carModel.year_start" type="number" min="1900" max="2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                    <label class="block text-xs font-medium text-gray-700">Ano final<input x-model="catalogoCompatibilidade.carModel.year_end" type="number" min="1900" max="2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  </div>
+                  <div class="flex items-center justify-end gap-3">
+                    <button type="button" @click="catalogoCompatibilidade.carModel = null" class="rounded px-2 py-2 text-xs text-gray-700">Cancelar</button>
+                    <button type="submit" :disabled="!catalogoCarCanCreate()" class="rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Salvar modelo</button>
+                  </div>
+                </fieldset>
+              </form>
+            </template>
+            <div x-show="catalogoCompatibilidade.row?.vehicle_type === 'car' && catalogoCompatibilidade.selectedVehicle && !catalogoCompatibilidade.editingPeriod" class="mt-3">
+              <label class="text-xs font-semibold text-gray-700">O que deseja registrar?
+                <select x-model="catalogoCompatibilidade.carAction" :disabled="catalogoCompatibilidade.saving" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <option value="reference">Medida indicada pelo fabricante</option>
+                  <option value="fitment">Vínculo deste pneu com o carro</option>
+                </select>
+              </label>
+              <p class="mt-1 text-xs text-gray-600" x-text="catalogoCompatibilityYearLabel(catalogoCompatibilidade.selectedVehicle)"></p>
+            </div>
+            <template x-if="catalogoCompatibilidade.selectedVehicle && catalogoCompatibilidade.carAction === 'reference' && catalogoCompatibilidade.carReference">
+              <form @submit.prevent="catalogoCarSaveReference()" class="mt-3">
+                <fieldset :disabled="catalogoCompatibilidade.saving" class="space-y-3">
+                  <legend class="text-sm font-semibold text-gray-900">Referência da medida</legend>
+                  <p class="text-xs leading-4 text-gray-600">Transcreva a medida, os anos e a posição indicados no manual para esta versão. O bot poderá consultar essa referência por modelo.</p>
+                  <label class="block text-xs font-medium text-gray-700">Medida conforme o fabricante<input x-model="catalogoCompatibilidade.carReference.tire_size" type="text" maxlength="60" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  <label class="block text-xs font-medium text-gray-700">Índice de carga e velocidade (opcional)<input x-model="catalogoCompatibilidade.carReference.index_spec" type="text" maxlength="30" class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  <label class="block text-xs font-medium text-gray-700">Posição no manual<select x-model="catalogoCompatibilidade.carReference.position" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700">
+                    <option value="">Selecione a posição</option><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Dianteiro e traseiro</option>
+                  </select></label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block text-xs font-medium text-gray-700">Ano inicial<input x-model="catalogoCompatibilidade.carReference.year_start" type="number" :min="catalogoCompatibilidade.selectedVehicle.year_start || 1900" :max="catalogoCompatibilidade.selectedVehicle.year_end || 2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                    <label class="block text-xs font-medium text-gray-700">Ano final<input x-model="catalogoCompatibilidade.carReference.year_end" type="number" :min="catalogoCompatibilidade.selectedVehicle.year_start || 1900" :max="catalogoCompatibilidade.selectedVehicle.year_end || 2100" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  </div>
+                  <label class="block text-xs font-medium text-gray-700">Link do manual ou da ficha do fabricante<input x-model="catalogoCompatibilidade.carReference.source_url" type="url" placeholder="https://" maxlength="2048" required class="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-emerald-700"></label>
+                  <button type="submit" :disabled="!catalogoCarCanSaveReference()" class="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40">Registrar referência da medida</button>
+                </fieldset>
+              </form>
+            </template>
+            <div x-show="catalogoCompatibilidade.selectedVehicle && (catalogoCompatibilidade.row?.vehicle_type !== 'car' || catalogoCompatibilidade.carAction === 'fitment')" class="mt-3 space-y-3">
+              <p class="border-t border-gray-200 pt-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-700" x-text="catalogoCompatibilidade.editingPeriod ? 'Corrigindo ' + catalogoCompatibilityYearLabel(catalogoCompatibilidade.editingPeriod) : (catalogoCompatibilidade.row?.vehicle_type === 'car' ? 'Vínculo exclusivo deste pneu' : 'Homologação direta')"></p>
               <div class="grid grid-cols-2 gap-2"><label class="text-[11px] font-semibold text-gray-600">Posição<select :disabled="!!catalogoCompatibilidade.editingPeriod" x-model="catalogoCompatibilidade.form.position" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"><option value="front">Dianteiro</option><option value="rear">Traseiro</option><option value="both">Dianteiro e traseiro</option></select></label><label class="text-[11px] font-semibold text-gray-600">Fonte<select x-model="catalogoCompatibilidade.form.source" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"><option value="manual">Conferência manual</option><option value="manufacturer">Fabricante</option></select></label></div>
               <div class="grid grid-cols-2 gap-2"><label class="text-[11px] font-semibold text-gray-600">Ano inicial <span class="font-normal text-gray-400">(opcional)</span><input x-ref="compatibilityStart" x-model="catalogoCompatibilidade.form.year_start" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2016" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-emerald-700"></label><label class="text-[11px] font-semibold text-gray-600">Ano final <span class="font-normal text-gray-400">(opcional)</span><input x-model="catalogoCompatibilidade.form.year_end" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2026" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-emerald-700"></label></div>
               <p class="text-[10px] leading-4 text-gray-500">Ex.: 2016 a 2026. Use o mesmo ano nos dois campos quando a aplicação valer só para um ano. Deixe vazio quando não houver limite conhecido.</p>
               <label class="flex items-center gap-2 text-xs text-gray-700"><input x-model="catalogoCompatibilidade.form.is_oem" type="checkbox" class="rounded border-gray-300 text-emerald-700">Medida original de fábrica</label>
               <textarea x-model="catalogoCompatibilidade.form.reason" maxlength="500" rows="2" placeholder="Fonte ou motivo da associação *" class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-700"></textarea>
-              <button type="button" @click="catalogoCompatibilitySave()" :disabled="!catalogoCompatibilityCanSave()" class="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40" x-text="catalogoCompatibilidade.saving ? 'Salvando...' : (catalogoCompatibilidade.editingPeriod ? 'Salvar correção do período' : 'Adicionar período')"></button>
+              <button type="button" @click="catalogoCompatibilitySave()" :disabled="!catalogoCompatibilityCanSave()" class="w-full rounded-lg bg-emerald-800 px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-40" x-text="catalogoCompatibilidade.saving ? 'Salvando...' : (catalogoCompatibilidade.editingPeriod ? 'Salvar correção do período' : (catalogoCompatibilidade.row?.vehicle_type === 'car' ? 'Vincular este pneu ao carro' : 'Adicionar período'))"></button>
               <div x-show="!catalogoCompatibilidade.editingPeriod" class="mt-4 space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <div><p class="text-xs font-semibold text-blue-950">Pesquisa na internet para revisar</p><p class="mt-0.5 text-[10px] leading-4 text-blue-800">Cole a fonte encontrada. Isso cria apenas uma candidata; o Bot não usa antes de você aprovar.</p></div>
                 <input x-model="catalogoCompatibilidade.discoveryForm.source_url" type="url" maxlength="2000" placeholder="https://fonte-oficial..." class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-600">
@@ -11206,19 +11259,19 @@
             </div>
           </section>
 
-          <div x-show="catalogoCompatibilidade.message" :class="catalogoCompatibilidade.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="mt-4 rounded-lg border p-3 text-xs" x-text="catalogoCompatibilidade.message?.text"></div>
+          <div x-show="catalogoCompatibilidade.message" role="status" :class="catalogoCompatibilidade.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="mt-4 rounded-lg border p-3 text-xs" x-text="catalogoCompatibilidade.message?.text"></div>
 
           <section x-show="catalogoCompatibilidade.applications?.length > 0" class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
             <h3 class="text-sm font-bold text-emerald-950">Veículos, anos e posição de referência</h3>
             <p class="mt-1 text-xs font-semibold text-emerald-800">Em uso pelo Bot — não precisa aprovar uma por uma.</p>
-            <p class="mt-1 text-[11px] leading-4 text-gray-600">Relação moto, medida e posição. Respeite ano/versão, construção e índices. Não é homologação automática do produto em estoque.</p>
+            <p class="mt-1 text-[11px] leading-4 text-gray-600">A referência informa a medida por modelo, ano, versão e posição. Confira a construção e os índices do pneu em estoque.</p>
             <div class="mt-3 grid gap-3 sm:grid-cols-2">
               <template x-for="app in (catalogoCompatibilidade.applications || [])" :key="app.application_id">
                 <article class="rounded-lg border border-emerald-100 bg-white p-3">
                   <p class="text-xs font-bold text-gray-950" x-text="app.make + ' ' + app.model"></p>
                   <p class="mt-1 text-[11px] text-gray-600" x-text="catalogoCompatibilityYearLabel(app)"></p>
-                  <p class="mt-2 text-xs font-semibold text-emerald-800" x-text="(app.position === 'front' ? 'Dianteiro' : 'Traseiro') + ' · ' + app.display_measure"></p>
-                  <p class="mt-1 text-[10px] text-gray-500" x-text="'Original: ' + app.tire_size + ' · Índice: ' + (app.index_spec || 'não informado') + ' · ' + app.mounting"></p>
+                  <p class="mt-2 text-xs font-semibold text-emerald-800" x-text="catalogoCompatibilityPositionLabel(app.position) + ' · ' + app.display_measure"></p>
+                  <p class="mt-1 text-[10px] text-gray-500" x-text="'Original: ' + app.tire_size + ' · Índice: ' + (app.index_spec || 'não informado') + (app.mounting ? ' · ' + app.mounting : '')"></p>
                   <p x-show="app.notes" class="mt-1 text-[10px] text-gray-500" x-text="app.notes"></p>
                   <a :href="app.source_url" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-[10px] text-blue-700 underline">Ver fonte do fabricante</a>
                 </article>
@@ -11233,7 +11286,7 @@
               <template x-for="item in (catalogoCompatibilidade.applicationReviews || [])" :key="item.application_id">
                 <article class="rounded-lg border border-amber-100 bg-white p-3">
                   <p class="text-xs font-semibold" x-text="item.make + ' ' + item.model"></p>
-                  <p class="mt-1 text-[11px] text-gray-600" x-text="(item.position === 'front' ? 'Dianteiro' : 'Traseiro') + ' · Anos propostos: ' + (item.year_start || '?') + ' a ' + (item.year_end || '?')"></p>
+                  <p class="mt-1 text-[11px] text-gray-600" x-text="catalogoCompatibilityPositionLabel(item.position) + ' · Anos propostos: ' + (item.year_start || '?') + ' a ' + (item.year_end || '?')"></p>
                   <p class="mt-1 text-[11px]" :class="item.status === 'rejected' ? 'text-red-700' : 'text-amber-800'" x-text="item.review_note"></p>
                 </article>
               </template>
@@ -11267,7 +11320,11 @@
           </div>
 
           <div data-testid="catalog-compatibility-empty" x-show="!catalogoCompatibilidade.loading && !catalogoCompatibilidade.error && !catalogoCompatibilidade.referencesToClassify?.length && catalogoCompatibilidade.rows.length === 0 && !catalogoCompatibilidade.applications?.length" class="mt-5 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5 text-center">
-            <i data-lucide="bike" class="mx-auto h-6 w-6 text-amber-600"></i>
+            <span class="text-amber-600" aria-hidden="true">
+              <span x-show="catalogoCompatibilidade.row?.vehicle_type === 'car'"><i data-lucide="car" class="mx-auto h-6 w-6"></i></span>
+              <span x-show="catalogoCompatibilidade.row?.vehicle_type === 'motorcycle'"><i data-lucide="bike" class="mx-auto h-6 w-6"></i></span>
+              <span x-show="!['car','motorcycle'].includes(catalogoCompatibilidade.row?.vehicle_type)"><i data-lucide="circle-help" class="mx-auto h-6 w-6"></i></span>
+            </span>
             <p class="mt-3 text-sm font-semibold text-amber-950">Nenhuma aplicação confirmada</p>
           </div>
 
@@ -11292,7 +11349,7 @@
         </div>
 
         <div class="border-t border-gray-100 bg-white px-6 py-4">
-          <p class="mb-3 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] leading-5 text-gray-600"><i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>A aplicação por medida respeita a moto, o ano e a posição. Antes da montagem, confira construção, índices, montagem e estado do pneu específico.</p>
+          <p class="mb-3 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-[11px] leading-5 text-gray-600"><i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>Antes da montagem, confira modelo, versão, ano e posição do veículo, além da construção, dos índices e do estado deste pneu.</p>
           <button type="button" @click="catalogoCompatibilityClose()" class="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">Fechar</button>
         </div>
       </aside>

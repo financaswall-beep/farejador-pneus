@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { resolveVehicleModel } from '../atendente/tools/resolve-vehicle-model.js';
 import {
   buscarCompatibilidadeInputSchema,
   buscarProdutoInputSchema,
@@ -12,6 +13,7 @@ import {
 } from '../atendente/tools/commerce-tools.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../shared/tire-size.js';
+import { productVehicleFilter } from '../atendente/tools/product-vehicle-filter.js';
 import type { TireCondition } from '../shared/tire-condition.js';
 
 interface CatalogRow {
@@ -58,6 +60,7 @@ export async function buscarProdutoMatriz(
   const parsed = buscarProdutoInputSchema.parse(input);
   const values: unknown[] = [parsed.environment];
   const filters = ['p.environment = $1', 'p.deleted_at IS NULL'];
+  if (parsed.tipo_veiculo) filters.push(productVehicleFilter(parsed.tipo_veiculo));
   if (parsed.marca) {
     values.push(parsed.marca);
     filters.push(`p.brand ILIKE '%' || $${values.length} || '%'`);
@@ -148,16 +151,6 @@ export async function verificarEstoqueMatriz(
   };
 }
 
-interface VehicleRow {
-  vehicle_model_id: string;
-  make: string;
-  model: string;
-  variant: string | null;
-  year_start: number | null;
-  year_end: number | null;
-  displacement_cc: number | null;
-}
-
 interface FitmentRow {
   vehicle_model_id: string;
   product_id: string;
@@ -180,10 +173,7 @@ export async function buscarCompatibilidadeMatriz(
   options: { deferLimit?: boolean } = {},
 ): Promise<CompatibilidadeResultado[]> {
   const parsed = buscarCompatibilidadeInputSchema.parse(input);
-  const vehicles = await client.query<VehicleRow>(
-    `SELECT * FROM commerce.resolve_vehicle_model($1, $2, $3) LIMIT 5`,
-    [parsed.environment, parsed.moto_modelo, parsed.moto_ano ?? null],
-  );
+  const vehicles = await resolveVehicleModel(client, parsed);
   if (vehicles.rows.length === 0) return [];
   const position = parsed.posicao_pneu && parsed.posicao_pneu !== 'both' ? parsed.posicao_pneu : null;
   // Duas fontes podem comprovar faixas sobrepostas. Ao consultar um ano,
@@ -204,6 +194,7 @@ export async function buscarCompatibilidadeMatriz(
        LEFT JOIN commerce.matriz_current_prices cp
          ON cp.product_id = p.id AND cp.environment = p.environment
       WHERE vf.environment = $1 AND vf.vehicle_model_id = ANY($2::uuid[])
+        AND ${productVehicleFilter(parsed.tipo_veiculo ?? 'motorcycle')}
         AND ($3::text IS NULL OR vf.position = $3 OR vf.position = 'both')
         AND ($4::text IS NULL OR p.tire_condition = $4)
         AND ($5::int IS NULL OR (

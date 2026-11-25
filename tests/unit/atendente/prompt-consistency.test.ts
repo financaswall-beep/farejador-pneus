@@ -15,6 +15,13 @@ import { SYSTEM_PROMPT, PHOTO_PROMPT_BLOCK } from '../../../src/atendente-v2/pro
 import { activeToolDefinitions } from '../../../src/atendente-v2/tools.js';
 
 describe('consistência das regras centrais do prompt', () => {
+  it('aceita o tipo na busca por medida mesmo com oferta de conjuntos desligada', () => {
+    const search = activeToolDefinitions().find(tool => tool.function.name === 'buscar_produto')!;
+    expect(search.function.parameters.properties).toHaveProperty('tipo_veiculo.enum', ['car', 'motorcycle']);
+    expect(search.function.parameters.properties).not.toHaveProperty('quer_conjunto');
+    expect(search.function.parameters.required ?? []).not.toContain('tipo_veiculo');
+  });
+
   it('usa a mesma regra de oferta nas buscas por medida e por moto', () => {
     for (const name of ['buscar_produto', 'buscar_compatibilidade']) {
       const definition = activeToolDefinitions().find(tool => tool.function.name === name);

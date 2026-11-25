@@ -2,11 +2,11 @@ import type { CatalogApplication } from '../../shared/vehicle-application-catalo
 import { applicationMeasureKey } from '../../shared/vehicle-tire-applications.js';
 import type { TireVehicleType } from '../../shared/tire-vehicle-type.js';
 
-// Aplicação é uma relação com a moto, não uma especificação do SKU.
+// A referência de medida acompanha a categoria indicada no catálogo.
 export function catalogApplicationSummary(applications: CatalogApplication[], measure: string | null,
   vehicleType?: TireVehicleType | null) {
   const matches = applications.filter(a => a.display_measure === applicationMeasureKey(measure)
-    && (!vehicleType || a.vehicle_type === vehicleType));
+    && (a.vehicle_type ?? null) === (vehicleType ?? null));
   return {
     application_count: matches.length,
     application_positions: [...new Set(matches.map(a => a.position))].sort(),

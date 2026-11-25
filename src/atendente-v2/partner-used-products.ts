@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import type { BuscarProdutoInput, ProdutoOferta } from '../atendente/tools/commerce-tools.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { env } from '../shared/config/env.js';
+import { productVehicleFilter } from '../atendente/tools/product-vehicle-filter.js';
 
 /** Candidatos do parceiro: saldo/preço só entram depois do roteamento normal. */
 export async function partnerUsedProducts(client: PoolClient, input: BuscarProdutoInput): Promise<ProdutoOferta[]> {
@@ -13,6 +14,7 @@ export async function partnerUsedProducts(client: PoolClient, input: BuscarProdu
             0 AS total_stock_available,true AS partner_generic
        FROM commerce.products p JOIN commerce.tire_specs ts ON ts.environment=p.environment AND ts.product_id=p.id
       WHERE p.environment=$1 AND p.partner_generic AND p.deleted_at IS NULL
+        AND ${productVehicleFilter(input.tipo_veiculo)}
         AND ($2::text IS NULL OR commerce.catalog_measure_identity(ts.tire_size)=commerce.catalog_measure_identity($2))
         AND ($3::text IS NULL OR p.product_code=$3)
         AND EXISTS(SELECT 1 FROM commerce.partner_stock_levels s WHERE s.environment=p.environment

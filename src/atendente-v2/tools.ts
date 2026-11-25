@@ -39,7 +39,7 @@ import { env } from '../shared/config/env.js';
 import { getMatrizWholesaleStockQty, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { insertCommerceOrderMirror } from './order-mirror.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
-import { compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
+import { approvedFitmentContext, compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { resolveCustomerLocation } from './customer-location.js';
@@ -133,8 +133,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       parameters: {
         type: 'object',
         properties: {
-          moto_modelo: { type: 'string', description: 'Modelo da moto. Ex: "Fan 150", "CG Titan 160"' },
-          moto_ano: { type: 'integer', description: 'Ano do modelo com quatro dígitos, quando informado pelo cliente. Ex: 2021 (opcional)' },
+          tipo_veiculo: { type: 'string', enum: ['motorcycle', 'car'], description: 'Categoria identificada pelo modelo ou pelo cliente. Par, aro e quantidade não identificam a categoria.' },
+          modelo: { type: 'string', description: 'Modelo do carro ou da moto, com a versão quando informada.' },
+          ano: { type: 'integer', description: 'Ano do veículo, quando informado.' },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'], description: 'Posição do pneu (opcional)' },
           condicao_pneu: {
             type: 'string',
@@ -144,7 +145,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           bairro: { type: 'string', description: 'Bairro do cliente, se já informado — pra mostrar o estoque da loja que vai atender.' },
           municipio: { type: 'string', description: 'Cidade (opcional, ajuda a localizar o bairro).' },
         },
-        required: ['moto_modelo'],
+        required: ['modelo', 'tipo_veiculo'],
         additionalProperties: false,
       },
     },
@@ -466,15 +467,20 @@ async function executeToolInternal(
       case 'registrar_interesse_reposicao': return JSON.stringify(await registerStockInterest(client,environment,conversationId,args));
       case 'buscar_compatibilidade': {
         const compatInput = compatibilityInput(environment, args);
+        if (!compatInput.tipo_veiculo) return JSON.stringify({ encontrado: false, precisa_confirmar_tipo_veiculo: true,
+          mensagem: 'Confirme se o modelo é de carro ou moto, ou peça a medida escrita no pneu.' });
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
         const result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
-        const withApprovedFitments = vehiclesWithApprovedFitments(result);
+        const withApprovedFitments = vehiclesWithApprovedFitments(result).filter(v =>
+          compatInput.tipo_veiculo !== 'car' || compatInput.posicao_pneu !== 'both'
+          || ['front','rear'].every(axis => v.produtos.some(p => p.position === 'both' || p.position === axis)));
         // A edição de um manual não limita a vigência cadastrada. A referência
         // só é consultada DEPOIS dos vínculos aprovados para o modelo/ano/posição.
         if (withApprovedFitments.length === 0) {
-          const catalog = await loadVehicleApplicationCatalog(client, environment);
+          const catalog = await loadVehicleApplicationCatalog(client, environment, undefined,
+            compatInput.tipo_veiculo === 'car' ? 'car' : undefined);
           const application = vehicleApplicationAnswer(compatInput, catalog);
           if (application) {
             if (!application.consultas_de_produto.length) return JSON.stringify(application);
@@ -487,7 +493,7 @@ async function executeToolInternal(
               const resultado = JSON.parse(await executeTool(client, environment, conversationId,
                 'buscar_produto', { ...query,
                   // A busca aceita posição não cadastrada, mas exclui a oposta explícita.
-                  posicao_pneu: positions.length === 1 ? positions[0] : 'both', tipo_veiculo: 'motorcycle',
+                  posicao_pneu: positions.length === 1 ? positions[0] : 'both',
                   bairro: args.bairro, municipio: args.municipio })) as Record<string, unknown>;
               searches.push({ medida_pneu: query.medida_pneu, resultado });
             }
@@ -501,22 +507,19 @@ async function executeToolInternal(
               proximo_passo: 'A medida já foi identificada e consultas_estoque contém a busca comercial feita agora. Não repita pergunta de ano/foto quando as flags forem falsas. Use somente os produtos, preços e disponibilidade retornados, respeitando precisa_localizacao e sem_estoque_loja_perto. Uma consulta com erro não significa falta de estoque. Sem produto cadastrado nessa medida, informe que não encontrou opção no catálogo consultado. A aplicação é por medida; a construção, os índices e a montagem do SKU ainda precisam corresponder à referência. Não troque radial por diagonal.',
             });
           }
-          return JSON.stringify(result.length === 0
-            ? { encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo e ano.' }
-            : { encontrado: false, motivo: 'compatibilidade_nao_cadastrada',
-              mensagem: 'A moto foi reconhecida, mas ainda não existe compatibilidade aprovada para esse ano e posição. Peça a medida escrita no pneu; não adivinhe a medida.' });
+          return JSON.stringify({ encontrado: false, motivo: 'compatibilidade_nao_cadastrada',
+            precisa_confirmar_medida: true, estoque_consultado: false,
+            mensagem: 'Peça a medida escrita na lateral do pneu ou uma foto dela. Falta aplicação confirmada para esse veículo. A disponibilidade depende da busca pela medida.' });
         }
-        const precisaModelo = new Set(withApprovedFitments.map(v => `${v.make}:${v.model}:${v.variant ?? ''}`)).size > 1;
-        if (!compatInput.moto_ano || !compatInput.posicao_pneu || precisaModelo) {
+        const context = approvedFitmentContext(compatInput, withApprovedFitments);
+        if (Object.values(context).some(Boolean)) {
           return JSON.stringify({
             encontrado: true, tipo_resultado: 'compatibilidade_cadastrada_confirmar_contexto',
             modelos: withApprovedFitments.map(({ make, model, variant, year_start, year_end }) =>
               ({ make, model, variant, year_start, year_end })),
-            precisa_confirmar_modelo_versao: precisaModelo,
-            precisa_confirmar_ano: !compatInput.moto_ano,
-            precisa_confirmar_posicao: !compatInput.posicao_pneu,
+            ...context,
             estoque_consultado: false,
-            proximo_passo: 'Pergunte somente o que falta identificar. Se houver mais de um modelo, apresente as opções. Não escolha um produto de outra geração nem confirme disponibilidade antes de identificar a moto e consultar a loja que atende.',
+            proximo_passo: 'Pergunte somente o que falta identificar. Se houver mais de um modelo, apresente as opções. Confirme a disponibilidade após identificar o veículo e consultar a loja que atende.',
           });
         }
         observeSearchProducts(withApprovedFitments.flatMap(v => v.produtos.map(p => ({
@@ -604,6 +607,7 @@ async function executeToolInternal(
       case 'buscar_produto': {
         const productInput = {
           environment,
+          tipo_veiculo: (args.tipo_veiculo ?? undefined) as 'car' | 'motorcycle' | undefined,
           medida_pneu: args.medida_pneu as string | undefined,
           marca: args.marca as string | undefined,
           condicao_pneu: args.condicao_pneu as 'meia_vida' | 'novo' | 'remold' | undefined,

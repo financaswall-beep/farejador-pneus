@@ -4,6 +4,7 @@ import type { TireVehicleType } from './tire-vehicle-type.js';
 
 export interface CatalogApplication extends VehicleTireApplication {
   vehicle_type?: TireVehicleType | null;
+  vehicle_variant?: string | null;
   aliases?: string[];
   // Revisão explícita da família: uma única edição não comprova todos os anos.
   year_optional?: boolean;
@@ -48,7 +49,18 @@ export function matchCatalogApplications(
     if (row.vehicle_type ? row.vehicle_type !== vehicleType : vehicleType !== 'motorcycle') return false;
     // Cada alias é uma identificação completa; não juntar tokens de variantes distintas.
     const names = [row.model, row.reference_model, ...(row.aliases ?? [])];
-    if (!names.some(name => {
+    if (vehicleType === 'car') {
+      // Exige um modelo: marca, cilindrada, acabamento ou um termo solto não bastam.
+      const entered = query.join(' ');
+      const variant = tokens(row.vehicle_variant ?? '').join(' ');
+      const make = tokens(row.make).join(' ');
+      const qualified = names.some(name => {
+        const full = tokens(name).join(' ');
+        const base = variant && full.endsWith(' ' + variant) ? full.slice(0, -(variant.length + 1)) : full;
+        return [base,full].some(n => n && n !== make && n !== variant && (entered === n || entered === make + ' ' + n));
+      });
+      if (!qualified) return false;
+    } else if (!names.some(name => {
       const haystack = new Set(tokens(`${row.make} ${name}`));
       return query.every(t => haystack.has(t));
     })) return false;

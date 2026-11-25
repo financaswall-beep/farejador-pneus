@@ -1,24 +1,25 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.catalogoCompatibilidade = function () {
   return {
-    async catalogoCompatibilityOpen(row) {
-      if (!row?.tire_size || row.product_type === 'service') return;
-      this.catalogoSelecionado = null;
-      this.catalogoCadastro.open = false;
-      this.catalogoCompatibilidade = {
-        open: true,
-        row,
-        rows: [],
-        applications: [], applicationReviews: [], referencesToClassify: [], selectedReferences: [],
-        summary: { models: 0, fitments: 0 },
-        loading: true,
-        error: null,
-        search: '', searchRows: [], searching: false, selectedVehicle: null,
+    catalogoCompatibilityState(row) {
+      return {
+        open: Boolean(row), row, rows: [], applications: [], applicationReviews: [],
+        referencesToClassify: [], selectedReferences: [], summary: { models: 0, fitments: 0 },
+        loading: Boolean(row), error: null, search: '', searchRows: [], searching: false,
+        searchVersion: 0, loadVersion: 0, searchDone: false, selectedVehicle: null,
+        carModel: null, carAction: null, carReference: null,
         form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
         editingPeriod: null, saving: false, message: null,
         discoveries: [], discoveriesLoading: false,
         discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
       };
+    },
+
+    async catalogoCompatibilityOpen(row) {
+      if (!row?.tire_size || row.product_type === 'service') return;
+      this.catalogoSelecionado = null;
+      this.catalogoCadastro.open = false;
+      this.catalogoCompatibilidade = this.catalogoCompatibilityState(row);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
       if (!row.product_id) {
         await this.catalogoCompatibilityLoad();
@@ -31,58 +32,41 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
     },
 
     async catalogoCompatibilityLoad(productId) {
-      if (!productId && !this.catalogoCompatibilidade.row?.product_id) {
-        const state = this.catalogoCompatibilidade;
-        if (!state.row?.tire_size) return;
-        state.loading = true;
-        state.error = null;
-        try {
-          const data = await this.apiGet(`/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}${state.row.vehicle_type ? '&vehicle_type='+encodeURIComponent(state.row.vehicle_type) : ''}`);
-          if (this.catalogoCompatibilidade !== state) return;
-          state.applications = Array.isArray(data.applications) ? data.applications : [];
-          state.referencesToClassify = data.referencias_para_classificar || [];
-          state.selectedReferences = [];
-          state.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
-        } catch {
-          state.error = 'Não foi possível carregar as aplicações desta medida.';
-        } finally {
-          state.loading = false;
-          this.$nextTick(() => window.lucide && window.lucide.createIcons());
-        }
-        return;
-      }
-      if (!productId || this.catalogoCompatibilidade.row?.product_id !== productId) return;
-      this.catalogoCompatibilidade.loading = true;
-      this.catalogoCompatibilidade.error = null;
+      const state = this.catalogoCompatibilidade;
+      if (!state.row?.tire_size && !productId) return;
+      if ((state.row?.product_id || null) !== (productId || null)) return;
+      const category = state.row?.vehicle_type;
+      const url = productId ? `/admin/api/catalog/${encodeURIComponent(productId)}/compatibility`
+        : `/admin/api/catalog/measure-applications?measure=${encodeURIComponent(state.row.tire_size)}&vehicle_type=${['motorcycle', 'car'].includes(category) ? category : 'unknown'}`;
+      const version = (state.loadVersion || 0) + 1;
+      state.loadVersion = version;
+      state.loading = true;
+      state.error = null;
       try {
-        const data = await this.apiGet(
-          `/admin/api/catalog/${encodeURIComponent(productId)}/compatibility`,
-        );
-        if (this.catalogoCompatibilidade.row?.product_id !== productId) return;
-        this.catalogoCompatibilidade.rows = Array.isArray(data.rows) ? data.rows : [];
-        this.catalogoCompatibilidade.applications = Array.isArray(data.applications) ? data.applications : [];
-        this.catalogoCompatibilidade.referencesToClassify = data.referencias_para_classificar || [];
-        this.catalogoCompatibilidade.selectedReferences = [];
-        this.catalogoCompatibilidade.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
-        this.catalogoCompatibilidade.summary = data.summary || { models: 0, fitments: 0 };
+        const data = await this.apiGet(url);
+        if (state.loadVersion !== version) return;
+        state.rows = Array.isArray(data.rows) ? data.rows : [];
+        state.applications = Array.isArray(data.applications) ? data.applications : [];
+        state.referencesToClassify = category === 'car' ? [] : data.referencias_para_classificar || [];
+        state.selectedReferences = [];
+        state.applicationReviews = Array.isArray(data.application_reviews) ? data.application_reviews : [];
+        state.summary = data.summary || { models: 0, fitments: 0 };
       } catch {
-        if (this.catalogoCompatibilidade.row?.product_id !== productId) return;
-        this.catalogoCompatibilidade.rows = [];
-        this.catalogoCompatibilidade.applications = [];
-        this.catalogoCompatibilidade.applicationReviews = [];
-        this.catalogoCompatibilidade.summary = { models: 0, fitments: 0 };
-        this.catalogoCompatibilidade.error = 'Não foi possível carregar as compatibilidades.';
+        if (state.loadVersion !== version) return;
+        state.rows = [];
+        state.applications = [];
+        state.applicationReviews = [];
+        state.summary = { models: 0, fitments: 0 };
+        state.error = 'Não foi possível carregar as compatibilidades.';
       } finally {
-        if (this.catalogoCompatibilidade.row?.product_id === productId) {
-          this.catalogoCompatibilidade.loading = false;
-          this.$nextTick(() => window.lucide && window.lucide.createIcons());
-        }
+        if (state.loadVersion === version) state.loading = false;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },
 
     async catalogoClassifyReferences() {
       const state = this.catalogoCompatibilidade;
-      if (this.adminUser?.role !== 'owner' || state.loading || state.error || state.saving || !state.selectedReferences?.length) return;
+      if (this.adminUser?.role !== 'owner' || state.loading || state.error || state.saving || state.row?.vehicle_type === 'car' || !state.selectedReferences?.length) return;
       state.saving = true;
       state.message = null;
       try {
@@ -105,62 +89,61 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
     },
 
     catalogoCompatibilityClose() {
-      this.catalogoCompatibilidade = {
-        open: false,
-        row: null,
-        rows: [],
-        applications: [], applicationReviews: [], referencesToClassify: [], selectedReferences: [],
-        summary: { models: 0, fitments: 0 },
-        loading: false,
-        error: null,
-        search: '', searchRows: [], searching: false, selectedVehicle: null,
-        form: { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' },
-        editingPeriod: null, saving: false, message: null,
-        discoveries: [], discoveriesLoading: false,
-        discoveryForm: { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 },
-      };
+      this.catalogoCompatibilidade = this.catalogoCompatibilityState(null);
+    },
+
+    catalogoCompatibilityResetSearch() {
+      const state = this.catalogoCompatibilidade;
+      state.searchVersion = (state.searchVersion || 0) + 1;
+      state.searchRows = [];
+      state.searching = false;
+      state.searchDone = false;
+      state.selectedVehicle = null;
+      state.editingPeriod = null;
+      state.carModel = null;
+      state.carReference = null;
+      state.carAction = null;
+      state.message = null;
     },
 
     async catalogoCompatibilitySearch() {
-      const term = String(this.catalogoCompatibilidade.search || '').trim();
-      this.catalogoCompatibilidade.editingPeriod = null;
-      this.catalogoCompatibilidade.selectedVehicle = null;
-      this.catalogoCompatibilidade.searchRows = [];
-      if (term.length < 2) return;
-      if (!this.catalogoCompatibilidade.row?.vehicle_type) {
-        this.catalogoCompatibilidade.message = { ok: false, text: 'Classifique o pneu como Moto ou Carro na ficha técnica antes de vincular um veículo.' };
-        return;
-      }
-      this.catalogoCompatibilidade.searching = true;
-      this.catalogoCompatibilidade.message = null;
+      const state = this.catalogoCompatibilidade;
+      const term = String(state.search || '').trim();
+      const category = state.row?.vehicle_type;
+      if (term.length < 2 || state.selectedVehicle || state.carModel || !['motorcycle', 'car'].includes(category)) return;
+      const version = state.searchVersion;
+      state.searching = true;
       try {
         const data = await this.apiGet(
-          `/admin/api/catalog/vehicle-models?q=${encodeURIComponent(term)}&vehicle_type=${encodeURIComponent(this.catalogoCompatibilidade.row.vehicle_type)}`,
+          `/admin/api/catalog/vehicle-models?q=${encodeURIComponent(term)}&vehicle_type=${category}`,
         );
-        this.catalogoCompatibilidade.searchRows = Array.isArray(data.rows) ? data.rows : [];
+        if (state.searchVersion !== version) return;
+        state.searchRows = Array.isArray(data.rows) ? data.rows : [];
+        state.searchDone = true;
       } catch {
-        this.catalogoCompatibilidade.message = {
-          ok: false, text: 'Não foi possível pesquisar os modelos de veículo.',
-        };
+        if (state.searchVersion === version) state.message = { ok: false, text: 'Não foi possível pesquisar os modelos de veículo.' };
       } finally {
-        this.catalogoCompatibilidade.searching = false;
-        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        if (state.searchVersion === version) state.searching = false;
       }
     },
 
     catalogoCompatibilitySelectVehicle(vehicle) {
-      this.catalogoCompatibilidade.selectedVehicle = vehicle;
-      this.catalogoCompatibilidade.searchRows = [];
-      this.catalogoCompatibilidade.search = [vehicle.make, vehicle.model, vehicle.variant]
-        .filter(Boolean).join(' ');
-      this.catalogoCompatibilidade.form.year_start = vehicle.year_start || '';
-      this.catalogoCompatibilidade.form.year_end = vehicle.year_end || '';
+      const state = this.catalogoCompatibilidade;
+      if (vehicle.vehicle_type && vehicle.vehicle_type !== state.row?.vehicle_type) return;
+      this.catalogoCompatibilityResetSearch();
+      state.selectedVehicle = vehicle;
+      state.search = [vehicle.make, vehicle.model, vehicle.variant].filter(Boolean).join(' ');
+      state.form = { position: 'both', is_oem: false, source: 'manual', reason: '',
+        year_start: vehicle.year_start || '', year_end: vehicle.year_end || '' };
+      state.discoveryForm = { source_url: '', source_title: '', evidence_summary: '', confidence_level: 0.8 };
+      if (state.row?.vehicle_type === 'car') this.catalogoCarStartReference();
     },
 
     catalogoCompatibilityEdit(item) {
       const state = this.catalogoCompatibilidade;
       if (state.saving) return;
       this.catalogoCompatibilitySelectVehicle(item);
+      state.carAction = 'fitment';
       state.editingPeriod = { year_start: item.year_start, year_end: item.year_end };
       state.form.position = item.position;
       state.form.source = item.source === 'manufacturer' ? 'manufacturer' : 'manual';
@@ -189,7 +172,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
 
     catalogoCompatibilityCanSave() {
       const state = this.catalogoCompatibilidade;
-      return this.adminUser?.role === 'owner' && !state.saving
+      return this.adminUser?.role === 'owner' && !state.saving && !state.loading && !state.error
+        && (state.row?.vehicle_type !== 'car' || state.carAction === 'fitment')
         && Boolean(state.selectedVehicle?.vehicle_model_id)
         && ['front', 'rear', 'both'].includes(state.form?.position)
         && this.catalogoCompatibilityYearsValid()
@@ -220,7 +204,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
         state.selectedVehicle = null;
         state.editingPeriod = null;
         state.form = { position: 'both', is_oem: false, source: 'manual', year_start: '', year_end: '', reason: '' };
-        state.message = { ok: true, text: 'Compatibilidade salva no escopo da categoria deste produto.' };
+        state.message = { ok: true, text: state.row.vehicle_type === 'car'
+          ? 'Vínculo salvo para este pneu.' : 'Vínculo salvo para os pneus de moto desta medida.' };
         await this.catalogoCompatibilityLoad(productId);
         await this.loadCatalogo();
       } catch (error) {
@@ -239,7 +224,8 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
       if (this.adminUser?.role !== 'owner' || !productId || state.saving) return;
       const reason = window.prompt('Motivo da remoção desta compatibilidade:');
       if (!reason || reason.trim().length < 2) return;
-      if (!window.confirm(`Remover apenas o período ${this.catalogoCompatibilityYearLabel(item)} deste vínculo e dos produtos no mesmo escopo?`)) return;
+      const scope = state.row.vehicle_type === 'car' ? 'deste pneu' : 'dos pneus de moto desta medida';
+      if (!window.confirm(`Remover o vínculo ${scope} no período ${this.catalogoCompatibilityYearLabel(item)}?`)) return;
       state.saving = true;
       state.message = null;
       try {
@@ -247,7 +233,7 @@ window.PAINEL_MODULES.catalogoCompatibilidade = function () {
           `/admin/api/catalog/${encodeURIComponent(productId)}/compatibility/${encodeURIComponent(item.vehicle_model_id)}/${encodeURIComponent(item.position)}`,
           { reason: reason.trim(), previous_period: { year_start: item.year_start, year_end: item.year_end } },
         );
-        state.message = { ok: true, text: 'Compatibilidade removida da medida e registrada na auditoria.' };
+        state.message = { ok: true, text: 'Vínculo removido e registrado na auditoria.' };
         await this.catalogoCompatibilityLoad(productId);
         await this.loadCatalogo();
       } catch {

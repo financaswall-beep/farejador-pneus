@@ -161,6 +161,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.catalogoReferencia,
     window.PAINEL_MODULES.catalogoDescobertas,
     window.PAINEL_MODULES.catalogoCompatibilidade,
+    window.PAINEL_MODULES.catalogoCarros,
     window.PAINEL_MODULES.catalogoMarca,
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)
     window.PAINEL_MODULES.pedidosParceiros, // app.pedidos.parceiros.js (linhas 2098-2248 pré-obra): pedido manual + novo parceiro + candidaturas (Etapa 3)

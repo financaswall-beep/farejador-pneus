@@ -86,6 +86,26 @@ describe('categoria do pneu — migração e contratos reais', () => {
     await expect(product('car', '140/70R17', brand)).rejects.toThrow('catalog_variant_already_exists');
   });
 
+  it('busca por medida distingue as categorias explícitas e preserva ofertas antigas de moto', async () => {
+    const measure = '115/75-19';
+    const car = await product('car', measure);
+    const moto = await product('motorcycle', measure);
+    const legacy = await product(undefined, measure);
+    const { buscarProdutoMatriz } = await import('../../src/atendente-v2/matriz-product-search.js');
+    const { buscarProduto } = await import('../../src/atendente/tools/commerce-tools.js');
+    const query = { environment: 'test' as const, medida_pneu: measure, apenas_com_estoque: false, limit: 10 };
+    const client = await db.pool.connect();
+    try {
+      for (const search of [buscarProdutoMatriz, buscarProduto]) {
+        const ids = async (type?: 'car' | 'motorcycle') => (await search(client, { ...query, tipo_veiculo: type }))
+          .map(row => row.product_id).sort();
+        expect(await ids('car')).toEqual([car.product_id]);
+        expect(await ids('motorcycle')).toEqual([moto.product_id, legacy.product_id].sort());
+        expect(await ids()).toEqual([car.product_id, moto.product_id, legacy.product_id].sort());
+      }
+    } finally { client.release(); }
+  });
+
   it('recusa compatibilidade entre categorias e ambientes inclusive por SQL direto', async () => {
     const p = await product('car');
     const motorcycle = await vehicle('motorcycle');

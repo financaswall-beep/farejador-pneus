@@ -8,6 +8,7 @@ import {
   CATALOG_STOCK_MATCH,
   CATALOG_WHERE,
   catalogStockMatch,
+  partnerApplicationMatchesCategory,
 } from './panel-catalog-query.js';
 
 export type PartnerPanelCatalogType = 'all' | 'tire' | 'service';
@@ -224,7 +225,8 @@ export async function getPartnerPanelCatalog(
         tire_position: row.tire_position,
         vehicle_type: row.vehicle_type ?? null,
         tire_construction: row.tire_construction ?? null,
-        application_count: row.product_type === 'tire' ? applications.filter(a => a.display_measure === applicationMeasureKey(row.tire_size)).length : 0,
+        application_count: row.product_type === 'tire' ? applications.filter(a => a.display_measure === applicationMeasureKey(row.tire_size)
+          && partnerApplicationMatchesCategory(a.vehicle_type, row.vehicle_type)).length : 0,
         has_local_stock: finiteNumber(row.local_stock_rows) > 0,
         local_stock_rows: finiteNumber(row.local_stock_rows),
         local_quantity_on_hand: finiteNumber(row.local_quantity_on_hand),
@@ -252,10 +254,11 @@ export async function getPartnerPanelCatalogCompatibility(
       brand: string | null;
       tire_condition: string | null;
       tire_size: string | null;
+      vehicle_type: TireVehicleType | null;
       tire_construction: 'radial' | 'bias' | null;
     }>(
       `SELECT p.id product_id,p.product_code,p.product_name,p.brand,
-              p.tire_condition,ts.tire_size,ts.construction tire_construction
+              p.tire_condition,ts.tire_size,ts.vehicle_type,ts.construction tire_construction
          FROM commerce.products p
          LEFT JOIN commerce.tire_specs ts
            ON ts.environment=p.environment AND ts.product_id=p.id
@@ -288,7 +291,8 @@ export async function getPartnerPanelCatalogCompatibility(
         fitments: fitments.rows.length,
       },
       rows: fitments.rows,
-      applications: await loadVehicleApplicationCatalog(client, ctx.environment, product.tire_size),
+      applications: (await loadVehicleApplicationCatalog(client, ctx.environment, product.tire_size))
+        .filter(a => partnerApplicationMatchesCategory(a.vehicle_type, product.vehicle_type)),
     };
   });
 }

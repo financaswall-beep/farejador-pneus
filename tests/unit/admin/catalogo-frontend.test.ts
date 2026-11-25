@@ -120,8 +120,8 @@ describe('catalogo no painel', () => {
       apiGet: vi.fn().mockResolvedValue({ applications: [{ model: 'NMAX', position: 'rear',
         year_start: 2017, year_end: 2022 }], application_reviews: [] }),
       catalogoDiscoveryLoad: vi.fn(), catalogoCompatibilidade: {} };
-    await context.catalogoCompatibilityOpen({ tire_size: '130/70-13', measure_draft: true, product_type: 'tire' });
-    expect(context.apiGet).toHaveBeenCalledWith('/admin/api/catalog/measure-applications?measure=130%2F70-13');
+    await context.catalogoCompatibilityOpen({ tire_size: '130/70-13', measure_draft: true, product_type: 'tire', vehicle_type: 'motorcycle' });
+    expect(context.apiGet).toHaveBeenCalledWith('/admin/api/catalog/measure-applications?measure=130%2F70-13&vehicle_type=motorcycle');
     expect(context.catalogoDiscoveryLoad).not.toHaveBeenCalled();
     expect(context.catalogoCompatibilidade.applications[0].position).toBe('rear');
     expect(context.catalogoCompatibilityYearLabel(context.catalogoCompatibilidade.applications[0])).toBe('2017 a 2022');
@@ -152,7 +152,7 @@ describe('catalogo no painel', () => {
     expect(html).toContain('Aplicações consultadas no fabricante');
     expect(html).toContain('catalogoCompatibilidade.applications');
     expect(html).toContain('partnerCatalogo.applications');
-    expect(html).toContain('Não é homologação automática do produto em estoque');
+    expect(html).toContain('A referência informa a medida por modelo, ano, versão e posição.');
     expect(html).toContain('Em uso pelo Bot — não precisa aprovar uma por uma.');
     expect(html).toContain('catalogoCompatibilidade.discoveries.filter(item => !item.active_reference)');
     expect(html).toContain('Ver registro original');

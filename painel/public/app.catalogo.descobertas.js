@@ -2,30 +2,26 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.catalogoDescobertas = function () {
   return {
     async catalogoDiscoveryLoad(productId) {
-      if (!productId || this.catalogoCompatibilidade.row?.product_id !== productId) return;
-      this.catalogoCompatibilidade.discoveriesLoading = true;
+      const state = this.catalogoCompatibilidade;
+      if (!productId || state.row?.product_id !== productId) return;
+      state.discoveriesLoading = true;
       try {
         const data = await this.apiGet(
           `/admin/api/catalog/${encodeURIComponent(productId)}/fitment-discoveries`,
         );
-        if (this.catalogoCompatibilidade.row?.product_id === productId) {
-          this.catalogoCompatibilidade.discoveries = Array.isArray(data.rows) ? data.rows : [];
-        }
+        state.discoveries = Array.isArray(data.rows) ? data.rows : [];
       } catch {
-        if (this.catalogoCompatibilidade.row?.product_id === productId) {
-          this.catalogoCompatibilidade.message = {
-            ok: false, text: 'As compatibilidades oficiais abriram, mas a fila de pesquisa não carregou.',
-          };
-        }
+        state.message = { ok: false, text: 'Não foi possível carregar a fila de pesquisa deste pneu.' };
       } finally {
-        this.catalogoCompatibilidade.discoveriesLoading = false;
+        state.discoveriesLoading = false;
       }
     },
 
     catalogoDiscoveryCanCreate() {
       const state = this.catalogoCompatibilidade;
       const form = state.discoveryForm || {};
-      return this.adminUser?.role === 'owner' && !state.saving
+      return this.adminUser?.role === 'owner' && !state.saving && !state.loading && !state.error
+        && (state.row?.vehicle_type !== 'car' || state.carAction === 'fitment')
         && Boolean(state.selectedVehicle?.vehicle_model_id)
         && /^https?:\/\//i.test(String(form.source_url || '').trim())
         && String(form.evidence_summary || '').trim().length >= 5
@@ -62,7 +58,7 @@ window.PAINEL_MODULES.catalogoDescobertas = function () {
         state.message = {
           ok: false,
           text: code.includes('catalog_discovery_already_pending')
-            ? 'Já existe uma pesquisa pendente para esta moto, posição e medida.'
+            ? 'Já existe uma pesquisa pendente para este modelo, posição e medida.'
             : 'Não foi possível registrar a pesquisa.',
         };
       } finally {
@@ -89,7 +85,7 @@ window.PAINEL_MODULES.catalogoDescobertas = function () {
           { decision, reason: reason.trim() },
         );
         state.message = { ok: true, text: result.status === 'promoted'
-          ? 'Pesquisa aprovada e propagada para todos os produtos desta medida.'
+          ? (state.row.vehicle_type === 'car' ? 'Pesquisa aprovada para este pneu.' : 'Pesquisa aprovada para os pneus de moto desta medida.')
           : 'Pesquisa rejeitada e preservada no histórico.' };
         await Promise.all([
           this.catalogoDiscoveryLoad(productId),
