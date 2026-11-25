@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
-const svc = vi.hoisted(() => ({ read: vi.fn(), create: vi.fn(), edit: vi.fn(), inventory: vi.fn(), models: vi.fn() }));
+const svc = vi.hoisted(() => ({ read: vi.fn(), create: vi.fn(), edit: vi.fn(), inventory: vi.fn(), models: vi.fn(), stats: vi.fn() }));
+vi.mock('../../../src/admin/painel/queries-catalogo-stats.js', () => ({ getCatalogProductStats: svc.stats }));
 vi.mock('../../../src/admin/auth.js', () => ({
   requireAdminAuth: async (r: any, p: any) => { if (!r.headers.authorization) return p.code(401).send({ error: 'auth' }); },
   requireAdminOwner: async (r: any, p: any) => { if (r.headers.authorization !== 'owner') return p.code(403).send({ error: 'owner' }); },
@@ -28,6 +29,31 @@ vi.mock('../../../src/admin/painel/queries-catalogo-compatibilidade.js', () => (
 import { registerPainelCatalogo } from '../../../src/admin/painel/route-catalogo.js';
 
 describe('categoria no contrato do catálogo', () => {
+  it('restringe as estatísticas ao dono e resolve produto e ambiente no servidor', async () => {
+    const app = Fastify();
+    await registerPainelCatalogo(app);
+    const id = '11111111-1111-4111-8111-111111111111';
+    const url = '/admin/api/catalog/products/' + id + '/stats';
+    const headers = { authorization: 'owner' };
+    try {
+      expect((await app.inject({ url, headers: { authorization: 'staff' } })).statusCode).toBe(403);
+      expect((await app.inject({ url: url.replace(id, 'invalido'), headers })).statusCode).toBe(400);
+      expect(svc.stats).not.toHaveBeenCalled();
+      svc.stats.mockResolvedValueOnce(null);
+      expect((await app.inject({ url, headers })).statusCode).toBe(404);
+      const stats = { share: { units: 0, total: 0, percent: null } };
+      svc.stats.mockResolvedValueOnce(stats);
+      const response = await app.inject({ url: url + '?environment=prod', headers });
+      expect(svc.stats).toHaveBeenLastCalledWith(expect.anything(), 'test', id);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.json()).toEqual(stats);
+      svc.stats.mockRejectedValueOnce(new Error('database details'));
+      expect((await app.inject({ url, headers })).json()).toEqual({ error: 'internal_server_error' });
+    } finally {
+      await app.close();
+    }
+  });
   it('valida filtros e mantém todos como padrão, sem permitir escolher outro ambiente', async () => {
     const app = Fastify(); await registerPainelCatalogo(app);
     svc.read.mockResolvedValue({ rows: [], summary: {} });

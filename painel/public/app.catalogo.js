@@ -164,6 +164,7 @@ window.PAINEL_MODULES.catalogo = function () {
         this.catalogoCreateOpen(row);
         return;
       }
+      this.catalogoResetStats();
       this.catalogoSelecionado = row;
       this.catalogoAtacadoInit?.(row);
       this.catalogoPriceForm = {
@@ -188,6 +189,7 @@ window.PAINEL_MODULES.catalogo = function () {
 
     catalogoClose() {
       if (this.catalogoSaving || this.catalogoSpecSaving || this.catalogoAtacadoSaving || this.catalogoMarket?.saving) return;
+      this.catalogoResetStats();
       this.catalogoSelecionado = null;
       this.catalogoHistory = [];
       this.catalogoMessage = null;

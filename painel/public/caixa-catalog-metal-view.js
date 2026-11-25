@@ -3,6 +3,7 @@
   const C = window.Caixa, U = C.operationCatalogUtils;
   const e = value => String(value ?? '').replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[x]);
   const paths = { back: 'm14 5-7 7 7 7', next: 'm9 5 7 7-7 7', search: 'M19 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0m-2 5 5 6',
+    chart: 'M4 20h16M7 16v-4m5 4V8m5 8V4',
     filter: 'M3 5h18M6 12h12M9 19h6', check: 'm5 12 4 4L19 6', plus: 'M12 4v16M4 12h16',
     camera: 'M3 7h4l2-3h6l2 3h4v14H3V7Zm13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
     video: 'M3 5h12v14H3V5Zm12 5 6-4v12l-6-4', photo: 'M3 3h18v18H3zM3 17l6-6 5 5 3-3 4 4M8 7h.01',
@@ -18,9 +19,13 @@
   const key = row => String(row.row_key || row.product_id || [row.tire_size, row.brand, row.tire_condition].join('|'));
   const meta = row => [row.brand, U.conditionLabel(row.tire_condition)].filter(Boolean).join(' · ');
   function picture(row) { return C.tireIllustration(row); }
-  function identity(row, compact) {
+  function identity(row, compact, includeModel) {
     const box = plate('mcg-product' + (compact ? ' mcg-product-compact' : '')), copy = el('div');
     copy.append(el('strong', row.tire_size || row.product_name || 'Pneu'), el('p', meta(row)));
+    if (includeModel) {
+      const specs = [row.tread_pattern, U.positionLabel(row.tire_position)].filter(Boolean).join(' · ');
+      if (specs) copy.appendChild(el('small', specs));
+    }
     if (row.product_code) copy.appendChild(el('small', 'Código ' + row.product_code)); box.append(picture(row), copy); return box;
   }
   function heading(title, back) { const n = el('header', null, 'mcg-heading'); if (back) { const b = button('', back, 'icon-button', 'back'); b.setAttribute('aria-label', 'Voltar'); n.appendChild(b); } const h = el('h2', title); h.tabIndex = -1; n.appendChild(h); return n; }
@@ -54,15 +59,103 @@
     if (!rows.length) host.appendChild(el('p', 'Nenhum pneu encontrado. Revise a busca ou os filtros.', 'mcg-notice'));
     if (rows.length > m.page * 20) host.appendChild(button('Carregar mais pneus', 'more'));
   }
-  function detail(row) {
-    const tire = row.product_type === 'tire', page = el('div', null, 'mcg-page'); page.append(heading(tire ? 'Pneu do catálogo' : 'Produto do catálogo', 'products'), identity(row));
-    const price = plate('mcg-price-summary'), value = el('div'); value.append(el('small', 'Preço de venda'), el('strong', U.priceLabel(row))); price.append(value, el('span', U.available(row) + ' disponíveis')); page.appendChild(price);
+  const percentFormat = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+  const pct = value => value == null ? '—' : percentFormat.format(value) + '%';
+  const ordersLabel = count => count + (count === 1 ? ' pedido' : ' pedidos');
+  function detailTabs(active) {
+    const tabs = el('div', null, 'mcg-detail-tabs');
+    tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Informações do pneu');
+    for (const [id, label, symbol] of [['info', 'Ficha do pneu', 'file'], ['stats', 'Estatísticas', 'chart']]) {
+      const tab = button(label, 'tab-' + id, active === id ? 'primary' : 'secondary', symbol);
+      tab.id = 'mcg-tab-' + id; tab.tabIndex = active === id ? 0 : -1;
+      tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', String(active === id));
+      tab.setAttribute('aria-controls', 'mcg-detail-panel'); tabs.appendChild(tab);
+    }
+    return tabs;
+  }
+  function shareCard(share, weeks, row) {
+    const card = plate('mcg-metric');
+    card.append(el('h3', 'Participação na medida'), el('strong', pct(share.percent), 'mcg-metric-value'));
+    if (share.percent != null) {
+      card.appendChild(el('p', share.units + ' de ' + share.total + ' pneus ' + (row.tire_size || '') + ' vendidos na mesma condição e tipo de veículo.'));
+    } else {
+      card.appendChild(el('p', 'Sem base comparável para esta medida no período.'));
+    }
+    if (share.delta_pp != null) {
+      const delta = share.delta_pp;
+      card.appendChild(el('p', (delta > 0 ? '+' : '') + percentFormat.format(delta) + ' p.p. sobre as 4 semanas anteriores', 'mcg-metric-note'));
+    }
+    const chart = el('ol', null, 'mcg-week-chart');
+    chart.setAttribute('aria-label', 'Participação por semana, da mais antiga à mais recente');
+    weeks.forEach((week, i) => {
+      const item = el('li'), plot = el('div', null, 'mcg-week-plot'), bar = el('span', null, 'mcg-week-bar');
+      bar.style.height = (week.percent ?? 0) + '%';
+      plot.setAttribute('aria-hidden', 'true'); bar.appendChild(el('b', pct(week.percent))); plot.appendChild(bar);
+      item.append(plot, el('span', 'Sem. ' + (i + 1)));
+      item.setAttribute('aria-label', 'Semana ' + (i + 1) + (week.percent == null ? ', sem base comparável' : ', ' + pct(week.percent) + ', ' + week.units + ' de ' + week.total + ' pneus'));
+      chart.appendChild(item);
+    });
+    card.appendChild(chart); return card;
+  }
+  function meter(value) {
+    const track = el('div', null, 'mcg-metric-track'), fill = el('span');
+    track.setAttribute('aria-hidden', 'true'); fill.style.width = value + '%'; track.appendChild(fill); return track;
+  }
+  function basketCard(basket) {
+    const card = plate('mcg-metric');
+    card.append(el('h3', 'O que vende junto'), el('p', ordersLabel(basket.orders) + ' com este pneu'));
+    const more = el('details', null, 'mcg-basket-more');
+    if (basket.items.length > 5) more.appendChild(el('summary', 'Ver todos os ' + basket.items.length + ' produtos'));
+    basket.items.forEach((item, index) => {
+      const line = el('div', null, 'mcg-metric-row');
+      line.append(el('span', item.label), el('b', ordersLabel(item.orders)));
+      const list = index < 5 ? card : more;
+      list.append(line, meter(item.orders / basket.orders * 100));
+    });
+    if (basket.items.length > 5) card.appendChild(more);
+    if (!basket.items.length && basket.orders) card.appendChild(el('p', 'Nenhum outro produto identificado nesses pedidos.', 'mcg-metric-note'));
+    return card;
+  }
+  function discountCard(discount) {
+    const card = plate('mcg-metric');
+    card.append(el('h3', 'Vendas sem desconto'), el('strong', pct(discount.percent), 'mcg-metric-value'));
+    if (discount.eligible_orders) {
+      card.append(el('p', discount.orders_without_discount + ' de ' + ordersLabel(discount.eligible_orders) + (discount.eligible_orders === 1 ? ' avaliado' : ' avaliados')),
+        meter(discount.percent));
+    } else {
+      card.appendChild(el('p', discount.unknown_orders ? 'Sem base para verificar o desconto.' : 'Nenhum pedido com este pneu no período.'));
+    }
+    if (discount.unknown_orders) card.appendChild(el('p', 'Sem referência suficiente em ' + ordersLabel(discount.unknown_orders) + '.', 'mcg-metric-note'));
+    return card;
+  }
+  function showStats(body, stats, row) {
+    body.appendChild(el('p', 'Varejo da Matriz · Últimas 4 semanas', 'mcg-hint'));
+    if (!stats.data) {
+      const status = el('p', stats.error ? 'Não foi possível carregar as estatísticas deste pneu.' : 'Carregando estatísticas…', stats.error ? 'mcg-error' : 'mcg-notice');
+      status.setAttribute('role', stats.error ? 'alert' : 'status'); body.appendChild(status);
+      if (stats.error) body.appendChild(button('Tentar novamente', 'retry-stats', 'primary', 'refresh'));
+      return;
+    }
+    const data = stats.data;
+    body.append(shareCard(data.share, data.weeks, row), basketCard(data.basket), discountCard(data.discount));
+  }
+  function detail(row, stats) {
+    const tire = row.product_type === 'tire', page = el('div', null, 'mcg-page'); page.append(heading(tire ? 'Pneu do catálogo' : 'Produto do catálogo', 'products'), identity(row, false, !!stats));
     const owner = C.matrixCatalog.allowed();
-    if (owner) { if (tire) page.appendChild(button('Ficha técnica', 'spec', 'secondary', 'file')); page.appendChild(button('Alterar preço', 'price', 'secondary', 'tag')); }
-    else { const spec = plate(); [['Tipo de veículo', ({ motorcycle: 'Moto', car: 'Carro' })[row.vehicle_type]], ['Posição no veículo', U.positionLabel(row.tire_position)], ['Modelo / desenho', row.tread_pattern], ['Índice de carga', row.load_index], ['Velocidade', row.speed_rating]].forEach(([label, value]) => { const p = el('p'); p.append(el('strong', label + ': '), document.createTextNode(value || 'Não informado')); spec.appendChild(p); }); page.appendChild(spec); }
-    if (tire) page.appendChild(button('Compatibilidade', 'fitments', 'secondary', 'car'));
-    if (owner && tire) page.appendChild(button('Fotos e vídeos para o bot', 'media', 'secondary', 'photo'));
-    page.appendChild(el('p', row.catalogued ? 'Cadastro completo' : 'Cadastro pendente', 'mcg-badge' + (row.catalogued ? '' : ' mcg-amber'))); return page;
+    let body = page;
+    if (owner && tire && row.product_id) {
+      const active = stats ? 'stats' : 'info';
+      body = el('div', null, 'mcg-page'); body.id = 'mcg-detail-panel'; body.tabIndex = 0;
+      body.setAttribute('role', 'tabpanel'); body.setAttribute('aria-labelledby', 'mcg-tab-' + active);
+      page.append(detailTabs(active), body);
+      if (stats) { showStats(body, stats, row); return page; }
+    }
+    const price = plate('mcg-price-summary'), value = el('div'); value.append(el('small', 'Preço de venda'), el('strong', U.priceLabel(row))); price.append(value, el('span', U.available(row) + ' disponíveis')); body.appendChild(price);
+    if (owner) { if (tire) body.appendChild(button('Ficha técnica', 'spec', 'secondary', 'file')); body.appendChild(button('Alterar preço', 'price', 'secondary', 'tag')); }
+    else { const spec = plate(); [['Tipo de veículo', ({ motorcycle: 'Moto', car: 'Carro' })[row.vehicle_type]], ['Posição no veículo', U.positionLabel(row.tire_position)], ['Modelo / desenho', row.tread_pattern], ['Índice de carga', row.load_index], ['Velocidade', row.speed_rating]].forEach(([label, value]) => { const p = el('p'); p.append(el('strong', label + ': '), document.createTextNode(value || 'Não informado')); spec.appendChild(p); }); body.appendChild(spec); }
+    if (tire) body.appendChild(button('Compatibilidade', 'fitments', 'secondary', 'car'));
+    if (owner && tire) body.appendChild(button('Fotos e vídeos para o bot', 'media', 'secondary', 'photo'));
+    body.appendChild(el('p', row.catalogued ? 'Cadastro completo' : 'Cadastro pendente', 'mcg-badge' + (row.catalogued ? '' : ' mcg-amber'))); return page;
   }
   function filterForm(state) {
     const form = el('form'); form.id = 'mcg-filter-form'; form.appendChild(heading('Filtrar catálogo', 'close-filters'));

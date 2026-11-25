@@ -57,6 +57,25 @@
 .mcg-product-compact .mcg-tire { height: 80px; }
 .mcg-product-compact strong { font-size: 32px; }
 .mcg-product-compact p { font-size: 20px; }
+.mcg-detail-tabs { display: flex; gap: 5px; }
+.mcg-detail-tabs button { flex: 1; font-size: 19px; }
+.mcg-detail-tabs svg { width: 20px; height: 20px; }
+.mcg-metric { padding: 16px 15px; }
+.mcg-metric h3 { font: 800 23px/1.15 var(--mc-font); }
+.mcg-metric p { margin-top: 4px; color: #304638; font: 500 17px/1.25 var(--mc-font); }
+.mcg-metric .mcg-metric-note { margin-top: 7px; color: #245b42; font-size: 16px; }
+.mcg-metric-value { display: block; margin-top: 6px; color: #105739; font: 900 41px/1.05 var(--mc-font); }
+.mcg-week-chart { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); list-style: none; margin: 14px 0 0; padding: 20px 0 0; text-align: center; font-size: 16px; }
+.mcg-week-plot { position: relative; height: 90px; margin-bottom: 2px; border-bottom: 1px solid #7c9285; background: repeating-linear-gradient(to top,transparent 0 29px,#506f5c26 29px 30px); }
+.mcg-week-bar { position: absolute; bottom: 0; left: 20%; width: 60%; border-radius: 3px 3px 0 0; background: #377354; }
+.mcg-week-bar b { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); line-height: 1.2; white-space: nowrap; }
+.mcg-metric-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 17px; }
+.mcg-metric-row span { min-width: 0; overflow-wrap: anywhere; }
+.mcg-metric-row b { flex: none; }
+.mcg-basket-more { margin-top: 7px; }
+.mcg-basket-more summary { padding: 12px 0; color: #145535; cursor: pointer; font-size: 17px; font-weight: 700; }
+.mcg-metric-track { height: 7px; margin-top: 5px; overflow: hidden; border-radius: 5px; background: #aebdb4; }
+.mcg-metric-track > span { display: block; height: 100%; background: #2d674a; }
 .mcg-price-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mcg-price-summary small { display: block; font-size: 19px; }
 .mcg-price-summary strong { display: block; margin-top: 4px; font: 900 39px/1 var(--mc-font); }

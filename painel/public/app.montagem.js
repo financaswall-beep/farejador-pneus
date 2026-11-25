@@ -155,6 +155,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.galpaoCorrecao, // transfere condição com trilha, sem editar histórico
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.catalogo,
+    window.PAINEL_MODULES.catalogoStats,
     window.PAINEL_MODULES.catalogoAtacado,
     window.PAINEL_MODULES.catalogoBootstrap,
     window.PAINEL_MODULES.catalogoFicha,
