@@ -2,7 +2,8 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CaixaAuth } from '../../../src/admin/caixa/queries.js';
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), create: vi.fn(), fromStock: vi.fn(), spec: vi.fn(),
-  price: vi.fn(), add: vi.fn(), remove: vi.fn(), compatibility: vi.fn(), applications: vi.fn(), search: vi.fn() }));
+  price: vi.fn(), add: vi.fn(), remove: vi.fn(), compatibility: vi.fn(), applications: vi.fn(), search: vi.fn(), stats: vi.fn() }));
+vi.mock('../../../src/admin/painel/queries-catalogo-stats.js', () => ({ getCatalogProductStats: mocks.stats }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test' } }));
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/admin/painel/queries-catalogo.js', () => ({ getCatalogOverview: mocks.overview, setCatalogPrice: mocks.price }));
@@ -29,6 +30,18 @@ describe('cadastro central pela sessão do app', () => {
   });
   afterEach(async () => app.close());
   const headers = { authorization: 'owner', 'x-stock': 'yes' };
+  it('usa a mesma consulta do painel e exige a sessão da Matriz com estoque e papel dono', async () => {
+    const url = base + '/products/' + id + '/stats';
+    expect((await app.inject({ url })).statusCode).toBe(401);
+    expect((await app.inject({ url, headers: { authorization: 'owner' } })).statusCode).toBe(403);
+    expect((await app.inject({ url, headers: { ...headers, authorization: 'staff' } })).statusCode).toBe(403);
+    expect(mocks.stats).not.toHaveBeenCalled();
+    mocks.stats.mockResolvedValueOnce({ basket: { orders: 0, items: [] } });
+    const response = await app.inject({ url, headers });
+    expect(mocks.stats).toHaveBeenCalledWith(expect.anything(), 'test', id);
+    expect(response.json().basket).toEqual({ orders: 0, items: [] });
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
   it('protege consulta e mutações com autenticação, módulo e papel de proprietário', async () => {
     expect((await app.inject({ url: base })).statusCode).toBe(401);
     expect((await app.inject({ url: base, headers: { authorization: 'owner' } })).statusCode).toBe(403);

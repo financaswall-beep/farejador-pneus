@@ -13,7 +13,7 @@ function loadCatalogModule() {
     setTimeout,
   };
   vm.runInNewContext(readFileSync('painel/public/app.vehicle-types.js', 'utf8'), sandbox);
-  for (const name of ['ficha', 'descobertas']) vm.runInNewContext(readFileSync('painel/public/app.catalogo.'+name+'.js', 'utf8'), sandbox);
+  for (const name of ['ficha', 'descobertas', 'stats']) vm.runInNewContext(readFileSync('painel/public/app.catalogo.'+name+'.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/catalog-create-utils.js', 'utf8'), sandbox);
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.bootstrap.js', 'utf8'), sandbox);
@@ -25,6 +25,7 @@ function loadCatalogModule() {
   return {
     ...sandbox.window.PAINEL_MODULES.vehicleTypes(),
     ...sandbox.window.PAINEL_MODULES.catalogo(),
+    ...sandbox.window.PAINEL_MODULES.catalogoStats(),
     ...sandbox.window.PAINEL_MODULES.catalogoFicha(),
     ...sandbox.window.PAINEL_MODULES.catalogoDescobertas(),
     ...sandbox.window.PAINEL_MODULES.catalogoBootstrap(),
@@ -35,6 +36,49 @@ function loadCatalogModule() {
 }
 
 describe('catalogo no painel', () => {
+  it('só consulta ao abrir estatísticas de um pneu da Matriz e mantém as alterações da ficha', async () => {
+    const stats = { share: { units: 2 }, weeks: [], basket: {}, discount: {} };
+    const form = { price: '158', reason: 'Tabela nova' };
+    const state = { ...loadCatalogModule(), apiGet: vi.fn().mockResolvedValue(stats),
+      isMatrixPanel: vi.fn(() => true), adminUser: { role: 'owner' }, catalogoPriceForm: form,
+      catalogoSelecionado: { product_id: 'pneu-a', product_type: 'tire', catalogued: true } };
+    expect(state.apiGet).not.toHaveBeenCalled();
+    state.isMatrixPanel.mockReturnValueOnce(false);
+    await state.catalogoShowStats();
+    state.catalogoSelecionado.product_type = 'service';
+    await state.catalogoShowStats();
+    expect(state.apiGet).not.toHaveBeenCalled();
+    state.catalogoSelecionado.product_type = 'tire';
+    await state.catalogoShowStats();
+    await state.catalogoShowStats();
+    expect(state.catalogoStats).toEqual(stats);
+    expect(state.apiGet.mock.calls).toEqual([['/admin/api/catalog/products/pneu-a/stats']]);
+    expect(state.catalogoPriceForm).toEqual(form);
+    state.catalogoClose();
+    expect(state.catalogoStats).toBeNull();
+    expect(state.catalogoTab).toBe('ficha');
+  });
+
+  it('descarta respostas de uma abertura anterior, mesmo ao reabrir o mesmo pneu', async () => {
+    let resolveFirst!: (value: unknown) => void;
+    const first = new Promise(resolve => { resolveFirst = resolve; });
+    const row = { product_id: 'pneu-a', product_type: 'tire', catalogued: true };
+    const state = { ...loadCatalogModule(), apiGet: vi.fn().mockReturnValueOnce(first)
+      .mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ share: { units: 0 } }),
+      adminUser: { role: 'owner' }, isMatrixPanel: () => true, catalogoSelecionado: row };
+    const late = state.catalogoShowStats();
+    expect(state.catalogoStatsStatus).toBe('loading');
+    state.catalogoClose();
+    state.catalogoSelecionado = row;
+    await state.catalogoShowStats();
+    expect(state.catalogoStatsStatus).toBe('error');
+    await state.catalogoShowStats();
+    resolveFirst({ share: { units: 99 } });
+    await late;
+    expect(state.catalogoStatsStatus).toBe('ready');
+    expect(state.catalogoStats).toEqual({ share: { units: 0 } });
+  });
+
   it('mantém o código automático do cadastro manual e do estoque com a regra compartilhada do app', () => {
     const context = { ...loadCatalogModule(), adminUser: { role: 'owner' }, $nextTick: vi.fn(),
       catalogoCadastro: { mode: 'manual', row: null, form: { measure: '90/90-18', brand: 'Téchnic', tire_condition: 'novo' } } };
@@ -270,7 +314,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toMatch(/\/admin\/painel\/tailwind\.css\?v=[A-Za-z0-9._-]+/);
-    expect(html).toContain('/admin/painel/app.catalogo.js?v=20261124-logos-referencia');
+    expect(html).toContain('/admin/painel/app.catalogo.js?v=20261125-estatisticas');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');

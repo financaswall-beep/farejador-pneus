@@ -9,12 +9,12 @@
   const filters = V.el('dialog', null, 'is-matrix-metal mcg-dialog'); filters.id = 'mcg-filters'; filters.setAttribute('aria-label', 'Filtrar catálogo'); document.body.appendChild(filters);
   const stockChoice = V.el('dialog', null, 'is-matrix-metal mcg-dialog'); stockChoice.id = 'mcg-stock-selector'; stockChoice.setAttribute('aria-label', 'Escolher item para alterar preço'); document.body.appendChild(stockChoice);
   let choiceRow = null;
-  const m = { active: false, session: '', selected: '', media: false, page: 1 };
+  const m = { active: false, session: '', selected: '', stats: null, media: false, page: 1 };
   const owner = () => C.matrixCatalog.allowed();
   const valid = () => m.active && !C.isPartner() && !!C.token() && C.canModule('estoque') && m.session === C.sessionFingerprint();
   const selected = () => state.rows.find(row => V.key(row) === m.selected);
   function reset() {
-    m.active = false; m.session = ''; m.selected = ''; m.media = false; m.page = 1;
+    m.active = false; m.session = ''; m.selected = ''; m.stats = null; m.media = false; m.page = 1;
     state.request++; Object.assign(state, { rows: [], brands: [], summary: {}, loaded: false, loading: false, error: false, query: '', brand: '', filter: 'all' });
     filters.close(); filters.replaceChildren(); stockChoice.close(); stockChoice.replaceChildren(); choiceRow = null; host.replaceChildren(); panel.dataset.catalogView = 'products';
     title.querySelector('h2').textContent = 'Catálogo';
@@ -29,7 +29,9 @@
       filters.close(); stockChoice.close(); source.closeStockSelection(); C.matrixCatalog.reset?.(); C.matrixCatalogFitments?.reset();
       const price = document.getElementById('stock-price-modal');
       if (price.classList.contains('mcg-stock-price') && !price.classList.contains('hidden')) C.resetStockPrice();
-      C.catalogMetalForms?.syncPanel(); m.selected = '';
+      C.catalogMetalForms?.syncPanel();
+      if (m.stats) host.replaceChildren();
+      m.selected = ''; m.stats = null;
     }
     else render();
   }
@@ -37,16 +39,29 @@
     if (!valid()) return;
     const row = selected(), same = host.dataset.product === m.selected, scroll = panel.scrollTop;
     const focus = host.contains(document.activeElement) ? document.activeElement.id : '';
-    if (row && !state.loading && !state.error) { host.replaceChildren(V.detail(row)); panel.dataset.catalogView = 'detail'; }
+    if (row && !state.loading && !state.error) { host.replaceChildren(V.detail(row, m.stats)); panel.dataset.catalogView = 'detail'; }
     else if (m.selected && (state.loading || state.error)) {
       const page = V.el('div', null, 'mcg-page'); page.append(V.heading('Pneu do catálogo', 'products'), V.el('p', state.error ? 'Não foi possível atualizar o pneu.' : 'Atualizando cadastro…', 'mcg-notice'));
       if (state.error) page.appendChild(V.button('Tentar novamente', 'refresh', 'primary')); host.replaceChildren(page);
-    } else { m.selected = ''; host.replaceChildren(V.list(m, state)); V.cards(m, state, host.querySelector('#mcg-product-list')); panel.dataset.catalogView = 'products'; }
+    } else { m.selected = ''; m.stats = null; host.replaceChildren(V.list(m, state)); V.cards(m, state, host.querySelector('#mcg-product-list')); panel.dataset.catalogView = 'products'; }
     host.dataset.product = m.selected;
     if (m.media) panel.dataset.catalogView = C.matrixPhotoGallery.mediaView?.() || 'gallery';
     panel.scrollTop = same ? scroll : 0; if (focus) host.querySelector('#' + focus)?.focus({ preventScroll: true });
   }
-  function open(row) { if (!valid() || !row) return; m.selected = V.key(row); render(); host.querySelector('h2')?.focus({ preventScroll: true }); }
+  function open(row) { if (!valid() || !row) return; m.selected = V.key(row); m.stats = null; render(); host.querySelector('h2')?.focus({ preventScroll: true }); }
+  async function loadStats(row) {
+    if (!valid() || !owner() || !row?.product_id || row.product_type !== 'tire') return;
+    const request = { data: null, error: false };
+    m.stats = request; render(); host.querySelector('#mcg-tab-stats')?.focus({ preventScroll: true });
+    try {
+      const data = await C.matrixCatalog.api('/products/' + encodeURIComponent(row.product_id) + '/stats');
+      if (!data?.share || !Array.isArray(data.weeks) || !Array.isArray(data.basket?.items) || !data.discount) throw new Error('invalid_catalog_stats');
+      request.data = data;
+    } catch {
+      request.error = true;
+    }
+    if (valid() && owner() && m.stats === request && selected()?.product_id === row.product_id) render();
+  }
   function openPrice(row) {
     if (!owner()) return;
     const U = C.operationCatalogUtils, entries = U.localEntries(row);
@@ -69,7 +84,7 @@
   function act(event) {
     const b = event.target.closest('[data-mcg-action]'); if (!b || b.disabled || !valid()) return;
     const action = b.dataset.mcgAction, row = selected();
-    if (action === 'products') { m.selected = ''; render(); }
+    if (action === 'products') { m.selected = ''; m.stats = null; render(); }
     else if (action === 'refresh') { if (m.media) void C.matrixPhotoGallery.refresh(); else void C.loadOperationCatalog(1); }
     else if (action === 'filters') showFilters();
     else if (action === 'close-filters') filters.close();
@@ -83,6 +98,8 @@
       const target = state.rows.find(item => V.key(item) === b.dataset.key);
       if (action === 'detail') open(target); else if (owner()) C.openMatrixCatalogEditor(target);
     } else if (row) {
+      if ((action === 'tab-stats' && !m.stats) || (action === 'retry-stats' && m.stats?.error)) void loadStats(row);
+      if (action === 'tab-info' && m.stats) { m.stats = null; render(); host.querySelector('#mcg-tab-info')?.focus({ preventScroll: true }); }
       if (action === 'spec' && owner()) C.openMatrixCatalogEditor(row, 'spec');
       if (action === 'price') openPrice(row);
       if (action === 'fitments') void C.openMatrixCatalogFitments(row);
@@ -90,6 +107,12 @@
     }
   }
   host.addEventListener('click', act); title.addEventListener('click', act); filters.addEventListener('click', act); stockChoice.addEventListener('click', act);
+  host.addEventListener('keydown', event => {
+    if (!event.target.closest('.mcg-detail-tabs') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 'info' : event.key === 'End' ? 'stats' : m.stats ? 'info' : 'stats';
+    host.querySelector('#mcg-tab-' + next)?.click();
+  });
   host.addEventListener('input', event => { if (event.target.id === 'mcg-search' && valid()) { state.query = event.target.value; m.page = 1; V.cards(m, state, host.querySelector('#mcg-product-list')); } });
   filters.addEventListener('submit', event => { event.preventDefault(); if (!valid()) return; const data = new FormData(event.target); state.query = String(data.get('query') || '').trim(); state.brand = String(data.get('brand') || ''); state.filter = String(data.get('filter') || 'all'); m.page = 1; filters.close(); render(); });
   document.addEventListener('keydown', event => {

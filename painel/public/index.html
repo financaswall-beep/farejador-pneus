@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/admin/painel/marketing-organic.css?v=20260930-organic-nav1" />
 <link rel="stylesheet" href="/admin/painel/marketing-organic-results.css?v=20260930-results1" />
 <link rel="stylesheet" href="/admin/painel/marketing-publisher.css?v=20261113-carrossel1" />
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261118-retiradas" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20261125-catalog-stats" />
 <style>
   #sino-dropdown{display:flex;flex-direction:column;max-height:calc(100dvh - 6rem)}
   #sino-dropdown>div{flex-shrink:0}
@@ -296,7 +296,8 @@
 <script src="/admin/painel/app.catalogo.referencia.js?v=20261124-modelo"></script>
   <script src="/admin/painel/app.catalogo.descobertas.js?v=20261125-carros"></script>
   <script src="/admin/painel/app.vehicle-types.js?v=20260916-vehicle-ui1"></script>
-  <script src="/admin/painel/app.catalogo.js?v=20261124-logos-referencia"></script>
+  <script src="/admin/painel/app.catalogo.js?v=20261125-estatisticas"></script>
+<script src="/admin/painel/app.catalogo.stats.js?v=20261125-estatisticas"></script>
 <script src="/admin/painel/app.catalogo.atacado.js?v=20261006-atacado1"></script>
 <script src="/admin/painel/catalog-create-utils.js?v=20260918-catalog3"></script>
 <script src="/admin/painel/app.catalogo.bootstrap.js?v=20260918-catalog3"></script>
@@ -311,7 +312,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260822-continuity1"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260822-continuity1"></script>
-<script src="/admin/painel/app.montagem.js?v=20261125-carros"></script>
+<script src="/admin/painel/app.montagem.js?v=20261125-estatisticas"></script>
 <script src="/admin/painel/app.js?v=20261019-sino1"></script>
 <script defer src="/admin/painel/app.bot.chat.js?v=20261118-milly1"></script>
 <script defer src="/admin/painel/caixa-chat.js?v=20261118-milly1"></script>
@@ -11372,13 +11373,19 @@
                     x-text="String(catalogoSelecionado?.brand || 'SEM MARCA').toUpperCase()"></span>
             </template>
             <h2 class="mt-3 truncate text-xl font-bold text-gray-950" x-text="catalogoTitle(catalogoSelecionado)"></h2>
+            <p x-show="catalogoStatsDisponiveis()" class="mt-1 text-sm font-semibold text-gray-700"
+               x-text="[catalogoSelecionado?.tread_pattern, catalogoSelecionado?.tire_position ? catalogoPositionLabel(catalogoSelecionado.tire_position) : ''].filter(Boolean).join(' · ')"></p>
             <p class="mt-1 text-xs text-gray-500" x-text="catalogoTechnicalLabel(catalogoSelecionado)"></p>
             <p class="mt-1 text-xs text-gray-400" x-text="`${catalogoSelecionado?.product_code} · ${catalogoConditionLabel(catalogoSelecionado?.tire_condition)}`"></p>
           </div>
           <button type="button" @click="catalogoClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
 
-        <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div x-show="catalogoStatsDisponiveis()" role="tablist" aria-label="Informações do pneu" @keydown="catalogoTabKey($event)" class="flex shrink-0 gap-5 border-b border-gray-200 px-6">
+          <button type="button" id="catalog-tab-ficha" role="tab" aria-controls="catalog-panel-ficha" :aria-selected="catalogoTab === 'ficha'" :tabindex="catalogoTab === 'ficha' ? 0 : -1" @click="catalogoTab = 'ficha'" class="border-b-2 py-3 text-sm font-semibold" :class="catalogoTab === 'ficha' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500'">Ficha do pneu</button>
+          <button type="button" id="catalog-tab-stats" role="tab" aria-controls="catalog-panel-stats" :aria-selected="catalogoTab === 'stats'" :tabindex="catalogoTab === 'stats' ? 0 : -1" @click="catalogoShowStats()" class="border-b-2 py-3 text-sm font-semibold" :class="catalogoTab === 'stats' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500'">Estatísticas</button>
+        </div>
+        <div id="catalog-panel-ficha" x-show="catalogoTab === 'ficha'" :role="catalogoStatsDisponiveis() ? 'tabpanel' : null" :aria-labelledby="catalogoStatsDisponiveis() ? 'catalog-tab-ficha' : null" class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <section class="overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/50">
             <div class="flex items-center gap-2 border-b border-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900"><i data-lucide="warehouse" class="h-4 w-4"></i>Dados trazidos do Estoque</div>
             <div class="grid grid-cols-3 divide-x divide-emerald-100 px-2 py-4 text-center">
@@ -11482,8 +11489,62 @@
           </section>
         </div>
 
+        <div id="catalog-panel-stats" x-show="catalogoTab === 'stats'" role="tabpanel" aria-labelledby="catalog-tab-stats" tabindex="0" class="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600">
+            <span class="flex items-center gap-1"><i aria-hidden="true" data-lucide="store" class="h-4 w-4"></i>Varejo da Matriz</span>
+            <span class="flex items-center gap-1" title="28 dias até hoje, no horário de São Paulo"><i aria-hidden="true" data-lucide="calendar-days" class="h-4 w-4"></i>Últimas 4 semanas</span>
+          </div>
+          <p x-show="catalogoStatsStatus === 'loading'" role="status" class="py-6 text-sm text-gray-600">Carregando estatísticas…</p>
+          <div x-show="catalogoStatsStatus === 'error'" role="alert" class="rounded-xl border border-rose-200 p-4 text-sm text-rose-800">
+            <p>Não foi possível carregar as estatísticas deste pneu.</p>
+            <button type="button" @click="catalogoShowStats()" class="mt-2 font-semibold underline">Tentar novamente</button>
+          </div>
+          <template x-if="catalogoStats">
+            <div class="space-y-3">
+              <section class="rounded-xl border border-gray-200 p-4">
+                <h3 class="text-sm font-semibold text-gray-950">Participação na medida</h3>
+                <p class="mt-2 text-4xl font-bold text-emerald-800" x-text="catalogoPercent(catalogoStats.share.percent)"></p>
+                <p class="mt-1 text-xs text-gray-600" x-show="catalogoStats.share.percent != null" x-text="catalogoStats.share.units + ' de ' + catalogoStats.share.total + ' pneus ' + catalogoTitle(catalogoSelecionado) + ' vendidos na mesma condição e tipo de veículo.'"></p>
+                <p class="mt-1 text-xs text-gray-600" x-show="catalogoStats.share.percent == null">Sem base de comparação para a medida, condição e tipo de veículo neste período.</p>
+                <p class="mt-1 text-xs font-semibold" x-show="catalogoStats.share.percent != null" :class="catalogoStats.share.delta_pp > 0 ? 'text-emerald-700' : 'text-gray-600'" x-text="catalogoStatsVariacao(catalogoStats.share.delta_pp)"></p>
+                <ol class="mt-4 grid grid-cols-4 gap-2" aria-label="Participação por semana, da mais antiga à atual">
+                  <template x-for="(week, index) in catalogoStats.weeks" :key="index">
+                    <li class="min-w-0 text-center" :aria-label="'Semana ' + (index + 1) + (week.percent == null ? ', sem base de comparação' : ', ' + catalogoPercent(week.percent) + ', ' + week.units + ' de ' + week.total + ' pneus')">
+                      <div class="flex h-24 flex-col items-center justify-end border-b border-gray-200" aria-hidden="true">
+                        <strong class="text-xs text-emerald-800" x-text="catalogoPercent(week.percent)"></strong>
+                        <span class="mt-1 block w-1/2 rounded-t" :class="index === 3 ? 'bg-emerald-800' : 'bg-emerald-600'" :style="{height: (week.percent || 0) * 0.72 + 'px'}"></span>
+                      </div>
+                      <span class="text-[10px] text-gray-500" aria-hidden="true" x-text="'Sem. ' + (index + 1)"></span>
+                    </li>
+                  </template>
+                </ol>
+              </section>
+              <section x-data="{ mostrarTodos: false }" class="rounded-xl border border-gray-200 p-4">
+                <h3 class="text-sm font-semibold text-gray-950">O que vende junto</h3>
+                <p class="mt-1 text-xs text-gray-600" x-text="catalogoStats.basket.orders ? 'Em ' + catalogoStats.basket.orders + (catalogoStats.basket.orders === 1 ? ' pedido com este pneu' : ' pedidos com este pneu') : 'Nenhum pedido com este pneu no período.'"></p>
+                <p x-show="catalogoStats.basket.orders > 0 && !catalogoStats.basket.items.length" class="mt-2 text-xs text-gray-600">Nenhum outro produto identificado nesses pedidos.</p>
+                <ul id="catalog-stats-basket" class="space-y-2"><template x-for="(item, index) in (mostrarTodos ? catalogoStats.basket.items : catalogoStats.basket.items.slice(0, 5))" :key="index">
+                  <li class="mt-3"><div class="flex justify-between gap-3 text-xs"><span class="min-w-0 break-words text-gray-700" x-text="item.label"></span><strong class="shrink-0" x-text="item.orders + (item.orders === 1 ? ' pedido' : ' pedidos')"></strong></div>
+                    <div aria-hidden="true" class="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100"><span class="block h-full rounded-full bg-emerald-600" :style="{width: 100 * item.orders / catalogoStats.basket.orders + '%'}"></span></div>
+                  </li>
+                </template></ul>
+                <button x-show="catalogoStats.basket.items.length > 5" type="button" aria-controls="catalog-stats-basket" :aria-expanded="mostrarTodos" @click="mostrarTodos = !mostrarTodos" class="mt-3 text-xs font-semibold text-emerald-800 underline"
+                        x-text="mostrarTodos ? 'Mostrar menos' : 'Ver todos os ' + catalogoStats.basket.items.length + ' produtos'"></button>
+              </section>
+              <section class="rounded-xl border border-gray-200 p-4">
+                <h3 class="text-sm font-semibold text-gray-950">Vendas sem desconto</h3>
+                <div class="mt-2 flex flex-wrap items-baseline gap-2"><strong class="text-3xl text-emerald-800" x-text="catalogoPercent(catalogoStats.discount.percent)"></strong>
+                  <p x-show="catalogoStats.discount.eligible_orders > 0" class="text-xs text-gray-600" x-text="catalogoStats.discount.orders_without_discount + ' de ' + catalogoStats.discount.eligible_orders + (catalogoStats.discount.eligible_orders === 1 ? ' pedido avaliado' : ' pedidos avaliados')"></p>
+                </div>
+                <div x-show="catalogoStats.discount.percent != null" aria-hidden="true" class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100"><span class="block h-full rounded-full bg-emerald-800" :style="{width: (catalogoStats.discount.percent || 0) + '%'}"></span></div>
+                <p class="mt-2 text-xs text-gray-600" x-text="catalogoStats.discount.eligible_orders ? 'Considera o desconto registrado neste pneu e o preço cobrado em relação à tabela da venda.' : (catalogoStats.basket.orders ? 'Sem referência suficiente para avaliar os pedidos.' : 'Nenhum pedido com este pneu no período.')"></p>
+                <p x-show="catalogoStats.discount.unknown_orders > 0" class="mt-1 text-xs text-gray-600" x-text="catalogoStats.discount.unknown_orders + (catalogoStats.discount.unknown_orders === 1 ? ' pedido sem comparação de preço.' : ' pedidos sem comparação de preço.')"></p>
+              </section>
+            </div>
+          </template>
+        </div>
         <div class="border-t border-gray-100 bg-white px-6 py-4">
-          <p class="mb-3 text-xs text-gray-500">Varejo e atacado têm salvamento independente.</p>
+          <p x-show="catalogoTab === 'ficha'" class="mb-3 text-xs text-gray-500">Varejo e atacado têm salvamento independente.</p>
           <button type="button" @click="catalogoClose()" :disabled="catalogoSaving || catalogoSpecSaving || catalogoAtacadoSaving" class="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">Fechar</button>
         </div>
       </aside>
