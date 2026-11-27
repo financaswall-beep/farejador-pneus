@@ -42,9 +42,13 @@ export function customerWantsPhoto(
   lastAssistantText?: string | null | undefined,
 ): boolean {
   if (!latestUserText) return false;
-  const u = normalize(latestUserText);
+  const receivedImage = latestUserText.includes('[O cliente enviou uma imagem.]');
+  const u = normalize(latestUserText.replace('[O cliente enviou uma imagem.]', '').trim());
   if (!u.trim()) return false;
   if (NEGATION.test(u)) return false;
+  const requestsStorePhoto = /\b(?:me (?:manda|envia|mostra)|(?:manda|envia|mande|envie) (?:uma|a)|(?:voce |voces )?tem foto|quero ver)\b/.test(u);
+  if ((receivedImage || /\b(?:segue|mandei|enviei|(?:vou|posso) (?:te )?(?:enviar|mandar))\b.*\b(?:foto|imagem)\b/.test(u))
+    && !requestsStorePhoto) return false;
   if (PHOTO_WORDS.test(u) || SEE_TIRE.test(u)) return true;
   // Follow-up só conta se o BOT acabou de falar de foto (senão "manda" é genérico).
   if (lastAssistantText) {

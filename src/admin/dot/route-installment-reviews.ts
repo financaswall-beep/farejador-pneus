@@ -39,7 +39,9 @@ export function registerInstallmentReviews(app:FastifyInstance,origin:string) {
     try {
       const review=await ownerReview(getAdminContext(req).personId!,id.data.id,body.data.decisao);
       if(review.status!=='autorizada' || review.dados.arquivo || review.dados.imagem_base64) return {status:review.status};
-      const args={...review.dados,idempotency_key:review.key};
+      // Os efeitos foram calculados pelo servidor na proposta e serão revalidados na execução.
+      const {efeitos: _efeitos, ...original}=review.dados;
+      const args={...original,idempotency_key:review.key};
       // A ficha da retirada foi gerada pelo sistema para a revisão. A execução confere a ficha atual.
       if(review.operacao===cancelPickupTool && 'ficha' in args) delete args.ficha;
       const result=await invokeDotTool(review.identity,review.operacao,args);

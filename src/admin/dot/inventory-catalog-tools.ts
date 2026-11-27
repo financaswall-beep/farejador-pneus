@@ -38,7 +38,7 @@ write('catalog','alterar_preco_atacado_catalogo','Altera o preço de atacado; nu
 const fitment=compatibilityBody.innerType().extend(product.shape).superRefine((data,ctx)=>{
   const parsed=compatibilityBody.safeParse(data);if(!parsed.success)for(const issue of parsed.error.issues)ctx.addIssue(issue);
 });
-write('catalog','salvar_compatibilidade_catalogo','Adiciona uma faixa. Para corrigir, consulte a ficha e informe previous_period com os anos anteriores e year_start/year_end com os novos. Mostre ambos ao dono. Só marque fabricante/OEM quando houver evidência confirmada. A aplicação alcança as fichas da mesma medida, conforme o painel.',fitment,
+write('catalog','salvar_compatibilidade_catalogo','Adiciona uma faixa de compatibilidade de produto. Em carros, altera apenas o pneu selecionado. Para registrar uma medida original por versão, use cadastrar_referencia_veiculo. Para corrigir a faixa, consulte a ficha e informe previous_period e os anos novos. Mostre ambos ao dono. Só marque fabricante/OEM com evidência confirmada.',fitment,
   (db,data,actor)=>addCatalogCompatibility({productId:data.product_id,vehicleModelId:data.vehicle_model_id,position:data.position,
     isOem:data.is_oem,source:data.source,confidenceLevel:data.confidence_level,yearStart:data.year_start,yearEnd:data.year_end,previousPeriod:data.previous_period,reason:data.reason,actorLabel:actor},undefined,db));
 write('catalog','remover_compatibilidade_catalogo','Remove a faixa selecionada. Consulte a ficha, preencha previous_period com os dois limites e apresente os anos ao dono.',compatibilityDeleteParams.merge(compatibilityDeleteBody),

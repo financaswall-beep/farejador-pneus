@@ -29,6 +29,9 @@ describe('customerWantsPhoto', () => {
     'quero retirar na loja',
     'pode ser entrega amanhã',
     'vou ver com minha esposa e te falo',
+    '[O cliente enviou uma imagem.]',
+    'segue a foto do meu pneu\n[O cliente enviou uma imagem.]',
+    'posso te mandar uma foto da lateral?',
     '',
     '   ',
   ])('NÃO dispara em negação/assunto-outro: "%s"', (msg) => {

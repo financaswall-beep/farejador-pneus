@@ -1,4 +1,5 @@
 import { env } from '../../shared/config/env.js';
+import { applicationMeasureKey } from '../../shared/vehicle-tire-applications.js';
 import { getMatrixCatalogWithWholesale } from '../painel/queries-catalogo-wholesale.js';
 import { readPage, pageRows, project, rejectFilters, type DotReadContext } from './read-model.js';
 
@@ -34,10 +35,11 @@ export function readDotLots(ctx:DotReadContext,view:'lotes'|'movimentos'|'vendas
 export async function readDotCatalog(ctx:DotReadContext,view:'produtos'|'compatibilidade'|'historico_precos') {
   if(view==='compatibilidade')rejectFilters(ctx,'referencia');
   if(view==='historico_precos')rejectFilters(ctx,'medida');
+  const measureKey=applicationMeasureKey(ctx.input.medida);
   if(view==='compatibilidade')return readPage(ctx,`SELECT application_id AS id,make,model,position,display_measure,
     year_start,year_end,status,application_kind FROM commerce.vehicle_measure_applications WHERE environment=$1
-    AND status='verified' AND $4::uuid IS NULL AND ($5='' OR display_measure ILIKE '%'||$5||'%')`,
-  'make,model,position,id','Aplicações verificadas por medida, conforme o Catálogo. Não homologam automaticamente um produto específico.');
+    AND status='verified' AND $4::uuid IS NULL AND ($5='' OR display_measure ILIKE '%'||COALESCE($8,$5)||'%')`,
+  'make,model,position,id','Aplicações verificadas por medida, conforme o Catálogo. Não homologam automaticamente um produto específico.',[measureKey||null]);
   if(view==='historico_precos')return readPage(ctx,`SELECT id,product_id,price_amount,currency,valid_from,valid_until,'varejo' channel
     FROM commerce.matriz_product_prices WHERE environment=$1 AND ($4::uuid IS NULL OR product_id=$4)
       AND (valid_from AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN $2::date AND $3::date AND $5=''
@@ -49,7 +51,9 @@ export async function readDotCatalog(ctx:DotReadContext,view:'produtos'|'compati
   const rows=catalog.rows.filter(value=>{
     const row=value as Record<string,unknown>;
     return (!ctx.input.referencia||row.product_id===ctx.input.referencia)
-      && (!ctx.input.medida||String(row.tire_size??'').toLowerCase().includes(ctx.input.medida.toLowerCase()));
+      && (!ctx.input.medida || (measureKey
+        ? applicationMeasureKey(String(row.tire_size??''))===measureKey
+        : String(row.tire_size??'').toLowerCase().includes(ctx.input.medida.toLowerCase())));
   }).map(row=>project(row,['product_id','product_code','product_name','product_type','brand','tire_size','vehicle_type',
     'tire_condition','tire_position','tire_construction','load_index','speed_rating','price_amount','wholesale_price_amount',
     'currency','compatibility_count','official_quantity_on_hand','official_quantity_reserved','total_stock_available',

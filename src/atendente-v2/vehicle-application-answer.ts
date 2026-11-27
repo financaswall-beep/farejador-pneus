@@ -1,8 +1,9 @@
 import type { BuscarCompatibilidadeInput, CompatibilidadeResultado } from '../atendente/tools/commerce-tools.js';
 import { buscarCompatibilidadeInputSchema } from '../atendente/tools/commerce-tools.js';
 import { applicationsForMotorcycle, VEHICLE_APPLICATION_VERSION } from '../shared/vehicle-tire-applications.js';
-import { matchCatalogApplications, type CatalogApplication } from '../shared/vehicle-application-catalog.js';
+import { knownCarFamily, matchCatalogApplications, type CatalogApplication } from '../shared/vehicle-application-catalog.js';
 import type { TireVehicleType } from '../shared/tire-vehicle-type.js';
+import { carApplicationAnswer } from './car-application-selection.js';
 
 export function compatibilityInput(environment: 'prod' | 'test', args: Record<string, unknown>) {
   return buscarCompatibilidadeInputSchema.parse({
@@ -32,7 +33,7 @@ export function approvedFitmentContext(input: BuscarCompatibilidadeInput, vehicl
     precisa_confirmar_posicao: !input.posicao_pneu && !bothAxles };
 }
 
-export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, catalog?: CatalogApplication[], vehicleType: TireVehicleType = input.tipo_veiculo ?? 'motorcycle') {
+export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, catalog?: CatalogApplication[], vehicleType: TireVehicleType = input.tipo_veiculo ?? 'motorcycle', enteredRim?: number) {
   const parsed = buscarCompatibilidadeInputSchema.parse(input);
   const lookup = (year?: number): CatalogApplication[] => catalog
     ? matchCatalogApplications(catalog, parsed.moto_modelo, year, parsed.posicao_pneu, vehicleType)
@@ -42,10 +43,10 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, cata
     const knownModelRows = parsed.moto_ano
       ? lookup()
       : [];
-    if (!knownModelRows.length) return null;
+    if (!knownModelRows.length && !(vehicleType === 'car' && catalog && knownCarFamily(catalog, parsed.moto_modelo))) return null;
     return {
       encontrado: true,
-      tipo_resultado: 'modelo_reconhecido_ano_nao_confirmado',
+      tipo_resultado: knownModelRows.length ? 'modelo_reconhecido_ano_nao_confirmado' : 'versao_ou_eixo_sem_aplicacao',
       versao_catalogo: VEHICLE_APPLICATION_VERSION,
       ano_informado: parsed.moto_ano,
       referencias_de_ano_disponiveis: [...new Set(knownModelRows.map(row => row.year_reference))],
@@ -60,19 +61,17 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, cata
       estoque_consultado: false,
       consultas_de_produto: [],
       mensagem: 'O modelo é reconhecido, mas falta aplicação confirmada para o ano e a posição informados.',
-      proximo_passo: 'Peça a medida escrita na lateral do pneu, foto da medida ou confirmação no manual. Pergunte posição apenas se precisa_confirmar_posicao=true. Com a medida exata, use buscar_produto diretamente. Não repita o ano, não use a medida de outra geração e não conclua que falta estoque.',
+      proximo_passo: 'Peça a medida escrita na lateral ou a confirmação no manual. Foto sem inscrição na legenda requer leitura pela equipe. Pergunte posição apenas se precisa_confirmar_posicao=true. Com a medida exata, use buscar_produto diretamente. Não repita o ano, não use a medida de outra geração e não conclua que falta estoque.',
     };
   }
   // Edições diferentes do manual não são versões diferentes da medida.
   // R/ZR continuam explícitos: a busca nominal não homologa construção/índices do SKU.
-  const unconfirmedVariant = vehicleType === 'car' && rows.some(r => !mentionsVariant(parsed.moto_modelo, r.vehicle_variant));
-  const ambiguous = unconfirmedVariant || ['front', 'rear'].some(position =>
+  if (vehicleType === 'car') return carApplicationAnswer(parsed, rows, enteredRim);
+  const ambiguous = ['front', 'rear'].some(position =>
     new Set(rows.filter(r => r.position === position).map(r => r.tire_size)).size > 1);
   const unknownYears = rows.some(r => r.year_start === null && r.year_end === null);
-  const sameCarAxles = vehicleType === 'car' && new Set(rows.map(r => r.position)).size === 2
-    && new Set(rows.map(r => r.tire_size)).size === 1;
   const partialPair = parsed.posicao_pneu === 'both' && !['front','rear'].every(p => rows.some(r => r.position === p));
-  const missingPosition = (!parsed.posicao_pneu && !sameCarAxles) || (vehicleType === 'motorcycle' && partialPair);
+  const missingPosition = !parsed.posicao_pneu || partialPair;
   const yearOptional = rows.every(r => 'year_optional' in r && r.year_optional === true);
   const needsYear = !parsed.moto_ano && (!yearOptional || unknownYears || (vehicleType === 'motorcycle' && ambiguous));
   const confirmedContext = !ambiguous && !unknownYears && !missingPosition && !partialPair && !needsYear;
@@ -90,16 +89,14 @@ export function vehicleApplicationAnswer(input: BuscarCompatibilidadeInput, cata
     precisa_confirmar_modelo_versao: ambiguous,
     precisa_confirmar_ano: needsYear,
     precisa_confirmar_posicao: missingPosition,
-    precisa_confirmar_medida: (unknownYears && Boolean(parsed.moto_ano)) || (vehicleType === 'car' && partialPair),
+    precisa_confirmar_medida: unknownYears && Boolean(parsed.moto_ano),
     produto_confirmado: false,
     estoque_consultado: false,
     consultas_de_produto: confirmedContext
       ? [...new Set(rows.map(r => r.display_measure))].map(medida_pneu => ({
         medida_pneu, tipo_veiculo: vehicleType, ...(parsed.condicao_pneu ? { condicao_pneu: parsed.condicao_pneu } : {}),
       })) : [],
-    mensagem: partialPair && vehicleType === 'car'
-      ? 'Só há referência de um dos eixos. Peça a medida na lateral do pneu do outro eixo.'
-      : ambiguous
+    mensagem: ambiguous
       ? 'Apresente as versões encontradas e confirme o modelo antes de escolher uma medida.'
       : needsYear
         ? 'A medida está documentada nos anos retornados, mas a pesquisa ainda não cobre toda a história deste modelo. Pergunte somente o ano que falta para verificar a faixa correta.'
