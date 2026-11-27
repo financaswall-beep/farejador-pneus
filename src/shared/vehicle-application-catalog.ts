@@ -7,6 +7,7 @@ export interface CatalogApplication extends Omit<VehicleTireApplication, 'source
   source_checked_at: string | null;
   validation_scope: 'manufacturer_measure' | 'catalog_measure';
   vehicle_type?: TireVehicleType | null;
+  vehicle_model_id?: string;
   vehicle_variant?: string | null;
   aliases?: string[];
   // Revisão explícita da família: uma única edição não comprova todos os anos.
@@ -39,6 +40,21 @@ function tokens(value: string): string[] {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/([a-z])(\d)/g, '$1 $2').replace(/(\d)([a-z])/g, '$1 $2')
     .split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/** Reconhece só o nome-base completo, nunca uma marca ou o acabamento solto.
+ * Uma versão adicional desconhecida não herda as referências das irmãs. */
+export function knownCarFamily(catalog: CatalogApplication[], model: string): boolean {
+  const entered = tokens(model).join(' ');
+  return catalog.some(row => {
+    if (row.vehicle_type !== 'car') return false;
+    const full = tokens(row.model).join(' ');
+    const variant = tokens(row.vehicle_variant ?? '').join(' ');
+    const base = variant && full.endsWith(' ' + variant) ? full.slice(0, -(variant.length + 1)) : full;
+    const make = tokens(row.make).join(' ');
+    return Boolean(base && base !== make && [base, make + ' ' + base].some(family =>
+      entered === family || entered.startsWith(family + ' ')));
+  });
 }
 
 export function matchCatalogApplications(

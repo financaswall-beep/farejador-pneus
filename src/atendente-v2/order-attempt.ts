@@ -4,6 +4,14 @@ import { buildOrderIdempotencyKey, type OrderFingerprintItem } from './order-ide
 type Environment = 'prod' | 'test';
 export interface BotOrderExecution { triggerMessageId: string }
 
+/** Uma conversa pode conter IDs oferecidos antes do arquivamento. A trava vale até o fim da criação. */
+export async function activeOrderProducts(client: PoolClient, environment: Environment, items: {product_id: string}[]) {
+  const ids = [...new Set(items.map(item=>item.product_id))];
+  const rows = await client.query(`SELECT id FROM commerce.products WHERE environment=$1
+    AND id=ANY($2::uuid[]) AND deleted_at IS NULL ORDER BY id FOR SHARE`, [environment,ids]);
+  return rows.rows.length===ids.length;
+}
+
 /** A identidade vem do job, nunca de argumentos escolhidos pelo modelo. */
 export async function botOrderRequestId(client: PoolClient, environment: Environment,
   conversationId: string, execution?: BotOrderExecution): Promise<string | null> {

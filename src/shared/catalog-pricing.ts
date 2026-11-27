@@ -27,7 +27,7 @@ export async function loadCurrentCatalogPrices(
   }>(
     `WITH locked_products AS MATERIALIZED (
        SELECT id FROM commerce.products
-        WHERE environment=$1 AND id=ANY($2::uuid[])
+        WHERE environment=$1 AND id=ANY($2::uuid[]) AND deleted_at IS NULL
         ORDER BY id FOR KEY SHARE
      )
      SELECT cp.product_id,cp.price_amount,cp.price_type,cp.currency

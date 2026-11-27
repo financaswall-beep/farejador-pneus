@@ -170,7 +170,7 @@ it('código é secreto por hash, vinculado ao recurso/PKCE e só pode ser trocad
 it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-las sem permissão', async () => {
   const access = (await exchange(await newCode())).json().access_token;
   const listing = (await rpc(access)).json();
-  expect(listing.result.tools).toHaveLength(138);
+  expect(listing.result.tools).toHaveLength(149);
   for (const name of ['consultar_permissoes_milly','consultar_retirada_para_cancelar','consultar_retirada_para_concluir','consultar_compra_para_receber']) {
     expect(listing.result.tools).toContainEqual(expect.objectContaining({name}));
   }
@@ -180,7 +180,10 @@ it('lista as ferramentas de vencimento mesmo no modo consulta e recusa executá-
     'conferir_grupo_galpao','mover_pneus_entre_pilhas','salvar_referencia_online','confirmar_origem_retirada',
     'confirmar_transferencia_estoque','estornar_transferencia_estoque','cadastrar_produto_catalogo','editar_ficha_catalogo',
     'alterar_preco_catalogo','alterar_preco_atacado_catalogo','salvar_compatibilidade_catalogo','remover_compatibilidade_catalogo',
-    'registrar_descoberta_catalogo','revisar_descoberta_catalogo','classificar_referencias_moto','anexar_foto_catalogo','anexar_video_catalogo','configurar_midias_catalogo'];
+    'registrar_descoberta_catalogo','revisar_descoberta_catalogo','classificar_referencias_moto','anexar_foto_catalogo','anexar_video_catalogo','configurar_midias_catalogo',
+    'cadastrar_veiculo_catalogo','corrigir_veiculo_catalogo','definir_status_veiculo_catalogo',
+    'cadastrar_referencia_veiculo','corrigir_referencia_veiculo','definir_status_referencia_veiculo',
+    'corrigir_identidade_produto_catalogo','alterar_status_produto_catalogo'];
   const writes = ['importar_midia_publicacao','preparar_publicacao','publicar_ou_agendar_post','reagendar_publicacao','cancelar_publicacao','excluir_publicacao_instagram','preparar_alteracao_vencimento','confirmar_alteracao_vencimento',
     'lancar_despesa_matriz','anexar_comprovante_despesa','registrar_venda_lote','registrar_venda_atacado','registrar_baixa_financeira','estornar_baixa_financeira','renegociar_parcelas_venda','criar_cobranca_servico','agendar_despesas_mensais','registrar_entrada_avulsa','estornar_entrada_avulsa','vincular_gasto_a_viagem','registrar_retirada_do_dono','estornar_retirada_do_dono','registrar_adiantamento_fornecedor',
     'cadastrar_fornecedor','editar_fornecedor','arquivar_fornecedor','registrar_compra_fornecedor','registrar_compra_lote_fornecedor',
@@ -358,6 +361,59 @@ it('Milly acrescenta e corrige somente a faixa autorizada pelo dono, visível na
   expect(await rows()).toMatchObject([{year_start:2017,year_end:2017},newer]);
   await write('remover_compatibilidade_catalogo',{previous_period:newer});
   expect(await rows()).toMatchObject([{year_start:2017,year_end:2017}]);
+});
+
+it('administra pelo MCP as versões e referências de carro sem depender de SKU', async () => {
+  const {token,call}=await ownerFinanceMcp();
+  const grant=(await db.pool.query('SELECT grant_id FROM network.dot_oauth_tokens WHERE access_hash=$1',
+    [createHash('sha256').update(token).digest('hex')])).rows[0].grant_id;
+  const permission=(mode:string)=>app.inject({method:'PUT',url:'/admin/api/dot/connections/'+grant+'/operation-permissions',
+    headers:headers(),payload:{operation_confirmation:mode,catalog_operations_enabled:true}});
+  expect((await permission('conversa')).statusCode).toBe(200);
+  const write=async(name:string, fields:object)=>{
+    const args={...fields,idempotency_key:randomUUID()};
+    const proposal=await call(name,args);
+    expect(proposal).toMatchObject({executada:false,confirmacao:'conversa'});
+    await call('confirmar_operacao_milly',{proposta:proposal.proposta,fingerprint:proposal.fingerprint,autorizado_pelo_dono:true});
+    const saved=await call(name,args);
+    expect(saved.executada).toBe(true);
+    expect(await call(name,args)).toEqual(saved);
+    return saved.resultado;
+  };
+  const identity={vehicle_type:'car',make:'Marca de teste',model:'Picape MCP',variant:'SR',year_start:2024,year_end:2026};
+  const {vehicle}=await write('cadastrar_veiculo_catalogo',identity);
+  expect((await write('cadastrar_veiculo_catalogo',identity)).created).toBe(false);
+  const vehicle_model_id=vehicle.vehicle_model_id;
+  const fields={vehicle_model_id,tire_size:'265/65 R17',position:'both',year_start:2025,year_end:2025,
+    source_url:'https://example.org/manual',index_spec:'110T'};
+  const reference=await write('cadastrar_referencia_veiculo',fields);
+  const query=(include_archived=false)=>call('consultar_aplicacoes_veiculo',{model:identity.model,year:2025,include_archived});
+  expect((await query()).vehicles[0].applications).toHaveLength(2);
+  const corrected=await write('corrigir_referencia_veiculo',{...fields,previous_application_ids:reference.application_ids,
+    tire_size:'265/60 R18',reason:'Correção documentada'});
+  expect((await query()).vehicles[0].applications.map((r: {tire_size:string})=>r.tire_size)).toEqual(['265/60R18','265/60R18']);
+  expect((await query(true)).vehicles[0].applications).toHaveLength(4);
+  const original=await write('corrigir_referencia_veiculo',{...fields,previous_application_ids:corrected.application_ids,
+    reason:'Restabelecer a medida anteriormente documentada'});
+  expect(original.application_ids).toEqual(reference.application_ids);
+  await write('corrigir_referencia_veiculo',{...fields,tire_size:'265/60 R18',previous_application_ids:original.application_ids,
+    reason:'Confirmado na fonte atual'});
+  await write('corrigir_veiculo_catalogo',{...identity,vehicle_model_id,variant:'SRX',reason:'Correção da versão'});
+  expect((await query()).vehicles[0].variant).toBe('SRX');
+  const manual={vehicle_model_id,application_ids:[corrected.application_ids[0]],reason:'Revisão do eixo'};
+  await write('definir_status_referencia_veiculo',{...manual,status:'arquivado'});
+  await write('definir_status_veiculo_catalogo',{vehicle_model_id,status:'arquivado',reason:'Revisão técnica'});
+  expect((await query()).vehicles).toEqual([]);
+  await write('definir_status_veiculo_catalogo',{vehicle_model_id,status:'ativo',reason:'Revisão concluída'});
+  expect((await query()).vehicles[0].applications).toHaveLength(1);
+  // O painel recompõe os parâmetros originais e o servidor recalcula os efeitos.
+  expect((await permission('painel')).statusCode).toBe(200);
+  const proposal=await call('definir_status_referencia_veiculo',{...manual,status:'ativo',idempotency_key:randomUUID()});
+  expect(proposal.dados.efeitos.vehicle.variant).toBe('SRX');
+  const result=await app.inject({method:'POST',url:'/admin/api/dot/operation-reviews/'+proposal.proposta,
+    headers:headers(),payload:{decisao:'autorizada'}});
+  expect(result.json()).toMatchObject({status:'executada'});
+  expect((await query()).vehicles[0].applications).toHaveLength(2);
 });
 
 it('só o dono muda o canal; troca de canal e revogação invalidam propostas anteriores',async()=>{
@@ -565,7 +621,7 @@ it('cliente oficial MCP inicializa, lista e consulta pelo transporte HTTP',async
   });
   try{
     await client.connect(transport);
-    expect((await client.listTools()).tools).toHaveLength(138);
+    expect((await client.listTools()).tools).toHaveLength(149);
     const result=await client.callTool({name:'consultar_vendas_matriz',arguments:{periodo:'hoje'}});
     expect(result.isError).not.toBe(true);
   }finally{await client.close();}

@@ -19,6 +19,7 @@ vi.mock('../../../src/atendente-v2/channel-pricing.js', () => ({
 import { manufacturerApplicationSeed } from '../../../src/shared/vehicle-tire-applications.js';
 import { buildApplicationImport } from '../../../scripts/vehicle-application-import.js';
 import { executeTool } from '../../../src/atendente-v2/tools.js';
+import { carFitmentReplyNudge } from '../../../src/atendente-v2/car-fitment-reply.js';
 
 const vehicle = {
   vehicle_model_id: 'v1', make: 'Honda', model: 'CB 250F Twister', variant: null,
@@ -36,11 +37,15 @@ const args = { moto_modelo: 'Twister', moto_ano: 2021, posicao_pneu: 'rear', mun
 function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitment], stock: unknown[] = [],
   references: unknown[] = manufacturerApplicationSeed().map(a => ({ ...a, reference: a }))) {
   const query = vi.fn(async (sql: string, _values?: unknown[]) => {
+    if (sql.includes('AS confirmed FROM unnest')) return { rows: [{confirmed: _values?.[1] === '92987bab-415c-4789-9b98-3415071230b1'}] };
+    if (sql.includes('FROM core.message_attachments') && sql.includes('coordinates_lat'))
+      return { rows: [{ coordinates_lat: '-22.9', coordinates_lng: '-43.1' }] };
     if (sql.includes('resolve_vehicle_model')) return { rows: vehicles };
     if (sql.includes('vehicle_fitments') || sql.includes('find_compatible_tires')) return { rows: products };
     if (sql.includes('vehicle_measure_applications')) return { rows: references };
     if (sql.includes('FROM commerce.products') || sql.includes('search_products') || sql.includes('commerce.product_full')) return { rows: [] };
     if (sql.includes('wholesale_stock')) return { rows: stock };
+    if (sql.includes('FROM commerce.geo_resolutions')) return { rows: [] };
     // O cenário não tem parceiro atendendo o município; a busca atual também consulta a rede.
     if (sql.includes('FROM network.unit_coverage')) return { rows: [] };
     throw new Error(`Consulta inesperada: ${sql}`);
@@ -51,6 +56,60 @@ function database(vehicles: unknown[] = [vehicle], products: unknown[] = [fitmen
 describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', unified => {
   beforeEach(() => { config.WHOLESALE_UNIFIED_STOCK = unified; });
 
+  it('consulta a família completa da Hilux antes do SKU genérico, mesmo sem oferta da SR', async () => {
+    const versions = [
+      ['SR', '265/65R17', 'Cabine Dupla'],
+      ['SRX', '265/60R18', 'Cabine Dupla'],
+      ['Cabine Simples Manual', '225/70R17', 'Cabine Simples'],
+      ['Cabine Simples Automático', '225/70R17', 'Cabine Simples'],
+    ];
+    const references = versions.flatMap(([variant, measure, body]) => ['front','rear'].map(position => {
+      const reference = { ...manufacturerApplicationSeed()[0]!, make: 'Toyota', model: 'Hilux ' + variant,
+        reference_model: 'Hilux ' + variant, vehicle_variant: variant, aliases: ['Hilux ' + body],
+        vehicle_model_id: variant === 'SRX' ? '880ccf97-a433-4e33-8bdb-f610ea50310c' : 'e91c8cef-ac13-439e-8940-8fab6c48f771',
+        vehicle_type: 'car', year_start: 2025, year_end: 2025, position, tire_size: measure!,
+        display_measure: measure!.replace('R','-') };
+      return { ...reference, reference };
+    }));
+    const {client, query} = database([{ ...vehicle, model: 'Hilux', make: 'Toyota' }],
+      [{ ...fitment, tire_size: '265/60-18', fitment_position: 'both', position: 'both' }], [], references);
+    const run = async (modelo: string, extra = {}) => JSON.parse(await executeTool(client, 'test', 'conv',
+      'buscar_compatibilidade', { tipo_veiculo: 'car', ano: 2025, modelo, ...extra }));
+    for (const [model, measure] of [['Hilux SR','265/65-17'],['Hilux SRX','265/60-18']]) {
+      expect(await run(model!)).toMatchObject({ consultas_de_produto: [{medida_pneu: measure}],
+        precisa_localizacao: true, estoque_consultado: false, produto_confirmado: false });
+    }
+    expect(await run('Hilux')).toMatchObject({ total_aplicacoes: 8, precisa_confirmar_medida: true,
+      precisa_confirmar_posicao: false, consultas_de_produto: [] });
+    expect(await run('Hilux', {aro: 17})).toMatchObject({ precisa_confirmar_medida: true, consultas_de_produto: [] });
+    expect(JSON.parse(await executeTool(client, 'test', 'conv', 'buscar_produto', {medida_pneu:'R17'})))
+      .toMatchObject({precisa_confirmar_medida: true, estoque_consultado: false});
+    expect(await run('Hilux', {aro: 16})).toMatchObject({ tipo_resultado: 'aro_sem_aplicacao_confirmada', precisa_confirmar_medida: true });
+    expect(await run('Hilux Cabine Dupla')).toMatchObject({ precisa_confirmar_aro: true, mensagem: expect.stringContaining('R17 ou R18') });
+    expect(await run('Hilux Cabine Dupla', {aro: 17})).toMatchObject({ consultas_de_produto: [{medida_pneu: '265/65-17'}] });
+    expect(await run('Hilux', {aro: 18})).toMatchObject({ consultas_de_produto: [{medida_pneu: '265/60-18'}] });
+    expect(await run('Hilux Cabine Simples')).toMatchObject({ consultas_de_produto: [{medida_pneu: '225/70-17'}] });
+    for (const [model, ano] of [['Hilux SW4', 2025], ['Hilux SR', 2026]]) {
+      expect(await run(model as string, {ano})).toMatchObject({ precisa_confirmar_medida: true, consultas_de_produto: [] });
+    }
+    expect(query.mock.calls.some(([sql]) => /resolve_vehicle_model|wholesale_stock|FROM commerce.products/.test(sql))).toBe(false);
+    const commercial = await run('Hilux SR', {bairro: 'Centro', municipio: 'Niterói'});
+    expect(commercial).toMatchObject({ consultas_estoque: [{medida_pneu: '265/65-17',resultado: {encontrado: false}}],
+      estoque_consultado: true, produto_confirmado: false, produtos: [] });
+    expect(query.mock.calls.some(([sql]) => sql.includes('resolve_vehicle_model'))).toBe(false);
+    expect(await run('Hilux SRX', {produto_id:'92987bab-415c-4789-9b98-3415071230b1'})).toMatchObject({produto_confirmado:true,estoque_consultado:false});
+    expect(await run('Hilux SRX', {produto_id:'3158acd3-07a2-4bbe-9a53-5e55959b2db1'})).toMatchObject({produto_confirmado:false});
+    const proof = query.mock.calls.find(([sql]) => sql.includes('AS confirmed FROM unnest'))!;
+    expect(proof[1]?.slice(2)).toEqual([2025, Array(2).fill('880ccf97-a433-4e33-8bdb-f610ea50310c'),
+      ['front','rear'], Array(2).fill('265/60-18')]);
+    config.ROUTING_GEO = true;
+    try {
+      const withPin = await run('Hilux SRX');
+      expect(withPin).toMatchObject({estoque_consultado: true, consultas_estoque: [{medida_pneu: '265/60-18'}]});
+      expect(query.mock.calls.some(([sql]) => sql.includes('coordinates_lat'))).toBe(true);
+    } finally { config.ROUTING_GEO = false; }
+  });
+
   it('carro com os dois eixos iguais consulta estoque de carro uma vez e não confirma o SKU pela medida', async () => {
     const base = { ...manufacturerApplicationSeed()[0]!, make: 'Fabricante A', model: 'Modelo A SR',
       reference_model: 'Modelo A SR', vehicle_variant: 'SR', vehicle_type: 'car', aliases: ['Modelo A'],
@@ -58,12 +117,12 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
     const rows = ['front','rear'].map(position => ({ ...base, position, reference: base }));
     const { client, query } = database([],[],[],rows);
     const run = async (modelo: string) => JSON.parse(await executeTool(client, 'test', 'conv',
-      'buscar_compatibilidade', { modelo, tipo_veiculo: 'car', ano: 2024 }));
+      'buscar_compatibilidade', { modelo, tipo_veiculo: 'car', ano: 2024, bairro: 'Centro', municipio: 'Niterói' }));
     const result = await run('Modelo A SR');
     expect(result).toMatchObject({ precisa_confirmar_ano: false, precisa_confirmar_posicao: false,
       precisa_confirmar_modelo_versao: false, produto_confirmado: false, estoque_consultado: true,
       consultas_de_produto: [{ medida_pneu: '265/60-18', tipo_veiculo: 'car' }] });
-    expect(query.mock.calls[0]?.[1]).toEqual(['test','Modelo A SR',2024,'car']);
+    expect(query.mock.calls[0]?.[1]).toEqual(['test',null,'car']);
     expect(query.mock.calls.some(([sql, values]) => sql.includes('vehicle_measure_applications') && values?.[2]==='car')).toBe(true);
     expect(query.mock.calls.some(([sql]) => sql.includes("ts.vehicle_type = 'car'") && !sql.includes('resolve_vehicle_model'))).toBe(true);
     expect(await run('Modelo A')).toMatchObject({ precisa_confirmar_modelo_versao: true, consultas_de_produto: [] });
@@ -244,4 +303,21 @@ describe.each([true, false])('buscar_compatibilidade com estoque unificado=%s', 
       || sql.includes('commerce.product_full'));
     expect(productQuery?.[0]).toContain(unified ? 'ts.position IS NULL' : 'tire_position IS NULL');
   });
+});
+
+it('uma resposta curta retoma a consulta de carro apenas quando o turno anterior pediu esclarecimento', () => {
+  const context = [
+    {role: 'user', content: 'Tem pneu para Hilux 2025?'},
+    {role: 'assistant', content: null, tool_calls: [{type:'function', id:'c1', function: {
+      name:'buscar_compatibilidade', arguments: JSON.stringify({tipo_veiculo: 'car', modelo:'Hilux', ano:2025}) } }]},
+    {role:'tool', tool_call_id:'c1', content: JSON.stringify({precisa_confirmar_medida:true})},
+    {role:'assistant', content:'Me diz a medida escrita na lateral?'},
+  ] as const;
+  const messages = JSON.parse(JSON.stringify(context));
+  expect(carFitmentReplyNudge([...messages, {role:'user',content:'R17'}])).toContain('aro=17');
+  expect(carFitmentReplyNudge([...messages, {role:'user',content:'cabine dupla'}])).toContain('cabine dupla');
+  expect(carFitmentReplyNudge([...messages, {role:'user',content:'265/60 R18'}])).toBe('');
+  expect(carFitmentReplyNudge([{role:'user',content:'R18'}])).toBe('');
+  expect(carFitmentReplyNudge([...messages,{role:'user',content:'outro assunto'},{role:'assistant',content:'Quantos?'},
+    {role:'user',content:'17'}])).toBe('');
 });

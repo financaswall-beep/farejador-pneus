@@ -19,6 +19,7 @@ import { introduceBareWholesaleContact } from './wholesale-contact.js';
 import { photoRequestNudge } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
 import { buildProductSearchNudge } from './product-search-nudge.js';
+import { carFitmentReplyNudge } from './car-fitment-reply.js';
 import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
 import { buildPurchaseContext } from './purchase-context.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
@@ -169,7 +170,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void|{consultaMi
     const locationNudge = buildLocationReplyNudge(lastAssistantText, customerPin != null);
     // A busca respeita a localização primeiro, inclusive em pedidos sem medida
     // ("pneuzinho traseiro da Twister"). Não exige busca antes de saber a região.
-    const productNudge = buildProductSearchNudge(latestCustomerText, customerPin != null);
+    const productNudge = buildProductSearchNudge(latestCustomerText, customerPin != null) + carFitmentReplyNudge(history);
     // Empurrão de ENTREGA-PELO-PINO (furo da conversa #696): quando o cliente escolhe entrega
     // e já mandou o pino, o bot travava pedindo o endereço escrito só pra COTAR o frete. Com a
     // flag on (calcular_frete já cota pelo pino), garante o comportamento: cotar primeiro,

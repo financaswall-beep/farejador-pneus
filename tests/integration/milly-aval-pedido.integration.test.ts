@@ -170,6 +170,20 @@ it('oferta vencida e pausa não autorizam cobrar tabela no aceite antigo; nova c
   await db.pool.query("UPDATE ops.milly_consultas SET valid_until=clock_timestamp()-interval '1 second' WHERE id=$1",[q.id]);
   await ligar(false);
   const antigo=await mensagem(v.conversationId,'Fechado, um pneu por R$ 80 na retirada, pago no Pix.');
+  // A conversa e o preço permanecem no histórico mesmo se a ficha sair de venda entre a oferta e o aceite.
+  await db.pool.query("UPDATE commerce.products SET deleted_at=now() WHERE environment='test' AND id=$1",[product]);
+  try {
+    const {loadCurrentCatalogPrices} = await import('../../src/shared/catalog-pricing.js');
+    expect((await loadCurrentCatalogPrices(db.pool,'test',[product])).size).toBe(0);
+    expect((await db.pool.query("SELECT 1 FROM commerce.matriz_product_prices WHERE environment='test' AND product_id=$1",[product])).rowCount)
+      .toBeGreaterThan(0);
+    const refused=await checkout(v,antigo,80);
+    expect(refused).toMatchObject({erro:'produto_indisponivel'});
+    expect(refused.texto_para_cliente).toBeUndefined();
+    expect((await db.pool.query('SELECT 1 FROM commerce.orders WHERE source_conversation_id=$1',[v.conversationId])).rowCount).toBe(0);
+  } finally {
+    await db.pool.query("UPDATE commerce.products SET deleted_at=NULL WHERE environment='test' AND id=$1",[product]);
+  }
   const primeira=await checkout(v,antigo,80);
   expect(await checkout(v,antigo,110)).toEqual(primeira);
   expect(primeira.erro).toBe('oferta_expirada');

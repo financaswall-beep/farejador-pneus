@@ -30,7 +30,7 @@ export async function reconfirmarAposVencimento(client:PoolClient,environment:En
     erro:'confirmar_pagamento',mensagem:'Confirme a forma de pagamento para apresentar o preço atualizado.'};
   if(modalidade!=='pickup' && modalidade!=='delivery')return {erro:'confirmar_modalidade'};
   const nomes=await client.query<{id:string;product_name:string}>(
-    'SELECT id,product_name FROM commerce.products WHERE environment=$1 AND id=ANY($2::uuid[])',[environment,ids]);
+    'SELECT id,product_name FROM commerce.products WHERE environment=$1 AND id=ANY($2::uuid[]) AND deleted_at IS NULL',[environment,ids]);
   const porId=new Map(nomes.rows.map(p=>[p.id,p.product_name]));
   if(ids.some(id=>!porId.get(id)))return {erro:'produto_indisponivel'};
   let itens=[...cotacao.itens].sort((a,b)=>a.product_id.localeCompare(b.product_id));

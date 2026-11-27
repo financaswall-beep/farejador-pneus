@@ -52,6 +52,11 @@ it('valida e serializa o cadastro de modelos, inclusive sem versão', async () =
   expect(results.map(r => r.statusCode).sort()).toEqual([200,201]);
   expect(results[0].json().vehicle.vehicle_model_id).toBe(results[1].json().vehicle.vehicle_model_id);
   expect((await postModel({...model,variant:null,year_end:2025})).statusCode).toBe(409);
+  const overlapping = await Promise.all([
+    postModel({...model,variant:'Sobreposição',year_start:2021,year_end:2025}),
+    postModel({...model,variant:'sobreposição',year_start:2025,year_end:2026})
+  ]);
+  expect(overlapping.map(r=>r.statusCode).sort()).toEqual([201,409]);
 });
 
 it('exige o papel de proprietário mesmo quando o colaborador tem acesso ao catálogo', async () => {

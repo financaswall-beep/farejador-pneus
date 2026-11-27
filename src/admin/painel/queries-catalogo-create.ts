@@ -26,6 +26,7 @@ export interface CreateCatalogProductInput {
   speedRating?: string | null;
   position?: 'front' | 'rear' | 'both' | null;
   vehicleType?: TireVehicleType | null;
+  inheritFitments?: boolean;
 }
 
 export interface CreatedCatalogProduct {
@@ -157,7 +158,7 @@ export async function createCatalogProduct(
        loadIndex, speedRating, position, vehicleType],
     );
     const tireSpecId = tireSpec.rows[0]!.id;
-    const copiedFitments = await client.query(
+    const copiedFitments = input.inheritFitments === false ? { rowCount: 0 } : await client.query(
       `INSERT INTO commerce.vehicle_fitments
          (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,
           confidence_level,year_start,year_end)

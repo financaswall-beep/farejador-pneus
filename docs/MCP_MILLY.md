@@ -108,7 +108,9 @@ A Milly lê a ficha, apresenta a proposta e espera o dono autorizá-la por voz n
 | Saldo físico | Entrada, definição de saldo/custo/mínimo, baixa por perda/quebra/uso interno, contagem física e remoção de variante |
 | Organização | Correção de marca, transferência de condição, separação de lote, simulação/confirmação/estorno de transferências |
 | Produto | Cadastro manual ou a partir do estoque, ficha técnica, preço de varejo e de atacado |
-| Aplicações | Busca de veículos, compatibilidade, remoção de aplicação e registro/revisão de descobertas |
+| Identidade do produto | Consulta de impacto, correção, arquivamento, busca de arquivados e reativação. O nome pode mudar na própria ficha. Alterar código, marca, medida ou condição cria uma ficha com novo código e conserva a anterior com seu histórico. |
+| Carros e versões | Cadastro, correção e arquivamento por marca, modelo, versão e anos. Consulte as aplicações por veículo mesmo quando a medida não tem produto ou estoque. |
+| Aplicações | Cadastro, correção e arquivamento da referência técnica por versão, medida, eixo e fonte. Para homologar comercialmente um pneu de carro, registre o vínculo no produto específico. |
 | Mídias | Consulta, foto, vídeo, foto principal, exibição e configuração de pasta já autorizada do Drive |
 
 As operações reutilizam os serviços e schemas do painel, dentro da mesma transação da autorização/idempotência. Reservas, custos, histórico e regras de transferência continuam sendo verificados. Consulte a variante e use medida, marca e condição devolvidas pelo estoque. Fotos e vídeos usam o processamento existente e dependem das funcionalidades e credenciais de mídia habilitadas.

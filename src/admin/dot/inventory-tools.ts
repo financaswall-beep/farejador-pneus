@@ -1,6 +1,8 @@
 import './inventory-stock-tools.js';
 import './warehouse-tools.js';
 import './inventory-catalog-tools.js';
+import './catalog-car-tools.js';
+import './inventory-product-lifecycle-tools.js';
 import './inventory-media-tools.js';
 import './retail-delivery-tools.js';
 import './retail-trip-bundle.js';

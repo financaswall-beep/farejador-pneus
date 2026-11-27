@@ -14,6 +14,7 @@ const year = z.number().int().min(1900).max(2100);
 const validPeriod = (value: {year_start: number; year_end: number}) => value.year_start <= value.year_end;
 export const carModelBody = z.object({
   vehicle_type: z.literal('car'), make: name, model: name, variant: name.nullish(),
+  aliases: z.array(name).max(20).optional(),
   year_start: year, year_end: year,
 }).strict().refine(validPeriod);
 export const carReferenceBody = z.object({

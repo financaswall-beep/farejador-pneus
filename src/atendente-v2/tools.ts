@@ -40,13 +40,14 @@ import { getMatrizWholesaleStockQty, checkMatrizGalpaoShortfall } from './wholes
 import { insertCommerceOrderMirror } from './order-mirror.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, vehiclesWithApprovedFitments, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { approvedFitmentContext, compatibilityInput, vehicleApplicationAnswer } from './vehicle-application-answer.js';
+import { lookupCarApplication, quoteVehicleApplication, type MeasureSearch } from './vehicle-application-stock.js';
 import { loadVehicleApplicationCatalog } from '../shared/vehicle-application-catalog.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { confirmationModality } from './stock-confirmation-routing.js';
 import { botOrderRequestId, previousBotOrderAttempt, resolveBotOrderKey,
-  recordBotOrderAttempt, botOrderReplay, type BotOrderExecution } from './order-attempt.js';
+  recordBotOrderAttempt, botOrderReplay, activeOrderProducts, type BotOrderExecution } from './order-attempt.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
 import {
@@ -129,13 +130,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_compatibilidade',
-      description: 'Consulta compatibilidades cadastradas e aplicações verificadas por medida no banco, respeitando modelo, posição e faixa de anos inclusive. Ao resolver a medida, consulta também preço/estoque. Use consultas_estoque quando presente e apresente a oferta seguindo SINGLE TIRE OFFER; pergunte somente o contexto indicado nas flags precisa_confirmar_*. Falha ou lacuna de aplicação não significa falta de estoque.',
+      description: 'Identifica a medida por modelo, versão, ano e eixo. Para carros, consulte mesmo antes de saber o bairro. Na resposta curta sobre aro, repita modelo, versão e ano do histórico e informe aro. Faça a pergunta indicada em mensagem. Com localização e medida resolvidas, use consultas_estoque e siga SINGLE TIRE OFFER.',
       parameters: {
         type: 'object',
         properties: {
           tipo_veiculo: { type: 'string', enum: ['motorcycle', 'car'], description: 'Categoria identificada pelo modelo ou pelo cliente. Par, aro e quantidade não identificam a categoria.' },
           modelo: { type: 'string', description: 'Modelo do carro ou da moto, com a versão quando informada.' },
           ano: { type: 'integer', description: 'Ano do veículo, quando informado.' },
+          aro: { type: 'integer', minimum: 8, maximum: 30, description: 'Aro escrito no pneu do carro e informado pelo cliente, por exemplo 18 em R18. Preserve modelo e ano.' },
+          produto_id: { type: 'string', format: 'uuid', description: 'ID já identificado do produto de carro, somente quando o cliente pergunta se esse produto específico serve.' },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'], description: 'Posição do pneu (opcional)' },
           condicao_pneu: {
             type: 'string',
@@ -456,10 +459,15 @@ async function executeToolInternal(
   execution?: BotOrderExecution,
 ): Promise<string> {
   try {
+    if (name === 'buscar_produto' && typeof args.medida_pneu === 'string' && /^\s*(?:aro\s*|r\s*)?\d{1,2}\s*$/i.test(args.medida_pneu)) {
+      return JSON.stringify({ precisa_confirmar_medida: true, estoque_consultado: false,
+        mensagem: 'O cliente informou apenas o aro. Retome buscar_compatibilidade com o veículo e ano da conversa ou peça a medida completa.' });
+    }
     if(['criar_pedido','editar_pedido','cancelar_pedido'].includes(name)
       && await audioNeedsConfirmation(client,environment,conversationId)) return JSON.stringify({
         erro:'audio_precisa_confirmacao',orientacao:'Os dados do áudio ainda precisam de confirmação para mudar o pedido. Apresente o resumo e peça confirmação por texto. Se não for possível, ofereça atendente.' });
-    args = await prepareToolLocation(client, environment, conversationId, name, args);
+    const carLookup = name === 'buscar_compatibilidade' && args.tipo_veiculo === 'car';
+    if (!carLookup) args = await prepareToolLocation(client, environment, conversationId, name, args);
     switch (name) {
       case 'pedir_video':return requestCatalogVideos(client,environment,conversationId,args);
       case 'consultar_horario_loja': return JSON.stringify(await consultStoreHours(client,environment,conversationId,args));
@@ -469,49 +477,36 @@ async function executeToolInternal(
         const compatInput = compatibilityInput(environment, args);
         if (!compatInput.tipo_veiculo) return JSON.stringify({ encontrado: false, precisa_confirmar_tipo_veiculo: true,
           mensagem: 'Confirme se o modelo é de carro ou moto, ou peça a medida escrita no pneu.' });
+        const search: MeasureSearch = async query => JSON.parse(await executeTool(client, environment, conversationId,
+          'buscar_produto', { ...query, bairro: args.bairro, municipio: args.municipio }));
+        if (carLookup) {
+          const technical = await lookupCarApplication(client, conversationId, compatInput, args, search);
+          if (technical) return technical;
+        }
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
         const result = env.WHOLESALE_UNIFIED_STOCK
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
+        if (carLookup && args.produto_id) {
+          for (const vehicle of result) vehicle.produtos = vehicle.produtos.filter(p => p.product_id === args.produto_id);
+        }
         const withApprovedFitments = vehiclesWithApprovedFitments(result).filter(v =>
           compatInput.tipo_veiculo !== 'car' || compatInput.posicao_pneu !== 'both'
           || ['front','rear'].every(axis => v.produtos.some(p => p.position === 'both' || p.position === axis)));
-        // A edição de um manual não limita a vigência cadastrada. A referência
-        // só é consultada DEPOIS dos vínculos aprovados para o modelo/ano/posição.
         if (withApprovedFitments.length === 0) {
-          const catalog = await loadVehicleApplicationCatalog(client, environment, undefined,
-            compatInput.tipo_veiculo === 'car' ? 'car' : undefined);
-          const application = vehicleApplicationAnswer(compatInput, catalog);
-          if (application) {
-            if (!application.consultas_de_produto.length) return JSON.stringify(application);
-            // Mesma busca comercial, localização e rastreamento usados para medida digitada.
-            // Não depender de outra rodada do LLM para consultar o estoque da aplicação.
-            const searches: Array<{ medida_pneu: string; resultado: Record<string, unknown> }> = [];
-            for (const query of application.consultas_de_produto) {
-              const positions = [...new Set(application.aplicacoes
-                .filter(a => a.display_measure === query.medida_pneu).map(a => a.position))];
-              const resultado = JSON.parse(await executeTool(client, environment, conversationId,
-                'buscar_produto', { ...query,
-                  // A busca aceita posição não cadastrada, mas exclui a oposta explícita.
-                  posicao_pneu: positions.length === 1 ? positions[0] : 'both',
-                  bairro: args.bairro, municipio: args.municipio })) as Record<string, unknown>;
-              searches.push({ medida_pneu: query.medida_pneu, resultado });
-            }
-            return JSON.stringify({ ...application,
-              estoque_consultado: searches.every(s => !s.resultado.erro),
-              consultas_estoque: searches,
-              produtos: searches.flatMap(s => Array.isArray(s.resultado.produtos) ? s.resultado.produtos : []),
-              ...(searches.some(s => s.resultado.precisa_localizacao) ? { precisa_localizacao: true } : {}),
-              ...(searches.some(s => s.resultado.sem_estoque_loja_perto) ? { sem_estoque_loja_perto: true } : {}),
-              ...(searches.some(s => s.resultado.erro) ? { falha_consulta_estoque: true } : {}),
-              proximo_passo: 'A medida já foi identificada e consultas_estoque contém a busca comercial feita agora. Não repita pergunta de ano/foto quando as flags forem falsas. Use somente os produtos, preços e disponibilidade retornados, respeitando precisa_localizacao e sem_estoque_loja_perto. Uma consulta com erro não significa falta de estoque. Sem produto cadastrado nessa medida, informe que não encontrou opção no catálogo consultado. A aplicação é por medida; a construção, os índices e a montagem do SKU ainda precisam corresponder à referência. Não troque radial por diagonal.',
-            });
-          }
+          const application = carLookup ? null : vehicleApplicationAnswer(compatInput,
+            await loadVehicleApplicationCatalog(client, environment));
+          if (application) return await quoteVehicleApplication(application, async () => true, search);
           return JSON.stringify({ encontrado: false, motivo: 'compatibilidade_nao_cadastrada',
             precisa_confirmar_medida: true, estoque_consultado: false,
-            mensagem: 'Peça a medida escrita na lateral do pneu ou uma foto dela. Falta aplicação confirmada para esse veículo. A disponibilidade depende da busca pela medida.' });
+            mensagem: 'Peça a medida completa escrita na lateral. Se preferir enviar uma foto para leitura, ofereça o atendimento da equipe. Falta aplicação confirmada para esse veículo.' });
         }
         const context = approvedFitmentContext(compatInput, withApprovedFitments);
+        if (carLookup && (args.aro !== undefined || withApprovedFitments.every(v =>
+          !v.variant && v.produtos.every(p => !p.is_oem)))) {
+          return JSON.stringify({ encontrado: true, precisa_confirmar_medida: true, estoque_consultado: false,
+            mensagem: 'Qual é a medida completa escrita na lateral do pneu?' });
+        }
         if (Object.values(context).some(Boolean)) {
           return JSON.stringify({
             encontrado: true, tipo_resultado: 'compatibilidade_cadastrada_confirmar_contexto',
@@ -522,6 +517,7 @@ async function executeToolInternal(
             proximo_passo: 'Pergunte somente o que falta identificar. Se houver mais de um modelo, apresente as opções. Confirme a disponibilidade após identificar o veículo e consultar a loja que atende.',
           });
         }
+        if (carLookup) args = await prepareToolLocation(client, environment, conversationId, name, args);
         observeSearchProducts(withApprovedFitments.flatMap(v => v.produtos.map(p => ({
           id: p.product_id, measure: p.tire_size,
           matrixAvailable: env.WHOLESALE_UNIFIED_STOCK ? p.total_stock : null,
@@ -1227,6 +1223,8 @@ async function criarPedido(
   if (replay) return replay;
   const quotedItems = Array.isArray(args.itens) ? args.itens as PedidoItem[] : [];
   if (quotedItems.length === 0) return JSON.stringify({ erro: 'itens_obrigatorios' });
+  if (!await activeOrderProducts(client, environment, quotedItems)) return JSON.stringify({
+    erro: 'produto_indisponivel', mensagem: 'Um dos produtos saiu do catálogo. Consulte as opções atuais antes de fechar.' });
   const bundle = await checkedBotGroupOffer(client, environment, conversationId, requestId, args.conjunto_id, quotedItems);
   if (bundle.error) return JSON.stringify({
     erro: bundle.error,

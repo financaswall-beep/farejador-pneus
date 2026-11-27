@@ -47,6 +47,7 @@ describe('importação real do catálogo técnico',()=>{
         (SELECT count(*) FROM commerce.vehicle_fitments) fitments,
         (SELECT count(*) FROM commerce.wholesale_stock) stock`);
       const before=(await counts()).rows;
+      const productionApplications=await loadVehicleApplicationCatalog(client,'prod');
       await client.query('BEGIN');
       const result=await importVehicleApplications(client,'test');
       expect(result.inserted).toBe(buildApplicationImport().length);
@@ -54,7 +55,7 @@ describe('importação real do catálogo técnico',()=>{
       expect((await counts()).rows).toEqual(before);
       const apps=await loadVehicleApplicationCatalog(client,'test');
       expect(apps.length).toBe(result.verified);
-      expect(await loadVehicleApplicationCatalog(client,'prod')).toEqual([]);
+      expect(await loadVehicleApplicationCatalog(client,'prod')).toEqual(productionApplications);
       expect(matchCatalogApplications(apps,'NMAX',2018,'rear')[0]?.tire_size).toBe('130/70-13');
       expect(apps.some(a=>a.application_id.startsWith('claude-'))).toBe(false);
       expect((await client.query(`SELECT count(*)::int n FROM commerce.vehicle_measure_applications
